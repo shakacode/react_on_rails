@@ -5,13 +5,15 @@ require "stringio"
 module ReactOnRailsPro
   class CompressionMiddlewareGuard
     COMPATIBILITY_GUIDE_PATH =
-      "docs/building-features/streaming-server-rendering.md#compression-middleware-compatibility"
+      "https://www.shakacode.com/react-on-rails/docs/building-features/" \
+      "streaming-server-rendering/#compression-middleware-compatibility"
     PROBLEMATIC_MIDDLEWARES = %w[Rack::Deflater Rack::Brotli].freeze
 
     Finding = Struct.new(:middleware_name, :source_location, keyword_init: true)
 
-    def initialize(middlewares:)
+    def initialize(middlewares:, logger: nil)
       @middlewares = normalize_middlewares(middlewares)
+      @logger = logger
     end
 
     def findings
@@ -24,7 +26,7 @@ module ReactOnRailsPro
 
         Finding.new(
           middleware_name: middleware_name(middleware),
-          source_location: condition.source_location
+          source_location: source_location_for(condition)
         )
       end
     end
@@ -44,7 +46,6 @@ module ReactOnRailsPro
 
     def normalize_middlewares(middlewares)
       return middlewares.middlewares if middlewares.respond_to?(:middlewares)
-      return middlewares.to_a if middlewares.respond_to?(:to_a)
 
       Array(middlewares)
     end
@@ -70,15 +71,24 @@ module ReactOnRailsPro
       false
     rescue StreamingBodyProbe::BodyIteratedError
       true
-    rescue StandardError
+    rescue StandardError => e
+      log_probe_failure(condition, e)
       false
     end
 
+    # Minimal Rack env used to probe `:if` callbacks.
+    # Callbacks that depend on application-specific keys can still raise here;
+    # those probe failures are logged at debug level and treated as non-findings.
     def probe_env
       {
+        "CONTENT_TYPE" => "text/html; charset=utf-8",
+        "HTTP_ACCEPT" => "text/html",
         "REQUEST_METHOD" => "GET",
         "PATH_INFO" => "/__react_on_rails_pro_stream_probe__",
         "HTTP_ACCEPT_ENCODING" => "gzip,identity",
+        "HTTP_HOST" => "example.test",
+        "SERVER_NAME" => "example.test",
+        "rack.url_scheme" => "https",
         "rack.errors" => StringIO.new,
         "rack.input" => StringIO.new
       }
@@ -100,7 +110,24 @@ module ReactOnRailsPro
       " (#{display_path}:#{line})"
     end
 
+    def source_location_for(condition)
+      condition.respond_to?(:source_location) ? condition.source_location : nil
+    end
+
+    def log_probe_failure(condition, error)
+      return unless @logger.respond_to?(:debug)
+
+      identifier = source_location_for(condition)&.join(":") || condition.class.name || condition.inspect
+
+      @logger.debug do
+        "[React on Rails Pro] CompressionMiddlewareGuard could not probe `:if` callback " \
+          "(#{identifier}): #{error.class}: #{error.message}"
+      end
+    end
+
     class StreamingBodyProbe
+      include Enumerable
+
       class BodyIteratedError < StandardError; end
 
       def each
