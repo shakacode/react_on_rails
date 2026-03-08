@@ -355,23 +355,20 @@ module ReactOnRails
         before { hide_const("Rails") }
 
         it "falls back to BUNDLE_GEMFILE dirname when set to a valid file" do
-          allow(ENV).to receive(:fetch).and_call_original
-          allow(ENV).to receive(:fetch).with("BUNDLE_GEMFILE", nil).and_return(__FILE__)
+          stub_const("ENV", ENV.to_h.merge("BUNDLE_GEMFILE" => __FILE__))
 
           expected_dir = Pathname.new(__FILE__).expand_path.dirname
           expect(described_class.project_root).to eq(expected_dir)
         end
 
         it "falls back to Dir.pwd when BUNDLE_GEMFILE is not set" do
-          allow(ENV).to receive(:fetch).and_call_original
-          allow(ENV).to receive(:fetch).with("BUNDLE_GEMFILE", nil).and_return(nil)
+          stub_const("ENV", ENV.to_h.except("BUNDLE_GEMFILE"))
 
           expect(described_class.project_root).to eq(Pathname.new(Dir.pwd))
         end
 
         it "falls back to Dir.pwd when BUNDLE_GEMFILE points to a non-existent file" do
-          allow(ENV).to receive(:fetch).and_call_original
-          allow(ENV).to receive(:fetch).with("BUNDLE_GEMFILE", nil).and_return("/non/existent/Gemfile")
+          stub_const("ENV", ENV.to_h.merge("BUNDLE_GEMFILE" => "/non/existent/Gemfile"))
 
           expect(described_class.project_root).to eq(Pathname.new(Dir.pwd))
         end
