@@ -80,14 +80,19 @@ function TanStackHydrationApp({
   createBrowserHistory,
 }: TanStackHydrationAppProps): ReactElement {
   // eslint-disable-next-line no-underscore-dangle -- Internal hydration payload key injected by server-side render.
-  const dehydratedState = incomingProps.__tanstackRouterDehydratedState as DehydratedRouterState | undefined;
+  const dehydratedState = incomingProps.__tanstackRouterDehydratedState as
+    | DehydratedRouterState
+    | null
+    | undefined;
   const ssrRouter = dehydratedState?.ssrRouter;
-  const hasSsrPayload = dehydratedState !== undefined;
+  const hasSsrPayload = dehydratedState != null;
   const hasSsrRouter = ssrRouter !== undefined;
   const hasDehydratedRouter =
     dehydratedState?.dehydratedRouter !== undefined && dehydratedState.dehydratedRouter !== null;
 
   const routerRef = useRef<TanStackRouter | null>(null);
+  // This only deduplicates the manual load within one mounted hydration instance.
+  // A full remount creates a fresh router and may legitimately issue another load.
   const didTriggerPostHydrationLoadRef = useRef(false);
   const didInitializeSsrGlobalRef = useRef(false);
 
@@ -150,6 +155,8 @@ function TanStackHydrationApp({
     didTriggerPostHydrationLoadRef.current = true;
 
     let cancelled = false;
+    // `cancelled` only suppresses logging for a discarded mount. The in-flight load still
+    // completes unless the router exposes a best-effort cancelLoad() hook.
     router.load().catch((err: unknown) => {
       if (!cancelled) {
         console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);

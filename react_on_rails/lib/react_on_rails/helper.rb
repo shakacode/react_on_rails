@@ -617,9 +617,20 @@ module ReactOnRails
     def merge_client_props(existing_props, client_props)
       merged_props = existing_props.dup
       client_props.each do |key, value|
+        raise_if_duplicate_client_prop_key_types!(merged_props, key)
         merged_props[client_prop_target_key(merged_props, key)] = value
       end
       merged_props
+    end
+
+    def raise_if_duplicate_client_prop_key_types!(props, key)
+      string_key = key.to_s
+      symbol_key = string_key.to_sym
+      return unless props.key?(string_key) && props.key?(symbol_key)
+
+      raise ReactOnRails::Error,
+            "Cannot merge result[\"clientProps\"] when props contains both string and symbol versions of " \
+            "#{string_key.inspect}. Normalize props keys before calling react_component."
     end
 
     def client_prop_target_key(props, key)

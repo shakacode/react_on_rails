@@ -284,6 +284,49 @@ describe('tanstack-router integration (Pro)', () => {
     expect(router.hydrate).not.toHaveBeenCalled();
   });
 
+  it('treats a null SSR payload as absent during client hydration', () => {
+    const router = buildRouter();
+
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '',
+          hash: '',
+          href: '/products',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const result = renderFn(
+      {
+        __tanstackRouterDehydratedState: null,
+      },
+      {
+        serverSide: false,
+        pathname: '/products',
+        search: null,
+      } as unknown as RailsContext,
+    );
+
+    expect(() =>
+      renderToString(
+        React.createElement(result as React.ComponentType<Record<string, unknown>>, {
+          __tanstackRouterDehydratedState: null,
+        }),
+      ),
+    ).not.toThrow();
+    expect(router.hydrate).not.toHaveBeenCalled();
+    expect(router.ssr).not.toBe(true);
+  });
+
   it('builds SSR match payloads even when router.dehydrate is unavailable', async () => {
     const router = buildRouter();
     delete router.dehydrate;

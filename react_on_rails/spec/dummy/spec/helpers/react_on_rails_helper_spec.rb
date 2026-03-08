@@ -293,6 +293,16 @@ describe ReactOnRailsHelper do
         expect(result).to include('"name":"Name from clientProps"')
         expect(result.scan('"name":').length).to eq(1)
       end
+
+      it "raises a clear error when merge_client_props sees both string and symbol versions of a key" do
+        expect do
+          helper.send(
+            :merge_client_props,
+            { name: "symbol value", "name" => "string value" },
+            { "name" => "value from clientProps" }
+          )
+        end.to raise_error(ReactOnRails::Error, /both string and symbol versions of "name"/)
+      end
     end
 
     describe "API with component name only (no props or other options)" do
