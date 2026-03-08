@@ -11,6 +11,7 @@ import {
   createBrowserHistory,
   createMemoryHistory,
 } from '@tanstack/react-router';
+import { RouterClient } from '@tanstack/react-router/ssr/client';
 import {
   createTanStackRouterRenderFunction,
   serverRenderTanStackAppAsync,
@@ -57,6 +58,7 @@ const options = {
 
 const deps = {
   RouterProvider,
+  RouterClient,
   createMemoryHistory,
   createBrowserHistory,
 };

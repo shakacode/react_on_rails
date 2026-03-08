@@ -3,6 +3,8 @@ import type {
   DehydratedRouterState,
   TanStackHistory,
   TanStackRouter,
+  TanStackSsrMatch,
+  TanStackSsrRouterState,
   TanStackRouterOptions,
 } from './types.ts';
 import type { RailsContext } from 'react-on-rails/types';
@@ -42,6 +44,60 @@ function buildAppElement(
   return app;
 }
 
+function dehydrateSsrMatchId(id: string): string {
+  return id.split('/').join('\0');
+}
+
+function buildSsrMatch(match: unknown): TanStackSsrMatch | null {
+  if (!match || typeof match !== 'object') {
+    return null;
+  }
+
+  const candidate = match as Record<string, unknown>;
+  if (
+    typeof candidate.id !== 'string' ||
+    typeof candidate.updatedAt !== 'number' ||
+    typeof candidate.status !== 'string'
+  ) {
+    return null;
+  }
+
+  const dehydratedMatch: TanStackSsrMatch = {
+    i: dehydrateSsrMatchId(candidate.id),
+    u: candidate.updatedAt,
+    s: candidate.status,
+  };
+
+  // eslint-disable-next-line no-underscore-dangle -- TanStack Router internal field name.
+  if (candidate.__beforeLoadContext !== undefined) {
+    // eslint-disable-next-line no-underscore-dangle -- TanStack Router internal field name.
+    dehydratedMatch.b = candidate.__beforeLoadContext;
+  }
+  if (candidate.loaderData !== undefined) {
+    dehydratedMatch.l = candidate.loaderData;
+  }
+  if (candidate.error !== undefined) {
+    dehydratedMatch.e = candidate.error;
+  }
+  if (candidate.ssr !== undefined) {
+    dehydratedMatch.ssr = candidate.ssr;
+  }
+
+  return dehydratedMatch;
+}
+
+function buildSsrRouterState(router: TanStackRouter): TanStackSsrRouterState {
+  const matches = Array.isArray(router.state.matches)
+    ? router.state.matches.map(buildSsrMatch).filter((match): match is TanStackSsrMatch => match !== null)
+    : [];
+
+  return {
+    manifest: undefined,
+    lastMatchId: matches[matches.length - 1]?.i,
+    matches,
+  };
+}
+
 export interface TanStackServerRenderResult {
   appElement: ReactElement;
   dehydratedState: DehydratedRouterState;
@@ -75,6 +131,7 @@ export async function serverRenderTanStackAppAsync(
   const dehydratedState: DehydratedRouterState = {
     url,
     dehydratedRouter: typeof router.dehydrate === 'function' ? router.dehydrate() : null,
+    ssrRouter: buildSsrRouterState(router),
   };
 
   return {

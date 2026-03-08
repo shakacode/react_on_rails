@@ -15,7 +15,15 @@ function buildRouter(): TanStackRouter {
       search: { category: 'tools' },
     },
     resolvedLocation: null,
-    matches: [] as unknown[],
+    matches: [
+      {
+        id: '/products',
+        updatedAt: 123,
+        status: 'success',
+        loaderData: { products: ['hammer'] },
+        ssr: true,
+      },
+    ] as unknown[],
   };
 
   return {
@@ -58,13 +66,26 @@ describe('tanstack-router integration (Pro)', () => {
     // Server-side should return a Promise (async path)
     expect(result).toBeInstanceOf(Promise);
 
-    const resolved = await result as ServerRenderResult;
+    const resolved = (await result) as ServerRenderResult;
     expect(renderFn.renderFunction).toBe(true);
     expect(React.isValidElement(resolved.renderedHtml)).toBe(true);
     expect(resolved.clientProps).toEqual({
       __tanstackRouterDehydratedState: {
         url: '/products?category=tools',
         dehydratedRouter: { matches: [{ id: 'products' }] },
+        ssrRouter: {
+          manifest: undefined,
+          lastMatchId: '\u0000products',
+          matches: [
+            {
+              i: '\u0000products',
+              l: { products: ['hammer'] },
+              s: 'success',
+              ssr: true,
+              u: 123,
+            },
+          ],
+        },
       },
     });
     expect(deps.createMemoryHistory).toHaveBeenCalledWith({ initialEntries: ['/products?category=tools'] });
@@ -201,6 +222,108 @@ describe('tanstack-router integration (Pro)', () => {
     expect(observedProps[0]).toEqual({ userId: 42 });
   });
 
+  it('does not throw on client hydration when the SSR payload has no dehydrated router data', () => {
+    const router = buildRouter();
+    router.dehydrate = jest.fn().mockReturnValue(null);
+
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '',
+          hash: '',
+          href: '/products',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const result = renderFn(
+      {
+        __tanstackRouterDehydratedState: {
+          url: '/products',
+          dehydratedRouter: null,
+        },
+      },
+      {
+        serverSide: false,
+        pathname: '/products',
+        search: null,
+      } as unknown as RailsContext,
+    );
+
+    expect(() =>
+      renderToString(
+        React.createElement(result as React.ComponentType<Record<string, unknown>>, {
+          __tanstackRouterDehydratedState: {
+            url: '/products',
+            dehydratedRouter: null,
+            ssrRouter: {
+              manifest: undefined,
+              lastMatchId: '\u0000products',
+              matches: [
+                {
+                  i: '\u0000products',
+                  l: { products: ['hammer'] },
+                  s: 'success',
+                  ssr: true,
+                  u: 123,
+                },
+              ],
+            },
+          },
+        }),
+      ),
+    ).not.toThrow();
+    expect(router.hydrate).not.toHaveBeenCalled();
+  });
+
+  it('builds SSR match payloads even when router.dehydrate is unavailable', async () => {
+    const router = buildRouter();
+    delete router.dehydrate;
+
+    const result = await serverRenderTanStackAppAsync(
+      { createRouter: () => router },
+      { initial: 'prop' },
+      {
+        serverSide: true,
+        pathname: '/products',
+        search: '',
+      } as unknown as RailsContext & { serverSide: true },
+      (_props: { router: TanStackRouter }) => React.createElement('div'),
+      jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '',
+          hash: '',
+          href: '/products',
+          state: null,
+        },
+      }),
+    );
+
+    expect(result.dehydratedState.dehydratedRouter).toBeNull();
+    expect(result.dehydratedState.ssrRouter).toEqual({
+      manifest: undefined,
+      lastMatchId: '\u0000products',
+      matches: [
+        {
+          i: '\u0000products',
+          l: { products: ['hammer'] },
+          s: 'success',
+          ssr: true,
+          u: 123,
+        },
+      ],
+    });
+  });
+
   it('enables SSR mode for async server rendering before returning dehydrated state', async () => {
     const router = buildRouter();
 
@@ -229,6 +352,19 @@ describe('tanstack-router integration (Pro)', () => {
     expect(result.dehydratedState).toEqual({
       url: '/products?category=tools',
       dehydratedRouter: { matches: [{ id: 'products' }] },
+      ssrRouter: {
+        manifest: undefined,
+        lastMatchId: '\u0000products',
+        matches: [
+          {
+            i: '\u0000products',
+            l: { products: ['hammer'] },
+            s: 'success',
+            ssr: true,
+            u: 123,
+          },
+        ],
+      },
     });
   });
 });

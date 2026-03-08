@@ -46,6 +46,12 @@ interface TanStackRouterDeps {
    */
   RouterProvider: React.ComponentType<{ router: TanStackRouter }>;
   /**
+   * Optional RouterClient component from @tanstack/react-router/ssr/client.
+   * When provided, it enables TanStack Router's SSR client hydration path for
+   * router versions that do not expose router.dehydrate()/router.hydrate().
+   */
+  RouterClient?: React.ComponentType<{ router: TanStackRouter }>;
+  /**
    * The createMemoryHistory function from @tanstack/react-router.
    * Used for server-side rendering.
    */
@@ -74,7 +80,7 @@ export function createTanStackRouterRenderFunction(
   options: TanStackRouterOptions,
   deps: TanStackRouterDeps,
 ): RenderFunction {
-  const { RouterProvider, createMemoryHistory, createBrowserHistory } = deps;
+  const { RouterProvider, RouterClient, createMemoryHistory, createBrowserHistory } = deps;
 
   const renderFn = (
     props: Record<string, unknown> = {},
@@ -110,6 +116,7 @@ export function createTanStackRouterRenderFunction(
         clientProps,
         railsContext as RailsContext & { serverSide: false },
         RouterProvider,
+        RouterClient,
         createBrowserHistory,
       );
     };

@@ -84,7 +84,6 @@
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
   "devDependencies": {
-    "@tanstack/react-router": "^1.163.3",
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
     "react": "^19.0.3",

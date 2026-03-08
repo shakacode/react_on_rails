@@ -22,8 +22,8 @@ export interface TanStackRouter {
   };
   dehydrate?: () => unknown;
   hydrate?: (data: unknown) => void;
-  // SSR flag (TanStack Start internal)
-  ssr?: boolean;
+  // TanStack Router uses this internal field during SSR hydration.
+  ssr?: boolean | { manifest: unknown };
 }
 
 export interface TanStackHistory {
@@ -34,6 +34,33 @@ export interface TanStackHistory {
     href: string;
     state: unknown;
   };
+}
+
+/**
+ * Dehydrated SSR match payload. The single-char keys match TanStack Router's
+ * upstream `$_TSR` bootstrap wire format — they must NOT be renamed.
+ */
+export interface TanStackSsrMatch {
+  /** id — route match identifier */
+  i: string;
+  /** updatedAt — timestamp of last update */
+  u: number;
+  /** status — match resolution status */
+  s: string;
+  /** beforeLoadContext */
+  b?: unknown;
+  /** loaderData */
+  l?: unknown;
+  /** error */
+  e?: unknown;
+  ssr?: unknown;
+}
+
+export interface TanStackSsrRouterState {
+  manifest?: unknown;
+  dehydratedData?: unknown;
+  lastMatchId?: string;
+  matches: TanStackSsrMatch[];
 }
 
 export interface TanStackRouterOptions {
@@ -68,4 +95,6 @@ export interface DehydratedRouterState {
   url: string;
   /** Router dehydrated state from router.dehydrate() */
   dehydratedRouter: unknown;
+  /** TanStack Router SSR match payload used by RouterClient hydration */
+  ssrRouter?: TanStackSsrRouterState;
 }
