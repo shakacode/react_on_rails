@@ -252,6 +252,7 @@ describe('worker', () => {
   test('post /asset-exists when asset exists', async () => {
     const bundleHash = 'some-bundle-hash';
     await createAsset(testName, bundleHash);
+    fs.writeFileSync(bundleCompleteMarkerPath(testName, bundleHash), '');
 
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
@@ -272,6 +273,32 @@ describe('worker', () => {
     expect(res.json()).toEqual({
       exists: true,
       results: [{ bundleHash, exists: true }],
+    });
+  });
+
+  test('post /asset-exists treats assets in incomplete bundles as missing', async () => {
+    const bundleHash = 'some-bundle-hash';
+    await createAsset(testName, bundleHash);
+
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+      password: 'my_password',
+    });
+
+    const query = querystring.stringify({ filename: 'loadable-stats.json' });
+
+    const res = await app
+      .inject()
+      .post(`/asset-exists?${query}`)
+      .payload({
+        password: 'my_password',
+        targetBundles: [bundleHash],
+      })
+      .end();
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      exists: false,
+      results: [{ bundleHash, exists: false }],
     });
   });
 

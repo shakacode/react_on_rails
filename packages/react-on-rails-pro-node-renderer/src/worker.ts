@@ -472,10 +472,18 @@ export default function run(config: Partial<Config>) {
     const results = await Promise.all(
       targetBundles.map(async (bundleHash) => {
         const assetPath = getAssetPath(bundleHash, filename);
-        const exists = await fileExistsAsync(assetPath);
+        const [assetExists, bundleComplete] = await Promise.all([
+          fileExistsAsync(assetPath),
+          isBundleComplete(bundleHash),
+        ]);
+        const exists = assetExists && bundleComplete;
 
         if (exists) {
           log.info(`/asset-exists Uploaded asset DOES exist in bundle ${bundleHash}: ${assetPath}`);
+        } else if (assetExists) {
+          log.info(
+            `/asset-exists Uploaded asset exists in incomplete bundle ${bundleHash}, treating it as missing: ${assetPath}`,
+          );
         } else {
           log.info(`/asset-exists Uploaded asset DOES NOT exist in bundle ${bundleHash}: ${assetPath}`);
         }
