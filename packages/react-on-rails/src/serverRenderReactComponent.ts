@@ -19,9 +19,14 @@ import type {
   RenderStateHtml,
 } from './types/index.ts';
 
-function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): RenderState {
+type ProcessedRenderState = Omit<RenderState, 'result'> & {
+  result: FinalHtmlResult | null;
+};
+
+function processServerRenderHash(result: ServerRenderResult, options: RenderOptions): ProcessedRenderState {
   const { redirectLocation, routeError } = result;
   const hasErrors = !!routeError;
+  const { clientProps } = result;
 
   if (hasErrors) {
     console.error(`React Router ERROR: ${JSON.stringify(routeError)}`);
@@ -39,10 +44,12 @@ function processServerRenderHash(result: ServerRenderResult, options: RenderOpti
     // Possibly, someday, we could have the Rails server redirect.
     htmlResult = '';
   } else {
-    htmlResult = result.renderedHtml;
+    htmlResult = isValidElement(result.renderedHtml)
+      ? renderToString(result.renderedHtml)
+      : result.renderedHtml;
   }
 
-  return { result: htmlResult ?? null, hasErrors };
+  return { result: htmlResult ?? null, hasErrors, clientProps };
 }
 
 function processReactElement(result: ReactElement): string {
@@ -72,8 +79,8 @@ function processPromise(
     if (isValidElement(promiseResult)) {
       return processReactElement(promiseResult);
     }
-    // promiseResult is string | ServerRenderHashRenderedHtml (both are FinalHtmlResult)
-    return promiseResult as FinalHtmlResult;
+    // promiseResult can be a FinalHtmlResult or a ServerRenderResult hash.
+    return promiseResult as FinalHtmlResult | ServerRenderResult;
   });
 }
 
@@ -101,7 +108,7 @@ function handleRenderingError(e: unknown, options: { componentName: string; thro
 
 async function createPromiseResult(
   renderState: RenderState,
-  componentName: string,
+  options: RenderOptions,
   throwJsErrors: boolean,
 ): Promise<RenderResult> {
   // Capture console history before awaiting the promise
@@ -110,11 +117,14 @@ async function createPromiseResult(
   // In both cases, we need to keep a reference to console.history to avoid losing console logs in case of reset.
   const consoleHistory = console.history;
   try {
-    const html = await renderState.result;
+    const asyncResult = await renderState.result;
+    const finalRenderState: ProcessedRenderState = isServerRenderHash(asyncResult)
+      ? processServerRenderHash(asyncResult, options)
+      : ({ ...renderState, result: asyncResult } satisfies ProcessedRenderState);
     const consoleReplayScript = consoleReplay(consoleHistory);
-    return createResultObject(html, consoleReplayScript, renderState);
+    return createResultObject(finalRenderState.result, consoleReplayScript, finalRenderState);
   } catch (e: unknown) {
-    const errorRenderState = handleRenderingError(e, { componentName, throwJsErrors });
+    const errorRenderState = handleRenderingError(e, { componentName: options.componentName, throwJsErrors });
     const consoleReplayScript = consoleReplay(consoleHistory);
     return createResultObject(errorRenderState.result, consoleReplayScript, errorRenderState);
   }
@@ -122,12 +132,12 @@ async function createPromiseResult(
 
 function createFinalResult(
   renderState: RenderState,
-  componentName: string,
+  options: RenderOptions,
   throwJsErrors: boolean,
 ): null | string | Promise<RenderResult> {
   const { result } = renderState;
   if (isPromise(result)) {
-    return createPromiseResult({ ...renderState, result }, componentName, throwJsErrors);
+    return createPromiseResult({ ...renderState, result }, options, throwJsErrors);
   }
 
   const consoleReplayScript = consoleReplay();
@@ -187,7 +197,16 @@ function serverRenderReactComponentInternal(options: RenderParams): null | strin
   //    - hasErrors: boolean (Indicates if any errors occurred during rendering)
   //    - renderingError: Error | null (The error object if an error occurred, null otherwise)
   // 4. For Promise results, it awaits resolution before creating the final JSON
-  return createFinalResult(renderState, componentName, throwJsErrors);
+  return createFinalResult(
+    renderState,
+    {
+      componentName,
+      domNodeId,
+      trace,
+      renderingReturnsPromises,
+    },
+    throwJsErrors,
+  );
 }
 
 const serverRenderReactComponent: typeof serverRenderReactComponentInternal = (options) => {

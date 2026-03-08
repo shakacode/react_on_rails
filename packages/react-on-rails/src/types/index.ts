@@ -120,7 +120,8 @@ type ServerRenderHashRenderedHtml = {
 };
 
 interface ServerRenderResult {
-  renderedHtml?: string | ServerRenderHashRenderedHtml;
+  renderedHtml?: string | ServerRenderHashRenderedHtml | ReactElement;
+  clientProps?: Record<string, unknown>;
   redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
@@ -128,13 +129,17 @@ interface ServerRenderResult {
 
 type CreateReactOutputSyncResult = ServerRenderResult | ReactElement;
 
-type CreateReactOutputAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactElement>;
+type CreateReactOutputAsyncResult = Promise<
+  string | ServerRenderHashRenderedHtml | ReactElement | ServerRenderResult
+>;
 
 type CreateReactOutputResult = CreateReactOutputSyncResult | CreateReactOutputAsyncResult;
 
 type RenderFunctionSyncResult = ReactComponent | ServerRenderResult;
 
-type RenderFunctionAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactComponent>;
+type RenderFunctionAsyncResult = Promise<
+  string | ServerRenderHashRenderedHtml | ReactComponent | ServerRenderResult
+>;
 
 type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
 
@@ -248,6 +253,7 @@ export type FinalHtmlResult = string | ServerRenderHashRenderedHtml;
 
 export interface RenderResult {
   html: FinalHtmlResult | null;
+  clientProps?: Record<string, unknown>;
   consoleReplayScript: string;
   hasErrors: boolean;
   renderingError?: RenderingError;
@@ -472,10 +478,11 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   isRSCBundle: boolean;
 }
 
-export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;
+export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult | ServerRenderResult>;
 
 export type RenderState = {
   result: null | RenderStateHtml;
+  clientProps?: Record<string, unknown>;
   hasErrors: boolean;
   error?: RenderingError;
 };

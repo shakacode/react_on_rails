@@ -562,19 +562,85 @@ module ReactOnRails
 
       render_options = create_render_options(react_component_name, options)
 
-      # Setup the page_loaded_js, which is the same regardless of prerendering or not!
-      # The reason is that React is smart about not doing extra work if the server rendering did its job.
-      component_specification_tag = generate_component_script(render_options)
-
       load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
+
+      # clientProps are only expected on successful SSR hashes. Current error hashes do not
+      # include that key, so non-SSR/error paths skip this merge entirely.
+      merge_server_rendered_client_props!(render_options, result) if result.is_a?(Hash)
+
+      # Setup the page_loaded_js, which is the same regardless of prerendering or not!
+      # The reason is that React is smart about not doing extra work if the server rendering did its job.
+      component_specification_tag = generate_component_script(render_options)
 
       {
         render_options: render_options,
         tag: component_specification_tag,
         result: result
       }
+    end
+
+    def merge_server_rendered_client_props!(render_options, result)
+      client_props = result["clientProps"]
+      return if client_props.nil?
+
+      unless client_props.is_a?(Hash)
+        raise ReactOnRails::Error, "Expected result[\"clientProps\"] to be a Hash, got #{client_props.class.name}."
+      end
+
+      return if client_props.empty?
+
+      raw_existing_props = render_options.props
+      existing_props = if raw_existing_props.nil?
+                         {}
+                       elsif raw_existing_props.is_a?(String)
+                         begin
+                           JSON.parse(raw_existing_props)
+                         rescue JSON::ParserError
+                           raise ReactOnRails::Error,
+                                 "Cannot merge result[\"clientProps\"] into props: failed to parse props JSON " \
+                                 "string. Ensure props is a Ruby Hash or a JSON string representing an object."
+                         end
+                       else
+                         raw_existing_props
+                       end
+
+      unless existing_props.is_a?(Hash)
+        class_name = existing_props.class.name
+        raise ReactOnRails::Error,
+              "Cannot merge result[\"clientProps\"] into non-Hash props. " \
+              "Pass props as a Hash, not #{class_name}."
+      end
+
+      render_options.set_option(:props, merge_client_props(existing_props, client_props))
+    end
+
+    def merge_client_props(existing_props, client_props)
+      merged_props = existing_props.dup
+      client_props.each do |key, value|
+        raise_if_duplicate_client_prop_key_types!(merged_props, key)
+        merged_props[client_prop_target_key(merged_props, key)] = value
+      end
+      merged_props
+    end
+
+    def raise_if_duplicate_client_prop_key_types!(props, key)
+      string_key = key.to_s
+      symbol_key = string_key.to_sym
+      return unless props.key?(string_key) && props.key?(symbol_key)
+
+      raise ReactOnRails::Error,
+            "Cannot merge result[\"clientProps\"] when props contains both string and symbol versions of " \
+            "#{string_key.inspect}. Normalize props keys before calling react_component."
+    end
+
+    def client_prop_target_key(props, key)
+      string_key = key.to_s
+      symbol_key = string_key.to_sym
+      # Preserve an existing symbol key when clientProps arrives from JSON with string keys,
+      # otherwise we would create duplicate entries that serialize to the same JSON key.
+      props.key?(symbol_key) && !props.key?(string_key) ? symbol_key : string_key
     end
 
     def render_redux_store_data(redux_store_data)

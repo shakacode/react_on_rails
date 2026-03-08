@@ -159,7 +159,7 @@ Sometimes you need more than just a simple React component. **Render-Functions**
 
 1. Access Rails context (current URL, locale, etc.)
 2. Initialize Redux stores with props
-3. Set up React Router
+3. Set up React Router or TanStack Router (TanStack SSR requires React on Rails Pro)
 4. Return different components based on props
 
 ### Basic Example
@@ -186,7 +186,7 @@ export default MyApp;
 
 ### Server-Side Rendering with Render-Functions
 
-For advanced server rendering (like React Router), you can return an object:
+For advanced server rendering (like routing + hydration state), you can return an object:
 
 ```js
 ({
@@ -199,6 +199,22 @@ For advanced server rendering (like React Router), you can return an object:
 ```
 
 Use with `react_component_hash` helper for multiple HTML strings (useful with React Helmet for meta tags).
+
+If you also need to send extra data back to the browser for hydration, add `clientProps`:
+
+```js
+({
+  renderedHtml: '<div>SSR HTML</div>',
+  clientProps: {
+    // Optional: merged into client hydration props on the Rails side
+    routerDehydratedState: { url: railsContext.location },
+  },
+  redirectLocation: { pathname: '/login', search: '' }, // Optional
+  routeError: null, // Optional
+});
+```
+
+Think of it like this: `renderedHtml` is what the user sees now, and `clientProps` is a lunchbox of data React uses after the page loads.
 
 For complete Render-Function details and examples, see the [Render-Functions Guide](../core-concepts/render-functions.md).
 
@@ -222,6 +238,7 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 - **[Redux Integration](../building-features/react-and-redux.md)** - Add state management
 - **[React Router](../building-features/react-router.md)** - Client-side routing
+- **[TanStack Router](../building-features/tanstack-router.md)** - Pro-only first-class router integration with SSR dehydration/hydration
 - **[Server-Side Rendering](../core-concepts/react-server-rendering.md)** - Deep dive into SSR
 - **[Internationalization](../building-features/i18n.md)** - Add i18n support
 - **[Testing](../building-features/testing-configuration.md)** - Test your React components

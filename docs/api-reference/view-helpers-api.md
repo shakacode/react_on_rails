@@ -24,7 +24,7 @@ Uncommonly used options:
   id: nil,
 ```
 
-- **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape `{ redirectLocation, error, renderedHtml }`), or a "renderer function" that manually renders a React component to the dom (client side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
+- **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape `{ renderedHtml, clientProps?, redirectLocation?, routeError? }`), or a "renderer function" that manually renders a React component to the DOM (client-side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
   All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](../configuration/README.md).
 - **general options:**
   - **props:** Ruby Hash which contains the properties to pass to the React object, or a JSON string. If you pass a string, we'll escape it for you.
@@ -38,6 +38,7 @@ Uncommonly used options:
   - **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   - **logging_on_server:** Default is true. True will log JS console messages and errors to the server.
   - **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
+  - **`clientProps` merge behavior:** If a prerender result includes `clientProps`, React on Rails merges them into the generated client hydration props payload (`props.merge(clientProps)`). The original `props:` value must be a Ruby Hash or a JSON string representing an object.
 
 ---
 
@@ -100,11 +101,15 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 
 ### React Router
 
-[React Router](https://reactrouter.com/) is supported, including server-side rendering! See:
+[React Router](https://reactrouter.com/) is supported via manual integration, including server-side rendering. See:
 
 1. [React on Rails docs for React Router](../building-features/react-router.md)
 2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/RouterApp.server.jsx](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
 3. [React on Rails Pro loadable-components guide](https://www.shakacode.com/react-on-rails-pro/docs/code-splitting-loadable-components) for modern code splitting with server-side rendering.
+
+### TanStack Router
+
+TanStack Router has a first-class SSR helper through `react-on-rails-pro/tanstack-router` (requires React on Rails Pro). See [TanStack Router guide](../building-features/tanstack-router.md).
 
 ---
 
