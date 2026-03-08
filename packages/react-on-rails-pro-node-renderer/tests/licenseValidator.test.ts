@@ -261,7 +261,7 @@ describe('LicenseValidator', () => {
       expect(module.getLicenseStatus()).toBe('valid');
     });
 
-    it('returns valid for empty string plan (treated as absent for backwards compat)', () => {
+    it('returns invalid for empty string plan (aligned with Ruby: "" is not a valid plan)', () => {
       const payload = {
         sub: 'test@example.com',
         iat: Math.floor(Date.now() / 1000),
@@ -274,7 +274,7 @@ describe('LicenseValidator', () => {
       process.env.REACT_ON_RAILS_PRO_LICENSE = token;
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
-      expect(module.getLicenseStatus()).toBe('valid');
+      expect(module.getLicenseStatus()).toBe('invalid');
     });
 
     it('returns valid for null plan (treated as absent)', () => {
