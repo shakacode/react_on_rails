@@ -216,7 +216,7 @@ To migrate to React on Rails Pro:
   end
   ```
 
-  See the [React on Rails Pro Configuration docs](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md) for more details.
+  See the [React on Rails Pro Configuration docs](https://github.com/shakacode/react_on_rails/blob/master/docs/pro/configuration.md) for more details.
 
 - **Streaming View Helpers Moved to Pro Gem**: The following view helpers have been removed from the open-source gem and are now only available in React on Rails Pro:
   - `stream_react_component` - Progressive SSR using React 18+ streaming
@@ -350,7 +350,7 @@ _Includes all features from the React on Rails Pro 4.0.0 release series (previou
 - **Pino logging**: Replaced Winston, aligning with Fastify. [PR 479](https://github.com/shakacode/react_on_rails_pro/pull/479) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - **HTTP/2 Cleartext communication** with Node Renderer. [PR 392](https://github.com/shakacode/react_on_rails_pro/pull/392) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - **HTTPX for Node renderer**: Converted from `Net::HTTP` to HTTPX. [PR 452](https://github.com/shakacode/react_on_rails_pro/pull/452) by [alexeyr-ci](https://github.com/alexeyr-ci). Upgraded to ~> 1.5. [PR 520](https://github.com/shakacode/react_on_rails_pro/pull/520) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-- **Error reporting/tracing overhaul**: See [the docs](react_on_rails_pro/docs/node-renderer/error-reporting-and-tracing.md). [PR 471](https://github.com/shakacode/react_on_rails_pro/pull/471) by [alexeyr-ci](https://github.com/alexeyr-ci).
+- **Error reporting/tracing overhaul**: See [the docs](docs/pro/node-renderer/error-reporting-and-tracing.md). [PR 471](https://github.com/shakacode/react_on_rails_pro/pull/471) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - Added `fastifyServerOptions` config and set `bodyLimit` to 100 MB by default. [PR 511](https://github.com/shakacode/react_on_rails_pro/pull/511) by [Romex91](https://github.com/Romex91).
 - Renamed `includeTimerPolyfills` to `stubTimers`. Fail immediately on obsolete config options. [PR 506](https://github.com/shakacode/react_on_rails_pro/pull/506) by [alexeyr-ci](https://github.com/alexeyr-ci).
 - Shakapacker 8.0.0 support (drops 6.x). [PR 415](https://github.com/shakacode/react_on_rails_pro/pull/415) by [rameziophobia](https://github.com/rameziophobia).

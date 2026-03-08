@@ -5,7 +5,6 @@
 # Only checks git-tracked, user-facing docs to match CI workflow:
 #   - docs/**/*.md
 #   - *.md (root level only)
-#   - react_on_rails_pro/docs/**/*.md
 #   - react_on_rails_pro/*.md
 #
 # Usage:
@@ -22,6 +21,5 @@ fi
 {
   git ls-files 'docs/*.md' 'docs/**/*.md'
   git ls-files '*.md' | grep -v '/' || true
-  git ls-files 'react_on_rails_pro/docs/*.md' 'react_on_rails_pro/docs/**/*.md'
   git ls-files 'react_on_rails_pro/*.md'
 } | sort -u | lychee --config .lychee.toml --files-from -
