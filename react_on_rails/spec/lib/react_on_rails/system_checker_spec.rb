@@ -304,7 +304,25 @@ RSpec.describe ReactOnRails::SystemChecker do
       it "adds a warning message" do
         checker.check_react_on_rails_npm_package
         expect(checker.warnings?).to be true
-        expect(checker.messages.last[:content]).to include("react-on-rails NPM package not found")
+        expect(checker.messages.last[:content]).to include("Neither react-on-rails nor react-on-rails-pro")
+      end
+    end
+
+    context "when package.json exists with react-on-rails-pro" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails-pro" => "^16.0.0" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds a success message for pro package" do
+        checker.check_react_on_rails_npm_package
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("react-on-rails-pro NPM package")
+        end).to be true
       end
     end
 
@@ -341,6 +359,24 @@ RSpec.describe ReactOnRails::SystemChecker do
     context "when package.json exists with matching beta versions" do
       let(:package_json_content) do
         { "dependencies" => { "react-on-rails" => "16.2.0-beta.10" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds a success message" do
+        checker.send(:check_package_version_sync)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("versions match")
+        end).to be true
+      end
+    end
+
+    context "when package.json exists with matching versions for react-on-rails-pro" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails-pro" => "16.2.0-beta.10" } }.to_json
       end
 
       before do
@@ -476,6 +512,65 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect do
           checker.send(:check_package_version_sync)
         end.not_to raise_error
+      end
+    end
+  end
+
+  describe "#check_react_dependencies" do
+    let(:base_package_json) do
+      {
+        "dependencies" => {
+          "react" => "^19.0.0",
+          "react-dom" => "^19.0.0"
+        }
+      }
+    end
+
+    before do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("package.json").and_return(true)
+      allow(File).to receive(:read).with("package.json").and_return(base_package_json.to_json)
+    end
+
+    context "when shakapacker javascript_transpiler is swc" do
+      let(:shakapacker_content) do
+        <<~YAML
+          default:
+            javascript_transpiler: swc
+        YAML
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(shakapacker_content)
+      end
+
+      it "does not warn about missing @babel/preset-react" do
+        checker.check_react_dependencies
+        expect(checker.messages.none? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+
+    context "when shakapacker javascript_transpiler is babel" do
+      let(:shakapacker_content) do
+        <<~YAML
+          default:
+            javascript_transpiler: babel
+        YAML
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(shakapacker_content)
+      end
+
+      it "warns when @babel/preset-react is missing" do
+        checker.check_react_dependencies
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
       end
     end
   end

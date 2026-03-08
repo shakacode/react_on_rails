@@ -12,7 +12,6 @@
 // https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/
 
 import React from 'react';
-import LikeButton from './LikeButton';
 
 // Simulate an async data fetch (replace with a real API call or DB query)
 async function fetchGreeting(name) {
@@ -39,7 +38,7 @@ async function fetchGreeting(name) {
     facts: [
       'This component rendered entirely on the server — zero JS was sent to the browser for it.',
       'The date formatting above used server-side Intl APIs — no date library shipped to the client.',
-      'The "Like" button below IS a client component — only its JS is sent to the browser.',
+      'This starter keeps the example server-only so the default scaffold runs cleanly.',
     ],
   };
 }
@@ -70,9 +69,6 @@ const HelloServer = async ({ name = 'World' }) => {
           ))}
         </ul>
       </div>
-
-      {/* LikeButton is a client component — it ships JS for interactivity */}
-      <LikeButton />
     </div>
   );
 };

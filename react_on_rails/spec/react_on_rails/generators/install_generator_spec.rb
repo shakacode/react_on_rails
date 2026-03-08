@@ -960,6 +960,13 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "keeps default HelloServer component server-only" do
+      assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx" do |content|
+        expect(content).not_to include("import LikeButton")
+        expect(content).not_to include("<LikeButton />")
+      end
+    end
+
     it "adds HelloServer route" do
       assert_file "config/routes.rb" do |content|
         expect(content).to include("hello_server")
@@ -1049,6 +1056,13 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.tsx"
       assert_file "app/javascript/src/HelloServer/components/LikeButton.tsx"
+    end
+
+    it "keeps TypeScript HelloServer component server-only by default" do
+      assert_file "app/javascript/src/HelloServer/components/HelloServer.tsx" do |content|
+        expect(content).not_to include("import LikeButton")
+        expect(content).not_to include("<LikeButton />")
+      end
     end
 
     it "creates tsconfig.json file" do
