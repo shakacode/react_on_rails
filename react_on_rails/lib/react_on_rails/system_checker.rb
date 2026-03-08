@@ -359,22 +359,23 @@ module ReactOnRails
       end
     end
 
-    def check_webpack_config_content(webpack_config_path)
-      content = File.read(webpack_config_path)
+    def check_webpack_config_content(config_path)
+      content = File.read(config_path)
+      bundler_name = config_path.include?("rspack") ? "rspack" : "webpack"
 
       if react_on_rails_config?(content)
-        add_success("✅ Webpack config includes React on Rails environment configuration")
+        add_success("✅ #{bundler_name.capitalize} config includes React on Rails environment configuration")
         add_info("    ℹ️  Environment-specific configs detected for optimal React on Rails integration")
       elsif standard_shakapacker_config?(content)
         add_warning(<<~MSG.strip)
-          ⚠️  Standard Shakapacker webpack config detected.
+          ⚠️  Standard Shakapacker #{bundler_name} config detected.
 
           React on Rails works better with environment-specific configuration.
           Consider running: rails generate react_on_rails:install --force
           This adds client and server environment configs for better performance.
         MSG
       else
-        add_info("ℹ️  Custom webpack config detected")
+        add_info("ℹ️  Custom #{bundler_name} config detected")
         add_info("    💡 Ensure config supports both client and server rendering")
         add_info("    💡 Verify React JSX transformation is configured")
         add_info("    💡 Check that asset output paths match Rails expectations")
