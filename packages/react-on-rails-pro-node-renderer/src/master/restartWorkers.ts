@@ -19,8 +19,12 @@ type ReplacementWorkerWaitResult =
     }
   | {
       status: 'timed_out';
-      reason: 'fork' | 'listening' | 'exit';
-      replacementWorkerId?: number;
+      reason: 'fork';
+    }
+  | {
+      status: 'timed_out';
+      reason: 'listening' | 'exit';
+      replacementWorkerId: number;
     };
 
 declare module 'cluster' {
