@@ -281,7 +281,7 @@ describe('createApp', () => {
     expect(mockedLogError).toHaveBeenCalledWith('Failed to add react_on_rails_pro gem required by --rsc.');
     expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
     expect(mockedLogInfo).toHaveBeenCalledWith(
-      'Directory removed. Configure access to React on Rails Pro gem source and rerun. For custom source/git setups, rerun without --rsc and add react_on_rails_pro manually in Gemfile.',
+      'Directory removed. Ensure react_on_rails_pro is installable in your Bundler/RubyGems setup, then rerun with --rsc.',
     );
   });
 
@@ -298,7 +298,7 @@ describe('createApp', () => {
 
     expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
     expect(mockedLogError).toHaveBeenCalledWith(
-      'Configure gem source access for react_on_rails_pro, then delete the created "my-app" directory and rerun with --rsc.',
+      'Ensure react_on_rails_pro is installable, then delete the created "my-app" directory and rerun with --rsc.',
     );
   });
 
