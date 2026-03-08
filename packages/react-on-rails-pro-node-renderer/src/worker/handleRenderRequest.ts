@@ -22,6 +22,9 @@ import {
   isReadableStream,
   isErrorRenderResult,
   getRequestBundleFilePath,
+  isBundleComplete,
+  cleanIncompleteBundleDirectory,
+  markBundleComplete,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
 import type { TracingContext } from '../shared/tracing.js';
@@ -103,6 +106,23 @@ async function handleNewBundleProvided(
     }
 
     try {
+      const [bundleFileExists, bundleComplete] = await Promise.all([
+        fileExistsAsync(bundleFilePathPerTimestamp),
+        isBundleComplete(providedNewBundle.timestamp),
+      ]);
+      if (bundleFileExists && bundleComplete) {
+        log.info(
+          'Bundle %s already exists and is complete. Skipping duplicate upload.',
+          bundleFilePathPerTimestamp,
+        );
+        return undefined;
+      }
+
+      const wasIncomplete = await cleanIncompleteBundleDirectory(providedNewBundle.timestamp);
+      if (wasIncomplete) {
+        log.warn('Removed incomplete bundle directory before writing bundle %s', bundleFilePathPerTimestamp);
+      }
+
       log.info(
         `Moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
@@ -110,26 +130,51 @@ async function handleNewBundleProvided(
       if (assetsToCopy) {
         await copyUploadedAssets(assetsToCopy, bundleDirectory);
       }
+      await markBundleComplete(providedNewBundle.timestamp);
 
       log.info(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
     } catch (error) {
-      const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
-      if (!fileExists) {
-        const msg = formatExceptionMessage(
-          renderingRequest,
-          error,
-          `Unexpected error when moving the bundle from ${providedNewBundle.bundle.savedFilePath} \
-to ${bundleFilePathPerTimestamp})`,
+      // On Windows and some cross-device move fallbacks, fs-extra can surface
+      // EEXIST if a competing write already created the destination path.
+      const isExistingBundleWriteConflict =
+        (error as NodeJS.ErrnoException).code === 'EEXIST' &&
+        (await fileExistsAsync(bundleFilePathPerTimestamp));
+      if (isExistingBundleWriteConflict) {
+        log.warn(
+          'Bundle already existed when writing %s while lock was held. Preserving existing bundle, but content was not re-verified in this process.',
+          bundleFilePathPerTimestamp,
         );
-        log.error(msg);
-        return errorResponseResult(msg);
+        try {
+          if (assetsToCopy) {
+            await copyUploadedAssets(assetsToCopy, bundleDirectory);
+          }
+          // Complete-marker writes are idempotent. This keeps the loser path safe
+          // even if the competing writer exits after moving bundle bytes.
+          if (!(await isBundleComplete(providedNewBundle.timestamp))) {
+            await markBundleComplete(providedNewBundle.timestamp);
+          }
+        } catch (recoveryError) {
+          const msg = formatExceptionMessage(
+            renderingRequest,
+            recoveryError,
+            `Error during EEXIST recovery for bundle ${bundleFilePathPerTimestamp}`,
+          );
+          log.error(msg);
+          return errorResponseResult(msg);
+        }
+        return undefined;
       }
-      log.info(
-        'File exists when trying to overwrite bundle %s. Assuming bundle written by other thread',
-        bundleFilePathPerTimestamp,
+
+      const msg = formatExceptionMessage(
+        renderingRequest,
+        error,
+        `Unexpected error when preparing the bundle from ${providedNewBundle.bundle.savedFilePath} \
+to ${bundleFilePathPerTimestamp}`,
       );
+      log.error(msg);
+      return errorResponseResult(msg);
     }
 
     return undefined;
@@ -166,9 +211,23 @@ async function handleNewBundlesProvided(
   // handleNewBundleProvided catches its own errors, so Promise.all would also
   // wait for every promise.
   const settled = await Promise.allSettled(handlingPromises);
-  const firstFailure = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-  if (firstFailure) {
-    throw firstFailure.reason;
+  const failures = settled.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+  if (failures.length > 0) {
+    failures.forEach((failure, index) => {
+      log.error(
+        'Bundle upload failed for bundle %d/%d. Error: %s',
+        index + 1,
+        handlingPromises.length,
+        failure.reason instanceof Error ? failure.reason.message : String(failure.reason),
+      );
+    });
+
+    const failureMessages = failures
+      .map((failure) => (failure.reason instanceof Error ? failure.reason.message : String(failure.reason)))
+      .join('; ');
+    throw new Error(
+      `Bundle upload failed for ${failures.length}/${handlingPromises.length} bundles: ${failureMessages}`,
+    );
   }
 
   // handleNewBundleProvided returns undefined on success or a ResponseResult on
@@ -234,8 +293,11 @@ export async function handleRenderRequest({
       await Promise.all(
         [...(dependencyBundleTimestamps ?? []), bundleTimestamp].map(async (timestamp) => {
           const bundleFilePath = getRequestBundleFilePath(timestamp);
-          const fileExists = await fileExistsAsync(bundleFilePath);
-          return fileExists ? null : timestamp;
+          const [fileExists, bundleComplete] = await Promise.all([
+            fileExistsAsync(bundleFilePath),
+            isBundleComplete(timestamp),
+          ]);
+          return fileExists && bundleComplete ? null : timestamp;
         }),
       )
     ).filter((timestamp) => timestamp !== null);
