@@ -1,5 +1,7 @@
 # Using TanStack Router
 
+[TanStack Router](https://tanstack.com/router) is a fully type-safe React router with built-in data loading, search param validation, and first-class TypeScript support. It's a strong choice when you want end-to-end type safety from your route definitions through to your components and search params.
+
 React on Rails Pro supports TanStack Router SSR via `react-on-rails-pro/tanstack-router`.
 This helper creates a render-function that handles both server-side rendering and client hydration/navigation.
 
