@@ -106,7 +106,7 @@ describe(testName, () => {
     });
   });
 
-  test('If bundle file exists without .complete marker, treat bundle as missing', async () => {
+  test('If bundle file exists without bundle-completed marker, treat bundle as missing', async () => {
     expect.assertions(1);
     await fsPromises.copyFile(getFixtureBundle(), vmBundlePath(testName));
 
@@ -122,7 +122,7 @@ describe(testName, () => {
     });
   });
 
-  test('If bundle file and .complete marker exist without VM context, load bundle from disk', async () => {
+  test('If bundle file and bundle-completed marker exist without VM context, load bundle from disk', async () => {
     expect.assertions(3);
     await fsPromises.copyFile(getFixtureBundle(), vmBundlePath(testName));
     await fsPromises.writeFile(bundleCompleteMarkerPath(testName, String(BUNDLE_TIMESTAMP)), '');

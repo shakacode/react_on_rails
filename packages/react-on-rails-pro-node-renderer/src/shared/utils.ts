@@ -111,7 +111,17 @@ export function copyUploadedAsset(
 }
 
 export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirectory: string): Promise<void> {
-  const copyMultipleAssets = uploadedAssets.map((asset) => {
+  const filteredAssets = uploadedAssets.filter((asset) => {
+    if (asset.filename === BUNDLE_COMPLETE_MARKER_FILE) {
+      log.warn(
+        'Skipping uploaded asset with reserved bundle-completion marker filename: %s',
+        asset.filename,
+      );
+      return false;
+    }
+    return true;
+  });
+  const copyMultipleAssets = filteredAssets.map((asset) => {
     const destinationAssetFilePath = path.join(targetDirectory, asset.filename);
     return copyUploadedAsset(asset, destinationAssetFilePath, {
       // Bundle directories become immutable once complete. Keep existing files
@@ -124,7 +134,7 @@ export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirector
   });
   await Promise.all(copyMultipleAssets);
   log.info(
-    `Copied assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`,
+    `Copied assets ${JSON.stringify(filteredAssets.map((fileDescriptor) => fileDescriptor.filename))}`,
   );
 }
 
@@ -200,7 +210,7 @@ export function getBundleDirectory(bundleTimestamp: string | number) {
   return bundleDirectory;
 }
 
-export const BUNDLE_COMPLETE_MARKER_FILE = '.complete';
+export const BUNDLE_COMPLETE_MARKER_FILE = '.react-on-rails-node-renderer-bundle-completed';
 
 export function getBundleCompleteMarkerPath(bundleTimestamp: string | number) {
   const bundleDirectory = getBundleDirectory(bundleTimestamp);

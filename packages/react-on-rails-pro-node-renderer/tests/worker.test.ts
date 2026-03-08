@@ -24,6 +24,7 @@ import {
   assetPath,
   assetPathOther,
   bundleCompleteMarkerPath,
+  BUNDLE_COMPLETE_MARKER_FILE,
 } from './helper';
 
 const testName = 'worker';
@@ -399,7 +400,7 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, bundleHashOther))).toBe(true);
   });
 
-  test('post /upload-assets writes .complete marker when bundle file exists', async () => {
+  test('post /upload-assets writes bundle-completed marker when bundle file exists', async () => {
     const bundleHash = 'some-bundle-hash';
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rorp-upload-assets-marker-'));
     const tempBundlePath = path.join(tempDir, `${bundleHash}.js`);
@@ -486,6 +487,41 @@ describe('worker', () => {
 
     expect(res.statusCode).toBe(400);
     expect(res.payload).toContain('outside cache root');
+  });
+
+  test('post /upload-assets skips uploaded file with reserved bundle-completed marker filename', async () => {
+    const bundleHash = 'some-bundle-hash';
+    const bundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
+    fs.mkdirSync(bundleDir, { recursive: true });
+
+    // Create a temp file pretending to be the marker filename
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rorp-upload-marker-skip-'));
+    const markerAssetPath = path.join(tempDir, BUNDLE_COMPLETE_MARKER_FILE);
+    fs.writeFileSync(markerAssetPath, 'should-not-be-copied');
+
+    try {
+      const app = worker({
+        serverBundleCachePath: serverBundleCachePathForTest(),
+        password: 'my_password',
+      });
+
+      const form = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        password: 'my_password',
+        targetBundles: [bundleHash],
+        asset1: createReadStream(markerAssetPath),
+      });
+
+      const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+
+      expect(res.statusCode).toBe(200);
+      // The marker file should NOT have been copied into the bundle directory
+      expect(fs.existsSync(path.join(bundleDir, BUNDLE_COMPLETE_MARKER_FILE))).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   describe('gem version validation', () => {

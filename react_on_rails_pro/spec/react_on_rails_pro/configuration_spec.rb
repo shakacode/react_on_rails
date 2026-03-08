@@ -30,6 +30,24 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
         expect(ReactOnRailsPro.configuration.assets_to_copy).to be_nil
       end
+
+      it "raises if an asset has the reserved bundle-completion marker filename" do
+        marker = ReactOnRailsPro::Configuration::BUNDLE_COMPLETE_MARKER_FILE
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.assets_to_copy = ["/some/path/#{marker}"]
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /reserved bundle-completion marker filename/)
+      end
+
+      it "raises if the marker filename appears as a basename in a nested path" do
+        marker = ReactOnRailsPro::Configuration::BUNDLE_COMPLETE_MARKER_FILE
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.assets_to_copy = ["loadable-stats.json", "/assets/#{marker}"]
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /reserved bundle-completion marker filename/)
+      end
     end
 
     describe ".remote_bundle_cache_adapter" do

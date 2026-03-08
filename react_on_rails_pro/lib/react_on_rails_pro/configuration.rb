@@ -186,8 +186,22 @@ module ReactOnRailsPro
 
     private
 
+    BUNDLE_COMPLETE_MARKER_FILE = ".react-on-rails-node-renderer-bundle-completed"
+
     def setup_assets_to_copy
       self.assets_to_copy = (Array(assets_to_copy) if assets_to_copy.present?)
+      validate_assets_to_copy_no_reserved_filenames
+    end
+
+    def validate_assets_to_copy_no_reserved_filenames
+      return if assets_to_copy.blank?
+
+      reserved = assets_to_copy.select { |asset| File.basename(asset.to_s) == BUNDLE_COMPLETE_MARKER_FILE }
+      return if reserved.empty?
+
+      raise ReactOnRailsPro::Error,
+            "assets_to_copy must not include the reserved bundle-completion marker filename " \
+            "\"#{BUNDLE_COMPLETE_MARKER_FILE}\". Found: #{reserved.join(', ')}"
     end
 
     def configure_default_url_if_not_provided
