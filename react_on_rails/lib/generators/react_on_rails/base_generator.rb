@@ -139,6 +139,10 @@ module ReactOnRails
 
         # Always ensure precompile_hook is configured (Shakapacker 9.0+ only)
         configure_precompile_hook_in_shakapacker
+
+        # For SSR bundles, configure Shakapacker private_output_path (9.0+ only)
+        # This keeps Shakapacker and React on Rails server bundle paths in sync.
+        configure_private_output_path_in_shakapacker
       end
 
       def add_base_gems_to_gemfile
@@ -371,6 +375,46 @@ module ReactOnRails
                   "\\1precompile_hook: 'bin/shakapacker-precompile-hook'"
 
         puts Rainbow("✅ Configured precompile_hook in shakapacker.yml").green
+      end
+
+      def configure_private_output_path_in_shakapacker
+        # private_output_path is only supported in Shakapacker 9.0+
+        return unless ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+
+        shakapacker_config_path = "config/shakapacker.yml"
+        return unless File.exist?(shakapacker_config_path)
+
+        content = File.read(shakapacker_config_path)
+
+        # A non-empty active value means the app already made an explicit choice.
+        return if content.match?(/^\s+private_output_path:\s*\S+/)
+
+        # Normalize an empty active key before falling back to insertion.
+        gsub_file(
+          shakapacker_config_path,
+          /^(\s*)private_output_path:\s*$/,
+          "\\1private_output_path: ssr-generated"
+        )
+
+        # First try: uncomment an existing private_output_path placeholder line.
+        gsub_file(
+          shakapacker_config_path,
+          /^(\s*)#\s*private_output_path:\s*.*$/,
+          "\\1private_output_path: ssr-generated"
+        )
+
+        # Fallback: insert directly after public_output_path in the same section.
+        unless File.read(shakapacker_config_path).match?(/^\s+private_output_path:\s*ssr-generated/)
+          gsub_file(
+            shakapacker_config_path,
+            /^(\s*)(public_output_path:\s*.*\n)/,
+            "\\1\\2\\1private_output_path: ssr-generated\n"
+          )
+        end
+
+        return unless File.read(shakapacker_config_path).match?(/^\s+private_output_path:\s*ssr-generated/)
+
+        puts Rainbow("✅ Configured private_output_path in shakapacker.yml").green
       end
     end
   end

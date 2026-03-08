@@ -183,6 +183,7 @@ describe InstallGenerator, type: :generator do
           source_entry_path: packs
           public_root_path: public
           public_output_path: packs
+          # private_output_path: ssr-generated
           cache_path: tmp/shakapacker
           webpack_compile_output: true
           shakapacker_precompile: true
@@ -226,6 +227,17 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "configures private_output_path for SSR bundles on Shakapacker 9+" do
+      assert_file "config/shakapacker.yml" do |content|
+        if ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+          expect(content).to include("private_output_path: ssr-generated")
+          expect(content).not_to match(/^\s*#\s*private_output_path:/)
+        else
+          expect(content).to match(/^\s*#\s*private_output_path:/)
+        end
+      end
+    end
+
     it "preserves other shakapacker.yml settings and comments" do
       assert_file "config/shakapacker.yml" do |content|
         # Comments should be preserved
@@ -236,6 +248,54 @@ describe InstallGenerator, type: :generator do
         # Other settings should be preserved
         expect(content).to include("source_path: app/javascript")
         expect(content).to include("assets_bundler: \"webpack\"")
+      end
+    end
+  end
+
+  context "when shakapacker.yml already has private_output_path key without a value" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          public_output_path: packs
+          private_output_path:
+          assets_bundler: "webpack"
+          # precompile_hook: ~
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "does not insert duplicate private_output_path entries" do
+      skip "private_output_path requires Shakapacker >= 9.0.0" unless
+        ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+
+      assert_file "config/shakapacker.yml" do |content|
+        expect(content.scan(/^\s*private_output_path:/).size).to eq(1)
       end
     end
   end
@@ -440,6 +500,14 @@ describe InstallGenerator, type: :generator do
         # Should use swc loader (rspack works best with SWC)
         expect(content).to include("javascript_transpiler: swc")
         expect(content).not_to match(/javascript_transpiler:\s*["']?babel["']?/)
+      end
+    end
+
+    it "adds private_output_path on Shakapacker 9+ when missing" do
+      assert_file "config/shakapacker.yml" do |content|
+        if ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+          expect(content).to include("private_output_path: ssr-generated")
+        end
       end
     end
 

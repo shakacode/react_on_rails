@@ -548,6 +548,7 @@ module ReactOnRails
 
           if status.success?
             puts "✅ Assets precompiled successfully"
+            ensure_default_port(procfile)
             ProcessManager.ensure_procfile(procfile)
             ProcessManager.run_with_process_manager(procfile)
           else
@@ -650,6 +651,7 @@ module ReactOnRails
           )
 
           PackGenerator.generate(verbose: verbose)
+          ensure_default_port(procfile)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
@@ -666,6 +668,7 @@ module ReactOnRails
           print_procfile_info(procfile, route: route)
 
           PackGenerator.generate(verbose: verbose)
+          ensure_default_port(procfile)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
@@ -700,8 +703,8 @@ module ReactOnRails
 
         def configure_ports
           selected = PortSelector.select_ports
-          ENV["PORT"] = selected[:rails].to_s
-          ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
+          ENV["PORT"] ||= selected[:rails].to_s
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"] ||= selected[:webpack].to_s
         rescue PortSelector::NoPortAvailable => e
           warn e.message
           exit 1
@@ -713,6 +716,12 @@ module ReactOnRails
           else
             ENV.fetch("PORT", 3000).to_i
           end
+        end
+
+        def ensure_default_port(procfile)
+          return if ENV["PORT"].to_s.strip != ""
+
+          ENV["PORT"] = procfile_port(procfile).to_s
         end
 
         def box_border(width)

@@ -32,10 +32,30 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   describe ".start" do
     before { mock_system_calls }
 
+    around do |example|
+      original_port = ENV.fetch("PORT", nil)
+      ENV.delete("PORT")
+      example.run
+    ensure
+      if original_port.nil?
+        ENV.delete("PORT")
+      else
+        ENV["PORT"] = original_port
+      end
+    end
+
     it "starts development mode by default" do
       expect(ReactOnRails::Dev::PackGenerator).to receive(:generate)
       expect(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile).with("Procfile.dev")
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev")
+
+      described_class.start(:development)
+    end
+
+    it "sets default PORT=3000 for development mode" do
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev") do
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
 
       described_class.start(:development)
     end
@@ -87,6 +107,28 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       ENV.delete("PORT")
     end
 
+    it "sets default PORT=3001 for production-like mode" do
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: true)
+      expect(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+      expect(ReactOnRails::Dev::ProcessManager)
+        .to receive(:run_with_process_manager).with("Procfile.dev-prod-assets") do
+          expect(ENV.fetch("PORT", nil)).to eq("3001")
+        end
+
+      described_class.start(:production_like)
+    end
+
+    it "does not override an existing PORT value" do
+      ENV["PORT"] = "4242"
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev") do
+        expect(ENV.fetch("PORT", nil)).to eq("4242")
+      end
+
+      described_class.start(:development)
+    end
+
     it "starts production-like mode with custom rails_env" do
       env = { "NODE_ENV" => "production", "RAILS_ENV" => "staging" }
       argv = ["bundle", "exec", "rails", "assets:precompile"]
@@ -124,6 +166,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV.delete("PORT")
         ENV.delete("SHAKAPACKER_DEV_SERVER_PORT")
         example.run
+      ensure
         ENV["PORT"] = old_port
         ENV["SHAKAPACKER_DEV_SERVER_PORT"] = old_webpack_port
       end
@@ -385,6 +428,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       old_port = ENV.fetch("PORT", nil)
       ENV.delete("PORT")
       example.run
+    ensure
       ENV["PORT"] = old_port
     end
 

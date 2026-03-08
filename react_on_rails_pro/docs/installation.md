@@ -8,7 +8,8 @@ Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CH
 
 ## Version Format
 
-For the below docs, find the desired `<version>` in the CHANGELOG. Note that for pre-release versions:
+For the commands below, choose versions from the CHANGELOG and replace placeholders like
+`<gem_version>` and `<npm_version>`. Note that for pre-release versions:
 
 - Gems use all periods: `16.2.0.beta.1`
 - NPM packages use dashes: `16.2.0-beta.1`
@@ -22,11 +23,15 @@ The easiest way to set up React on Rails Pro is using the generator. This automa
 For new React on Rails apps, use the `--pro` flag:
 
 ```bash
-# Add the Pro gem to your Gemfile first
-bundle add react_on_rails_pro
+# Add the Pro gem first (pin exact version)
+bundle add react_on_rails_pro --version="<gem_version>" --strict
+
+# The generator requires a clean git working tree
+git add .
+git commit -m "Prepare app for React on Rails Pro install"
 
 # Run the generator with --pro
-rails generate react_on_rails:install --pro
+bundle exec rails generate react_on_rails:install --pro
 ```
 
 This creates the Pro initializer, node-renderer.js, installs npm packages, and adds the Node Renderer to Procfile.dev.
@@ -37,17 +42,31 @@ For existing React on Rails apps, use the standalone Pro generator:
 
 ```bash
 # Add the Pro gem to your Gemfile
-bundle add react_on_rails_pro
+bundle add react_on_rails_pro --version="<gem_version>" --strict
 
 # Run the Pro generator
-rails generate react_on_rails:pro
+bundle exec rails generate react_on_rails:pro
 ```
 
 The standalone generator adds Pro-specific files and modifies your existing webpack configs (`serverWebpackConfig.js` and `ServerClientOrBoth.js`) to enable Pro features like `libraryTarget: 'commonjs2'` and `target = 'node'`.
 
 ## After Running the Generator
 
-You still need to configure your license. Set the environment variable:
+Run a quick validation, then configure your license.
+
+```bash
+bundle exec rails react_on_rails:doctor
+bin/shakapacker
+bin/dev
+```
+
+If port 3000 is already in use:
+
+```bash
+PORT=3001 bin/dev
+```
+
+Set the license environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
@@ -61,10 +80,10 @@ RSC requires React on Rails Pro and React 19.0.x. To add RSC support, use `--rsc
 
 ```bash
 # Fresh install with RSC
-rails generate react_on_rails:install --rsc
+bundle exec rails generate react_on_rails:install --rsc
 
 # Or add RSC to existing Pro app
-rails generate react_on_rails:rsc
+bundle exec rails generate react_on_rails:rsc
 ```
 
 The RSC generator creates `rscWebpackConfig.js`, adds `RSCWebpackPlugin` to both server and client webpack configs, configures `RSC_BUNDLE_ONLY` handling in `ServerClientOrBoth.js`, and sets up the RSC bundle watcher process. See [React Server Components](./react-server-components/tutorial.md) for more information.
@@ -86,7 +105,7 @@ Ensure your **Rails** app is using the **react_on_rails** gem, version 16.0.0 or
 Add the `react_on_rails_pro` gem to your **Gemfile**:
 
 ```ruby
-gem "react_on_rails_pro", "~> 16.2"
+gem "react_on_rails_pro", "= <gem_version>"
 ```
 
 Then run:
@@ -138,19 +157,19 @@ All React on Rails Pro users need to install the `react-on-rails-pro` npm packag
 ### Using npm:
 
 ```bash
-npm install react-on-rails-pro
+npm install react-on-rails-pro@<npm_version> --save-exact
 ```
 
 ### Using yarn:
 
 ```bash
-yarn add react-on-rails-pro
+yarn add react-on-rails-pro@<npm_version> --exact
 ```
 
 ### Using pnpm:
 
 ```bash
-pnpm add react-on-rails-pro
+pnpm add react-on-rails-pro@<npm_version> --save-exact
 ```
 
 ## Usage
@@ -187,13 +206,13 @@ See the [React Server Components tutorial](./react-server-components/tutorial.md
 ### Using npm:
 
 ```bash
-npm install react-on-rails-pro-node-renderer
+npm install react-on-rails-pro-node-renderer@<npm_version> --save-exact
 ```
 
 ### Using yarn:
 
 ```bash
-yarn add react-on-rails-pro-node-renderer
+yarn add react-on-rails-pro-node-renderer@<npm_version> --exact
 ```
 
 ### Add to package.json:
@@ -201,7 +220,7 @@ yarn add react-on-rails-pro-node-renderer
 ```json
 {
   "dependencies": {
-    "react-on-rails-pro-node-renderer": "^16.2.0"
+    "react-on-rails-pro-node-renderer": "<npm_version>"
   }
 }
 ```
