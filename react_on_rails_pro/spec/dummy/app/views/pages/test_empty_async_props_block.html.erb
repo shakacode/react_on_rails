@@ -1,0 +1,8 @@
+<h1>Empty Async Props Block Test</h1>
+<p>Testing stream_react_component_with_async_props with an empty block (issue #2269)</p>
+
+<%= stream_react_component_with_async_props("AsyncPropsComponent", props: { name: "John Doe", age: 30, description: "Software Engineer" }) do |_emit|
+  # Empty block - no async props emitted
+  # This reproduces the scenario from issue #2269 where passing an empty block
+  # caused the stream to hang or return nil before the fix in PR #2297
+end %>

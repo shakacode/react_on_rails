@@ -28,6 +28,7 @@ Rails.application.routes.draw do
   get "cached_stream_async_components_for_testing" => "pages#cached_stream_async_components_for_testing",
       as: :cached_stream_async_components_for_testing
   get "test_incremental_rendering" => "pages#test_incremental_rendering", as: :test_incremental_rendering
+  get "test_empty_async_props_block" => "pages#test_empty_async_props_block", as: :test_empty_async_props_block
   get "stream_async_components_for_testing_client_render" => "pages#stream_async_components_for_testing_client_render",
       as: :stream_async_components_for_testing_client_render
   get "rsc_posts_page_over_http" => "pages#rsc_posts_page_over_http", as: :rsc_posts_page_over_http

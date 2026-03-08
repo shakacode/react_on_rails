@@ -111,6 +111,41 @@ describe "Incremental Rendering Integration", :integration do
     end
   end
 
+  describe "render_code_with_incremental_updates with empty block" do
+    it "completes without hanging when async_props_block emits nothing (issue #2269)" do
+      # Upload bundles first
+      ReactOnRailsPro::Request.upload_assets
+
+      # Construct the incremental render path
+      js_code = "ReactOnRails.getStreamValues()"
+      request_digest = Digest::MD5.hexdigest(js_code)
+      render_path = "/bundles/#{server_bundle_hash}/incremental-render/#{request_digest}"
+
+      # Wrap in timeout to catch deadlocks - the original bug caused infinite hang
+      Timeout.timeout(10) do
+        # Perform incremental rendering with an EMPTY block (no props emitted)
+        # Before the fix in PR #2297, this would deadlock because the Node handler
+        # used fire-and-forget (void) for onResponseStart/onRequestEnded
+        stream = ReactOnRailsPro::Request.render_code_with_incremental_updates(
+          render_path,
+          js_code,
+          async_props_block: proc { |_emitter| }
+        )
+
+        # Collect all chunks from the stream - should complete without hanging
+        chunks = []
+        stream.each_chunk do |chunk|
+          chunks << chunk
+        end
+
+        # The stream should have returned at least some response (even if error message)
+        # The key assertion is that we reached this point without deadlocking
+        response_text = chunks.join
+        expect(response_text).not_to be_empty
+      end
+    end
+  end
+
   describe "render_code_with_incremental_updates" do
     it "sends stream values and receives them in the response" do
       # Upload bundles first
