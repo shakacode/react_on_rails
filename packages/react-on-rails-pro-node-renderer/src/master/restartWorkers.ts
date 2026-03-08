@@ -10,6 +10,10 @@ import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 const DEFAULT_REPLACEMENT_WORKER_LISTEN_TIMEOUT_MS = 30000;
+// Heuristic window for accepting pre-exit fork candidates.
+// Smaller values can miss legitimate replacements under scheduler delay and
+// force a fallback wait for a post-exit fork event; larger values increase the
+// chance of correlating unrelated crash-restart forks.
 const PRE_EXIT_REPLACEMENT_FORK_WINDOW_MS = 250;
 
 type ReplacementWorkerWaitResult =
