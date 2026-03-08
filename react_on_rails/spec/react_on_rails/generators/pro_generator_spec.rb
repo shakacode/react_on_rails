@@ -144,4 +144,81 @@ describe ProGenerator, type: :generator do
       end
     end
   end
+
+  # Rspack variant — verifies that standalone Pro generator writes to config/rspack/
+  # when it detects an existing rspack project via config/shakapacker.yml.
+  # ProGenerator has no --rspack option; detection is via rspack_configured_in_project?.
+  # Uses before (not before(:all)) to allow mocking the Pro gem check.
+
+  # Unit tests for using_rspack? on ProGenerator specifically.
+  # ProGenerator does not declare --rspack, so options[:rspack] is always nil and
+  # rspack_configured_in_project? (YAML detection) is the only real code path.
+  # Integration tests above exercise this end-to-end; these unit tests make the
+  # detection logic explicit on the class that actually uses it.
+
+  describe "#using_rspack?" do
+    context "when shakapacker.yml has assets_bundler: rspack" do
+      let(:generator) { described_class.new }
+
+      before do
+        prepare_destination
+        simulate_rspack_shakapacker_yml
+        allow(generator).to receive(:destination_root).and_return(destination_root)
+        allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+      end
+
+      it "returns true via YAML fallback (no --rspack option available on ProGenerator)" do
+        expect(generator.send(:using_rspack?)).to be true
+      end
+    end
+
+    context "when no shakapacker.yml exists" do
+      let(:generator) { described_class.new }
+
+      before do
+        prepare_destination
+        allow(generator).to receive(:destination_root).and_return(destination_root)
+        allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+      end
+
+      it "returns false" do
+        expect(generator.send(:using_rspack?)).to be false
+      end
+    end
+  end
+
+  context "when prerequisites are met on an existing rspack project" do
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      # simulate_rspack_base_webpack_files also creates the rspack shakapacker.yml
+      # so rspack_configured_in_project? returns true (no --rspack flag available)
+      simulate_rspack_base_webpack_files
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    describe "Pro webpack config transforms in config/rspack/" do
+      it "applies Pro transforms to serverWebpackConfig in config/rspack/" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("libraryTarget: 'commonjs2',")
+          expect(content).to include("function extractLoader")
+          expect(content).to include("serverWebpackConfig.target = 'node';")
+          expect(content).to include("module.exports = {")
+        end
+      end
+
+      it "updates ServerClientOrBoth.js to destructured import in config/rspack/" do
+        assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("{ default: serverWebpackConfig }")
+        end
+      end
+    end
+  end
 end
