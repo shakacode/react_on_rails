@@ -136,6 +136,19 @@ Prettier handles all formatting. Never manually format — run `rake autofix` in
 
 **PR creation**: Use `gh pr create` with a clear title, summary, and test plan.
 
+## Review Workflow
+
+For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
+
+- Use at most one AI reviewer that leaves inline comments. Additional AI tools should be summary-only or used manually.
+- Wait for the first full review pass to finish before pushing follow-up commits.
+- Batch review fixes into one follow-up push when practical. Do not create a new commit for each minor comment.
+- Treat as blocking only: correctness bugs, failing tests, regressions, and clear inconsistencies with adjacent code. Nits and style suggestions are optional unless a maintainer asks for them.
+- Verify language, runtime, and library claims locally before changing code in response to AI review comments.
+- Deduplicate repeated bot comments before acting on them. Fix the underlying issue once, then resolve the duplicates.
+- Rebase or merge `master` once, near the end of the review cycle. For `CHANGELOG.md` conflicts, prefer resolving them as the final step before merge.
+- When asking an agent to address review comments, instruct it to classify comments into `blocking`, `optional`, and `noise`, then apply only the `blocking` items plus any explicitly selected optional items.
+
 ## Boundaries
 
 ### Always
