@@ -376,9 +376,11 @@ RSpec.describe "Streaming API" do
   end
 
   describe "Component streaming concurrency" do
-    def run_stream(controller, template: "ignored")
+    def run_stream(controller, template: "ignored", **options)
       Sync do |parent|
-        parent.async { controller.stream_view_containing_react_components(template: template) }
+        parent.async do
+          controller.stream_view_containing_react_components(template: template, **options)
+        end
         yield(parent)
       end
     end
@@ -390,6 +392,7 @@ RSpec.describe "Streaming API" do
       mocked_response = instance_double(ActionController::Live::Response)
       mocked_stream = instance_double(ActionController::Live::Buffer)
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+      allow(mocked_response).to receive(:content_type=)
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
       allow(mocked_stream).to receive(:closed?).and_return(false)
@@ -489,6 +492,30 @@ RSpec.describe "Streaming API" do
       expect(write_timestamps.length).to be >= 2
       gaps = write_timestamps.each_cons(2).map { |a, b| b - a }
       expect(gaps.all? { |gap| gap >= 0.04 }).to be true
+    end
+
+    it "warns when non-HTML formats are streamed without an explicit content type" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+      mock_logger = instance_double(Logger, warn: nil)
+      allow(Rails).to receive(:logger).and_return(mock_logger)
+
+      expect(mock_logger).to receive(:warn).with(/non-HTML formats \[:text\].*without `content_type:`/)
+
+      run_stream(controller, formats: [:text]) do |_parent|
+        sleep 0.1
+      end
+    end
+
+    it "does not warn when non-HTML formats provide an explicit content type" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+      mock_logger = instance_double(Logger, warn: nil)
+      allow(Rails).to receive(:logger).and_return(mock_logger)
+
+      expect(mock_logger).not_to receive(:warn)
+
+      run_stream(controller, formats: [:text], content_type: "application/x-ndjson") do |_parent|
+        sleep 0.1
+      end
     end
 
     describe "client disconnect handling" do

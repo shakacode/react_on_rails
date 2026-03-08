@@ -12,6 +12,10 @@ module ReactOnRailsPro
     #
     # @param template [String] The path to the template file to be streamed.
     # @param close_stream_at_end [Boolean] Whether to automatically close the stream after rendering (default: true).
+    # @param content_type [String, nil] Optional response content type. Set after rendering but before the first
+    #   stream write, overriding any content type inferred from the template format. When using
+    #   a non-HTML `formats:` value (for example `[:text]`), pass `content_type` too unless
+    #   committing the format-derived MIME type is intentional.
     # @param render_options [Hash] Additional options to pass to `render_to_string`.
     #
     # components must be added to the view using the `stream_react_component` helper.
@@ -30,10 +34,13 @@ module ReactOnRailsPro
     #       For more details, refer to `lib/react_on_rails/helper.rb` in the react_on_rails repository.
     #
     # @see ReactOnRails::Helper#stream_react_component
-    def stream_view_containing_react_components(template:, close_stream_at_end: true, **render_options)
+    def stream_view_containing_react_components(
+      template:, close_stream_at_end: true, content_type: nil, **render_options
+    )
       require "async"
       require "async/barrier"
       require "async/limited_queue"
+      warn_on_non_html_formats_without_content_type(render_options[:formats], content_type)
 
       Sync do |parent_task|
         # Initialize async primitives for concurrent component streaming
@@ -48,6 +55,11 @@ module ReactOnRailsPro
         # View may contain extra newlines, chunk already contains a newline
         # Having multiple newlines between chunks causes hydration errors
         # So we strip extra newlines from the template string and add a single newline
+        # `formats: [:text]` causes render_to_string to set response.content_type
+        # to `text/plain`; override it here before the first stream write, which
+        # is when ActionController::Live commits headers. render_to_string itself
+        # never writes to response.stream, so this assignment is always safe.
+        response.content_type = content_type if content_type
         response.stream.write(template_string)
 
         drain_streams_concurrently(parent_task)
@@ -119,6 +131,20 @@ module ReactOnRailsPro
       Rails.logger.debug do
         "[React on Rails Pro] Client disconnected during streaming (#{context}): #{exception.class}"
       end
+    end
+
+    def warn_on_non_html_formats_without_content_type(formats, content_type)
+      return if content_type.present?
+
+      requested_formats = Array(formats).compact.map(&:to_sym)
+      return if requested_formats.empty? || requested_formats.all?(:html)
+
+      Rails.logger.warn(
+        "[React on Rails Pro] stream_view_containing_react_components received non-HTML formats " \
+        "#{requested_formats.inspect} without `content_type:`. Rails will commit the format-derived " \
+        "MIME type (for example `text/plain` for `:text`). Pass `content_type:` explicitly when " \
+        "streaming non-HTML responses."
+      )
     end
   end
 end
