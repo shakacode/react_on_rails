@@ -94,8 +94,6 @@ module ReactOnRailsPro
     # - Barrier is stopped to cancel all producer tasks, preventing wasted work
     # - No exception propagates to the controller for client disconnects
     def drain_streams_concurrently(parent_task)
-      client_disconnected = false
-
       writing_task = parent_task.async do
         # Drain all remaining chunks from the queue to the response stream
         while (chunk = @main_output_queue.dequeue)
@@ -103,7 +101,6 @@ module ReactOnRailsPro
         end
       rescue IOError, Errno::EPIPE => e
         # Client disconnected - stop writing gracefully
-        client_disconnected = true
         log_client_disconnect("writer", e)
       ensure
         # Cancel all producers when writer exits for ANY reason (normal completion,
@@ -136,8 +133,6 @@ module ReactOnRailsPro
       rescue StandardError
         raise unless primary_exception
       end
-
-      @async_barrier.stop if client_disconnected
     end
 
     def log_client_disconnect(context, exception)

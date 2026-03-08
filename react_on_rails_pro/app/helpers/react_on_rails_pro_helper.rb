@@ -314,7 +314,11 @@ module ReactOnRailsProHelper
 
     # Enqueue remaining chunks asynchronously
     @async_barrier.async do
-      rest_chunks.each { |chunk| @main_output_queue.enqueue(chunk) }
+      rest_chunks.each do |chunk|
+        break if response.stream.closed?
+
+        @main_output_queue.enqueue(chunk)
+      end
     rescue Async::Queue::ClosedError
       # Queue closed due to error/disconnect in another component — stop enqueuing
     end
@@ -459,9 +463,9 @@ module ReactOnRailsProHelper
       end
     end
 
-    # Wait for and return the first chunk (blocking)
-    first_chunk_var.wait
-    result = first_chunk_var.value
+    # Wait for and return the first chunk (blocking).
+    # Async::Variable#wait blocks until resolved, then returns the stored value.
+    result = first_chunk_var.wait
 
     # If the async task stored an exception (pre-first-chunk error), raise it now.
     # This happens BEFORE response.stream.write(template_string) in
