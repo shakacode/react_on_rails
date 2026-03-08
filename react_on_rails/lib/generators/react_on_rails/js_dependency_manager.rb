@@ -17,11 +17,15 @@ module ReactOnRails
     # - add_npm_dependencies(packages, dev: false): Add packages via package_json gem
     # - package_json: Access to PackageJson instance (always available via shakapacker)
     # - destination_root: Generator destination directory
+    # - using_rspack?: Returns true if rspack is the configured bundler
+    #   (called unconditionally; provided by GeneratorHelper)
+    # - using_swc?: Returns true if SWC is the configured transpiler
+    #   (called unconditionally; provided by GeneratorHelper)
     #
     # == Optional Methods
     # Including classes may define:
-    # - options.rspack?: Returns true if --rspack flag is set (for Rspack support)
-    # - options.typescript?: Returns true if --typescript flag is set (for TypeScript support)
+    # - use_pro?: Returns true if React on Rails Pro should be used
+    # - use_rsc?: Returns true if React Server Components should be used
     #
     # == Installation Behavior
     # The module ALWAYS runs package manager install after adding dependencies.
@@ -144,10 +148,6 @@ module ReactOnRails
         add_pro_dependencies if using_pro
         add_rsc_dependencies if using_rsc
         add_dev_dependencies
-      end
-
-      def using_rspack?
-        respond_to?(:options) && options&.rspack?
       end
 
       def add_react_on_rails_package
@@ -390,12 +390,8 @@ module ReactOnRails
       def add_dev_dependencies
         puts "Installing development dependencies..."
 
-        # Use Rspack-specific dev dependencies if --rspack flag is set
-        dev_deps = if respond_to?(:options) && options&.rspack?
-                     RSPACK_DEV_DEPENDENCIES
-                   else
-                     DEV_DEPENDENCIES
-                   end
+        # Use Rspack-specific dev dependencies if rspack is configured
+        dev_deps = using_rspack? ? RSPACK_DEV_DEPENDENCIES : DEV_DEPENDENCIES
 
         return if add_packages(dev_deps, dev: true)
 

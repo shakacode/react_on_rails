@@ -347,7 +347,14 @@ module ReactOnRails
         # Check for essential shakapacker configuration files and binaries
         shakapacker_binaries_exist? &&
           File.exist?("config/shakapacker.yml") &&
-          File.exist?("config/webpack/webpack.config.js")
+          shakapacker_config_file_exists?
+      end
+
+      def shakapacker_config_file_exists?
+        File.exist?("config/webpack/webpack.config.js") ||
+          File.exist?("config/webpack/webpack.config.ts") ||
+          File.exist?("config/rspack/rspack.config.js") ||
+          File.exist?("config/rspack/rspack.config.ts")
       end
 
       def print_shakapacker_setup_banner
@@ -381,7 +388,13 @@ module ReactOnRails
         end
 
         # Then run the shakapacker installer
-        success = Bundler.with_unbundled_env { system("bundle exec rails shakapacker:install") }
+        # Use options.rspack? directly (not using_rspack?): shakapacker.yml doesn't exist yet at this
+        # point, so using_rspack? would fall back to rspack_configured_in_project? which returns false,
+        # causing Shakapacker to install webpack configs into config/webpack/ instead of rspack.
+        shakapacker_install_env = options.rspack? ? { "SHAKAPACKER_ASSETS_BUNDLER" => "rspack" } : {}
+        success = Bundler.with_unbundled_env do
+          system(shakapacker_install_env, "bundle exec rails shakapacker:install")
+        end
         if success
           true
         else

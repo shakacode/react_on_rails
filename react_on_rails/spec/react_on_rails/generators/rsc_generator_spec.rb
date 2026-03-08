@@ -129,6 +129,108 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  # Rspack variant — verifies that standalone RSC generator writes to config/rspack/
+  # when it detects an existing rspack project via config/shakapacker.yml.
+  # RscGenerator has no --rspack option; detection is via rspack_configured_in_project?.
+
+  context "when Pro is installed on an existing rspack project" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      # simulate_rspack_pro_webpack_files also creates the rspack shakapacker.yml
+      # so rspack_configured_in_project? returns true (no --rspack flag available)
+      simulate_rspack_pro_webpack_files
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "creates RSC webpack config in config/rspack/ (not config/webpack/)" do
+      assert_file "config/rspack/rscWebpackConfig.js" do |content|
+        expect(content).to include("rscConfig")
+      end
+      assert_no_file "config/webpack/rscWebpackConfig.js"
+    end
+
+    describe "RSC webpack config transforms in config/rspack/" do
+      it "adds RSCWebpackPlugin to serverWebpackConfig" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("RSCWebpackPlugin")
+          expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+        end
+      end
+
+      it "adds rscBundle parameter to configureServer" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to match(/configureServer\s*=\s*\(rscBundle\s*=\s*false\)/)
+        end
+      end
+
+      it "adds RSCWebpackPlugin to clientWebpackConfig" do
+        assert_file "config/rspack/clientWebpackConfig.js" do |content|
+          expect(content).to include("RSCWebpackPlugin")
+          expect(content).to include("new RSCWebpackPlugin({ isServer: false })")
+        end
+      end
+
+      it "adds RSC handling to ServerClientOrBoth" do
+        assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("rscWebpackConfig")
+          expect(content).to include("RSC_BUNDLE_ONLY")
+          expect(content).to include("rscConfig")
+        end
+      end
+    end
+  end
+
+  # Rspack + legacy Pro variant — same as the legacy webpack exports context below,
+  # but with Pro configs in config/rspack/ and rspack shakapacker.yml.
+  # Verifies that the backward-compatible rscWebpackConfig.js is created in the
+  # correct rspack path when the project uses legacy-style Pro exports.
+
+  context "when Pro is installed with legacy webpack exports on an existing rspack project" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_rspack_legacy_pro_webpack_files
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "creates backward-compatible rscWebpackConfig.js in config/rspack/" do
+      assert_file "config/rspack/rscWebpackConfig.js" do |content|
+        expect(content).to include("const serverWebpackModule = require('./serverWebpackConfig')")
+        expect(content).to include("serverWebpackModule.default || serverWebpackModule")
+        expect(content).to include("serverWebpackModule.extractLoader ||")
+      end
+      assert_no_file "config/webpack/rscWebpackConfig.js"
+    end
+
+    it "adds RSC import to ServerClientOrBoth in config/rspack/ for legacy server import syntax" do
+      assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+        expect(content).to include("const serverWebpackConfig = require('./serverWebpackConfig');")
+        expect(content).to include("const rscWebpackConfig = require('./rscWebpackConfig');")
+      end
+    end
+  end
+
   context "when Pro is installed with legacy webpack exports" do
     before(:all) do
       prepare_destination
@@ -165,6 +267,41 @@ describe RscGenerator, type: :generator do
 
   # TypeScript variant — only tests file extension behavior (.tsx vs .jsx).
   # Webpack transforms are TypeScript-agnostic and covered by the main context above.
+
+  # Unit tests for using_rspack? on RscGenerator specifically.
+  # RscGenerator does not declare --rspack, so options[:rspack] is always nil and
+  # rspack_configured_in_project? (YAML detection) is the only real code path.
+  # Integration tests above exercise this end-to-end; these unit tests make the
+  # detection logic explicit on the class that actually uses it.
+
+  describe "#using_rspack?" do
+    context "when shakapacker.yml has assets_bundler: rspack" do
+      let(:generator) { described_class.new }
+
+      before do
+        prepare_destination
+        simulate_rspack_shakapacker_yml
+        allow(generator).to receive(:destination_root).and_return(destination_root)
+      end
+
+      it "returns true via YAML fallback (no --rspack option available on RscGenerator)" do
+        expect(generator.send(:using_rspack?)).to be true
+      end
+    end
+
+    context "when no shakapacker.yml exists" do
+      let(:generator) { described_class.new }
+
+      before do
+        prepare_destination
+        allow(generator).to receive(:destination_root).and_return(destination_root)
+      end
+
+      it "returns false" do
+        expect(generator.send(:using_rspack?)).to be false
+      end
+    end
+  end
 
   context "when Pro is installed with --typescript" do
     before(:all) do
