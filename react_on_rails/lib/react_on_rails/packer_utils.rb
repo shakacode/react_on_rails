@@ -1,9 +1,15 @@
 # frozen_string_literal: true
 
+require "erb"
+require "pathname"
 require "shakapacker"
+require "yaml"
 
 module ReactOnRails
+  # rubocop:disable Metrics/ModuleLength
   module PackerUtils
+    SHAKAPACKER_CONFIG_PATH = File.join("config", "shakapacker.yml")
+
     def self.dev_server_running?
       Shakapacker.dev_server.running?
     end
@@ -179,21 +185,20 @@ module ReactOnRails
     end
 
     def self.extract_precompile_hook
-      # Prefer the public API (available in Shakapacker 9.0+)
-      return ::Shakapacker.config.precompile_hook if ::Shakapacker.config.respond_to?(:precompile_hook)
+      # Prefer using Shakapacker's runtime config when available.
+      # In bin/dev startup before Rails boots, this can raise (e.g., missing Rails.env),
+      # so we rescue and fall back to parsing config/shakapacker.yml directly.
+      hook_value = extract_precompile_hook_from_shakapacker_config
+      return hook_value unless hook_value.nil?
 
-      # Fallback: access config data using private :data method
-      config_data = ::Shakapacker.config.send(:data)
-
-      # Try symbol keys first (Shakapacker's internal format), then fall back to string keys
-      config_data&.[](:precompile_hook) || config_data&.[]("precompile_hook")
+      extract_precompile_hook_from_yaml
     end
 
     # Regex pattern to detect pack generation in hook scripts
     # Matches both:
     # - The rake task: react_on_rails:generate_packs
-    # - The Ruby method: generate_packs_if_stale (used by generator template)
-    GENERATE_PACKS_PATTERN = /\b(react_on_rails:generate_packs|generate_packs_if_stale)\b/
+    # - The Ruby methods: generate_packs_if_stale / generate_packs_if_needed
+    GENERATE_PACKS_PATTERN = /\b(react_on_rails:generate_packs|generate_packs_if_stale|generate_packs_if_needed)\b/
 
     # Pattern to detect a real self-guard statement that exits early when
     # SHAKAPACKER_SKIP_PRECOMPILE_HOOK is true. This avoids false positives
@@ -227,10 +232,11 @@ module ReactOnRails
     end
 
     def self.resolve_hook_script_path(hook_value)
-      # Hook value might be a script path relative to Rails root
-      return nil unless defined?(Rails) && Rails.respond_to?(:root)
+      return nil if hook_value.blank?
 
-      potential_path = Rails.root.join(hook_value.to_s.strip)
+      # Hook value might be a script path relative to project root.
+      # Rails.root is preferred when available, otherwise derive root from BUNDLE_GEMFILE or cwd.
+      potential_path = project_root.join(hook_value.to_s.strip)
       potential_path if potential_path.file?
     end
 
@@ -258,5 +264,73 @@ module ReactOnRails
     rescue StandardError
       nil
     end
+
+    def self.extract_precompile_hook_from_shakapacker_config
+      # Prefer the public API (available in Shakapacker 9.0+)
+      return ::Shakapacker.config.precompile_hook if ::Shakapacker.config.respond_to?(:precompile_hook)
+
+      # Fallback: access config data using private :data method
+      config_data = ::Shakapacker.config.send(:data)
+
+      # Try symbol keys first (Shakapacker's internal format), then fall back to string keys
+      config_data&.[](:precompile_hook) || config_data&.[]("precompile_hook")
+    rescue StandardError
+      nil
+    end
+
+    def self.extract_precompile_hook_from_yaml
+      config_path = project_root.join(SHAKAPACKER_CONFIG_PATH)
+      return nil unless config_path.file?
+
+      yaml_content = ERB.new(File.read(config_path)).result
+      config_data = YAML.safe_load(yaml_content, aliases: true) || {}
+
+      env_config = extract_hash_for_environment(config_data, current_shakapacker_environment)
+      return env_config["precompile_hook"] if env_config.key?("precompile_hook")
+      return env_config[:precompile_hook] if env_config.key?(:precompile_hook)
+
+      default_config = extract_hash_for_environment(config_data, "default")
+      return default_config["precompile_hook"] if default_config.key?("precompile_hook")
+      return default_config[:precompile_hook] if default_config.key?(:precompile_hook)
+
+      nil
+    rescue StandardError
+      nil
+    end
+
+    def self.extract_hash_for_environment(config_data, env_name)
+      value = config_data[env_name] || config_data[env_name.to_sym]
+      value.is_a?(Hash) ? value : {}
+    end
+
+    def self.current_shakapacker_environment
+      return Rails.env.to_s if defined?(Rails) && Rails.respond_to?(:env) && !Rails.env.to_s.strip.empty?
+
+      rails_env = ENV.fetch("RAILS_ENV", nil)
+      return rails_env unless rails_env.to_s.strip.empty?
+
+      rack_env = ENV.fetch("RACK_ENV", nil)
+      return rack_env unless rack_env.to_s.strip.empty?
+
+      "development"
+    end
+
+    def self.project_root
+      if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+        root = Rails.root
+        return root if root.respond_to?(:join)
+
+        return Pathname.new(root.to_s)
+      end
+
+      bundle_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+      if bundle_gemfile && !bundle_gemfile.strip.empty?
+        gemfile_path = Pathname.new(bundle_gemfile).expand_path
+        return gemfile_path.dirname if gemfile_path.file?
+      end
+
+      Pathname.new(Dir.pwd)
+    end
   end
+  # rubocop:enable Metrics/ModuleLength
 end

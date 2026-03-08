@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require "fileutils"
+require "tmpdir"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRails
@@ -156,6 +158,31 @@ module ReactOnRails
 
         expect(described_class.extract_precompile_hook).to eq(hook_value)
       end
+
+      it "falls back to config/shakapacker.yml when Shakapacker config is unavailable pre-Rails" do
+        Dir.mktmpdir do |tmp_dir|
+          config_dir = File.join(tmp_dir, "config")
+          FileUtils.mkdir_p(config_dir)
+          File.write(File.join(tmp_dir, "Gemfile"), "source 'https://rubygems.org'\n")
+          File.write(File.join(config_dir, "shakapacker.yml"), <<~YAML)
+            default: &default
+              precompile_hook: 'bin/shakapacker-precompile-hook'
+            development:
+              <<: *default
+          YAML
+
+          old_bundle_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+          ENV["BUNDLE_GEMFILE"] = File.join(tmp_dir, "Gemfile")
+
+          hide_const("Rails")
+          allow(::Shakapacker).to receive(:config)
+            .and_raise(NameError, "uninitialized constant Shakapacker::Env::Rails")
+
+          expect(described_class.extract_precompile_hook).to eq("bin/shakapacker-precompile-hook")
+        ensure
+          ENV["BUNDLE_GEMFILE"] = old_bundle_gemfile
+        end
+      end
     end
 
     describe ".shakapacker_precompile_hook_configured?" do
@@ -224,6 +251,18 @@ module ReactOnRails
           expect(described_class.shakapacker_precompile_hook_configured?).to be true
         end
 
+        it "returns true when script contains generate_packs_if_needed helper" do
+          allow(script_full_path).to receive(:file?).and_return(true)
+          allow(File).to receive(:exist?).with(script_full_path).and_return(true)
+          allow(File).to receive(:read).with(script_full_path).and_return(<<~RUBY)
+            #!/usr/bin/env ruby
+            load "spec/support/shakapacker_precompile_hook_shared.rb"
+            generate_packs_if_needed
+          RUBY
+
+          expect(described_class.shakapacker_precompile_hook_configured?).to be true
+        end
+
         it "returns false when script doesn't contain generate_packs" do
           allow(script_full_path).to receive(:file?).and_return(true)
           allow(File).to receive(:exist?).with(script_full_path).and_return(true)
@@ -239,6 +278,42 @@ module ReactOnRails
           allow(script_full_path).to receive(:file?).and_return(false)
 
           expect(described_class.shakapacker_precompile_hook_configured?).to be false
+        end
+      end
+
+      context "when Rails is unavailable during early bin/dev startup" do
+        it "detects script-based hooks from shakapacker.yml fallback" do
+          Dir.mktmpdir do |tmp_dir|
+            config_dir = File.join(tmp_dir, "config")
+            bin_dir = File.join(tmp_dir, "bin")
+            FileUtils.mkdir_p(config_dir)
+            FileUtils.mkdir_p(bin_dir)
+
+            File.write(File.join(tmp_dir, "Gemfile"), "source 'https://rubygems.org'\n")
+            File.write(File.join(config_dir, "shakapacker.yml"), <<~YAML)
+              default: &default
+                precompile_hook: 'bin/shakapacker-precompile-hook'
+              development:
+                <<: *default
+            YAML
+
+            File.write(File.join(bin_dir, "shakapacker-precompile-hook"), <<~RUBY)
+              #!/usr/bin/env ruby
+              ReactOnRails::PacksGenerator.instance.generate_packs_if_stale
+            RUBY
+
+            old_bundle_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+            ENV["BUNDLE_GEMFILE"] = File.join(tmp_dir, "Gemfile")
+
+            hide_const("Rails")
+            allow(::Shakapacker).to receive(:config)
+              .and_raise(NameError, "uninitialized constant Shakapacker::Env::Rails")
+
+            expect(described_class.shakapacker_precompile_hook_value).to eq("bin/shakapacker-precompile-hook")
+            expect(described_class.shakapacker_precompile_hook_configured?).to be true
+          ensure
+            ENV["BUNDLE_GEMFILE"] = old_bundle_gemfile
+          end
         end
       end
 
