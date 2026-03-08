@@ -159,7 +159,7 @@ Sometimes you need more than just a simple React component. **Render-Functions**
 
 1. Access Rails context (current URL, locale, etc.)
 2. Initialize Redux stores with props
-3. Set up React Router or TanStack Router
+3. Set up React Router or TanStack Router (TanStack SSR requires React on Rails Pro)
 4. Return different components based on props
 
 ### Basic Example
@@ -238,7 +238,7 @@ Now that you understand the core concepts, here are recommended paths forward:
 
 - **[Redux Integration](../building-features/react-and-redux.md)** - Add state management
 - **[React Router](../building-features/react-router.md)** - Client-side routing
-- **[TanStack Router](../building-features/tanstack-router.md)** - Router integration with SSR dehydration/hydration
+- **[TanStack Router](../building-features/tanstack-router.md)** - Pro-only first-class router integration with SSR dehydration/hydration
 - **[Server-Side Rendering](../core-concepts/react-server-rendering.md)** - Deep dive into SSR
 - **[Internationalization](../building-features/i18n.md)** - Add i18n support
 - **[Testing](../building-features/testing-configuration.md)** - Test your React components

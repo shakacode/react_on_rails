@@ -7,8 +7,24 @@ TanStack Router SSR **requires React on Rails Pro** with the Node Renderer and
 `rendering_returns_promises = true` in your Pro configuration. The async Node Renderer
 uses TanStack Router's public `router.load()` API for reliable, maintainable SSR.
 
-Client-side-only TanStack Router (without SSR) works with the open-source package —
+Client-side-only TanStack Router (without SSR) works with the open-source package -
 no special integration is needed since it's just a standard React app.
+
+## Support Model
+
+- **First-class TanStack Router SSR**: React on Rails Pro only, via `react-on-rails-pro/tanstack-router`
+- **Server renderer**: Pro Node Renderer with `rendering_returns_promises = true`
+- **ExecJS**: intentionally not supported for TanStack Router SSR
+- **Client-only TanStack Router**: works in OSS without any special helper
+- **React Router**: remains the manual integration option; see [Using React Router](./react-router.md)
+
+## Why Pro-Only
+
+This guide intentionally avoids an ExecJS SSR path.
+
+Synchronous SSR with TanStack Router pushes React on Rails toward private TanStack Router internals.
+The Pro-only async path keeps the integration on TanStack Router's public `router.load()`,
+`router.dehydrate()`, and `router.hydrate()` APIs, which is a much better long-term maintenance boundary.
 
 ## Install
 
@@ -21,7 +37,7 @@ pnpm add @tanstack/react-router
 Create a render-function with `createTanStackRouterRenderFunction` and register it with React on Rails:
 
 ```tsx
-import ReactOnRails from 'react-on-rails';
+import ReactOnRails from 'react-on-rails-pro';
 import { createTanStackRouterRenderFunction } from 'react-on-rails-pro/tanstack-router';
 import {
   RouterProvider,
@@ -82,6 +98,7 @@ Ensure your React on Rails Pro initializer includes:
 
 ```ruby
 ReactOnRailsPro.configure do |config|
+  # TanStack Router SSR requires the Pro Node Renderer async path.
   config.rendering_returns_promises = true
 end
 ```

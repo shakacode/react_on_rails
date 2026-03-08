@@ -38,7 +38,7 @@ Uncommonly used options:
   - **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   - **logging_on_server:** Default is true. True will log JS console messages and errors to the server.
   - **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
-  - **`clientProps` merge behavior:** If a prerender result includes `clientProps`, React on Rails merges them into the generated client hydration props payload (`props.merge(clientProps)`). This requires the original `props:` value to be a Ruby Hash.
+  - **`clientProps` merge behavior:** If a prerender result includes `clientProps`, React on Rails merges them into the generated client hydration props payload (`props.merge(clientProps)`). The original `props:` value must be a Ruby Hash or a JSON string representing an object.
 
 ---
 
@@ -101,7 +101,7 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 
 ### React Router
 
-[React Router](https://reactrouter.com/) is supported, including server-side rendering! See:
+[React Router](https://reactrouter.com/) is supported via manual integration, including server-side rendering. See:
 
 1. [React on Rails docs for React Router](../building-features/react-router.md)
 2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/RouterApp.server.jsx](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
@@ -109,7 +109,7 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 
 ### TanStack Router
 
-TanStack Router SSR is supported through the `react-on-rails-pro/tanstack-router` helper (requires React on Rails Pro). See [TanStack Router guide](../building-features/tanstack-router.md).
+TanStack Router has a first-class SSR helper through `react-on-rails-pro/tanstack-router` (requires React on Rails Pro). See [TanStack Router guide](../building-features/tanstack-router.md).
 
 ---
 

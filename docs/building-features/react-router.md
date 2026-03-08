@@ -6,6 +6,9 @@ React on Rails supports React Router for client-side routing. This guide shows h
 
 **Important:** The React on Rails generator does not install React Router. You'll need to add it to your project manually.
 
+> React Router support in React on Rails is a manual integration pattern.
+> If you want a first-class SSR helper with router dehydration/hydration, use TanStack Router with React on Rails Pro.
+
 ## Compatibility Note
 
 If you're using Turbo (Rails 7+) or Turbolinks (Rails 6 and earlier), be aware that both React Router and Turbo/Turbolinks handle browser navigation and the back button. These two routing systems can conflict. Consider:
@@ -28,7 +31,7 @@ npm install react-router-dom@^6.0.0
 # or: pnpm add react-router-dom@^6.0.0
 ```
 
-**Why React Router v6?** React Router v7 has merged with Remix and uses a different architecture that may not be fully compatible with React on Rails' server-side rendering approach. We recommend v6 for stable integration. If you need v7 features, please test thoroughly and share your findings with the community.
+**Why React Router v6?** React Router v7 has merged with Remix and uses a different architecture that may not be fully compatible with React on Rails' manual server-side rendering approach. We recommend v6 for stable integration. If you need v7 features, please test thoroughly and share your findings with the community.
 
 React Router v6 offers multiple routing approaches. For React on Rails, we recommend **Declarative Mode** (traditional component-based routing, covered in this guide).
 

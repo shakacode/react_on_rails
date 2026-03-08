@@ -10,7 +10,7 @@
  * import { createTanStackRouterRenderFunction } from 'react-on-rails-pro/tanstack-router';
  * import { createRouter, RouterProvider, createMemoryHistory, createBrowserHistory } from '@tanstack/react-router';
  * import { routeTree } from './routeTree.gen';
- * import ReactOnRails from 'react-on-rails';
+ * import ReactOnRails from 'react-on-rails-pro';
  *
  * const TanStackApp = createTanStackRouterRenderFunction(
  *   {
@@ -24,13 +24,14 @@
  *
  * @remarks
  * TanStack Router SSR requires React on Rails Pro with the Node Renderer.
+ * This intentionally uses the async renderer path rather than ExecJS-backed sync SSR.
  * If you encounter issues after upgrading @tanstack/react-router, update react-on-rails-pro
  * or file an issue at https://github.com/shakacode/react_on_rails/issues
  *
  * @packageDocumentation
  */
 
-import type { RailsContext, RenderFunction, RenderFunctionResult, ServerRenderResult } from 'react-on-rails/types';
+import type { RailsContext, RenderFunction, RenderFunctionResult } from 'react-on-rails/types';
 import type { TanStackHistory, TanStackRouter, TanStackRouterOptions } from './types.ts';
 import { serverRenderTanStackAppAsync } from './serverRender.ts';
 import { clientHydrateTanStackApp } from './clientHydrate.ts';
