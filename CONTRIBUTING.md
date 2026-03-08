@@ -440,6 +440,31 @@ Run `rake -T` or `rake -D` to see testing options.
 
 See below for verifying changes to the generators.
 
+## Updating the Shakapacker Version for Testing
+
+When a new version of Shakapacker is released, the pinned version used across the test suite needs to be updated. The version is specified in several places:
+
+**Source files (update manually):**
+
+1. `react_on_rails/Gemfile.development_dependencies` — gem version pin
+2. `react_on_rails/spec/dummy/package.json` — npm version pin
+3. `react_on_rails_pro/Gemfile.development_dependencies` — gem version pin (Pro)
+4. `react_on_rails_pro/spec/dummy/package.json` — npm version pin (Pro)
+5. `react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile` — gem version pin (Pro)
+6. `react_on_rails_pro/spec/execjs-compatible-dummy/package.json` — npm version pin (Pro)
+
+**Lock files (regenerated automatically):**
+
+After updating the source files above, regenerate lock files by running `bundle install` and `pnpm install` in the relevant directories:
+
+- `react_on_rails/` and `react_on_rails/spec/dummy/` (OSS)
+- `react_on_rails_pro/` and `react_on_rails_pro/spec/dummy/` and `react_on_rails_pro/spec/execjs-compatible-dummy/` (Pro)
+- Root `Gemfile.lock` and `pnpm-lock.yaml`
+
+**Example apps (handled automatically):**
+
+The CI-generated example apps (under `gen-examples/`) automatically resolve the shakapacker version via the gem dependency. The `pin_shakapacker_npm_version` helper in `react_on_rails/rakelib/shakapacker_examples.rake` ensures the npm version matches the gem.
+
 ## CI Testing and Optimization
 
 React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `master`. Contributors have access to local CI tools to validate changes before pushing.

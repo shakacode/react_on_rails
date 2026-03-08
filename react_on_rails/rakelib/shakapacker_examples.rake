@@ -16,6 +16,45 @@ require_relative "task_helpers"
 namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
 
+  # Pins the shakapacker npm package version to exactly match the installed gem version.
+  # Prevents semver range resolution (e.g., ^9.5.0 -> 9.6.0) from causing version mismatches.
+  def pin_shakapacker_npm_version(dir) # rubocop:disable Metrics/CyclomaticComplexity
+    gem_version = shakapacker_gem_version_from_lockfile(dir)
+    return unless gem_version
+
+    package_json_path = File.join(dir, "package.json")
+    return unless File.exist?(package_json_path)
+
+    begin
+      package_json = JSON.parse(File.read(package_json_path))
+    rescue JSON::ParserError => e
+      puts "  ERROR: Failed to parse #{package_json_path}: #{e.message}"
+      raise
+    end
+
+    changed = false
+    %w[dependencies devDependencies].each do |section|
+      deps = package_json[section]
+      next unless deps&.key?("shakapacker")
+      next if deps["shakapacker"] == gem_version
+
+      puts "  Pinning npm shakapacker in #{section} from #{deps['shakapacker']} to exact #{gem_version}"
+      deps["shakapacker"] = gem_version
+      changed = true
+    end
+
+    File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n") if changed
+  end
+
+  # Reads the shakapacker gem version from the example app's Gemfile.lock
+  def shakapacker_gem_version_from_lockfile(dir)
+    lockfile = File.join(dir, "Gemfile.lock")
+    return unless File.exist?(lockfile)
+
+    match = File.read(lockfile).match(/^\s+shakapacker\s+\(([^)]+)\)/)
+    match&.[](1)
+  end
+
   # Updates React-related dependencies to a specific version
   def update_react_dependencies(deps, react_version)
     return unless deps
@@ -110,9 +149,11 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         apply_react_version(example_type.dir, example_type.react_version_string)
         # Re-run bundle install to ensure dependencies are resolved correctly
         bundle_install_in(example_type.dir)
-        # Run npm install BEFORE shakapacker:binstubs to ensure the npm shakapacker version
-        # matches the gem version. The binstubs task loads the Rails environment which
-        # validates version matching between gem and npm package.
+        # Pin the npm shakapacker version to exactly match the installed gem version.
+        # shakapacker:install may add "^X.Y.Z" to package.json, which allows npm to
+        # resolve a newer minor version (e.g., 9.6.0 when gem is 9.5.0), causing
+        # Shakapacker's gem/npm version consistency check to fail.
+        pin_shakapacker_npm_version(example_type.dir)
         # Use --legacy-peer-deps to avoid peer dependency conflicts when
         # react-on-rails expects newer React versions
         # Use --install-links to copy file: dependencies instead of symlinking,
@@ -122,6 +163,11 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         # The binstub format may differ between major versions
         unbundled_sh_in_dir(example_type.dir, "bundle exec rake shakapacker:binstubs")
       else
+        # Pin the npm shakapacker version to exactly match the installed gem version.
+        # shakapacker:install may add "^X.Y.Z" to package.json, which allows npm to
+        # resolve a newer minor version (e.g., 9.6.0 when gem is 9.5.0), causing
+        # Shakapacker's gem/npm version consistency check to fail.
+        pin_shakapacker_npm_version(example_type.dir)
         # Use --install-links to copy file: dependencies instead of symlinking,
         # preventing duplicate React instances from webpack resolving through symlinks
         sh_in_dir(example_type.dir, "npm install --install-links")
