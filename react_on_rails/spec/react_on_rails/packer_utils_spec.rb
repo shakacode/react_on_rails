@@ -335,6 +335,48 @@ module ReactOnRails
         expect(described_class.hook_script_has_self_guard?(hook_path)).to be false
       end
     end
+
+    describe ".project_root" do
+      context "when Rails is defined with a root" do
+        let(:rails_root) { Pathname.new("/fake/rails/root") }
+
+        before do
+          allow(Rails).to receive(:respond_to?).and_call_original
+          allow(Rails).to receive(:respond_to?).with(:root).and_return(true)
+          allow(Rails).to receive(:root).and_return(rails_root)
+        end
+
+        it "returns Rails.root" do
+          expect(described_class.project_root).to eq(rails_root)
+        end
+      end
+
+      context "when Rails is not defined" do
+        before { hide_const("Rails") }
+
+        it "falls back to BUNDLE_GEMFILE dirname when set to a valid file" do
+          allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:[]).with("BUNDLE_GEMFILE").and_return(__FILE__)
+
+          expected_dir = Pathname.new(__FILE__).expand_path.dirname
+          expect(described_class.project_root).to eq(expected_dir)
+        end
+
+        it "falls back to Dir.pwd when BUNDLE_GEMFILE is not set" do
+          allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:[]).with("BUNDLE_GEMFILE").and_return(nil)
+
+          expect(described_class.project_root).to eq(Pathname.new(Dir.pwd))
+        end
+
+        it "falls back to Dir.pwd when BUNDLE_GEMFILE points to a non-existent file" do
+          allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:[]).with("BUNDLE_GEMFILE").and_return("/non/existent/Gemfile")
+
+          expect(described_class.project_root).to eq(Pathname.new(Dir.pwd))
+        end
+      end
+    end
   end
 
   describe "version constants validation" do

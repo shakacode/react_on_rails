@@ -235,7 +235,7 @@ module ReactOnRails
     end
 
     def self.project_root
-      return Pathname.new(Rails.root) if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+      return Rails.root if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
 
       bundle_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
       if bundle_gemfile && !bundle_gemfile.strip.empty?
