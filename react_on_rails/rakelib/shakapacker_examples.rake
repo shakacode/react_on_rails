@@ -16,6 +16,34 @@ require_relative "task_helpers"
 namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   include ReactOnRails::TaskHelpers
 
+  # Pins the shakapacker npm package version to exactly match the installed gem version.
+  # Prevents semver range resolution (e.g., ^9.5.0 -> 9.6.0) from causing version mismatches.
+  def pin_shakapacker_npm_version(dir)
+    gem_version = shakapacker_gem_version_from_lockfile(dir)
+    return unless gem_version
+
+    package_json_path = File.join(dir, "package.json")
+    return unless File.exist?(package_json_path)
+
+    package_json = JSON.parse(File.read(package_json_path))
+    deps = package_json["dependencies"] || {}
+    current = deps["shakapacker"]
+    return unless current && current != gem_version
+
+    puts "  Pinning npm shakapacker from #{current} to exact #{gem_version}"
+    deps["shakapacker"] = gem_version
+    File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
+  end
+
+  # Reads the shakapacker gem version from the example app's Gemfile.lock
+  def shakapacker_gem_version_from_lockfile(dir)
+    lockfile = File.join(dir, "Gemfile.lock")
+    return unless File.exist?(lockfile)
+
+    match = File.read(lockfile).match(/^\s+shakapacker\s+\((\d+\.\d+\.\d+)\)/)
+    match&.[](1)
+  end
+
   # Updates React-related dependencies to a specific version
   def update_react_dependencies(deps, react_version)
     return unless deps
@@ -122,6 +150,11 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         # The binstub format may differ between major versions
         unbundled_sh_in_dir(example_type.dir, "bundle exec rake shakapacker:binstubs")
       else
+        # Pin the npm shakapacker version to exactly match the installed gem version.
+        # shakapacker:install may add "^X.Y.Z" to package.json, which allows npm to
+        # resolve a newer minor version (e.g., 9.6.0 when gem is 9.5.0), causing
+        # Shakapacker's gem/npm version consistency check to fail.
+        pin_shakapacker_npm_version(example_type.dir)
         # Use --install-links to copy file: dependencies instead of symlinking,
         # preventing duplicate React instances from webpack resolving through symlinks
         sh_in_dir(example_type.dir, "npm install --install-links")
