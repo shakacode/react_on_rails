@@ -75,7 +75,11 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
       Rails.logger.error e.backtrace.join("\n")
       raise e
     ensure
-      redis&.close
+      begin
+        redis&.close
+      rescue StandardError => e
+        Rails.logger.warn "Failed to close Redis: #{e.message}"
+      end
     end
 
     stream_view_containing_react_components(template: "/pages/rsc_posts_page_over_redis")

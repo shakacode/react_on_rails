@@ -118,13 +118,13 @@ module ReactOnRailsPro
         raise e
       end
     ensure
-      # Close the queue first to unblock writing_task (it may be waiting on dequeue)
-      @main_output_queue.close
-
-      # Capture the primary exception (if any) BEFORE entering begin/rescue.
+      # Capture the primary exception (if any) BEFORE any cleanup that could raise.
       # Inside a rescue block, $ERROR_INFO is always the caught exception,
       # so we must snapshot it here where it reflects the propagating exception.
       primary_exception = $ERROR_INFO
+
+      # Close the queue to unblock writing_task (it may be waiting on dequeue)
+      @main_output_queue.close
 
       # Wait for writing_task to finish. Wrap in rescue to avoid masking a primary
       # exception (e.g., producer error) with a secondary writing_task exception.

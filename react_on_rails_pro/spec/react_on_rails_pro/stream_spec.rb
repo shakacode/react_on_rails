@@ -531,14 +531,15 @@ RSpec.describe "Streaming API" do
           raise IOError, "client disconnected" if write_count == 2
         end
 
-        Timeout.timeout(5) do
-          run_stream(controller) do |_parent|
-            10.times { |i| queues[0].enqueue("Chunk#{i}") }
-            queues[0].close
-            sleep 0.5
+        expect do
+          Timeout.timeout(5) do
+            run_stream(controller) do |_parent|
+              10.times { |i| queues[0].enqueue("Chunk#{i}") }
+              queues[0].close
+              sleep 0.5
+            end
           end
-        end
-        # If we reach here without Timeout::Error, no deadlock occurred
+        end.not_to raise_error
       ensure
         ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = original_buffer
       end
@@ -555,13 +556,15 @@ RSpec.describe "Streaming API" do
           raise Errno::EPIPE, "broken pipe" if write_count == 2
         end
 
-        Timeout.timeout(5) do
-          run_stream(controller) do |_parent|
-            10.times { |i| queues[0].enqueue("Chunk#{i}") }
-            queues[0].close
-            sleep 0.5
+        expect do
+          Timeout.timeout(5) do
+            run_stream(controller) do |_parent|
+              10.times { |i| queues[0].enqueue("Chunk#{i}") }
+              queues[0].close
+              sleep 0.5
+            end
           end
-        end
+        end.not_to raise_error
       ensure
         ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = original_buffer
       end
@@ -637,13 +640,15 @@ RSpec.describe "Streaming API" do
 
         # The key assertion: completes within timeout (no deadlock).
         # The ArgumentError is handled by Async's task machinery.
-        Timeout.timeout(5) do
-          run_stream(controller) do |_parent|
-            10.times { |i| queues[0].enqueue("Chunk#{i}") }
-            queues[0].close
-            sleep 0.5
+        expect do
+          Timeout.timeout(5) do
+            run_stream(controller) do |_parent|
+              10.times { |i| queues[0].enqueue("Chunk#{i}") }
+              queues[0].close
+              sleep 0.5
+            end
           end
-        end
+        end.not_to raise_error
       ensure
         ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = original_buffer
       end

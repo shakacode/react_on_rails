@@ -17,73 +17,75 @@ require "async/variable"
 require "timeout"
 require_relative "spec_helper"
 
-# Replicates ActionController::Live::Buffer behavior with real Queue-based IO.
-# Thread-safe: writer (fiber) pushes, reader (thread) pops.
-class TestStreamBuffer
-  def initialize
-    @buf = Queue.new
-    @closed = false
-  end
-
-  def write(string)
-    raise IOError, "closed stream" if @closed
-
-    @buf.push(string)
-  end
-
-  def each
-    while (str = @buf.pop)
-      yield str
+module StreamIntegrationHelpers
+  # Replicates ActionController::Live::Buffer behavior with real Queue-based IO.
+  # Thread-safe: writer (fiber) pushes, reader (thread) pops.
+  class TestStreamBuffer
+    def initialize
+      @buf = Queue.new
+      @closed = false
     end
-  end
 
-  def close
-    return if @closed
+    def write(string)
+      raise IOError, "closed stream" if @closed
 
-    @closed = true
-    @buf.push(nil)
-  end
+      @buf.push(string)
+    end
 
-  def closed?
-    @closed
-  end
-end
-
-# Minimal response wrapper satisfying the Stream concern's interface.
-class TestLiveResponse
-  attr_reader :stream
-  attr_accessor :content_type
-
-  def initialize(stream)
-    @stream = stream
-  end
-end
-
-# Controller that includes the real Stream concern with configurable components.
-# Each component produces a fixed number of chunks via barrier tasks.
-class IntegrationStreamController
-  include ReactOnRailsPro::Stream
-
-  def initialize(response:, component_configs:)
-    @live_response = response
-    @component_configs = component_configs
-  end
-
-  def response
-    @live_response
-  end
-
-  def render_to_string(**_opts)
-    @component_configs.each do |config|
-      chunk_count = config[:chunks]
-      component_id = config[:id]
-      @async_barrier.async do
-        chunk_count.times do |i|
-          @main_output_queue.enqueue("#{component_id}_chunk_#{i}\n")
-        end
+    def each
+      while (str = @buf.pop)
+        yield str
       end
     end
-    "TEMPLATE\n"
+
+    def close
+      return if @closed
+
+      @closed = true
+      @buf.push(nil)
+    end
+
+    def closed?
+      @closed
+    end
+  end
+
+  # Minimal response wrapper satisfying the Stream concern's interface.
+  class TestLiveResponse
+    attr_reader :stream
+    attr_accessor :content_type
+
+    def initialize(stream)
+      @stream = stream
+    end
+  end
+
+  # Controller that includes the real Stream concern with configurable components.
+  # Each component produces a fixed number of chunks via barrier tasks.
+  class TestStreamController
+    include ReactOnRailsPro::Stream
+
+    def initialize(response:, component_configs:)
+      @live_response = response
+      @component_configs = component_configs
+    end
+
+    def response
+      @live_response
+    end
+
+    def render_to_string(**_opts)
+      @component_configs.each do |config|
+        chunk_count = config[:chunks]
+        component_id = config[:id]
+        @async_barrier.async do
+          chunk_count.times do |i|
+            @main_output_queue.enqueue("#{component_id}_chunk_#{i}\n")
+          end
+        end
+      end
+      "TEMPLATE\n"
+    end
   end
 end
 
@@ -105,9 +107,9 @@ RSpec.describe "Streaming client disconnect integration" do
     allow(ReactOnRailsPro.configuration)
       .to receive(:concurrent_component_streaming_buffer_size).and_return(buffer_size)
 
-    buffer = TestStreamBuffer.new
-    response = TestLiveResponse.new(buffer)
-    controller = IntegrationStreamController.new(
+    buffer = StreamIntegrationHelpers::TestStreamBuffer.new
+    response = StreamIntegrationHelpers::TestLiveResponse.new(buffer)
+    controller = StreamIntegrationHelpers::TestStreamController.new(
       response: response,
       component_configs: component_configs
     )
@@ -147,9 +149,9 @@ RSpec.describe "Streaming client disconnect integration" do
     allow(ReactOnRailsPro.configuration)
       .to receive(:concurrent_component_streaming_buffer_size).and_return(buffer_size)
 
-    buffer = TestStreamBuffer.new
-    response = TestLiveResponse.new(buffer)
-    controller = IntegrationStreamController.new(
+    buffer = StreamIntegrationHelpers::TestStreamBuffer.new
+    response = StreamIntegrationHelpers::TestLiveResponse.new(buffer)
+    controller = StreamIntegrationHelpers::TestStreamController.new(
       response: response,
       component_configs: component_configs
     )
