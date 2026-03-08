@@ -124,7 +124,9 @@ rescue StandardError => e
 end
 
 # Main execution (only if run directly, not when required)
-if __FILE__ == $PROGRAM_NAME
+def run_precompile_tasks
   build_rescript_if_needed
   generate_packs_if_needed
 end
+
+run_precompile_tasks if __FILE__ == $PROGRAM_NAME

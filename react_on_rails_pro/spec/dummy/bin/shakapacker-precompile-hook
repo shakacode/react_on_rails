@@ -20,10 +20,9 @@ unless File.exist?(shared_hook)
   exit 1
 end
 
-# Load shared implementation (defines build_rescript_if_needed and generate_packs_if_needed)
+# Load shared implementation (defines run_precompile_tasks)
 load shared_hook
 
-# Explicitly invoke the functions. The shared file's `if __FILE__ == $PROGRAM_NAME`
-# block does not run when the file is loaded via `load`.
-build_rescript_if_needed
-generate_packs_if_needed
+# Explicitly invoke run_precompile_tasks. The shared file's
+# `if __FILE__ == $PROGRAM_NAME` block does not run when loaded via `load`.
+run_precompile_tasks
