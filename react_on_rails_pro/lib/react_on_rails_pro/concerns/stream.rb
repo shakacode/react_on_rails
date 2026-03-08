@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "English"
+
 module ReactOnRailsPro
   module Stream
     extend ActiveSupport::Concern
@@ -103,6 +105,12 @@ module ReactOnRailsPro
         # Client disconnected - stop writing gracefully
         client_disconnected = true
         log_client_disconnect("writer", e)
+      ensure
+        # Cancel all producers when writer exits for ANY reason (normal completion,
+        # client disconnect, or unexpected error). Prevents deadlock where producers
+        # block on enqueue to a full queue that nobody is consuming.
+        # Idempotent — no-op if barrier tasks already completed.
+        @async_barrier.stop
       end
 
       # Wait for all component streaming tasks to complete
@@ -116,12 +124,19 @@ module ReactOnRailsPro
       # Close the queue first to unblock writing_task (it may be waiting on dequeue)
       @main_output_queue.close
 
-      # Wait for writing_task to ensure client_disconnected flag is set
-      # before we check it (fixes race condition where ensure runs before
-      # writing_task's rescue block sets the flag)
-      writing_task.wait
+      # Capture the primary exception (if any) BEFORE entering begin/rescue.
+      # Inside a rescue block, $ERROR_INFO is always the caught exception,
+      # so we must snapshot it here where it reflects the propagating exception.
+      primary_exception = $ERROR_INFO
 
-      # If client disconnected, stop all producer tasks to avoid wasted work
+      # Wait for writing_task to finish. Wrap in rescue to avoid masking a primary
+      # exception (e.g., producer error) with a secondary writing_task exception.
+      begin
+        writing_task.wait
+      rescue StandardError
+        raise unless primary_exception
+      end
+
       @async_barrier.stop if client_disconnected
     end
 
