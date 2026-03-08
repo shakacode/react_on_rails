@@ -494,6 +494,61 @@ describe ReactOnRailsProHelper do
         # The exact count depends on timing, but should be less than 9 (all remaining)
         expect(collected_chunks.length).to be < 9
       end
+
+      it "does not call on_complete when client disconnects mid-stream" do
+        many_chunks = Array.new(10) do |i|
+          { html: "<div>Chunk #{i}</div>", consoleReplayScript: "" }
+        end
+        mock_request_and_response(many_chunks)
+
+        # Simulate client disconnect after first chunk
+        closed_call_count = 0
+        allow(mocked_rails_stream).to receive(:closed?) do
+          closed_call_count += 1
+          closed_call_count > 1
+        end
+
+        on_complete_called = false
+        on_complete = lambda { |_chunks|
+          on_complete_called = true
+        }
+
+        stream_react_component(
+          component_name,
+          props: props,
+          on_complete: on_complete,
+          **component_options
+        )
+
+        @async_barrier.wait
+        @main_output_queue.close
+        while @main_output_queue.dequeue; end
+
+        expect(on_complete_called).to be false
+      end
+
+      it "calls on_complete when stream is fully consumed" do
+        mock_request_and_response
+
+        collected_all_chunks = nil
+        on_complete = lambda { |all_chunks|
+          collected_all_chunks = all_chunks
+        }
+
+        stream_react_component(
+          component_name,
+          props: props,
+          on_complete: on_complete,
+          **component_options
+        )
+
+        @async_barrier.wait
+        @main_output_queue.close
+        while @main_output_queue.dequeue; end
+
+        expect(collected_all_chunks).not_to be_nil
+        expect(collected_all_chunks.length).to eq(chunks.length)
+      end
     end
 
     describe "stream_view_containing_react_components" do # rubocop:disable RSpec/MultipleMemoizedHelpers

@@ -74,12 +74,20 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
       Rails.logger.error "Error writing posts and comments to Redis: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
       raise e
+    ensure
+      begin
+        redis&.close
+      rescue StandardError => e
+        Rails.logger.warn "Failed to close Redis: #{e.message}"
+      end
     end
 
     stream_view_containing_react_components(template: "/pages/rsc_posts_page_over_redis")
 
     return if redis_thread.join(10)
 
+    redis_thread.kill
+    redis_thread.join(1)
     Rails.logger.error "Redis thread timed out"
     raise "Redis thread timed out"
   end
@@ -109,6 +117,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
     return if redis_thread.join(10)
 
+    redis_thread.kill
+    redis_thread.join(1)
     Rails.logger.error "Redis thread timed out"
     raise "Redis thread timed out"
   end
