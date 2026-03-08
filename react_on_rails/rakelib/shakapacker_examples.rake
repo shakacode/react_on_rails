@@ -144,17 +144,16 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       # Re-run bundle install since dev_tests generator adds rspec-rails and coveralls to Gemfile
       bundle_install_in(example_type.dir)
 
-      # Pin the npm shakapacker version to exactly match the installed gem version.
-      # shakapacker:install may add "^X.Y.Z" to package.json, which allows npm to
-      # resolve a newer minor version (e.g., 9.6.0 when gem is 9.5.0), causing
-      # Shakapacker's gem/npm version consistency check to fail.
-      pin_shakapacker_npm_version(example_type.dir)
-
       # Apply specific React version for compatibility testing examples
       if example_type.pinned_react_version?
         apply_react_version(example_type.dir, example_type.react_version_string)
         # Re-run bundle install to ensure dependencies are resolved correctly
         bundle_install_in(example_type.dir)
+        # Pin the npm shakapacker version to exactly match the installed gem version.
+        # shakapacker:install may add "^X.Y.Z" to package.json, which allows npm to
+        # resolve a newer minor version (e.g., 9.6.0 when gem is 9.5.0), causing
+        # Shakapacker's gem/npm version consistency check to fail.
+        pin_shakapacker_npm_version(example_type.dir)
         # Use --legacy-peer-deps to avoid peer dependency conflicts when
         # react-on-rails expects newer React versions
         # Use --install-links to copy file: dependencies instead of symlinking,
@@ -164,6 +163,11 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         # The binstub format may differ between major versions
         unbundled_sh_in_dir(example_type.dir, "bundle exec rake shakapacker:binstubs")
       else
+        # Pin the npm shakapacker version to exactly match the installed gem version.
+        # shakapacker:install may add "^X.Y.Z" to package.json, which allows npm to
+        # resolve a newer minor version (e.g., 9.6.0 when gem is 9.5.0), causing
+        # Shakapacker's gem/npm version consistency check to fail.
+        pin_shakapacker_npm_version(example_type.dir)
         # Use --install-links to copy file: dependencies instead of symlinking,
         # preventing duplicate React instances from webpack resolving through symlinks
         sh_in_dir(example_type.dir, "npm install --install-links")
