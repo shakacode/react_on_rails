@@ -13,6 +13,9 @@ bin/dev
 Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) to see your React component.
 
 This creates a TypeScript app by default. For JavaScript, use `--template javascript`.
+For React Server Components (RSC), add `--rsc` and visit `/hello_server` after setup.
+`--rsc` requires `react_on_rails_pro` to be installable in your environment.
+RSC supports both JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 
 ## Options
 
@@ -23,34 +26,42 @@ npx create-react-on-rails-app my-app --template javascript
 # Use Rspack for ~20x faster builds
 npx create-react-on-rails-app my-app --rspack
 
+# Generate React Server Components setup (includes react_on_rails_pro)
+npx create-react-on-rails-app my-app --rsc
+
 # Specify package manager
 npx create-react-on-rails-app my-app --package-manager pnpm
 
 # Combine options
 npx create-react-on-rails-app my-app --rspack --package-manager pnpm
+
+# Combine RSC with Rspack
+npx create-react-on-rails-app my-app --rspack --rsc
 ```
 
 ### All Options
 
-| Option                       | Description                                 | Default       |
-| ---------------------------- | ------------------------------------------- | ------------- |
-| `-t, --template <type>`      | `javascript` or `typescript`                | `typescript`  |
-| `--rspack`                   | Use Rspack instead of Webpack (~20x faster) | `false`       |
-| `-p, --package-manager <pm>` | `npm` or `pnpm`                             | auto-detected |
+| Option                       | Description                                                    | Default       |
+| ---------------------------- | -------------------------------------------------------------- | ------------- |
+| `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`  |
+| `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`       |
+| `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`       |
+| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected |
 
 ## What It Does
 
 The CLI runs these steps automatically:
 
 1. **Creates a Rails app** (`rails new` with PostgreSQL, no default JS)
-2. **Adds React on Rails** (`bundle add react_on_rails`)
-3. **Runs the generator** (`rails generate react_on_rails:install`)
+2. **Adds required gems** (`bundle add react_on_rails`, plus `react_on_rails_pro` for `--rsc`)
+3. **Runs the generator** (`rails generate react_on_rails:install` with your selected flags)
 
 After completion, you get:
 
 - A Rails 8 app with PostgreSQL
 - Shakapacker configured with Webpack (or Rspack) and HMR
 - A working HelloWorld React component (TypeScript by default)
+- Optional RSC setup (`--rsc`) with HelloServer route and Pro Node renderer wiring
 - Server-side rendering ready
 - Development scripts (`bin/dev` with hot reloading)
 

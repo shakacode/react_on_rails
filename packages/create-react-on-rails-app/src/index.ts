@@ -30,6 +30,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
     template,
     packageManager: packageManager as 'npm' | 'pnpm',
     rspack: Boolean(rawOpts.rspack),
+    rsc: Boolean(rawOpts.rsc),
   };
 
   console.log('');
@@ -40,6 +41,15 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
   if (!nameValidation.success) {
     logError(nameValidation.error ?? 'Invalid app name');
     process.exit(1);
+  }
+
+  if (options.rsc) {
+    logInfo('Note: --rsc installs react_on_rails_pro and requires that gem to be installable.');
+    logInfo(
+      'If installation fails, verify your Bundler/RubyGems setup for react_on_rails_pro, then rerun with --rsc.',
+    );
+    logInfo('Pro setup docs: https://www.shakacode.com/react-on-rails-pro/docs/installation/');
+    console.log('');
   }
 
   logInfo('Checking prerequisites...');
@@ -65,7 +75,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
 
   console.log('');
   logInfo(
-    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}`,
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${options.rsc ? ', mode: rsc' : ''}`,
   );
 
   createApp(appName, options);
@@ -85,6 +95,7 @@ program
   .option('-t, --template <type>', 'javascript or typescript', 'typescript')
   .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
   .option('--rspack', 'Use Rspack instead of Webpack (~20x faster builds)', false)
+  .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)', false)
   .addHelpText(
     'after',
     `
@@ -92,14 +103,20 @@ Examples:
   $ npx create-react-on-rails-app my-app
   $ npx create-react-on-rails-app my-app --template javascript
   $ npx create-react-on-rails-app my-app --rspack
+  $ npx create-react-on-rails-app my-app --rsc
+  $ npx create-react-on-rails-app my-app --rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
 What it does:
   1. Creates a new Rails app with PostgreSQL
-  2. Adds the react_on_rails gem
+  2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for --rsc)
   3. Runs the React on Rails generator (Shakapacker, components, webpack config)
 
-After setup, run bin/dev and visit http://localhost:3000/hello_world
+After setup, run bin/dev and visit:
+  - http://localhost:3000/hello_world (default)
+  - http://localhost:3000/hello_server (--rsc)
+
+--rsc supports both JavaScript and TypeScript templates.
 
 Documentation: https://www.shakacode.com/react-on-rails/docs/`,
   )
