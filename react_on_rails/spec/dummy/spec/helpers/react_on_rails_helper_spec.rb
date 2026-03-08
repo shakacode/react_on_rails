@@ -499,6 +499,24 @@ describe ReactOnRailsHelper do
       expect { ob.send(:rails_context, server_side: true) }.not_to raise_error
       expect { ob.send(:rails_context, server_side: false) }.not_to raise_error
     end
+
+    it "adds cspNonce when a nonce is available" do
+      helper = PlainReactOnRailsHelper.new
+      allow(helper).to receive(:csp_nonce).and_return("nonce123")
+
+      context = helper.send(:rails_context, server_side: true)
+
+      expect(context[:cspNonce]).to eq("nonce123")
+    end
+
+    it "omits cspNonce when nonce is not available" do
+      helper = PlainReactOnRailsHelper.new
+      allow(helper).to receive(:csp_nonce).and_return(nil)
+
+      context = helper.send(:rails_context, server_side: true)
+
+      expect(context).not_to have_key(:cspNonce)
+    end
   end
 
   describe "#rails_context_if_not_already_rendered" do
