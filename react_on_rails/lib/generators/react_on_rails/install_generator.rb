@@ -134,11 +134,13 @@ module ReactOnRails
           create_css_module_types
           create_typescript_config
         end
+        # `invoke` instantiates child generators with a fresh options hash, so
+        # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
                  pro: options.pro?, rsc: options.rsc?,
                  shakapacker_just_installed: shakapacker_just_installed?,
-                 force: options[:force], skip: options[:skip] }
+                 force: options[:force], skip: options[:skip], pretend: options[:pretend] }
 
         # Component generator logic:
         # - --rsc without --redux: Skip HelloWorld, HelloServer will be generated in setup_rsc
@@ -146,12 +148,14 @@ module ReactOnRails
         # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
-                                                          force: options[:force], skip: options[:skip] }
+                                                          force: options[:force], skip: options[:skip],
+                                                          pretend: options[:pretend] }
         elsif !use_rsc?
           # Only generate HelloWorld if RSC is not enabled
           # For RSC, HelloServer replaces HelloWorld as the example component
           invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript?,
-                                                        force: options[:force], skip: options[:skip] }
+                                                        force: options[:force], skip: options[:skip],
+                                                        pretend: options[:pretend] }
         end
 
         setup_react_dependencies
@@ -160,15 +164,22 @@ module ReactOnRails
         # Pass invoked_by_install: true so they skip message printing (we handle it)
         if use_pro?
           invoke "react_on_rails:pro", [], { invoked_by_install: true,
-                                             force: options[:force], skip: options[:skip] }
+                                             force: options[:force], skip: options[:skip],
+                                             pretend: options[:pretend] }
         end
         return unless use_rsc?
 
         invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true,
-                                           force: options[:force], skip: options[:skip] }
+                                           force: options[:force], skip: options[:skip],
+                                           pretend: options[:pretend] }
       end
 
       def setup_react_dependencies
+        if options[:pretend]
+          say_status :pretend, "Skipping React dependency setup in --pretend mode", :yellow
+          return
+        end
+
         setup_js_dependencies
       end
 
@@ -231,6 +242,11 @@ module ReactOnRails
       def ensure_shakapacker_installed
         return if shakapacker_configured?
 
+        if options[:pretend]
+          say_status :pretend, "Skipping automatic Shakapacker installation in --pretend mode", :yellow
+          return
+        end
+
         print_shakapacker_setup_banner
         ensure_shakapacker_in_gemfile
 
@@ -259,6 +275,13 @@ module ReactOnRails
         # For --rsc without --redux, hello_world doesn't exist — update DEFAULT_ROUTE
         if use_rsc? && !options.redux?
           gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
+        end
+
+        # `directory` and `gsub_file` above are Thor actions that already honor
+        # --pretend. Only the raw Ruby filesystem calls below need an explicit guard.
+        if options[:pretend]
+          say_status :pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow
+          return
         end
 
         # Make these and only these files executable
@@ -460,12 +483,22 @@ module ReactOnRails
       end
 
       def install_typescript_dependencies
+        if options[:pretend]
+          say_status :pretend, "Skipping TypeScript dependency installation in --pretend mode", :yellow
+          return
+        end
+
         puts Rainbow("📝 Installing TypeScript dependencies...").yellow
         # Delegate to shared module for consistent dependency management
         add_typescript_dependencies
       end
 
       def create_css_module_types
+        if options[:pretend]
+          say_status :pretend, "Skipping CSS module type definitions in --pretend mode", :yellow
+          return
+        end
+
         puts Rainbow("📝 Creating CSS module type definitions...").yellow
 
         # Ensure the types directory exists
@@ -494,6 +527,11 @@ module ReactOnRails
       end
 
       def create_typescript_config
+        if options[:pretend]
+          say_status :pretend, "Skipping tsconfig.json creation in --pretend mode", :yellow
+          return
+        end
+
         if File.exist?("tsconfig.json")
           puts Rainbow("⚠️  tsconfig.json already exists, skipping creation").yellow
           return

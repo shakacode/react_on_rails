@@ -84,7 +84,11 @@ module ReactOnRails
         end
 
         # Make the hook script executable (copy_file guarantees it exists)
-        File.chmod(0o755, File.join(destination_root, "bin/shakapacker-precompile-hook"))
+        if options[:pretend]
+          say_status :pretend, "Skipping chmod on shakapacker-precompile-hook in --pretend mode", :yellow
+        else
+          File.chmod(0o755, File.join(destination_root, "bin/shakapacker-precompile-hook"))
+        end
       end
 
       def copy_js_bundle_files

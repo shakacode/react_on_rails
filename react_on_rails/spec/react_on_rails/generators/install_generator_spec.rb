@@ -1189,6 +1189,101 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "--pretend mode behavior" do
+    let(:install_generator) { described_class.new([], { pretend: true }) }
+    let(:typescript_install_generator) { described_class.new([], { pretend: true, typescript: true }) }
+
+    it "skips automatic shakapacker installation commands" do
+      allow(install_generator).to receive(:shakapacker_configured?).and_return(false)
+
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping automatic Shakapacker installation in --pretend mode", :yellow)
+      expect(install_generator).not_to receive(:print_shakapacker_setup_banner)
+      expect(install_generator).not_to receive(:ensure_shakapacker_in_gemfile)
+      expect(install_generator).not_to receive(:install_shakapacker)
+      expect(install_generator).not_to receive(:finalize_shakapacker_setup)
+
+      install_generator.send(:ensure_shakapacker_installed)
+    end
+
+    it "does not chmod copied bin scripts in pretend mode" do
+      allow(install_generator).to receive(:directory)
+      allow(install_generator).to receive(:use_rsc?).and_return(false)
+
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
+      expect(Dir).not_to receive(:chdir)
+      expect(File).not_to receive(:chmod)
+
+      install_generator.send(:add_bin_scripts)
+    end
+
+    it "does not install typescript dependencies in pretend mode" do
+      expect(typescript_install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping TypeScript dependency installation in --pretend mode", :yellow)
+      expect(typescript_install_generator).not_to receive(:add_typescript_dependencies)
+
+      typescript_install_generator.send(:install_typescript_dependencies)
+    end
+
+    it "does not set up react dependencies in pretend mode" do
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping React dependency setup in --pretend mode", :yellow)
+      expect(install_generator).not_to receive(:setup_js_dependencies)
+
+      install_generator.send(:setup_react_dependencies)
+    end
+
+    it "does not create css module type files in pretend mode" do
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping CSS module type definitions in --pretend mode", :yellow)
+      expect(FileUtils).not_to receive(:mkdir_p)
+      expect(File).not_to receive(:write)
+
+      install_generator.send(:create_css_module_types)
+    end
+
+    it "does not write tsconfig.json in pretend mode" do
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping tsconfig.json creation in --pretend mode", :yellow)
+      expect(File).not_to receive(:write)
+
+      install_generator.send(:create_typescript_config)
+    end
+
+    it "forwards pretend mode to base and react_no_redux generators" do
+      allow(install_generator).to receive(:ensure_shakapacker_installed)
+      allow(install_generator).to receive(:setup_react_dependencies)
+      allow(install_generator).to receive_messages(use_pro?: false, use_rsc?: false)
+
+      expect(install_generator).to receive(:invoke)
+        .with("react_on_rails:base", [], hash_including(pretend: true))
+      expect(install_generator).to receive(:invoke)
+        .with("react_on_rails:react_no_redux", [], hash_including(pretend: true))
+
+      install_generator.send(:invoke_generators)
+    end
+
+    it "forwards pretend mode to redux, pro, and rsc generators" do
+      redux_pro_rsc_install_generator = described_class.new([], { pretend: true, redux: true, pro: true, rsc: true })
+
+      allow(redux_pro_rsc_install_generator).to receive(:ensure_shakapacker_installed)
+      allow(redux_pro_rsc_install_generator).to receive(:setup_react_dependencies)
+      allow(redux_pro_rsc_install_generator).to receive_messages(use_pro?: true, use_rsc?: true)
+
+      expect(redux_pro_rsc_install_generator).to receive(:invoke)
+        .with("react_on_rails:base", [], hash_including(pretend: true))
+      expect(redux_pro_rsc_install_generator).to receive(:invoke)
+        .with("react_on_rails:react_with_redux", [], hash_including(pretend: true))
+      expect(redux_pro_rsc_install_generator).to receive(:invoke)
+        .with("react_on_rails:pro", [], hash_including(pretend: true))
+      expect(redux_pro_rsc_install_generator).to receive(:invoke)
+        .with("react_on_rails:rsc", [], hash_including(pretend: true))
+
+      redux_pro_rsc_install_generator.send(:invoke_generators)
+    end
+  end
+
   context "when detecting existing bin-files on *nix" do
     let(:install_generator) { described_class.new }
 
