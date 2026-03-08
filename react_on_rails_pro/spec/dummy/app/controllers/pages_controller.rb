@@ -116,6 +116,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
     return if redis_thread.join(10)
 
+    redis_thread.kill
     Rails.logger.error "Redis thread timed out"
     raise "Redis thread timed out"
   end
