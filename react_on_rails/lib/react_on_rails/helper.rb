@@ -566,6 +566,8 @@ module ReactOnRails
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
 
+      # clientProps are only expected on successful SSR hashes. Current error hashes do not
+      # include that key, so non-SSR/error paths skip this merge entirely.
       merge_server_rendered_client_props!(render_options, result) if result.is_a?(Hash)
 
       # Setup the page_loaded_js, which is the same regardless of prerendering or not!

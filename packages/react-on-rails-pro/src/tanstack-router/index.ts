@@ -110,6 +110,8 @@ export function createTanStackRouterRenderFunction(
     }
 
     // Client-side: return a React component so React on Rails can instantiate it with props.
+    // This intentionally creates a fresh closure per renderFn call so the client component
+    // captures the current railsContext and TanStack Router dependencies for that mount.
     return function TanStackRouterClientApp(clientProps: Record<string, unknown> = {}) {
       return clientHydrateTanStackApp(
         options,
