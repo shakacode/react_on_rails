@@ -119,8 +119,9 @@ module ReactOnRailsPro
       end
     ensure
       # Capture the primary exception (if any) BEFORE any cleanup that could raise.
-      # Inside a rescue block, $ERROR_INFO is always the caught exception,
-      # so we must snapshot it here where it reflects the propagating exception.
+      # In an ensure block, $ERROR_INFO holds the exception currently propagating
+      # out of the method (nil if returning normally). We must snapshot it before
+      # the begin/rescue below, where $ERROR_INFO would reflect the caught exception.
       primary_exception = $ERROR_INFO
 
       # Close the queue to unblock writing_task (it may be waiting on dequeue)
