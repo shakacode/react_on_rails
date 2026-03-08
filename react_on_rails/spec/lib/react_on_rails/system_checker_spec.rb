@@ -649,28 +649,97 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
 
     describe "#shakapacker_configured?" do
-      it "returns true when all required files exist" do
-        files = [
-          "bin/shakapacker",
-          "bin/shakapacker-dev-server",
-          "config/shakapacker.yml",
-          "config/webpack/webpack.config.js"
-        ]
+      before do
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
+        allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        # Default all config files to missing
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(false)
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
+      end
 
-        files.each do |file|
-          allow(File).to receive(:exist?).with(file).and_return(true)
-        end
-
+      it "returns true when webpack JS config exists" do
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
-      it "returns false when any required file is missing" do
-        allow(File).to receive(:exist?).with("bin/shakapacker").and_return(false)
-        allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
+      it "returns true when webpack TS config exists" do
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
 
+      it "returns true when rspack JS config exists" do
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(true)
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
+
+      it "returns true when rspack TS config exists" do
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
+
+      it "returns false when no bundler config file exists" do
         expect(checker.send(:shakapacker_configured?)).to be false
+      end
+
+      it "returns false when binaries are missing" do
+        allow(File).to receive(:exist?).with("bin/shakapacker").and_return(false)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
+        expect(checker.send(:shakapacker_configured?)).to be false
+      end
+    end
+
+    describe "#standard_shakapacker_config?" do
+      it "recognizes CommonJS webpack config" do
+        content = <<~JS
+          const { generateWebpackConfig } = require('shakapacker')
+          const webpackConfig = generateWebpackConfig()
+          module.exports = webpackConfig
+        JS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "recognizes CommonJS rspack config" do
+        content = <<~JS
+          const { generateRspackConfig } = require('shakapacker/rspack')
+          const rspackConfig = generateRspackConfig()
+          module.exports = rspackConfig
+        JS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "recognizes TypeScript ESM webpack config" do
+        content = <<~TS
+          import { generateWebpackConfig } from 'shakapacker'
+          import type { Configuration } from 'webpack'
+          const webpackConfig: Configuration = generateWebpackConfig()
+          export default webpackConfig
+        TS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "recognizes TypeScript ESM rspack config" do
+        content = <<~TS
+          import { generateRspackConfig } from 'shakapacker/rspack'
+          import type { RspackOptions } from '@rspack/core'
+          const rspackConfig: RspackOptions = generateRspackConfig()
+          export default rspackConfig
+        TS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "rejects fully custom config without standard patterns" do
+        content = <<~JS
+          const path = require('path')
+          module.exports = {
+            entry: './src/index.js',
+            output: { path: path.resolve(__dirname, 'dist') }
+          }
+        JS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be false
       end
     end
   end

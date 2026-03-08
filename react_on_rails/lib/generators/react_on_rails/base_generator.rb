@@ -320,7 +320,13 @@ module ReactOnRails
 
       def bundler_main_config_path
         if using_rspack?
-          "config/rspack/rspack.config.js"
+          if File.exist?("config/rspack/rspack.config.ts")
+            "config/rspack/rspack.config.ts"
+          else
+            "config/rspack/rspack.config.js"
+          end
+        elsif File.exist?("config/webpack/webpack.config.ts")
+          "config/webpack/webpack.config.ts"
         else
           "config/webpack/webpack.config.js"
         end
@@ -588,6 +594,10 @@ module ReactOnRails
       end
 
       def shakapacker_default_configs
+        shakapacker_cjs_default_configs + shakapacker_esm_default_configs
+      end
+
+      def shakapacker_cjs_default_configs
         configs = []
 
         # Shakapacker v7+ (generateWebpackConfig function)
@@ -635,6 +645,40 @@ module ReactOnRails
           const { generateRspackConfig } = require('shakapacker/rspack')
           const rspackConfig = generateRspackConfig()
           module.exports = rspackConfig
+        CONFIG
+
+        configs
+      end
+
+      def shakapacker_esm_default_configs
+        configs = []
+
+        # Shakapacker v9.4+ TypeScript webpack configs (ESM syntax)
+        configs << <<~CONFIG
+          import { generateWebpackConfig } from 'shakapacker'
+          import type { Configuration } from 'webpack'
+          const webpackConfig: Configuration = generateWebpackConfig()
+          export default webpackConfig
+        CONFIG
+
+        configs << <<~CONFIG
+          import { generateWebpackConfig } from 'shakapacker'
+          const webpackConfig = generateWebpackConfig()
+          export default webpackConfig
+        CONFIG
+
+        # Shakapacker v9.4+ TypeScript rspack configs (ESM syntax)
+        configs << <<~CONFIG
+          import { generateRspackConfig } from 'shakapacker/rspack'
+          import type { RspackOptions } from '@rspack/core'
+          const rspackConfig: RspackOptions = generateRspackConfig()
+          export default rspackConfig
+        CONFIG
+
+        configs << <<~CONFIG
+          import { generateRspackConfig } from 'shakapacker/rspack'
+          const rspackConfig = generateRspackConfig()
+          export default rspackConfig
         CONFIG
 
         configs

@@ -134,7 +134,7 @@ module ReactOnRails
           • bin/shakapacker
           • bin/shakapacker-dev-server
           • config/shakapacker.yml
-          • config/webpack/webpack.config.js
+          • config/{webpack,rspack}/{webpack,rspack}.config.{js,ts}
 
           Run: bundle exec rails shakapacker:install
         MSG
@@ -291,19 +291,28 @@ module ReactOnRails
 
     # Webpack configuration validation
     def check_webpack_configuration
-      webpack_config_path = "config/webpack/webpack.config.js"
-      if File.exist?(webpack_config_path)
-        add_success("✅ Webpack configuration exists")
-        check_webpack_config_content
+      config_path = detect_bundler_config_path
+      if config_path
+        add_success("✅ Bundler configuration exists (#{config_path})")
+        check_webpack_config_content(config_path)
         suggest_webpack_inspection
       else
         add_error(<<~MSG.strip)
-          🚫 Webpack configuration not found.
+          🚫 Bundler configuration not found.
 
-          Expected: config/webpack/webpack.config.js
+          Expected one of: config/webpack/webpack.config.{js,ts} or config/rspack/rspack.config.{js,ts}
           Run: rails generate react_on_rails:install
         MSG
       end
+    end
+
+    def detect_bundler_config_path
+      %w[
+        config/webpack/webpack.config.js
+        config/webpack/webpack.config.ts
+        config/rspack/rspack.config.js
+        config/rspack/rspack.config.ts
+      ].find { |path| File.exist?(path) }
     end
 
     def suggest_webpack_inspection
@@ -348,8 +357,7 @@ module ReactOnRails
       end
     end
 
-    def check_webpack_config_content
-      webpack_config_path = "config/webpack/webpack.config.js"
+    def check_webpack_config_content(webpack_config_path)
       content = File.read(webpack_config_path)
 
       if react_on_rails_config?(content)
@@ -427,7 +435,14 @@ module ReactOnRails
       File.exist?("bin/shakapacker") &&
         File.exist?("bin/shakapacker-dev-server") &&
         File.exist?("config/shakapacker.yml") &&
-        File.exist?("config/webpack/webpack.config.js")
+        bundler_config_file_exists?
+    end
+
+    def bundler_config_file_exists?
+      File.exist?("config/webpack/webpack.config.js") ||
+        File.exist?("config/webpack/webpack.config.ts") ||
+        File.exist?("config/rspack/rspack.config.js") ||
+        File.exist?("config/rspack/rspack.config.ts")
     end
 
     def shakapacker_in_gemfile?
@@ -443,8 +458,13 @@ module ReactOnRails
     def standard_shakapacker_config?(content)
       normalized = normalize_config_content(content)
       shakapacker_patterns = [
+        # CommonJS patterns (JS configs)
         /generateWebpackConfig.*require.*shakapacker/,
-        /webpackConfig.*require.*shakapacker/
+        /webpackConfig.*require.*shakapacker/,
+        /generateRspackConfig.*require.*shakapacker/,
+        # ESM patterns (TS configs)
+        /generateWebpackConfig.*from ['"]shakapacker['"]/,
+        %r{generateRspackConfig.*from ['"]shakapacker/rspack['"]}
       ]
       shakapacker_patterns.any? { |pattern| normalized.match?(pattern) }
     end
