@@ -519,6 +519,53 @@ RSpec.describe "Streaming API" do
     end
 
     describe "client disconnect handling" do
+      it "does not deadlock when client disconnects with full bounded queue" do
+        original_buffer = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = 1
+
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        write_count = 0
+        allow(stream).to receive(:write) do |_chunk|
+          write_count += 1
+          raise IOError, "client disconnected" if write_count == 2
+        end
+
+        Timeout.timeout(5) do
+          run_stream(controller) do |_parent|
+            10.times { |i| queues[0].enqueue("Chunk#{i}") }
+            queues[0].close
+            sleep 0.5
+          end
+        end
+        # If we reach here without Timeout::Error, no deadlock occurred
+      ensure
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = original_buffer
+      end
+
+      it "does not deadlock when client disconnects with Errno::EPIPE and full bounded queue" do
+        original_buffer = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = 1
+
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        write_count = 0
+        allow(stream).to receive(:write) do |_chunk|
+          write_count += 1
+          raise Errno::EPIPE, "broken pipe" if write_count == 2
+        end
+
+        Timeout.timeout(5) do
+          run_stream(controller) do |_parent|
+            10.times { |i| queues[0].enqueue("Chunk#{i}") }
+            queues[0].close
+            sleep 0.5
+          end
+        end
+      ensure
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = original_buffer
+      end
+
       it "stops writing on IOError" do
         queues, controller, stream = setup_stream_test(component_count: 1)
 
@@ -572,6 +619,33 @@ RSpec.describe "Streaming API" do
         end
 
         expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+      end
+    end
+
+    describe "exception handling" do
+      it "does not deadlock when writer raises unexpected exception with full queue" do
+        original_buffer = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = 1
+
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        write_count = 0
+        allow(stream).to receive(:write) do |_chunk|
+          write_count += 1
+          raise ArgumentError, "unexpected encoding error" if write_count == 2
+        end
+
+        # The key assertion: completes within timeout (no deadlock).
+        # The ArgumentError is handled by Async's task machinery.
+        Timeout.timeout(5) do
+          run_stream(controller) do |_parent|
+            10.times { |i| queues[0].enqueue("Chunk#{i}") }
+            queues[0].close
+            sleep 0.5
+          end
+        end
+      ensure
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = original_buffer
       end
     end
   end

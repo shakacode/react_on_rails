@@ -315,6 +315,8 @@ module ReactOnRailsProHelper
     # Enqueue remaining chunks asynchronously
     @async_barrier.async do
       rest_chunks.each { |chunk| @main_output_queue.enqueue(chunk) }
+    rescue Async::Queue::ClosedError
+      # Queue closed due to error/disconnect in another component — stop enqueuing
     end
 
     # Return first chunk directly
@@ -436,8 +438,8 @@ module ReactOnRailsProHelper
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
       stream = yield
-      process_stream_chunks(stream, first_chunk_var, all_chunks)
-      on_complete&.call(all_chunks)
+      fully_consumed = process_stream_chunks(stream, first_chunk_var, all_chunks)
+      on_complete&.call(all_chunks) if fully_consumed
     rescue StandardError => e
       # Propagate the error to the calling fiber via the variable.
       # Async::Variable can only be resolved once — if it was already resolved
@@ -470,12 +472,17 @@ module ReactOnRailsProHelper
     result
   end
 
+  # Returns true if the stream was fully consumed, false if aborted (client disconnect).
+  # When false, callers must NOT invoke on_complete to avoid caching partial data.
   def process_stream_chunks(stream, first_chunk_var, all_chunks)
     is_first = true
 
     stream.each_chunk do |chunk|
-      # Check if client disconnected before processing chunk
-      break if response.stream.closed?
+      # Client disconnected — abort without caching partial results
+      if response.stream.closed?
+        first_chunk_var.value = nil if is_first
+        return false
+      end
 
       all_chunks&.push(chunk)
 
@@ -491,6 +498,7 @@ module ReactOnRailsProHelper
 
     # Handle case where stream has no chunks
     first_chunk_var.value = nil if is_first
+    true
   end
 
   def internal_stream_react_component(component_name, options = {})
