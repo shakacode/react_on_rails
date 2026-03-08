@@ -205,7 +205,7 @@ GEM
       racc (~> 1.4)
     nokogiri (1.19.0-x86_64-linux-gnu)
       racc (~> 1.4)
-    package_json (0.1.0)
+    package_json (0.2.0)
     pp (0.6.3)
       prettyprint
     prettyprint (0.2.0)
@@ -281,8 +281,8 @@ GEM
       rexml (~> 3.2, >= 3.2.5)
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
-    semantic_range (3.0.0)
-    shakapacker (9.5.0)
+    semantic_range (3.1.1)
+    shakapacker (9.6.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -343,7 +343,7 @@ DEPENDENCIES
   react_on_rails!
   react_on_rails_pro!
   selenium-webdriver
-  shakapacker (= 9.5.0)
+  shakapacker (= 9.6.0)
   sprockets-rails
   sqlite3 (~> 1.4)
   tzinfo-data
