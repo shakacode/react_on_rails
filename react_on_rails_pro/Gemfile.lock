@@ -414,9 +414,9 @@ GEM
       rexml (~> 3.2, >= 3.2.5)
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
-    semantic_range (3.1.0)
+    semantic_range (3.1.1)
     sexp_processor (4.17.1)
-    shakapacker (9.5.0)
+    shakapacker (9.6.0)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -531,7 +531,7 @@ DEPENDENCIES
   sass-rails
   scss_lint
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 9.5.0)
+  shakapacker (= 9.6.0)
   spring
   spring-watcher-listen
   sprockets
