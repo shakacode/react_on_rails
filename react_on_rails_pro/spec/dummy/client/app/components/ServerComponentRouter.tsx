@@ -47,6 +47,9 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
           <li>
             <Link to={`${basePath}/server-component-with-retry`}>Server Component with Retry</Link>
           </li>
+          <li>
+            <Link to={`${basePath}/chunk-mapping-test`}>Chunk Mapping Test (RSC Bug Repro)</Link>
+          </li>
         </ul>
       </nav>
       <Suspense fallback={<div>Loading Page...</div>}>
@@ -83,6 +86,10 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             element={<RSCRoute componentName="AsyncComponentsTreeForTesting" componentProps={props} />}
           />
           <Route path={`${basePath}/server-component-with-retry`} element={<ServerComponentWithRetry />} />
+          <Route
+            path={`${basePath}/chunk-mapping-test`}
+            element={<RSCRoute componentName="ChunkMappingTest" componentProps={{}} />}
+          />
         </Routes>
       </Suspense>
     </ErrorBoundary>

@@ -1,0 +1,9 @@
+<h1>RSC Chunk Mapping Bug Reproduction</h1>
+<p>If you see "BUG: SERVER variant loaded in browser!" below, the chunk mapping bug is confirmed.</p>
+<p>The correct behavior would show "CORRECT: Client variant loaded in browser".</p>
+<hr/>
+
+<%= stream_react_component("ChunkMappingTest",
+    props: {},
+    prerender: true,
+    id: "chunk-mapping-test-0") %>
