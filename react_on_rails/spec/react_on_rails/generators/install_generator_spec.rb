@@ -947,18 +947,7 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
-    it "creates HelloServer controller and view" do
-      assert_file "app/controllers/hello_server_controller.rb" do |content|
-        expect(content).to include("class HelloServerController")
-        expect(content).to include('layout "hello_world"')
-        expect(content).to include("ReactOnRailsPro::Stream")
-      end
-
-      assert_file "app/views/hello_server/index.html.erb" do |content|
-        expect(content).to include("HelloServer")
-        expect(content).to include("stream_react_component")
-      end
-    end
+    include_examples "rsc_hello_server_controller"
 
     it "adds HelloServer route" do
       assert_file "config/routes.rb" do |content|
@@ -1017,13 +1006,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates HelloServer controller with hello_world layout" do
-      assert_file "app/controllers/hello_server_controller.rb" do |content|
-        expect(content).to include("class HelloServerController")
-        expect(content).to include('layout "hello_world"')
-        expect(content).to include("ReactOnRailsPro::Stream")
-      end
-    end
+    include_examples "rsc_hello_server_controller"
   end
 
   context "with --rsc --typescript" do
@@ -1069,13 +1052,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates HelloServer controller with hello_world layout" do
-      assert_file "app/controllers/hello_server_controller.rb" do |content|
-        expect(content).to include("class HelloServerController")
-        expect(content).to include('layout "hello_world"')
-        expect(content).to include("ReactOnRailsPro::Stream")
-      end
-    end
+    include_examples "rsc_hello_server_controller"
   end
 
   context "with --rsc --rspack" do
@@ -1110,13 +1087,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates HelloServer controller with hello_world layout" do
-      assert_file "app/controllers/hello_server_controller.rb" do |content|
-        expect(content).to include("class HelloServerController")
-        expect(content).to include('layout "hello_world"')
-        expect(content).to include("ReactOnRailsPro::Stream")
-      end
-    end
+    include_examples "rsc_hello_server_controller"
   end
 
   context "when rscWebpackConfig.js already exists" do
@@ -1153,10 +1124,6 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with helpful message" do
-    let(:expected) do
-      GeneratorMessages.format_info(GeneratorMessages.helpful_message_after_installation)
-    end
-
     before do
       # Clear any previous messages to ensure clean test state
       GeneratorMessages.clear
