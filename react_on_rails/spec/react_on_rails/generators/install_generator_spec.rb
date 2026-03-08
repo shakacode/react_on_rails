@@ -291,10 +291,11 @@ describe InstallGenerator, type: :generator do
     end
 
     it "does not insert duplicate private_output_path entries" do
+      skip "private_output_path requires Shakapacker >= 9.0.0" unless
+        ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
+
       assert_file "config/shakapacker.yml" do |content|
-        if ReactOnRails::PackerUtils.shakapacker_version_requirement_met?("9.0.0")
-          expect(content.scan(/^\s*private_output_path:/).size).to eq(1)
-        end
+        expect(content.scan(/^\s*private_output_path:/).size).to eq(1)
       end
     end
   end

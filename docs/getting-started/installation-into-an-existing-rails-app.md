@@ -21,9 +21,17 @@
    bundle add react_on_rails --version="<react_on_rails_gem_version>" --strict
    ```
 
+   Then install the matching npm packages (versions must stay in sync with the gems):
+
+   ```bash
+   # Use your preferred package manager
+   yarn add react-on-rails@<react_on_rails_npm_version> shakapacker@<shakapacker_version> --exact
+   # or: npm install react-on-rails@<react_on_rails_npm_version> shakapacker@<shakapacker_version> --save-exact
+   ```
+
 2. Run the following command to install Shakapacker with React. Note, if you are using an older version of
-   Rails than 5.1, you'll need to install Webpacker with React per the instructions
-   [here](https://github.com/rails/webpacker).
+   Rails than 5.1, you'll need to install Webpacker with React per the
+   [Webpacker React installation guide](https://github.com/rails/webpacker).
 
    ```bash
    bundle exec rails shakapacker:install

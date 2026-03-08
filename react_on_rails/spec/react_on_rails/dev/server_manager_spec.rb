@@ -36,6 +36,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       original_port = ENV.fetch("PORT", nil)
       ENV.delete("PORT")
       example.run
+    ensure
       if original_port.nil?
         ENV.delete("PORT")
       else
@@ -165,6 +166,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV.delete("PORT")
         ENV.delete("SHAKAPACKER_DEV_SERVER_PORT")
         example.run
+      ensure
         ENV["PORT"] = old_port
         ENV["SHAKAPACKER_DEV_SERVER_PORT"] = old_webpack_port
       end
@@ -426,6 +428,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       old_port = ENV.fetch("PORT", nil)
       ENV.delete("PORT")
       example.run
+    ensure
       ENV["PORT"] = old_port
     end
 

@@ -386,8 +386,15 @@ module ReactOnRails
 
         content = File.read(shakapacker_config_path)
 
-        # Any active key means the app already made an explicit choice.
-        return if content.match?(/^\s+private_output_path:/)
+        # A non-empty active value means the app already made an explicit choice.
+        return if content.match?(/^\s+private_output_path:\s*\S+/)
+
+        # Normalize an empty active key before falling back to insertion.
+        gsub_file(
+          shakapacker_config_path,
+          /^(\s*)private_output_path:\s*$/,
+          "\\1private_output_path: ssr-generated"
+        )
 
         # First try: uncomment an existing private_output_path placeholder line.
         gsub_file(
