@@ -13,6 +13,7 @@
  */
 
 import { RSCPayloadChunk } from 'react-on-rails/types';
+import { sanitizeNonce } from './utils.ts';
 
 /**
  * Transforms an RSC stream and replays console logs on the client.
@@ -28,7 +29,6 @@ import { RSCPayloadChunk } from 'react-on-rails/types';
  * @param stream - The RSC payload stream to transform
  * @returns A transformed stream with console logs extracted and replayed
  */
-const sanitizeNonce = (nonce?: string) => nonce?.replace(/[^a-zA-Z0-9+/=_-]/g, '');
 
 export default function transformRSCStreamAndReplayConsoleLogs(
   stream: ReadableStream<Uint8Array | string>,

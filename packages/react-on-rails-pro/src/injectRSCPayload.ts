@@ -14,7 +14,7 @@
 
 import { PassThrough } from 'stream';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
-import { createRSCPayloadKey } from './utils.ts';
+import { createRSCPayloadKey, sanitizeNonce } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 import safePipe from './safePipe.ts';
 
@@ -35,7 +35,7 @@ function cacheKeyJSArray(cacheKey: string) {
 }
 
 function nonceAttribute(cspNonce?: string) {
-  const sanitizedNonce = cspNonce?.replace(/[^a-zA-Z0-9+/=_-]/g, '');
+  const sanitizedNonce = sanitizeNonce(cspNonce);
   return sanitizedNonce ? ` nonce="${sanitizedNonce}"` : '';
 }
 
