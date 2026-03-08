@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "pathname"
 require "shakapacker"
 
 module ReactOnRails
@@ -227,11 +228,22 @@ module ReactOnRails
     end
 
     def self.resolve_hook_script_path(hook_value)
-      # Hook value might be a script path relative to Rails root
-      return nil unless defined?(Rails) && Rails.respond_to?(:root)
+      return nil if hook_value.blank?
 
-      potential_path = Rails.root.join(hook_value.to_s.strip)
+      potential_path = project_root.join(hook_value.to_s.strip)
       potential_path if potential_path.file?
+    end
+
+    def self.project_root
+      return Pathname.new(Rails.root) if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+
+      bundle_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+      if bundle_gemfile && !bundle_gemfile.strip.empty?
+        gemfile_path = Pathname.new(bundle_gemfile).expand_path
+        return gemfile_path.dirname if gemfile_path.file?
+      end
+
+      Pathname.new(Dir.pwd)
     end
 
     # Check if a hook script file contains the self-guard pattern that prevents
