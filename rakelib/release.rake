@@ -126,6 +126,16 @@ def verify_gh_auth(monorepo_root:)
   puts "✓ GitHub CLI authenticated with write access to #{repo_slug}"
 end
 
+def run_release_preflight_checks!(monorepo_root:, dry_run:)
+  return if dry_run
+
+  puts "\n#{'=' * 80}"
+  puts "PRE-FLIGHT CHECKS"
+  puts "=" * 80
+  verify_npm_auth
+  verify_gh_auth(monorepo_root: monorepo_root)
+end
+
 def current_gem_version(monorepo_root)
   version_file = File.join(monorepo_root, "react_on_rails", "lib", "react_on_rails", "version.rb")
   content = File.read(version_file)
@@ -645,13 +655,7 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
   # Configure output verbosity
   verbose(is_verbose)
 
-  # Pre-flight authentication checks (skip for dry runs)
-  unless is_dry_run
-    puts "\n#{'=' * 80}"
-    puts "PRE-FLIGHT CHECKS"
-    puts "=" * 80
-    verify_npm_auth
-  end
+  run_release_preflight_checks!(monorepo_root: monorepo_root, dry_run: is_dry_run)
 
   released_gem_version = nil
   released_npm_version = nil

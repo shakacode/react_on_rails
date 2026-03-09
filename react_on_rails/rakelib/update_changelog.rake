@@ -46,13 +46,27 @@ rescue SystemExit
   nil
 end
 
-def stable_tag_versions(monorepo_root)
+def fetch_git_tags!(monorepo_root)
+  remotes_output, remotes_status = Open3.capture2e("git", "-C", monorepo_root, "remote")
+  abort "Failed to list git remotes.\n#{remotes_output}" unless remotes_status.success?
+
+  remote_names = remotes_output.lines.map(&:strip).reject(&:empty?)
+  return if remote_names.empty?
+
+  remote_name = remote_names.include?("origin") ? "origin" : remote_names.first
+  fetch_output, fetch_status = Open3.capture2e("git", "-C", monorepo_root, "fetch", remote_name, "--tags", "--quiet")
+  abort "Failed to fetch git tags from #{remote_name}.\n#{fetch_output}" unless fetch_status.success?
+end
+
+def tag_versions(monorepo_root)
   tags_output, status = Open3.capture2e("git", "-C", monorepo_root, "tag", "-l", "v*")
   abort "Failed to list git tags.\n#{tags_output}" unless status.success?
 
-  tags_output.lines.map(&:strip).filter_map { |tag| parse_release_tag_to_version(tag) }
-             .reject { |version| prerelease_version?(version) }
-             .uniq
+  tags_output.lines.map(&:strip).filter_map { |tag| parse_release_tag_to_version(tag) }.uniq
+end
+
+def stable_tag_versions(monorepo_root)
+  tag_versions(monorepo_root).reject { |version| prerelease_version?(version) }
 end
 
 def latest_stable_tag_version(monorepo_root)
@@ -99,11 +113,12 @@ def bump_stable_version(version, bump_type)
 end
 
 def prerelease_indices_from_tags(monorepo_root, base_version, channel)
-  tags_output, status = Open3.capture2e("git", "-C", monorepo_root, "tag", "-l", "v#{base_version}.#{channel}.*")
+  tags_output, status = Open3.capture2e("git", "-C", monorepo_root, "tag", "-l", "v#{base_version}*")
   abort "Failed to list prerelease tags.\n#{tags_output}" unless status.success?
 
   tags_output.lines.map(&:strip).filter_map do |tag|
-    match = tag.match(/\Av#{Regexp.escape(base_version)}\.#{channel}\.(\d+)\z/i)
+    normalized_version = parse_release_tag_to_version(tag)
+    match = normalized_version&.match(/\A#{Regexp.escape(base_version)}\.#{channel}\.(\d+)\z/i)
     match&.captures&.first&.to_i
   end
 end
@@ -144,7 +159,70 @@ def render_changelog_sections(prefix, sections)
   "#{prefix}#{sections.map { |section| "#{section[:header]}#{section[:body]}" }.join}"
 end
 
-# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+def changelog_versions(changelog)
+  parse_changelog_sections(changelog)[:sections]
+    .map { |section| section[:version] }
+    .reject { |version| version == "Unreleased" }
+    .map { |version| normalize_version_string(version) }
+end
+
+def prerelease_base_version(version)
+  version.to_s.sub(/\.(test|beta|alpha|rc|pre)\.\d+\z/i, "")
+end
+
+def active_prerelease_base_version(monorepo_root, changelog)
+  latest_stable = latest_stable_tag_version(monorepo_root)
+  prerelease_bases = (tag_versions(monorepo_root) + changelog_versions(changelog))
+                     .uniq
+                     .select { |version| prerelease_version?(version) }
+                     .map { |version| prerelease_base_version(version) }
+                     .select do |base_version|
+                       Gem::Version.new(base_version) > Gem::Version.new(latest_stable)
+                     end
+                     .uniq
+
+  prerelease_bases.max_by { |base_version| Gem::Version.new(base_version) }
+end
+
+def collapse_prerelease_series(changelog, base_version)
+  %w[test beta alpha rc pre].reduce(changelog) do |current_changelog, channel|
+    collapse_prerelease_sections(current_changelog, base_version, channel)
+  end
+end
+
+def prepare_changelog_for_auto_version(changelog, monorepo_root)
+  active_base_version = active_prerelease_base_version(monorepo_root, changelog)
+  return changelog unless active_base_version
+
+  collapse_prerelease_series(changelog, active_base_version)
+end
+
+def changelog_section_blocks(section_body)
+  block_lines = []
+  blocks = []
+
+  section_body.lines.each do |line|
+    normalized_line = line.rstrip
+    if normalized_line.match?(/^####+\s+/) && !block_lines.empty?
+      blocks << normalize_changelog_block(block_lines)
+      block_lines = [normalized_line]
+    else
+      block_lines << normalized_line
+    end
+  end
+
+  blocks << normalize_changelog_block(block_lines) unless block_lines.empty?
+  blocks.reject(&:empty?)
+end
+
+def normalize_changelog_block(lines)
+  normalized_lines = lines.map(&:rstrip)
+  normalized_lines.shift while normalized_lines.first == ""
+  normalized_lines.pop while normalized_lines.last == ""
+  normalized_lines.join("\n")
+end
+
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
 def collapse_prerelease_sections(changelog, base_version, channel)
   parsed = parse_changelog_sections(changelog)
   sections = parsed[:sections]
@@ -156,10 +234,9 @@ def collapse_prerelease_sections(changelog, base_version, channel)
   return changelog if matching_sections.empty?
 
   merged_body = matching_sections
-                .flat_map { |section| section[:body].strip.lines.map(&:strip) }
-                .reject(&:empty?)
+                .flat_map { |section| changelog_section_blocks(section[:body]) }
                 .uniq
-                .join("\n")
+                .join("\n\n")
                 .strip
   sections.reject! { |section| section[:version].match?(target_regex) }
 
@@ -174,10 +251,10 @@ def collapse_prerelease_sections(changelog, base_version, channel)
 
   render_changelog_sections(parsed[:prefix], sections)
 end
-# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
-def compute_auto_version(changelog, mode, monorepo_root)
-  bump_type = inferred_bump_type_from_unreleased(changelog)
+def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: changelog)
+  bump_type = inferred_bump_type_from_unreleased(changelog_for_bump)
   latest_stable = latest_stable_tag_version(monorepo_root)
   base_version = bump_stable_version(latest_stable, bump_type)
 
@@ -247,11 +324,15 @@ task :update_changelog, %i[mode_or_tag] do |_, args|
   auto_mode = %w[release rc beta].find { |mode| mode == input.downcase }
 
   if auto_mode
-    changelog_version = compute_auto_version(changelog, auto_mode, monorepo_root)
-    if %w[rc beta].include?(auto_mode)
-      base_version = changelog_version.sub(/\.(?:rc|beta)\.\d+\z/i, "")
-      changelog = collapse_prerelease_sections(changelog, base_version, auto_mode)
-    end
+    fetch_git_tags!(monorepo_root)
+    prepared_changelog = prepare_changelog_for_auto_version(changelog, monorepo_root)
+    changelog_version = compute_auto_version(
+      changelog,
+      auto_mode,
+      monorepo_root,
+      changelog_for_bump: prepared_changelog
+    )
+    changelog = prepared_changelog
     tag_date = Date.today.strftime("%Y-%m-%d")
     puts "Auto-computed #{auto_mode} version: #{changelog_version}"
   else

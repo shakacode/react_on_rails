@@ -99,4 +99,20 @@ RSpec.describe "release.rake helper methods" do
       end
     end
   end
+
+  describe "#run_release_preflight_checks!" do
+    it "checks both npm and GitHub auth before a real release" do
+      expect(self).to receive(:verify_npm_auth)
+      expect(self).to receive(:verify_gh_auth).with(monorepo_root: "/tmp/repo")
+
+      run_release_preflight_checks!(monorepo_root: "/tmp/repo", dry_run: false)
+    end
+
+    it "skips auth checks for dry runs" do
+      expect(self).not_to receive(:verify_npm_auth)
+      expect(self).not_to receive(:verify_gh_auth)
+
+      run_release_preflight_checks!(monorepo_root: "/tmp/repo", dry_run: true)
+    end
+  end
 end
