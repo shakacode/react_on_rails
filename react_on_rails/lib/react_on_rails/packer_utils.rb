@@ -273,7 +273,11 @@ module ReactOnRails
       config_data = ::Shakapacker.config.send(:data)
 
       # Try symbol keys first (Shakapacker's internal format), then fall back to string keys
-      config_data&.[](:precompile_hook) || config_data&.[]("precompile_hook")
+      if config_data&.key?(:precompile_hook)
+        config_data[:precompile_hook]
+      elsif config_data&.key?("precompile_hook")
+        config_data["precompile_hook"]
+      end
     rescue StandardError
       nil
     end
@@ -282,8 +286,8 @@ module ReactOnRails
       config_path = project_root.join(SHAKAPACKER_CONFIG_PATH)
       return nil unless config_path.file?
 
-      yaml_content = ERB.new(File.read(config_path)).result
-      config_data = YAML.safe_load(yaml_content, aliases: true) || {}
+      yaml_content = ERB.new(File.read(config_path)).result(binding)
+      config_data = YAML.safe_load(yaml_content, permitted_classes: [Symbol], aliases: true) || {}
 
       env_config = extract_hash_for_environment(config_data, current_shakapacker_environment)
       return env_config["precompile_hook"] if env_config.key?("precompile_hook")
@@ -304,7 +308,14 @@ module ReactOnRails
     end
 
     def self.current_shakapacker_environment
-      return Rails.env.to_s if defined?(Rails) && Rails.respond_to?(:env) && !Rails.env.to_s.strip.empty?
+      if defined?(Rails) && Rails.respond_to?(:env)
+        env = begin
+          Rails.env.to_s
+        rescue StandardError
+          nil
+        end
+        return env unless env.to_s.strip.empty?
+      end
 
       rails_env = ENV.fetch("RAILS_ENV", nil)
       return rails_env unless rails_env.to_s.strip.empty?
