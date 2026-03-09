@@ -21,6 +21,7 @@ module ReactOnRails
     # - use_pro?, use_rsc?: Feature flag helpers
     # - pro_gem_installed?: Pro gem detection
     #
+    # rubocop:disable Metrics/ModuleLength
     module ProSetup
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
@@ -56,7 +57,7 @@ module ReactOnRails
         # Try auto-installing (similar to ensure_shakapacker_in_gemfile in install_generator)
         puts Rainbow("📝 Adding react_on_rails_pro to Gemfile...").yellow
         if Bundler.with_unbundled_env { system("bundle add react_on_rails_pro --strict") }
-          @pro_gem_installed = nil
+          @pro_gem_installed = true
           return false
         end
 
@@ -318,5 +319,6 @@ module ReactOnRails
         )
       end
     end
+    # rubocop:enable Metrics/ModuleLength
   end
 end

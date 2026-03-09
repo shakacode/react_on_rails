@@ -1915,6 +1915,26 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when auto-installing Pro gem succeeds" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(install_generator).to receive(:system).with("bundle add react_on_rails_pro --strict").and_return(true)
+
+      # Simulate stale memoized value from an earlier check.
+      install_generator.instance_variable_set(:@pro_gem_installed, false)
+    end
+
+    specify "missing_pro_gem? marks memoized pro_gem_installed? state as installed" do
+      expect(install_generator.send(:missing_pro_gem?)).to be false
+      expect(install_generator).to have_received(:system).with("bundle add react_on_rails_pro --strict")
+      expect(install_generator.instance_variable_get(:@pro_gem_installed)).to be true
+    end
+  end
+
   context "when using --pro flag with Pro gem in Gem.loaded_specs" do
     let(:install_generator) { described_class.new([], { pro: true }) }
 
