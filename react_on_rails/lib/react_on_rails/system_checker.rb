@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
+require "erb"
 require "open3"
+require "yaml"
 
 module ReactOnRails
   # SystemChecker provides validation methods for React on Rails setup
@@ -186,14 +188,13 @@ module ReactOnRails
       return unless File.exist?(package_json_path)
 
       package_json = JSON.parse(File.read(package_json_path))
-      npm_version = package_json.dig("dependencies", "react-on-rails") ||
-                    package_json.dig("devDependencies", "react-on-rails")
+      package_name, npm_version = react_on_rails_npm_package_details(package_json)
 
-      if npm_version
-        add_success("✅ react-on-rails NPM package #{npm_version} is declared")
+      if package_name
+        add_success("✅ #{package_name} NPM package #{npm_version} is declared")
       else
         add_warning(<<~MSG.strip)
-          ⚠️  react-on-rails NPM package not found in package.json.
+          ⚠️  Neither react-on-rails nor react-on-rails-pro NPM package found in package.json.
 
           Install it with:
           npm install react-on-rails
@@ -208,8 +209,7 @@ module ReactOnRails
 
       begin
         package_json = JSON.parse(File.read("package.json"))
-        npm_version = package_json.dig("dependencies", "react-on-rails") ||
-                      package_json.dig("devDependencies", "react-on-rails")
+        package_name, npm_version = react_on_rails_npm_package_details(package_json)
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
 
@@ -221,7 +221,7 @@ module ReactOnRails
         gem_version = ReactOnRails::VERSION
 
         if normalized_npm_version == gem_version
-          add_success("✅ React on Rails gem and NPM package versions match (#{gem_version})")
+          add_success("✅ React on Rails gem and #{package_name} NPM package versions match (#{gem_version})")
           check_version_patterns(npm_version, gem_version)
         else
           # Check for major version differences
@@ -232,7 +232,7 @@ module ReactOnRails
             add_error(<<~MSG.strip)
               🚫 Major version mismatch detected:
               • Gem version: #{gem_version} (major: #{gem_major})
-              • NPM version: #{npm_version} (major: #{npm_major})
+              • #{package_name} version: #{npm_version} (major: #{npm_major})
 
               Major version differences can cause serious compatibility issues.
               Update both packages to use the same major version immediately.
@@ -241,7 +241,7 @@ module ReactOnRails
             add_warning(<<~MSG.strip)
               ⚠️  Version mismatch detected:
               • Gem version: #{gem_version}
-              • NPM version: #{npm_version}
+              • #{package_name} version: #{npm_version}
 
               Consider updating to exact, fixed matching versions of gem and npm package for best compatibility.
             MSG
@@ -341,7 +341,7 @@ module ReactOnRails
 
       begin
         package_json = JSON.parse(File.read("package.json"))
-        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+        all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
         all_deps["webpack-bundle-analyzer"]
       rescue StandardError
         false
@@ -372,6 +372,14 @@ module ReactOnRails
     end
 
     private
+
+    def react_on_rails_npm_package_details(package_json)
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
+      return ["react-on-rails-pro", all_deps["react-on-rails-pro"]] if all_deps["react-on-rails-pro"]
+      return ["react-on-rails", all_deps["react-on-rails"]] if all_deps["react-on-rails"]
+
+      [nil, nil]
+    end
 
     def node_missing?
       command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
@@ -449,11 +457,53 @@ module ReactOnRails
     end
 
     def required_react_dependencies
-      {
+      deps = {
         "react" => "React library",
-        "react-dom" => "React DOM library",
-        "@babel/preset-react" => "Babel React preset"
+        "react-dom" => "React DOM library"
       }
+
+      deps["@babel/preset-react"] = "Babel React preset" if using_babel_transpiler?
+      deps
+    end
+
+    def using_babel_transpiler?
+      transpiler = detected_javascript_transpiler
+      return true if transpiler.nil?
+
+      transpiler == "babel"
+    end
+
+    def detected_javascript_transpiler
+      config = parsed_shakapacker_config
+      unless config
+        if File.exist?("config/shakapacker.yml")
+          add_info("ℹ️  Unable to parse config/shakapacker.yml — defaulting to Babel assumption")
+        end
+        return nil
+      end
+
+      rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
+      env_config = config[rails_env] || {}
+      default_config = config["default"] || {}
+      transpiler = env_config["javascript_transpiler"] || default_config["javascript_transpiler"]
+      normalize_transpiler_value(transpiler)
+    end
+
+    def parsed_shakapacker_config
+      shakapacker_config_path = "config/shakapacker.yml"
+      return nil unless File.exist?(shakapacker_config_path)
+
+      raw_content = File.read(shakapacker_config_path)
+      rendered_content = ERB.new(raw_content).result
+      parsed = YAML.safe_load(rendered_content, aliases: true)
+      parsed.is_a?(Hash) ? parsed : nil
+    rescue StandardError, ScriptError
+      nil
+    end
+
+    def normalize_transpiler_value(transpiler)
+      normalized = transpiler.to_s.strip.downcase
+      normalized.empty? ? nil : normalized
     end
 
     def additional_build_dependencies
@@ -468,10 +518,10 @@ module ReactOnRails
       }
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity
     def check_build_dependencies(package_json)
       build_deps = additional_build_dependencies
-      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
       present_deps = []
       missing_deps = []
@@ -496,7 +546,7 @@ module ReactOnRails
       suffix = missing_deps.length > 3 ? "..." : ""
       add_info("ℹ️  Optional build dependencies: #{short_list}#{suffix}")
     end
-    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     def parse_package_json
       JSON.parse(File.read("package.json"))
@@ -506,12 +556,12 @@ module ReactOnRails
     end
 
     def find_missing_dependencies(package_json, required_deps)
-      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
       required_deps.keys.reject { |dep| all_deps[dep] }
     end
 
     def report_dependency_status(required_deps, missing_deps, package_json)
-      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
       required_deps.each do |dep, description|
         add_success("✅ #{description} (#{dep}) is installed") if all_deps[dep]
@@ -572,7 +622,7 @@ module ReactOnRails
     end
 
     def report_dependency_versions(package_json)
-      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
       react_version = all_deps["react"]
       react_dom_version = all_deps["react-dom"]
@@ -643,7 +693,7 @@ module ReactOnRails
 
       begin
         package_json = JSON.parse(File.read("package.json"))
-        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+        all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
         webpack_version = all_deps["webpack"]
         add_info("📦 Webpack version: #{webpack_version}") if webpack_version
