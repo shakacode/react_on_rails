@@ -4,6 +4,8 @@ import { getCommandVersion } from './utils.js';
 const MIN_NODE_VERSION = 18;
 const MIN_RUBY_MAJOR = 3;
 const MIN_RUBY_MINOR = 0;
+const MIN_RAILS_MAJOR = 7;
+const MIN_RAILS_MINOR = 0;
 
 export function validateNode(): ValidationResult {
   const version = process.versions.node;
@@ -73,7 +75,25 @@ export function validateRails(): ValidationResult {
     };
   }
 
-  return { valid: true, message: railsVersion.split('\n')[0].trim() };
+  const firstLine = railsVersion.split('\n')[0].trim();
+  const match = firstLine.match(/rails\s+(\d+)\.(\d+)/i);
+  if (!match) {
+    return {
+      valid: false,
+      message: `Could not parse Rails version from: "${firstLine}". Please ensure Rails ${MIN_RAILS_MAJOR}.${MIN_RAILS_MINOR}+ is installed.`,
+    };
+  }
+
+  const major = parseInt(match[1], 10);
+  const minor = parseInt(match[2], 10);
+  if (major < MIN_RAILS_MAJOR || (major === MIN_RAILS_MAJOR && minor < MIN_RAILS_MINOR)) {
+    return {
+      valid: false,
+      message: `Rails ${major}.${minor} detected. React on Rails requires Rails ${MIN_RAILS_MAJOR}.${MIN_RAILS_MINOR}+.`,
+    };
+  }
+
+  return { valid: true, message: firstLine };
 }
 
 export function validatePackageManager(pm: 'npm' | 'pnpm'): ValidationResult {

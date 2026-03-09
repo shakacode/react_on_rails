@@ -20,7 +20,7 @@ npx create-react-on-rails-app my-app [options]
 - `--tailwind` - Add Tailwind CSS
 - `--pro` - Install React on Rails Pro with RSC demo (future enhancement)
 - `--skip-install` - Skip dependency installation
-- `--interactive` - Interactive mode with prompts (default: true)
+- `--interactive` - Future enhancement: interactive mode with prompts (not in Phase 1)
 
 ### Example Usage
 
@@ -37,7 +37,7 @@ npx create-react-on-rails-app my-app --template=redux-typescript --package-manag
 # Using Rspack bundler
 npx create-react-on-rails-app my-app --template=typescript --bundler=rspack
 
-# Interactive mode (prompts for all options)
+# Future: interactive mode (prompts for all options)
 npx create-react-on-rails-app my-app --interactive
 
 # Future: React on Rails Pro with RSC
@@ -124,10 +124,8 @@ packages/create-react-on-rails-app/
 ```json
 {
   "dependencies": {
-    "commander": "^11.0.0",
-    "chalk": "^5.0.0",
-    "ora": "^6.0.0",
-    "prompts": "^2.4.0"
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0"
   }
 }
 ```
