@@ -541,6 +541,19 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
     end
 
+    context "when package.json has only devDependencies (no dependencies key)" do
+      let(:package_json) do
+        { "devDependencies" => { "react" => "^19.0.0", "react-dom" => "^19.0.0" } }
+      end
+
+      it "reports React and React DOM versions from devDependencies" do
+        checker.send(:report_dependency_versions, package_json)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("React ^19.0.0, React DOM ^19.0.0")
+        end).to be true
+      end
+    end
+
     describe "#report_shakapacker_version" do
       context "when Gemfile.lock exists with shakapacker" do
         let(:gemfile_lock_content) do

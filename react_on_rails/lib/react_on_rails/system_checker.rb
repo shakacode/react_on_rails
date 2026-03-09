@@ -341,7 +341,7 @@ module ReactOnRails
 
       begin
         package_json = JSON.parse(File.read("package.json"))
-        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+        all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
         all_deps["webpack-bundle-analyzer"]
       rescue StandardError
         false
@@ -468,10 +468,10 @@ module ReactOnRails
       }
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity
     def check_build_dependencies(package_json)
       build_deps = additional_build_dependencies
-      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
       present_deps = []
       missing_deps = []
@@ -496,7 +496,7 @@ module ReactOnRails
       suffix = missing_deps.length > 3 ? "..." : ""
       add_info("ℹ️  Optional build dependencies: #{short_list}#{suffix}")
     end
-    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     def parse_package_json
       JSON.parse(File.read("package.json"))
@@ -506,12 +506,12 @@ module ReactOnRails
     end
 
     def find_missing_dependencies(package_json, required_deps)
-      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
       required_deps.keys.reject { |dep| all_deps[dep] }
     end
 
     def report_dependency_status(required_deps, missing_deps, package_json)
-      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
       required_deps.each do |dep, description|
         add_success("✅ #{description} (#{dep}) is installed") if all_deps[dep]
@@ -572,7 +572,7 @@ module ReactOnRails
     end
 
     def report_dependency_versions(package_json)
-      all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
       react_version = all_deps["react"]
       react_dom_version = all_deps["react-dom"]
@@ -643,7 +643,7 @@ module ReactOnRails
 
       begin
         package_json = JSON.parse(File.read("package.json"))
-        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+        all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
         webpack_version = all_deps["webpack"]
         add_info("📦 Webpack version: #{webpack_version}") if webpack_version
