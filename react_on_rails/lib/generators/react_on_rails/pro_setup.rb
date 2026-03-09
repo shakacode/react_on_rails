@@ -24,7 +24,7 @@ module ReactOnRails
     # rubocop:disable Metrics/ModuleLength
     module ProSetup
       PRO_GEM_NAME = "react_on_rails_pro"
-      PRO_GEM_AUTO_INSTALL_COMMAND = "bundle add #{PRO_GEM_NAME} --optimistic".freeze
+      PRO_GEM_AUTO_INSTALL_COMMAND = "bundle add #{PRO_GEM_NAME} --strict".freeze
 
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
