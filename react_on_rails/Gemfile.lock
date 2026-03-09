@@ -221,9 +221,9 @@ GEM
     pry-byebug (3.10.1)
       byebug (~> 11.0)
       pry (>= 0.13, < 0.15)
-    pry-doc (1.5.0)
+    pry-doc (1.7.0)
       pry (~> 0.11)
-      yard (~> 0.9.11)
+      yard (~> 0.9.21)
     pry-rails (0.3.9)
       pry (>= 0.10.4)
     pry-rescue (1.6.0)
@@ -434,7 +434,7 @@ GEM
     websocket-extensions (0.1.5)
     xpath (3.2.0)
       nokogiri (~> 1.8)
-    yard (0.9.36)
+    yard (0.9.38)
     zeitwerk (2.7.4)
 
 PLATFORMS
