@@ -51,8 +51,17 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     lockfile = File.join(dir, "Gemfile.lock")
     return unless File.exist?(lockfile)
 
-    match = File.read(lockfile).match(/^\s+shakapacker\s+\(([^)]+)\)/)
-    match&.[](1)
+    lockfile_content = File.read(lockfile)
+    exact_version_pattern = /(\d+\.\d+\.\d+(?:[.-][A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?)/
+
+    # Prefer the GEM specs section entry (4-space indent) to avoid matching dependency
+    # constraints like "shakapacker (>= 6.0)" from DEPENDENCIES.
+    gem_specs_match = lockfile_content.match(/^\s{4}shakapacker\s+\(#{exact_version_pattern}\)$/)
+    return gem_specs_match[1] if gem_specs_match
+
+    # Fallback for non-standard lockfile formatting that still includes an exact version.
+    fallback_match = lockfile_content.match(/^\s+shakapacker\s+\(#{exact_version_pattern}\)$/)
+    fallback_match&.[](1)
   end
 
   # Updates React-related dependencies to a specific version
