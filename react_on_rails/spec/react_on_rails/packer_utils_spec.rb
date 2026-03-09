@@ -171,16 +171,13 @@ module ReactOnRails
               <<: *default
           YAML
 
-          old_bundle_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
-          ENV["BUNDLE_GEMFILE"] = File.join(tmp_dir, "Gemfile")
+          stub_const("ENV", ENV.to_h.merge("BUNDLE_GEMFILE" => File.join(tmp_dir, "Gemfile")))
 
           hide_const("Rails")
           allow(::Shakapacker).to receive(:config)
             .and_raise(NameError, "uninitialized constant Shakapacker::Env::Rails")
 
           expect(described_class.extract_precompile_hook).to eq("bin/shakapacker-precompile-hook")
-        ensure
-          ENV["BUNDLE_GEMFILE"] = old_bundle_gemfile
         end
       end
     end

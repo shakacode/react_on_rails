@@ -221,7 +221,7 @@ module ReactOnRails
 
       # Check if it's a script file path
       script_path = resolve_hook_script_path(hook_value)
-      return false unless script_path && File.exist?(script_path)
+      return false unless script_path
 
       # Read and check script contents
       script_contents = File.read(script_path)
@@ -234,10 +234,29 @@ module ReactOnRails
     def self.resolve_hook_script_path(hook_value)
       return nil if hook_value.blank?
 
+      hook_path = hook_value.to_s.strip
+      return nil if hook_path.empty?
+
+      # Strip interpreter prefix (e.g., "ruby bin/hook" -> "bin/hook")
+      hook_path = extract_script_from_command(hook_path) || hook_path
+
       # Hook value might be a script path relative to project root.
-      # Rails.root is preferred when available, otherwise derive root from BUNDLE_GEMFILE or cwd.
-      potential_path = project_root.join(hook_value.to_s.strip)
+      # project_root prefers Rails.root and otherwise derives from BUNDLE_GEMFILE or cwd.
+      potential_path = project_root.join(hook_path)
       potential_path if potential_path.file?
+    end
+
+    # Extract the script path from an interpreter-prefixed command.
+    # e.g., "ruby bin/shakapacker-precompile-hook" -> "bin/shakapacker-precompile-hook"
+    # Returns nil if the value doesn't look like an interpreter-prefixed command.
+    def self.extract_script_from_command(command)
+      parts = command.strip.split(/\s+/, 2)
+      return nil unless parts.length == 2
+
+      interpreter = File.basename(parts[0])
+      return parts[1] if %w[ruby node bash sh].include?(interpreter)
+
+      nil
     end
 
     # Check if a hook script file contains the self-guard pattern that prevents
@@ -286,7 +305,7 @@ module ReactOnRails
       config_path = project_root.join(SHAKAPACKER_CONFIG_PATH)
       return nil unless config_path.file?
 
-      yaml_content = ERB.new(File.read(config_path)).result(binding)
+      yaml_content = ERB.new(File.read(config_path)).result
       config_data = YAML.safe_load(yaml_content, permitted_classes: [Symbol], aliases: true) || {}
 
       env_config = extract_hash_for_environment(config_data, current_shakapacker_environment)
@@ -327,12 +346,7 @@ module ReactOnRails
     end
 
     def self.project_root
-      if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
-        root = Rails.root
-        return root if root.respond_to?(:join)
-
-        return Pathname.new(root.to_s)
-      end
+      return Rails.root if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
 
       bundle_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
       if bundle_gemfile && !bundle_gemfile.strip.empty?
