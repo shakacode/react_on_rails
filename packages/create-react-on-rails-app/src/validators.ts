@@ -86,6 +86,7 @@ export function validateRails(): ValidationResult {
 
   const major = parseInt(match[1], 10);
   const minor = parseInt(match[2], 10);
+  // minor check is 0 now; kept for parity with Ruby validator and easy bumping later
   if (major < MIN_RAILS_MAJOR || (major === MIN_RAILS_MAJOR && minor < MIN_RAILS_MINOR)) {
     return {
       valid: false,

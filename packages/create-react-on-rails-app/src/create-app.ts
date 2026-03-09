@@ -88,10 +88,11 @@ export function validateAppName(name: string): { success: boolean; error?: strin
     return { success: false, error: 'App name is required.' };
   }
 
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+  if (!/^[a-zA-Z][a-zA-Z0-9]*([_-][a-zA-Z0-9]+)*$/.test(name)) {
     return {
       success: false,
-      error: 'App name can only contain letters, numbers, hyphens, and underscores.',
+      error:
+        'App name must start with a letter and can only contain letters, numbers, hyphens, and underscores.',
     };
   }
 
