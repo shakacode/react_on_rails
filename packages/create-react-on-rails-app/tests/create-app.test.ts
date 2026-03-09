@@ -53,16 +53,19 @@ describe('validateAppName', () => {
   it('rejects names starting with a hyphen', () => {
     const result = validateAppName('-myapp');
     expect(result.success).toBe(false);
+    expect(result.error).toContain('must start with a letter');
   });
 
   it('rejects names starting with an underscore', () => {
     const result = validateAppName('_myapp');
     expect(result.success).toBe(false);
+    expect(result.error).toContain('must start with a letter');
   });
 
   it('rejects names starting with a digit', () => {
     const result = validateAppName('1app');
     expect(result.success).toBe(false);
+    expect(result.error).toContain('must start with a letter');
   });
 
   it('rejects names ending with a hyphen', () => {
@@ -83,6 +86,12 @@ describe('validateAppName', () => {
   it('rejects names with special characters', () => {
     const result = validateAppName('my@app');
     expect(result.success).toBe(false);
+  });
+
+  it('rejects names that start with a number', () => {
+    const result = validateAppName('123app');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('must start with a letter');
   });
 
   it('rejects names with dots', () => {

@@ -21,6 +21,24 @@ export function execLiveArgs(command: string, args: string[], cwd?: string): voi
   }
 }
 
+/**
+ * Executes a shell command string and streams output to the current terminal.
+ * Security: callers must only pass trusted, shell-safe strings to avoid injection.
+ */
+export function execLive(command: string, cwd?: string): void {
+  const result = spawnSync(command, {
+    stdio: 'inherit',
+    cwd,
+    shell: true,
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(`Command "${command}" exited with code ${result.status}`);
+  }
+}
+
 export function getCommandVersion(command: string): string | null {
   try {
     return execFileSync(command, ['--version'], { encoding: 'utf8', stdio: 'pipe' }).trim();

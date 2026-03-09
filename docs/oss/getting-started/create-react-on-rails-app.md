@@ -72,7 +72,7 @@ The CLI checks for these before starting:
 
 - **Node.js 18+**
 - **Ruby 3.0+**
-- **Rails 7+** (`gem install rails`)
+- **Rails 7.0+** (`gem install rails`)
 - **npm or pnpm**
 
 If any are missing, you'll get a clear error message with installation instructions.
