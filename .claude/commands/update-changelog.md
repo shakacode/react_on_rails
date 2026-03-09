@@ -146,32 +146,30 @@ Entries should be organized under these section headings **in the following orde
 
 **Only include section headings that have entries.**
 
-### Version Management
+### Version Stamping with Rake Task
 
-After adding entries, use the rake task to manage version headers:
+When this command is invoked with `release`, `rc`, or `beta`, **use the rake task to stamp the version header** after adding entries:
 
 ```bash
-# Auto-compute version from changelog content
 bundle exec rake "update_changelog[release]"   # stamp next stable version
 bundle exec rake "update_changelog[rc]"        # stamp next RC version
 bundle exec rake "update_changelog[beta]"      # stamp next beta version
-
-# Explicit version or latest git tag
-bundle exec rake "update_changelog[v16.5.0]"   # explicit version
-bundle exec rake update_changelog              # use latest git tag
 ```
 
-This will:
+The rake task handles:
 
-- Add headers for the new version right after `### [Unreleased]`
-- Update version diff links at the bottom of the file
-- For `rc`/`beta` modes: collapse prior prerelease sections of the same base version into a single section
+- Auto-computing the next version from changelog headings and git tags
+- Inserting the version header right after `### [Unreleased]`
+- Updating version diff links at the bottom of the file
+- For `rc`/`beta` modes: collapsing prior prerelease sections of the same base version into a single section
+
+Do NOT manually insert version headers or update diff links -- the rake task does this correctly.
 
 **When to use which tool:**
 
-- **`/update-changelog release` (Claude Code)**: Full automation - analyzes commits, writes changelog entries, stamps version header, and creates a PR. Use this for comprehensive changelog updates before a release.
-- **`/update-changelog` (Claude Code, no args)**: Adds entries to `[Unreleased]` during development.
-- **`bundle exec rake update_changelog[mode]`**: Quick version header addition only. Use this if you just want the version header added and plan to write entries manually.
+- **`/update-changelog release` (Claude Code)**: Full automation -- analyzes commits, writes changelog entries, then calls the rake task to stamp the version header. Use before a release.
+- **`/update-changelog` (Claude Code, no args)**: Adds entries to `[Unreleased]` during development. Does not stamp a version header.
+- **`bundle exec rake update_changelog[mode]`**: Header-only stamping for users who want to write entries manually.
 
 ### Finding the Most Recent Version
 
@@ -273,7 +271,27 @@ When a new version is released:
    - Validate that the change is user-visible (per the criteria above). Skip CI, lint, refactoring, test-only changes.
    - Add the entry to `### [Unreleased]` under the appropriate category heading
 
-#### Step 4: Verify and finalize
+#### Step 4: Stamp version header (only for `release`, `rc`, or `beta` modes)
+
+If the user passed `release`, `rc`, or `beta` as an argument:
+
+1. Run the rake task to stamp the version header:
+
+   ```bash
+   bundle exec rake "update_changelog[release]"   # or rc, or beta
+   ```
+
+2. The rake task will:
+   - Auto-compute the next version
+   - Insert the header after `### [Unreleased]`
+   - Update diff links at the bottom
+   - For `rc`/`beta`: collapse prior prerelease sections
+
+3. **Verify** the computed version looks correct. If not, the user can manually adjust.
+
+If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
+
+#### Step 5: Verify and finalize
 
 1. **Verify formatting**:
    - Bold description with period
@@ -281,13 +299,16 @@ When a new version is released:
    - Proper author link
    - Consistent with existing entries
    - File ends with a newline character
-2. **Verify version sections are in order** (Unreleased → newest tag → older tags)
+2. **Verify version sections are in order** (Unreleased -> newest tag -> older tags)
 3. **Verify version diff links** at the bottom of the file are correct
 4. **Show the user** a summary of what was done:
    - Which version sections were created
    - Which entries were moved from Unreleased
    - Which new entries were added
    - Which PRs were skipped (and why)
+5. If in `release`/`rc`/`beta` mode, remind the user of next steps:
+   - Commit and push CHANGELOG.md
+   - Run `rake release` (no args) to publish and auto-create the GitHub release
 
 ### For Prerelease Versions (RC and Beta)
 
@@ -374,9 +395,9 @@ To migrate to React on Rails Pro:
    import ReactOnRails from 'react-on-rails-pro';
 ```
 
-## Beta Release Changelog Curation
+## Prerelease Changelog Curation
 
-When consolidating beta versions into a stable release, carefully curate entries to include only user-facing changes:
+When consolidating prerelease versions (beta, RC) into a stable release, carefully curate entries to include only user-facing changes:
 
 **Remove these types of entries:**
 
@@ -386,12 +407,12 @@ When consolidating beta versions into a stable release, carefully curate entries
    - CI/build script improvements
    - Internal tooling changes
 
-2. **Beta-specific fixes**:
-   - Bugs introduced during the beta cycle (not present in last stable)
-   - Fixes for new beta-only features (e.g., bin/dev in 16.2.0.beta)
-   - Generator handling of beta/RC version formats
+2. **Prerelease-specific fixes**:
+   - Bugs introduced during the prerelease cycle (not present in last stable)
+   - Fixes for new prerelease-only features
+   - Generator handling of prerelease version formats
 
-3. **Pro-specific features** (move to Pro changelog):
+3. **Pro-specific features** (move to Pro section):
    - Node renderer fixes/improvements
    - Streaming-related changes
    - Async loading features (Pro-exclusive)
@@ -412,12 +433,12 @@ When consolidating beta versions into a stable release, carefully curate entries
 
 For each suspicious entry:
 
-1. Check git history: `git log --oneline <last_stable>..<current_beta> -- <file>`
-2. Determine when bug was introduced (stable vs beta cycle)
-3. Verify whether fix applies to stable users or only beta users
+1. Check git history: `git log --oneline <last_stable>..<current_prerelease> -- <file>`
+2. Determine when bug was introduced (stable vs prerelease cycle)
+3. Verify whether fix applies to stable users or only prerelease users
 4. Check PR description for context about what was broken
 
-**Example reference:** See [PR #2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of beta changelog curation with detailed investigation notes.
+**Example reference:** See [PR #2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of prerelease changelog curation with detailed investigation notes.
 
 ## Additional Notes
 
