@@ -304,7 +304,43 @@ RSpec.describe ReactOnRails::SystemChecker do
       it "adds a warning message" do
         checker.check_react_on_rails_npm_package
         expect(checker.warnings?).to be true
-        expect(checker.messages.last[:content]).to include("react-on-rails NPM package not found")
+        expect(checker.messages.last[:content]).to include("Neither react-on-rails nor react-on-rails-pro")
+      end
+    end
+
+    context "when package.json exists with react-on-rails-pro" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails-pro" => "^16.0.0" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds a success message for pro package" do
+        checker.check_react_on_rails_npm_package
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("react-on-rails-pro NPM package")
+        end).to be true
+      end
+    end
+
+    context "when package.json has react-on-rails-pro only in devDependencies" do
+      let(:package_json_content) do
+        { "devDependencies" => { "react-on-rails-pro" => "^16.0.0" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "finds react-on-rails-pro in devDependencies" do
+        checker.check_react_on_rails_npm_package
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("react-on-rails-pro NPM package")
+        end).to be true
       end
     end
 
@@ -425,6 +461,24 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       it "correctly matches stable versions" do
+        checker.send(:check_package_version_sync)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("versions match")
+        end).to be true
+      end
+    end
+
+    context "when package.json exists with matching versions for react-on-rails-pro" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails-pro" => "16.2.0-beta.10" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds a success message" do
         checker.send(:check_package_version_sync)
         expect(checker.messages.any? do |msg|
           msg[:type] == :success && msg[:content].include?("versions match")

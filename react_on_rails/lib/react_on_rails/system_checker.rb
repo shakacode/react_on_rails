@@ -186,14 +186,13 @@ module ReactOnRails
       return unless File.exist?(package_json_path)
 
       package_json = JSON.parse(File.read(package_json_path))
-      npm_version = package_json.dig("dependencies", "react-on-rails") ||
-                    package_json.dig("devDependencies", "react-on-rails")
+      package_name, npm_version = react_on_rails_npm_package_details(package_json)
 
-      if npm_version
-        add_success("✅ react-on-rails NPM package #{npm_version} is declared")
+      if package_name
+        add_success("✅ #{package_name} NPM package #{npm_version} is declared")
       else
         add_warning(<<~MSG.strip)
-          ⚠️  react-on-rails NPM package not found in package.json.
+          ⚠️  Neither react-on-rails nor react-on-rails-pro NPM package found in package.json.
 
           Install it with:
           npm install react-on-rails
@@ -208,8 +207,7 @@ module ReactOnRails
 
       begin
         package_json = JSON.parse(File.read("package.json"))
-        npm_version = package_json.dig("dependencies", "react-on-rails") ||
-                      package_json.dig("devDependencies", "react-on-rails")
+        package_name, npm_version = react_on_rails_npm_package_details(package_json)
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
 
@@ -221,7 +219,7 @@ module ReactOnRails
         gem_version = ReactOnRails::VERSION
 
         if normalized_npm_version == gem_version
-          add_success("✅ React on Rails gem and NPM package versions match (#{gem_version})")
+          add_success("✅ React on Rails gem and #{package_name} NPM package versions match (#{gem_version})")
           check_version_patterns(npm_version, gem_version)
         else
           # Check for major version differences
@@ -232,7 +230,7 @@ module ReactOnRails
             add_error(<<~MSG.strip)
               🚫 Major version mismatch detected:
               • Gem version: #{gem_version} (major: #{gem_major})
-              • NPM version: #{npm_version} (major: #{npm_major})
+              • #{package_name} version: #{npm_version} (major: #{npm_major})
 
               Major version differences can cause serious compatibility issues.
               Update both packages to use the same major version immediately.
@@ -241,7 +239,7 @@ module ReactOnRails
             add_warning(<<~MSG.strip)
               ⚠️  Version mismatch detected:
               • Gem version: #{gem_version}
-              • NPM version: #{npm_version}
+              • #{package_name} version: #{npm_version}
 
               Consider updating to exact, fixed matching versions of gem and npm package for best compatibility.
             MSG
@@ -372,6 +370,14 @@ module ReactOnRails
     end
 
     private
+
+    def react_on_rails_npm_package_details(package_json)
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
+      return ["react-on-rails-pro", all_deps["react-on-rails-pro"]] if all_deps["react-on-rails-pro"]
+      return ["react-on-rails", all_deps["react-on-rails"]] if all_deps["react-on-rails"]
+
+      [nil, nil]
+    end
 
     def node_missing?
       command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
