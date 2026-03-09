@@ -1893,7 +1893,8 @@ describe InstallGenerator, type: :generator do
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("--pro")
       expect(error_text).to include("react_on_rails_pro")
-      expect(error_text).to include("More info:")
+      expect(error_text).to include("= 16.4.0")
+      expect(error_text).to include("justin@shakacode.com")
     end
   end
 

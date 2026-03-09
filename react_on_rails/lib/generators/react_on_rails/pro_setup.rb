@@ -68,17 +68,19 @@ module ReactOnRails
                          "This generator requires the react_on_rails_pro gem."
                        end
 
+        # TODO(#2575): Replace temporary email CTA after react-unrails.com flow is live.
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 Failed to auto-install react_on_rails_pro gem.
 
           #{context_line}
 
           Please add manually to your Gemfile:
-            gem 'react_on_rails_pro', '>= 16.3.0'
+            gem 'react_on_rails_pro', '= 16.4.0'
 
           Then run: bundle install
 
-          More info: https://www.shakacode.com/react-on-rails-pro/
+          Try Pro free! Email justin@shakacode.com for an evaluation license.
+          For evaluation licenses or more info, see: https://www.shakacode.com/react-on-rails-pro/
         MSG
         true
       end
