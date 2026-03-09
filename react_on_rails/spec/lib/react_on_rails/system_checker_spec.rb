@@ -597,6 +597,20 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
     end
 
+    context "when shakapacker.yml has non-hash YAML content" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("- item1\n- item2")
+      end
+
+      it "does not crash and defaults to requiring @babel/preset-react" do
+        expect { checker.check_react_dependencies }.not_to raise_error
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+
     context "when shakapacker.yml has broken ERB" do
       before do
         allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)

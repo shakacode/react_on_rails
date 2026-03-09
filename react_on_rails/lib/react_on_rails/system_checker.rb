@@ -495,7 +495,8 @@ module ReactOnRails
 
       raw_content = File.read(shakapacker_config_path)
       rendered_content = ERB.new(raw_content).result
-      YAML.safe_load(rendered_content, aliases: true) || {}
+      parsed = YAML.safe_load(rendered_content, aliases: true)
+      parsed.is_a?(Hash) ? parsed : nil
     rescue StandardError, ScriptError
       nil
     end
