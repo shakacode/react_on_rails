@@ -50,8 +50,8 @@ export default function transformRSCStreamAndReplayConsoleLogs(
 
         const replayConsoleCode = consoleReplayScript
           .trim()
-          .replace(/^<script.*>/, '')
-          .replace(/<\/script>$/, '');
+          .replace(/^<script[^>]*>/i, '')
+          .replace(/<\/script>$/i, '');
         if (replayConsoleCode?.trim() !== '') {
           const scriptElement = document.createElement('script');
           if (sanitizedNonce) {

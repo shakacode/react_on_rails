@@ -61,7 +61,7 @@ describe('transformRSCStreamAndReplayConsoleLogs', () => {
     await collectStream(transformedStream);
 
     const script = document.body.querySelector('script');
-    expect(script?.getAttribute('nonce')).toBe('abc123onclickalert1');
+    expect(script?.getAttribute('nonce')).toBeNull();
     expect(script?.getAttribute('onclick')).toBeNull();
   });
 });

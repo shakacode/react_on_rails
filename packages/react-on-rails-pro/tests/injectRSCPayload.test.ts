@@ -188,7 +188,7 @@ describe('injectRSCPayload', () => {
     const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, 'abc123" onload=alert(1)');
     const resultStr = await collectStreamData(result);
 
-    expect(resultStr).toContain('<script nonce="abc123onloadalert1">');
+    expect(resultStr).not.toContain('nonce=');
     expect(resultStr).not.toContain('onload=');
   });
 });
