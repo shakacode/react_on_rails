@@ -1,18 +1,195 @@
 # frozen_string_literal: true
 
+require "date"
 require "English"
 require "bundler"
+require "open3"
 require_relative "task_helpers"
 
 CLAUDE_CODE_TIP = <<~TIP
   ┌─────────────────────────────────────────────────────────────────────────────┐
-  │ TIP: This task only adds version headers and links, not changelog entries. │
-  │ For full automation, run /update-changelog in Claude Code.                 │
+  │ TIP: This task adds version headers and links, not changelog entry text.   │
+  │ For full commit analysis + entry writing, run /update-changelog in Claude. │
   │                                                                             │
   │ After running this task, manually add entries under the new header:        │
   │   #### Fixed / #### Added / #### Changed / etc.                            │
   └─────────────────────────────────────────────────────────────────────────────┘
 TIP
+
+def monorepo_root_for_changelog
+  File.expand_path("../..", __dir__)
+end
+
+def prerelease_version?(version)
+  version.to_s.match?(/\.(test|beta|alpha|rc|pre)\./i)
+end
+
+def normalize_version_string(version_or_tag)
+  version = version_or_tag.to_s.strip
+  version = version.delete_prefix("v")
+  version = version.sub(/-(test|beta|alpha|rc|pre)\./i, '.\1.')
+
+  unless version.match?(/\A\d+\.\d+\.\d+(\.(test|beta|alpha|rc|pre)\.\d+)?\z/i)
+    abort "Failed to parse version from #{version_or_tag.inspect}. Expected format like 16.4.0 or 16.4.0.rc.1."
+  end
+
+  version.downcase
+end
+
+def parse_release_tag_to_version(tag)
+  version_pattern = /\d+\.\d+\.\d+(?:\.(?:test|beta|alpha|rc|pre)\.\d+)?|\d+\.\d+\.\d+-(?:test|beta|alpha|rc|pre)\.\d+/
+  tag_match = tag.to_s.strip.match(/\Av(?<version>#{version_pattern})\z/i)
+  return nil unless tag_match
+
+  normalize_version_string(tag_match[:version])
+rescue SystemExit
+  nil
+end
+
+def stable_tag_versions(monorepo_root)
+  tags_output, status = Open3.capture2e("git", "-C", monorepo_root, "tag", "-l", "v*")
+  abort "Failed to list git tags.\n#{tags_output}" unless status.success?
+
+  tags_output.lines.map(&:strip).filter_map { |tag| parse_release_tag_to_version(tag) }
+             .reject { |version| prerelease_version?(version) }
+             .uniq
+end
+
+def latest_stable_tag_version(monorepo_root)
+  versions = stable_tag_versions(monorepo_root)
+  abort "Failed to compute latest stable tag: no stable v* tags found." if versions.empty?
+
+  versions.max_by { |version| Gem::Version.new(version) }
+end
+
+def extract_unreleased_section(changelog)
+  lines = changelog.lines
+  start_index = lines.index { |line| line.start_with?("### [Unreleased]") }
+  abort "Failed to find '### [Unreleased]' in CHANGELOG.md" unless start_index
+
+  end_index = ((start_index + 1)...lines.length).find { |idx| lines[idx].start_with?("### [") } || lines.length
+  lines[start_index...end_index].join
+end
+
+def inferred_bump_type_from_unreleased(changelog)
+  section = extract_unreleased_section(changelog)
+  return :major if section.match?(/^####\s+(?:⚠️\s*)?Breaking(?:\s+Changes?)?\b/i)
+  return :minor if section.match?(/^####\s+(Added|New\s+Features?|Features?|Enhancements?)\b/i)
+  return :patch if section.match?(/^####\s+(Fixed|Fixes|Bug\s+Fixes?|Security|Improved|Changed|Deprecated|Removed)\b/i)
+
+  :patch
+end
+
+def bump_stable_version(version, bump_type)
+  match = version.match(/\A(\d+)\.(\d+)\.(\d+)\z/)
+  abort "Failed to bump version: stable version #{version.inspect} is invalid." unless match
+
+  major = match[1].to_i
+  minor = match[2].to_i
+  patch = match[3].to_i
+
+  case bump_type
+  when :major
+    "#{major + 1}.0.0"
+  when :minor
+    "#{major}.#{minor + 1}.0"
+  else
+    "#{major}.#{minor}.#{patch + 1}"
+  end
+end
+
+def prerelease_indices_from_tags(monorepo_root, base_version, channel)
+  tags_output, status = Open3.capture2e("git", "-C", monorepo_root, "tag", "-l", "v#{base_version}.#{channel}.*")
+  abort "Failed to list prerelease tags.\n#{tags_output}" unless status.success?
+
+  tags_output.lines.map(&:strip).filter_map do |tag|
+    match = tag.match(/\Av#{Regexp.escape(base_version)}\.#{channel}\.(\d+)\z/i)
+    match&.captures&.first&.to_i
+  end
+end
+
+def prerelease_indices_from_changelog(changelog, base_version, channel)
+  changelog.scan(/^### \[#{Regexp.escape(base_version)}\.#{channel}\.(\d+)\]/i).flatten.map(&:to_i)
+end
+
+def parse_changelog_sections(changelog)
+  lines = changelog.lines
+  headers = []
+  lines.each_with_index do |line, index|
+    match = line.match(/^### \[([^\]]+)\].*$/)
+    headers << { index: index, version: match[1], header: line } if match
+  end
+
+  return { prefix: changelog, sections: [] } if headers.empty?
+
+  prefix = lines[0...headers.first[:index]].join
+  sections = headers.each_with_index.map do |header, section_index|
+    section_end = if section_index + 1 < headers.length
+                    headers[section_index + 1][:index]
+                  else
+                    lines.length
+                  end
+
+    {
+      version: header[:version],
+      header: header[:header],
+      body: lines[(header[:index] + 1)...section_end].join
+    }
+  end
+
+  { prefix: prefix, sections: sections }
+end
+
+def render_changelog_sections(prefix, sections)
+  "#{prefix}#{sections.map { |section| "#{section[:header]}#{section[:body]}" }.join}"
+end
+
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+def collapse_prerelease_sections(changelog, base_version, channel)
+  parsed = parse_changelog_sections(changelog)
+  sections = parsed[:sections]
+  unreleased_section = sections.find { |section| section[:version] == "Unreleased" }
+  return changelog unless unreleased_section
+
+  target_regex = /\A#{Regexp.escape(base_version)}\.#{channel}\.\d+\z/i
+  matching_sections = sections.select { |section| section[:version].match?(target_regex) }
+  return changelog if matching_sections.empty?
+
+  merged_body = matching_sections.map { |section| section[:body].strip }.reject(&:empty?).join("\n\n").strip
+  sections.reject! { |section| section[:version].match?(target_regex) }
+
+  unless merged_body.empty?
+    unreleased_body = unreleased_section[:body].rstrip
+    unreleased_section[:body] = if unreleased_body.empty?
+                                  "#{merged_body}\n"
+                                else
+                                  "#{unreleased_body}\n\n#{merged_body}\n"
+                                end
+  end
+
+  render_changelog_sections(parsed[:prefix], sections)
+end
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+def compute_auto_version(changelog, mode, monorepo_root)
+  bump_type = inferred_bump_type_from_unreleased(changelog)
+  latest_stable = latest_stable_tag_version(monorepo_root)
+  base_version = bump_stable_version(latest_stable, bump_type)
+
+  return base_version if mode == "release"
+
+  indices = prerelease_indices_from_tags(monorepo_root, base_version, mode) +
+            prerelease_indices_from_changelog(changelog, base_version, mode)
+  next_index = indices.empty? ? 0 : indices.max + 1
+  "#{base_version}.#{mode}.#{next_index}"
+end
+
+def fetch_git_tag_date(monorepo_root, git_tag)
+  output, status = Open3.capture2e("git", "-C", monorepo_root, "show", "-s", "--format=%cs", git_tag)
+  return nil unless status.success?
+
+  output.split("\n").last&.strip
+end
 
 # Update the compare links at the bottom of the changelog
 # version: version string without 'v' prefix (e.g., "16.2.0.beta.20")
@@ -39,26 +216,56 @@ def insert_version_header(changelog, anchor, tag_date)
   false
 end
 
-desc "Updates CHANGELOG.md inserting headers for the new version (headers only, not content).
-Argument: Git tag. Defaults to the latest tag.
+desc "Updates CHANGELOG.md by inserting a version header and compare links.
+Argument: Mode (`release`, `rc`, `beta`) or explicit git tag/version.
+
+Modes:
+  - release: auto-compute next stable version from Unreleased section headings
+  - rc: auto-compute next RC version and collapse prior RC sections of same base version
+  - beta: auto-compute next beta version and collapse prior beta sections of same base version
+
+Explicit argument examples:
+  - v16.4.0.rc.6
+  - 16.4.0.rc.6
+
+No argument: use latest git tag.
 TIP: Use /update-changelog in Claude Code for full automation."
 
-task :update_changelog, %i[tag] do |_, args|
+# rubocop:disable Metrics/BlockLength
+task :update_changelog, %i[mode_or_tag] do |_, args|
   puts CLAUDE_CODE_TIP
 
-  # Git tags use 'v' prefix (e.g., v16.2.0), but CHANGELOG uses versions without it
-  git_tag = args[:tag] || `git describe --tags --abbrev=0`.strip
-  changelog_version = git_tag.delete_prefix("v")
-  anchor = "[#{changelog_version}]"
-  changelog = File.read("CHANGELOG.md")
+  monorepo_root = monorepo_root_for_changelog
+  changelog_path = File.join(monorepo_root, "CHANGELOG.md")
+  changelog = File.read(changelog_path)
+  input = args[:mode_or_tag].to_s.strip
+  auto_mode = %w[release rc beta].find { |mode| mode == input.downcase }
 
-  if changelog.include?(anchor)
-    puts "Tag #{git_tag} is already documented in CHANGELOG.md"
-    next
+  if auto_mode
+    changelog_version = compute_auto_version(changelog, auto_mode, monorepo_root)
+    if %w[rc beta].include?(auto_mode)
+      base_version = changelog_version.sub(/\.(?:rc|beta)\.\d+\z/i, "")
+      changelog = collapse_prerelease_sections(changelog, base_version, auto_mode)
+    end
+    tag_date = Date.today.strftime("%Y-%m-%d")
+    puts "Auto-computed #{auto_mode} version: #{changelog_version}"
+  else
+    git_tag = if input.empty?
+                `git -C #{monorepo_root} describe --tags --abbrev=0`.strip
+              else
+                input
+              end
+
+    changelog_version = normalize_version_string(git_tag)
+    tag_date = fetch_git_tag_date(monorepo_root, git_tag) || Date.today.strftime("%Y-%m-%d")
   end
 
-  tag_date = `git show -s --format=%cs #{git_tag} 2>&1`.split("\n").last&.strip
-  abort("Failed to find tag #{git_tag}") unless $CHILD_STATUS.success? && tag_date
+  anchor = "[#{changelog_version}]"
+  header = "### #{anchor}"
+  if changelog.include?(header)
+    puts "Version #{changelog_version} is already documented in CHANGELOG.md"
+    next
+  end
 
   unless insert_version_header(changelog, anchor, tag_date)
     abort("Failed to insert version header: could not find '### [Unreleased]' " \
@@ -67,7 +274,8 @@ task :update_changelog, %i[tag] do |_, args|
 
   update_changelog_links(changelog, changelog_version, anchor)
 
-  File.write("CHANGELOG.md", changelog)
-  puts "Updated CHANGELOG.md with version header for #{git_tag}"
+  File.write(changelog_path, changelog)
+  puts "Updated CHANGELOG.md with version header for #{changelog_version}"
   puts "NOTE: You still need to write the changelog entries manually."
 end
+# rubocop:enable Metrics/BlockLength
