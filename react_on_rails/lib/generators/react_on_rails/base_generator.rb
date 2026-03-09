@@ -189,7 +189,9 @@ module ReactOnRails
         RSpec.configure do |config|
           # Ensure that if we are running js tests, we are using latest webpack assets
           # This will use the defaults of :js and :server_rendering meta tags
-          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+          #
+          # NOTE: Only needed if you set config.build_test_command in config/initializers/react_on_rails.rb.
+          # If using shakapacker's compile: true in config/shakapacker.yml (the default), this is not needed.
         end
       STR
 

@@ -1235,7 +1235,8 @@ module ReactOnRails
         next unless File.exist?(helper)
 
         content = File.read(helper)
-        content.include?("configure_rspec_to_compile_assets") || content.include?("ensure_assets_compiled")
+        # Only match uncommented calls to avoid false positives from commented-out lines
+        content.match?(/^\s*(?!#).*(?:configure_rspec_to_compile_assets|ensure_assets_compiled)/)
       end
     rescue StandardError
       false
