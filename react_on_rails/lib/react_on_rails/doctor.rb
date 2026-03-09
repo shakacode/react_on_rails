@@ -166,7 +166,7 @@ module ReactOnRails
     end
 
     def check_testing_setup
-      check_rspec_helper_setup
+      check_test_helper_setup
       check_build_test_configuration
     end
 
@@ -1004,16 +1004,17 @@ module ReactOnRails
       end
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
-    def check_rspec_helper_setup
-      spec_helper_paths = [
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    def check_test_helper_setup
+      helper_paths = [
         "spec/rails_helper.rb",
-        "spec/spec_helper.rb"
+        "spec/spec_helper.rb",
+        "test/test_helper.rb"
       ]
 
       react_on_rails_test_helper_found = false
 
-      spec_helper_paths.each do |helper_path|
+      helper_paths.each do |helper_path|
         next unless File.exist?(helper_path)
 
         content = File.read(helper_path)
@@ -1022,7 +1023,7 @@ module ReactOnRails
           next
         end
 
-        checker.add_success("✅ ReactOnRails RSpec helper configured in #{helper_path}")
+        checker.add_success("✅ ReactOnRails TestHelper configured in #{helper_path}")
         react_on_rails_test_helper_found = true
 
         # Check specific configurations
@@ -1034,15 +1035,20 @@ module ReactOnRails
       return if react_on_rails_test_helper_found
 
       if File.exist?("spec")
-        checker.add_warning("⚠️  ReactOnRails RSpec helper not found")
+        checker.add_warning("⚠️  ReactOnRails test helper not found")
         checker.add_info("  Add to spec/rails_helper.rb:")
         checker.add_info("  require 'react_on_rails/test_helper'")
         checker.add_info("  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      elsif File.exist?("test")
+        checker.add_warning("⚠️  ReactOnRails test helper not found")
+        checker.add_info("  Add to test/test_helper.rb:")
+        checker.add_info("  require 'react_on_rails/test_helper'")
+        checker.add_info("  ReactOnRails::TestHelper.ensure_assets_compiled")
       else
-        checker.add_info("ℹ️  No RSpec directory found - skipping RSpec helper check")
+        checker.add_info("ℹ️  No test directory found - skipping test helper check")
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def npm_test_script?
       return false unless File.exist?("package.json")
@@ -1200,8 +1206,13 @@ module ReactOnRails
             checker.add_info("  📖 See: #{testing_config_url}")
           elsif has_build_test_command && !uses_test_helper
             checker.add_warning("  ⚠️  build_test_command is set but ReactOnRails::TestHelper is not configured")
-            checker.add_info("  💡 Add to spec/rails_helper.rb:")
-            checker.add_info("      ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+            if File.exist?("spec")
+              checker.add_info("  💡 Add to spec/rails_helper.rb:")
+              checker.add_info("      ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+            else
+              checker.add_info("  💡 Add to test/test_helper.rb:")
+              checker.add_info("      ReactOnRails::TestHelper.ensure_assets_compiled")
+            end
             checker.add_info("  💡 Or remove build_test_command and use compile: true in shakapacker.yml")
           elsif !has_build_test_command && uses_test_helper
             checker.add_error("  🚫 ReactOnRails::TestHelper is configured but build_test_command is not set")
