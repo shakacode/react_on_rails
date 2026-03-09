@@ -182,8 +182,7 @@ ReactOnRails.configure do |config|
   # Furthermore, if you are not hashing the server bundle (not in the manifest.json), then React on Rails
   # will only look for the server bundle to be created in the typical file location, typically by
   # a `shakapacker --watch` process.
-  # If true, ensure that in config/shakapacker.yml that you have both dev_server.hmr and
-  # dev_server.inline set to false.
+  # If true, ensure that in config/shakapacker.yml you set dev_server.hmr to false.
   config.same_bundle_for_client_and_server = false
 
   # If set to true, this forces Rails to reload the server bundle if it is modified
@@ -818,7 +817,6 @@ When true, also set in `config/shakapacker.yml`:
 ```yaml
 dev_server:
   hmr: false
-  inline: false
 ```
 
 ### Internal Options

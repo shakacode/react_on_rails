@@ -98,7 +98,6 @@ development:
   extract_css: false
   dev_server:
     hmr: true
-    inline: true
 ```
 
 This basic configuration alone will have HMR working with the default Shakapacker setup. However, a code save will trigger a full page refresh each time you save a file.
