@@ -51,6 +51,26 @@ RSpec.describe "shakapacker_examples rake helpers" do
         expect(gem_version).to eq("9.6.0.beta.0")
       end
     end
+
+    it "prefers installed gem version over dependency constraint entries" do
+      Dir.mktmpdir do |dir|
+        File.write(
+          File.join(dir, "Gemfile.lock"),
+          <<~LOCK
+            GEM
+              specs:
+                shakapacker (9.6.0)
+
+            DEPENDENCIES
+              shakapacker (>= 6.0)
+          LOCK
+        )
+
+        gem_version = task_context.send(:shakapacker_gem_version_from_lockfile, dir)
+
+        expect(gem_version).to eq("9.6.0")
+      end
+    end
   end
 
   describe "pinned React example generation" do
