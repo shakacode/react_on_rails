@@ -73,7 +73,7 @@ describe('validateRails', () => {
     mockedGetCommandVersion.mockReturnValue('Rails 6.1.7');
     const result = validateRails();
     expect(result.valid).toBe(false);
-    expect(result.message).toContain('Rails 6.1');
+    expect(result.message).toContain('Rails 6.1.7');
   });
 
   it('returns invalid when rails version cannot be parsed', () => {
@@ -119,7 +119,7 @@ describe('validateAll', () => {
       if (command === 'npm') {
         return '10.8.2';
       }
-      return null;
+      throw new Error(`Unexpected command in mock: ${command}`);
     });
   }
 

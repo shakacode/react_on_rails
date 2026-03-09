@@ -90,7 +90,7 @@ export function validateRails(): ValidationResult {
   if (major < MIN_RAILS_MAJOR || (major === MIN_RAILS_MAJOR && minor < MIN_RAILS_MINOR)) {
     return {
       valid: false,
-      message: `Rails ${major}.${minor} detected. React on Rails requires Rails ${MIN_RAILS_MAJOR}.${MIN_RAILS_MINOR}+.`,
+      message: `${firstLine} detected. React on Rails requires Rails ${MIN_RAILS_MAJOR}.${MIN_RAILS_MINOR}+.`,
     };
   }
 
