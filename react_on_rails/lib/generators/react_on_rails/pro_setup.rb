@@ -24,7 +24,7 @@ module ReactOnRails
     # rubocop:disable Metrics/ModuleLength
     module ProSetup
       PRO_GEM_NAME = "react_on_rails_pro"
-      PRO_GEM_AUTO_INSTALL_COMMAND = "bundle add #{PRO_GEM_NAME} --strict".freeze
+      PRO_GEM_AUTO_INSTALL_COMMAND = "bundle add #{PRO_GEM_NAME} --optimistic".freeze
 
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
@@ -56,13 +56,7 @@ module ReactOnRails
       def missing_pro_gem?(force: false)
         return false unless force || use_pro?
         return false if pro_gem_installed?
-
-        # Try auto-installing (similar to ensure_shakapacker_in_gemfile in install_generator)
-        puts Rainbow("📝 Adding #{PRO_GEM_NAME} to Gemfile...").yellow
-        if Bundler.with_unbundled_env { system(PRO_GEM_AUTO_INSTALL_COMMAND) }
-          @pro_gem_installed = true
-          return false
-        end
+        return false if attempt_pro_gem_auto_install
 
         context_line = if options.key?(:pro) || options.key?(:rsc)
                          flag = options[:rsc] ? "--rsc" : "--pro"
@@ -78,7 +72,7 @@ module ReactOnRails
           #{context_line}
 
           Please add manually to your Gemfile:
-            gem '#{PRO_GEM_NAME}', '= #{recommended_pro_gem_version}'
+            gem '#{PRO_GEM_NAME}', '~> #{recommended_pro_gem_version}'
 
           Then run: bundle install
 
@@ -89,6 +83,20 @@ module ReactOnRails
       end
 
       private
+
+      # Attempt to auto-install the Pro gem via bundle add.
+      # @return [Boolean] true if the gem was successfully installed
+      def attempt_pro_gem_auto_install
+        puts Rainbow("📝 Adding #{PRO_GEM_NAME} to Gemfile...").yellow
+        if Bundler.with_unbundled_env { system(PRO_GEM_AUTO_INSTALL_COMMAND) }
+          # The gem is now in Gemfile/lockfile but not loaded in the current Ruby process.
+          # Generator code that follows must not reference ReactOnRailsPro constants directly.
+          mark_pro_gem_installed!
+          return true
+        end
+
+        false
+      end
 
       def create_pro_initializer
         initializer_path = "config/initializers/react_on_rails_pro.rb"
@@ -308,12 +316,13 @@ module ReactOnRails
 
       def missing_server_config_transforms(content)
         checks = [
-          ["libraryTarget: 'commonjs2'", "libraryTarget: 'commonjs2',"],
+          ["libraryTarget: 'commonjs2',", "libraryTarget: 'commonjs2',"],
           ["function extractLoader", "function extractLoader"],
           ["babelLoader.options.caller = { ssr: true }", "babelLoader.options.caller = { ssr: true }"],
           ["serverWebpackConfig.target = 'node'", "serverWebpackConfig.target = 'node'"],
           ["serverWebpackConfig.node = false", "serverWebpackConfig.node = false"],
-          ["module.exports = {", "module.exports = {"]
+          ["default: configureServer", "default: configureServer"],
+          ["extractLoader export", "extractLoader,"]
         ]
 
         checks.filter_map { |label, pattern| label unless content.include?(pattern) }
@@ -363,7 +372,8 @@ module ReactOnRails
           content.include?("babelLoader.options.caller = { ssr: true }") &&
           content.include?("serverWebpackConfig.target = 'node'") &&
           content.include?("serverWebpackConfig.node = false") &&
-          content.include?("module.exports = {")
+          content.include?("default: configureServer") &&
+          content.include?("extractLoader,")
       end
 
       def server_client_import_ready?

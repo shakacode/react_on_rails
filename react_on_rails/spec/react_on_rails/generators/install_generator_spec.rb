@@ -1885,16 +1885,17 @@ describe InstallGenerator, type: :generator do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
-      allow(install_generator).to receive(:system).with("bundle add react_on_rails_pro --strict").and_return(false)
+      allow(install_generator).to receive(:system).with("bundle add react_on_rails_pro --optimistic").and_return(false)
     end
 
     specify "missing_pro_gem? returns true and error mentions --pro flag" do
       expect(install_generator.send(:missing_pro_gem?)).to be true
-      expect(install_generator).to have_received(:system).with("bundle add react_on_rails_pro --strict")
+      expect(Bundler).to have_received(:with_unbundled_env)
+      expect(install_generator).to have_received(:system).with("bundle add react_on_rails_pro --optimistic")
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("--pro")
       expect(error_text).to include("react_on_rails_pro")
-      expect(error_text).to include("= #{expected_pro_version}")
+      expect(error_text).to include("~> #{expected_pro_version}")
       expect(error_text).to include("justin@shakacode.com")
     end
   end
@@ -1906,12 +1907,13 @@ describe InstallGenerator, type: :generator do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
-      allow(install_generator).to receive(:system).with("bundle add react_on_rails_pro --strict").and_return(false)
+      allow(install_generator).to receive(:system).with("bundle add react_on_rails_pro --optimistic").and_return(false)
     end
 
     specify "missing_pro_gem? returns true and error mentions --rsc flag" do
       expect(install_generator.send(:missing_pro_gem?)).to be true
-      expect(install_generator).to have_received(:system).with("bundle add react_on_rails_pro --strict")
+      expect(Bundler).to have_received(:with_unbundled_env)
+      expect(install_generator).to have_received(:system).with("bundle add react_on_rails_pro --optimistic")
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("--rsc")
     end
@@ -1924,7 +1926,7 @@ describe InstallGenerator, type: :generator do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
-      allow(install_generator).to receive(:system).with("bundle add react_on_rails_pro --strict").and_return(true)
+      allow(install_generator).to receive(:system).with("bundle add react_on_rails_pro --optimistic").and_return(true)
 
       # Simulate stale memoized value from an earlier check.
       install_generator.instance_variable_set(:@pro_gem_installed, false)
@@ -1932,7 +1934,8 @@ describe InstallGenerator, type: :generator do
 
     specify "missing_pro_gem? marks memoized pro_gem_installed? state as installed" do
       expect(install_generator.send(:missing_pro_gem?)).to be false
-      expect(install_generator).to have_received(:system).with("bundle add react_on_rails_pro --strict")
+      expect(Bundler).to have_received(:with_unbundled_env)
+      expect(install_generator).to have_received(:system).with("bundle add react_on_rails_pro --optimistic")
       expect(install_generator.instance_variable_get(:@pro_gem_installed)).to be true
     end
   end
