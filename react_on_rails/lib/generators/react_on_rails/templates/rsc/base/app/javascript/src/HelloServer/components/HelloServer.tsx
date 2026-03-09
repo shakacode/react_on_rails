@@ -5,7 +5,7 @@
 //
 // 1. Async data fetching — use await directly in the component (no useEffect needed)
 // 2. Server-only code — access databases, file systems, or secrets safely
-// 3. Zero client JS — heavy libraries used here don't increase your bundle size
+// 3. Zero client JS in this starter demo — nothing from this component ships to the browser
 // 4. Streaming — wrapped in <Suspense>, this component streams HTML as it resolves
 //
 // For more information, see:

@@ -755,7 +755,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates HelloServer instead of HelloWorld (controller, route, and components)" do
+    it "creates HelloServer instead of HelloWorld (controller, route, and server-only components)" do
       # HelloWorld should NOT exist - HelloServer replaces it entirely
       assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
       assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.jsx"
@@ -767,7 +767,7 @@ describe InstallGenerator, type: :generator do
       # HelloServer should exist
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
-      assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
+      assert_no_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
     it "creates HelloServer controller and view" do
@@ -826,7 +826,7 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.server.jsx"
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
-      assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
+      assert_no_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
     it "creates hello_world route and controller for Redux" do
@@ -867,7 +867,7 @@ describe InstallGenerator, type: :generator do
       assert_no_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.tsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.tsx"
-      assert_file "app/javascript/src/HelloServer/components/LikeButton.tsx"
+      assert_no_file "app/javascript/src/HelloServer/components/LikeButton.tsx"
     end
 
     it "keeps TypeScript HelloServer component server-only by default" do

@@ -209,8 +209,6 @@ module ReactOnRails
                   "#{ror_components_dir}/HelloServer.#{ext}")
         copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/HelloServer.#{ext}",
                   "#{components_dir}/HelloServer.#{ext}")
-        copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/LikeButton.#{ext}",
-                  "#{components_dir}/LikeButton.#{ext}")
 
         puts Rainbow("✅ Created HelloServer component").green
       end

@@ -9,9 +9,9 @@ describe "Hello Server", :js do
     expect(page).to have_text("How is this different from SSR?")
   end
 
-  it "renders the interactive LikeButton client component" do
+  it "does not emit RSC payload errors in the starter sample" do
     visit "/hello_server"
-    expect(page).to have_button("👍 Like")
-    expect(page).to have_text("0 likes")
+    expect(page.html).not_to include('"hasErrors":true')
+    expect(page.html).not_to include("useState is not a function")
   end
 end
