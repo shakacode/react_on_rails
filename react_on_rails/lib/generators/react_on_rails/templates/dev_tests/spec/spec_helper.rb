@@ -19,7 +19,9 @@
 #
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 RSpec.configure do |config|
-  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # NOTE: Only needed if you set config.build_test_command in config/initializers/react_on_rails.rb.
+  # If using shakapacker's compile: true in config/shakapacker.yml (the default), this is not needed.
+  # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest
