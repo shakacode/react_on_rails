@@ -1879,6 +1879,7 @@ describe InstallGenerator, type: :generator do
 
   context "when using --pro flag without Pro gem installed" do
     let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:expected_pro_version) { Gem::Version.new(ReactOnRails::VERSION).release.to_s }
 
     before do
       allow(Gem).to receive(:loaded_specs).and_return({})
@@ -1893,7 +1894,7 @@ describe InstallGenerator, type: :generator do
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("--pro")
       expect(error_text).to include("react_on_rails_pro")
-      expect(error_text).to include("= 16.4.0")
+      expect(error_text).to include("= #{expected_pro_version}")
       expect(error_text).to include("justin@shakacode.com")
     end
   end

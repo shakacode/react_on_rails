@@ -23,6 +23,9 @@ module ReactOnRails
     #
     # rubocop:disable Metrics/ModuleLength
     module ProSetup
+      PRO_GEM_NAME = "react_on_rails_pro"
+      PRO_GEM_AUTO_INSTALL_COMMAND = "bundle add #{PRO_GEM_NAME} --strict".freeze
+
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
       #
@@ -55,8 +58,8 @@ module ReactOnRails
         return false if pro_gem_installed?
 
         # Try auto-installing (similar to ensure_shakapacker_in_gemfile in install_generator)
-        puts Rainbow("📝 Adding react_on_rails_pro to Gemfile...").yellow
-        if Bundler.with_unbundled_env { system("bundle add react_on_rails_pro --strict") }
+        puts Rainbow("📝 Adding #{PRO_GEM_NAME} to Gemfile...").yellow
+        if Bundler.with_unbundled_env { system(PRO_GEM_AUTO_INSTALL_COMMAND) }
           @pro_gem_installed = true
           return false
         end
@@ -70,12 +73,12 @@ module ReactOnRails
 
         # TODO(#2575): Replace temporary email CTA after react-unrails.com flow is live.
         GeneratorMessages.add_error(<<~MSG.strip)
-          🚫 Failed to auto-install react_on_rails_pro gem.
+          🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
 
           #{context_line}
 
           Please add manually to your Gemfile:
-            gem 'react_on_rails_pro', '= 16.4.0'
+            gem '#{PRO_GEM_NAME}', '= #{recommended_pro_gem_version}'
 
           Then run: bundle install
 
@@ -175,44 +178,47 @@ module ReactOnRails
         end
 
         content = File.read(webpack_config_path)
+        server_config_ready = pro_server_config_ready?(content)
+        import_ready = server_client_import_ready?
 
-        # Check if Pro settings are already enabled (not commented)
-        if content.include?("libraryTarget: 'commonjs2',") &&
-           !content.include?("// libraryTarget: 'commonjs2',")
+        # Skip only when both server config and import style are already updated.
+        if server_config_ready && import_ready
           puts Rainbow("ℹ️  Webpack config already has Pro settings enabled, skipping").yellow
           return
         end
 
         puts Rainbow("📝 Updating serverWebpackConfig.js for Pro...").yellow
 
-        # Add extractLoader helper function after bundler require
-        add_extract_loader_to_server_config(webpack_config, content)
+        unless server_config_ready
+          # Add extractLoader helper function after bundler require
+          add_extract_loader_to_server_config(webpack_config, content)
 
-        # Add Babel SSR caller setup (uses extractLoader, so must come after)
-        add_babel_ssr_caller_to_server_config(webpack_config, content)
+          # Add Babel SSR caller setup (uses extractLoader, so must come after)
+          add_babel_ssr_caller_to_server_config(webpack_config, content)
 
-        # Uncomment libraryTarget: 'commonjs2'
-        library_target_pattern = %r{// If using the React on Rails Pro.*\n\s*// libraryTarget: 'commonjs2',}
-        library_target_replacement = "// Required for React on Rails Pro Node Renderer\n    " \
-                                     "libraryTarget: 'commonjs2',"
-        gsub_file(webpack_config, library_target_pattern, library_target_replacement)
+          # Uncomment libraryTarget: 'commonjs2'
+          library_target_pattern = %r{// If using the React on Rails Pro.*\n\s*// libraryTarget: 'commonjs2',}
+          library_target_replacement = "// Required for React on Rails Pro Node Renderer\n    " \
+                                       "libraryTarget: 'commonjs2',"
+          gsub_file(webpack_config, library_target_pattern, library_target_replacement)
 
-        # Replace stale comments and uncomment target = 'node', add node = false
-        # The base template has 4 lines: 2 explanatory comments + "uncomment" hint + commented code
-        # Replace with clean Pro output matching the template's use_pro? branch
-        # rubocop:disable Layout/LineLength
-        target_node_pattern = %r{\s*// If using the default 'web',.*\n\s*// break with SSR\..*\n\s*// If using the React on Rails Pro.*\n\s*// serverWebpackConfig\.target = 'node'}
-        # rubocop:enable Layout/LineLength
-        target_node_replacement = "\n\n  " \
-                                  "// React on Rails Pro uses Node renderer, so target must be 'node'\n  " \
-                                  "// This fixes issues with libraries like Emotion and loadable-components\n  " \
-                                  "serverWebpackConfig.target = 'node';\n\n  " \
-                                  "// Disable Node.js polyfills - not needed when targeting Node\n  " \
-                                  "serverWebpackConfig.node = false;"
-        gsub_file(webpack_config, target_node_pattern, target_node_replacement)
+          # Replace stale comments and uncomment target = 'node', add node = false
+          # The base template has 4 lines: 2 explanatory comments + "uncomment" hint + commented code
+          # Replace with clean Pro output matching the template's use_pro? branch
+          # rubocop:disable Layout/LineLength
+          target_node_pattern = %r{\s*// If using the default 'web',.*\n\s*// break with SSR\..*\n\s*// If using the React on Rails Pro.*\n\s*// serverWebpackConfig\.target = 'node'}
+          # rubocop:enable Layout/LineLength
+          target_node_replacement = "\n\n  " \
+                                    "// React on Rails Pro uses Node renderer, so target must be 'node'\n  " \
+                                    "// This fixes issues with libraries like Emotion and loadable-components\n  " \
+                                    "serverWebpackConfig.target = 'node';\n\n  " \
+                                    "// Disable Node.js polyfills - not needed when targeting Node\n  " \
+                                    "serverWebpackConfig.node = false;"
+          gsub_file(webpack_config, target_node_pattern, target_node_replacement)
 
-        # Change module.exports to Pro style (exports object with default and extractLoader)
-        update_server_config_exports(webpack_config)
+          # Change module.exports to Pro style (exports object with default and extractLoader)
+          update_server_config_exports(webpack_config)
+        end
 
         # Update ServerClientOrBoth.js import style
         update_server_client_or_both_import
@@ -285,11 +291,8 @@ module ReactOnRails
 
       def verify_pro_webpack_transforms(webpack_config)
         content = File.read(File.join(destination_root, webpack_config))
-        missing = []
-        missing << "libraryTarget: 'commonjs2'" unless content.include?("libraryTarget: 'commonjs2',")
-        missing << "function extractLoader" unless content.include?("function extractLoader")
-        missing << "serverWebpackConfig.target = 'node'" unless content.include?("serverWebpackConfig.target = 'node'")
-        missing << "module.exports = {" unless content.include?("module.exports = {")
+        missing = missing_server_config_transforms(content)
+        missing.concat(missing_server_client_import_transform)
         return if missing.empty?
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -301,6 +304,29 @@ module ReactOnRails
           This can happen if your webpack config has been customized.
           Please verify #{webpack_config} manually.
         MSG
+      end
+
+      def missing_server_config_transforms(content)
+        checks = [
+          ["libraryTarget: 'commonjs2'", "libraryTarget: 'commonjs2',"],
+          ["function extractLoader", "function extractLoader"],
+          ["babelLoader.options.caller = { ssr: true }", "babelLoader.options.caller = { ssr: true }"],
+          ["serverWebpackConfig.target = 'node'", "serverWebpackConfig.target = 'node'"],
+          ["serverWebpackConfig.node = false", "serverWebpackConfig.node = false"],
+          ["module.exports = {", "module.exports = {"]
+        ]
+
+        checks.filter_map { |label, pattern| label unless content.include?(pattern) }
+      end
+
+      def missing_server_client_import_transform
+        server_client_path = resolve_server_client_or_both_path
+        return [] unless server_client_path
+
+        content = File.read(File.join(destination_root, server_client_path))
+        return [] if content.include?("{ default: serverWebpackConfig }")
+
+        ["{ default: serverWebpackConfig }"]
       end
 
       def update_server_client_or_both_import
@@ -319,6 +345,40 @@ module ReactOnRails
           %r{^const serverWebpackConfig = require\('\./serverWebpackConfig'\);$},
           "const { default: serverWebpackConfig } = require('./serverWebpackConfig');"
         )
+
+        new_content = File.read(File.join(destination_root, server_client_path))
+        return if new_content.include?("{ default: serverWebpackConfig }")
+
+        say_status(
+          :warning,
+          "ServerClientOrBoth import update failed in #{server_client_path}; manual edit required.",
+          :yellow
+        )
+      end
+
+      def pro_server_config_ready?(content)
+        content.include?("libraryTarget: 'commonjs2',") &&
+          !content.include?("// libraryTarget: 'commonjs2',") &&
+          content.include?("function extractLoader") &&
+          content.include?("babelLoader.options.caller = { ssr: true }") &&
+          content.include?("serverWebpackConfig.target = 'node'") &&
+          content.include?("serverWebpackConfig.node = false") &&
+          content.include?("module.exports = {")
+      end
+
+      def server_client_import_ready?
+        server_client_path = resolve_server_client_or_both_path
+        return true unless server_client_path
+
+        content = File.read(File.join(destination_root, server_client_path))
+        content.include?("{ default: serverWebpackConfig }")
+      end
+
+      # Keep manual fallback pinned to the latest stable release (drop pre-release suffixes like .rc.N).
+      def recommended_pro_gem_version
+        Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      rescue StandardError
+        ReactOnRails::VERSION
       end
     end
     # rubocop:enable Metrics/ModuleLength
