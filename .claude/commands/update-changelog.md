@@ -2,6 +2,68 @@
 
 You are helping to add an entry to the CHANGELOG.md file for the React on Rails project.
 
+## Arguments
+
+This command accepts an optional argument: `$ARGUMENTS`
+
+- **No argument** (`/update-changelog`): Add entries to `[Unreleased]` without stamping a version header. Use this during development.
+- **`release`** (`/update-changelog release`): Add entries and stamp a version header. Auto-compute the next version based on changes (breaking -> major, added features -> minor, fixes -> patch). Then `rake release` (with no args) will pick up this version automatically.
+- **`rc`** (`/update-changelog rc`): Same as `release`, but stamps an RC prerelease version (e.g., `16.5.0.rc.0`). Auto-increments the RC index if prior RCs exist for the same base version.
+- **`beta`** (`/update-changelog beta`): Same as `rc`, but stamps a beta prerelease version (e.g., `16.5.0.beta.0`).
+
+## When to Use This
+
+This command serves three use cases at different points in the release lifecycle:
+
+**During development** -- Add entries to `[Unreleased]` as PRs merge:
+
+- Run `/update-changelog` to find merged PRs missing from the changelog
+- Entries accumulate under `### [Unreleased]`
+
+**Before a release** -- Stamp a version header and prepare for release:
+
+- Run `/update-changelog release` (or `rc` or `beta`) to add entries AND stamp the version header
+- The version is auto-computed from changelog content (see "Auto-Computing the Next Version" below)
+- Commit and push CHANGELOG.md
+- Then run `rake release` (no args needed -- it reads the version from CHANGELOG.md)
+- The release task automatically creates a GitHub release from the changelog section
+
+**After a release you forgot to update the changelog for** -- Catch-up mode:
+
+- The command can retroactively find commits between tags and add missing entries
+- Ask the user whether to stamp a version header or add to `[Unreleased]`
+
+### Why changelog comes BEFORE the release
+
+- `rake release` automatically creates a GitHub release if a changelog section exists -- no separate `sync_github_release` step needed
+- The release task warns if no changelog section is found for the target version
+- A premature version header (if release fails) is harmless -- you'll release eventually
+- A missing changelog after release means the GitHub release must be created manually
+
+## Auto-Computing the Next Version
+
+When stamping a version header (`release`, `rc`, or `beta`), compute the next version as follows:
+
+1. **Find the latest stable version tag** using semver sort:
+
+   ```bash
+   git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1
+   ```
+
+2. **Determine bump type from changelog content**:
+   - If changes include `#### Breaking Changes` or `#### ⚠️ Breaking Changes` -> **major** bump
+   - If changes include `#### Added` or `#### New Features` -> **minor** bump
+   - If changes only include `#### Fixed`, `#### Security`, `#### Improved`, `#### Changed`, `#### Deprecated` -> **patch** bump
+
+3. **Compute the version**:
+   - For `release`: Apply the bump to the latest stable tag (e.g., `16.4.0` + minor -> `16.5.0`)
+   - For `rc`: Apply the bump, then find the next RC index (e.g., if `v16.5.0.rc.0` tag exists -> `16.5.0.rc.1`)
+   - For `beta`: Same as RC but with beta suffix
+
+4. **Verify**: Check that the computed version is newer than ALL existing tags (stable and prerelease). If not, ask the user what to do.
+
+5. **Show the computed version to the user** and ask for confirmation before stamping the header.
+
 ## Critical Requirements
 
 1. **User-visible changes only**: Only add changelog entries for user-visible changes:
@@ -89,18 +151,27 @@ Entries should be organized under these section headings **in the following orde
 After adding entries, use the rake task to manage version headers:
 
 ```bash
-bundle exec rake update_changelog
+# Auto-compute version from changelog content
+bundle exec rake "update_changelog[release]"   # stamp next stable version
+bundle exec rake "update_changelog[rc]"        # stamp next RC version
+bundle exec rake "update_changelog[beta]"      # stamp next beta version
+
+# Explicit version or latest git tag
+bundle exec rake "update_changelog[v16.5.0]"   # explicit version
+bundle exec rake update_changelog              # use latest git tag
 ```
 
 This will:
 
 - Add headers for the new version right after `### [Unreleased]`
 - Update version diff links at the bottom of the file
+- For `rc`/`beta` modes: collapse prior prerelease sections of the same base version into a single section
 
 **When to use which tool:**
 
-- **`/update-changelog` (Claude Code)**: Full automation - analyzes commits, writes changelog entries, and creates a PR. Use this for comprehensive changelog updates.
-- **`bundle exec rake update_changelog`**: Quick version header addition only. Use this if you just want the version header added and plan to write entries manually.
+- **`/update-changelog release` (Claude Code)**: Full automation - analyzes commits, writes changelog entries, stamps version header, and creates a PR. Use this for comprehensive changelog updates before a release.
+- **`/update-changelog` (Claude Code, no args)**: Adds entries to `[Unreleased]` during development.
+- **`bundle exec rake update_changelog[mode]`**: Quick version header addition only. Use this if you just want the version header added and plan to write entries manually.
 
 ### Finding the Most Recent Version
 
@@ -218,69 +289,42 @@ When a new version is released:
    - Which new entries were added
    - Which PRs were skipped (and why)
 
-### For Beta to Non-Beta Version Release
+### For Prerelease Versions (RC and Beta)
 
-When releasing from beta to a stable version (e.g., git tag `v16.1.0.beta.3` → `v16.1.0`):
+When the user passes `rc` or `beta` as an argument (or when creating a prerelease section manually):
 
-1. **Remove all beta version labels** from the changelog:
-   - Change `### [16.1.0.beta.1]`, `### [16.1.0.beta.2]`, etc. to a single `### [16.1.0]` section
-   - Combine all beta entries into the stable release section
-
-2. **Consolidate duplicate entries**:
-   - If bug fixes or changes were made to features introduced in earlier betas, keep only the final state
-   - Remove redundant changelog entries for fixes to beta features
-   - Keep the most recent/accurate description of each change
-
-3. **Update version diff links** using `bundle exec rake update_changelog`
-
-### For New Beta Version Release
-
-When a new beta version is released (e.g., `16.2.0.beta.20`):
-
-1. **Check the latest git tag** to confirm the new version:
+1. **Find the latest tag** (stable or prerelease) using semver sort:
 
    ```bash
-   git tag --sort=-v:refname | head -5
+   git tag -l 'v*' --sort=-v:refname | head -10
    ```
 
-   This shows the latest tags (e.g., `v16.2.0.beta.20`). Strip the `v` prefix for changelog use.
+2. **Auto-compute the next prerelease version** using the process in "Auto-Computing the Next Version" above.
 
-2. **Find the most recent version** in the changelog by looking for the first `### [VERSION] - DATE` after `### [Unreleased]`
-
-3. **Insert the new version header immediately after `### [Unreleased]`**:
-
-   ```markdown
-   ### [Unreleased]
-
-   ### [16.2.0.beta.20] - 2025-12-12
-
-   ### [16.2.0.beta.19] - 2025-12-10
-   ```
-
-4. **Update the version diff links at the bottom of the file**:
-   - Change the `[unreleased]:` link to compare from the new version to master
-   - Add a new link for the new version comparing to the previous version:
-
-   ```markdown
-   [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.20...master
-   [16.2.0.beta.20]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...16.2.0.beta.20
-   [16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
-   ```
-
-5. **For changelog entries**, ask the user which approach to take:
-
-   **Option 1: Process changes since last beta**
-   - Only add entries for commits since the previous beta version
-   - Maintains detailed history of what changed in each beta
-
-   **Option 2: Collapse all prior betas into current beta**
-   - Combine all beta changelog entries into the new beta version
-   - Removes previous beta version sections
-   - Cleaner changelog with less version noise
-
-After the user chooses, proceed with that approach.
+3. **Always collapse prior prereleases into the current prerelease** (this is the default behavior):
+   - Combine all prior prerelease changelog entries into the new prerelease version section
+   - Remove previous prerelease version sections (e.g., remove `### [16.5.0.rc.0]` when creating `### [16.5.0.rc.1]`)
+   - Add any new user-visible changes from commits since the last prerelease
+   - Update version diff links to point from the last stable version to the new prerelease
+   - This keeps the changelog clean with a single prerelease section that accumulates all changes since the last stable release
 
 **CRITICAL**: The new version header must be inserted **immediately after `### [Unreleased]`**, NOT after "Changes since the last non-beta release." or any other text. This ensures correct ordering of version headers.
+
+### For Prerelease to Stable Version Release
+
+When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16.5.0`):
+
+1. **Remove all prerelease version labels** from the changelog:
+   - Change `### [16.5.0.rc.0]`, `### [16.5.0.rc.1]`, etc. to a single `### [16.5.0]` section
+   - Also handle beta versions: `### [16.5.0.beta.1]` etc.
+   - Combine all prerelease entries into the stable release section
+
+2. **Consolidate duplicate entries**:
+   - If bug fixes or changes were made to features introduced in earlier prereleases, keep only the final state
+   - Remove redundant changelog entries for fixes to prerelease features
+   - Keep the most recent/accurate description of each change
+
+3. **Update version diff links** at the bottom to point to the stable version
 
 ## Examples
 

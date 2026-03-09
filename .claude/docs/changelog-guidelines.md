@@ -16,6 +16,8 @@ Each release version has an optional `#### Pro` section at the end that contains
 - **Do NOT add entries for**: linting, formatting, refactoring, tests, or documentation fixes
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash in PR number)
 - **Use `/update-changelog` command** for guided changelog updates with automatic formatting
-- **Version management after releases**: `bundle exec rake update_changelog`
+- **Before a release**: Run `/update-changelog release` (or `rc`/`beta`) to stamp a version header; then `rake release` reads it automatically and creates the GitHub release
+- **Version management**: `bundle exec rake "update_changelog[release]"` (or `rc`/`beta`/explicit version) for header-only updates
+- **After releasing without changelog**: Run `bundle exec rake "sync_github_release[VERSION]"` to create the GitHub release from CHANGELOG.md
 - **Examples**: Run `grep -A 3 "^#### " CHANGELOG.md | head -30` to see real formatting examples
-- **Beta release curation**: See `.claude/commands/update-changelog.md` for beta-to-stable consolidation process
+- **Prerelease curation**: See `.claude/commands/update-changelog.md` for prerelease-to-stable consolidation process
