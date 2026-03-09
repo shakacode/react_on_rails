@@ -167,6 +167,7 @@ export default function ProductPage({ productId }) {
 
 ```jsx
 // ProductPage.jsx -- Server Component (no directive)
+// Data fetching patterns are covered in detail in Part 4: Data Fetching Migration
 export default async function ProductPage({ productId }) {
   const product = await getProduct(productId);
 

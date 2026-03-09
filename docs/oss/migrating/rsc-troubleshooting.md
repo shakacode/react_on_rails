@@ -2,7 +2,7 @@
 
 This guide covers the most common problems you'll encounter when migrating to React Server Components, with concrete solutions for each. Use it as a reference when you hit errors or unexpected behavior.
 
-> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md)
 
 ## Serialization Boundary Issues
 
@@ -270,7 +270,7 @@ For elements that intentionally differ between server and client:
 <time suppressHydrationWarning>{new Date().toLocaleDateString()}</time>
 ```
 
-This suppresses the warning but does not fix the mismatch -- use it only for non-critical content.
+This suppresses the warning for **this element only** (not its descendants) and does not fix the mismatch -- use it only for non-critical content. If child elements also differ, each needs its own `suppressHydrationWarning`.
 
 > **Warning:** The `if (!mounted) return null` pattern causes **Cumulative Layout Shift (CLS)** -- the element occupies no space on first paint, then pops in after hydration. Only use it for small, positionally stable UI elements (icon buttons, toggles). For anything that affects page layout, read the preference from a server-readable cookie to render the correct value on first paint (see the [Theme Provider](rsc-context-and-state.md#theme-provider-no-flash-of-wrong-theme) section), or use `suppressHydrationWarning` on non-layout-critical elements.
 
@@ -395,6 +395,8 @@ async function Page() {
 }
 
 // GOOD: Parallel fetching (300ms total)
+// Note: This version takes userId as a prop, avoiding the need to fetch user first.
+// If stats/posts depend on user data beyond the ID, fetch user first, then parallelize the rest.
 async function Page({ userId }) {
   const [user, stats, posts] = await Promise.all([getUser(userId), getStats(userId), getPosts(userId)]);
 }
@@ -408,13 +410,13 @@ Without Suspense, Server Components perform similarly to traditional SSR. Benchm
 
 ### RSC Payload Duplication
 
-Server-rendered content is sent twice: once as visible HTML and once as the RSC payload (serialized component tree) in `<script>` tags. This increases document size. Monitor RSC payload size to ensure it stays reasonable.
+The RSC payload (a serialized representation of the component tree) is embedded in `<script>` tags alongside the server-rendered HTML. This payload is used by React on the client to reconcile the component tree without re-rendering from scratch. The HTML and the RSC payload are not exact duplicates -- the payload contains component structure and props, not rendered markup -- but they do represent overlapping information, which increases document size. Monitor RSC payload size to ensure it stays reasonable.
 
 ## Testing Strategies
 
 ### The Fundamental Challenge
 
-Async Server Components are a new paradigm that existing testing tools were not designed for. **Vitest does not support async Server Components** as of early 2026.
+Async Server Components introduce new testing challenges. Vitest and Jest can test async Server Components as **plain async functions** (call the function, `await` the result, assert on the returned JSX). However, **rendering them through React's component pipeline** (e.g., with `@testing-library/react`) does not yet have full support -- React's test renderer does not handle the async server rendering path. The React team has published guidance on testing patterns, and `@testing-library/react` is actively adding RSC support.
 
 ### Recommended Testing Approach
 
@@ -528,7 +530,7 @@ export async function createUser(formData: FormData) {
 | `"Functions cannot be passed directly to Client Components unless you explicitly expose it by marking it with 'use server'"` | Passing a function prop from Server to Client Component                                                                                                                                                  | Use Server Actions, or define the function in the Client Component                                                                                                                                                                          |
 | `"You're importing a component that needs useState/useEffect..."`                                                            | Using hooks in a Server Component                                                                                                                                                                        | Add `'use client'` to the component file                                                                                                                                                                                                    |
 | `"Only plain objects, and a few built-ins, can be passed to Client Components..."`                                           | Passing class instances or non-serializable values                                                                                                                                                       | Convert to plain objects with `.toJSON()` or manual serialization                                                                                                                                                                           |
-| `"async/await is not yet supported in Client Components"`                                                                    | Making a Client Component async                                                                                                                                                                          | Move async logic to a Server Component, or use `useEffect`/`use()`                                                                                                                                                                          |
+| `"async/await is not yet supported in Client Components"`                                                                    | Making a Client Component async. This is an intentional design constraint, not a temporary limitation -- Client Components re-render on state changes, which is incompatible with async rendering.       | Move async logic to a Server Component, or use `useEffect`/`use()`                                                                                                                                                                          |
 | `"A component was suspended by an uncached promise..."`                                                                      | Creating a promise inside a Client Component and passing it to `use()`                                                                                                                                   | Pass the promise from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components)                                  |
 | `"createContext is not supported in Server Components"`                                                                      | Using `createContext` or `useContext` in a Server Component                                                                                                                                              | Move context to a `'use client'` provider wrapper                                                                                                                                                                                           |
 | `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type"`          | TypeScript doesn't recognize async components                                                                                                                                                            | Upgrade to TS 5.1.2+ and `@types/react@19` (or `@types/react` 18.2.8+ for React 18), or omit return type                                                                                                                                    |

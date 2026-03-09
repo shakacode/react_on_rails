@@ -9,8 +9,7 @@ This guide covers the React-side challenges of migrating an existing React on Ra
 React Server Components offer significant performance benefits when used correctly:
 
 - **62% reduction** in client-side bundle size ([Frigade case study](https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade))
-- **63% improvement** in Google Speed Index
-- Total blocking time reduced **from 110ms to 1ms**
+- Significant improvements in Google Speed Index and Total Blocking Time reported across RSC adoption case studies
 - Server-only dependencies (date-fns, marked, sanitize-html) never ship to the client
 
 However, these benefits require intentional architecture changes. Simply adding `'use client'` everywhere preserves the status quo -- `'use client'` is a [boundary marker, not a component annotation](rsc-component-patterns.md#use-client-marks-a-boundary-not-a-component-type). The guides below walk you through the restructuring needed to capture real gains.
@@ -46,7 +45,7 @@ How to handle React Context and global state in an RSC world. Covers:
 - Why Context doesn't work in Server Components and what to do about it
 - The provider wrapper pattern (creating `'use client'` provider components)
 - Composing multiple providers without "provider hell"
-- Migrating Redux to work alongside RSC, with guidance on where Zustand and Jotai fit
+- Migrating Redux to work alongside RSC
 - Using `React.cache()` as a server-side alternative to Context
 - Theme, auth, and i18n provider patterns
 

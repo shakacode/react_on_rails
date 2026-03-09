@@ -49,7 +49,7 @@ yarn why react-on-rails-rsc
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
 
-> **Security:** `react-on-rails-rsc` versions **19.0.0 through 19.0.3** contain known vulnerabilities in the vendored `react-server-dom-webpack` package, including a Remote Code Execution flaw (CVE-2025-55182). Version **19.0.4** is the minimum version that includes fixes for all known CVEs (CVE-2025-55182, CVE-2025-55183, CVE-2025-55184, CVE-2025-67779). Always use **19.0.4 or later**.
+> **Security:** `react-on-rails-rsc` versions **19.0.0 through 19.0.3** contain known vulnerabilities in the vendored `react-server-dom-webpack` package. Version **19.0.4** is the minimum version that includes fixes for all known security issues. Always use **19.0.4 or later**. Check the [react-on-rails-rsc changelog](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details.
 
 ## Step 2: Configure Rails for RSC
 
@@ -104,13 +104,13 @@ end
 This mounts a `GET /rsc_payload/:component_name` endpoint that React on Rails Pro uses internally. The default path (`rsc_payload/`) matches the `rsc_payload_generation_url_path` config. If your app has a route conflict at that path, you can customize both:
 
 ```ruby
-# Custom path (use the same slash-free base path in both places)
-rsc_payload_route path: "flight-payload"
+# Custom path (use the same value in both places, with trailing slash)
+rsc_payload_route path: "flight-payload/"
 ```
 
 ```ruby
 # config/initializers/react_on_rails_pro.rb
-config.rsc_payload_generation_url_path = "flight-payload"
+config.rsc_payload_generation_url_path = "flight-payload/"
 ```
 
 ## Step 4: Set Up the RSC Webpack Bundle

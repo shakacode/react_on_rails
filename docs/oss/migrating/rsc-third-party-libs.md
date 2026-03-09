@@ -2,7 +2,7 @@
 
 Most third-party React libraries were built before Server Components existed. Many rely on hooks, Context, or browser APIs that are unavailable in Server Components. This guide covers how to identify incompatible libraries, create wrapper patterns, and choose RSC-compatible alternatives.
 
-> **Part 5 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 5 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Data Fetching Migration](rsc-data-fetching.md)
 
 ## Why Libraries Break in Server Components
 
@@ -94,10 +94,10 @@ CSS-in-JS is the most impactful compatibility challenge for RSC migration. Runti
 
 ### Runtime CSS-in-JS (Problematic)
 
-| Library               | RSC Status                                                                                   | Notes                                                                                                                                              |
-| --------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **styled-components** | Maintenance mode (March 2025). v6.3.0+ added RSC support via React's `<style>` tag hoisting. | The maintainer stated: "For new projects, I would not recommend adopting styled-components." React Context dependency is the root incompatibility. |
-| **Emotion**           | No native RSC support                                                                        | Workaround: wrap all Emotion-styled components in `'use client'` files.                                                                            |
+| Library               | RSC Status                                                                                                          | Notes                                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **styled-components** | In maintenance mode. v6.3.0+ added RSC support via React's `<style>` tag hoisting before entering maintenance mode. | The maintainer stated: "For new projects, I would not recommend adopting styled-components." React Context dependency is the root incompatibility. |
+| **Emotion**           | No native RSC support                                                                                               | Workaround: wrap all Emotion-styled components in `'use client'` files.                                                                            |
 
 ### Zero-Runtime CSS-in-JS (RSC Compatible)
 

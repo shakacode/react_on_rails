@@ -2,7 +2,7 @@
 
 React Context is one of the biggest migration challenges when adopting RSC. Server Components cannot create or consume Context -- they have no access to `createContext`, `useContext`, or any Context provider. This guide covers the patterns for handling Context, providers, and global state in an RSC world.
 
-> **Part 3 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 3 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Component Tree Restructuring](rsc-component-patterns.md)
 
 ## Why Context Doesn't Work in Server Components
 
@@ -263,6 +263,10 @@ export default function HelloWorldApp(props) {
 
 **What RSC changes for Redux:** With Server Components, only the props that Client Components actually need get serialized into the HTML. Previously, all props passed via `react_component` were encoded in the page for hydration -- even data only used for display. Now, Server Components consume display-only data on the server (it never reaches the client), so you should pass only the interactive state your Client Components need into the `<ReduxProvider>`. This reduces the HTML page size and the amount of data the browser must parse.
 
+### Zustand and Jotai
+
+Zustand and Jotai follow the same pattern as Redux: keep all store access in Client Components. Both are lighter-weight alternatives that work well with RSC because they don't require a `<Provider>` wrapper (Zustand) or use a minimal one (Jotai). Wrap store-consuming components with `'use client'` and pass server-fetched data as initial values via props. See the [compatibility matrix](rsc-third-party-libs.md#library-compatibility-decision-matrix) for version requirements.
+
 ### General State Management Guidance
 
 RSC reduces the need for global state libraries because data fetching moves to the server:
@@ -357,7 +361,9 @@ helper_method :i18n_props
 def i18n_props
   {
     locale: I18n.locale.to_s,
-    messages: I18n.t('.').deep_stringify_keys, # or a subset of translations
+    # IMPORTANT: I18n.t('.') returns the ENTIRE translation tree for the locale,
+    # which can be thousands of keys. For production, pass only the subset needed:
+    messages: I18n.t('product_page').deep_stringify_keys,
   }
 end
 ```

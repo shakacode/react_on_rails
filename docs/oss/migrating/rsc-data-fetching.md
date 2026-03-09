@@ -2,7 +2,7 @@
 
 This guide covers how to migrate your data fetching from client-side patterns (`useEffect` + `fetch`, React Query, SWR) to Server Component patterns. In React on Rails, data flows from Rails to your components as props — eliminating the need for loading states, error handling boilerplate, and client-side caching in many cases.
 
-> **Part 4 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 4 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Context and State Management](rsc-context-and-state.md)
 
 ## The Core Shift: From Client-Side Fetching to Server-Side Data
 
@@ -418,6 +418,7 @@ export const preloadComments = (id) => {
 
 ```jsx
 // Post.jsx -- Server Component
+import { Suspense } from 'react';
 import { preloadComments, getComments, getPost } from '../lib/data';
 
 async function Post({ postId }) {
@@ -484,6 +485,7 @@ The `use()` hook lets Client Components resolve promises that were started on th
 ```jsx
 // Page.jsx -- Server Component
 import { Suspense } from 'react';
+import { getPost, getComments } from '../lib/data';
 import Comments from './Comments';
 
 export default async function Page({ id }) {
@@ -533,7 +535,7 @@ Creating a promise inside a Client Component and passing it to `use()` triggers 
 
 > **"A component was suspended by an uncached promise. Creating promises inside a Client Component or hook is not yet supported, except via a Suspense-compatible library or framework."**
 
-**Why it happens:** React tracks promises passed to `use()` by their call-position index across re-renders. On each render, it checks whether the promise at index N is the same object reference as the last render. When you create a promise inside a Client Component, every render produces a new promise instance -- React sees a different reference and throws.
+**Why it happens:** React tracks promises passed to `use()` by **object reference identity** across re-renders. On each render, it checks whether the promise is the same object as the previous render. When you create a promise inside a Client Component, every render produces a new promise instance -- React sees a different reference, cannot determine if the result is still valid, and throws.
 
 ```jsx
 // WRONG: Creating a promise inline — new promise every render
@@ -726,13 +728,15 @@ export async function createComment(formData) {
   const session = await getSession();
   if (!session?.userId) throw new Error('Unauthorized');
 
-  const content = formData.get('content');
-  const postId = formData.get('postId');
+  // Validate all input -- formData can contain arbitrary values from any client
+  const content = String(formData.get('content') || '').trim();
+  const postId = Number(formData.get('postId'));
+  if (!content || content.length > 10000) throw new Error('Invalid content');
+  if (!Number.isFinite(postId) || postId <= 0) throw new Error('Invalid postId');
 
-  await fetch('/api/comments', {
-    method: 'POST',
-    body: JSON.stringify({ content, postId }),
-  });
+  // In React on Rails, call your Rails model/service directly instead of
+  // making an HTTP round-trip back to your own API:
+  await db.comments.create({ data: { content, postId, userId: session.userId } });
 }
 ```
 
