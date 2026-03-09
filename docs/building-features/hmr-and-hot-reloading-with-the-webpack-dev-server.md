@@ -32,7 +32,7 @@ config.same_bundle_for_client_and_server = true
 `dev_server.hmr` maps to [devServer.hot](https://webpack.js.org/configuration/dev-server/#devserverhot).
 This must be false if you're using the webpack-dev-server for client and server bundles.
 
-If `hmr` is `true` in this configuration, you will see: `ReferenceError: window is not defined`
+If `hmr` is `true` when using the same bundle for client and server, you will see: `ReferenceError: window is not defined`
 
 ## Client-Side rendering with HMR using react-refresh-webpack-plugin
 
