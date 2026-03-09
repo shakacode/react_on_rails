@@ -55,7 +55,16 @@ bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package
 # CI/workflow linting
 actionlint                           # GitHub Actions lint
 yamllint .github/                    # YAML lint (do NOT run RuboCop on .yml files)
+
+# Dependency version updates
+rake shakapacker:update_version[9.6.1]  # Update shakapacker across the monorepo
 ```
+
+### Updating Shakapacker
+
+Use `rake shakapacker:update_version[VERSION]` to update shakapacker across the entire monorepo. This single command updates all Gemfiles, package.json files, Gemfile.lock files, and pnpm-lock.yaml. Do **not** manually edit individual version references — always use the rake task to keep everything in sync.
+
+The task handles Ruby version switching for apps that require a different Ruby version (set `RUBY_VERSION_MANAGER` to `rvm`, `rbenv`, `asdf`, or `mise` if needed; defaults to `rvm`). It continues gracefully if a single lock file update fails (e.g., due to a missing Ruby version).
 
 ## Testing
 
