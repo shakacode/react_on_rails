@@ -223,6 +223,28 @@ describe "React Router", :js do
   end
 end
 
+describe "TanStack Router Async", :js do
+  subject(:current_page) { page }
+
+  before { visit "/tanstack_router_async" }
+
+  context "when rendering /tanstack_router_async" do
+    it { is_expected.to have_text("Woohoo, we can use tanstack-router asynchronously here!") }
+
+    it "clicking links correctly renders other pages" do
+      click_on "TanStack Router Async Second Page"
+      expect(page).to have_current_path("/tanstack_router_async/second_page")
+      second_page_header_text = page.find(:css, "h2#tanstack-async-second-page").text
+      expect(second_page_header_text).to eq("TanStack Router Async Second Page")
+
+      click_on "TanStack Router Async Layout Only"
+      expect(page).to have_current_path("/tanstack_router_async")
+      home_page_header_text = page.find(:css, "h2#tanstack-async-home-page").text
+      expect(home_page_header_text).to eq("TanStack Router Async Home Page")
+    end
+  end
+end
+
 describe "Manual Rendering", :js do
   subject { page }
 

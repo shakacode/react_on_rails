@@ -7,3 +7,6 @@ config/react_on_rails_pro_license.key
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Local node renderer bundle cache rotated during debugging
+/.node-renderer-bundles.stale-*/

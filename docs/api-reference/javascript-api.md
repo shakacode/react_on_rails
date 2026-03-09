@@ -25,7 +25,8 @@ The best source of docs is the `interface ReactOnRails` in [types/index.ts](http
  * Main entry point to using the react-on-rails NPM package. This is how Rails will be able to
  * find you components for rendering. Components get called with props, or you may use a
  * "Render-Function" to return a React component or an object with the following shape:
- * { renderedHtml, redirectLocation, error }.
+ * { renderedHtml, clientProps?, redirectLocation?, routeError? }.
+ * `renderedHtml` may be a String, a React element, or a server-side hash.
  * For server rendering, if you wish to return multiple HTML strings from a Render-Function,
  * you may return an object from your Render-Function with a single top level property of
  * renderedHtml. Inside this object, place a key called componentHtml, along with any other
@@ -94,3 +95,5 @@ authenticityToken();
  */
 authenticityHeaders((otherHeaders = {}));
 ```
+
+For TanStack Router integration utilities, see [`react-on-rails-pro/tanstack-router`](../building-features/tanstack-router.md) (requires React on Rails Pro).
