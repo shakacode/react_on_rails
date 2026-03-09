@@ -22,12 +22,12 @@ export default function UserProfile({ userId }) {
 
   useEffect(() => {
     fetch(`/api/users/${userId}`)
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         setUser(data);
         setLoading(false);
       })
-      .catch(err => {
+      .catch((err) => {
         setError(err);
         setLoading(false);
       });
@@ -98,9 +98,7 @@ type SyncProps = { name: string; price: number };
 type AsyncProps = { reviews: Review[]; recommendations: Product[] };
 type Props = WithAsyncProps<AsyncProps, SyncProps>;
 
-export default function ProductPage({
-  name, price, getReactOnRailsAsyncProp
-}: Props) {
+export default function ProductPage({ name, price, getReactOnRailsAsyncProp }: Props) {
   const reviewsPromise = getReactOnRailsAsyncProp('reviews');
   const recommendationsPromise = getReactOnRailsAsyncProp('recommendations');
 
@@ -124,7 +122,9 @@ async function Reviews({ reviews }: { reviews: Promise<Review[]> }) {
   const resolved = await reviews;
   return (
     <ul>
-      {resolved.map(r => <li key={r.id}>{r.text}</li>)}
+      {resolved.map((r) => (
+        <li key={r.id}>{r.text}</li>
+      ))}
     </ul>
   );
 }
@@ -198,7 +198,7 @@ import { useQuery } from '@tanstack/react-query';
 function ProductList() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['products'],
-    queryFn: () => fetch('/api/products').then(res => res.json()),
+    queryFn: () => fetch('/api/products').then((res) => res.json()),
   });
 
   if (isLoading) return <Spinner />;
@@ -206,7 +206,9 @@ function ProductList() {
 
   return (
     <ul>
-      {data.map(p => <li key={p.id}>{p.name}</li>)}
+      {data.map((p) => (
+        <li key={p.id}>{p.name}</li>
+      ))}
     </ul>
   );
 }
@@ -221,7 +223,9 @@ async function ProductList() {
 
   return (
     <ul>
-      {products.map(p => <li key={p.id}>{p.name}</li>)}
+      {products.map((p) => (
+        <li key={p.id}>{p.name}</li>
+      ))}
     </ul>
   );
 }
@@ -262,12 +266,16 @@ import { useQuery } from '@tanstack/react-query';
 export default function ProductList() {
   const { data: products } = useQuery({
     queryKey: ['products'],
-    queryFn: () => fetch('/api/products').then(res => res.json()),
+    queryFn: () => fetch('/api/products').then((res) => res.json()),
   });
 
   return (
     <ul>
-      {products.map(p => <li key={p.id}>{p.name} - ${p.price}</li>)}
+      {products.map((p) => (
+        <li key={p.id}>
+          {p.name} - ${p.price}
+        </li>
+      ))}
     </ul>
   );
 }
@@ -303,7 +311,7 @@ export default async function DashboardPage() {
 
 import useSWR from 'swr';
 
-const fetcher = (url) => fetch(url).then(res => res.json());
+const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function DashboardStats({ fallbackData }) {
   const { data: stats } = useSWR('/api/dashboard/stats', fetcher, {
@@ -328,9 +336,9 @@ The most critical performance pitfall with Server Components is sequential data 
 ```jsx
 // BAD: Each await blocks the next
 async function Dashboard() {
-  const user = await getUser();           // 200ms
-  const stats = await getStats(user.id);  // 300ms
-  const posts = await getPosts(user.id);  // 250ms
+  const user = await getUser(); // 200ms
+  const stats = await getStats(user.id); // 300ms
+  const posts = await getPosts(user.id); // 250ms
   // Total: 750ms (sequential)
 
   return (
@@ -349,9 +357,9 @@ async function Dashboard() {
 // GOOD: Independent fetches run in parallel
 async function Dashboard({ userId }) {
   const [user, stats, posts] = await Promise.all([
-    getUser(userId),       // 200ms
-    getStats(userId),      // 300ms ── all start simultaneously
-    getPosts(userId),      // 250ms
+    getUser(userId), // 200ms
+    getStats(userId), // 300ms ── all start simultaneously
+    getPosts(userId), // 250ms
   ]);
   // Total: 300ms (limited by slowest)
 
@@ -376,13 +384,13 @@ async function Dashboard() {
     <div>
       <h1>Dashboard</h1>
       <Suspense fallback={<UserSkeleton />}>
-        <UserProfile />     {/* Fetches its own data */}
+        <UserProfile /> {/* Fetches its own data */}
       </Suspense>
       <Suspense fallback={<StatsSkeleton />}>
-        <StatsPanel />      {/* Fetches its own data */}
+        <StatsPanel /> {/* Fetches its own data */}
       </Suspense>
       <Suspense fallback={<FeedSkeleton />}>
-        <PostFeed />        {/* Fetches its own data */}
+        <PostFeed /> {/* Fetches its own data */}
       </Suspense>
     </div>
   );
@@ -410,12 +418,12 @@ export const preloadComments = (id) => {
 
 ```jsx
 // Post.jsx -- Server Component
-import { preloadComments, getComments } from '../lib/data';
+import { preloadComments, getComments, getPost } from '../lib/data';
 
 async function Post({ postId }) {
   preloadComments(postId); // Fire and forget
 
-  const post = await getPost(postId);  // This await doesn't block comments
+  const post = await getPost(postId); // This await doesn't block comments
 
   return (
     <>
@@ -456,6 +464,12 @@ async function ProductPage({ productId }) {
     </div>
   );
 }
+
+// ReviewsSection.jsx -- Async Server Component
+async function ReviewsSection({ promise }) {
+  const reviews = await promise;
+  return <ReviewList reviews={reviews} />;
+}
 ```
 
 ## Streaming with the `use()` Hook
@@ -468,8 +482,8 @@ import { Suspense } from 'react';
 import Comments from './Comments';
 
 export default async function Page({ id }) {
-  const post = await getPost(id);              // Await critical data
-  const commentsPromise = getComments(id);     // Start but DON'T await
+  const post = await getPost(id); // Await critical data
+  const commentsPromise = getComments(id); // Start but DON'T await
 
   return (
     <article>
@@ -490,10 +504,12 @@ export default async function Page({ id }) {
 import { use } from 'react';
 
 export default function Comments({ commentsPromise }) {
-  const comments = use(commentsPromise);  // Resolves the promise
+  const comments = use(commentsPromise); // Resolves the promise
   return (
     <ul>
-      {comments.map(c => <li key={c.id}>{c.text}</li>)}
+      {comments.map((c) => (
+        <li key={c.id}>{c.text}</li>
+      ))}
     </ul>
   );
 }
@@ -520,8 +536,14 @@ Creating a promise inside a Client Component and passing it to `use()` triggers 
 import { use } from 'react';
 
 function Comments({ postId }) {
-  const comments = use(fetch(`/api/comments/${postId}`).then(r => r.json()));
-  return <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>;
+  const comments = use(fetch(`/api/comments/${postId}`).then((r) => r.json()));
+  return (
+    <ul>
+      {comments.map((c) => (
+        <li key={c.id}>{c.text}</li>
+      ))}
+    </ul>
+  );
 }
 ```
 
@@ -533,7 +555,13 @@ import { use } from 'react';
 function Comments({ postId }) {
   const promise = getComments(postId); // New promise object each render
   const comments = use(promise);
-  return <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>;
+  return (
+    <ul>
+      {comments.map((c) => (
+        <li key={c.id}>{c.text}</li>
+      ))}
+    </ul>
+  );
 }
 ```
 
@@ -589,7 +617,13 @@ function Comments({ postId }) {
   });
   // The library manages promise identity internally —
   // same cache key returns the same promise reference.
-  return <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>;
+  return (
+    <ul>
+      {comments.map((c) => (
+        <li key={c.id}>{c.text}</li>
+      ))}
+    </ul>
+  );
 }
 ```
 
@@ -652,14 +686,14 @@ export const getUser = cache(fetchUser);
 
 ```jsx
 // WRONG: Creating cache inside a component
-function Profile({ userId }) {
+async function Profile({ userId }) {
   const getUser = cache(fetchUser); // New cache every render!
   const user = await getUser(userId);
 }
 
 // CORRECT: Define at module level
 const getUser = cache(fetchUser);
-function Profile({ userId }) {
+async function Profile({ userId }) {
   const user = await getUser(userId);
 }
 ```
@@ -681,6 +715,10 @@ Server Actions let you define server-side functions that can be called directly 
 'use server';
 
 export async function createComment(formData) {
+  // Server Actions are public HTTP endpoints -- always authenticate and validate
+  const session = await getSession();
+  if (!session?.userId) throw new Error('Unauthorized');
+
   const content = formData.get('content');
   const postId = formData.get('postId');
 
@@ -706,20 +744,22 @@ export default function CommentForm({ postId }) {
 }
 ```
 
+**Security:** Server Actions are exposed as public POST endpoints that anyone can call -- they are not restricted to your own UI. Always verify authentication and authorization before performing mutations, and validate all input. See the [runtime validation example](#runtime-validation-for-server-actions) in the Troubleshooting guide.
+
 **Note:** In React on Rails, most mutations flow through Rails controllers via standard forms or API endpoints. Server Actions are a React concept that can complement this when you need a direct server-side function call from the client.
 
 ## When to Keep Client-Side Fetching
 
 Not everything should move to the server. Keep client-side data fetching for:
 
-| Use Case | Why Client-Side | Recommended Tool |
-|----------|----------------|-----------------|
-| Real-time data (WebSocket, SSE) | Requires persistent connection | Native WebSocket + `useState` |
-| Polling / auto-refresh | Periodic updates after initial load | React Query / SWR |
-| Optimistic updates | Instant UI feedback before server confirms | React Query mutations |
-| Infinite scrolling | User-driven pagination | React Query / SWR |
-| User-triggered searches | Response to client interactions | `useState` + `fetch` or React Query |
-| Offline-first features | Must work without server | Local state + sync |
+| Use Case                        | Why Client-Side                            | Recommended Tool                    |
+| ------------------------------- | ------------------------------------------ | ----------------------------------- |
+| Real-time data (WebSocket, SSE) | Requires persistent connection             | Native WebSocket + `useState`       |
+| Polling / auto-refresh          | Periodic updates after initial load        | React Query / SWR                   |
+| Optimistic updates              | Instant UI feedback before server confirms | React Query mutations               |
+| Infinite scrolling              | User-driven pagination                     | React Query / SWR                   |
+| User-triggered searches         | Response to client interactions            | `useState` + `fetch` or React Query |
+| Offline-first features          | Must work without server                   | Local state + sync                  |
 
 ### Hybrid Pattern: Server Fetch + Client Updates
 
@@ -736,10 +776,7 @@ export default async function ChatPage({ channelId }) {
   return (
     <div>
       <ChannelHeader channelId={channelId} />
-      <ChatWindow
-        channelId={channelId}
-        initialMessages={initialMessages}
-      />
+      <ChatWindow channelId={channelId} initialMessages={initialMessages} />
     </div>
   );
 }
@@ -757,7 +794,7 @@ export default function ChatWindow({ channelId, initialMessages }) {
   useEffect(() => {
     const ws = new WebSocket(`wss://api.example.com/chat/${channelId}`);
     ws.onmessage = (event) => {
-      setMessages(prev => [...prev, JSON.parse(event.data)]);
+      setMessages((prev) => [...prev, JSON.parse(event.data)]);
     };
     return () => ws.close();
   }, [channelId]);
@@ -778,7 +815,9 @@ export default function Page() {
     <div>
       {/* Static shell renders immediately */}
       <Header />
-      <nav><SideNav /></nav>
+      <nav>
+        <SideNav />
+      </nav>
 
       <main>
         {/* Critical content streams first */}
@@ -840,6 +879,7 @@ function StatsSkeleton() {
 ### Step 1: Identify Candidates
 
 For each component that fetches data:
+
 - Does it only display data? → Convert to Server Component (or use [async props](#data-fetching-in-react-on-rails-pro) in React on Rails)
 - Does it need polling/optimistic updates? → Keep React Query/SWR, add server prefetch
 - Does it need real-time updates? → Keep client-side, pass initial data from server

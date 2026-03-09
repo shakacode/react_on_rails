@@ -94,22 +94,22 @@ CSS-in-JS is the most impactful compatibility challenge for RSC migration. Runti
 
 ### Runtime CSS-in-JS (Problematic)
 
-| Library | RSC Status | Notes |
-|---------|-----------|-------|
+| Library               | RSC Status                                                                                   | Notes                                                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **styled-components** | Maintenance mode (March 2025). v6.3.0+ added RSC support via React's `<style>` tag hoisting. | The maintainer stated: "For new projects, I would not recommend adopting styled-components." React Context dependency is the root incompatibility. |
-| **Emotion** | No native RSC support | Workaround: wrap all Emotion-styled components in `'use client'` files. |
+| **Emotion**           | No native RSC support                                                                        | Workaround: wrap all Emotion-styled components in `'use client'` files.                                                                            |
 
 ### Zero-Runtime CSS-in-JS (RSC Compatible)
 
-| Library | Notes |
-|---------|-------|
-| **Tailwind CSS** | No runtime JS. The standard choice for RSC projects. |
-| **CSS Modules** | Built into most frameworks. No runtime overhead. |
-| **Panda CSS** | Zero-runtime, type-safe, created by Chakra UI team. RSC-compatible by design. |
-| **Pigment CSS** | Created by MUI. Compiles to CSS Modules. Still unstable as of early 2026. |
-| **vanilla-extract** | TypeScript-native. Known issue: `.css.ts` imports in RSC may need `swc-plugin-vanilla-extract` workaround. |
-| **StyleX** | Facebook's compile-time solution. |
-| **Linaria** | Zero-runtime with familiar styled API. |
+| Library             | Notes                                                                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tailwind CSS**    | No runtime JS. The standard choice for RSC projects.                                                                                    |
+| **CSS Modules**     | Built into most frameworks. No runtime overhead.                                                                                        |
+| **Panda CSS**       | Zero-runtime, type-safe, created by Chakra UI team. RSC-compatible by design.                                                           |
+| **Pigment CSS**     | Created by MUI. Compiles to CSS Modules. Check the [Pigment CSS repo](https://github.com/mui/pigment-css) for current stability status. |
+| **vanilla-extract** | TypeScript-native. Known issue: `.css.ts` imports in RSC may need `swc-plugin-vanilla-extract` workaround.                              |
+| **StyleX**          | Facebook's compile-time solution.                                                                                                       |
+| **Linaria**         | Zero-runtime with familiar styled API.                                                                                                  |
 
 **Migration advice:** If you're currently using styled-components or Emotion and your app's performance is acceptable, there's no urgency to migrate. But for new RSC projects, choose a zero-runtime solution.
 
@@ -137,11 +137,11 @@ All components include `'use client'` directives. Cannot use compound components
 
 ## Form Libraries
 
-| Library | RSC Pattern | Notes |
-|---------|-------------|-------|
-| **React Hook Form** | Client-only (uses Context). Create a `'use client'` form component, import into Server Component. Can combine with Server Actions for submission. | Most popular option. |
-| **TanStack Form** | Emerging alternative with RSC-aware architecture. | Framework-agnostic. |
-| **React 19 built-in** | `useActionState` + `useFormStatus` hooks work natively with Server Actions. | Reduces need for third-party form libraries. |
+| Library               | RSC Pattern                                                                                                                                       | Notes                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **React Hook Form**   | Client-only (uses Context). Create a `'use client'` form component, import into Server Component. Can combine with Server Actions for submission. | Most popular option.                         |
+| **TanStack Form**     | Emerging alternative with RSC-aware architecture.                                                                                                 | Framework-agnostic.                          |
+| **React 19 built-in** | `useActionState` + `useFormStatus` hooks work natively with Server Actions.                                                                       | Reduces need for third-party form libraries. |
 
 ### Server Action Form Pattern
 
@@ -178,12 +178,12 @@ export default function Page() {
 
 ## Animation Libraries
 
-| Library | RSC Status | Notes |
-|---------|-----------|-------|
-| **Framer Motion / Motion** | Client-only. Relies on browser APIs. | Wrap animated elements in `'use client'` files. |
-| **React Spring** | Client-only. Uses hooks. | Same wrapper pattern. |
-| **CSS animations** | Fully compatible | `@keyframes`, `transition`, Tailwind animate utilities. |
-| **View Transitions API** | Browser-native, compatible | No React dependency. |
+| Library                    | RSC Status                           | Notes                                                   |
+| -------------------------- | ------------------------------------ | ------------------------------------------------------- |
+| **Framer Motion / Motion** | Client-only. Relies on browser APIs. | Wrap animated elements in `'use client'` files.         |
+| **React Spring**           | Client-only. Uses hooks.             | Same wrapper pattern.                                   |
+| **CSS animations**         | Fully compatible                     | `@keyframes`, `transition`, Tailwind animate utilities. |
+| **View Transitions API**   | Browser-native, compatible           | No React dependency.                                    |
 
 ### Animation Wrapper Pattern
 
@@ -200,13 +200,13 @@ export default function AnimatedDiv({ children, ...props }) {
 
 ## Charting Libraries
 
-| Library | RSC Compatibility | Notes |
-|---------|------------------|-------|
-| **Nivo** | Best RSC support | Pre-renders SVG charts on the server. |
-| **Recharts** | Client-only | SVG + React hooks. Needs `'use client'` wrapper. |
-| **Chart.js / react-chartjs-2** | Client-only | Canvas-based, requires DOM. |
-| **D3.js** | Partially compatible | Data transformation works server-side. DOM manipulation is client-only. |
-| **Tremor** | Client-only | Built on Recharts + Tailwind. |
+| Library                        | RSC Compatibility    | Notes                                                                   |
+| ------------------------------ | -------------------- | ----------------------------------------------------------------------- |
+| **Nivo**                       | Best RSC support     | Pre-renders SVG charts on the server.                                   |
+| **Recharts**                   | Client-only          | SVG + React hooks. Needs `'use client'` wrapper.                        |
+| **Chart.js / react-chartjs-2** | Client-only          | Canvas-based, requires DOM.                                             |
+| **D3.js**                      | Partially compatible | Data transformation works server-side. DOM manipulation is client-only. |
+| **Tremor**                     | Client-only          | Built on Recharts + Tailwind.                                           |
 
 ## Date Libraries
 
@@ -220,19 +220,19 @@ All major date libraries work in Server Components since they are pure utility f
 
 ## Data Fetching Libraries
 
-| Library | RSC Pattern | Notes |
-|---------|-------------|-------|
+| Library                            | RSC Pattern                                                                                                      | Notes                                                                                                |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | **React on Rails Pro async props** | Recommended for React on Rails. Rails streams props incrementally via `stream_react_component_with_async_props`. | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
-| **TanStack Query** | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`. | See [Data Fetching Migration](rsc-data-fetching.md) for details. |
-| **Apollo Client** | Server-side queries in Server Components, `ApolloProvider` for client queries. | Requires `'use client'` wrapper for provider. |
-| **SWR** | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props. | See [Data Fetching Migration](rsc-data-fetching.md) for details. |
+| **TanStack Query**                 | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`.               | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
+| **Apollo Client**                  | Server-side queries in Server Components, `ApolloProvider` for client queries.                                   | Requires `'use client'` wrapper for provider.                                                        |
+| **SWR**                            | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props.                         | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
 
 ## Internationalization
 
-| Library | RSC Pattern | Notes |
-|---------|-------------|-------|
+| Library                     | RSC Pattern                                                                                                                                                     | Notes                                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | **Rails I18n + react-intl** | Pass translations from Rails controller as props. Server Components use the translations object directly; Client Components use `<IntlProvider>` + `useIntl()`. | Recommended for React on Rails. See [Context guide](rsc-context-and-state.md#i18n-provider). |
-| **i18next / react-i18next** | Requires `'use client'` for hook-based usage. Server Components can use `i18next` directly (no hooks). | Framework-agnostic alternative. |
+| **i18next / react-i18next** | Requires `'use client'` for hook-based usage. Server Components can use `i18next` directly (no hooks).                                                          | Framework-agnostic alternative.                                                              |
 
 ## Authentication
 
@@ -280,6 +280,7 @@ import AlertIcon from 'lucide-react/dist/esm/icons/alert';
 ```
 
 For third-party packages, check if the library provides direct import paths (most popular libraries do). For example:
+
 - `@mui/material/Button` instead of `{ Button } from '@mui/material'`
 - `lodash-es/debounce` instead of `{ debounce } from 'lodash-es'`
 
@@ -319,29 +320,31 @@ export function trackEvent(event) {
 ```
 
 Use `server-only` for:
+
 - Database access modules
 - Modules that use API keys or secrets
 - Server-side utility functions
 
 Use `client-only` for:
+
 - Browser analytics
 - Modules that access `window`, `document`, `localStorage`
 - Client-specific utilities
 
 ## Library Compatibility Decision Matrix
 
-| Category | RSC-Native Choices | Requires `'use client'` Wrapper | Avoid / Migrate Away From |
-|----------|-------------------|-------------------------------|--------------------------|
-| **Styling** | Tailwind, CSS Modules, Panda CSS | vanilla-extract (with workaround) | styled-components (maintenance mode), Emotion |
-| **UI Components** | shadcn/ui, Radix (non-interactive) | MUI, Chakra, Mantine, Radix (interactive) | CSS-in-JS-dependent UI libs without migration path |
-| **Forms** | React 19 `useActionState` + Server Actions | React Hook Form, TanStack Form | Formik (less maintained) |
-| **Animation** | CSS animations, Tailwind animate | Framer Motion/Motion, React Spring | -- |
-| **Charts** | Nivo (SSR support) | Recharts, Tremor, Chart.js | -- |
-| **Data Fetching** | React on Rails Pro async props, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | -- |
-| **State** | Server Component props, `React.cache` | Zustand, Jotai (v2.6+), Redux Toolkit | Recoil (discontinued) |
-| **i18n** | Rails I18n + react-intl | react-i18next, i18next | -- |
-| **Auth** | Rails auth (Devise, etc.) via controller props | -- | -- |
-| **Date Utils** | date-fns, dayjs (pure functions) | -- | Moment.js (not tree-shakable) |
+| Category          | RSC-Native Choices                                                  | Requires `'use client'` Wrapper              | Avoid / Migrate Away From                          |
+| ----------------- | ------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| **Styling**       | Tailwind, CSS Modules, Panda CSS                                    | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
+| **UI Components** | shadcn/ui, Radix (non-interactive)                                  | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
+| **Forms**         | React 19 `useActionState` + Server Actions                          | React Hook Form, TanStack Form               | Formik (less maintained)                           |
+| **Animation**     | CSS animations, Tailwind animate                                    | Framer Motion/Motion, React Spring           | --                                                 |
+| **Charts**        | Nivo (SSR support)                                                  | Recharts, Tremor, Chart.js                   | --                                                 |
+| **Data Fetching** | React on Rails Pro async props, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | --                                                 |
+| **State**         | Server Component props, `React.cache`                               | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
+| **i18n**          | Rails I18n + react-intl                                             | react-i18next, i18next                       | --                                                 |
+| **Auth**          | Rails auth (Devise, etc.) via controller props                      | --                                           | --                                                 |
+| **Date Utils**    | date-fns, dayjs (pure functions)                                    | --                                           | Moment.js (not tree-shakable)                      |
 
 ## Next Steps
 

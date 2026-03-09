@@ -42,11 +42,7 @@ export function useTheme() {
 export default function ThemeProvider({ children }) {
   const [theme, setTheme] = useState('light');
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext value={{ theme, setTheme }}>{children}</ThemeContext>;
 }
 ```
 
@@ -58,7 +54,7 @@ import ProductDetails from './ProductDetails';
 export default function ProductPage(props) {
   return (
     <ThemeProvider>
-      <ProductDetails product={props.product} />  {/* Server Component passes through unchanged */}
+      <ProductDetails product={props.product} /> {/* Server Component passes through unchanged */}
     </ThemeProvider>
   );
 }
@@ -87,9 +83,7 @@ export default function Providers({ children, user }) {
   return (
     <AuthProvider user={user}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <ThemeProvider>{children}</ThemeProvider>
       </QueryClientProvider>
     </AuthProvider>
   );
@@ -108,11 +102,11 @@ export default async function ProductPage({ user, productId }) {
 
   return (
     <div>
-      <Header />           {/* Server Component -- outside providers */}
+      <Header /> {/* Server Component -- outside providers */}
       <Providers user={user}>
         <ProductDetails product={product} />
       </Providers>
-      <Footer />           {/* Server Component -- outside providers */}
+      <Footer /> {/* Server Component -- outside providers */}
     </div>
   );
 }
@@ -161,7 +155,13 @@ export default function ProductPage({ name, price, getReactOnRailsAsyncProp }) {
 // Server Component -- awaits the streamed prop
 async function Reviews({ reviewsPromise }) {
   const reviews = await reviewsPromise;
-  return <ul>{reviews.map(r => <li key={r.id}>{r.text}</li>)}</ul>;
+  return (
+    <ul>
+      {reviews.map((r) => (
+        <li key={r.id}>{r.text}</li>
+      ))}
+    </ul>
+  );
 }
 ```
 
@@ -227,9 +227,9 @@ export default async function ProductPage({ productId }) {
 
   return (
     <ReduxProvider>
-      <h1>{product.name}</h1>                {/* Server-rendered */}
-      <ProductSpecs product={product} />      {/* Server Component */}
-      <AddToCartButton product={product} />   {/* Client Component -- uses useDispatch */}
+      <h1>{product.name}</h1> {/* Server-rendered */}
+      <ProductSpecs product={product} /> {/* Server Component */}
+      <AddToCartButton product={product} /> {/* Client Component -- uses useDispatch */}
     </ReduxProvider>
   );
 }
@@ -267,13 +267,13 @@ export default function HelloWorldApp(props) {
 
 RSC reduces the need for global state libraries because data fetching moves to the server:
 
-| Use Case | Recommended Approach |
-|----------|---------------------|
-| Server data (read-only display) | Rails controller props → Server Component renders directly |
-| Server data (slow, shouldn't block the shell) | [Async props](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with Suspense boundaries |
-| Server data (with client cache/revalidation) | TanStack Query with prefetch + hydrate |
-| Client UI state (modals, forms, selections) | `useState` / Context in Client Components |
-| Complex client state (undo/redo, shared across many components) | Redux Toolkit in Client Components |
+| Use Case                                                        | Recommended Approach                                                                             |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Server data (read-only display)                                 | Rails controller props → Server Component renders directly                                       |
+| Server data (slow, shouldn't block the shell)                   | [Async props](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with Suspense boundaries |
+| Server data (with client cache/revalidation)                    | TanStack Query with prefetch + hydrate                                                           |
+| Client UI state (modals, forms, selections)                     | `useState` / Context in Client Components                                                        |
+| Complex client state (undo/redo, shared across many components) | Redux Toolkit in Client Components                                                               |
 
 ## Specific Provider Patterns
 
@@ -389,7 +389,7 @@ export default function ProductPage({ locale, messages, ...props }) {
     <div>
       <h1>{title}</h1>
       <I18nProvider locale={locale} messages={messages}>
-        <InteractiveFilters />  {/* Client Component can use useIntl() */}
+        <InteractiveFilters /> {/* Client Component can use useIntl() */}
       </I18nProvider>
     </div>
   );

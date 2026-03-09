@@ -16,7 +16,7 @@ This means the placement of `'use client'` directly determines your bundle size.
 
 A common misconception is that every component using hooks or browser APIs needs `'use client'`. It doesn't. You only need the directive at the **boundary** — the file where code transitions from server to client. Everything imported below that boundary is automatically client code:
 
-```
+```text
 ServerPage.jsx (Server Component)
 └── imports SearchBar.jsx ('use client')   ← boundary — needs the directive
     └── imports SearchInput.jsx            ← automatically client, NO directive needed
@@ -71,13 +71,12 @@ Choose one registered component to migrate. The ideal first candidate is a compo
   // ProductPage.client.js -- client entry point for the migrated component
   import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
-  registerServerComponent("ProductPage");
+  registerServerComponent('ProductPage');
   ```
 
   Add `ProductPage.client.js` as a client bundle entry point in your webpack config.
 
   **If each component has its own entry file** (e.g., `ProductPage.jsx` contains `ReactOnRails.register` and is used as a client bundle entry point):
-
   1. **Remove** the `ReactOnRails.register` call from `ProductPage.jsx`.
   2. **Create** `ProductPage.client.jsx` with the client-side registration:
 
@@ -85,7 +84,7 @@ Choose one registered component to migrate. The ideal first candidate is a compo
      // ProductPage.client.jsx -- replaces ProductPage.jsx as the client entry point
      import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
-     registerServerComponent("ProductPage");
+     registerServerComponent('ProductPage');
      ```
 
   3. **In the server bundle**, import the component and register it:
@@ -102,7 +101,7 @@ Choose one registered component to migrate. The ideal first candidate is a compo
 
 **Step 3: Push `'use client'` down to interactive children.** Identify child components that don't use hooks or browser APIs. Those can stay as server-rendered. Add `'use client'` only to the children that need interactivity.
 
-```
+```text
 Before (all client):
 ProductPage ('use client')       <-- Entry point, registered with ReactOnRails.register
 ├── ProductHeader
@@ -143,7 +142,7 @@ export default function ProductPage({ productId }) {
 
   useEffect(() => {
     fetch(`/api/products/${productId}`)
-      .then(res => res.json())
+      .then((res) => res.json())
       .then(setProduct);
   }, [productId]);
 
@@ -156,14 +155,8 @@ export default function ProductPage({ productId }) {
       <ProductSpecs specs={product.specs} />
       <ReviewList reviews={product.reviews} />
       <div>
-        <input
-          type="number"
-          value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
-        />
-        <button onClick={() => addToCart(product.id, quantity)}>
-          Add to Cart
-        </button>
+        <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+        <button onClick={() => addToCart(product.id, quantity)}>Add to Cart</button>
       </div>
     </div>
   );
@@ -174,7 +167,7 @@ export default function ProductPage({ productId }) {
 
 ```jsx
 // ProductPage.jsx -- Server Component (no directive)
-async function ProductPage({ productId }) {
+export default async function ProductPage({ productId }) {
   const product = await getProduct(productId);
 
   return (
@@ -194,20 +187,15 @@ async function ProductPage({ productId }) {
 'use client';
 
 import { useState } from 'react';
+import { addToCart } from '../actions'; // Server Action or API call for mutation
 
 export default function AddToCartButton({ productId }) {
   const [quantity, setQuantity] = useState(1);
 
   return (
     <div>
-      <input
-        type="number"
-        value={quantity}
-        onChange={(e) => setQuantity(Number(e.target.value))}
-      />
-      <button onClick={() => addToCart(productId, quantity)}>
-        Add to Cart
-      </button>
+      <input type="number" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+      <button onClick={() => addToCart(productId, quantity)}>Add to Cart</button>
     </div>
   );
 }
@@ -264,12 +252,12 @@ export default function Modal({ children }) {
 ```jsx
 // Page.jsx -- Server Component (composes both)
 import Modal from './Modal';
-import Cart from './Cart';  // Cart stays a Server Component
+import Cart from './Cart'; // Cart stays a Server Component
 
 export default function Page() {
   return (
     <Modal>
-      <Cart />  {/* Rendered on the server, passed through */}
+      <Cart /> {/* Rendered on the server, passed through */}
     </Modal>
   );
 }
@@ -326,9 +314,9 @@ import Footer from './Footer';
 export default function Homepage() {
   return (
     <ColorProvider>
-      <Header />       {/* Stays a Server Component */}
-      <MainContent />  {/* Stays a Server Component */}
-      <Footer />       {/* Stays a Server Component */}
+      <Header /> {/* Stays a Server Component */}
+      <MainContent /> {/* Stays a Server Component */}
+      <Footer /> {/* Stays a Server Component */}
     </ColorProvider>
   );
 }
@@ -343,6 +331,10 @@ Server Components can be `async` functions that fetch data directly. Wrap them i
 ```jsx
 // Dashboard.jsx -- Server Component
 import { Suspense } from 'react';
+import Stats from './Stats';
+import RevenueChart from './RevenueChart';
+import RecentOrders from './RecentOrders';
+import { StatsSkeleton, ChartSkeleton, TableSkeleton } from './Skeletons';
 
 export default function Dashboard() {
   return (
@@ -362,7 +354,7 @@ export default function Dashboard() {
 }
 
 // Stats.jsx -- Async Server Component
-async function Stats() {
+export default async function Stats() {
   const stats = await getStats();  // Direct server-side fetch
   return (
     <div>
@@ -385,8 +377,8 @@ import { Suspense } from 'react';
 import Comments from './Comments';
 
 export default async function Page({ id }) {
-  const post = await getPost(id);              // Await critical data
-  const commentsPromise = getComments(id);     // Start but DON'T await
+  const post = await getPost(id); // Await critical data
+  const commentsPromise = getComments(id); // Start but DON'T await
 
   return (
     <article>
@@ -400,6 +392,8 @@ export default async function Page({ id }) {
 }
 ```
 
+> **Requires React 19+.** The `use(promise)` pattern for server-to-client promise handoff is not available in React 18.
+
 ```jsx
 // Comments.jsx -- Client Component
 'use client';
@@ -407,10 +401,12 @@ export default async function Page({ id }) {
 import { use } from 'react';
 
 export default function Comments({ commentsPromise }) {
-  const comments = use(commentsPromise);  // Resolves the promise
+  const comments = use(commentsPromise); // Resolves the promise
   return (
     <ul>
-      {comments.map(c => <li key={c.id}>{c.text}</li>)}
+      {comments.map((c) => (
+        <li key={c.id}>{c.text}</li>
+      ))}
     </ul>
   );
 }
@@ -422,17 +418,17 @@ export default function Comments({ commentsPromise }) {
 
 ## Decision Guide: Server or Client Component?
 
-| Feature Needed | Component Type | Reason |
-|---------------|---------------|--------|
-| `useState`, `useReducer` | Client | State requires re-rendering |
-| `useEffect`, `useLayoutEffect` | Client | Lifecycle effects run in browser |
-| `onClick`, `onChange`, event handlers | Client | Events are browser-only |
-| `window`, `document`, `localStorage` | Client | Browser APIs |
-| Custom hooks using the above | Client | Transitively client |
-| Data fetching (database, API) | Server | Direct backend access, no bundle cost |
-| Rendering static/display-only content | Server | No JavaScript shipped |
-| Using server-only secrets (API keys) | Server | Never exposed to client |
-| Heavy dependencies (markdown parsers, formatters) | Server | Dependencies stay off client bundle |
+| Feature Needed                                    | Component Type | Reason                                |
+| ------------------------------------------------- | -------------- | ------------------------------------- |
+| `useState`, `useReducer`                          | Client         | State requires re-rendering           |
+| `useEffect`, `useLayoutEffect`                    | Client         | Lifecycle effects run in browser      |
+| `onClick`, `onChange`, event handlers             | Client         | Events are browser-only               |
+| `window`, `document`, `localStorage`              | Client         | Browser APIs                          |
+| Custom hooks using the above                      | Client         | Transitively client                   |
+| Data fetching (database, API)                     | Server         | Direct backend access, no bundle cost |
+| Rendering static/display-only content             | Server         | No JavaScript shipped                 |
+| Using server-only secrets (API keys)              | Server         | Never exposed to client               |
+| Heavy dependencies (markdown parsers, formatters) | Server         | Dependencies stay off client bundle   |
 
 ## Common Mistakes
 
@@ -445,7 +441,10 @@ export default function Comments({ commentsPromise }) {
 export default function Layout({ children }) {
   return (
     <div>
-      <nav><Logo /><SearchBar /></nav>
+      <nav>
+        <Logo />
+        <SearchBar />
+      </nav>
       <main>{children}</main>
       <footer>...</footer>
     </div>
@@ -491,8 +490,8 @@ export function ClientWrapper({ children }) {
 
 // In a Server Component parent:
 <ClientWrapper>
-  <ServerComponent />  {/* Stays a Server Component */}
-</ClientWrapper>
+  <ServerComponent /> {/* Stays a Server Component */}
+</ClientWrapper>;
 ```
 
 ### Mistake 3: Chunk contamination from shared `'use client'` files

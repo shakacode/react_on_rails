@@ -10,14 +10,15 @@ Everything passed from a Server Component to a Client Component must be serializ
 
 ### What Can Cross the Server-to-Client Boundary
 
-| Allowed | Not Allowed |
-|---------|-------------|
+| Allowed                                         | Not Allowed                       |
+| ----------------------------------------------- | --------------------------------- |
 | Strings, numbers, booleans, `null`, `undefined` | Functions (except Server Actions) |
-| Plain objects and arrays | Class instances |
-| `Date` objects | `Map`, `Set`, `WeakMap`, `WeakSet` |
-| `Promise` (resolved by `use()`) | Symbols |
-| React elements (`<Component />`) | DOM nodes |
-| Server Action references (`'use server'`) | Closures |
+| Plain objects and arrays                        | Class instances                   |
+| `Date` objects                                  | `WeakMap`, `WeakSet`              |
+| `Map`, `Set`, typed arrays (React 19+)          | Symbols                           |
+| `Promise` (resolved by `use()`)                 | DOM nodes                         |
+| React elements (`<Component />`)                | Closures                          |
+| Server Action references (`'use server'`)       |                                   |
 
 ### Common Error: Passing Functions
 
@@ -64,7 +65,7 @@ async function Page() {
 // ERROR: Class instances are not serializable
 async function Page() {
   const user = await User.findById(1); // Returns a class instance
-  return <ProfileCard user={user} />;  // Breaks if ProfileCard is 'use client'
+  return <ProfileCard user={user} />; // Breaks if ProfileCard is 'use client'
 }
 ```
 
@@ -211,7 +212,7 @@ import ServerComponent from './ServerComponent';
 export default function Page() {
   return (
     <ClientWrapper>
-      <ServerComponent />  {/* Stays a Server Component */}
+      <ServerComponent /> {/* Stays a Server Component */}
     </ClientWrapper>
   );
 }
@@ -227,14 +228,14 @@ Hydration mismatches occur when server-rendered HTML doesn't match what React pr
 
 ### Common Causes
 
-| Cause | Example | Fix |
-|-------|---------|-----|
-| Timestamps | `new Date()` differs server vs client | Use `suppressHydrationWarning` or render in `useEffect` |
-| Browser APIs | `window.innerWidth` is `undefined` on server | Guard with `typeof window !== 'undefined'` or use `useEffect` |
-| `localStorage` reads | Theme preference stored in browser | Read from cookie on server, or delay render with `useEffect` |
-| Random values | `Math.random()` produces different results | Generate on server, pass as prop |
-| Browser extensions | Extensions inject unexpected HTML | Cannot prevent; use `suppressHydrationWarning` on affected elements |
-| Invalid HTML nesting | `<p>` inside `<p>`, `<div>` inside `<p>` | Fix HTML structure |
+| Cause                | Example                                      | Fix                                                                 |
+| -------------------- | -------------------------------------------- | ------------------------------------------------------------------- |
+| Timestamps           | `new Date()` differs server vs client        | Use `suppressHydrationWarning` or render in `useEffect`             |
+| Browser APIs         | `window.innerWidth` is `undefined` on server | Guard with `typeof window !== 'undefined'` or use `useEffect`       |
+| `localStorage` reads | Theme preference stored in browser           | Read from cookie on server, or delay render with `useEffect`        |
+| Random values        | `Math.random()` produces different results   | Generate on server, pass as prop                                    |
+| Browser extensions   | Extensions inject unexpected HTML            | Cannot prevent; use `suppressHydrationWarning` on affected elements |
+| Invalid HTML nesting | `<p>` inside `<p>`, `<div>` inside `<p>`     | Fix HTML structure                                                  |
 
 ### Error Messages
 
@@ -254,7 +255,7 @@ function ThemeToggle() {
 
   useEffect(() => setMounted(true), []);
 
-  if (!mounted) return null; // Server render returns null
+  if (!mounted) return null; // Server and first client render return null
 
   // Only runs on client
   return <button>{localStorage.getItem('theme')}</button>;
@@ -266,12 +267,12 @@ function ThemeToggle() {
 For elements that intentionally differ between server and client:
 
 ```jsx
-<time suppressHydrationWarning>
-  {new Date().toLocaleDateString()}
-</time>
+<time suppressHydrationWarning>{new Date().toLocaleDateString()}</time>
 ```
 
 This suppresses the warning but does not fix the mismatch -- use it only for non-critical content.
+
+> **Warning:** The `if (!mounted) return null` pattern causes **Cumulative Layout Shift (CLS)** -- the element occupies no space on first paint, then pops in after hydration. Only use it for small, positionally stable UI elements (icon buttons, toggles). For anything that affects page layout, read the preference from a server-readable cookie to render the correct value on first paint (see the [Theme Provider](rsc-context-and-state.md#theme-provider-no-flash-of-wrong-theme) section), or use `suppressHydrationWarning` on non-layout-critical elements.
 
 ## Error Boundary Limitations
 
@@ -288,7 +289,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 function ErrorFallback({ error, resetErrorBoundary }) {
   function retry() {
-    window.location.reload();  // Re-renders Server Components on the server
+    window.location.reload(); // Re-renders Server Components on the server
   }
 
   return (
@@ -300,11 +301,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
 }
 
 export default function PageErrorBoundary({ children }) {
-  return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
-      {children}
-    </ErrorBoundary>
-  );
+  return <ErrorBoundary FallbackComponent={ErrorFallback}>{children}</ErrorBoundary>;
 }
 ```
 
@@ -342,11 +339,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
 }
 
 export default function PageErrorBoundary({ children }) {
-  return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
-      {children}
-    </ErrorBoundary>
-  );
+  return <ErrorBoundary FallbackComponent={ErrorFallback}>{children}</ErrorBoundary>;
 }
 ```
 
@@ -363,10 +356,10 @@ export default function PageErrorBoundary({ children }) {
 ```jsx
 // BAD: Directive after imports
 import { useState } from 'react';
-'use client'; // Too late -- will not work
+('use client'); // Too late -- will not work
 
 // GOOD: Directive before everything (comments allowed above)
-'use client';
+('use client');
 import { useState } from 'react';
 ```
 
@@ -374,11 +367,11 @@ import { useState } from 'react';
 
 ```jsx
 // BAD
-`use client`
+`use client`;
 
 // GOOD
-'use client'
-"use client"
+('use client');
+('use client');
 ```
 
 ### Confusing `'use client'` with `'use server'`
@@ -396,18 +389,14 @@ The most common performance regression. Sequential `await` calls create waterfal
 ```jsx
 // BAD: Sequential fetching (750ms total)
 async function Page() {
-  const user = await getUser();           // 200ms
-  const stats = await getStats(user.id);  // 300ms (waits for user)
-  const posts = await getPosts(user.id);  // 250ms (waits for stats)
+  const user = await getUser(); // 200ms
+  const stats = await getStats(user.id); // 300ms (waits for user)
+  const posts = await getPosts(user.id); // 250ms (waits for stats)
 }
 
 // GOOD: Parallel fetching (300ms total)
 async function Page({ userId }) {
-  const [user, stats, posts] = await Promise.all([
-    getUser(userId),
-    getStats(userId),
-    getPosts(userId),
-  ]);
+  const [user, stats, posts] = await Promise.all([getUser(userId), getStats(userId), getPosts(userId)]);
 }
 ```
 
@@ -471,7 +460,7 @@ The most common TypeScript issue:
 
 **Error:** `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type."`
 
-**Fix:** Upgrade to TypeScript 5.1.2+ with `@types/react` 18.2.8+, or omit the explicit return type annotation:
+**Fix:** Upgrade to TypeScript 5.1.2+ with `@types/react@19` (React 19 projects) or `@types/react` 18.2.8+ (React 18 projects), or omit the explicit return type annotation:
 
 ```tsx
 // BROKEN: Explicit return type triggers error in older TS
@@ -516,13 +505,13 @@ export async function createUser(formData: FormData) {
 
 ## Bundle Analysis Tools
 
-| Tool | Purpose |
-|------|---------|
-| **webpack-bundle-analyzer** | Analyze client bundle composition and module sizes |
-| **RSC Devtools** (Chrome extension) | Visualize RSC streaming data, server vs client rendering |
-| **DevConsole** | Color-coded component boundaries (green = client, blue = server) |
-| **RSC Parser** | Parse the React Flight wire format to inspect the component tree |
-| **`webpack-stats-explorer`** | Interactive exploration of webpack stats for chunk analysis |
+| Tool                                | Purpose                                                          |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| **webpack-bundle-analyzer**         | Analyze client bundle composition and module sizes               |
+| **RSC Devtools** (Chrome extension) | Visualize RSC streaming data, server vs client rendering         |
+| **DevConsole**                      | Color-coded component boundaries (green = client, blue = server) |
+| **RSC Parser**                      | Parse the React Flight wire format to inspect the component tree |
+| **`webpack-stats-explorer`**        | Interactive exploration of webpack stats for chunk analysis      |
 
 ### Key Metrics to Track
 
@@ -534,24 +523,24 @@ export async function createUser(formData: FormData) {
 
 ## Error Message Catalog
 
-| Error Message | Cause | Solution |
-|---|---|---|
-| `"Functions cannot be passed directly to Client Components unless you explicitly expose it by marking it with 'use server'"` | Passing a function prop from Server to Client Component | Use Server Actions, or define the function in the Client Component |
-| `"You're importing a component that needs useState/useEffect..."` | Using hooks in a Server Component | Add `'use client'` to the component file |
-| `"Only plain objects, and a few built-ins, can be passed to Client Components..."` | Passing class instances or non-serializable values | Convert to plain objects with `.toJSON()` or manual serialization |
-| `"async/await is not yet supported in Client Components"` | Making a Client Component async | Move async logic to a Server Component, or use `useEffect`/`use()` |
-| `"A component was suspended by an uncached promise..."` | Creating a promise inside a Client Component and passing it to `use()` | Pass the promise from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components) |
-| `"createContext is not supported in Server Components"` | Using `createContext` or `useContext` in a Server Component | Move context to a `'use client'` provider wrapper |
-| `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type"` | TypeScript doesn't recognize async components | Upgrade to TS 5.1.2+ and `@types/react` 18.2.8+, or omit return type |
-| RSC page downloads unexpectedly large chunks | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above |
-| `"Text content does not match server-rendered HTML"` | Hydration mismatch | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences |
-| `"Refs cannot be used in Server Components, nor passed to Client Components"` | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type. | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element. |
-| `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"` | Both packages installed as separate top-level dependencies, often due to yalc link issues | Ensure only `react-on-rails-pro` is in your `package.json`; the base package is installed automatically as a dependency. See [Duplicate Package Detection](#duplicate-package-detection) |
-| `ReferenceError: performance is not defined` | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals) |
-| `"global object mismatch"` | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc) | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch) |
-| SSR hangs indefinitely / request timeout on large RSC payloads | Stream backpressure deadlock when RSC payload exceeds 16 KB | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock) |
-| `"The 'react-on-rails' package version does not match the gem version"` | Gem and npm package installed at different versions | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch) |
-| `"The 'react-on-rails' package version is not an exact version"` | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch) |
+| Error Message                                                                                                                | Cause                                                                                                                                                                                                    | Solution                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"Functions cannot be passed directly to Client Components unless you explicitly expose it by marking it with 'use server'"` | Passing a function prop from Server to Client Component                                                                                                                                                  | Use Server Actions, or define the function in the Client Component                                                                                                                                                                          |
+| `"You're importing a component that needs useState/useEffect..."`                                                            | Using hooks in a Server Component                                                                                                                                                                        | Add `'use client'` to the component file                                                                                                                                                                                                    |
+| `"Only plain objects, and a few built-ins, can be passed to Client Components..."`                                           | Passing class instances or non-serializable values                                                                                                                                                       | Convert to plain objects with `.toJSON()` or manual serialization                                                                                                                                                                           |
+| `"async/await is not yet supported in Client Components"`                                                                    | Making a Client Component async                                                                                                                                                                          | Move async logic to a Server Component, or use `useEffect`/`use()`                                                                                                                                                                          |
+| `"A component was suspended by an uncached promise..."`                                                                      | Creating a promise inside a Client Component and passing it to `use()`                                                                                                                                   | Pass the promise from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components)                                  |
+| `"createContext is not supported in Server Components"`                                                                      | Using `createContext` or `useContext` in a Server Component                                                                                                                                              | Move context to a `'use client'` provider wrapper                                                                                                                                                                                           |
+| `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type"`          | TypeScript doesn't recognize async components                                                                                                                                                            | Upgrade to TS 5.1.2+ and `@types/react@19` (or `@types/react` 18.2.8+ for React 18), or omit return type                                                                                                                                    |
+| RSC page downloads unexpectedly large chunks                                                                                 | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above                                            |
+| `"Text content does not match server-rendered HTML"`                                                                         | Hydration mismatch                                                                                                                                                                                       | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences                                                                                                                                 |
+| `"Refs cannot be used in Server Components, nor passed to Client Components"`                                                | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type.                   | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element. |
+| `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"`                                                    | Both packages installed as separate top-level dependencies, often due to yalc link issues                                                                                                                | Ensure only `react-on-rails-pro` is in your `package.json`; the base package is installed automatically as a dependency. See [Duplicate Package Detection](#duplicate-package-detection)                                                    |
+| `ReferenceError: performance is not defined`                                                                                 | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode                                                                                                       | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                                                                   |
+| `"global object mismatch"`                                                                                                   | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc)                                                                                                            | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch)                                                                                                |
+| SSR hangs indefinitely / request timeout on large RSC payloads                                                               | Stream backpressure deadlock when RSC payload exceeds 16 KB                                                                                                                                              | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                                                                                                                      |
+| `"The 'react-on-rails' package version does not match the gem version"`                                                      | Gem and npm package installed at different versions                                                                                                                                                      | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                        |
+| `"The 'react-on-rails' package version is not an exact version"`                                                             | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json                                                                                                                          | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                         |
 
 ## Environment Variable Access
 
@@ -562,8 +551,8 @@ Server Components run on the server (in the node renderer), so they have access 
 ```jsx
 // Server Component -- full access to Node.js process.env
 async function DBComponent() {
-  const data = await fetch(process.env.DATABASE_URL);  // Works
-  const secret = process.env.API_SECRET;               // Works
+  const data = await fetch(process.env.DATABASE_URL); // Works
+  const secret = process.env.API_SECRET; // Works
 }
 ```
 
@@ -576,16 +565,14 @@ Client Components only have access to environment variables that are explicitly 
 const { environment } = require('@rails/webpacker');
 
 // Only these variables are available in Client Components
-environment.plugins.prepend('Environment',
-  new webpack.EnvironmentPlugin(['RAILS_ENV', 'PUBLIC_API_URL'])
-);
+environment.plugins.prepend('Environment', new webpack.EnvironmentPlugin(['RAILS_ENV', 'PUBLIC_API_URL']));
 ```
 
 ```jsx
 'use client';
 function ClientComp() {
-  const apiUrl = process.env.PUBLIC_API_URL;  // Works (injected by webpack)
-  const secret = process.env.API_SECRET;      // undefined (not injected)
+  const apiUrl = process.env.PUBLIC_API_URL; // Works (injected by webpack)
+  const secret = process.env.API_SECRET; // undefined (not injected)
 }
 ```
 
@@ -615,10 +602,10 @@ The sections above cover generic RSC pitfalls. The following issues are specific
 // node-renderer.js (or wherever you configure the renderer)
 module.exports = {
   supportModules: true, // Injects: Buffer, TextDecoder, TextEncoder,
-                        // URLSearchParams, ReadableStream, process,
-                        // setTimeout, setInterval, setImmediate,
-                        // clearTimeout, clearInterval, clearImmediate,
-                        // queueMicrotask
+  // URLSearchParams, ReadableStream, process,
+  // setTimeout, setInterval, setImmediate,
+  // clearTimeout, clearInterval, clearImmediate,
+  // queueMicrotask
 };
 ```
 
@@ -685,6 +672,7 @@ When using **yalc** for local development:
 1. **Verify your package setup:** `react-on-rails-pro` includes `react-on-rails` as a direct dependency. You should only have `react-on-rails-pro` in your `package.json` -- the base package is automatically installed through the dependency chain.
 
 2. **Check for stale yalc links:**
+
    ```bash
    # Remove stale yalc installations
    yalc installations clean
