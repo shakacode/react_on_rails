@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
+require "erb"
 require "open3"
+require "yaml"
 
 module ReactOnRails
   # SystemChecker provides validation methods for React on Rails setup
@@ -455,11 +457,52 @@ module ReactOnRails
     end
 
     def required_react_dependencies
-      {
+      deps = {
         "react" => "React library",
-        "react-dom" => "React DOM library",
-        "@babel/preset-react" => "Babel React preset"
+        "react-dom" => "React DOM library"
       }
+
+      deps["@babel/preset-react"] = "Babel React preset" if using_babel_transpiler?
+      deps
+    end
+
+    def using_babel_transpiler?
+      transpiler = detected_javascript_transpiler
+      return true if transpiler.nil?
+
+      transpiler == "babel"
+    end
+
+    def detected_javascript_transpiler
+      config = parsed_shakapacker_config
+      unless config
+        if File.exist?("config/shakapacker.yml")
+          add_info("ℹ️  Unable to parse config/shakapacker.yml — defaulting to Babel assumption")
+        end
+        return nil
+      end
+
+      rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
+      env_config = config[rails_env] || {}
+      default_config = config["default"] || {}
+      transpiler = env_config["javascript_transpiler"] || default_config["javascript_transpiler"]
+      normalize_transpiler_value(transpiler)
+    end
+
+    def parsed_shakapacker_config
+      shakapacker_config_path = "config/shakapacker.yml"
+      return nil unless File.exist?(shakapacker_config_path)
+
+      raw_content = File.read(shakapacker_config_path)
+      rendered_content = ERB.new(raw_content).result
+      YAML.safe_load(rendered_content, aliases: true) || {}
+    rescue StandardError, ScriptError
+      nil
+    end
+
+    def normalize_transpiler_value(transpiler)
+      normalized = transpiler.to_s.strip.downcase
+      normalized.empty? ? nil : normalized
     end
 
     def additional_build_dependencies

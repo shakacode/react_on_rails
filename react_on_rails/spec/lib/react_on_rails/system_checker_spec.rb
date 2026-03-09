@@ -534,6 +534,91 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
   end
 
+  describe "#check_react_dependencies" do
+    let(:base_package_json) do
+      {
+        "dependencies" => {
+          "react" => "^19.0.0",
+          "react-dom" => "^19.0.0"
+        }
+      }
+    end
+
+    before do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("package.json").and_return(true)
+      allow(File).to receive(:read).with("package.json").and_return(base_package_json.to_json)
+    end
+
+    context "when shakapacker javascript_transpiler is swc" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+          default:
+            javascript_transpiler: swc
+        YAML
+      end
+
+      it "does not warn about missing @babel/preset-react" do
+        checker.check_react_dependencies
+        expect(checker.messages.none? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+
+    context "when shakapacker javascript_transpiler is babel" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+          default:
+            javascript_transpiler: babel
+        YAML
+      end
+
+      it "warns when @babel/preset-react is missing" do
+        checker.check_react_dependencies
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+
+    context "when shakapacker.yml does not exist" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(false)
+      end
+
+      it "defaults to requiring @babel/preset-react" do
+        checker.check_react_dependencies
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+
+    context "when shakapacker.yml has broken ERB" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("<%= 1 + %>")
+      end
+
+      it "does not crash and adds a fallback info message" do
+        expect { checker.check_react_dependencies }.not_to raise_error
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :info && msg[:content].include?("Unable to parse")
+        end).to be true
+      end
+
+      it "defaults to requiring @babel/preset-react" do
+        checker.check_react_dependencies
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+  end
+
   describe "private methods" do
     describe "#cli_exists?" do
       it "returns true when command exists" do
