@@ -36,23 +36,23 @@ The simplest way to release is with no arguments -- the task reads the version f
 
 ```bash
 # Recommended: reads version from CHANGELOG.md (requires step 1)
-rake release
+bundle exec rake release
 
 # For a specific version (overrides CHANGELOG.md detection)
-rake release[16.2.0]
+bundle exec rake "release[16.2.0]"
 
 # For a pre-release version (note: use period, not dash)
-rake release[16.2.0.beta.1]  # Creates npm package 16.2.0-beta.1
+bundle exec rake "release[16.2.0.beta.1]"  # Creates npm package 16.2.0-beta.1
 
 # For a release candidate
-rake release[16.5.0.rc.0]
+bundle exec rake "release[16.5.0.rc.0]"
 
 # Dry run to test without publishing
-rake release[16.2.0,true]
+bundle exec rake "release[16.2.0,true]"
 
 # Override version policy checks (monotonic + changelog/bump consistency)
-RELEASE_VERSION_POLICY_OVERRIDE=true rake release[16.2.0]
-rake release[16.2.0,false,true]
+RELEASE_VERSION_POLICY_OVERRIDE=true bundle exec rake "release[16.2.0]"
+bundle exec rake "release[16.2.0,false,true]"
 ```
 
 When called with no arguments, `rake release`:
@@ -76,12 +76,12 @@ Dry runs use a temporary git worktree so version bumps and installs do not modif
 Use override only when needed:
 
 - `RELEASE_VERSION_POLICY_OVERRIDE=true`
-- Or task arg override (`rake release[..., ..., true]`)
+- Or task arg override (`bundle exec rake "release[..., ..., true]"`)
 
 **Full argument list:**
 
 ```bash
-rake release[version,dry_run,override_version_policy]
+bundle exec rake "release[version,dry_run,override_version_policy]"
 ```
 
 1. **`version`** (optional): Version bump type or explicit version
@@ -107,15 +107,15 @@ GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
 **Examples:**
 
 ```bash
-rake release                                  # Use CHANGELOG.md version or patch bump
-rake release[patch]                           # Bump patch version (16.1.1 → 16.1.2)
-rake release[minor]                           # Bump minor version (16.1.1 → 16.2.0)
-rake release[major]                           # Bump major version (16.1.1 → 17.0.0)
-rake release[16.2.0]                          # Set explicit version
-rake release[16.2.0.beta.1]                   # Set pre-release version (→ 16.2.0-beta.1 for NPM)
-rake release[patch,true]                      # Dry run
-VERBOSE=1 rake release[patch]                 # Release with verbose logging
-NPM_OTP=123456 RUBYGEMS_OTP=789012 rake release[patch]  # Skip OTP prompts
+bundle exec rake release                                  # Use CHANGELOG.md version or patch bump
+bundle exec rake "release[patch]"                         # Bump patch version (16.1.1 → 16.1.2)
+bundle exec rake "release[minor]"                         # Bump minor version (16.1.1 → 16.2.0)
+bundle exec rake "release[major]"                         # Bump major version (16.1.1 → 17.0.0)
+bundle exec rake "release[16.2.0]"                        # Set explicit version
+bundle exec rake "release[16.2.0.beta.1]"                 # Set pre-release version (→ 16.2.0-beta.1 for NPM)
+bundle exec rake "release[patch,true]"                    # Dry run
+VERBOSE=1 bundle exec rake "release[patch]"               # Release with verbose logging
+NPM_OTP=123456 RUBYGEMS_OTP=789012 bundle exec rake "release[patch]"  # Skip OTP prompts
 ```
 
 ### 3. What the Release Task Does
@@ -312,7 +312,7 @@ This task depends on the `gem-release` Ruby gem, which is installed via `bundle 
 Before releasing to production, always preview with a dry run:
 
 ```bash
-rake release[16.5.0,true]
+bundle exec rake "release[16.5.0,true]"
 ```
 
 This uses a temporary git worktree to show exactly what would be updated without making any changes.
@@ -324,7 +324,7 @@ This uses a temporary git worktree to show exactly what would be updated without
 Always test with a dry run before actually releasing:
 
 ```bash
-rake release[16.2.0,true]
+bundle exec rake "release[16.2.0,true]"
 ```
 
 This shows you exactly what would be updated without making any changes.
@@ -350,7 +350,7 @@ If the release fails partway through (e.g., during NPM publish):
 2. If the git tag was created but packages weren't published:
    - Delete the tag: `git tag -d vX.Y.Z && git push origin :vX.Y.Z`
    - Revert the version commit: `git reset --hard HEAD~1 && git push -f`
-   - Start over with `rake release[X.Y.Z]`
+   - Start over with `bundle exec rake "release[X.Y.Z]"`
 
 3. If GitHub release creation fails after successful publishing:
    - Fix GitHub auth (`gh auth login`) or permissions
@@ -368,7 +368,7 @@ If the release fails partway through (e.g., during NPM publish):
 
 ## Version History
 
-Running `rake release[X.Y.Z]` will create a commit that looks like this:
+Running `bundle exec rake "release[X.Y.Z]"` will create a commit that looks like this:
 
 ```
 commit abc123...

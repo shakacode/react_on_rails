@@ -5,10 +5,10 @@ require_relative "spec_helper"
 
 RSpec.describe "update_changelog.rake helper methods" do
   before do
-    next if Object.const_defined?(:UPDATE_CHANGELOG_RAKE_HELPERS_LOADED)
+    next if Object.instance_variable_defined?(:@update_changelog_rake_helpers_loaded)
 
     load File.expand_path("../../rakelib/update_changelog.rake", __dir__)
-    Object.const_set(:UPDATE_CHANGELOG_RAKE_HELPERS_LOADED, true)
+    Object.instance_variable_set(:@update_changelog_rake_helpers_loaded, true)
   end
 
   describe "#normalize_version_string" do
@@ -61,10 +61,12 @@ RSpec.describe "update_changelog.rake helper methods" do
         ### [16.4.0.rc.1] - 2026-03-01
         #### Added
         - First rc change
+        - Shared line
 
         ### [16.4.0.rc.0] - 2026-02-28
         #### Changed
         - Zeroth rc change
+        - Shared line
 
         ### [16.3.0] - 2026-02-01
         #### Fixed
@@ -77,6 +79,7 @@ RSpec.describe "update_changelog.rake helper methods" do
       expect(collapsed).not_to include("### [16.4.0.rc.0]")
       expect(collapsed).to include("First rc change")
       expect(collapsed).to include("Zeroth rc change")
+      expect(collapsed.scan("Shared line").size).to eq(1)
       expect(collapsed).to include("### [16.3.0] - 2026-02-01")
     end
   end

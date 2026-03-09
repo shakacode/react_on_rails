@@ -52,8 +52,8 @@ When stamping a version header (`release`, `rc`, or `beta`), compute the next ve
 
 2. **Determine bump type from changelog content**:
    - If changes include `#### Breaking Changes` or `#### ⚠️ Breaking Changes` -> **major** bump
-   - If changes include `#### Added` or `#### New Features` -> **minor** bump
-   - If changes only include `#### Fixed`, `#### Security`, `#### Improved`, `#### Changed`, `#### Deprecated` -> **patch** bump
+   - If changes include `#### Added`, `#### New Features`, `#### Features`, or `#### Enhancements` -> **minor** bump
+   - If changes only include `#### Fixed`, `#### Security`, `#### Improved`, `#### Changed`, `#### Deprecated`, or `#### Removed` -> **patch** bump
 
 3. **Compute the version**:
    - For `release`: Apply the bump to the latest stable tag (e.g., `16.4.0` + minor -> `16.5.0`)
@@ -169,7 +169,7 @@ Do NOT manually insert version headers or update diff links -- the rake task doe
 
 - **`/update-changelog release` (Claude Code)**: Full automation -- analyzes commits, writes changelog entries, then calls the rake task to stamp the version header. Use before a release.
 - **`/update-changelog` (Claude Code, no args)**: Adds entries to `[Unreleased]` during development. Does not stamp a version header.
-- **`bundle exec rake update_changelog[mode]`**: Header-only stamping for users who want to write entries manually.
+- **`bundle exec rake "update_changelog[mode]"`**: Header-only stamping for users who want to write entries manually.
 
 ### Finding the Most Recent Version
 
@@ -312,7 +312,7 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
 
 ### For Prerelease Versions (RC and Beta)
 
-When the user passes `rc` or `beta` as an argument (or when creating a prerelease section manually):
+When the user passes `rc` or `beta` as an argument:
 
 1. **Find the latest tag** (stable or prerelease) using semver sort:
 
@@ -438,7 +438,7 @@ For each suspicious entry:
 3. Verify whether fix applies to stable users or only prerelease users
 4. Check PR description for context about what was broken
 
-**Example reference:** See [PR #2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of prerelease changelog curation with detailed investigation notes.
+**Example reference:** See [PR 2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of prerelease changelog curation with detailed investigation notes.
 
 ## Additional Notes
 

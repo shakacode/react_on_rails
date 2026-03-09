@@ -155,7 +155,12 @@ def collapse_prerelease_sections(changelog, base_version, channel)
   matching_sections = sections.select { |section| section[:version].match?(target_regex) }
   return changelog if matching_sections.empty?
 
-  merged_body = matching_sections.map { |section| section[:body].strip }.reject(&:empty?).join("\n\n").strip
+  merged_body = matching_sections
+                .flat_map { |section| section[:body].strip.lines.map(&:strip) }
+                .reject(&:empty?)
+                .uniq
+                .join("\n")
+                .strip
   sections.reject! { |section| section[:version].match?(target_regex) }
 
   unless merged_body.empty?
@@ -251,13 +256,17 @@ task :update_changelog, %i[mode_or_tag] do |_, args|
     puts "Auto-computed #{auto_mode} version: #{changelog_version}"
   else
     git_tag = if input.empty?
-                `git -C #{monorepo_root} describe --tags --abbrev=0`.strip
+                git_output, git_status = Open3.capture2e("git", "-C", monorepo_root, "describe", "--tags", "--abbrev=0")
+                abort "Failed to get latest git tag.\n#{git_output}" unless git_status.success?
+                git_output.strip
               else
                 input
               end
 
     changelog_version = normalize_version_string(git_tag)
-    tag_date = fetch_git_tag_date(monorepo_root, git_tag) || Date.today.strftime("%Y-%m-%d")
+    tag_candidates = [git_tag, git_tag.start_with?("v") ? git_tag : "v#{git_tag}", "v#{changelog_version}"].uniq
+    tag_date = tag_candidates.filter_map { |candidate| fetch_git_tag_date(monorepo_root, candidate) }.first ||
+               Date.today.strftime("%Y-%m-%d")
   end
 
   anchor = "[#{changelog_version}]"

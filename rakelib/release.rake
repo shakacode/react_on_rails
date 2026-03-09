@@ -8,9 +8,9 @@ require "shellwords"
 require "tempfile"
 require "tmpdir"
 require_relative "task_helpers"
-require_relative File.join(gem_root, "lib", "react_on_rails", "version_syntax_converter")
-require_relative File.join(gem_root, "lib", "react_on_rails", "git_utils")
-require_relative File.join(gem_root, "lib", "react_on_rails", "utils")
+require_relative "../react_on_rails/lib/react_on_rails/version_syntax_converter"
+require_relative "../react_on_rails/lib/react_on_rails/git_utils"
+require_relative "../react_on_rails/lib/react_on_rails/utils"
 
 class RaisingMessageHandler
   def add_error(error)
@@ -37,8 +37,10 @@ def release_paths(monorepo_root)
 end
 
 def sh_in_dir_for_release(dir, *shell_commands)
-  shell_commands.flatten.each do |shell_command|
-    sh %(cd #{dir} && #{shell_command.strip})
+  Dir.chdir(dir) do
+    shell_commands.flatten.each do |shell_command|
+      sh(shell_command.strip)
+    end
   end
 end
 
@@ -100,12 +102,18 @@ def github_repo_slug(monorepo_root)
   match[:repo]
 end
 
+def capture_gh_output(*args)
+  Open3.capture2e("gh", *args)
+rescue Errno::ENOENT
+  abort "❌ GitHub CLI (`gh`) is not installed. Install it from https://cli.github.com/ and retry."
+end
+
 def verify_gh_auth(monorepo_root:)
-  result, status = Open3.capture2e("gh", "auth", "status")
+  result, status = capture_gh_output("auth", "status")
   abort "❌ GitHub CLI authentication required! Run `gh auth login` and retry.\n\n#{result}" unless status.success?
 
   repo_slug = github_repo_slug(monorepo_root)
-  permission_result, permission_status = Open3.capture2e("gh", "api", "repos/#{repo_slug}", "--jq", ".permissions.push")
+  permission_result, permission_status = capture_gh_output("api", "repos/#{repo_slug}", "--jq", ".permissions.push")
 
   unless permission_status.success?
     abort "❌ GitHub CLI authenticated, but failed to verify write access to #{repo_slug}.\n\n#{permission_result}"
@@ -131,7 +139,7 @@ def semver_keyword?(value)
   %w[patch minor major].include?(value.to_s.strip.downcase)
 end
 
-def prerelease_version?(version)
+def release_prerelease_version?(version)
   version.to_s.match?(/\.(test|beta|alpha|rc|pre)\./i)
 end
 
@@ -273,7 +281,7 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
     )
   end
 
-  if prerelease_version?(target_gem_version) && latest_tagged_version
+  if release_prerelease_version?(target_gem_version) && latest_tagged_version
     target_components = parse_gem_version_components(target_gem_version)
     latest_components = parse_gem_version_components(latest_tagged_version)
 
@@ -281,10 +289,14 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
                         target_components[:minor] == latest_components[:minor] &&
                         target_components[:patch] == latest_components[:patch]
 
-    return if same_release_base && prerelease_version?(latest_tagged_version)
+    if same_release_base && release_prerelease_version?(latest_tagged_version)
+      puts "ℹ️ VERSION POLICY: Skipping all downstream checks for same-base prerelease bump " \
+           "(#{latest_tagged_version} → #{target_gem_version})."
+      return
+    end
   end
 
-  latest_stable_version = tagged_versions.reject { |version| prerelease_version?(version) }
+  latest_stable_version = tagged_versions.reject { |version| release_prerelease_version?(version) }
                                          .max_by { |version| Gem::Version.new(version) }
   return unless latest_stable_version
 
@@ -299,7 +311,7 @@ def validate_release_version_policy!(monorepo_root:, target_gem_version:, allow_
     return if allow_override
   end
 
-  if prerelease_version?(target_gem_version)
+  if release_prerelease_version?(target_gem_version)
     puts "ℹ️ VERSION POLICY: Skipping changelog bump-consistency check for prerelease #{target_gem_version}."
     return
   end
@@ -385,7 +397,7 @@ def ensure_git_tag_exists!(monorepo_root:, tag:)
 end
 
 def prepare_github_release_context(monorepo_root:, gem_version:)
-  prerelease = prerelease_version?(gem_version)
+  prerelease = release_prerelease_version?(gem_version)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
   notes = extract_changelog_section(changelog_path: changelog_path, version: gem_version)
   abort "❌ Could not find `### [#{gem_version}]` in CHANGELOG.md. Add that section and retry." unless notes
@@ -504,7 +516,7 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_
       # because `gem release` (gem-release gem) doesn't support --otp,
       # but the underlying `gem push` reads OTP from this env var
       env_prefix = current_otp ? "GEM_HOST_OTP_CODE=#{current_otp} " : ""
-      sh %(cd #{dir} && #{env_prefix}gem release)
+      sh_in_dir_for_release(dir, "#{env_prefix}gem release")
       success = true
     # Rake's sh method raises RuntimeError (not Gem exceptions) when commands fail
     rescue RuntimeError, IOError => e
@@ -538,7 +550,7 @@ def publish_npm_with_retry(dir, package_name, base_args: "", otp: nil, max_retri
   while retry_count < max_retries && !success
     begin
       otp_arg = current_otp ? " --otp #{current_otp}" : ""
-      sh %(cd #{dir} && pnpm publish#{base_args}#{otp_arg})
+      sh_in_dir_for_release(dir, "pnpm publish#{base_args}#{otp_arg}")
       success = true
     rescue RuntimeError => e
       retry_count += 1
@@ -612,12 +624,8 @@ Examples:
   NPM_OTP=123456 RUBYGEMS_OTP=789012 rake release[patch]  # Skip OTP prompts")
 task :release, %i[version dry_run override_version_policy] do |_t, args|
   monorepo_root = current_monorepo_root
-  release_paths(monorepo_root)
 
   args_hash = args.to_hash
-
-  version_input = resolve_version_input(args_hash.fetch(:version, ""), monorepo_root)
-  validate_requested_version_input!(version_input)
 
   is_dry_run = ReactOnRails::Utils.object_to_boolean(args_hash[:dry_run])
   is_verbose = ENV["VERBOSE"] == "1"
@@ -625,26 +633,11 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
   npm_otp = ENV.fetch("NPM_OTP", nil)
   rubygems_otp = ENV.fetch("RUBYGEMS_OTP", nil)
 
-  # Resolve prerelease using a concrete version when a bump keyword is provided.
-  current_version = current_gem_version(monorepo_root)
-  target_gem_version = compute_target_gem_version(current_gem_version: current_version, version_input: version_input)
-  is_prerelease = prerelease_version?(target_gem_version)
-
-  # Check if on master branch (required for non-prerelease versions)
-  current_branch = `git -C #{monorepo_root} rev-parse --abbrev-ref HEAD`.strip
-  unless is_prerelease || current_branch == "master"
-    abort <<~ERROR
-      ❌ Release must be run from the master branch!
-
-      Current branch: #{current_branch}
-
-      To release a stable version, please switch to master:
-        git checkout master && git pull --rebase
-
-      For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
-        rake release[#{target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
-    ERROR
-  end
+  current_branch_output, current_branch_status = Open3.capture2e(
+    "git", "-C", monorepo_root, "rev-parse", "--abbrev-ref", "HEAD"
+  )
+  abort "❌ Failed to determine current git branch.\n\n#{current_branch_output}" unless current_branch_status.success?
+  current_branch = current_branch_output.strip
 
   # Check if there are uncommitted changes
   ReactOnRails::GitUtils.uncommitted_changes?(RaisingMessageHandler.new)
@@ -667,11 +660,29 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
     release_paths_hash = release_paths(release_root)
     sh_in_dir_for_release(release_root, "git pull --rebase") unless is_dry_run
 
+    version_input = resolve_version_input(args_hash.fetch(:version, ""), release_root)
+    validate_requested_version_input!(version_input)
+
     current_checkout_version = current_gem_version(release_root)
     resolved_target_gem_version = compute_target_gem_version(
       current_gem_version: current_checkout_version,
       version_input: version_input
     )
+    is_prerelease = release_prerelease_version?(resolved_target_gem_version)
+
+    unless is_prerelease || current_branch == "master"
+      abort <<~ERROR
+        ❌ Release must be run from the master branch!
+
+        Current branch: #{current_branch}
+
+        To release a stable version, please switch to master:
+          git checkout master && git pull --rebase
+
+        For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
+          rake release[#{resolved_target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
+      ERROR
+    end
 
     warn_changelog_missing(monorepo_root: release_root, version: resolved_target_gem_version)
     validate_release_version_policy!(
@@ -753,15 +764,16 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
     unless is_dry_run
       sh_in_dir_for_release(release_root, "LEFTHOOK=0 git add -A")
 
-      git_status = `cd #{release_root} && git diff --cached --quiet; echo $?`.strip
-      if git_status == "0"
+      _git_diff_output, git_diff_status = Open3.capture2e("git", "-C", release_root, "diff", "--cached", "--quiet")
+      if git_diff_status.success?
         puts "No version changes to commit (version already set to #{actual_gem_version})"
       else
         sh_in_dir_for_release(release_root, "LEFTHOOK=0 git commit -m 'Bump version to #{actual_gem_version}'")
       end
 
       tag_name = "v#{actual_gem_version}"
-      tag_exists = system("cd #{release_root} && git rev-parse #{tag_name} >/dev/null 2>&1")
+      tag_exists = system("git", "-C", release_root, "rev-parse", "--verify", "--quiet", "refs/tags/#{tag_name}",
+                          out: File::NULL, err: File::NULL)
       if tag_exists
         puts "Git tag #{tag_name} already exists, skipping tag creation"
       else
@@ -787,8 +799,9 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
 
       npm_dist_tag = npm_dist_tag_for_version(actual_npm_version)
       puts "NPM target: #{actual_npm_version} (dist-tag: #{npm_dist_tag})"
+      npm_base_args += " --tag #{npm_dist_tag}" unless npm_dist_tag == "latest"
 
-      if prerelease_version?(actual_gem_version)
+      if release_prerelease_version?(actual_gem_version)
         npm_base_args += " --no-git-checks"
         puts "Pre-release version detected - skipping git branch checks for NPM publish"
       end

@@ -4,16 +4,12 @@ require_relative "simplecov_helper"
 require_relative "spec_helper"
 require "tmpdir"
 
-def gem_root
-  File.expand_path("../..", __dir__)
-end
-
 RSpec.describe "release.rake helper methods" do
   before do
-    next if Object.const_defined?(:RELEASE_RAKE_HELPERS_LOADED)
+    next if Object.instance_variable_defined?(:@release_rake_helpers_loaded)
 
     load File.expand_path("../../../rakelib/release.rake", __dir__)
-    Object.const_set(:RELEASE_RAKE_HELPERS_LOADED, true)
+    Object.instance_variable_set(:@release_rake_helpers_loaded, true)
   end
 
   describe "#parse_release_tag_to_gem_version" do
