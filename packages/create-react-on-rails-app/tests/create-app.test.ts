@@ -47,7 +47,37 @@ describe('validateAppName', () => {
   it('rejects names with spaces', () => {
     const result = validateAppName('my app');
     expect(result.success).toBe(false);
-    expect(result.error).toContain('letters, numbers, hyphens, and underscores');
+    expect(result.error).toContain('must start with a letter');
+  });
+
+  it('rejects names starting with a hyphen', () => {
+    const result = validateAppName('-myapp');
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects names starting with an underscore', () => {
+    const result = validateAppName('_myapp');
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects names starting with a digit', () => {
+    const result = validateAppName('1app');
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects names ending with a hyphen', () => {
+    const result = validateAppName('myapp-');
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects names ending with an underscore', () => {
+    const result = validateAppName('myapp_');
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects names with consecutive separators', () => {
+    const result = validateAppName('my--app');
+    expect(result.success).toBe(false);
   });
 
   it('rejects names with special characters', () => {

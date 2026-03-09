@@ -55,11 +55,32 @@ describe('validateRails', () => {
     expect(result.message).toContain('Rails is not installed');
   });
 
-  it('returns valid when rails is available', () => {
+  it('returns valid for Rails 7.0+', () => {
+    mockedGetCommandVersion.mockReturnValue('Rails 7.0.6');
+    const result = validateRails();
+    expect(result.valid).toBe(true);
+    expect(result.message).toBe('Rails 7.0.6');
+  });
+
+  it('returns valid for newer Rails versions', () => {
     mockedGetCommandVersion.mockReturnValue('Rails 7.2.1');
     const result = validateRails();
     expect(result.valid).toBe(true);
     expect(result.message).toBe('Rails 7.2.1');
+  });
+
+  it('returns invalid for Rails 6.x', () => {
+    mockedGetCommandVersion.mockReturnValue('Rails 6.1.7');
+    const result = validateRails();
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('Rails 6.1.7');
+  });
+
+  it('returns invalid when rails version cannot be parsed', () => {
+    mockedGetCommandVersion.mockReturnValue('rails version unknown');
+    const result = validateRails();
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('Could not parse Rails version');
   });
 });
 
@@ -87,14 +108,35 @@ describe('validatePackageManager', () => {
 });
 
 describe('validateAll', () => {
+  function mockAllCommandsValid(): void {
+    mockedGetCommandVersion.mockImplementation((command: string) => {
+      if (command === 'ruby') {
+        return 'ruby 3.3.4 (2024-07-09 revision be1089c8ec)';
+      }
+      if (command === 'rails') {
+        return 'Rails 7.2.1';
+      }
+      if (command === 'npm') {
+        return '10.8.2';
+      }
+      throw new Error(`Unexpected command in mock: ${command}`);
+    });
+  }
+
   it('returns allValid false when any validator fails', () => {
     mockedGetCommandVersion.mockReturnValue(null);
     const { allValid } = validateAll('npm');
     expect(allValid).toBe(false);
   });
 
+  it('returns allValid true when all prerequisites pass', () => {
+    mockAllCommandsValid();
+    const { allValid } = validateAll('npm');
+    expect(allValid).toBe(true);
+  });
+
   it('checks all four prerequisites', () => {
-    mockedGetCommandVersion.mockReturnValue('some-version');
+    mockAllCommandsValid();
     const { results } = validateAll('npm');
     expect(results).toHaveLength(4);
     expect(results.map((r) => r.name)).toEqual(['Node.js', 'Ruby', 'Rails', 'Package Manager']);

@@ -88,10 +88,11 @@ export function validateAppName(name: string): { success: boolean; error?: strin
     return { success: false, error: 'App name is required.' };
   }
 
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+  if (!/^[a-zA-Z][a-zA-Z0-9]*([_-][a-zA-Z0-9]+)*$/.test(name)) {
     return {
       success: false,
-      error: 'App name can only contain letters, numbers, hyphens, and underscores.',
+      error:
+        'App name must start with a letter, end with a letter or number, and may contain hyphens or underscores only between alphanumeric characters.',
     };
   }
 
@@ -115,7 +116,7 @@ export function createApp(appName: string, options: CliOptions): void {
   const reactOnRailsProGemPath = options.rsc ? localGemPath('REACT_ON_RAILS_PRO_GEM_PATH') : null;
 
   // Step 1: Create Rails application
-  // appName is validated by validateAppName() to be [a-zA-Z0-9_-]+ only,
+  // appName is validated by validateAppName() to be ^[a-zA-Z][a-zA-Z0-9]*([_-][a-zA-Z0-9]+)*$ only,
   // so it's always a simple directory name safe to use with rails new.
   logStep(currentStep, totalSteps, 'Creating Rails application...');
   try {

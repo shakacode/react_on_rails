@@ -59,7 +59,7 @@ The CLI runs these steps automatically:
 
 After completion, you get:
 
-- A Rails 8 app with PostgreSQL
+- A Rails app with PostgreSQL (Rails 7+)
 - Shakapacker configured with Webpack (or Rspack) and HMR
 - A working HelloWorld React component (TypeScript by default)
 - Optional RSC setup (`--rsc`) with HelloServer route and Pro Node renderer wiring
@@ -72,7 +72,7 @@ The CLI checks for these before starting:
 
 - **Node.js 18+**
 - **Ruby 3.0+**
-- **Rails** (`gem install rails`)
+- **Rails 7+** (`gem install rails`)
 - **npm or pnpm**
 
 If any are missing, you'll get a clear error message with installation instructions.
