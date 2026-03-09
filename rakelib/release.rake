@@ -44,6 +44,12 @@ def sh_in_dir_for_release(dir, *shell_commands)
   end
 end
 
+def sh_args_in_dir_for_release(dir, *command_args, env: nil)
+  Dir.chdir(dir) do
+    env ? sh(env, *command_args) : sh(*command_args)
+  end
+end
+
 def unbundled_sh_in_dir_for_release(dir, *shell_commands)
   Dir.chdir(dir) do
     Bundler.with_unbundled_env do
@@ -59,7 +65,16 @@ def prompt_for_otp(service_name)
   $stdout.flush
   otp = $stdin.gets&.strip
   abort "\n❌ No OTP provided. Aborting." if otp.nil? || otp.empty?
-  otp
+  normalize_otp_code(otp, service_name: service_name)
+end
+
+def normalize_otp_code(otp, service_name:)
+  return nil if otp.nil?
+
+  normalized = otp.to_s.strip
+  abort "❌ Invalid OTP for #{service_name}. Expected digits only." unless normalized.match?(/\A\d+\z/)
+
+  normalized
 end
 
 def verify_npm_auth(registry_url = "https://registry.npmjs.org/")
@@ -508,7 +523,7 @@ end
 
 def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_RELEASE_MAX_RETRIES", "3").to_i)
   puts "\nPublishing #{gem_name} gem to RubyGems.org..."
-  current_otp = otp
+  current_otp = normalize_otp_code(otp, service_name: "RubyGems")
 
   if current_otp
     puts "Using provided OTP code..."
@@ -525,8 +540,8 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_
       # Use GEM_HOST_OTP_CODE environment variable instead of --otp flag
       # because `gem release` (gem-release gem) doesn't support --otp,
       # but the underlying `gem push` reads OTP from this env var
-      env_prefix = current_otp ? "GEM_HOST_OTP_CODE=#{current_otp} " : ""
-      sh_in_dir_for_release(dir, "#{env_prefix}gem release")
+      gem_release_env = current_otp ? { "GEM_HOST_OTP_CODE" => current_otp } : nil
+      sh_args_in_dir_for_release(dir, "gem", "release", env: gem_release_env)
       success = true
     # Rake's sh method raises RuntimeError (not Gem exceptions) when commands fail
     rescue RuntimeError, IOError => e
@@ -550,17 +565,19 @@ def publish_gem_with_retry(dir, gem_name, otp: nil, max_retries: ENV.fetch("GEM_
   current_otp
 end
 
-def publish_npm_with_retry(dir, package_name, base_args: "", otp: nil, max_retries: 3)
+def publish_npm_with_retry(dir, package_name, base_args: [], otp: nil, max_retries: 3)
   puts "\nPublishing #{package_name}..."
-  current_otp = otp
+  current_otp = normalize_otp_code(otp, service_name: "NPM")
+  publish_args = Array(base_args)
 
   retry_count = 0
   success = false
 
   while retry_count < max_retries && !success
     begin
-      otp_arg = current_otp ? " --otp #{current_otp}" : ""
-      sh_in_dir_for_release(dir, "pnpm publish#{base_args}#{otp_arg}")
+      command_args = ["pnpm", "publish", *publish_args]
+      command_args += ["--otp", current_otp] if current_otp
+      sh_args_in_dir_for_release(dir, *command_args)
       success = true
     rescue RuntimeError => e
       retry_count += 1
@@ -791,7 +808,7 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
       puts "Publishing PUBLIC packages to npmjs.org..."
       puts "=" * 80
 
-      npm_base_args = ""
+      npm_base_args = []
       current_npm_otp = npm_otp
 
       if current_npm_otp
@@ -803,10 +820,10 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
 
       npm_dist_tag = npm_dist_tag_for_version(actual_npm_version)
       puts "NPM target: #{actual_npm_version} (dist-tag: #{npm_dist_tag})"
-      npm_base_args += " --tag #{npm_dist_tag}" unless npm_dist_tag == "latest"
+      npm_base_args += ["--tag", npm_dist_tag] unless npm_dist_tag == "latest"
 
       if release_prerelease_version?(actual_gem_version)
-        npm_base_args += " --no-git-checks"
+        npm_base_args << "--no-git-checks"
         puts "Pre-release version detected - skipping git branch checks for NPM publish"
       end
 
