@@ -391,14 +391,31 @@ The most common performance regression. Sequential `await` calls create waterfal
 async function Page() {
   const user = await getUser(); // 200ms
   const stats = await getStats(user.id); // 300ms (waits for user)
-  const posts = await getPosts(user.id); // 250ms (also waits for user)
+  const posts = await getPosts(user.id); // 250ms (waits for user AND stats)
+  // Total: 750ms (sequential)
 }
+```
 
-// GOOD: Parallel fetching (300ms total)
-// Note: This version takes userId as a prop, avoiding the need to fetch user first.
-// If stats/posts depend on user data beyond the ID, fetch user first, then parallelize the rest.
+**Fix 1:** If the user ID is available from props or route params, all three fetches can run in parallel:
+
+```jsx
+// GOOD: Parallel fetching when userId is available upfront (300ms total)
 async function Page({ userId }) {
   const [user, stats, posts] = await Promise.all([getUser(userId), getStats(userId), getPosts(userId)]);
+}
+```
+
+**Fix 2:** If you must fetch the user first (e.g., stats and posts depend on user data), fetch the user first, then parallelize the dependent calls:
+
+```jsx
+// GOOD: Fetch user first, then parallelize dependent calls (500ms total)
+async function Page() {
+  const user = await getUser(); // 200ms
+  const [stats, posts] = await Promise.all([
+    getStats(user.id), // 300ms ── start simultaneously
+    getPosts(user.id), // 250ms
+  ]);
+  // Total: 200 + 300 = 500ms (instead of 750ms)
 }
 ```
 

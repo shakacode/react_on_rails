@@ -2,7 +2,7 @@
 
 This guide covers how to migrate your data fetching from client-side patterns (`useEffect` + `fetch`, React Query, SWR) to Server Component patterns. In React on Rails, data flows from Rails to your components as props — eliminating the need for loading states, error handling boilerplate, and client-side caching in many cases.
 
-> **Part 4 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Context and State Management](rsc-context-and-state.md)
+> **Part 4 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Context and State Management](rsc-context-and-state.md) | Next: [Third-Party Library Compatibility](rsc-third-party-libs.md)
 
 ## The Core Shift: From Client-Side Fetching to Server-Side Data
 
@@ -236,9 +236,27 @@ async function ProductList() {
 When you need React Query's client features (background refetching, mutations, optimistic updates), prefetch on the server and hydrate on the client:
 
 ```jsx
+// ReactQueryProvider.jsx -- Client Component (provides QueryClient + hydration)
+'use client';
+
+import { QueryClient, QueryClientProvider, HydrationBoundary } from '@tanstack/react-query';
+import { useState } from 'react';
+
+export default function ReactQueryProvider({ children, dehydratedState }) {
+  const [queryClient] = useState(() => new QueryClient());
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HydrationBoundary state={dehydratedState}>{children}</HydrationBoundary>
+    </QueryClientProvider>
+  );
+}
+```
+
+```jsx
 // ProductsPage.jsx -- Server Component
-import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
+import { dehydrate, QueryClient } from '@tanstack/react-query';
 import { getProducts } from '../lib/data';
+import ReactQueryProvider from './ReactQueryProvider';
 import ProductList from './ProductList';
 
 export default async function ProductsPage() {
@@ -250,9 +268,9 @@ export default async function ProductsPage() {
   });
 
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
+    <ReactQueryProvider dehydratedState={dehydrate(queryClient)}>
       <ProductList />
-    </HydrationBoundary>
+    </ReactQueryProvider>
   );
 }
 ```
@@ -285,7 +303,7 @@ export default function ProductList() {
 
 1. Server Component creates a `QueryClient` and prefetches data
 2. `dehydrate()` serializes the cache state
-3. `HydrationBoundary` passes the cache to the client
+3. `ReactQueryProvider` wraps children with both `QueryClientProvider` (required for `useQuery`) and `HydrationBoundary` (seeds the cache)
 4. Client-side `useQuery` picks up the prefetched data -- no loading state on first render
 5. Subsequent refetches happen client-side as usual
 

@@ -2,7 +2,7 @@
 
 React Context is one of the biggest migration challenges when adopting RSC. Server Components cannot create or consume Context -- they have no access to `createContext`, `useContext`, or any Context provider. This guide covers the patterns for handling Context, providers, and global state in an RSC world.
 
-> **Part 3 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Component Tree Restructuring](rsc-component-patterns.md)
+> **Part 3 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Component Tree Restructuring](rsc-component-patterns.md) | Next: [Data Fetching Migration](rsc-data-fetching.md)
 
 ## Why Context Doesn't Work in Server Components
 
@@ -42,6 +42,7 @@ export function useTheme() {
 export default function ThemeProvider({ children }) {
   const [theme, setTheme] = useState('light');
 
+  // React 19: <Context value={...}> replaces <Context.Provider value={...}>
   return <ThemeContext value={{ theme, setTheme }}>{children}</ThemeContext>;
 }
 ```

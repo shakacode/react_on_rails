@@ -25,10 +25,12 @@ const AsyncProfileContent = async ({ name }) => {
 
       <div>
         <h2>Profile: {name}</h2>
-        <p>This content was fetched asynchronously inside a <strong>React Server Component</strong>.</p>
         <p>
-          The <code>&lt;title&gt;</code> and <code>&lt;meta&gt;</code> tags above were rendered
-          on the server and hoisted to <code>&lt;head&gt;</code> by React 19.
+          This content was fetched asynchronously inside a <strong>React Server Component</strong>.
+        </p>
+        <p>
+          The <code>&lt;title&gt;</code> and <code>&lt;meta&gt;</code> tags above were rendered on the server
+          and hoisted to <code>&lt;head&gt;</code> by React 19.
         </p>
       </div>
     </>
@@ -55,23 +57,20 @@ const NativeMetadataRSCApp = ({ helloWorldData }) => {
       {/* Initial metadata — rendered in the shell (first streaming chunk) */}
       <title>Loading... | React on Rails</title>
       <meta property="og:site_name" content="React on Rails Demo" />
-      <link rel="canonical" href="https://example.com/profile" />
-
+      <link rel="canonical" href="https://example.com/profile" />{' '}
+      {/* placeholder — use the real page URL in production */}
       <h1>React 19 Native Metadata in RSC</h1>
       <p>
         This page is rendered by a <strong>React Server Component</strong> (no &apos;use client&apos;
-        directive). The <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code>, and{' '}
-        <code>&lt;link&gt;</code> tags are rendered on the server and hoisted to{' '}
-        <code>&lt;head&gt;</code> by React 19.
+        directive). The <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code>, and <code>&lt;link&gt;</code>{' '}
+        tags are rendered on the server and hoisted to <code>&lt;head&gt;</code> by React 19.
       </p>
       <p>
-        <strong>How it works:</strong> The initial title is &quot;Loading... | React on Rails&quot;.
-        When the async content below loads (~1s), the title updates to &quot;{name}&apos;s Profile |
-        React on Rails&quot;.
+        <strong>How it works:</strong> The initial title is &quot;Loading... | React on Rails&quot;. When the
+        async content below loads (~1s), the title updates to &quot;{name}&apos;s Profile | React on
+        Rails&quot;.
       </p>
-
       <hr />
-
       <h3>Async Server Content (loaded via Suspense):</h3>
       <Suspense fallback={<div>Loading profile for {name}...</div>}>
         <AsyncProfileContent name={name} />

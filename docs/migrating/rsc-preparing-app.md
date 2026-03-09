@@ -2,7 +2,7 @@
 
 This guide walks you through the infrastructure changes needed to prepare an existing React on Rails application for React Server Components (RSC). After completing these steps, your app works exactly as before -- no component behavior changes -- but the RSC pipeline is in place so you can begin migrating components to Server Components.
 
-> **Part 1 of the [RSC Migration Series](migrating-to-rsc.md)**
+> **Part 1 of the [RSC Migration Series](migrating-to-rsc.md)** | Next: [Component Tree Restructuring](rsc-component-patterns.md)
 
 ## What This Guide Covers
 
@@ -49,7 +49,7 @@ yarn why react-on-rails-rsc
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
 
-> **Security:** `react-on-rails-rsc` versions **19.0.0 through 19.0.3** contain known vulnerabilities in the vendored `react-server-dom-webpack` package. Version **19.0.4** is the minimum version that includes fixes for all known security issues. Always use **19.0.4 or later**. Check the [react-on-rails-rsc changelog](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details.
+> **Recommendation:** Use `react-on-rails-rsc` **19.0.4 or later**. Earlier versions (19.0.0 through 19.0.3) vendored older builds of `react-server-dom-webpack` that were updated in 19.0.4 with upstream security patches.
 
 ## Step 2: Configure Rails for RSC
 
