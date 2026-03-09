@@ -146,14 +146,15 @@ module ReactOnRails
         add_react_dependencies
         add_css_dependencies
         add_rspack_dependencies if using_rspack?
-        if using_swc?
-          add_swc_dependencies
-        else
-          add_babel_react_dependencies
-        end
+        add_transpiler_dependencies
         add_pro_dependencies if using_pro
         add_rsc_dependencies if using_rsc
         add_dev_dependencies
+      end
+
+      def add_transpiler_dependencies
+        add_swc_dependencies if using_swc?
+        add_babel_react_dependencies if !using_swc? && !using_rspack?
       end
 
       def add_react_on_rails_package

@@ -421,6 +421,15 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(warnings.size).to be > 0
       expect(warnings.first.to_s).to include("Failed to add Babel React preset dependency")
     end
+
+    it "adds warning when an exception is raised" do
+      allow(instance).to receive(:add_packages).and_raise(StandardError, "network error")
+
+      instance.send(:add_babel_react_dependencies)
+
+      expect(warnings.size).to be > 0
+      expect(warnings.first.to_s).to include("Error adding Babel React preset dependency")
+    end
   end
 
   describe "error handling consistency" do
@@ -468,6 +477,18 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "does not add Babel React preset when SWC is used" do
       instance.using_swc = true
+
+      instance.send(:add_js_dependencies)
+
+      babel_calls = instance.add_npm_dependencies_calls.select do |call|
+        call[:packages].include?("@babel/preset-react")
+      end
+      expect(babel_calls).to eq([])
+    end
+
+    it "does not add Babel React preset when rspack is used and SWC is not configured" do
+      instance.using_swc = false
+      instance.using_rspack = true
 
       instance.send(:add_js_dependencies)
 
