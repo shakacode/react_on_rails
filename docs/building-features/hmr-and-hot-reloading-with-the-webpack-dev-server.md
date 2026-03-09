@@ -32,9 +32,7 @@ config.same_bundle_for_client_and_server = true
 `dev_server.hmr` maps to [devServer.hot](https://webpack.js.org/configuration/dev-server/#devserverhot).
 This must be false if you're using the webpack-dev-server for client and server bundles.
 
-If you don't configure HMR to false, you'll see errors like:
-
-- `ReferenceError: window is not defined` (if `hmr` is true)
+If `hmr` is `true` in this configuration, you will see: `ReferenceError: window is not defined`
 
 ## Client-Side rendering with HMR using react-refresh-webpack-plugin
 
@@ -96,7 +94,7 @@ To enable the HMR functionality, you have to use `./bin/shakapacker-dev-server`
 That's it :).
 Now the browser should reflect changes in `.js` and `.css` files without reloading.
 
-If for some reason the plugin doesn't work, you can revert the changes and leave only devServer `hmr` set to true, affecting only CSS files.
+If for some reason the plugin doesn't work, you can revert the changes and leave only `dev_server.hmr` set to `true`, affecting only CSS files.
 
 These plugins are working and tested with
 
