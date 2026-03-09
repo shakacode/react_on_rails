@@ -634,4 +634,75 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
   end
+
+  describe "Pro package consistency checks" do
+    let(:doctor) { described_class.new }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    before do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("package.json").and_return(true)
+    end
+
+    context "when both react-on-rails and react-on-rails-pro npm packages are installed" do
+      before do
+        allow(File).to receive(:read).with("package.json").and_return(
+          JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0", "react-on-rails-pro" => "16.4.0" } })
+        )
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        allow(ReactOnRails::Utils).to receive(:package_manager_remove_command)
+          .with("react-on-rails").and_return("npm remove react-on-rails")
+      end
+
+      it "reports an error about duplicate packages" do
+        expect(checker).to receive(:add_error).with(/Both 'react-on-rails' and 'react-on-rails-pro'/)
+        doctor.send(:check_pro_package_consistency)
+      end
+    end
+
+    context "when Pro gem is installed but using base npm package" do
+      before do
+        allow(File).to receive(:read).with("package.json").and_return(
+          JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0" } })
+        )
+        allow(ReactOnRails::Utils).to receive_messages(
+          react_on_rails_pro?: true,
+          package_manager_install_exact_command: "npm install react-on-rails-pro@16.4.0"
+        )
+      end
+
+      it "reports an error about gem/package mismatch" do
+        expect(checker).to receive(:add_error).with(/Pro gem is installed but using the base/)
+        doctor.send(:check_pro_package_consistency)
+      end
+    end
+
+    context "when Pro npm package is installed without Pro gem" do
+      before do
+        allow(File).to receive(:read).with("package.json").and_return(
+          JSON.generate({ "dependencies" => { "react-on-rails-pro" => "16.4.0" } })
+        )
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "reports an error about missing Pro gem" do
+        expect(checker).to receive(:add_error).with(/npm package is installed but the Pro gem is not/)
+        doctor.send(:check_pro_package_consistency)
+      end
+    end
+
+    context "when packages and gems are consistent" do
+      before do
+        allow(File).to receive(:read).with("package.json").and_return(
+          JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0" } })
+        )
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "reports no errors" do
+        expect(checker).not_to receive(:add_error)
+        doctor.send(:check_pro_package_consistency)
+      end
+    end
+  end
 end

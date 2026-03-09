@@ -129,6 +129,7 @@ module ReactOnRails
       # Use system_checker for comprehensive package validation instead of duplicating
       checker.check_react_on_rails_packages
       check_version_wildcards
+      check_pro_package_consistency
     end
 
     def check_packages
@@ -510,6 +511,62 @@ module ReactOnRails
       rescue StandardError
         # Ignore other errors
       end
+    end
+
+    def check_pro_package_consistency
+      return unless File.exist?("package.json")
+
+      package_json = JSON.parse(File.read("package.json"))
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
+      has_base = all_deps.key?("react-on-rails")
+      has_pro = all_deps.key?("react-on-rails-pro")
+      is_pro_gem = ReactOnRails::Utils.react_on_rails_pro?
+
+      check_duplicate_packages(has_base, has_pro)
+      check_pro_gem_package_mismatch(is_pro_gem, has_base, has_pro)
+      check_pro_package_without_gem(is_pro_gem, has_pro)
+    rescue StandardError
+      # Ignore errors — other checks already report package.json issues
+    end
+
+    def check_duplicate_packages(has_base, has_pro)
+      return unless has_base && has_pro
+
+      remove_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails")
+      checker.add_error(<<~MSG.strip)
+        🚫 Both 'react-on-rails' and 'react-on-rails-pro' npm packages are installed.
+
+        The Pro package includes all base functionality. Having both causes conflicts.
+
+        Fix: #{remove_cmd}
+      MSG
+    end
+
+    def check_pro_gem_package_mismatch(is_pro_gem, has_base, has_pro)
+      return unless is_pro_gem && has_base && !has_pro
+
+      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+        "react-on-rails-pro", ReactOnRails::VERSION
+      )
+      checker.add_error(<<~MSG.strip)
+        🚫 Pro gem is installed but using the base 'react-on-rails' npm package.
+
+        The Pro gem requires the 'react-on-rails-pro' npm package.
+
+        Fix: #{install_cmd}
+      MSG
+    end
+
+    def check_pro_package_without_gem(is_pro_gem, has_pro)
+      return unless !is_pro_gem && has_pro
+
+      checker.add_error(<<~MSG.strip)
+        🚫 'react-on-rails-pro' npm package is installed but the Pro gem is not.
+
+        The Pro npm package requires the 'react_on_rails_pro' gem.
+
+        Fix: Add gem 'react_on_rails_pro' to your Gemfile and run bundle install
+      MSG
     end
 
     def check_key_configuration_files
