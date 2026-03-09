@@ -175,12 +175,7 @@ describe('createApp', () => {
       ['add', 'react_on_rails', '--strict'],
       appPath,
     );
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      3,
-      'bundle',
-      ['add', 'react_on_rails_pro', '--strict'],
-      appPath,
-    );
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(3, 'bundle', ['add', 'react_on_rails_pro'], appPath);
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       4,
       'bundle',
@@ -219,7 +214,7 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenCalledTimes(3);
     expect(mockedExecLiveArgs).not.toHaveBeenCalledWith(
       'bundle',
-      ['add', 'react_on_rails_pro', '--strict'],
+      ['add', 'react_on_rails_pro'],
       expect.anything(),
     );
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_world');
