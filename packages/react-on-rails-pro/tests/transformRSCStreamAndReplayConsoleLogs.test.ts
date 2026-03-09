@@ -46,7 +46,7 @@ describe('transformRSCStreamAndReplayConsoleLogs', () => {
     expect(html).toBe('<div>Hello</div>');
     const script = document.body.querySelector('script');
     expect(script).not.toBeNull();
-    expect(script?.getAttribute('nonce')).toBe('abc123');
+    expect(script?.nonce).toBe('abc123');
     expect(script?.textContent).toContain('console.log("x")');
   });
 

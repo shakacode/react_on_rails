@@ -34,21 +34,20 @@ function cacheKeyJSArray(cacheKey: string) {
   return `(self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${JSON.stringify(cacheKey)}]||=[]`;
 }
 
-function nonceAttribute(cspNonce?: string) {
-  const sanitizedNonce = sanitizeNonce(cspNonce);
+function nonceAttribute(sanitizedNonce?: string) {
   return sanitizedNonce ? ` nonce="${sanitizedNonce}"` : '';
 }
 
-function createScriptTag(script: string, cspNonce?: string) {
-  return `<script${nonceAttribute(cspNonce)}>${escapeScript(script)}</script>`;
+function createScriptTag(script: string, sanitizedNonce?: string) {
+  return `<script${nonceAttribute(sanitizedNonce)}>${escapeScript(script)}</script>`;
 }
 
-function createRSCPayloadInitializationScript(cacheKey: string, cspNonce?: string) {
-  return createScriptTag(cacheKeyJSArray(cacheKey), cspNonce);
+function createRSCPayloadInitializationScript(cacheKey: string, sanitizedNonce?: string) {
+  return createScriptTag(cacheKeyJSArray(cacheKey), sanitizedNonce);
 }
 
-function createRSCPayloadChunk(chunk: string, cacheKey: string, cspNonce?: string) {
-  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`, cspNonce);
+function createRSCPayloadChunk(chunk: string, cacheKey: string, sanitizedNonce?: string) {
+  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`, sanitizedNonce);
 }
 
 /**
@@ -83,6 +82,7 @@ export default function injectRSCPayload(
   domNodeId: string | undefined,
   cspNonce?: string,
 ) {
+  const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
   const resultStream = new PassThrough();
   safePipe(pipeableHtmlStream, htmlStream, (err) => {
@@ -248,7 +248,7 @@ export default function injectRSCPayload(
         //
         // The initialization script creates: (self.REACT_ON_RAILS_RSC_PAYLOADS||={})[cacheKey]||=[]
         // This creates a global array that the client-side RSCProvider monitors for new chunks.
-        const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, cspNonce);
+        const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
         rscInitializationBuffers.push(Buffer.from(initializationScript));
 
         // Process RSC payload stream asynchronously
@@ -256,7 +256,7 @@ export default function injectRSCPayload(
           (async () => {
             for await (const chunk of stream ?? []) {
               const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
-              const payloadScript = createRSCPayloadChunk(decodedChunk, rscPayloadKey, cspNonce);
+              const payloadScript = createRSCPayloadChunk(decodedChunk, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
               scheduleFlush();
             }

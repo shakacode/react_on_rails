@@ -4,8 +4,9 @@ export function wrapInScriptTags(scriptId: string, scriptBody: string, nonce?: s
     return '';
   }
 
-  // Sanitize nonce to prevent attribute injection attacks
+  // Sanitize nonce to prevent attribute injection attacks.
   // CSP nonces should be base64/base64url-like strings with optional trailing padding.
+  // NOTE: keep this logic in sync with sanitizeNonce() in react-on-rails-pro/src/utils.ts
   const nonceWithAllowedCharsOnly = nonce?.replace(/[^a-zA-Z0-9+/=_-]/g, '');
   const sanitizedNonce = nonceWithAllowedCharsOnly?.match(/^[a-zA-Z0-9+/_-]+={0,2}$/)?.[0];
   const nonceAttr = sanitizedNonce ? ` nonce="${sanitizedNonce}"` : '';
