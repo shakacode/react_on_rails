@@ -338,11 +338,13 @@ module ReactOnRails
 
       # Returns Pro package names with version suffix matching the gem version.
       # Uses VersionSyntaxConverter to handle Ruby->npm format conversion.
-      # Falls back to unversioned package names if version can't be determined.
+      # Falls back to ReactOnRails::VERSION since Pro and base gems share the same version.
       def pro_packages_with_version
-        return PRO_DEPENDENCIES unless defined?(ReactOnRailsPro::VERSION)
-
-        npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRailsPro::VERSION)
+        # Prefer Pro gem version if loaded; fall back to base gem version (same by policy).
+        # After auto-install via bundle add, the Pro gem isn't loaded in the current process,
+        # so ReactOnRailsPro::VERSION won't be defined. The base gem version is always available.
+        gem_version = defined?(ReactOnRailsPro::VERSION) ? ReactOnRailsPro::VERSION : ReactOnRails::VERSION
+        npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
         PRO_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }
       rescue StandardError
         puts "WARNING: Could not determine Pro package version. Installing latest."
