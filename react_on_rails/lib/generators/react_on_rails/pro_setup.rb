@@ -2,6 +2,7 @@
 
 require "open3"
 require "rainbow"
+require "timeout"
 require_relative "generator_messages"
 
 module ReactOnRails
@@ -90,7 +91,9 @@ module ReactOnRails
       # @return [Boolean] true if the gem was successfully installed
       def attempt_pro_gem_auto_install
         puts Rainbow("📝 Adding #{PRO_GEM_NAME} to Gemfile...").yellow
-        output, status = Bundler.with_unbundled_env { Open3.capture2e(PRO_GEM_AUTO_INSTALL_COMMAND) }
+        output, status = Timeout.timeout(120) do
+          Bundler.with_unbundled_env { Open3.capture2e(PRO_GEM_AUTO_INSTALL_COMMAND) }
+        end
         if status.success?
           # The gem is now in Gemfile/lockfile but not loaded in the current Ruby process.
           # Generator code that follows must not reference ReactOnRailsPro constants directly.
@@ -99,6 +102,9 @@ module ReactOnRails
         end
 
         puts output unless output.to_s.strip.empty?
+        false
+      rescue Timeout::Error
+        puts Rainbow("⏱️  bundle add timed out after 120 seconds.").red
         false
       end
 
@@ -370,8 +376,8 @@ module ReactOnRails
       end
 
       def pro_server_config_ready?(content)
-        content.include?("libraryTarget: 'commonjs2',") &&
-          !content.include?("// libraryTarget: 'commonjs2',") &&
+        content.include?("// Required for React on Rails Pro Node Renderer") &&
+          content.include?("libraryTarget: 'commonjs2',") &&
           content.include?("function extractLoader") &&
           content.include?("babelLoader.options.caller = { ssr: true }") &&
           content.include?("serverWebpackConfig.target = 'node'") &&
@@ -389,6 +395,8 @@ module ReactOnRails
       end
 
       # Keep manual fallback pinned to the latest stable release (drop pre-release suffixes like .rc.N).
+      # react_on_rails_pro follows the same version number as react_on_rails by policy.
+      # Both gems are released in lockstep; if this ever changes, replace with a dedicated constant.
       def recommended_pro_gem_version
         Gem::Version.new(ReactOnRails::VERSION).release.to_s
       rescue StandardError
