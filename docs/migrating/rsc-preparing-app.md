@@ -104,13 +104,13 @@ end
 This mounts a `GET /rsc_payload/:component_name` endpoint that React on Rails Pro uses internally. The default path (`rsc_payload/`) matches the `rsc_payload_generation_url_path` config. If your app has a route conflict at that path, you can customize both:
 
 ```ruby
-# Custom path (must match the config)
+# Custom path (use the same slash-free base path in both places)
 rsc_payload_route path: "flight-payload"
 ```
 
 ```ruby
 # config/initializers/react_on_rails_pro.rb
-config.rsc_payload_generation_url_path = "flight-payload/"
+config.rsc_payload_generation_url_path = "flight-payload"
 ```
 
 ## Step 4: Set Up the RSC Webpack Bundle
@@ -179,8 +179,7 @@ const configureRsc = () => {
         const resultArray = Array.isArray(result) ? result : result ? [result] : [];
         const resolvedRule = { use: resultArray };
         const jsLoader =
-          extractLoader(resolvedRule, 'babel-loader') ||
-          extractLoader(resolvedRule, 'swc-loader');
+          extractLoader(resolvedRule, 'babel-loader') || extractLoader(resolvedRule, 'swc-loader');
         if (jsLoader) {
           return [...resultArray, { loader: 'react-on-rails-rsc/WebpackLoader' }];
         }
@@ -188,9 +187,7 @@ const configureRsc = () => {
       };
     } else if (Array.isArray(rule.use)) {
       // Babel transpiler: rule.use is a static array
-      const jsLoader =
-        extractLoader(rule, 'babel-loader') ||
-        extractLoader(rule, 'swc-loader');
+      const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');
       if (jsLoader) {
         rule.use.push({
           loader: 'react-on-rails-rsc/WebpackLoader',
@@ -252,9 +249,7 @@ const configureServer = (rscBundle = false) => {
     serverWebpackConfig.plugins.push(
       new RSCWebpackPlugin({
         isServer: true,
-        clientReferences: [
-          { directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ },
-        ],
+        clientReferences: [{ directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ }],
       }),
     );
   }
@@ -266,7 +261,7 @@ const configureServer = (rscBundle = false) => {
 
 module.exports = {
   default: configureServer,
-  extractLoader,     // Export if you have this utility function
+  extractLoader, // Export if you have this utility function
 };
 ```
 
@@ -288,9 +283,7 @@ const configureClient = () => {
   clientConfig.plugins.push(
     new RSCWebpackPlugin({
       isServer: false,
-      clientReferences: [
-        { directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ },
-      ],
+      clientReferences: [{ directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ }],
     }),
   );
 

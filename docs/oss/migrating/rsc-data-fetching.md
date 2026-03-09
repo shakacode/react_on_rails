@@ -338,7 +338,7 @@ The most critical performance pitfall with Server Components is sequential data 
 async function Dashboard() {
   const user = await getUser(); // 200ms
   const stats = await getStats(user.id); // 300ms
-  const posts = await getPosts(user.id); // 250ms
+  const posts = await getPosts(user.id); // 250ms (also waits for user)
   // Total: 750ms (sequential)
 
   return (
@@ -470,6 +470,11 @@ async function ReviewsSection({ promise }) {
   const reviews = await promise;
   return <ReviewList reviews={reviews} />;
 }
+
+async function RelatedSection({ promise }) {
+  const related = await promise;
+  return <RelatedProducts products={related} />;
+}
 ```
 
 ## Streaming with the `use()` Hook
@@ -586,6 +591,8 @@ function Comments({ postId }) {
 ```jsx
 // CORRECT: Promise created in a Server Component, passed as a prop
 // Page.jsx -- Server Component
+import { Suspense } from 'react';
+
 export default async function Page({ id }) {
   const commentsPromise = getComments(id); // Created once on the server
   return (

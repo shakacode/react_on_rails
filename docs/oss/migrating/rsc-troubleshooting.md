@@ -391,7 +391,7 @@ The most common performance regression. Sequential `await` calls create waterfal
 async function Page() {
   const user = await getUser(); // 200ms
   const stats = await getStats(user.id); // 300ms (waits for user)
-  const posts = await getPosts(user.id); // 250ms (waits for stats)
+  const posts = await getPosts(user.id); // 250ms (also waits for user)
 }
 
 // GOOD: Parallel fetching (300ms total)
@@ -551,7 +551,8 @@ Server Components run on the server (in the node renderer), so they have access 
 ```jsx
 // Server Component -- full access to Node.js process.env
 async function DBComponent() {
-  const data = await fetch(process.env.DATABASE_URL); // Works
+  const data = await fetch(process.env.INTERNAL_API_URL); // Works if this env var holds an HTTP(S) URL
+  const dbUrl = process.env.DATABASE_URL; // Works
   const secret = process.env.API_SECRET; // Works
 }
 ```

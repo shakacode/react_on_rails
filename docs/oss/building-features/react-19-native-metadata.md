@@ -4,30 +4,30 @@ React 19 introduces built-in support for rendering `<title>`, `<meta>`, and `<li
 
 ## Why Migrate?
 
-| | react-helmet + react_component_hash | React 19 Native Metadata |
-|---|---|---|
-| **SSR approach** | `renderToString` only | Works with `renderToString`, streaming, and RSC |
-| **Streaming support** | Not compatible | Fully compatible |
-| **Dependencies** | `react-helmet` package | None (built into React 19) |
-| **Server setup** | Render-function returning object + `Helmet.renderStatic()` | Standard component |
-| **View helper** | `react_component_hash` (returns Hash) | `react_component` or `stream_react_component` (returns HTML) |
-| **Bundle complexity** | Separate server/client render-functions | Same component for both |
+|                       | react-helmet + react_component_hash                        | React 19 Native Metadata                                     |
+| --------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ |
+| **SSR approach**      | `renderToString` only                                      | Works with `renderToString`, streaming, and RSC              |
+| **Streaming support** | Not compatible                                             | Fully compatible                                             |
+| **Dependencies**      | `react-helmet` package                                     | None (built into React 19)                                   |
+| **Server setup**      | Render-function returning object + `Helmet.renderStatic()` | Standard component                                           |
+| **View helper**       | `react_component_hash` (returns Hash)                      | `react_component` or `stream_react_component` (returns HTML) |
+| **Bundle complexity** | Separate server/client render-functions                    | Same component for both                                      |
 
 ## What React 19 Hoists to `<head>`
 
 React 19 automatically hoists these elements from anywhere in the component tree into the document `<head>`:
 
-| Element | Hoisted? | Notes |
-|---------|----------|-------|
-| `<title>` | Yes | Last rendered `<title>` wins |
-| `<meta>` | Yes | All variants (`name`, `property`, `httpEquiv`, `charSet`) |
-| `<link rel="stylesheet">` | Yes | Must include `precedence` prop for ordering |
-| `<link rel="preload">` | Yes | |
-| `<link rel="icon">` | Yes | And other `rel` types |
-| `<script async src="...">` | Yes | Only `async` scripts with `src` |
-| `<style>` with `precedence` | Yes | Inline styles with `precedence` prop |
-| `<script>` (inline) | **No** | Stays where rendered in the tree |
-| `<script defer>` | **No** | Not hoisted |
+| Element                     | Hoisted? | Notes                                                     |
+| --------------------------- | -------- | --------------------------------------------------------- |
+| `<title>`                   | Yes      | Last rendered `<title>` wins                              |
+| `<meta>`                    | Yes      | All variants (`name`, `property`, `httpEquiv`, `charSet`) |
+| `<link rel="stylesheet">`   | Yes      | Must include `precedence` prop for ordering               |
+| `<link rel="preload">`      | Yes      |                                                           |
+| `<link rel="icon">`         | Yes      | And other `rel` types                                     |
+| `<script async src="...">`  | Yes      | Only `async` scripts with `src`                           |
+| `<style>` with `precedence` | Yes      | Inline styles with `precedence` prop                      |
+| `<script>` (inline)         | **No**   | Stays where rendered in the tree                          |
+| `<script defer>`            | **No**   | Not hoisted                                               |
 
 > **Key limitation:** Inline `<script>` tags (including those with `dangerouslySetInnerHTML`) are **not** hoisted to `<head>`. They render where placed in the component tree. This matters for use cases like Apollo Client state serialization — see [What react_component_hash Is Still Needed For](#what-react_component_hash-is-still-needed-for).
 
@@ -303,7 +303,7 @@ export default async (props, _railsContext) => {
   });
 
   const apolloState = client.extract();
-  const apolloStateTag = `<script>window.__APOLLO_STATE__ = ${JSON.stringify(apolloState)};</script>`;
+  const apolloStateTag = `<script>window.__APOLLO_STATE__ = ${JSON.stringify(apolloState).replace(/</g, '\\u003c')};</script>`;
 
   return {
     renderedHtml: {
@@ -313,6 +313,8 @@ export default async (props, _railsContext) => {
   };
 };
 ```
+
+> **Security:** If you serialize JSON into an inline `<script>` tag, escape `<` characters (or use a safe serializer) so user data cannot break out of the script block with `</script>`.
 
 ### Code-Splitting with @loadable/component
 
@@ -340,16 +342,16 @@ export default (props, _railsContext) => {
 
 Use this matrix to decide which approach to use:
 
-| Use Case | Before | After |
-|----------|--------|-------|
-| Page title and meta tags | `react-helmet` + `react_component_hash` | React 19 native `<title>`, `<meta>` |
-| Canonical URLs | `react-helmet` + `react_component_hash` | React 19 native `<link rel="canonical">` |
-| Open Graph tags | `react-helmet` + `react_component_hash` | React 19 native `<meta property="og:...">` |
-| Stylesheets | `react-helmet` or `ChunkExtractor` | React 19 native `<link rel="stylesheet" precedence="...">` |
-| Async script loading | `ChunkExtractor` or manual | React 19 native `<script async src="...">` |
-| Apollo Client state | `react_component_hash` | **Keep** `react_component_hash` (no migration path) |
-| Inline scripts (`dangerouslySetInnerHTML`) | `react_component_hash` | **Keep** `react_component_hash` (inline scripts not hoisted) |
-| `@loadable/component` chunks | `react_component_hash` + `ChunkExtractor` | Consider `React.lazy` + `Suspense` with streaming |
+| Use Case                                   | Before                                    | After                                                        |
+| ------------------------------------------ | ----------------------------------------- | ------------------------------------------------------------ |
+| Page title and meta tags                   | `react-helmet` + `react_component_hash`   | React 19 native `<title>`, `<meta>`                          |
+| Canonical URLs                             | `react-helmet` + `react_component_hash`   | React 19 native `<link rel="canonical">`                     |
+| Open Graph tags                            | `react-helmet` + `react_component_hash`   | React 19 native `<meta property="og:...">`                   |
+| Stylesheets                                | `react-helmet` or `ChunkExtractor`        | React 19 native `<link rel="stylesheet" precedence="...">`   |
+| Async script loading                       | `ChunkExtractor` or manual                | React 19 native `<script async src="...">`                   |
+| Apollo Client state                        | `react_component_hash`                    | **Keep** `react_component_hash` (no migration path)          |
+| Inline scripts (`dangerouslySetInnerHTML`) | `react_component_hash`                    | **Keep** `react_component_hash` (inline scripts not hoisted) |
+| `@loadable/component` chunks               | `react_component_hash` + `ChunkExtractor` | Consider `React.lazy` + `Suspense` with streaming            |
 
 ## Prerequisites
 

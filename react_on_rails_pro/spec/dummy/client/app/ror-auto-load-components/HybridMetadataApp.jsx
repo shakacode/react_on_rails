@@ -3,28 +3,31 @@
 import React, { Suspense } from 'react';
 
 /**
- * Async component that simulates data fetching for the page body.
- * Does NOT set any <title> or <meta> tags - metadata is handled by Rails.
+ * Delayed client component that demonstrates streamed body content while Rails
+ * owns the page metadata.
  */
-const AsyncProfileContent = async ({ name }) => {
-  if (typeof window === 'undefined') {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
-    });
-  }
-
+const HybridMetadataProfileContent = ({ name }) => {
   return (
     <div>
       <h2>Profile: {name}</h2>
-      <p>This content was streamed from the server via React Suspense.</p>
+      <p>This content resolved through a delayed lazy import inside a Suspense boundary.</p>
       <p>
-        The page title and meta description are set by the <strong>Rails controller</strong>, not by
-        this React component. They appear in the initial HTML &lt;head&gt; before any JavaScript
-        executes, making this approach ideal for SEO-critical streaming pages.
+        The page title and meta description are set by the <strong>Rails controller</strong>, not by this
+        React component. They appear in the initial HTML &lt;head&gt; before any JavaScript executes, making
+        this approach ideal for SEO-critical streaming pages.
       </p>
     </div>
   );
 };
+
+const AsyncProfileContent = React.lazy(
+  () =>
+    new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ default: HybridMetadataProfileContent });
+      }, 1000);
+    }),
+);
 
 /**
  * Demonstrates the hybrid approach: Rails-side metadata + streaming React body.
@@ -46,12 +49,12 @@ const HybridMetadataApp = ({ helloWorldData }) => {
     <div>
       <h1>Hybrid: Rails Metadata + Streaming Body</h1>
       <p>
-        This page sets its title and meta tags from the <strong>Rails controller</strong>, so they
-        appear in &lt;head&gt; from the very first byte of the HTTP response.
+        This page sets its title and meta tags from the <strong>Rails controller</strong>, so they appear in
+        &lt;head&gt; from the very first byte of the HTTP response.
       </p>
       <p>
-        The React component body below streams progressively via Suspense, but the metadata is
-        already in place for SEO crawlers.
+        The React component body below streams progressively via Suspense, but the metadata is already in
+        place for SEO crawlers.
       </p>
 
       <hr />

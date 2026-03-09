@@ -46,7 +46,7 @@ How to handle React Context and global state in an RSC world. Covers:
 - Why Context doesn't work in Server Components and what to do about it
 - The provider wrapper pattern (creating `'use client'` provider components)
 - Composing multiple providers without "provider hell"
-- Migrating Redux, Zustand, and Jotai to work alongside RSC
+- Migrating Redux to work alongside RSC, with guidance on where Zustand and Jotai fit
 - Using `React.cache()` as a server-side alternative to Context
 - Theme, auth, and i18n provider patterns
 
@@ -93,11 +93,11 @@ Before diving into the React patterns, understand how RSC maps to React on Rails
 
 **Three API changes per component.** Each component you migrate touches three layers:
 
-| Layer | Before | After |
-|-------|--------|-------|
-| ERB view helper | `react_component("Product", ...)` | `stream_react_component("Product", ...)` |
+| Layer           | Before                               | After                                                         |
+| --------------- | ------------------------------------ | ------------------------------------------------------------- |
+| ERB view helper | `react_component("Product", ...)`    | `stream_react_component("Product", ...)`                      |
 | JS registration | `ReactOnRails.register({ Product })` | `registerServerComponent({ Product })` (in all three bundles) |
-| Controller | Standard Rails controller | Add `include ReactOnRailsPro::Stream` |
+| Controller      | Standard Rails controller            | Add `include ReactOnRailsPro::Stream`                         |
 
 **Three webpack bundles.** RSC requires separate client, server, and RSC bundles. The `registerServerComponent` API behaves differently in each:
 
@@ -122,11 +122,11 @@ This approach lets you migrate incrementally, one component at a time, without e
 
 Before you start, audit your components using this classification:
 
-| Category | Criteria | Action |
-|----------|----------|--------|
-| **Server-ready** (green) | No hooks, no browser APIs, no event handlers | Remove `'use client'` -- these are Server Components by default |
-| **Refactorable** (yellow) | Mix of data fetching and interactivity | Split into a Server Component (data) + Client Component (interaction) |
-| **Client-only** (red) | Uses `useState`, `useEffect`, event handlers, browser APIs | Keep `'use client'` -- these remain Client Components |
+| Category                  | Criteria                                                   | Action                                                                |
+| ------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------- |
+| **Server-ready** (green)  | No hooks, no browser APIs, no event handlers               | Remove `'use client'` -- these are Server Components by default       |
+| **Refactorable** (yellow) | Mix of data fetching and interactivity                     | Split into a Server Component (data) + Client Component (interaction) |
+| **Client-only** (red)     | Uses `useState`, `useEffect`, event handlers, browser APIs | Keep `'use client'` -- these remain Client Components                 |
 
 ## Prerequisites
 

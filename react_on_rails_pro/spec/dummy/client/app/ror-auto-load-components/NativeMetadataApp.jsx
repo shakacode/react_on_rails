@@ -3,23 +3,12 @@
 import React, { Suspense } from 'react';
 
 /**
- * Async component that simulates data fetching and sets metadata upon completion.
+ * Delayed client component used to demonstrate metadata updates after a Suspense boundary resolves.
  *
- * When used with streaming (stream_react_component), this component triggers a
- * Suspense boundary: the shell renders first with the initial <title>, then this
- * content streams later and React 19 updates the document <title> on the client.
- *
- * When used with sync SSR (react_component), React renders everything at once
- * and the final <title> wins.
+ * React.lazy keeps this example valid inside a 'use client' module. Async
+ * function components are only supported for server components.
  */
-const AsyncProfileContent = async ({ name }) => {
-  // Simulate async data fetching (e.g., database query, API call)
-  if (typeof window === 'undefined') {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 1000);
-    });
-  }
-
+const NativeMetadataProfileContent = ({ name }) => {
   return (
     <>
       {/* React 19: this <title> is automatically hoisted to <head> */}
@@ -28,7 +17,7 @@ const AsyncProfileContent = async ({ name }) => {
 
       <div>
         <h2>Profile: {name}</h2>
-        <p>This content was loaded asynchronously on the server via React Suspense streaming.</p>
+        <p>This content resolved through a delayed lazy import inside a Suspense boundary.</p>
         <p>
           When this Suspense boundary resolved, React 19 updated the document title to &quot;
           {name}&apos;s Profile | React on Rails&quot; using native &lt;title&gt; hoisting.
@@ -37,6 +26,15 @@ const AsyncProfileContent = async ({ name }) => {
     </>
   );
 };
+
+const AsyncProfileContent = React.lazy(
+  () =>
+    new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({ default: NativeMetadataProfileContent });
+      }, 1000);
+    }),
+);
 
 /**
  * Demonstrates React 19's native document metadata hoisting.
@@ -60,7 +58,7 @@ const NativeMetadataApp = ({ helloWorldData }) => {
     <div>
       {/* Initial metadata - rendered in the shell (first streaming chunk) */}
       <title>Loading... | React on Rails</title>
-      <meta name="og:site_name" content="React on Rails Demo" />
+      <meta property="og:site_name" content="React on Rails Demo" />
 
       <h1>React 19 Native Document Metadata</h1>
       <p>
@@ -68,9 +66,8 @@ const NativeMetadataApp = ({ helloWorldData }) => {
         react-helmet. React automatically hoists them to the document &lt;head&gt;.
       </p>
       <p>
-        <strong>How it works:</strong> The initial title is &quot;Loading... | React on Rails&quot;.
-        Once the async content below loads, the title updates to &quot;{name}&apos;s Profile | React
-        on Rails&quot;.
+        <strong>How it works:</strong> The initial title is &quot;Loading... | React on Rails&quot;. Once the
+        async content below loads, the title updates to &quot;{name}&apos;s Profile | React on Rails&quot;.
       </p>
 
       <hr />
