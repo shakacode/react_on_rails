@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "open3"
 require "rainbow"
 require_relative "generator_messages"
 
@@ -85,16 +86,19 @@ module ReactOnRails
       private
 
       # Attempt to auto-install the Pro gem via bundle add.
+      # Captures bundler output to avoid interleaving with generator messages.
       # @return [Boolean] true if the gem was successfully installed
       def attempt_pro_gem_auto_install
         puts Rainbow("📝 Adding #{PRO_GEM_NAME} to Gemfile...").yellow
-        if Bundler.with_unbundled_env { system(PRO_GEM_AUTO_INSTALL_COMMAND) }
+        output, status = Bundler.with_unbundled_env { Open3.capture2e(PRO_GEM_AUTO_INSTALL_COMMAND) }
+        if status.success?
           # The gem is now in Gemfile/lockfile but not loaded in the current Ruby process.
           # Generator code that follows must not reference ReactOnRailsPro constants directly.
           mark_pro_gem_installed!
           return true
         end
 
+        puts output unless output.to_s.strip.empty?
         false
       end
 
@@ -316,16 +320,16 @@ module ReactOnRails
 
       def missing_server_config_transforms(content)
         checks = [
-          ["libraryTarget: 'commonjs2',", "libraryTarget: 'commonjs2',"],
-          ["function extractLoader", "function extractLoader"],
-          ["babelLoader.options.caller = { ssr: true }", "babelLoader.options.caller = { ssr: true }"],
-          ["serverWebpackConfig.target = 'node'", "serverWebpackConfig.target = 'node'"],
-          ["serverWebpackConfig.node = false", "serverWebpackConfig.node = false"],
-          ["default: configureServer", "default: configureServer"],
-          ["extractLoader export", "extractLoader,"]
+          "libraryTarget: 'commonjs2',",
+          "function extractLoader",
+          "babelLoader.options.caller = { ssr: true }",
+          "serverWebpackConfig.target = 'node'",
+          "serverWebpackConfig.node = false",
+          "default: configureServer",
+          "extractLoader,"
         ]
 
-        checks.filter_map { |label, pattern| label unless content.include?(pattern) }
+        checks.reject { |pattern| content.include?(pattern) }
       end
 
       def missing_server_client_import_transform
