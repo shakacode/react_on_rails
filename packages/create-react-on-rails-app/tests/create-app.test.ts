@@ -360,4 +360,16 @@ describe('createApp', () => {
     );
     expect(mockedExecLiveArgs).not.toHaveBeenCalled();
   });
+
+  it('exits early when local react_on_rails_pro path does not exist', () => {
+    const missingProGemPath = '/tmp/missing-react_on_rails_pro';
+    process.env.REACT_ON_RAILS_PRO_GEM_PATH = missingProGemPath;
+    mockedFs.existsSync.mockImplementation((targetPath) => targetPath !== missingProGemPath);
+
+    expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
+    expect(mockedLogError).toHaveBeenCalledWith(
+      `Local gem path from REACT_ON_RAILS_PRO_GEM_PATH does not exist: ${missingProGemPath}`,
+    );
+    expect(mockedExecLiveArgs).not.toHaveBeenCalled();
+  });
 });

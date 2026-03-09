@@ -102,4 +102,9 @@ grep -q "hello_server" "$APP_RSC_RSPACK_DIR/config/routes.rb"
 grep -q "\"@rspack/core\"" "$APP_RSC_RSPACK_DIR/package.json"
 
 echo "Smoke test passed."
-echo "Generated apps left in: $WORKDIR"
+if [[ "${KEEP_WORKDIR:-0}" == "1" ]]; then
+  echo "Generated apps left in: $WORKDIR"
+else
+  rm -rf "$WORKDIR"
+  echo "Cleaned up temp dir: $WORKDIR"
+fi
