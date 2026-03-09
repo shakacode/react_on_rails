@@ -1880,26 +1880,36 @@ describe InstallGenerator, type: :generator do
   context "when using --pro flag without Pro gem installed" do
     let(:install_generator) { described_class.new([], { pro: true }) }
 
-    specify "missing_pro_gem? returns true and error mentions --pro flag" do
+    before do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(install_generator).to receive(:system).with("bundle add react_on_rails_pro --strict").and_return(false)
+    end
 
+    specify "missing_pro_gem? returns true and error mentions --pro flag" do
       expect(install_generator.send(:missing_pro_gem?)).to be true
+      expect(install_generator).to have_received(:system).with("bundle add react_on_rails_pro --strict")
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("--pro")
       expect(error_text).to include("react_on_rails_pro")
-      expect(error_text).to include("Try Pro free!")
+      expect(error_text).to include("More info:")
     end
   end
 
   context "when using --rsc flag without Pro gem installed" do
     let(:install_generator) { described_class.new([], { rsc: true }) }
 
-    specify "missing_pro_gem? returns true and error mentions --rsc flag" do
+    before do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(install_generator).to receive(:system).with("bundle add react_on_rails_pro --strict").and_return(false)
+    end
 
+    specify "missing_pro_gem? returns true and error mentions --rsc flag" do
       expect(install_generator.send(:missing_pro_gem?)).to be true
+      expect(install_generator).to have_received(:system).with("bundle add react_on_rails_pro --strict")
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("--rsc")
     end
