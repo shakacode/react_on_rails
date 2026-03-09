@@ -5,8 +5,9 @@ export function wrapInScriptTags(scriptId: string, scriptBody: string, nonce?: s
   }
 
   // Sanitize nonce to prevent attribute injection attacks
-  // CSP nonces should be base64 strings, so only allow alphanumeric, +, /, =, -, and _
-  const sanitizedNonce = nonce?.replace(/[^a-zA-Z0-9+/=_-]/g, '');
+  // CSP nonces should be base64/base64url-like strings with optional trailing padding.
+  const nonceWithAllowedCharsOnly = nonce?.replace(/[^a-zA-Z0-9+/=_-]/g, '');
+  const sanitizedNonce = nonceWithAllowedCharsOnly?.match(/^[a-zA-Z0-9+/_-]+={0,2}$/)?.[0];
   const nonceAttr = sanitizedNonce ? ` nonce="${sanitizedNonce}"` : '';
 
   return `
