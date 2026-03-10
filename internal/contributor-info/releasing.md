@@ -1,63 +1,161 @@
 # Install and Release
 
-We're releasing this as a unified release with 5 packages total. We keep the version numbers in sync across all packages using unified versioning.
+We're releasing this as a unified release with 6 packages total. We keep the version numbers in sync across all packages using unified versioning.
 
 ## Testing the Gem before Release from a Rails App
 
 See [Contributing](https://github.com/shakacode/react_on_rails/tree/master/CONTRIBUTING.md)
 
-## Releasing a New Version
+## Release Process
 
-Run `rake -D release` to see instructions on how to release via the rake task.
+### 1. Update the Changelog (BEFORE releasing)
 
-### Release Command
+**Always update CHANGELOG.md before running the release task.** The release task reads the version from CHANGELOG.md and automatically creates a GitHub release from the changelog section.
+
+1. Ensure all desired changes are merged to `master` branch
+2. Run `/update-changelog release` (or `rc` or `beta` for prereleases) to:
+   - Find merged PRs missing from the changelog
+   - Add changelog entries under the appropriate category headings
+   - Auto-compute the next version based on changes (breaking -> major, features -> minor, fixes -> patch)
+   - Stamp the version header (e.g., `### [16.5.0] - 2026-03-08`)
+3. Review the changelog entries and verify the computed version
+4. Commit and push CHANGELOG.md
+
+If you forget this step, the release task will print a warning and the GitHub release will need to be created manually afterward using `sync_github_release`.
+
+#### Why changelog comes BEFORE the release
+
+- `rake release` automatically creates a GitHub release if a changelog section exists -- no separate `sync_github_release` step needed
+- The release task warns if no changelog section is found for the target version
+- A premature version header (if release fails) is harmless -- you'll release eventually
+- A missing changelog after release means the GitHub release must be created manually
+
+### 2. Run the Release Task
+
+The simplest way to release is with no arguments -- the task reads the version from CHANGELOG.md:
 
 ```bash
-rake release[version,dry_run,registry,skip_push]
+# Recommended: reads version from CHANGELOG.md (requires step 1)
+bundle exec rake release
+
+# For a specific version (overrides CHANGELOG.md detection)
+bundle exec rake "release[16.2.0]"
+
+# For a pre-release version (note: use period, not dash)
+bundle exec rake "release[16.2.0.beta.1]"  # Creates npm package 16.2.0-beta.1
+
+# For a release candidate
+bundle exec rake "release[16.5.0.rc.0]"
+
+# Dry run to test without publishing
+bundle exec rake "release[16.2.0,true]"
+
+# Override version policy checks (monotonic + changelog/bump consistency)
+RELEASE_VERSION_POLICY_OVERRIDE=true bundle exec rake "release[16.2.0]"
+bundle exec rake "release[16.2.0,false,true]"
 ```
 
-**Arguments:**
+When called with no arguments, `rake release`:
 
-1. **`version`** (required): Version bump type or explicit version
+1. Reads the first versioned header from CHANGELOG.md (e.g., `### [16.5.0]`)
+2. Compares it to the current gem version
+3. If the changelog version is newer, prompts for confirmation and uses it
+4. If no new version is found, falls back to a patch bump
+
+Dry runs use a temporary git worktree so version bumps and installs do not modify your current checkout.
+
+`rake release` validates release-version policy before publishing:
+
+- Target version must be greater than the latest tagged release.
+- If the versioned target changelog section exists (`### [X.Y.Z...]`; not `Unreleased`), it maps to expected bump type:
+  - Breaking changes => major bump
+  - Added/New Features/Features/Enhancements => minor bump
+  - Fixed/Fixes/Bug Fixes/Security/Improved/Deprecated => patch bump
+  - Other headings => no inferred bump level (consistency check is skipped)
+
+Use override only when needed:
+
+- `RELEASE_VERSION_POLICY_OVERRIDE=true`
+- Or task arg override (`bundle exec rake "release[..., ..., true]"`)
+
+**Full argument list:**
+
+```bash
+bundle exec rake "release[version,dry_run,override_version_policy]"
+```
+
+1. **`version`** (optional): Version bump type or explicit version
    - Bump types: `patch`, `minor`, `major`
    - Explicit: `16.2.0`
    - Pre-release: `16.2.0.beta.1` (rubygem format with dots, converted to `16.2.0-beta.1` for NPM)
+   - Empty (auto): use latest CHANGELOG.md version if newer, else patch bump
 
-2. **`dry_run`** (optional): `true` to preview changes without releasing
-   - Default: `false`
+2. **`dry_run`** (optional): `true` to preview changes without releasing (default: `false`)
 
-3. **`registry`** (optional): Publishing registry for testing
-   - `verdaccio`: Publish all NPM packages to local Verdaccio (skips RubyGems)
-   - `npm`: Normal release to npmjs.org + rubygems.org (default)
+3. **`override_version_policy`** (optional): `true` to override version policy checks (default: `false`)
 
-4. **`skip_push`** (optional): Skip git push to remote
-   - `skip_push`: Don't push commits/tags to remote
-   - Default: pushes to remote
+**Environment variables:**
+
+```bash
+VERBOSE=1                    # Enable verbose logging (shows all output)
+NPM_OTP=<code>               # Provide NPM one-time password (reused for all NPM publishes)
+RUBYGEMS_OTP=<code>          # Provide RubyGems one-time password (reused for both gems)
+RELEASE_VERSION_POLICY_OVERRIDE=true # Override release version policy checks
+GEM_RELEASE_MAX_RETRIES=<n>  # Override max retry attempts (default: 3)
+```
 
 **Examples:**
 
 ```bash
-rake release[patch]                          # Bump patch version (16.1.1 → 16.1.2)
-rake release[minor]                          # Bump minor version (16.1.1 → 16.2.0)
-rake release[major]                          # Bump major version (16.1.1 → 17.0.0)
-rake release[16.2.0]                         # Set explicit version
-rake release[16.2.0.beta.1]                  # Set pre-release version (→ 16.2.0-beta.1 for NPM)
-rake release[16.2.0,true]                    # Dry run to preview changes
-rake release[16.2.0,false,verdaccio]         # Test with local Verdaccio
-rake release[patch,false,npm,skip_push]      # Release but don't push to GitHub
+bundle exec rake release                                  # Use CHANGELOG.md version or patch bump
+bundle exec rake "release[patch]"                         # Bump patch version (16.1.1 → 16.1.2)
+bundle exec rake "release[minor]"                         # Bump minor version (16.1.1 → 16.2.0)
+bundle exec rake "release[major]"                         # Bump major version (16.1.1 → 17.0.0)
+bundle exec rake "release[16.2.0]"                        # Set explicit version
+bundle exec rake "release[16.2.0.beta.1]"                 # Set pre-release version (→ 16.2.0-beta.1 for NPM)
+bundle exec rake "release[patch,true]"                    # Dry run
+VERBOSE=1 bundle exec rake "release[patch]"               # Release with verbose logging
+NPM_OTP=123456 RUBYGEMS_OTP=789012 bundle exec rake "release[patch]"  # Skip OTP prompts
 ```
+
+### 3. What the Release Task Does
+
+The `rake release` task automatically:
+
+1. **Validates release prerequisites**:
+   - Checks for uncommitted changes (will abort if found)
+   - Verifies NPM authentication (will run `npm login` if needed)
+   - Warns if CHANGELOG.md section is missing for the target version
+   - Validates version policy (monotonic + changelog/bump consistency)
+2. **Pulls latest changes** from the repository
+3. **Bumps version numbers** in:
+   - `react_on_rails/lib/react_on_rails/version.rb` (Ruby gem version)
+   - All `package.json` files (npm package versions - converted from Ruby format)
+   - Pro version files
+4. **Updates Gemfile.lock files** across the monorepo
+5. **Commits, tags, and pushes** all version changes
+6. **Publishes to npm** (requires 2FA token):
+   - `react-on-rails`
+   - `react-on-rails-pro`
+   - `react-on-rails-pro-node-renderer`
+   - `create-react-on-rails-app`
+7. **Publishes to RubyGems** (requires 2FA token):
+   - `react_on_rails`
+   - `react_on_rails_pro`
+8. **Creates GitHub release** from CHANGELOG.md (if the matching section exists)
 
 ### What Gets Released
 
-The release task publishes 5 packages with unified versioning:
+The release task publishes 6 packages with unified versioning:
 
 **PUBLIC (npmjs.org + rubygems.org):**
 
 1. **react-on-rails** - NPM package
 2. **react-on-rails-pro** - NPM package
 3. **react-on-rails-pro-node-renderer** - NPM package
-4. **react_on_rails** - RubyGem
-5. **react_on_rails_pro** - RubyGem
+4. **create-react-on-rails-app** - NPM package
+5. **react_on_rails** - RubyGem
+6. **react_on_rails_pro** - RubyGem
 
 ### Version Synchronization
 
@@ -74,8 +172,9 @@ The task updates versions in all the following files:
 **Pro package:**
 
 - `react_on_rails_pro/lib/react_on_rails_pro/version.rb` (VERSION only, not PROTOCOL_VERSION)
-- `react_on_rails_pro/package.json` (node-renderer)
 - `packages/react-on-rails-pro/package.json` (+ dependency version)
+- `packages/react-on-rails-pro-node-renderer/package.json`
+- `packages/create-react-on-rails-app/package.json`
 - `react_on_rails_pro/Gemfile.lock`
 - `react_on_rails_pro/spec/dummy/Gemfile.lock`
 
@@ -84,74 +183,99 @@ The task updates versions in all the following files:
 - `react_on_rails_pro.gemspec` dynamically references `ReactOnRails::VERSION`
 - `react-on-rails-pro` NPM dependency is pinned to exact version (e.g., `"react-on-rails": "16.2.0"`)
 
-### Pre-release Versions
+### 4. Version Format
 
-For pre-release versions, the gem version format is automatically converted to NPM semver format:
+**Important:** Use Ruby gem version format (no dashes) when passing versions to the rake task:
 
-- Gem: `3.0.0.beta.1`
-- NPM: `3.0.0-beta.1`
+- Correct: `16.1.0`, `16.2.0.beta.1`, `16.0.0.rc.2`
+- Wrong: `16.1.0-beta.1`, `16.0.0-rc.2`
+
+The task automatically converts Ruby gem format to npm semver format:
+
+- Ruby: `16.2.0.beta.1` -> npm: `16.2.0-beta.1`
+- Ruby: `16.0.0.rc.2` -> npm: `16.0.0-rc.2`
+
+**CHANGELOG.md headers** use RubyGems dot format (without `v` prefix):
+
+- `### [16.5.0.rc.1]` -- correct (matches gem version format)
+
+### 5. During the Release
+
+1. When prompted for **npm OTP**, enter your 2FA code from your authenticator app
+2. When prompted for **RubyGems OTP**, enter your 2FA code
+3. If using `rake release` with no version, confirm the version detected from CHANGELOG.md (or the computed patch version)
+4. The script will automatically commit and push version bumps
+5. The script will automatically create a GitHub release (if CHANGELOG.md section exists)
+
+### 6. After Release
+
+1. Verify the release on:
+   - [npm](https://www.npmjs.com/package/react-on-rails)
+   - [RubyGems](https://rubygems.org/gems/react_on_rails)
+   - [GitHub releases](https://github.com/shakacode/react_on_rails/releases)
+
+2. If the changelog was updated before release (recommended), verify the GitHub release was auto-created with the correct notes.
+
+3. If the changelog was NOT updated before release, update it now:
+
+   **Option A - Use Claude Code (recommended):**
+
+   Run `/update-changelog` to analyze commits, write changelog entries, and create a PR. Then sync the GitHub release:
+
+   ```bash
+   bundle exec rake "sync_github_release[16.5.0]"
+   ```
+
+   **Option B - Manual (headers only, you must write entries):**
+
+   ```bash
+   bundle exec rake "update_changelog[16.5.0]"
+   # Write entries manually, then:
+   git commit -a -m 'Update CHANGELOG.md'
+   git push
+   bundle exec rake "sync_github_release[16.5.0]"
+   ```
+
+### Syncing GitHub Releases Manually
+
+If the automatic GitHub release creation was skipped (e.g., CHANGELOG.md section was missing during release), you can create it manually after updating the changelog:
+
+1. Update `CHANGELOG.md` with the published version section
+2. Commit and push `CHANGELOG.md`
+3. Run:
+
+```bash
+# Stable
+bundle exec rake "sync_github_release[16.5.0]"
+
+# Prerelease
+bundle exec rake "sync_github_release[16.5.0.rc.1]"
+
+# Dry run
+bundle exec rake "sync_github_release[16.5.0,true]"
+```
+
+`sync_github_release` reads release notes from the matching `CHANGELOG.md` section and creates/updates the GitHub release for the corresponding tag.
 
 ### Pre-Release Checklist
 
 Before running the release command, verify:
 
-1. **NPM authentication**: Run `npm whoami` to confirm you're logged in
+1. **GitHub CLI**: Run `gh auth login` and ensure your account/token has write access to the repository (required for automatic GitHub release creation)
+
+2. **NPM authentication**: Run `npm whoami` to confirm you're logged in
    - If not logged in, the release script will automatically run `npm login` for you
 
-2. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
+3. **RubyGems authentication**: Ensure you have valid credentials for `gem push`
 
-3. **No uncommitted changes**: Run `git status` to verify clean working tree
-
-### Release Process
-
-When you run `rake release[X.Y.Z]`, the task will:
-
-1. Check for uncommitted changes (will abort if found)
-2. Verify NPM authentication (will run `npm login` if needed)
-3. Pull latest changes from the remote repository
-4. Clean up example directories
-5. Bump the gem version in `react_on_rails/lib/react_on_rails/version.rb`
-6. Update all package.json files with the new version
-7. Update the Pro package's dependency on react-on-rails
-8. Update the dummy app's Gemfile.lock
-9. Commit all version changes with message "Bump version to X.Y.Z"
-10. Create a git tag `vX.Y.Z`
-11. Push commits and tags to the remote repository
-12. Publish `react-on-rails` to NPM (requires 2FA token)
-13. Publish `react-on-rails-pro` to NPM (requires 2FA token)
-14. Publish `react_on_rails` to RubyGems (requires 2FA token)
+4. **No uncommitted changes**: Run `git status` to verify clean working tree
 
 ### Two-Factor Authentication
 
 You'll need to enter OTP tokens when prompted:
 
-- Once for publishing `react-on-rails` to NPM
-- Once for publishing `react-on-rails-pro` to NPM
-- Once for publishing `react_on_rails` to RubyGems
-
-### Post-Release Steps
-
-After a successful release, update the changelog using one of these options:
-
-**Option A - Use Claude Code (recommended):**
-
-Run the `/update-changelog` command in Claude Code. This will analyze commits, write changelog entries, and create a PR automatically.
-
-**Option B - Manual (headers only, you must write entries):**
-
-1. Update the CHANGELOG.md headers:
-
-   ```bash
-   bundle exec rake update_changelog
-   ```
-
-   Note: This only adds version headers and links. You must write the actual changelog entries manually.
-
-2. Commit and push:
-   ```bash
-   git commit -a -m 'Update CHANGELOG.md'
-   git push
-   ```
+- Once for publishing `react-on-rails` to NPM (reused for subsequent NPM packages if valid)
+- Once for publishing `react_on_rails` to RubyGems (reused for `react_on_rails_pro` if valid)
 
 ## Requirements
 
@@ -183,35 +307,15 @@ The script automatically detects and switches Ruby versions when needed:
 
 This task depends on the `gem-release` Ruby gem, which is installed via `bundle install`.
 
-## Testing with Verdaccio
+## Testing with Dry Run
 
-Before releasing to production, test the release process locally:
+Before releasing to production, always preview with a dry run:
 
-1. Install and start Verdaccio:
+```bash
+bundle exec rake "release[16.5.0,true]"
+```
 
-   ```bash
-   npm install -g verdaccio
-   verdaccio
-   ```
-
-2. Run release with verdaccio registry:
-
-   ```bash
-   rake release[patch,false,verdaccio]
-   ```
-
-3. This will:
-   - Publish all 3 NPM packages to local Verdaccio
-   - Skip RubyGem publishing
-   - Update version files (revert manually after testing)
-
-4. Test installing from Verdaccio:
-   ```bash
-   npm set registry http://localhost:4873/
-   npm install react-on-rails@16.2.0
-   # Reset when done:
-   npm config delete registry
-   ```
+This uses a temporary git worktree to show exactly what would be updated without making any changes.
 
 ## Troubleshooting
 
@@ -220,7 +324,7 @@ Before releasing to production, test the release process locally:
 Always test with a dry run before actually releasing:
 
 ```bash
-rake release[16.2.0,true]
+bundle exec rake "release[16.2.0,true]"
 ```
 
 This shows you exactly what would be updated without making any changes.
@@ -246,9 +350,14 @@ If the release fails partway through (e.g., during NPM publish):
 2. If the git tag was created but packages weren't published:
    - Delete the tag: `git tag -d vX.Y.Z && git push origin :vX.Y.Z`
    - Revert the version commit: `git reset --hard HEAD~1 && git push -f`
-   - Start over with `rake release[X.Y.Z]`
+   - Start over with `bundle exec rake "release[X.Y.Z]"`
 
-3. If some packages were published but not others:
+3. If GitHub release creation fails after successful publishing:
+   - Fix GitHub auth (`gh auth login`) or permissions
+   - Ensure `CHANGELOG.md` has matching header `### [X.Y.Z]`
+   - Rerun only: `bundle exec rake "sync_github_release[X.Y.Z]"`
+
+4. If some packages were published but not others:
    - You can manually publish the missing packages:
      ```bash
      cd packages/react-on-rails && pnpm version X.Y.Z && pnpm publish
@@ -259,7 +368,7 @@ If the release fails partway through (e.g., during NPM publish):
 
 ## Version History
 
-Running `rake release[X.Y.Z]` will create a commit that looks like this:
+Running `bundle exec rake "release[X.Y.Z]"` will create a commit that looks like this:
 
 ```
 commit abc123...

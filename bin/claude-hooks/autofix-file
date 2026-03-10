@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Claude Code PostToolUse hook: auto-fix a single file after Edit/Write.
+# Runs Prettier (JS/TS/JSON/MD/YAML) or RuboCop -A (Ruby) depending on extension.
+#
+# Claude Code pipes a JSON object on stdin with tool_input.file_path.
+# Falls back to $1 for manual testing.
+set -euo pipefail
+
+source "$(dirname "$0")/../lefthook/ensure-mise"
+
+# Extract file_path from stdin JSON (Claude Code PostToolUse payload)
+if [ -t 0 ]; then
+  # No stdin (manual invocation) — use $1
+  FILE="${1:-}"
+else
+  INPUT="$(cat)"
+  FILE="$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))" 2>/dev/null || true)"
+fi
+
+if [ -z "$FILE" ]; then
+  exit 0
+fi
+
+# Skip if file doesn't exist (e.g., deleted)
+if [ ! -f "$FILE" ]; then
+  exit 0
+fi
+
+# Resolve to repo-relative path
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+REL_PATH="${FILE#"$REPO_ROOT/"}"
+
+case "$REL_PATH" in
+  *.rb|*.rake|*.ru)
+    bundle exec rubocop -A --force-exclusion -- "$REL_PATH" 2>&1 | tail -3
+    ;;
+  *.js|*.jsx|*.ts|*.tsx|*.json|*.md|*.yml|*.yaml)
+    if [[ "$REL_PATH" == react_on_rails_pro/* ]]; then
+      PRO_REL="${REL_PATH#react_on_rails_pro/}"
+      (cd react_on_rails_pro && pnpm exec prettier --write "$PRO_REL" 2>&1 | tail -1)
+    else
+      pnpm exec prettier --write "$REL_PATH" 2>&1 | tail -1
+    fi
+    ;;
+esac

@@ -12,7 +12,7 @@ During this transition:
 
 ---
 
-- [internal/contributor-info/Releasing](./internal/contributor-info/releasing.md) for instructions on releasing.
+- [internal/contributor-info/Releasing](./internal/contributor-info/releasing.md) for instructions on releasing. Key workflow: update CHANGELOG.md **before** releasing (run `/update-changelog release`), then `rake release` reads the version and auto-creates the GitHub release.
 - [internal/contributor-info/pull-requests](./internal/contributor-info/pull-requests.md)
 - [internal/contributor-info/rbs-type-signatures](./internal/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
 - See other docs in [internal/contributor-info](./internal/contributor-info)
