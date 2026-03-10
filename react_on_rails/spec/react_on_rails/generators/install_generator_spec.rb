@@ -1880,19 +1880,21 @@ describe InstallGenerator, type: :generator do
   context "when using --pro flag without Pro gem installed" do
     let(:install_generator) { described_class.new([], { pro: true }) }
     let(:expected_pro_version) { Gem::Version.new(ReactOnRails::VERSION).release.to_s }
+    let(:fake_pid) { 12_345 }
 
     before do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
-      allow(Open3).to receive(:capture2e).with("bundle add react_on_rails_pro --strict")
-                                         .and_return(["", instance_double(Process::Status, success?: false)])
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+      allow(install_generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: false))
     end
 
     specify "missing_pro_gem? returns true and error mentions --pro flag" do
       expect(install_generator.send(:missing_pro_gem?)).to be true
       expect(Bundler).to have_received(:with_unbundled_env)
-      expect(Open3).to have_received(:capture2e).with("bundle add react_on_rails_pro --strict")
+      expect(Process).to have_received(:spawn)
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("--pro")
       expect(error_text).to include("react_on_rails_pro")
@@ -1903,19 +1905,21 @@ describe InstallGenerator, type: :generator do
 
   context "when using --rsc flag without Pro gem installed" do
     let(:install_generator) { described_class.new([], { rsc: true }) }
+    let(:fake_pid) { 12_345 }
 
     before do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
-      allow(Open3).to receive(:capture2e).with("bundle add react_on_rails_pro --strict")
-                                         .and_return(["", instance_double(Process::Status, success?: false)])
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+      allow(install_generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: false))
     end
 
     specify "missing_pro_gem? returns true and error mentions --rsc flag" do
       expect(install_generator.send(:missing_pro_gem?)).to be true
       expect(Bundler).to have_received(:with_unbundled_env)
-      expect(Open3).to have_received(:capture2e).with("bundle add react_on_rails_pro --strict")
+      expect(Process).to have_received(:spawn)
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("--rsc")
     end
@@ -1923,13 +1927,15 @@ describe InstallGenerator, type: :generator do
 
   context "when auto-installing Pro gem succeeds" do
     let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:fake_pid) { 12_345 }
 
     before do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
-      allow(Open3).to receive(:capture2e).with("bundle add react_on_rails_pro --strict")
-                                         .and_return(["", instance_double(Process::Status, success?: true)])
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+      allow(install_generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: true))
 
       # Simulate stale memoized value from an earlier check.
       install_generator.instance_variable_set(:@pro_gem_installed, false)
@@ -1938,8 +1944,40 @@ describe InstallGenerator, type: :generator do
     specify "missing_pro_gem? marks memoized pro_gem_installed? state as installed" do
       expect(install_generator.send(:missing_pro_gem?)).to be false
       expect(Bundler).to have_received(:with_unbundled_env)
-      expect(Open3).to have_received(:capture2e).with("bundle add react_on_rails_pro --strict")
+      expect(Process).to have_received(:spawn)
       expect(install_generator.instance_variable_get(:@pro_gem_installed)).to be true
+    end
+  end
+
+  context "when auto-install times out" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+    let(:fake_pid) { 12_345 }
+
+    before do
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+      allow(install_generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(nil)
+    end
+
+    specify "missing_pro_gem? returns true with timeout message" do
+      expect(install_generator.send(:missing_pro_gem?)).to be true
+    end
+  end
+
+  context "when auto-install raises an error" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+      allow(Bundler).to receive(:with_unbundled_env).and_raise(Errno::ENOENT, "bundle not found")
+    end
+
+    specify "missing_pro_gem? returns true and handles error gracefully" do
+      expect(install_generator.send(:missing_pro_gem?)).to be true
     end
   end
 

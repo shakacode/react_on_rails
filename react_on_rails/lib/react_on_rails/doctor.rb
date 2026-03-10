@@ -525,8 +525,8 @@ module ReactOnRails
       check_duplicate_packages(has_base, has_pro)
       check_pro_gem_package_mismatch(is_pro_gem, has_base, has_pro)
       check_pro_package_without_gem(is_pro_gem, has_pro)
-    rescue StandardError
-      # Ignore errors — other checks already report package.json issues
+    rescue StandardError => e
+      checker.add_warning("⚠️  Pro package consistency check failed: #{e.message}")
     end
 
     def check_duplicate_packages(has_base, has_pro)
@@ -558,7 +558,7 @@ module ReactOnRails
     end
 
     def check_pro_package_without_gem(is_pro_gem, has_pro)
-      return unless !is_pro_gem && has_pro
+      return if is_pro_gem || !has_pro
 
       checker.add_error(<<~MSG.strip)
         🚫 'react-on-rails-pro' npm package is installed but the Pro gem is not.
