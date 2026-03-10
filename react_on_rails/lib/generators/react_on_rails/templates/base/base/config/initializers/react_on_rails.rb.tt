@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # React on Rails configuration
-# See https://github.com/shakacode/react_on_rails/blob/master/docs/configuration/README.md
+# See https://github.com/shakacode/react_on_rails/blob/master/docs/oss/configuration/README.md
 # for complete documentation of all configuration options.
 
 ReactOnRails.configure do |config|
@@ -43,7 +43,7 @@ ReactOnRails.configure do |config|
   # ALTERNATIVE APPROACH: Uncomment below AND configure ReactOnRails::TestHelper
   # - Provides explicit control over test asset compilation timing
   # - Requires adding ReactOnRails::TestHelper to spec/rails_helper.rb
-  # - See: https://github.com/shakacode/react_on_rails/blob/master/docs/building-features/testing-configuration.md
+  # - See: https://github.com/shakacode/react_on_rails/blob/master/docs/oss/building-features/testing-configuration.md
   #
   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 
@@ -62,5 +62,5 @@ ReactOnRails.configure do |config|
   # - Custom rendering extensions
   # - And more...
   #
-  # See: https://github.com/shakacode/react_on_rails/blob/master/docs/configuration/README.md
+  # See: https://github.com/shakacode/react_on_rails/blob/master/docs/oss/configuration/README.md
 end

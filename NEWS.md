@@ -21,7 +21,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 - 2017-04-09: 8.0.0 beta work to include webpacker_lite gem has begun. See [#786](https://github.com/shakacode/react_on_rails/issues/786).
 - 2017-04-03: 6.9.3 Released! Props rendered in JSON script tag. Page size is smaller now due to less escaping!
 - 2017-03-06: Updated to Webpack v2!
-- 2017-03-02: Demo of internationalization (i18n) is live at [reactrails.com](https://reactrails.com/). Docs [here](docs/building-features/i18n.md).
+- 2017-03-02: Demo of internationalization (i18n) is live at [reactrails.com](https://reactrails.com/). Docs [here](docs/oss/building-features/i18n.md).
 - 2017-02-28: See [discussions here on Webpacker](https://github.com/rails/webpacker/issues/139) regarding how Webpacker will allow React on Rails to avoid using the asset pipeline in the near future.
 - 2017-02-28: Upgrade to Webpack v2 or use the `--bail` option in your Webpack script for test and production builds. See the discussion on [PR #730](https://github.com/shakacode/react_on_rails/pull/730).
 - 2016-11-03: Spoke at [LA Ruby: "React on Rails: Why, What, and How?"](http://www.meetup.com/laruby/events/234825187/). [Video and pictures in this article](https://blog.shakacode.com/my-react-on-rails-talk-at-the-la-ruby-rails-meetup-november-10-2016-eaaa83aff800#.ej6h4eglp).
@@ -55,7 +55,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
   3. Support for Turbolinks 5!
 - There was a fatal error when using the latest version of Redux for server rendering. See [Redux #1335](https://github.com/reduxjs/redux/issues/1335). See [diff 3.1.6...3.1.4](https://github.com/reduxjs/redux/commit/e2e14d26f09ca729ae0555442f50fcfc45bfb423#diff-1fdf421c05c1140f6d71444ea2b27638). Workaround for server rendering: Use Redux 3.1.7 or upgrade to React On Rails v2.3.0. [this commit](https://github.com/shakacode/react_on_rails/commit/59f1e68d3d233775e6abc63bff180ea59ac2d79e) on [PR #244](https://github.com/shakacode/react_on_rails/pull/244/).
 - 2.x Highlights:
-  1. Fixed a **critical** problem with TurboLinks. Be sure to see [turbolinks docs](docs/building-features/turbolinks.md) for more information on how to debug TurboLinks issues.
+  1. Fixed a **critical** problem with TurboLinks. Be sure to see [turbolinks docs](docs/oss/building-features/turbolinks.md) for more information on how to debug TurboLinks issues.
   2. Provides a convenient helper to ensure that JavaScript assets are compiled before running tests.
 - React on Rails does not yet have _generator_ support for building new apps that use CSS modules and hot reloading via the Rails server as is demonstrated in the [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/). _We do support this, but we don't generate the code._ If you did generate a fresh app from react_on_rails and want to move to CSS Modules, then see [PR 175: Babel 6 / CSS Modules / Rails hot reloading](https://github.com/shakacode/react-webpack-rails-tutorial/pull/175). Note, while there are probably fixes after this PR was accepted, this has the majority of the changes. See [the tutorial](https://github.com/shakacode/react-webpack-rails-tutorial/#news) for more information. Ping us if you want to help!
 - Be sure to read our article [The React on Rails Doctrine](https://medium.com/@railsonmaui/the-react-on-rails-doctrine-3c59a778c724).
