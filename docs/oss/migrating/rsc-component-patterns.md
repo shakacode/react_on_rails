@@ -431,7 +431,7 @@ export default function Comments({ commentsPromise }) {
 | Data fetching (database, API)                     | Server         | Direct backend access, no bundle cost |
 | Rendering static/display-only content             | Server         | No JavaScript shipped                 |
 | Using server-only secrets (API keys)              | Server         | Never exposed to client               |
-| Heavy dependencies (markdown parsers, formatters) | Server         | Dependencies stay off client bundle   |
+| Heavy dependencies (Markdown parsers, formatters) | Server         | Dependencies stay off client bundle   |
 
 ## Common Mistakes
 
