@@ -1,6 +1,6 @@
 # Error Reporting and Tracing
 
-[Please see this documentation for versions before 4.0.0](https://github.com/shakacode/react_on_rails_pro/blob/ac2afba93c672f49f16bf967d6accbed0fda386e/docs/node-renderer/error-reporting-and-tracing.md).
+For versions before 4.0.0, error reporting was configured via `honeybadgerApiKey` and `sentryDsn` options which are now deprecated. See the current integration approach below.
 
 To integrate with error reporting and tracing services,
 you need a custom configuration script as described in [Node Renderer JavaScript Configuration](./js-configuration.md).
@@ -49,8 +49,7 @@ To enable Sentry Tracing:
 ## Other services
 
 You can create your own integrations in the same way as the provided ones.
-If you have access to the React on Rails Pro repository,
-you can use [their implementations](https://github.com/shakacode/react_on_rails_pro/tree/master/packages/node-renderer/src/integrations) as examples.
+You can use [the built-in implementations](https://github.com/shakacode/react_on_rails/tree/master/packages/react-on-rails-pro-node-renderer/src/integrations) as examples.
 Import these functions from `react-on-rails-pro-node-renderer/integrations/api`:
 
 ### Error reporting services

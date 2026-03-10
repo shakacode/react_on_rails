@@ -7,9 +7,9 @@ Node rendering and caching performance enhancements for [React on Rails](https:/
 The best way to see how React on Rails Pro works is to install this repo locally and take a look at
 the example application:
 
-[spec/dummy](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/README.md)
+[spec/dummy](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/README.md)
 
-1. Uses a @rails/webpacker standard configuration.
+1. Uses a Shakapacker standard configuration.
 1. Has pages that demonstrate:
    1. caching
    2. loadable-components
