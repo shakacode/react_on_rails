@@ -168,7 +168,8 @@ export default function ProductPage({ productId }) {
 
 ```jsx
 // ProductPage.jsx -- Server Component (no directive)
-// Data fetching patterns are covered in detail in Part 4: Data Fetching Migration
+// Generic RSC example: in React on Rails, this data would typically come from
+// Rails props or async props. See Part 4 for the recommended fetching patterns.
 export default async function ProductPage({ productId }) {
   const product = await getProduct(productId);
 
