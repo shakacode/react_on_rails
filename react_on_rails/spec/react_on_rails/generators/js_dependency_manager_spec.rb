@@ -14,9 +14,11 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       attr_accessor :options
 
       # Mock methods required by JsDependencyManager
-      def add_npm_dependencies(_packages, dev: false)
+      def add_npm_dependencies(packages, dev: false)
         @add_npm_dependencies_called = true
         @add_npm_dependencies_dev = dev
+        @add_npm_dependencies_calls ||= []
+        @add_npm_dependencies_calls << { packages: packages, dev: dev }
         @add_npm_dependencies_result
       end
 
@@ -49,6 +51,10 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       def add_npm_dependencies_dev?
         @add_npm_dependencies_dev
+      end
+
+      def add_npm_dependencies_calls
+        @add_npm_dependencies_calls ||= []
       end
 
       attr_writer :package_json
@@ -126,6 +132,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     it "defines SWC_DEPENDENCIES" do
       expect(ReactOnRails::Generators::JsDependencyManager::SWC_DEPENDENCIES).to(
         eq(%w[@swc/core swc-loader])
+      )
+    end
+
+    it "defines BABEL_REACT_DEPENDENCIES" do
+      expect(ReactOnRails::Generators::JsDependencyManager::BABEL_REACT_DEPENDENCIES).to eq(
+        %w[@babel/preset-react]
       )
     end
 
@@ -394,6 +406,32 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     end
   end
 
+  describe "#add_babel_react_dependencies" do
+    it "adds Babel React preset as dev dependency" do
+      instance.send(:add_babel_react_dependencies)
+      expect(instance.add_npm_dependencies_called?).to be(true)
+      expect(instance.add_npm_dependencies_dev?).to be(true)
+    end
+
+    it "adds warning when add_packages fails" do
+      instance.add_npm_dependencies_result = false
+
+      instance.send(:add_babel_react_dependencies)
+
+      expect(warnings.size).to be > 0
+      expect(warnings.first.to_s).to include("Failed to add Babel React preset dependency")
+    end
+
+    it "adds warning when an exception is raised" do
+      allow(instance).to receive(:add_packages).and_raise(StandardError, "network error")
+
+      instance.send(:add_babel_react_dependencies)
+
+      expect(warnings.size).to be > 0
+      expect(warnings.first.to_s).to include("Error adding Babel React preset dependency")
+    end
+  end
+
   describe "error handling consistency" do
     it "all add_* methods use warnings instead of errors" do
       instance.add_npm_dependencies_result = false
@@ -405,10 +443,11 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_css_dependencies)
       instance.send(:add_rspack_dependencies)
       instance.send(:add_typescript_dependencies)
+      instance.send(:add_babel_react_dependencies)
       instance.send(:add_dev_dependencies)
 
       # All should add warnings, not errors
-      expect(warnings.count).to be >= 6
+      expect(warnings.count).to be >= 7
       expect(errors.size).to eq(0)
     end
 
@@ -420,6 +459,43 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       warning = warnings.first
       expect(warning.to_s).to include("npm install")
       expect(warning.to_s).to include("manually")
+    end
+  end
+
+  describe "#add_js_dependencies" do
+    it "adds Babel React preset when SWC is not used" do
+      instance.using_swc = false
+
+      instance.send(:add_js_dependencies)
+
+      babel_calls = instance.add_npm_dependencies_calls.select do |call|
+        call[:packages].include?("@babel/preset-react")
+      end
+      expect(babel_calls.size).to be > 0
+      expect(babel_calls.all? { |call| call[:dev] }).to be(true)
+    end
+
+    it "does not add Babel React preset when SWC is used" do
+      instance.using_swc = true
+
+      instance.send(:add_js_dependencies)
+
+      babel_calls = instance.add_npm_dependencies_calls.select do |call|
+        call[:packages].include?("@babel/preset-react")
+      end
+      expect(babel_calls).to eq([])
+    end
+
+    it "does not add Babel React preset when rspack is used and SWC is not configured" do
+      instance.using_swc = false
+      instance.using_rspack = true
+
+      instance.send(:add_js_dependencies)
+
+      babel_calls = instance.add_npm_dependencies_calls.select do |call|
+        call[:packages].include?("@babel/preset-react")
+      end
+      expect(babel_calls).to eq([])
     end
   end
 
