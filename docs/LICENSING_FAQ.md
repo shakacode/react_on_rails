@@ -31,7 +31,7 @@
 import ReactOnRails from 'react-on-rails-pro';
 ```
 
-See the [Installation Guide](../react_on_rails_pro/docs/installation.md) for details.
+See the [Installation Guide](./pro/installation.md) for details.
 
 ### Q: How will the monorepo structure maintain license separation?
 
@@ -119,7 +119,7 @@ react_on_rails/ (monorepo root)
 - Node.js rendering process management
 - Premium support and consultation
 
-See [REACT-ON-RAILS-PRO-LICENSE.md](../REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
+See [REACT-ON-RAILS-PRO-LICENSE.md](https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
 
 ### Q: Can I modify the MIT-licensed interface files?
 

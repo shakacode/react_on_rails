@@ -10,5 +10,5 @@ This directory holds internal-only documentation that should not be published on
 
 ## Publishing rule
 
-- User-facing docs belong in `docs/` and `react_on_rails_pro/docs/`.
+- User-facing docs belong in `docs/` (including `docs/pro/`).
 - Internal docs belong in `internal/`.

@@ -98,7 +98,7 @@ ReactOnRails.configure do |config|
   #
   # React Server Components and Streaming SSR are React on Rails Pro features.
   # For detailed configuration of RSC and streaming features, see:
-  # https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/docs/configuration.md
+  # https://github.com/shakacode/react_on_rails/blob/master/docs/pro/configuration.md
   #
   # Key Pro configurations (configured in ReactOnRailsPro.configure block):
   # - rsc_bundle_js_file: Path to RSC bundle

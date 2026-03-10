@@ -71,7 +71,7 @@ UNCATEGORIZED_CHANGED=false
 while IFS= read -r file; do
   case "$file" in
     # Documentation files
-    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*|react_on_rails_pro/docs/*|react_on_rails_pro/docs/**/*|SUMMARY.md|book.json)
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 

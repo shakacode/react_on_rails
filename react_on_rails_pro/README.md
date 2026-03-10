@@ -156,7 +156,7 @@ end %>
 - Automatic cache invalidation based on props
 - Works with Rails fragment caching infrastructure
 
-**📖 Learn more**: [docs/caching.md](./docs/caching.md)
+**📖 Learn more**: [docs/pro/caching.md](../docs/pro/caching.md)
 
 ### 2. Prerender Caching
 
@@ -175,7 +175,7 @@ end
 - Caches across multiple requests
 - Complements fragment caching for maximum performance
 
-**📖 Learn more**: [docs/caching.md](./docs/caching.md)
+**📖 Learn more**: [docs/pro/caching.md](../docs/pro/caching.md)
 
 ### 3. React on Rails Pro Node Renderer
 
@@ -203,7 +203,7 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-**📖 Learn more**: [docs/node-renderer/basics.md](./docs/node-renderer/basics.md)
+**📖 Learn more**: [docs/pro/node-renderer/basics.md](../docs/pro/node-renderer/basics.md)
 
 ### 4. React Server Components (RSC)
 
@@ -236,7 +236,7 @@ Speed up webpack rebuilds by caching unchanged bundles.
 - **Faster development**: Hot reload only what changed
 - **Lower costs**: Reduce build server time
 
-**📖 Learn more**: [docs/bundle-caching.md](./docs/bundle-caching.md)
+**📖 Learn more**: [docs/pro/bundle-caching.md](../docs/pro/bundle-caching.md)
 
 ### 6. Global State Management
 
@@ -249,7 +249,7 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-**📖 Learn more**: [docs/configuration.md](./docs/configuration.md)
+**📖 Learn more**: [docs/pro/configuration.md](../docs/pro/configuration.md)
 
 ---
 
@@ -326,9 +326,9 @@ rails console
 
 ### Next Steps
 
-- **Enable caching**: See [docs/caching.md](./docs/caching.md)
-- **Set up Node Renderer**: See [docs/node-renderer/basics.md](./docs/node-renderer/basics.md)
-- **Optimize performance**: See [docs/configuration.md](./docs/configuration.md)
+- **Enable caching**: See [docs/pro/caching.md](../docs/pro/caching.md)
+- **Set up Node Renderer**: See [docs/pro/node-renderer/basics.md](../docs/pro/node-renderer/basics.md)
+- **Optimize performance**: See [docs/pro/configuration.md](../docs/pro/configuration.md)
 - **Set up for your team**: See [LICENSE_SETUP.md](./LICENSE_SETUP.md#team-setup)
 
 ---
@@ -337,20 +337,20 @@ rails console
 
 ### Installation & Setup
 
-- **[Installation Guide](./docs/installation.md)** - Detailed installation instructions
+- **[Installation Guide](../docs/pro/installation.md)** - Detailed installation instructions
 - **[License Setup](./LICENSE_SETUP.md)** - Complete license configuration guide
-- **[Configuration Reference](./docs/configuration.md)** - All configuration options
+- **[Configuration Reference](../docs/pro/configuration.md)** - All configuration options
 
 ### Features
 
-- **[Caching Guide](./docs/caching.md)** - Fragment and prerender caching
-- **[Bundle Caching](./docs/bundle-caching.md)** - Speed up webpack builds
-- **[Node Renderer Basics](./docs/node-renderer/basics.md)** - Standalone Node.js server
-- **[Node Renderer Configuration](./docs/node-renderer/js-configuration.md)** - JavaScript config
+- **[Caching Guide](../docs/pro/caching.md)** - Fragment and prerender caching
+- **[Bundle Caching](../docs/pro/bundle-caching.md)** - Speed up webpack builds
+- **[Node Renderer Basics](../docs/pro/node-renderer/basics.md)** - Standalone Node.js server
+- **[Node Renderer Configuration](../docs/pro/node-renderer/js-configuration.md)** - JavaScript config
 
 ### API Reference
 
-- **[Ruby API](./docs/ruby-api.md)** - Helper methods and utilities
+- **[Ruby API](../docs/pro/ruby-api.md)** - Helper methods and utilities
 - **[CHANGELOG](./CHANGELOG.md)** - Version history and upgrade notes
 
 ### Upgrading
@@ -408,7 +408,7 @@ Check out these production applications using React on Rails Pro:
 
 - **📧 Email Support**: [support@shakacode.com](mailto:support@shakacode.com)
 - **💼 Sales & Licensing**: [justin@shakacode.com](mailto:justin@shakacode.com)
-- **📖 Documentation**: [docs/](./docs/)
+- **📖 Documentation**: [docs/pro/](../docs/pro/)
 - **🐛 Found a Bug?**: Email [support@shakacode.com](mailto:support@shakacode.com) (for Pro customers)
 
 ### Professional Services
