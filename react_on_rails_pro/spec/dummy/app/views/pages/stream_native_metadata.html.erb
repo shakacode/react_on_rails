@@ -17,9 +17,11 @@
   <code>&lt;title&gt;</code> in the document <code>&lt;head&gt;</code>.
 </p>
 <p>
-  <strong>Trade-off:</strong> Metadata is NOT in <code>&lt;head&gt;</code> in the initial
-  server-rendered HTML. The title updates client-side via React 19's hoisting scripts in
-  the streamed chunks. SEO crawlers that don't execute JavaScript will not see the final title.
+  <strong>Trade-off:</strong> The <em>final</em> metadata from inside the Suspense boundary is
+  NOT in <code>&lt;head&gt;</code> in the initial server-rendered HTML. The initial fallback title
+  ("Loading... | React on Rails") is hoisted into the shell, but the resolved title arrives later
+  via React 19's hoisting scripts in the streamed chunks. SEO crawlers that don't execute
+  JavaScript will see only the fallback title, not the resolved one.
 </p>
 <p>
   <strong>Compare with:</strong>

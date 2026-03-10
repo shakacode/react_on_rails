@@ -61,6 +61,7 @@ Choose one registered component to migrate. The ideal first candidate is a compo
   registerServerComponent({ ProductPage });
 
   // Not yet migrated -- still Client Components
+  import ReactOnRails from 'react-on-rails';
   import CartPage from '../components/CartPage';
   ReactOnRails.register({ CartPage });
   ```
