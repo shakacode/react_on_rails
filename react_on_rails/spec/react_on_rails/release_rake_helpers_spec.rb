@@ -172,6 +172,19 @@ RSpec.describe "release.rake helper methods" do
     end
   end
 
+  describe "#with_release_checkout" do
+    it "preserves the original error if worktree cleanup also fails" do
+      allow(Dir).to receive(:mktmpdir).with("react-on-rails-release-dry-run").and_yield("/tmp/release-dry-run")
+      allow(self).to receive(:sh_in_dir_for_release) do |_dir, command|
+        raise "cleanup failed" if command.include?("git worktree remove --force")
+      end
+
+      expect do
+        with_release_checkout(monorepo_root: "/tmp/repo", dry_run: true) { raise "original failure" }
+      end.to raise_error(RuntimeError, "original failure")
+    end
+  end
+
   describe "#publish_gem_with_retry" do
     it "passes OTP via environment instead of shell interpolation" do
       expect(self).to receive(:sh_args_in_dir_for_release).with(

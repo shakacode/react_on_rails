@@ -499,7 +499,13 @@ def with_release_checkout(monorepo_root:, dry_run:)
     begin
       yield(worktree_dir)
     ensure
-      sh_in_dir_for_release(monorepo_root, "git worktree remove --force #{escaped_worktree_dir}")
+      original_error = $ERROR_INFO
+      begin
+        sh_in_dir_for_release(monorepo_root, "git worktree remove --force #{escaped_worktree_dir}")
+      rescue StandardError => e
+        warn "⚠️  Failed to clean up worktree #{worktree_dir}: #{e.message}"
+        raise e if original_error.nil?
+      end
     end
   end
 end
