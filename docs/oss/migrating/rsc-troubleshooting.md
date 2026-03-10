@@ -371,7 +371,6 @@ import { useState } from 'react';
 
 // GOOD
 ('use client');
-('use client');
 ```
 
 ### Confusing `'use client'` with `'use server'`
