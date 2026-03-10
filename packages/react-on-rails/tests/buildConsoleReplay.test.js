@@ -114,14 +114,17 @@ console.warn.apply(console, ["other message","{\\"c\\":3,\\"d\\":4}"]);
     const maliciousNonce = 'abc123" onload="alert(1)';
     const actual = buildConsoleReplay(undefined, 0, maliciousNonce);
 
-    // Should strip dangerous characters (quotes, parens, spaces)
-    // = is kept as it's valid in base64, but the quotes are stripped making it harmless
-    expect(actual).toContain('nonce="abc123onload=alert1"');
-    // Should NOT contain quotes that would close the attribute
-    expect(actual).not.toContain('nonce="abc123"');
+    // Should reject invalid nonce format after sanitization
+    expect(actual).not.toContain('nonce=');
     expect(actual).not.toContain('alert(1)');
-    // Verify the dangerous parts (quotes and parens) are removed
-    expect(actual).not.toMatch(/nonce="[^"]*"[^>]*onload=/);
+    expect(actual).not.toContain('onload=');
+  });
+
+  it('buildConsoleReplay keeps valid trailing base64 padding in nonce', () => {
+    console.history = [{ arguments: ['test'], level: 'log' }];
+    const actual = buildConsoleReplay(undefined, 0, 'YWJjMTIz==');
+
+    expect(actual).toContain('nonce="YWJjMTIz=="');
   });
 
   it('consoleReplay skips specified number of messages', () => {

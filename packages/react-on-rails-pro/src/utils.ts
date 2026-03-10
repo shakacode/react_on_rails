@@ -44,3 +44,8 @@ export const wrapInNewPromise = <T>(promise: Promise<T>) => {
 export const extractErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error);
 };
+
+export const sanitizeNonce = (nonce?: string) => {
+  const nonceWithAllowedCharsOnly = nonce?.replace(/[^a-zA-Z0-9+/=_-]/g, '');
+  return nonceWithAllowedCharsOnly?.match(/^[a-zA-Z0-9+/_-]+={0,2}$/)?.[0];
+};
