@@ -23,6 +23,7 @@ module ReactOnRails
       # 2. Only webpack watch process for server bundle as we're the hot reloading setup.
       # 3. For whatever reason, the watch processes are running, but some clean script removed
       #    the generated bundles.
+      # 4. bin/dev static is running with fresh assets → reuse dev output (no compilation).
       def call
         # Only check this ONCE during a test run
         return if self.class.has_been_run
@@ -36,6 +37,17 @@ module ReactOnRails
 
         # All done if no stale files!
         return if stale_gen_files.empty?
+
+        # If test assets are stale, check if development assets can be reused.
+        # This handles the common case where bin/dev static is running and has
+        # already compiled fresh assets. Instead of running build_test_command
+        # (which would duplicate that work), we override Shakapacker's test config
+        # to point at the dev output directory.
+        if DevAssetsDetector.try_activate_dev_assets!
+          # Shakapacker config now points at dev output.
+          # Dev assets were verified fresh by the detector, so skip compilation.
+          return
+        end
 
         ReactOnRails::PacksGenerator.instance.generate_packs_if_stale if ReactOnRails.configuration.auto_load_bundle
 
