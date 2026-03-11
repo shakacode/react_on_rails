@@ -148,7 +148,7 @@ The task exits with code 0 on success and code 1 if the license is missing, inva
 | Field                  | Type            | Description                                         |
 | ---------------------- | --------------- | --------------------------------------------------- |
 | `status`               | string          | `"valid"`, `"expired"`, `"invalid"`, or `"missing"` |
-| `organization`         | string or null  | Organization name from the license                  |
+| `organization`         | string or null  | Organization name from the JWT `org` claim          |
 | `plan`                 | string or null  | License plan (`"paid"`, `"startup"`, etc.)          |
 | `expiration`           | string or null  | ISO 8601 expiration date                            |
 | `attribution_required` | boolean         | Whether attribution is required                     |
@@ -302,10 +302,12 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
   "iat": 1234567890, // Issued at timestamp (REQUIRED)
   "exp": 1234567890, // Expiration timestamp (REQUIRED)
   "plan": "paid", // License plan (Optional — only "paid" is valid for production)
-  "organization": "Your Company", // Organization name (Optional)
+  "org": "Your Company", // Organization name (Optional)
   "iss": "api" // Issuer identifier (Optional, standard JWT claim)
 }
 ```
+
+> Note: The JWT claim is `org`. The verify task output uses the field name `organization` for readability.
 
 ### Security
 
