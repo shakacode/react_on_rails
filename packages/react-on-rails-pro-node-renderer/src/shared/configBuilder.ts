@@ -27,6 +27,10 @@ export interface Config {
   // https://devcenter.heroku.com/articles/dyno-startup-behavior#port-binding-of-web-dynos
   // Similarly on ControlPlane: https://docs.controlplane.com/reference/workload/containers#port-variable
   port: number;
+  // The host/IP address the renderer should bind to.
+  // Defaults to 'localhost' (127.0.0.1). Set to '0.0.0.0' for containerized environments
+  // where external health checks need to reach the server (e.g. Docker, ECS with ALB).
+  host: string;
   // The renderer log level
   logLevel: LevelWithSilent;
   // The HTTP server log level
@@ -143,6 +147,8 @@ const defaultConfig: Config = {
   // Use env port if we run on Heroku
   port: Number(env.RENDERER_PORT) || DEFAULT_PORT,
 
+  host: env.RENDERER_HOST || 'localhost',
+
   // Show only important messages by default
   logLevel: logLevel(env.RENDERER_LOG_LEVEL || DEFAULT_LOG_LEVEL),
 
@@ -194,6 +200,7 @@ const defaultConfig: Config = {
 function envValuesUsed() {
   return {
     RENDERER_PORT: !userConfig.port && env.RENDERER_PORT,
+    RENDERER_HOST: !('host' in userConfig) && env.RENDERER_HOST,
     RENDERER_LOG_LEVEL: !userConfig.logLevel && env.RENDERER_LOG_LEVEL,
     RENDERER_LOG_HTTP_LEVEL: !userConfig.logHttpLevel && env.RENDERER_LOG_HTTP_LEVEL,
     RENDERER_SERVER_BUNDLE_CACHE_PATH:

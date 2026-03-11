@@ -125,7 +125,7 @@ export default function run(config: Partial<Config>) {
   // getConfig():
   buildConfig(config);
 
-  const { serverBundleCachePath, logHttpLevel, port, fastifyServerOptions, workersCount } = getConfig();
+  const { serverBundleCachePath, logHttpLevel, port, host, fastifyServerOptions, workersCount } = getConfig();
 
   const app = fastify({
     http2: useHttp2 as true,
@@ -462,9 +462,13 @@ export default function run(config: Partial<Config>) {
   // we are extracting worker from cluster to avoid false TS error
   const { worker } = cluster;
   if (workersCount === 0 || cluster.isWorker) {
-    app.listen({ port }, () => {
+    app.listen({ port, host }, (err, address) => {
+      if (err) {
+        log.error({ err, host, port }, 'Node renderer failed to start');
+        process.exit(1);
+      }
       const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
-      log.info(`Node renderer ${workerName} listening on port ${port}!`);
+      log.info({ workerName, address }, 'Node renderer listening');
     });
   }
 
