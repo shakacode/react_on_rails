@@ -757,8 +757,12 @@ export async function createComment(formData) {
   if (!Number.isFinite(postId) || postId <= 0) throw new Error('Invalid postId');
 
   // In React on Rails, Server Actions run in Node.js and cannot access
-  // Rails models directly. Call your Rails API endpoint instead:
-  const response = await fetch('/api/comments', {
+  // Rails models directly. Call your Rails API endpoint instead.
+  // Use an absolute URL and an API-only route or another non-session auth
+  // mechanism, because this server-side fetch does not have the browser's
+  // CSRF token.
+  const railsBaseUrl = process.env.RAILS_BASE_URL || 'http://localhost:3000';
+  const response = await fetch(new URL('/api/comments', railsBaseUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content, postId, userId: session.userId }),

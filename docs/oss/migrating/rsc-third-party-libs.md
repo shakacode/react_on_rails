@@ -151,10 +151,14 @@ All components include `'use client'` directives. Cannot use compound components
 
 export async function submitForm(formData) {
   const name = formData.get('name');
+  // Server Actions run in Node.js, so this fetch needs an absolute URL.
+  // Point RAILS_BASE_URL at your Rails app (for example http://localhost:3000
+  // in development).
+  const railsBaseUrl = process.env.RAILS_BASE_URL || 'http://localhost:3000';
   // Note: This fetch runs server-side. The Rails endpoint must skip CSRF
   // protection (e.g., `protect_from_forgery with: :null_session` for API
   // routes) since there is no browser session to provide a CSRF token.
-  const res = await fetch('/api/users', {
+  const res = await fetch(new URL('/api/users', railsBaseUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user: { name } }),

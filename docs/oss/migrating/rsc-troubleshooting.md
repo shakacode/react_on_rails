@@ -55,10 +55,13 @@ async function Page() {
     'use server';
     // In React on Rails, Server Actions run in Node.js and cannot access
     // Rails models directly. Call your Rails API endpoint instead:
+    // Server-side fetch needs an absolute URL. Point RAILS_BASE_URL at your
+    // Rails app (for example http://localhost:3000 in development).
     // This server-side fetch will not include the browser's CSRF token, so
     // use an API-only route (for example `protect_from_forgery with:
     // :null_session`) or another non-session auth mechanism.
-    await fetch('/api/items', {
+    const railsBaseUrl = process.env.RAILS_BASE_URL || 'http://localhost:3000';
+    await fetch(new URL('/api/items', railsBaseUrl), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: formData.get('name') }),
@@ -630,7 +633,12 @@ The sections above cover generic RSC pitfalls. The following issues are specific
 
 **Cause:** This was a bug in `react-on-rails-pro` where the internal RSC stream teeing mechanism could deadlock under backpressure with large payloads.
 
-**Fix:** Upgrade to a version that includes this patch (`react-on-rails-pro` >= 16.4.0.rc.3, or any newer stable release) ([PR #2444](https://github.com/shakacode/react_on_rails/pull/2444)).
+**Fix:** Upgrade to a release that includes this patch (`react-on-rails-pro`
+16.4.0.rc.3+ was the first patched line). If a newer stable release is
+available, prefer that and check the
+[CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md)
+for the current recommendation. See also
+[PR #2444](https://github.com/shakacode/react_on_rails/pull/2444).
 
 ### Node Renderer VM Context -- Missing Globals
 
