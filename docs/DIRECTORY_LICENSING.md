@@ -134,4 +134,4 @@ Each phase includes mandatory license compliance verification before proceeding 
 
 ---
 
-_This document is maintained as part of the React on Rails monorepo merger plan. For implementation details, see [MONOREPO_MERGER_PLAN_REF.md](./MONOREPO_MERGER_PLAN_REF.md)_
+_This document is maintained as part of the React on Rails monorepo merger plan. For implementation details, see [MONOREPO_MERGER_PLAN_REF.md](../internal/planning/MONOREPO_MERGER_PLAN_REF.md)_

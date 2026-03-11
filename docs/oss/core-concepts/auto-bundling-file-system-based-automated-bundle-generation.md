@@ -483,10 +483,10 @@ Now when you visit your pages, React on Rails automatically:
 #### Performance Screenshots
 
 **HelloWorld (Lightweight Component):**
-![HelloWorld Bundle Analysis](../images/bundle-splitting-hello-world.png)
+![HelloWorld Bundle Analysis](../../images/bundle-splitting-hello-world.png)
 
 **HeavyMarkdownEditor (Heavy Component):**
-![HeavyMarkdownEditor Bundle Analysis](../images/bundle-splitting-heavy-markdown.png)
+![HeavyMarkdownEditor Bundle Analysis](../../images/bundle-splitting-heavy-markdown.png)
 
 _Screenshots show browser dev tools network analysis demonstrating the dramatic difference in bundle sizes and load times between the two components._
 
@@ -495,7 +495,7 @@ _Screenshots show browser dev tools network analysis demonstrating the dramatic 
 If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
 
 > [!IMPORTANT]
-> **Not related to React Server Components.** The `.client.` and `.server.` file suffixes control **which webpack bundle** imports the file (client bundle vs. server bundle for SSR) — a React on Rails auto-bundling concept that predates React Server Components. If you are using React Server Components (Pro feature), RSC classification is controlled separately by the `'use client'` directive; a `.server.jsx` file is NOT automatically a React Server Component. See the [RSC glossary](../pro/react-server-components/glossary.md) for details. These suffixes only make sense for client components, as server components exist only in the RSC bundle.
+> **Not related to React Server Components.** The `.client.` and `.server.` file suffixes control **which webpack bundle** imports the file (client bundle vs. server bundle for SSR) — a React on Rails auto-bundling concept that predates React Server Components. If you are using React Server Components (Pro feature), RSC classification is controlled separately by the `'use client'` directive; a `.server.jsx` file is NOT automatically a React Server Component. See the [RSC glossary](../../pro/react-server-components/glossary.md) for details. These suffixes only make sense for client components, as server components exist only in the RSC bundle.
 
 <!-- MD028: intentional separate blockquote -->
 

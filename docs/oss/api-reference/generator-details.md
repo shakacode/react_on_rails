@@ -246,7 +246,7 @@ For existing apps, use the standalone Pro generator to avoid re-processing base 
 rails generate react_on_rails:pro
 ```
 
-See the [React on Rails Pro overview](../pro/react-on-rails-pro.md) for feature details.
+See the [React on Rails Pro overview](../../pro/react-on-rails-pro.md) for feature details.
 
 ### React Server Components Support
 
@@ -299,7 +299,7 @@ rails generate react_on_rails:rsc
 rails generate react_on_rails:rsc --typescript
 ```
 
-See the [RSC performance guide](../pro/major-performance-breakthroughs-upgrade-guide.md) for details.
+See the [RSC performance guide](../../pro/major-performance-breakthroughs-upgrade-guide.md) for details.
 
 ### Auto-Bundling and Component Registration
 

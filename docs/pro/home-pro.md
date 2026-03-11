@@ -7,9 +7,9 @@ Node rendering and caching performance enhancements for [React on Rails](https:/
 The best way to see how React on Rails Pro works is to install this repo locally and take a look at
 the example application:
 
-[spec/dummy](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy/README.md)
+[spec/dummy](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/README.md)
 
-1. Uses a @rails/webpacker standard configuration.
+1. Uses a Shakapacker standard configuration.
 1. Has pages that demonstrate:
    1. caching
    2. loadable-components
@@ -24,7 +24,7 @@ See the README.md in those sample apps for more details.
 
 React on Rails Pro supports React 18's Streaming Server-Side Rendering, allowing you to progressively render and stream HTML content to the client. This enables faster page loads and better user experience.
 
-See [docs/streaming-server-rendering](./streaming-server-rendering.md) for more details.
+See [Streaming Server Rendering](./streaming-server-rendering.md) for more details.
 
 ### Caching
 
@@ -33,13 +33,13 @@ Caching of SSR is critical for achieving optimum performance.
 - **Fragment Caching**: for `react_component` and `react_component_hash`, including lazy evaluation of props.
 - **Prerender Caching**: Server rendering JavaScript evaluation is cached if `prerender_caching` is turned on in your Rails config. This applies to all JavaScript evaluation methods.
 
-See [docs/caching](./caching.md) for more details.
+See [Fragment Caching](./caching.md) for more details.
 
 ### Clearing of Global State
 
 Suppose you detect that some library used in server-rendering is leaking state between calls to server render. In that case, you can set the `config.ssr_pre_hook_js` in your `config/initializers/react_on_rails_pro.rb` to run some JavaScript to clear the globally leaked state at the beginning of each call to server render.
 
-For more details, see [Rails Configuration](../../docs/configuration/README.md).
+For more details, see [Rails Configuration (OSS)](../oss/configuration/README.md).
 
 ### React On Rails Pro Node Renderer
 
