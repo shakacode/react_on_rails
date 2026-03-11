@@ -200,6 +200,7 @@ const defaultConfig: Config = {
 function envValuesUsed() {
   return {
     RENDERER_PORT: !userConfig.port && env.RENDERER_PORT,
+    RENDERER_HOST: !userConfig.host && env.RENDERER_HOST,
     RENDERER_LOG_LEVEL: !userConfig.logLevel && env.RENDERER_LOG_LEVEL,
     RENDERER_LOG_HTTP_LEVEL: !userConfig.logHttpLevel && env.RENDERER_LOG_HTTP_LEVEL,
     RENDERER_SERVER_BUNDLE_CACHE_PATH:
