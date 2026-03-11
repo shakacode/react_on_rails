@@ -59,7 +59,7 @@ The CLI runs these steps automatically:
 
 After completion, you get:
 
-- A Rails app with PostgreSQL (Rails 7+)
+- A Rails 7+ app with PostgreSQL
 - Shakapacker configured with Webpack (or Rspack) and HMR
 - A working HelloWorld React component (TypeScript by default)
 - Optional RSC setup (`--rsc`) with HelloServer route and Pro Node renderer wiring
