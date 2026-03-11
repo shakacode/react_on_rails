@@ -26,6 +26,7 @@ module ReactOnRails
       PRO_GEM_NAME = "react_on_rails_pro"
       PRO_GEM_AUTO_INSTALL_COMMAND = "bundle add #{PRO_GEM_NAME} --strict".freeze
       AUTO_INSTALL_TIMEOUT = 120
+      TERMINATION_GRACE_PERIOD = 5
 
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
@@ -92,35 +93,51 @@ module ReactOnRails
       def attempt_pro_gem_auto_install
         puts Rainbow("📝 Adding #{PRO_GEM_NAME} to Gemfile...").yellow
 
-        output_r, output_w = IO.pipe
-        pid = Bundler.with_unbundled_env do
-          Process.spawn(PRO_GEM_AUTO_INSTALL_COMMAND, out: output_w, err: output_w)
-        end
-        output_w.close
-
-        # Read in a thread to prevent pipe buffer deadlock
-        output_thread = Thread.new { output_r.read }
-        status = wait_for_bundle_process(pid)
-        output = output_thread.value
-        output_r.close
-
-        unless status
-          puts Rainbow("⏱️  bundle add timed out after #{AUTO_INSTALL_TIMEOUT} seconds.").red
-          return false
-        end
+        status, output = run_bundle_add_with_captured_output
+        return timeout_install_failure unless status
 
         puts output unless output.to_s.strip.empty?
+        return false unless status.success?
 
-        if status.success?
-          # The gem is now in Gemfile/lockfile but not loaded in the current Ruby process.
-          # Generator code that follows must not reference ReactOnRailsPro constants directly.
-          mark_pro_gem_installed!
-          true
-        else
-          false
-        end
+        # The gem is now in Gemfile/lockfile but not loaded in the current Ruby process.
+        # Generator code that follows must not reference ReactOnRailsPro constants directly.
+        mark_pro_gem_installed!
+        true
       rescue StandardError => e
         puts Rainbow("⚠️  Failed to run bundle add: #{e.message}").red
+        false
+      end
+
+      def run_bundle_add_with_captured_output
+        output_r, output_w = IO.pipe
+        output_thread = nil
+
+        begin
+          pid = Bundler.with_unbundled_env do
+            Process.spawn(PRO_GEM_AUTO_INSTALL_COMMAND, out: output_w, err: output_w)
+          end
+          output_w.close
+          output_w = nil
+
+          # Read in a thread to prevent pipe buffer deadlock.
+          output_thread = Thread.new do
+            output_r.read
+          rescue IOError
+            ""
+          end
+
+          status = wait_for_bundle_process(pid)
+          output = output_thread.value
+          [status, output]
+        ensure
+          output_w.close if output_w && !output_w.closed?
+          output_r.close if output_r && !output_r.closed?
+          output_thread&.join(0.1)
+        end
+      end
+
+      def timeout_install_failure
+        puts Rainbow("⏱️  bundle add timed out after #{AUTO_INSTALL_TIMEOUT} seconds.").red
         false
       end
 
@@ -134,12 +151,24 @@ module ReactOnRails
 
           if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
             Process.kill("TERM", pid)
+            term_deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + TERMINATION_GRACE_PERIOD
+            loop do
+              _term_pid, term_status = Process.wait2(pid, Process::WNOHANG)
+              return nil if term_status
+              break if Process.clock_gettime(Process::CLOCK_MONOTONIC) > term_deadline
+
+              sleep 0.2
+            end
+
+            Process.kill("KILL", pid)
             Process.wait(pid)
             return nil
           end
 
           sleep 0.5
         end
+      rescue Errno::ECHILD, Errno::ESRCH
+        nil
       end
 
       def create_pro_initializer

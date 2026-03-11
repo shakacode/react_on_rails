@@ -30,19 +30,22 @@ describe ProGenerator, type: :generator do
 
   context "when Pro gem is not installed" do
     let(:generator) { described_class.new }
+    let(:fake_pid) { 12_345 }
 
     before do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
       allow(Bundler).to receive(:with_unbundled_env).and_yield
-      allow(Open3).to receive(:capture2e).with("bundle add react_on_rails_pro --strict")
-                                         .and_return(["", instance_double(Process::Status, success?: false)])
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+      allow(generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: false))
     end
 
     specify "missing_pro_gem? returns true with standalone error message" do
       expect(generator.send(:missing_pro_gem?, force: true)).to be true
       expect(Bundler).to have_received(:with_unbundled_env)
-      expect(Open3).to have_received(:capture2e).with("bundle add react_on_rails_pro --strict")
+      expect(Process).to have_received(:spawn)
+        .with("bundle add react_on_rails_pro --strict", out: anything, err: anything)
       error_text = GeneratorMessages.messages.join("\n")
       # Standalone message should NOT mention --pro flag
       expect(error_text).to include("This generator requires the react_on_rails_pro gem")
