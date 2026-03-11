@@ -2,6 +2,7 @@
 
 require "json"
 require_relative "utils"
+require_relative "version_syntax_converter"
 require_relative "system_checker"
 
 begin
@@ -545,8 +546,11 @@ module ReactOnRails
     def check_pro_gem_package_mismatch(is_pro_gem, has_base, has_pro)
       return unless is_pro_gem && has_base && !has_pro
 
+      pro_gem_version = ReactOnRails::Utils.react_on_rails_pro_version
+      gem_version = pro_gem_version.empty? ? ReactOnRails::VERSION : pro_gem_version
+      npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
       install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
-        "react-on-rails-pro", ReactOnRails::VERSION
+        "react-on-rails-pro", npm_version
       )
       checker.add_error(<<~MSG.strip)
         🚫 Pro gem is installed but using the base 'react-on-rails' npm package.

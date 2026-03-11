@@ -667,6 +667,7 @@ RSpec.describe ReactOnRails::Doctor do
         )
         allow(ReactOnRails::Utils).to receive_messages(
           react_on_rails_pro?: true,
+          react_on_rails_pro_version: "16.4.0",
           package_manager_install_exact_command: "npm install react-on-rails-pro@16.4.0"
         )
       end
