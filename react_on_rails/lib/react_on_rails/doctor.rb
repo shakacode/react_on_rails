@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "json"
+require "erb"
+require "yaml"
 require_relative "utils"
 require_relative "system_checker"
 
@@ -1191,17 +1193,18 @@ module ReactOnRails
 
         if File.exist?(shakapacker_yml)
           shakapacker_content = File.read(shakapacker_yml)
-          check_test_public_output_path_workflow(shakapacker_content)
-          check_private_output_path_watcher_overlap(shakapacker_content)
+          shakapacker_config = parse_shakapacker_config(shakapacker_content)
+          check_test_public_output_path_workflow(shakapacker_content, shakapacker_config)
+          check_private_output_path_watcher_overlap(shakapacker_content, shakapacker_config)
 
-          # Match test section and look for compile: true
-          has_compile_true = shakapacker_content.match(/^test:.*?^\s+compile:\s*true/m)
+          has_compile_true = compile_true_for_test_env?(shakapacker_content, shakapacker_config)
+          conflicting_test_config = has_build_test_command && has_compile_true
 
           testing_config_url =
             "https://github.com/shakacode/react_on_rails/blob/master/" \
             "docs/oss/building-features/testing-configuration.md"
 
-          if has_build_test_command && has_compile_true
+          if conflicting_test_config
             checker.add_warning("  ⚠️  Both build_test_command and shakapacker compile: true are configured")
             checker.add_info("  💡 These are mutually exclusive - use only one approach")
             checker.add_info("  💡 Recommended: Use build_test_command with ReactOnRails::TestHelper")
@@ -1219,13 +1222,13 @@ module ReactOnRails
             checker.add_info("  📖 See: #{testing_config_url}")
           end
 
-          if has_build_test_command && framework_status.empty?
+          if has_build_test_command && framework_status.empty? && !conflicting_test_config
             checker.add_warning("  ⚠️  build_test_command is set but no test helper files were found")
             checker.add_info(
               "  💡 Expected one or more of: spec/rails_helper.rb, spec/spec_helper.rb, test/test_helper.rb"
             )
             checker.add_info("  💡 Or remove build_test_command and use compile: true in shakapacker.yml")
-          elsif has_build_test_command && missing_frameworks.any?
+          elsif has_build_test_command && missing_frameworks.any? && !conflicting_test_config
             checker.add_warning(
               "  ⚠️  build_test_command is set but ReactOnRails::TestHelper is missing for " \
               "#{framework_names(missing_frameworks)}"
@@ -1314,9 +1317,14 @@ module ReactOnRails
       ENV["SHAKAPACKER_CONFIG"] || DEFAULT_SHAKAPACKER_CONFIG_PATH
     end
 
-    def check_test_public_output_path_workflow(shakapacker_content)
-      development_output_path = extract_env_config_value(shakapacker_content, "development", "public_output_path")
-      test_output_path = extract_env_config_value(shakapacker_content, "test", "public_output_path")
+    def check_test_public_output_path_workflow(shakapacker_content, shakapacker_config = nil)
+      development_output_path = extract_env_config_value(
+        shakapacker_content,
+        "development",
+        "public_output_path",
+        shakapacker_config
+      )
+      test_output_path = extract_env_config_value(shakapacker_content, "test", "public_output_path", shakapacker_config)
 
       return unless development_output_path && test_output_path
 
@@ -1369,14 +1377,25 @@ module ReactOnRails
       false
     end
 
-    def check_private_output_path_watcher_overlap(shakapacker_content)
-      default_private = extract_env_config_value(shakapacker_content, "default", "private_output_path")
+    def check_private_output_path_watcher_overlap(shakapacker_content, shakapacker_config = nil)
+      default_private = extract_env_config_value(
+        shakapacker_content,
+        "default",
+        "private_output_path",
+        shakapacker_config
+      )
       development_private = extract_env_config_value(
         shakapacker_content,
         "development",
-        "private_output_path"
+        "private_output_path",
+        shakapacker_config
       ) || default_private
-      test_private = extract_env_config_value(shakapacker_content, "test", "private_output_path") || default_private
+      test_private = extract_env_config_value(
+        shakapacker_content,
+        "test",
+        "private_output_path",
+        shakapacker_config
+      ) || default_private
 
       return unless development_private && test_private
       return unless development_private == test_private
@@ -1389,34 +1408,36 @@ module ReactOnRails
       checker.add_info("  💡 Use ./bin/dev test-watch to auto-select full vs client-only test watch mode")
     end
 
-    def extract_env_config_value(content, env_name, key)
-      lines = content.lines
-      in_section = false
-      section_indent = 0
+    def extract_env_config_value(content, env_name, key, shakapacker_config = nil)
+      return extract_env_config_value_from_hash(shakapacker_config, env_name, key) if shakapacker_config.is_a?(Hash)
 
-      lines.each do |line|
-        if (section_match = line.match(/^(\s*)#{Regexp.escape(env_name)}:\s*(?:#.*)?$/))
-          in_section = true
-          section_indent = section_match[1].length
-          next
-        end
+      parsed_config = parse_shakapacker_config(content)
+      return nil unless parsed_config.is_a?(Hash)
 
-        next unless in_section
-        next if line.strip.empty? || line.strip.start_with?("#")
+      extract_env_config_value_from_hash(parsed_config, env_name, key)
+    end
 
-        current_indent = line[/^\s*/].size
-        if current_indent <= section_indent
-          in_section = false
-          next
-        end
+    def extract_env_config_value_from_hash(config, env_name, key)
+      default_config = config["default"] || {}
+      env_config = config[env_name] || {}
+      merged_config = default_config.merge(env_config)
+      normalize_yaml_scalar(merged_config[key].to_s) if merged_config.key?(key)
+    end
 
-        value_match = line.match(/^\s*#{Regexp.escape(key)}:\s*(.+?)\s*(?:#.*)?$/)
-        next unless value_match
-
-        return normalize_yaml_scalar(value_match[1])
-      end
-
+    def parse_shakapacker_config(content)
+      parsed = YAML.safe_load(ERB.new(content).result, permitted_classes: [Symbol], aliases: true)
+      parsed.is_a?(Hash) ? parsed : nil
+    rescue StandardError
       nil
+    end
+
+    def compile_true_for_test_env?(content, shakapacker_config)
+      if shakapacker_config.is_a?(Hash)
+        test_compile_value = extract_env_config_value_from_hash(shakapacker_config, "test", "compile")
+        test_compile_value.to_s == "true"
+      else
+        content.match?(/^test:.*?^\s+compile:\s*true/m)
+      end
     end
 
     def normalize_yaml_scalar(value)
@@ -1426,14 +1447,8 @@ module ReactOnRails
     def test_helper_status_by_framework
       status = {}
 
-      rspec_helper = preferred_rspec_helper_file
-      if rspec_helper
-        content = File.read(rspec_helper)
-        status[:rspec] = {
-          path: rspec_helper,
-          configured: helper_call_present?(content, "configure_rspec_to_compile_assets")
-        }
-      end
+      rspec_status = rspec_helper_status
+      status[:rspec] = rspec_status if rspec_status
 
       if File.exist?(MINITEST_HELPER_FILE)
         content = File.read(MINITEST_HELPER_FILE)
@@ -1446,6 +1461,22 @@ module ReactOnRails
       status
     rescue StandardError
       {}
+    end
+
+    def rspec_helper_status
+      rspec_files = RSPEC_HELPER_FILES.select { |file| File.exist?(file) }
+      return nil unless rspec_files.any?
+
+      rspec_statuses = rspec_files.map do |file|
+        content = File.read(file)
+        { path: file, configured: helper_call_present?(content, "configure_rspec_to_compile_assets") }
+      end
+      configured_status = rspec_statuses.find { |helper_status| helper_status[:configured] }
+
+      {
+        path: configured_status&.dig(:path) || rspec_statuses.first[:path],
+        configured: rspec_statuses.any? { |helper_status| helper_status[:configured] }
+      }
     end
 
     def preferred_rspec_helper_file

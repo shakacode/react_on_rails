@@ -33,7 +33,8 @@ module ReactOnRails
           result = detector.check
           return false unless result
 
-          apply_shakapacker_override!(result)
+          return false unless apply_shakapacker_override!(result)
+
           print_activation_message(result)
           true
         rescue StandardError => e
@@ -45,17 +46,25 @@ module ReactOnRails
 
         def apply_shakapacker_override!(result)
           config = ::Shakapacker.config
+          return false unless config.respond_to?(:data, true)
+          return false unless config.instance_variable_defined?(:@data)
 
-          # Replace the frozen data hash with one pointing test output at dev output
+          # Uses Shakapacker private internals (`data`/`@data`) to temporarily point
+          # test lookups at dev output. Keep this defensive for future Shakapacker changes.
           new_data = config.send(:data).dup
-          new_data[:public_output_path] = result[:dev_output_relative]
+          if new_data.key?("public_output_path")
+            new_data["public_output_path"] = result[:dev_output_relative]
+          else
+            new_data[:public_output_path] = result[:dev_output_relative]
+          end
           config.instance_variable_set(:@data, new_data.freeze)
 
           # Clear cached manifest so it reloads from the new path
           shakapacker_instance = ::Shakapacker.instance
-          return unless shakapacker_instance.instance_variable_defined?(:@manifest)
+          return true unless shakapacker_instance.instance_variable_defined?(:@manifest)
 
           shakapacker_instance.remove_instance_variable(:@manifest)
+          true
         end
 
         def print_activation_message(result)
@@ -94,7 +103,7 @@ module ReactOnRails
         path = project_root.join("config", "shakapacker.yml")
         return nil unless path.exist?
 
-        YAML.safe_load(ERB.new(path.read).result, permitted_classes: [Symbol])
+        YAML.safe_load(ERB.new(path.read).result, permitted_classes: [Symbol], aliases: true)
       rescue StandardError => e
         warn "React on Rails: Could not parse shakapacker.yml: #{e.message}" if ENV["DEBUG"]
         nil
@@ -140,9 +149,22 @@ module ReactOnRails
       # served from webpack-dev-server's memory, not the filesystem.
       def hmr_manifest?(manifest_path)
         manifest = JSON.parse(File.read(manifest_path))
-        manifest.values.any? { |v| v.to_s.match?(%r{\Ahttps?://}) }
+        hmr_url_present?(manifest)
       rescue JSON::ParserError
         true # Unparseable manifest is not usable
+      end
+
+      def hmr_url_present?(value)
+        case value
+        when String
+          value.match?(%r{\Ahttps?://})
+        when Array
+          value.any? { |item| hmr_url_present?(item) }
+        when Hash
+          value.values.any? { |item| hmr_url_present?(item) }
+        else
+          false
+        end
       end
 
       # Dev assets are fresh if the manifest is newer than all source files.

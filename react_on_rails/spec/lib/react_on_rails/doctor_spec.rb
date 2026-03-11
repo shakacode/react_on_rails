@@ -594,6 +594,37 @@ RSpec.describe ReactOnRails::Doctor do
       expect(success_messages).to include(a_string_including("separate public_output_path values"))
     end
 
+    it "uses inherited default output paths when analyzing test/dev workflow" do
+      write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+        ReactOnRails.configure do |config|
+          config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+        end
+      RUBY
+      write_project_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          public_output_path: packs
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          public_output_path: packs-test
+          compile: false
+      YAML
+      write_project_file("spec/rails_helper.rb", <<~RUBY)
+        require "react_on_rails/test_helper"
+        RSpec.configure do |config|
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+        end
+      RUBY
+
+      doctor.send(:check_build_test_configuration)
+
+      success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+      expect(success_messages).to include(a_string_including("separate public_output_path values"))
+    end
+
     it "warns when development and test share public_output_path" do
       write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
         ReactOnRails.configure do |config|
@@ -760,6 +791,52 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).to include(
         a_string_including("missing for Minitest in test/test_helper.rb")
       )
+    end
+
+    it "detects RSpec helper setup from spec/spec_helper.rb when rails_helper.rb exists" do
+      write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+        ReactOnRails.configure do |config|
+          config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+        end
+      RUBY
+      write_project_file("config/shakapacker.yml", <<~YAML)
+        test:
+          compile: false
+      YAML
+      write_project_file("spec/rails_helper.rb", <<~RUBY)
+        require "spec_helper"
+        RSpec.configure do |config|
+          config.example_status_persistence_file_path = "spec/examples.txt"
+        end
+      RUBY
+      write_project_file("spec/spec_helper.rb", <<~RUBY)
+        RSpec.configure do |config|
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+        end
+      RUBY
+
+      doctor.send(:check_build_test_configuration)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).not_to include(a_string_including("missing for RSpec"))
+    end
+
+    it "does not emit helper-missing warning when both compile:true and build_test_command are set" do
+      write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+        ReactOnRails.configure do |config|
+          config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+        end
+      RUBY
+      write_project_file("config/shakapacker.yml", <<~YAML)
+        test:
+          compile: true
+      YAML
+
+      doctor.send(:check_build_test_configuration)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      expect(warning_messages).to include(a_string_including("Both build_test_command and shakapacker compile: true"))
+      expect(warning_messages).not_to include(a_string_including("no test helper files were found"))
     end
   end
 

@@ -3,6 +3,8 @@
 require "English"
 require "open3"
 require "rainbow"
+require "erb"
+require "yaml"
 require_relative "../packer_utils"
 require_relative "database_checker"
 require_relative "service_checker"
@@ -329,9 +331,38 @@ module ReactOnRails
           # Detect existing shakapacker watcher processes (from either bin/dev or bin/dev static).
           # If one is already running, client-only test watch avoids duplicate server-bundle rebuilds.
           return true if find_process_pids("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch").any?
-          return true if find_process_pids("bin/shakapacker --watch").any?
+
+          full_watchers = find_process_pids("bin/shakapacker --watch")
+          return false if full_watchers.empty?
+          return true if shared_private_output_paths?
+
+          puts Rainbow("   Existing shakapacker watcher found, but bundle sharing is unclear; using full mode.").yellow
 
           false
+        end
+
+        def shared_private_output_paths?
+          shakapacker_config = parsed_shakapacker_config
+          return false unless shakapacker_config.is_a?(Hash)
+
+          default_config = shakapacker_config["default"] || {}
+          development_config = default_config.merge(shakapacker_config["development"] || {})
+          test_config = default_config.merge(shakapacker_config["test"] || {})
+          development_private = development_config["private_output_path"]
+          test_private = test_config["private_output_path"]
+
+          return false unless development_private && test_private
+
+          development_private == test_private
+        end
+
+        def parsed_shakapacker_config
+          config_path = ENV["SHAKAPACKER_CONFIG"] || "config/shakapacker.yml"
+          return nil unless File.exist?(config_path)
+
+          YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true, permitted_classes: [Symbol])
+        rescue StandardError
+          nil
         end
 
         # rubocop:disable Metrics/AbcSize

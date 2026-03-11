@@ -3,10 +3,12 @@
 module ReactOnRails
   module TestHelper
     class EnsureAssetsCompiled
+      @has_been_run = false
+      @mutex = Mutex.new
+
       class << self
         attr_accessor :has_been_run
-
-        @has_been_run = false
+        attr_reader :mutex
       end
 
       attr_reader :webpack_assets_status_checker,
@@ -25,11 +27,12 @@ module ReactOnRails
       #    the generated bundles.
       # 4. bin/dev static is running with fresh assets → reuse dev output (no compilation).
       def call
-        # Only check this ONCE during a test run
-        return if self.class.has_been_run
+        self.class.mutex.synchronize do
+          # Only check this ONCE during a test run, even with threaded test runners.
+          return if self.class.has_been_run
 
-        # Be sure we don't do this again.
-        self.class.has_been_run = true
+          self.class.has_been_run = true
+        end
 
         ReactOnRails::Locales.compile
 
@@ -43,11 +46,10 @@ module ReactOnRails
         # already compiled fresh assets. Instead of running build_test_command
         # (which would duplicate that work), we override Shakapacker's test config
         # to point at the dev output directory.
-        if DevAssetsDetector.try_activate_dev_assets!
-          # Shakapacker config now points at dev output.
-          # Dev assets were verified fresh by the detector, so skip compilation.
-          return
-        end
+        # Shakapacker config now points at dev output.
+        # If only the manifest was stale, dev assets fully cover the stale state.
+        return if DevAssetsDetector.try_activate_dev_assets! &&
+                  stale_gen_files.all? { |path| File.basename(path.to_s) == "manifest.json" }
 
         ReactOnRails::PacksGenerator.instance.generate_packs_if_stale if ReactOnRails.configuration.auto_load_bundle
 

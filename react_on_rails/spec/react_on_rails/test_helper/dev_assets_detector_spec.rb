@@ -38,6 +38,23 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
     File.write(File.join(tmpdir, "config", "shakapacker.yml"), YAML.dump(config))
   end
 
+  def write_shakapacker_yml_with_aliases(dev_output: "packs", test_output: "packs-test")
+    File.write(File.join(tmpdir, "config", "shakapacker.yml"), <<~YAML)
+      default: &default
+        source_path: app/javascript
+        public_root_path: public
+        public_output_path: #{dev_output}
+      development:
+        <<: *default
+      test:
+        <<: *default
+        public_output_path: #{test_output}
+        compile: false
+      production:
+        <<: *default
+    YAML
+  end
+
   def write_manifest(dir, entries: { "application.js" => "/packs/application.js" })
     FileUtils.mkdir_p(dir)
     File.write(File.join(dir, "manifest.json"), JSON.generate(entries))
@@ -145,12 +162,45 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
         expect(result[:dev_output_relative]).to eq("packs")
       end
     end
+
+    context "when shakapacker.yml uses YAML aliases" do
+      before do
+        write_shakapacker_yml_with_aliases
+        write_source_file(age_offset: 10)
+        write_manifest(dev_output_dir)
+      end
+
+      it "parses aliases and returns reusable dev output details" do
+        result = detector.check
+        expect(result).not_to be_nil
+        expect(result[:dev_output_relative]).to eq("packs")
+      end
+    end
+
+    context "when manifest has nested HMR URLs" do
+      before do
+        write_shakapacker_yml
+        write_source_file(age_offset: 10)
+        write_manifest(dev_output_dir, entries: {
+                         "entrypoints" => {
+                           "application" => {
+                             "js" => ["http://localhost:3035/packs/application.js"]
+                           }
+                         }
+                       })
+      end
+
+      it "returns nil (nested HMR assets are not usable)" do
+        expect(detector.check).to be_nil
+      end
+    end
   end
 
   describe ".try_activate_dev_assets!" do
     let(:mock_config) do
       instance_double(Shakapacker::Configuration,
                       instance_variable_set: nil,
+                      instance_variable_defined?: true,
                       send: frozen_data)
     end
     let(:mock_instance) do
@@ -162,6 +212,7 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
 
     before do
       allow(Shakapacker).to receive_messages(config: mock_config, instance: mock_instance)
+      allow(mock_config).to receive(:respond_to?).with(:data, true).and_return(true)
       allow(mock_config).to receive(:send).with(:data).and_return(frozen_data)
     end
 
@@ -188,6 +239,14 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
         expect(mock_config).to receive(:instance_variable_set).with(:@data, anything) do |_name, new_data|
           expect(new_data[:public_output_path]).to eq("packs")
           expect(new_data).to be_frozen
+        end
+        described_class.try_activate_dev_assets!
+      end
+
+      it "overrides string-keyed Shakapacker data with dev output path" do
+        allow(mock_config).to receive(:send).with(:data).and_return({ "public_output_path" => "packs-test" }.freeze)
+        expect(mock_config).to receive(:instance_variable_set).with(:@data, anything) do |_name, new_data|
+          expect(new_data["public_output_path"]).to eq("packs")
         end
         described_class.try_activate_dev_assets!
       end
