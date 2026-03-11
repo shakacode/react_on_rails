@@ -50,7 +50,8 @@ module ReactOnRails
           return false unless config.instance_variable_defined?(:@data)
 
           # Uses Shakapacker private internals (`data`/`@data`) to temporarily point
-          # test lookups at dev output. Keep this defensive for future Shakapacker changes.
+          # test lookups at dev output. Tested against Shakapacker 8.x and 9.x.
+          # Keep this defensive for future Shakapacker changes.
           new_data = config.send(:data).dup
           override_config_value!(new_data, :public_root_path, result[:dev_public_root_relative])
           override_config_value!(new_data, :public_output_path, result[:dev_output_relative])

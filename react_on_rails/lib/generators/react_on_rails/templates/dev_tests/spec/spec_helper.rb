@@ -21,7 +21,7 @@
 RSpec.configure do |config|
   # Requires config.build_test_command in config/initializers/react_on_rails.rb.
   # This is the default setup for React on Rails generated apps.
-  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest

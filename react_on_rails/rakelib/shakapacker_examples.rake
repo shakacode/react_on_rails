@@ -187,10 +187,10 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       # and gem versions, not the parent workspace's bundle context.
       unbundled_sh_in_dir(example_type.dir, "bundle exec rake react_on_rails:generate_packs")
       # Pre-build webpack bundles so server-side rendering works in tests.
-      # With build_test_command commented out (relying on shakapacker compile: true),
-      # the server bundle won't exist until webpack runs. Shakapacker's compile: true
-      # only triggers from javascript_pack_tag in the layout, which renders AFTER
-      # react_component(prerender: true) in the view body tries to read the server bundle.
+      # Even with build_test_command set, the server bundle needs to exist before
+      # test runs. Shakapacker's compile: true only triggers from javascript_pack_tag
+      # in the layout, which renders AFTER react_component(prerender: true) in the
+      # view body tries to read the server bundle.
       unbundled_sh_in_dir(example_type.dir, "RAILS_ENV=test bundle exec bin/shakapacker")
     end
   end

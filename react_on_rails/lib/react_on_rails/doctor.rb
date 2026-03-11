@@ -1032,7 +1032,10 @@ module ReactOnRails
       framework_status = test_helper_status_by_framework
 
       if framework_status.empty?
-        checker.add_info("ℹ️  No test directory found - skipping test helper check")
+        checker.add_info(
+          "ℹ️  No test helper files found (spec/rails_helper.rb, spec/spec_helper.rb, " \
+          "test/test_helper.rb) - skipping test helper check"
+        )
         return
       end
 

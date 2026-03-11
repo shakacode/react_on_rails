@@ -46,6 +46,9 @@ ReactOnRails.configure do |config|
   # - Can be slower due to on-demand recompilation
   # - See: https://github.com/shakacode/react_on_rails/blob/master/docs/oss/building-features/testing-configuration.md
   #
+  # If you set build_test_command, also add to your spec/rails_helper.rb (inside RSpec.configure):
+  #   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  #
   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 
   config.auto_load_bundle = true

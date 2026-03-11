@@ -49,7 +49,7 @@ RSpec.configure do |config|
   #
   # Requires config.build_test_command in config/initializers/react_on_rails.rb.
   # This is the default setup for React on Rails generated apps.
-  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 
   # Remove this line if you"re not using ActiveRecord or ActiveRecord fixtures
   config.fixture_path = "#{Rails.root}/spec/fixtures"
