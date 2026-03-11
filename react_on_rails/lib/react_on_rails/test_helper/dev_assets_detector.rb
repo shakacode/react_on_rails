@@ -52,11 +52,8 @@ module ReactOnRails
           # Uses Shakapacker private internals (`data`/`@data`) to temporarily point
           # test lookups at dev output. Keep this defensive for future Shakapacker changes.
           new_data = config.send(:data).dup
-          if new_data.key?("public_output_path")
-            new_data["public_output_path"] = result[:dev_output_relative]
-          else
-            new_data[:public_output_path] = result[:dev_output_relative]
-          end
+          override_config_value!(new_data, :public_root_path, result[:dev_public_root_relative])
+          override_config_value!(new_data, :public_output_path, result[:dev_output_relative])
           config.instance_variable_set(:@data, new_data.freeze)
 
           # Clear cached manifest so it reloads from the new path
@@ -75,6 +72,17 @@ module ReactOnRails
 
           MSG
         end
+
+        def override_config_value!(config_data, key, value)
+          string_key = key.to_s
+          symbol_key = key.to_sym
+
+          if config_data.key?(string_key)
+            config_data[string_key] = value
+          else
+            config_data[symbol_key] = value
+          end
+        end
       end
 
       # Checks if development assets are reusable for tests.
@@ -84,17 +92,13 @@ module ReactOnRails
         shakapacker_yml = load_shakapacker_yml
         return nil unless shakapacker_yml
 
-        dev_output_relative, dev_full_path = resolve_dev_output(shakapacker_yml)
-        return nil unless dev_output_relative
+        dev_output = resolve_dev_output(shakapacker_yml)
+        return nil unless dev_output
 
-        manifest_path = dev_full_path.join("manifest.json")
+        manifest_path = dev_output[:dev_full_path].join("manifest.json")
         return nil unless manifest_usable?(manifest_path)
 
-        {
-          dev_output_relative: dev_output_relative,
-          dev_full_path: dev_full_path,
-          manifest_path: manifest_path
-        }
+        dev_output.merge(manifest_path: manifest_path)
       end
 
       private
@@ -109,21 +113,25 @@ module ReactOnRails
         nil
       end
 
-      # Returns [dev_output_relative, dev_full_path] or nil if dev/test share the same path
+      # Returns dev output details or nil if dev/test already resolve to the same full path.
       def resolve_dev_output(shakapacker_yml)
         dev_config = resolve_env_config(shakapacker_yml, "development")
         test_config = resolve_env_config(shakapacker_yml, "test")
 
         dev_output_relative = dev_config["public_output_path"] || "packs"
         test_output_relative = test_config["public_output_path"] || "packs"
+        dev_public_root_relative = dev_config["public_root_path"] || "public"
+        test_public_root_relative = test_config["public_root_path"] || "public"
 
-        # If already using the same path, no override needed
-        return nil if dev_output_relative == test_output_relative
+        dev_full_path = project_root.join(dev_public_root_relative, dev_output_relative)
+        test_full_path = project_root.join(test_public_root_relative, test_output_relative)
+        return nil if dev_full_path == test_full_path
 
-        public_root = dev_config["public_root_path"] || "public"
-        dev_full_path = project_root.join(public_root, dev_output_relative)
-
-        [dev_output_relative, dev_full_path]
+        {
+          dev_output_relative: dev_output_relative,
+          dev_public_root_relative: dev_public_root_relative,
+          dev_full_path: dev_full_path
+        }
       end
 
       def manifest_usable?(manifest_path)

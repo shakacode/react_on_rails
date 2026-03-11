@@ -21,20 +21,22 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
     FileUtils.rm_rf(tmpdir)
   end
 
-  def write_shakapacker_yml(dev_output: "packs", test_output: "packs-test")
+  def write_shakapacker_yml(dev_output: "packs", test_output: "packs-test", dev_root: "public", test_root: nil)
     config = {
       "default" => {
         "source_path" => "app/javascript",
-        "public_root_path" => "public",
+        "public_root_path" => dev_root,
         "public_output_path" => dev_output
       },
       "development" => {},
       "test" => {
+        "public_root_path" => test_root,
         "public_output_path" => test_output,
         "compile" => false
       },
       "production" => {}
     }
+    config["test"].compact!
     File.write(File.join(tmpdir, "config", "shakapacker.yml"), YAML.dump(config))
   end
 
@@ -143,6 +145,7 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
         result = detector.check
         expect(result).not_to be_nil
         expect(result[:dev_output_relative]).to eq("packs")
+        expect(result[:dev_public_root_relative]).to eq("public")
         expect(result[:dev_full_path]).to eq(Pathname.new(dev_output_dir))
         expect(result[:manifest_path]).to eq(
           Pathname.new(File.join(dev_output_dir, "manifest.json"))
@@ -160,6 +163,30 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
         result = detector.check
         expect(result).not_to be_nil
         expect(result[:dev_output_relative]).to eq("packs")
+      end
+    end
+
+    context "when public roots differ but output names match" do
+      let(:alt_dev_output_dir) { File.join(tmpdir, "frontend-public", "packs") }
+
+      before do
+        FileUtils.mkdir_p(alt_dev_output_dir)
+        write_shakapacker_yml(
+          dev_output: "packs",
+          test_output: "packs",
+          dev_root: "frontend-public",
+          test_root: "public"
+        )
+        write_source_file(age_offset: 10)
+        write_manifest(alt_dev_output_dir)
+      end
+
+      it "still returns dev output details because the full paths differ" do
+        result = detector.check
+        expect(result).not_to be_nil
+        expect(result[:dev_output_relative]).to eq("packs")
+        expect(result[:dev_public_root_relative]).to eq("frontend-public")
+        expect(result[:dev_full_path]).to eq(Pathname.new(alt_dev_output_dir))
       end
     end
 
@@ -219,6 +246,7 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
     context "when dev assets are reusable" do
       let(:dev_result) do
         {
+          dev_public_root_relative: "public",
           dev_output_relative: "packs",
           dev_full_path: Pathname.new(dev_output_dir),
           manifest_path: Pathname.new(File.join(dev_output_dir, "manifest.json"))
@@ -237,6 +265,7 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
 
       it "overrides Shakapacker data with dev output path" do
         expect(mock_config).to receive(:instance_variable_set).with(:@data, anything) do |_name, new_data|
+          expect(new_data[:public_root_path]).to eq("public")
           expect(new_data[:public_output_path]).to eq("packs")
           expect(new_data).to be_frozen
         end
@@ -244,8 +273,14 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
       end
 
       it "overrides string-keyed Shakapacker data with dev output path" do
-        allow(mock_config).to receive(:send).with(:data).and_return({ "public_output_path" => "packs-test" }.freeze)
+        string_keyed_data = {
+          "public_root_path" => "test-public",
+          "public_output_path" => "packs-test"
+        }.freeze
+
+        allow(mock_config).to receive(:send).with(:data).and_return(string_keyed_data)
         expect(mock_config).to receive(:instance_variable_set).with(:@data, anything) do |_name, new_data|
+          expect(new_data["public_root_path"]).to eq("public")
           expect(new_data["public_output_path"]).to eq("packs")
         end
         described_class.try_activate_dev_assets!

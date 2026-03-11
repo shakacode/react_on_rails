@@ -330,7 +330,16 @@ module ReactOnRails
         def shakapacker_watch_process_running?
           # Detect existing shakapacker watcher processes (from either bin/dev or bin/dev static).
           # If one is already running, client-only test watch avoids duplicate server-bundle rebuilds.
-          return true if find_process_pids("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch").any?
+          server_only_watchers = find_process_pids("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+          if server_only_watchers.any?
+            return true if shared_private_output_paths?
+
+            puts Rainbow(
+              "   Existing server-bundle-only watcher found, " \
+              "but test/development private outputs differ; using full mode."
+            ).yellow
+            return false
+          end
 
           full_watchers = find_process_pids("bin/shakapacker --watch")
           return false if full_watchers.empty?
