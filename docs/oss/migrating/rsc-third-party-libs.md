@@ -159,8 +159,9 @@ export async function submitForm(formData) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user: { name } }),
   });
-  // Error handling omitted for brevity — in production, check res.ok
-  // and handle failures (e.g., throw an error or return a validation message).
+  if (!res.ok) {
+    throw new Error(`Failed to create user: ${res.status}`);
+  }
 }
 ```
 

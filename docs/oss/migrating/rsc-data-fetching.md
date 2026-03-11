@@ -88,7 +88,7 @@ This is the recommended data fetching pattern for React on Rails because:
 end %>
 ```
 
-> **See also:** [`stream_react_component_with_async_props` API documentation](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/) for setup instructions and configuration options.
+> **See also:** [`stream_react_component_with_async_props` RSC tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/) for setup instructions and configuration options.
 
 **React component (Server Component):**
 

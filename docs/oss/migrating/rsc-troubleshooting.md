@@ -470,11 +470,20 @@ Server Actions can be tested as regular async functions:
 // actions.test.js
 import { createUser } from './actions';
 
-it('creates a user', async () => {
+it('rejects invalid input', async () => {
   const formData = new FormData();
   formData.set('name', 'Alice');
+  // email is missing -- expect validation error
   const result = await createUser(formData);
-  expect(result.name).toBe('Alice');
+  expect(result.error).toBeDefined();
+});
+
+it('accepts valid input', async () => {
+  const formData = new FormData();
+  formData.set('name', 'Alice');
+  formData.set('email', 'alice@example.com');
+  const result = await createUser(formData);
+  expect(result).toBeUndefined(); // createUser returns no value on success
 });
 ```
 
@@ -618,7 +627,7 @@ The sections above cover generic RSC pitfalls. The following issues are specific
 
 **Cause:** This was a bug in `react-on-rails-pro` where the internal RSC stream teeing mechanism could deadlock under backpressure with large payloads.
 
-**Fix:** Upgrade to `react-on-rails-pro` >= 16.4.0.rc.3 ([PR #2444](https://github.com/shakacode/react_on_rails/pull/2444)).
+**Fix:** Upgrade to a version that includes this patch (`react-on-rails-pro` >= 16.4.0.rc.3, or any newer stable release) ([PR #2444](https://github.com/shakacode/react_on_rails/pull/2444)).
 
 ### Node Renderer VM Context -- Missing Globals
 

@@ -217,6 +217,8 @@ const configureRsc = () => {
 module.exports = configureRsc;
 ```
 
+> **Mutation safety note:** This example assumes `serverWebpackConfig(true)` returns a fresh config object per call. If your setup reuses shared config objects, clone `module.rules` / `rule.use` before mutating them in `configureRsc`.
+>
 > **React aliases note:** If your webpack config deduplicates React with aliases (common in pnpm/monorepo setups), you must override those aliases in the RSC config to point to the react-server entry files. Directory-path aliases bypass webpack's `conditionNames` resolution. Add these to the `alias` block above:
 >
 > ```js
