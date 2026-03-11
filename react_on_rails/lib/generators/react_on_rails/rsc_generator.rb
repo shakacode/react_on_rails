@@ -80,9 +80,9 @@ module ReactOnRails
       end
 
       def add_rsc_npm_dependencies
-        puts Rainbow("📝 Adding RSC npm dependencies...").yellow
+        say "📝 Adding RSC npm dependencies...", :yellow
         add_rsc_dependencies
-        puts Rainbow("✅ RSC npm dependencies added").green
+        say "✅ RSC npm dependencies added", :green
       end
 
       def print_success_message

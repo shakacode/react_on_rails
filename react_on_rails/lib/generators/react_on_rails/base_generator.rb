@@ -104,7 +104,7 @@ module ReactOnRails
       end
 
       def copy_webpack_config
-        puts "Adding #{using_rspack? ? 'Rspack' : 'Webpack'} config"
+        say "Adding #{using_rspack? ? 'Rspack' : 'Webpack'} config"
         base_path = "base/base"
         base_files = %w[babel.config.js
                         config/webpack/clientWebpackConfig.js
@@ -130,12 +130,12 @@ module ReactOnRails
         config = "config/shakapacker.yml"
 
         if options.shakapacker_just_installed?
-          puts "Replacing Shakapacker default config with React on Rails version"
+          say "Replacing Shakapacker default config with React on Rails version"
           # Shakapacker's installer just created this file from scratch (no pre-existing config).
           # Safe to overwrite silently with RoR's version-aware template (e.g., private_output_path).
           template("#{base_path}#{config}.tt", config, force: true)
         else
-          puts "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
+          say "Adding Shakapacker #{ReactOnRails::PackerUtils.shakapacker_version} config"
           # Thor handles the conflict: prompts user interactively, or respects --force/--skip flags.
           template("#{base_path}#{config}.tt", config)
         end
@@ -206,12 +206,12 @@ module ReactOnRails
             # Remove the file first to avoid conflict prompt, then recreate it
             remove_file(webpack_config_path, verbose: false)
             # Show what we're doing
-            puts "   #{set_color('replace', :green)}  #{webpack_config_path} " \
-                 "(auto-upgrading from standard Shakapacker to React on Rails config)"
+            say_status :replace,
+                       "#{webpack_config_path} (auto-upgrading from standard Shakapacker to React on Rails config)",
+                       :green
             template("#{base_path}/config/webpack/webpack.config.js.tt", webpack_config_path, config)
           elsif react_on_rails_config?(existing_content)
-            puts "   #{set_color('identical', :blue)}  #{webpack_config_path} " \
-                 "(already React on Rails compatible)"
+            say_status :identical, "#{webpack_config_path} (already React on Rails compatible)", :blue
             # Skip - don't need to do anything
           else
             handle_custom_webpack_config(base_path, config, webpack_config_path)
@@ -226,23 +226,25 @@ module ReactOnRails
         # Custom config - ask user
         config_file_name = File.basename(webpack_config_path)
         bundler_name = using_rspack? ? "rspack" : "webpack"
-        puts "\n#{set_color('NOTICE:', :yellow)} Your #{config_file_name} appears to be customized."
-        puts "React on Rails needs to replace it with an environment-specific loader."
-        puts "Your current config will be backed up to #{config_file_name}.backup"
+        say ""
+        say_status :notice, "Your #{config_file_name} appears to be customized.", :yellow
+        say "React on Rails needs to replace it with an environment-specific loader."
+        say "Your current config will be backed up to #{config_file_name}.backup"
 
         if yes?("Replace #{config_file_name} with React on Rails version? (Y/n)")
           # Create backup
           backup_path = "#{webpack_config_path}.backup"
           if File.exist?(webpack_config_path)
             FileUtils.cp(webpack_config_path, backup_path)
-            puts "   #{set_color('create', :green)}  #{backup_path} (backup of your custom config)"
+            say_status :create, "#{backup_path} (backup of your custom config)", :green
           end
 
           template("#{base_path}/config/webpack/webpack.config.js.tt", webpack_config_path, config)
         else
-          puts "   #{set_color('skip', :yellow)}  #{webpack_config_path}"
-          puts "   #{set_color('WARNING:', :red)} React on Rails may not work correctly " \
-               "without the environment-specific #{bundler_name} config"
+          say_status :skip, webpack_config_path, :yellow
+          say_status :warning,
+                     "React on Rails may not work correctly without the environment-specific #{bundler_name} config",
+                     :red
         end
       end
 
@@ -367,7 +369,7 @@ module ReactOnRails
         shakapacker_config_path = "config/shakapacker.yml"
         return unless File.exist?(shakapacker_config_path)
 
-        puts Rainbow("🔧 Configuring Shakapacker for Rspack...").yellow
+        say "🔧 Configuring Shakapacker for Rspack...", :yellow
 
         # Use regex replacement to preserve file structure (comments, anchors, aliases)
         # This replaces ALL occurrences of assets_bundler, not just in default section
@@ -385,7 +387,7 @@ module ReactOnRails
           '\1swc\2'
         )
 
-        puts Rainbow("✅ Updated shakapacker.yml for Rspack").green
+        say "✅ Updated shakapacker.yml for Rspack", :green
       end
 
       def configure_precompile_hook_in_shakapacker
@@ -406,7 +408,7 @@ module ReactOnRails
                   /^(\s*)#\s*precompile_hook:\s*~\s*$/,
                   "\\1precompile_hook: 'bin/shakapacker-precompile-hook'"
 
-        puts Rainbow("✅ Configured precompile_hook in shakapacker.yml").green
+        say "✅ Configured precompile_hook in shakapacker.yml", :green
       end
 
       def configure_private_output_path_in_shakapacker
@@ -446,7 +448,7 @@ module ReactOnRails
 
         return unless File.read(shakapacker_config_path).match?(/^\s+private_output_path:\s*ssr-generated/)
 
-        puts Rainbow("✅ Configured private_output_path in shakapacker.yml").green
+        say "✅ Configured private_output_path in shakapacker.yml", :green
       end
     end
   end

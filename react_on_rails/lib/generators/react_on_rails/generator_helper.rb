@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "rainbow"
 require "json"
 
 # rubocop:disable Metrics/ModuleLength
@@ -11,12 +10,12 @@ module GeneratorHelper
     require "package_json" unless defined?(PackageJson)
     @package_json ||= PackageJson.read
   rescue LoadError
-    puts "Warning: package_json gem not available. This is expected before Shakapacker installation."
-    puts "Dependencies will be installed using the default package manager after Shakapacker setup."
+    say "Warning: package_json gem not available. This is expected before Shakapacker installation."
+    say "Dependencies will be installed using the default package manager after Shakapacker setup."
     nil
   rescue StandardError => e
-    puts "Warning: Could not read package.json: #{e.message}"
-    puts "This is normal before Shakapacker creates the package.json file."
+    say "Warning: Could not read package.json: #{e.message}"
+    say "This is normal before Shakapacker creates the package.json file."
     nil
   end
 
@@ -33,8 +32,8 @@ module GeneratorHelper
       end
       true
     rescue StandardError => e
-      puts "Warning: Could not add packages via package_json gem: #{e.message}"
-      puts "Will fall back to direct npm commands."
+      say "Warning: Could not add packages via package_json gem: #{e.message}"
+      say "Will fall back to direct npm commands."
       false
     end
   end
@@ -95,8 +94,8 @@ module GeneratorHelper
 
   def print_generator_messages
     GeneratorMessages.messages.each do |message|
-      puts message
-      puts "" # Blank line after each message for readability
+      say message
+      say "" # Blank line after each message for readability
     end
   end
 

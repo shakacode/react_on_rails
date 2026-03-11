@@ -70,9 +70,9 @@ module ReactOnRails
       end
 
       def add_pro_npm_dependencies
-        puts Rainbow("📝 Adding Pro npm dependencies...").yellow
+        say "📝 Adding Pro npm dependencies...", :yellow
         add_pro_dependencies
-        puts Rainbow("✅ Pro npm dependencies added").green
+        say "✅ Pro npm dependencies added", :green
       end
 
       def print_success_message

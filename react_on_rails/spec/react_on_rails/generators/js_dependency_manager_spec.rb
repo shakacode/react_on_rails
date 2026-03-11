@@ -28,6 +28,14 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
         "/test/path"
       end
 
+      def say(message = "", _color = nil)
+        puts message
+      end
+
+      def say_status(_status, message, _color = nil)
+        puts message
+      end
+
       # Mock using_swc? from GeneratorHelper (defaults to true for SWC testing)
       def using_swc?
         @using_swc.nil? ? true : @using_swc
@@ -291,7 +299,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       # Capture stdout to verify the warning message
       expect do
         instance.send(:add_react_on_rails_package)
-      end.to output(/WARNING: Unrecognized version format invalid-version/).to_stdout
+      end.to output(/Unrecognized version format invalid-version/).to_stdout
     end
 
     it "adds warning when add_package fails" do

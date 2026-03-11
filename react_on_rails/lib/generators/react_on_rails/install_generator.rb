@@ -360,15 +360,15 @@ module ReactOnRails
       end
 
       def print_shakapacker_setup_banner
-        puts Rainbow("\n#{'=' * 80}").cyan
-        puts Rainbow("🔧 SHAKAPACKER SETUP").cyan.bold
-        puts Rainbow("=" * 80).cyan
+        say "\n#{'=' * 80}", :cyan
+        say "🔧 SHAKAPACKER SETUP", :cyan
+        say "=" * 80, :cyan
       end
 
       def ensure_shakapacker_in_gemfile
         return if shakapacker_in_gemfile?
 
-        puts Rainbow("📝 Adding Shakapacker to Gemfile...").yellow
+        say "📝 Adding Shakapacker to Gemfile...", :yellow
         # Use with_unbundled_env to prevent inheriting BUNDLE_GEMFILE from parent process
         # See: https://github.com/shakacode/react_on_rails/issues/2287
         success = Bundler.with_unbundled_env { system("bundle add shakapacker --strict") }
@@ -378,11 +378,11 @@ module ReactOnRails
       end
 
       def install_shakapacker
-        puts Rainbow("⚙️  Installing Shakapacker (required for webpack integration)...").yellow
+        say "⚙️  Installing Shakapacker (required for webpack integration)...", :yellow
 
         # First run bundle install to make shakapacker available
         # Use with_unbundled_env to prevent inheriting BUNDLE_GEMFILE from parent process
-        puts Rainbow("📦 Running bundle install...").yellow
+        say "📦 Running bundle install...", :yellow
         bundle_success = Bundler.with_unbundled_env { system("bundle install") }
         unless bundle_success
           handle_shakapacker_install_error
@@ -406,10 +406,10 @@ module ReactOnRails
       end
 
       def finalize_shakapacker_setup(yml_content_before)
-        puts Rainbow("✅ Shakapacker installed successfully!").green
-        puts Rainbow("=" * 80).cyan
-        puts Rainbow("🚀 CONTINUING WITH REACT ON RAILS SETUP").cyan.bold
-        puts "#{Rainbow('=' * 80).cyan}\n"
+        say "✅ Shakapacker installed successfully!", :green
+        say "=" * 80, :cyan
+        say "🚀 CONTINUING WITH REACT ON RAILS SETUP", :cyan
+        say "#{'=' * 80}\n", :cyan
 
         yml_content_after = File.exist?(SHAKAPACKER_YML_PATH) ? File.read(SHAKAPACKER_YML_PATH) : nil
 
@@ -503,7 +503,7 @@ module ReactOnRails
           return
         end
 
-        puts Rainbow("📝 Installing TypeScript dependencies...").yellow
+        say "📝 Installing TypeScript dependencies...", :yellow
         # Delegate to shared module for consistent dependency management
         add_typescript_dependencies
       end
@@ -514,7 +514,7 @@ module ReactOnRails
           return
         end
 
-        puts Rainbow("📝 Creating CSS module type definitions...").yellow
+        say "📝 Creating CSS module type definitions...", :yellow
 
         # Ensure the types directory exists
         FileUtils.mkdir_p("app/javascript/types")
@@ -538,7 +538,7 @@ module ReactOnRails
         TS
 
         File.write("app/javascript/types/css-modules.d.ts", css_module_types_content)
-        puts Rainbow("✅ Created CSS module type definitions").green
+        say "✅ Created CSS module type definitions", :green
       end
 
       def create_typescript_config
@@ -548,7 +548,7 @@ module ReactOnRails
         end
 
         if File.exist?("tsconfig.json")
-          puts Rainbow("⚠️  tsconfig.json already exists, skipping creation").yellow
+          say "⚠️  tsconfig.json already exists, skipping creation", :yellow
           return
         end
 
@@ -574,7 +574,7 @@ module ReactOnRails
         }
 
         File.write("tsconfig.json", JSON.pretty_generate(tsconfig_content))
-        puts Rainbow("✅ Created tsconfig.json").green
+        say "✅ Created tsconfig.json", :green
       end
     end
     # rubocop:enable Metrics/ClassLength

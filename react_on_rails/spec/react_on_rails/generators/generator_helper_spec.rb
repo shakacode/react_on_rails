@@ -5,6 +5,12 @@ require_relative "../support/generator_spec_helper"
 RSpec.describe GeneratorHelper, type: :generator do
   include described_class
 
+  # The module is exercised in isolation here (without Thor::Shell),
+  # so provide minimal shell methods used by generator helpers.
+  def say(message = "", _color = nil)
+    puts message
+  end
+
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
 
   describe "#add_npm_dependencies" do
