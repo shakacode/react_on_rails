@@ -25,7 +25,7 @@ The core React on Rails gem and npm package.
 
 ### Categories
 
-- [Getting Started](./oss/getting-started/README.md) - Installation, quick start, tutorial
+- [Getting Started](./oss/getting-started/quick-start.md) - Installation, quick start, tutorial
 - [Core Concepts](./oss/core-concepts/) - How React on Rails works, SSR, auto-bundling
 - [Building Features](./oss/building-features/) - Redux, routing, i18n, testing
 - [Configuration](./oss/configuration/README.md) - All configuration options
