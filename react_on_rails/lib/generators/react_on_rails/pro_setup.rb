@@ -24,7 +24,8 @@ module ReactOnRails
     # rubocop:disable Metrics/ModuleLength
     module ProSetup
       PRO_GEM_NAME = "react_on_rails_pro"
-      PRO_GEM_AUTO_INSTALL_COMMAND = "bundle add #{PRO_GEM_NAME} --strict".freeze
+      # Version is appended dynamically via pro_gem_auto_install_command to ensure
+      # the installed version matches the current react_on_rails gem version.
       AUTO_INSTALL_TIMEOUT = 120
       TERMINATION_GRACE_PERIOD = 5
 
@@ -114,7 +115,7 @@ module ReactOnRails
 
         begin
           pid = Bundler.with_unbundled_env do
-            Process.spawn(PRO_GEM_AUTO_INSTALL_COMMAND, out: output_w, err: output_w)
+            Process.spawn(pro_gem_auto_install_command, out: output_w, err: output_w)
           end
           output_w.close
           output_w = nil
@@ -439,7 +440,9 @@ module ReactOnRails
       end
 
       def pro_server_config_ready?(content)
-        content.include?("libraryTarget: 'commonjs2',") &&
+        # Check for the Pro-specific comment marker (written by the transform) to avoid
+        # false-negatives when commented-out lines also contain the pattern string.
+        content.include?("// Required for React on Rails Pro Node Renderer") &&
           content.include?("function extractLoader") &&
           content.include?("babelLoader.options.caller = { ssr: true }") &&
           content.include?("serverWebpackConfig.target = 'node'") &&
@@ -454,6 +457,10 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, server_client_path))
         content.include?("{ default: serverWebpackConfig }")
+      end
+
+      def pro_gem_auto_install_command
+        "bundle add #{PRO_GEM_NAME} --version='~> #{recommended_pro_gem_version}' --strict"
       end
 
       # Keep manual fallback pinned to the latest stable release (drop pre-release suffixes like .rc.N).

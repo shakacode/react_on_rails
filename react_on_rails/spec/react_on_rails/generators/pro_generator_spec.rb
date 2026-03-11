@@ -45,7 +45,8 @@ describe ProGenerator, type: :generator do
       expect(generator.send(:missing_pro_gem?, force: true)).to be true
       expect(Bundler).to have_received(:with_unbundled_env)
       expect(Process).to have_received(:spawn)
-        .with("bundle add react_on_rails_pro --strict", out: anything, err: anything)
+        .with(a_string_matching(/\Abundle add react_on_rails_pro --version='~> [\d.]+' --strict\z/),
+              out: anything, err: anything)
       error_text = GeneratorMessages.messages.join("\n")
       # Standalone message should NOT mention --pro flag
       expect(error_text).to include("This generator requires the react_on_rails_pro gem")
