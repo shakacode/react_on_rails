@@ -49,7 +49,7 @@ const AsyncProfileContent = async ({ name }) => {
  * - Can perform async operations (data fetching, file I/O, etc.)
  * - Can render <title>, <meta>, <link> which React 19 hoists to <head>
  */
-const NativeMetadataRSCApp = ({ helloWorldData }) => {
+const NativeMetadataRSCApp = ({ canonicalUrl, helloWorldData }) => {
   const { name } = helloWorldData;
 
   return (
@@ -57,8 +57,7 @@ const NativeMetadataRSCApp = ({ helloWorldData }) => {
       {/* Initial metadata — rendered in the shell (first streaming chunk) */}
       <title>Loading... | React on Rails</title>
       <meta property="og:site_name" content="React on Rails Demo" />
-      <link rel="canonical" href="https://example.com/profile" />
-      {/* placeholder — use the real page URL in production */}
+      <link rel="canonical" href={canonicalUrl} />
       <h1>React 19 Native Metadata in RSC</h1>
       <p>
         This page is rendered by a <strong>React Server Component</strong> (no &apos;use client&apos;

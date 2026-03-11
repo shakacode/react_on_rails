@@ -1,6 +1,6 @@
 <%# prerender: true is the default for stream_react_component; shown explicitly for clarity %>
 <%= stream_react_component("NativeMetadataRSCApp",
-                         props: @app_props_server_render,
+                         props: @app_props_server_render.merge(canonicalUrl: request.original_url),
                          prerender: true,
                          trace: true,
                          id: "NativeMetadataRSCApp-react-component-0") %>

@@ -55,6 +55,9 @@ async function Page() {
     'use server';
     // In React on Rails, Server Actions run in Node.js and cannot access
     // Rails models directly. Call your Rails API endpoint instead:
+    // This server-side fetch will not include the browser's CSRF token, so
+    // use an API-only route (for example `protect_from_forgery with:
+    // :null_session`) or another non-session auth mechanism.
     await fetch('/api/items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

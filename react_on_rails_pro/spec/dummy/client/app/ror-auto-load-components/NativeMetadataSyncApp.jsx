@@ -18,7 +18,7 @@ import React from 'react';
  * No HelmetProvider, no renderToString wrapper, no render function returning a hash.
  * Just render the tags directly and React 19 handles the rest.
  */
-const NativeMetadataSyncApp = ({ helloWorldData }) => {
+const NativeMetadataSyncApp = ({ canonicalUrl, helloWorldData }) => {
   const { name } = helloWorldData;
 
   return (
@@ -32,8 +32,7 @@ const NativeMetadataSyncApp = ({ helloWorldData }) => {
       />
       <meta property="og:title" content={`${name}'s Profile | React on Rails`} />
       <meta property="og:site_name" content="React on Rails Demo" />
-      <link rel="canonical" href="https://example.com/profile" />
-      {/* placeholder — use the real page URL in production */}
+      <link rel="canonical" href={canonicalUrl} />
 
       <h1>React 19 Native Metadata (Sync SSR)</h1>
       <p>

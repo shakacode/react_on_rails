@@ -305,7 +305,11 @@ export default async (props, _railsContext) => {
   });
 
   const apolloState = client.extract();
-  const apolloStateTag = `<script>window.__APOLLO_STATE__ = ${JSON.stringify(apolloState).replace(/</g, '\\u003c')};</script>`;
+  const serializedApolloState = JSON.stringify(apolloState)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+  const apolloStateTag = `<script>window.__APOLLO_STATE__ = ${serializedApolloState};</script>`;
 
   return {
     renderedHtml: {
