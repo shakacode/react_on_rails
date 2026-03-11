@@ -468,7 +468,7 @@ export default function run(config: Partial<Config>) {
         process.exit(1);
       }
       const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
-      log.info(`Node renderer ${workerName} listening on ${address}!`);
+      log.info({ workerName, address }, 'Node renderer listening');
     });
   }
 
