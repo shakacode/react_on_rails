@@ -33,7 +33,7 @@ The most important pattern for Context migration. Create a `'use client'` wrappe
 
 import { createContext, useState, useContext } from 'react';
 
-const ThemeContext = createContext('light');
+const ThemeContext = createContext({ theme: 'light', setTheme: () => {} });
 
 export function useTheme() {
   return useContext(ThemeContext);
@@ -117,6 +117,8 @@ export default async function ProductPage({ user, productId }) {
 
 ## Pattern 3: Streaming Slow Data with Async Props
 
+> **Note:** This section covers a cross-cutting concern (data fetching via async props) that affects how you structure context and state. For the full treatment of data fetching patterns, see [Data Fetching Migration](rsc-data-fetching.md).
+
 In React on Rails, data comes from Rails as props. Some data is available immediately (user session, page title), but other data requires expensive queries (analytics, recommendations, external APIs). With **async props**, you send the fast data as regular props so the shell renders immediately, and stream the slow data in the background as it becomes ready.
 
 ```erb
@@ -167,6 +169,8 @@ async function Reviews({ reviewsPromise }) {
 ```
 
 `getReactOnRailsAsyncProp(key)` returns a cached Promise (same object on repeated calls), so you can pass it to multiple children -- Server Components `await` it, Client Components resolve it with `use()`. No `React.cache()` or Context wiring needed.
+
+> **Note:** `React.cache()` is only available in React Server Component environments. It is not available in client components or non-RSC server rendering (e.g., `renderToString`).
 
 > For the full async props API, TypeScript typing, and more examples, see [Data Fetching in React on Rails Pro](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
@@ -246,13 +250,15 @@ If your component creates its own store from props (the pattern used by the Reac
 // HelloWorldApp.client.jsx
 'use client';
 
-import { useMemo } from 'react';
+import { useState } from 'react';
 import { Provider } from 'react-redux';
 import configureStore from '../store/helloWorldStore';
 import HelloWorldContainer from '../containers/HelloWorldContainer';
 
 export default function HelloWorldApp(props) {
-  const store = useMemo(() => configureStore(props), [props]);
+  // useState ensures the store is only created once (on mount), even though
+  // props is a new object reference on every render.
+  const [store] = useState(() => configureStore(props));
 
   return (
     <Provider store={store}>
@@ -390,7 +396,7 @@ import I18nProvider from './I18nProvider';
 
 export default function ProductPage({ locale, messages, ...props }) {
   // Server Components can use the translations object directly
-  const title = messages['product_page.title'];
+  const title = messages['title'];
 
   return (
     <div>

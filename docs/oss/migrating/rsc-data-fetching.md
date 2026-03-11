@@ -88,6 +88,8 @@ This is the recommended data fetching pattern for React on Rails because:
 end %>
 ```
 
+> **See also:** [`stream_react_component_with_async_props` API documentation](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/) for setup instructions and configuration options.
+
 **React component (Server Component):**
 
 ```tsx
@@ -230,6 +232,8 @@ async function ProductList() {
   );
 }
 ```
+
+> **React on Rails Pro note:** If your data lives in Rails (ActiveRecord, etc.), use [async props](#data-fetching-in-react-on-rails-pro) instead of calling a data layer directly from the component. Async props stream Rails-fetched data to the component via Suspense, without bypassing Rails' authorization and caching layers.
 
 ### Pattern 2: Prefetch + Hydrate (Keep React Query for Client Features)
 
@@ -640,7 +644,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 function Comments({ postId }) {
   const { data: comments } = useSuspenseQuery({
     queryKey: ['comments', postId],
-    queryFn: () => getComments(postId),
+    queryFn: () => getComments(postId), // client-side fetch wrapper — not the server-side function above
   });
   // The library manages promise identity internally —
   // same cache key returns the same promise reference.
@@ -752,9 +756,14 @@ export async function createComment(formData) {
   if (!content || content.length > 10000) throw new Error('Invalid content');
   if (!Number.isFinite(postId) || postId <= 0) throw new Error('Invalid postId');
 
-  // In React on Rails, call your Rails model/service directly instead of
-  // making an HTTP round-trip back to your own API:
-  await db.comments.create({ data: { content, postId, userId: session.userId } });
+  // In React on Rails, Server Actions run in Node.js and cannot access
+  // Rails models directly. Call your Rails API endpoint instead:
+  const response = await fetch('/api/comments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, postId, userId: session.userId }),
+  });
+  if (!response.ok) throw new Error('Failed to create comment');
 }
 ```
 

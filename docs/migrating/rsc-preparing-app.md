@@ -33,11 +33,11 @@ Install `react-on-rails-rsc`, which provides the webpack loader, webpack plugin,
 
 ```bash
 yarn add react-on-rails-rsc
-# or
-npm install react-on-rails-rsc
+# or: npm install react-on-rails-rsc
+# or: pnpm add react-on-rails-rsc
 ```
 
-Verify that `react` and `react-dom` are at version 19, and that the major and minor versions of `react-on-rails-rsc` match your `react` version (e.g., `react` 19.1.x should use `react-on-rails-rsc` 19.1.x):
+Verify that `react` and `react-dom` are at version 19 and that the versions match:
 
 ```bash
 yarn why react
@@ -49,7 +49,7 @@ yarn why react-on-rails-rsc
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
 
-> **Recommendation:** Use `react-on-rails-rsc` **19.0.4 or later**. Earlier versions (19.0.0 through 19.0.3) vendored older builds of `react-server-dom-webpack` that were updated in 19.0.4 with upstream security patches.
+> **Version requirements:** Use `react-on-rails-rsc` **19.0.4 or later** -- earlier versions (19.0.0 through 19.0.3) vendored older builds of `react-server-dom-webpack` that were updated in 19.0.4 with upstream security patches. The major and minor versions of `react-on-rails-rsc` must match your `react` version (e.g., `react` 19.1.x requires `react-on-rails-rsc` 19.1.x).
 
 ## Step 2: Configure Rails for RSC
 
@@ -189,9 +189,7 @@ const configureRsc = () => {
       // Babel transpiler: rule.use is a static array
       const jsLoader = extractLoader(rule, 'babel-loader') || extractLoader(rule, 'swc-loader');
       if (jsLoader) {
-        rule.use.push({
-          loader: 'react-on-rails-rsc/WebpackLoader',
-        });
+        rule.use = [...rule.use, { loader: 'react-on-rails-rsc/WebpackLoader' }];
       }
     }
   });

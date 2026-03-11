@@ -40,14 +40,14 @@ const AsyncProfileContent = async ({ name }) => {
 /**
  * RSC entry point demonstrating React 19's native document metadata.
  *
- * This is a React Server Component (no 'use client' directive), which means:
- * - It runs exclusively on the server (Node renderer)
- * - It can perform async operations (data fetching, file I/O, etc.)
- * - It can render <title>, <meta>, <link> which React 19 hoists to <head>
- * - It is registered via registerServerComponent, not ReactOnRails.register
+ * This component is auto-loaded (registered via `registerServerComponent` by the
+ * pack generator because it has no 'use client' directive). In hand-crafted bundle
+ * files, you would call `registerServerComponent({ NativeMetadataRSCApp })` explicitly.
  *
- * The absence of 'use client' is what makes this a server component.
- * The pack generator detects this and uses registerServerComponent automatically.
+ * As a React Server Component (no 'use client' directive), it:
+ * - Runs exclusively on the server (Node renderer)
+ * - Can perform async operations (data fetching, file I/O, etc.)
+ * - Can render <title>, <meta>, <link> which React 19 hoists to <head>
  */
 const NativeMetadataRSCApp = ({ helloWorldData }) => {
   const { name } = helloWorldData;
@@ -57,7 +57,7 @@ const NativeMetadataRSCApp = ({ helloWorldData }) => {
       {/* Initial metadata — rendered in the shell (first streaming chunk) */}
       <title>Loading... | React on Rails</title>
       <meta property="og:site_name" content="React on Rails Demo" />
-      <link rel="canonical" href="https://example.com/profile" />{' '}
+      <link rel="canonical" href="https://example.com/profile" />
       {/* placeholder — use the real page URL in production */}
       <h1>React 19 Native Metadata in RSC</h1>
       <p>

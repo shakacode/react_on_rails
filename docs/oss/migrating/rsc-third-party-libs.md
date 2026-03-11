@@ -151,12 +151,16 @@ All components include `'use client'` directives. Cannot use compound components
 
 export async function submitForm(formData) {
   const name = formData.get('name');
-  // Call your Rails API endpoint for the mutation
-  await fetch('/api/users', {
+  // Note: This fetch runs server-side. The Rails endpoint must skip CSRF
+  // protection (e.g., `protect_from_forgery with: :null_session` for API
+  // routes) since there is no browser session to provide a CSRF token.
+  const res = await fetch('/api/users', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user: { name } }),
   });
+  // Error handling omitted for brevity — in production, check res.ok
+  // and handle failures (e.g., throw an error or return a validation message).
 }
 ```
 

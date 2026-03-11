@@ -6,12 +6,14 @@ React 19 introduces built-in support for rendering `<title>`, `<meta>`, and `<li
 
 |                       | react-helmet + react_component_hash                        | React 19 Native Metadata                                     |
 | --------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ |
-| **SSR approach**      | `renderToString` only                                      | Works with `renderToString`, streaming, and RSC              |
+| **SSR approach**      | `renderToString` only                                      | Works with `renderToString`¹, streaming, and RSC             |
 | **Streaming support** | Not compatible                                             | Fully compatible                                             |
 | **Dependencies**      | `react-helmet` package                                     | None (built into React 19)                                   |
 | **Server setup**      | Render-function returning object + `Helmet.renderStatic()` | Standard component                                           |
 | **View helper**       | `react_component_hash` (returns Hash)                      | `react_component` or `stream_react_component` (returns HTML) |
 | **Bundle complexity** | Separate server/client render-functions                    | Same component for both                                      |
+
+¹ With `renderToString`, metadata tags initially appear in `<body>` (since React on Rails renders component fragments, not full documents). They are hoisted to `<head>` only after client hydration. Streaming and RSC do not have this limitation.
 
 ## What React 19 Hoists to `<head>`
 
@@ -314,7 +316,7 @@ export default async (props, _railsContext) => {
 };
 ```
 
-> **Security:** If you serialize JSON into an inline `<script>` tag, escape `<` characters (or use a safe serializer) so user data cannot break out of the script block with `</script>`.
+> **Security:** If you serialize JSON into an inline `<script>` tag, escape `<`, `>`, and `&` characters at minimum. Consider using a library like [`serialize-javascript`](https://github.com/yahoo/serialize-javascript) for comprehensive escaping, so user data cannot break out of the script block with `</script>` or inject HTML entities.
 
 ### Code-Splitting with @loadable/component
 

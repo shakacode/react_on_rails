@@ -20,7 +20,8 @@
 </p>
 <p>
   <strong>Trade-off:</strong> The title is NOT in <code>&lt;head&gt;</code> in the initial
-  server-rendered HTML (it's in <code>&lt;body&gt;</code>). Browsers still update the tab
+  server-rendered HTML (it's in <code>&lt;body&gt;</code>) because React on Rails renders
+  component fragments, not full HTML documents. Browsers still update the tab
   title, but SEO crawlers that don't execute JavaScript may not see it.
 </p>
 <p>

@@ -26,10 +26,14 @@ const NativeMetadataSyncApp = ({ helloWorldData }) => {
       {/* React 19: these tags are rendered in <body> during SSR, */}
       {/* then hoisted to <head> by React during client hydration */}
       <title>{`${name}'s Profile | React on Rails`}</title>
-      <meta name="description" content={`Profile page for ${name} - rendered with React 19 native metadata`} />
+      <meta
+        name="description"
+        content={`Profile page for ${name} - rendered with React 19 native metadata`}
+      />
       <meta property="og:title" content={`${name}'s Profile | React on Rails`} />
       <meta property="og:site_name" content="React on Rails Demo" />
       <link rel="canonical" href="https://example.com/profile" />
+      {/* placeholder — use the real page URL in production */}
 
       <h1>React 19 Native Metadata (Sync SSR)</h1>
       <p>
@@ -41,15 +45,16 @@ const NativeMetadataSyncApp = ({ helloWorldData }) => {
         <code>&lt;div&gt;</code> in <code>&lt;body&gt;</code>.
       </p>
       <p>
-        <strong>After hydration:</strong> React 19 automatically hoists them to{' '}
-        <code>&lt;head&gt;</code>. Check the page title — it says &quot;{name}&apos;s Profile | React
-        on Rails&quot;.
+        <strong>After hydration:</strong> React 19 automatically hoists them to <code>&lt;head&gt;</code>.
+        Check the page title — it says &quot;{name}&apos;s Profile | React on Rails&quot;.
       </p>
 
       <hr />
 
       <h3>Profile: {name}</h3>
-      <p>This content renders synchronously, suitable for use with <code>react_component</code>.</p>
+      <p>
+        This content renders synchronously, suitable for use with <code>react_component</code>.
+      </p>
     </div>
   );
 };

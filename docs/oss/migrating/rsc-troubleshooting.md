@@ -53,7 +53,13 @@ export default function ClientButton() {
 async function Page() {
   async function handleSubmit(formData) {
     'use server';
-    await db.items.create({ data: { name: formData.get('name') } });
+    // In React on Rails, Server Actions run in Node.js and cannot access
+    // Rails models directly. Call your Rails API endpoint instead:
+    await fetch('/api/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: formData.get('name') }),
+    });
   }
   return <ClientForm action={handleSubmit} />;
 }
@@ -276,7 +282,7 @@ This suppresses the warning for **this element only** (not its descendants) and 
 
 ## Error Boundary Limitations
 
-Error Boundaries do **not** catch errors thrown in Server Components. Errors from Server Components are uncaught on the client.
+Error Boundaries do **not** catch errors thrown during the initial Server Component HTML stream -- those errors bypass client-side Error Boundaries entirely. However, errors during RSC payload fetches (client-side navigations, `refetchComponent` calls) surface as `ServerComponentFetchError` and **can** be caught by Error Boundaries.
 
 ### Workaround: Retry with Page Reload
 
@@ -569,6 +575,9 @@ Server Components run on the server (in the node renderer), so they have access 
 ```jsx
 // Server Component -- full access to Node.js process.env
 async function DBComponent() {
+  // WARNING: If INTERNAL_API_URL points back to the same Rails server,
+  // this creates a circular request (Node renderer → Rails → Node renderer).
+  // Use a direct database call or internal service URL that bypasses Rails routing.
   const data = await fetch(process.env.INTERNAL_API_URL); // Works if this env var holds an HTTP(S) URL
   const dbUrl = process.env.DATABASE_URL; // Works
   const secret = process.env.API_SECRET; // Works
