@@ -439,8 +439,7 @@ module ReactOnRails
       end
 
       def pro_server_config_ready?(content)
-        content.include?("// Required for React on Rails Pro Node Renderer") &&
-          content.include?("libraryTarget: 'commonjs2',") &&
+        content.include?("libraryTarget: 'commonjs2',") &&
           content.include?("function extractLoader") &&
           content.include?("babelLoader.options.caller = { ssr: true }") &&
           content.include?("serverWebpackConfig.target = 'node'") &&
