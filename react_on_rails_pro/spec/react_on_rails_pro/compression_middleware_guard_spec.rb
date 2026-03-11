@@ -119,6 +119,21 @@ RSpec.describe ReactOnRailsPro::CompressionMiddlewareGuard do
       expect(guard.findings).to be_empty
       expect(logger).to have_received(:debug)
     end
+
+    it "treats timed out probes as non-findings and logs debug" do
+      condition = lambda { |_env, *_rest|
+        sleep 5
+      }
+      allow(Timeout).to receive(:timeout).and_raise(Timeout::Error)
+
+      guard = described_class.new(
+        middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: condition }])],
+        logger: logger
+      )
+
+      expect(guard.findings).to be_empty
+      expect(logger).to have_received(:debug)
+    end
   end
 
   describe "#warning_messages" do

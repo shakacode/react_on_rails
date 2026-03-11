@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "stringio"
+require "timeout"
 
 module ReactOnRailsPro
   class CompressionMiddlewareGuard
@@ -8,6 +9,7 @@ module ReactOnRailsPro
       "https://www.shakacode.com/react-on-rails/docs/building-features/" \
       "streaming-server-rendering/#compression-middleware-compatibility"
     PROBLEMATIC_MIDDLEWARES = %w[Rack::Deflater Rack::Brotli].freeze
+    PROBE_TIMEOUT_SECONDS = 1
 
     Finding = Struct.new(:middleware_name, :source_location, keyword_init: true)
 
@@ -45,7 +47,9 @@ module ReactOnRailsPro
     private
 
     def normalize_middlewares(middlewares)
-      return middlewares.middlewares if middlewares.respond_to?(:middlewares)
+      if defined?(ActionDispatch::MiddlewareStack) && middlewares.is_a?(ActionDispatch::MiddlewareStack)
+        return middlewares.middlewares
+      end
 
       Array(middlewares)
     end
@@ -67,10 +71,15 @@ module ReactOnRailsPro
     end
 
     def destructively_iterates_stream?(condition)
-      condition.call(probe_env, 200, probe_headers, StreamingBodyProbe.new)
+      Timeout.timeout(PROBE_TIMEOUT_SECONDS) do
+        condition.call(probe_env, 200, probe_headers, StreamingBodyProbe.new)
+      end
       false
     rescue StreamingBodyProbe::BodyIteratedError
       true
+    rescue Timeout::Error => e
+      log_probe_failure(condition, e, reason: "timed out after #{PROBE_TIMEOUT_SECONDS}s")
+      false
     rescue StandardError => e
       log_probe_failure(condition, e)
       false
@@ -79,6 +88,7 @@ module ReactOnRailsPro
     # Minimal Rack env used to probe `:if` callbacks.
     # Callbacks that depend on application-specific keys can still raise here;
     # those probe failures are logged at debug level and treated as non-findings.
+    # Path-gated callbacks can bypass this probe and yield false negatives.
     def probe_env
       {
         "CONTENT_TYPE" => "text/html; charset=utf-8",
@@ -114,14 +124,19 @@ module ReactOnRailsPro
       condition.respond_to?(:source_location) ? condition.source_location : nil
     end
 
-    def log_probe_failure(condition, error)
+    def log_probe_failure(condition, error, reason: nil)
       return unless @logger.respond_to?(:debug)
 
       identifier = source_location_for(condition)&.join(":") || condition.class.name || condition.inspect
+      backtrace_hint = error.backtrace&.first
 
       @logger.debug do
-        "[React on Rails Pro] CompressionMiddlewareGuard could not probe `:if` callback " \
-          "(#{identifier}): #{error.class}: #{error.message}"
+        message = "[React on Rails Pro] CompressionMiddlewareGuard could not probe `:if` callback " \
+                  "(#{identifier}): "
+        message += "#{reason}: " if reason
+        message += "#{error.class}: #{error.message}"
+        message += " (#{backtrace_hint})" if backtrace_hint
+        message
       end
     end
 
