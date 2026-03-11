@@ -43,10 +43,16 @@ module ReactOnRails
       info: :blue
     }.freeze
 
+    RSPEC_HELPER_FILES = ["spec/rails_helper.rb", "spec/spec_helper.rb"].freeze
+    MINITEST_HELPER_FILE = "test/test_helper.rb"
+    DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
+    DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
+
     def initialize(verbose: false, fix: false)
       @verbose = verbose
       @fix = fix
       @checker = SystemChecker.new
+      @test_output_path_strategy = :unknown
     end
 
     def run_diagnosis
@@ -405,6 +411,8 @@ module ReactOnRails
         puts "• Your setup is healthy! Consider these development workflow steps:"
       end
 
+      puts "• Auto-apply supported fixes: FIX=true rake react_on_rails:doctor"
+
       # Enhanced contextual suggestions based on what exists
       if File.exist?("bin/dev") && File.exist?("Procfile.dev")
         puts "• Start development with HMR: #{Rainbow('./bin/dev').cyan}"
@@ -425,6 +433,7 @@ module ReactOnRails
       test_suggestions << "yarn test" if yarn_test_script?
 
       puts "• Run tests: #{test_suggestions.join(' or ')}" if test_suggestions.any?
+      print_test_workflow_next_steps
 
       # Build suggestions
       if checker.messages.any? { |msg| msg[:content].include?("server bundle") }
@@ -435,6 +444,19 @@ module ReactOnRails
       puts
     end
     # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+    def print_test_workflow_next_steps
+      case @test_output_path_strategy
+      when :shared
+        puts "• Shared test/dev output path detected: use static workflow only"
+        puts "  - Start app with: ./bin/dev static"
+        puts "  - Avoid ./bin/dev (HMR) with shared output paths"
+        puts "  - Start test watcher with: ./bin/dev test-watch --test-watch-mode=client-only"
+      when :separate
+        puts "• Recommended default: keep test output path separate from development"
+        puts "• Start test watcher with: ./bin/dev test-watch (auto mode)"
+      end
+    end
 
     def check_gem_version
       gem_version = ReactOnRails::VERSION
@@ -1004,51 +1026,26 @@ module ReactOnRails
       end
     end
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def check_test_helper_setup
-      helper_paths = [
-        "spec/rails_helper.rb",
-        "spec/spec_helper.rb",
-        "test/test_helper.rb"
-      ]
+      framework_status = test_helper_status_by_framework
 
-      react_on_rails_test_helper_found = false
-
-      helper_paths.each do |helper_path|
-        next unless File.exist?(helper_path)
-
-        content = File.read(helper_path)
-
-        unless content.include?("ReactOnRails::TestHelper") || content.include?("configure_rspec_to_compile_assets")
-          next
-        end
-
-        checker.add_success("✅ ReactOnRails TestHelper configured in #{helper_path}")
-        react_on_rails_test_helper_found = true
-
-        # Check specific configurations
-        checker.add_success("  ✓ Assets compilation enabled for tests") if content.include?("ensure_assets_compiled")
-
-        checker.add_success("  ✓ RSpec configuration present") if content.include?("RSpec.configure")
+      if framework_status.empty?
+        checker.add_info("ℹ️  No test directory found - skipping test helper check")
+        return
       end
 
-      return if react_on_rails_test_helper_found
+      checker.add_info("ℹ️  ReactOnRails::TestHelper is optional unless using build_test_command")
 
-      if File.exist?("spec")
-        checker.add_warning("⚠️  ReactOnRails test helper not found")
-        checker.add_info("  Add to spec/rails_helper.rb:")
-        checker.add_info("  require 'react_on_rails/test_helper'")
-        checker.add_info("  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
-      elsif File.exist?("test")
-        checker.add_warning("⚠️  ReactOnRails test helper not found")
-        checker.add_info("  Add to test/test_helper.rb:")
-        checker.add_info("  require 'react_on_rails/test_helper'")
-        checker.add_info("  ReactOnRails::TestHelper.ensure_assets_compiled")
-      else
-        checker.add_info("ℹ️  No test directory found - skipping test helper check")
+      framework_status.each do |framework, status|
+        if status[:configured]
+          checker.add_success(
+            "✅ ReactOnRails TestHelper configured for #{framework_name(framework)} in #{status[:path]}"
+          )
+        else
+          checker.add_info("ℹ️  ReactOnRails TestHelper missing for #{framework_name(framework)} in #{status[:path]}")
+        end
       end
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def npm_test_script?
       return false unless File.exist?("package.json")
@@ -1093,7 +1090,7 @@ module ReactOnRails
       end
 
       File.join(source_path, source_entry_path, bundle_filename)
-    rescue StandardError
+    rescue LoadError, StandardError
       # Handle missing Shakapacker gem or other configuration errors
       bundle_filename = server_bundle_filename
       "app/javascript/packs/#{bundle_filename}"
@@ -1175,22 +1172,28 @@ module ReactOnRails
       false
     end
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength, Metrics/BlockNesting
     def check_build_test_configuration
       config_path = "config/initializers/react_on_rails.rb"
-      shakapacker_yml = "config/shakapacker.yml"
+      shakapacker_yml = shakapacker_config_path
 
       return unless File.exist?(config_path)
 
       checker.add_info("\n🧪 Test Asset Compilation:")
+      @test_output_path_strategy = :unknown
 
       begin
         config_content = File.read(config_path)
         has_build_test_command = config_content.match(/^\s*config\.build_test_command\s*=\s*["']([^"']+)["']/)
-        uses_test_helper = uses_react_on_rails_test_helper?
+        framework_status = test_helper_status_by_framework
+        configured_frameworks = configured_test_frameworks(framework_status)
+        missing_frameworks = missing_test_helper_frameworks(framework_status)
 
         if File.exist?(shakapacker_yml)
           shakapacker_content = File.read(shakapacker_yml)
+          check_test_public_output_path_workflow(shakapacker_content)
+          check_private_output_path_watcher_overlap(shakapacker_content)
+
           # Match test section and look for compile: true
           has_compile_true = shakapacker_content.match(/^test:.*?^\s+compile:\s*true/m)
 
@@ -1201,57 +1204,440 @@ module ReactOnRails
           if has_build_test_command && has_compile_true
             checker.add_warning("  ⚠️  Both build_test_command and shakapacker compile: true are configured")
             checker.add_info("  💡 These are mutually exclusive - use only one approach")
-            checker.add_info("  💡 Recommended: Use compile: true in shakapacker.yml (simpler)")
-            checker.add_info("  💡 Alternative: Use build_test_command with ReactOnRails::TestHelper (explicit control)")
-            checker.add_info("  📖 See: #{testing_config_url}")
-          elsif has_build_test_command && !uses_test_helper
-            checker.add_warning("  ⚠️  build_test_command is set but ReactOnRails::TestHelper is not configured")
-            if File.exist?("spec")
-              checker.add_info("  💡 Add to spec/rails_helper.rb:")
-              checker.add_info("      ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+            checker.add_info("  💡 Recommended: Use build_test_command with ReactOnRails::TestHelper")
+            checker.add_info("  💡 Alternative: Use compile: true in shakapacker.yml (simpler, less explicit)")
+            if fix
+              if update_test_compile_to_false(shakapacker_yml)
+                checker.add_success("  ✅ FIX=true: Updated config/shakapacker.yml test.compile to false")
+                has_compile_true = false
+              else
+                checker.add_warning("  ⚠️  FIX=true: Could not update config/shakapacker.yml automatically")
+              end
             else
-              checker.add_info("  💡 Add to test/test_helper.rb:")
-              checker.add_info("      ReactOnRails::TestHelper.ensure_assets_compiled")
+              checker.add_info("  💡 To auto-fix to the recommended path, run: FIX=true rake react_on_rails:doctor")
             end
+            checker.add_info("  📖 See: #{testing_config_url}")
+          end
+
+          if has_build_test_command && framework_status.empty?
+            checker.add_warning("  ⚠️  build_test_command is set but no test helper files were found")
+            checker.add_info(
+              "  💡 Expected one or more of: spec/rails_helper.rb, spec/spec_helper.rb, test/test_helper.rb"
+            )
             checker.add_info("  💡 Or remove build_test_command and use compile: true in shakapacker.yml")
-          elsif !has_build_test_command && uses_test_helper
+          elsif has_build_test_command && missing_frameworks.any?
+            checker.add_warning(
+              "  ⚠️  build_test_command is set but ReactOnRails::TestHelper is missing for " \
+              "#{framework_names(missing_frameworks)}"
+            )
+            add_test_helper_setup_guidance(missing_frameworks, framework_status)
+
+            if fix
+              fixed_frameworks = fix_missing_test_helpers(missing_frameworks, framework_status)
+              if fixed_frameworks.any?
+                checker.add_success(
+                  "  ✅ FIX=true: Added ReactOnRails::TestHelper wiring for #{framework_names(fixed_frameworks)}"
+                )
+              else
+                checker.add_warning("  ⚠️  FIX=true: Could not auto-update test helper files")
+              end
+            else
+              checker.add_info("  💡 To auto-fix helper wiring, run: FIX=true rake react_on_rails:doctor")
+            end
+
+            checker.add_info("  💡 Or remove build_test_command and use compile: true in shakapacker.yml")
+          elsif !has_build_test_command && configured_frameworks.any?
             checker.add_error("  🚫 ReactOnRails::TestHelper is configured but build_test_command is not set")
             checker.add_info("  💡 Add to config/initializers/react_on_rails.rb:")
-            checker.add_info("      config.build_test_command = 'RAILS_ENV=test bin/shakapacker'")
+            checker.add_info("      #{DEFAULT_BUILD_TEST_COMMAND}")
             checker.add_info("  💡 Or remove TestHelper and use compile: true in shakapacker.yml")
-          elsif !has_build_test_command && !has_compile_true && !uses_test_helper
+
+            if fix
+              if add_default_build_test_command(config_path)
+                checker.add_success("  ✅ FIX=true: Added build_test_command to config/initializers/react_on_rails.rb")
+              else
+                checker.add_warning("  ⚠️  FIX=true: Could not auto-update config/initializers/react_on_rails.rb")
+              end
+            else
+              checker.add_info("  💡 To auto-add build_test_command, run: FIX=true rake react_on_rails:doctor")
+            end
+          elsif !has_build_test_command && !has_compile_true && configured_frameworks.empty?
             checker.add_warning("  ⚠️  No test asset compilation configured")
-            checker.add_info("  💡 Recommended: Add to shakapacker.yml test section:")
-            checker.add_info("      compile: true")
+            checker.add_info("  💡 Recommended: Add to config/initializers/react_on_rails.rb:")
+            checker.add_info("      #{DEFAULT_BUILD_TEST_COMMAND}")
+            if framework_status.empty?
+              checker.add_info("  💡 Then wire ReactOnRails::TestHelper into your test framework")
+            else
+              add_test_helper_setup_guidance(framework_status.keys, framework_status)
+            end
+
+            if fix && !framework_status.empty?
+              command_added = add_default_build_test_command(config_path)
+              fixed_frameworks = fix_missing_test_helpers(framework_status.keys, framework_status)
+
+              if command_added || fixed_frameworks.any?
+                checker.add_success("  ✅ FIX=true: Applied recommended build_test_command + TestHelper setup")
+              else
+                checker.add_warning("  ⚠️  FIX=true: Could not auto-apply recommended test setup")
+              end
+            elsif !framework_status.empty?
+              checker.add_info("  💡 To auto-apply the recommended setup, run: FIX=true rake react_on_rails:doctor")
+            end
             checker.add_info("  📖 See: #{testing_config_url}")
-          elsif has_compile_true
+          elsif has_compile_true && !has_build_test_command
             checker.add_success("  ✅ Test assets configured via Shakapacker auto-compilation")
             checker.add_info("      (compile: true in shakapacker.yml)")
-          elsif has_build_test_command && uses_test_helper
+            checker.add_info(
+              "  💡 For explicit pre-test compilation (recommended for SSR), " \
+              "use build_test_command + ReactOnRails::TestHelper"
+            )
+          elsif has_build_test_command && missing_frameworks.empty? && configured_frameworks.any?
             checker.add_success("  ✅ Test assets configured via React on Rails test helper")
             checker.add_info("      (build_test_command + ReactOnRails::TestHelper)")
           end
         else
-          checker.add_warning("  ⚠️  config/shakapacker.yml not found")
+          checker.add_warning("  ⚠️  #{shakapacker_yml} not found")
         end
       rescue StandardError => e
         checker.add_warning("  ⚠️  Could not analyze test configuration: #{e.message}")
       end
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/MethodLength, Metrics/BlockNesting
 
     def uses_react_on_rails_test_helper?
-      spec_helpers = ["spec/rails_helper.rb", "spec/spec_helper.rb", "test/test_helper.rb"]
-      spec_helpers.any? do |helper|
-        next unless File.exist?(helper)
-
-        content = File.read(helper)
-        # Only match uncommented calls to avoid false positives from commented-out lines
-        content.match?(/^\s*(?!#).*(?:configure_rspec_to_compile_assets|ensure_assets_compiled)/)
-      end
+      test_helper_status_by_framework.values.any? { |status| status[:configured] }
     rescue StandardError
       false
     end
+
+    def shakapacker_config_path
+      ENV["SHAKAPACKER_CONFIG"] || DEFAULT_SHAKAPACKER_CONFIG_PATH
+    end
+
+    def check_test_public_output_path_workflow(shakapacker_content)
+      development_output_path = extract_env_config_value(shakapacker_content, "development", "public_output_path")
+      test_output_path = extract_env_config_value(shakapacker_content, "test", "public_output_path")
+
+      return unless development_output_path && test_output_path
+
+      checker.add_info("  development.public_output_path: #{development_output_path}")
+      checker.add_info("  test.public_output_path: #{test_output_path}")
+
+      if development_output_path == test_output_path
+        @test_output_path_strategy = :shared
+        checker.add_warning("  ⚠️  test and development share public_output_path '#{test_output_path}'")
+        checker.add_info("  💡 Shared output is an advanced workflow meant for bin/dev static")
+        checker.add_info("  💡 Do not use shared output with bin/dev (HMR): manifests can collide")
+        add_shared_output_path_procfile_guidance
+      else
+        @test_output_path_strategy = :separate
+        checker.add_success("  ✅ test and development use separate public_output_path values (recommended)")
+        checker.add_info("  💡 Separate output paths prevent manifest collisions across test and development")
+      end
+    end
+
+    def add_shared_output_path_procfile_guidance
+      return unless hmr_procfile_configured?
+
+      if static_procfile_available?
+        checker.add_warning(
+          "  ⚠️  HMR Procfile.dev is present. Shared output path is high-risk unless you run bin/dev static."
+        )
+        checker.add_info("  💡 Use: ./bin/dev static")
+        checker.add_info("  💡 For test watch in this setup: ./bin/dev test-watch --test-watch-mode=client-only")
+      else
+        checker.add_error(
+          "  🚫 Shared output path + HMR Procfile.dev detected, but Procfile.dev-static-assets is missing"
+        )
+        checker.add_info("  💡 Fix: separate test/development public_output_path values, or add static Procfile support")
+      end
+    end
+
+    def hmr_procfile_configured?
+      return false unless File.exist?("Procfile.dev")
+
+      File.read("Procfile.dev").include?("shakapacker-dev-server")
+    rescue StandardError
+      false
+    end
+
+    def static_procfile_available?
+      return false unless File.exist?("Procfile.dev-static-assets")
+
+      File.read("Procfile.dev-static-assets").include?("bin/shakapacker --watch")
+    rescue StandardError
+      false
+    end
+
+    def check_private_output_path_watcher_overlap(shakapacker_content)
+      default_private = extract_env_config_value(shakapacker_content, "default", "private_output_path")
+      development_private = extract_env_config_value(
+        shakapacker_content,
+        "development",
+        "private_output_path"
+      ) || default_private
+      test_private = extract_env_config_value(shakapacker_content, "test", "private_output_path") || default_private
+
+      return unless development_private && test_private
+      return unless development_private == test_private
+
+      checker.add_info("  development.private_output_path: #{development_private}")
+      checker.add_info("  test.private_output_path: #{test_private}")
+      checker.add_info(
+        "  💡 Server bundles share this path; full dev/test watchers can duplicate server-bundle rebuilds"
+      )
+      checker.add_info("  💡 Use ./bin/dev test-watch to auto-select full vs client-only test watch mode")
+    end
+
+    def extract_env_config_value(content, env_name, key)
+      lines = content.lines
+      in_section = false
+      section_indent = 0
+
+      lines.each do |line|
+        if (section_match = line.match(/^(\s*)#{Regexp.escape(env_name)}:\s*(?:#.*)?$/))
+          in_section = true
+          section_indent = section_match[1].length
+          next
+        end
+
+        next unless in_section
+        next if line.strip.empty? || line.strip.start_with?("#")
+
+        current_indent = line[/^\s*/].size
+        if current_indent <= section_indent
+          in_section = false
+          next
+        end
+
+        value_match = line.match(/^\s*#{Regexp.escape(key)}:\s*(.+?)\s*(?:#.*)?$/)
+        next unless value_match
+
+        return normalize_yaml_scalar(value_match[1])
+      end
+
+      nil
+    end
+
+    def normalize_yaml_scalar(value)
+      value.to_s.strip.gsub(/\A['"]|['"]\z/, "")
+    end
+
+    def test_helper_status_by_framework
+      status = {}
+
+      rspec_helper = preferred_rspec_helper_file
+      if rspec_helper
+        content = File.read(rspec_helper)
+        status[:rspec] = {
+          path: rspec_helper,
+          configured: helper_call_present?(content, "configure_rspec_to_compile_assets")
+        }
+      end
+
+      if File.exist?(MINITEST_HELPER_FILE)
+        content = File.read(MINITEST_HELPER_FILE)
+        status[:minitest] = {
+          path: MINITEST_HELPER_FILE,
+          configured: helper_call_present?(content, "ensure_assets_compiled")
+        }
+      end
+
+      status
+    rescue StandardError
+      {}
+    end
+
+    def preferred_rspec_helper_file
+      RSPEC_HELPER_FILES.find { |file| File.exist?(file) }
+    end
+
+    def helper_call_present?(content, method_name)
+      content.match?(/^\s*(?!#).*\b#{Regexp.escape(method_name)}\b/)
+    end
+
+    def configured_test_frameworks(framework_status)
+      framework_status.filter_map { |framework, status| framework if status[:configured] }
+    end
+
+    def missing_test_helper_frameworks(framework_status)
+      framework_status.filter_map { |framework, status| framework unless status[:configured] }
+    end
+
+    def framework_names(frameworks)
+      frameworks.map { |framework| framework_name(framework) }.join(", ")
+    end
+
+    def framework_name(framework)
+      framework == :rspec ? "RSpec" : "Minitest"
+    end
+
+    def add_test_helper_setup_guidance(frameworks, framework_status)
+      frameworks.each do |framework|
+        path = framework_status.dig(framework, :path) || fallback_path_for_framework(framework)
+        checker.add_info("  💡 Add to #{path}:")
+        checker.add_info("      require 'react_on_rails/test_helper'")
+        if framework == :rspec
+          checker.add_info("      ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+        else
+          checker.add_info("      ReactOnRails::TestHelper.ensure_assets_compiled")
+        end
+      end
+    end
+
+    def fallback_path_for_framework(framework)
+      return "spec/rails_helper.rb" if framework == :rspec
+
+      MINITEST_HELPER_FILE
+    end
+
+    def fix_missing_test_helpers(frameworks, framework_status)
+      fixed_frameworks = []
+
+      frameworks.each do |framework|
+        path = framework_status.dig(framework, :path)
+        next unless path
+
+        fixed = case framework
+                when :rspec
+                  ensure_rspec_test_helper_setup(path)
+                when :minitest
+                  ensure_minitest_test_helper_setup(path)
+                else
+                  false
+                end
+
+        fixed_frameworks << framework if fixed
+      end
+
+      fixed_frameworks
+    end
+
+    def ensure_rspec_test_helper_setup(file_path)
+      content = File.read(file_path)
+      return true if helper_call_present?(content, "configure_rspec_to_compile_assets")
+
+      updated_content = ensure_require_statement(content, "react_on_rails/test_helper", /^\s*RSpec\.configure/)
+
+      rspec_block = <<~RUBY.chomp
+        RSpec.configure do |config|
+          # Ensure that tests run against fresh webpack assets.
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+        end
+      RUBY
+      existing_rspec_block_injection = <<~RUBY
+        # Ensure that tests run against fresh webpack assets.
+        ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+      RUBY
+
+      updated_content = if updated_content.match?(/^\s*RSpec\.configure\s+do\s+\|config\|/)
+                          updated_content.sub(
+                            /^(\s*RSpec\.configure\s+do\s+\|config\|\s*\n)/,
+                            "\\1#{existing_rspec_block_injection}"
+                          )
+                        else
+                          "#{updated_content.rstrip}\n\n#{rspec_block}\n"
+                        end
+
+      File.write(file_path, updated_content)
+      true
+    rescue StandardError
+      false
+    end
+
+    def ensure_minitest_test_helper_setup(file_path)
+      content = File.read(file_path)
+      return true if helper_call_present?(content, "ensure_assets_compiled")
+
+      updated_content = ensure_require_statement(
+        content,
+        "react_on_rails/test_helper",
+        /^\s*class\s+ActiveSupport::TestCase/
+      )
+      minitest_block = <<~RUBY
+        # Ensure that tests run against fresh webpack assets.
+        ActiveSupport::TestCase.setup do
+          ReactOnRails::TestHelper.ensure_assets_compiled
+        end
+      RUBY
+      updated_content = "#{updated_content.rstrip}\n\n#{minitest_block}"
+      File.write(file_path, updated_content)
+      true
+    rescue StandardError
+      false
+    end
+
+    def ensure_require_statement(content, require_path, before_pattern = nil)
+      return content if content.match?(/^\s*require\s+["']#{Regexp.escape(require_path)}["']/)
+
+      require_line = "require \"#{require_path}\"\n"
+      return "#{content.rstrip}\n#{require_line}\n" unless before_pattern
+
+      match = content.match(before_pattern)
+      return "#{content.rstrip}\n#{require_line}\n" unless match
+
+      insert_position = match.begin(0)
+      "#{content[0...insert_position]}#{require_line}#{content[insert_position..]}"
+    end
+
+    def add_default_build_test_command(config_path)
+      content = File.read(config_path)
+      return true if content.match?(/^\s*config\.build_test_command\s*=\s*["'][^"']+["']/)
+
+      build_test_line = "  #{DEFAULT_BUILD_TEST_COMMAND}"
+      updated_content = if content.match?(/\nend\s*\z/)
+                          content.sub(/\nend\s*\z/, "\n#{build_test_line}\nend\n")
+                        else
+                          "#{content.rstrip}\n#{build_test_line}\n"
+                        end
+
+      File.write(config_path, updated_content)
+      true
+    rescue StandardError
+      false
+    end
+
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def update_test_compile_to_false(shakapacker_path)
+      content = File.read(shakapacker_path)
+      lines = content.lines
+
+      in_test_section = false
+      test_indent = 0
+      changed = false
+
+      lines.each_with_index do |line, index|
+        if (match = line.match(/^(\s*)test:\s*(?:#.*)?$/))
+          in_test_section = true
+          test_indent = match[1].length
+          next
+        end
+
+        next unless in_test_section
+        next if line.strip.empty?
+
+        current_indent = line[/^\s*/].size
+        if current_indent <= test_indent
+          in_test_section = false
+          next
+        end
+
+        compile_match = line.match(/^(\s*compile:\s*)true(\s*(?:#.*)?)$/)
+        next unless compile_match
+
+        lines[index] = "#{compile_match[1]}false#{compile_match[2]}\n"
+        changed = true
+        break
+      end
+
+      return false unless changed
+
+      File.write(shakapacker_path, lines.join)
+      true
+    rescue StandardError
+      false
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     def relativize_path(absolute_path)
       return absolute_path unless absolute_path.is_a?(String)

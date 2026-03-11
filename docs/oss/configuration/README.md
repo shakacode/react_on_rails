@@ -35,11 +35,14 @@ development:
 
 test:
   <<: *default
-  # Ensure that shakapacker invokes Webpack to build files for tests if not using the
-  #   ReactOnRails rspec helper.
-  compile: true
+  # For ReactOnRails::TestHelper + build_test_command (recommended), keep compile false.
+  # If you prefer Shakapacker auto-compilation instead, set compile: true and remove
+  # TestHelper/build_test_command wiring.
+  compile: false
 
-  # Generated files for tests, in /public/webpack/test
+  # Generated files for tests, in /public/webpack/test.
+  # Keep this separate from development output so each environment has its own
+  # manifest.json and HMR/dev assets never overwrite test assets.
   public_output_path: webpack/test
 
 production:
@@ -58,7 +61,7 @@ React on Rails configuration options are organized into two categories:
 Options you'll commonly configure for most applications:
 
 - `server_bundle_js_file` - Server rendering bundle (recommended)
-- `build_test_command` - Test environment build command (used with `ReactOnRails::TestHelper.configure_rspec_to_compile_assets`)
+- `build_test_command` - Test environment build command (used with ReactOnRails::TestHelper)
 
 ### Advanced Configuration
 
@@ -90,7 +93,9 @@ ReactOnRails.configure do |config|
 
   ################################################################################
   # Test Configuration
-  # Used with ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # Used with ReactOnRails::TestHelper:
+  # - RSpec: ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # - Minitest: ReactOnRails::TestHelper.ensure_assets_compiled
   # This controls what command is run to build assets during tests
   ################################################################################
   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
@@ -333,20 +338,21 @@ ReactOnRails.configure do |config|
   ################################################################################
   ################################################################################
   # TEST CONFIGURATION OPTIONS
-  # Below options are used with the use of this test helper:
-  # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # build_test_command is used with ReactOnRails::TestHelper:
+  # - RSpec: ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+  # - Minitest: ReactOnRails::TestHelper.ensure_assets_compiled
   #
   # NOTE:
-  # Instead of using this test helper, you may ensure fresh test files using Shakapacker via:
-  # 1. Have `config/webpack/test.js` exporting an array of objects to configure both client and server bundles.
-  # 2. Set the compile option to true in config/shakapacker.yml for env test
+  # Alternative (simpler): use Shakapacker auto-compilation in tests:
+  # 1. Set compile: true in config/shakapacker.yml for test environment
+  # 2. Remove ReactOnRails::TestHelper wiring
   ################################################################################
 
-  # If you are using this in your spec_helper.rb (or rails_helper.rb):
+  # If you are using this in your RSpec helper files:
   #
   # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
   #
-  # with rspec then this controls what yarn command is run
+  # then this controls what yarn/pnpm/npm command is run
   # to automatically refresh your Webpack assets on every test run.
   #
 end
@@ -370,34 +376,24 @@ Note: There should be ONE server bundle that can render all your server-rendered
 
 **Type:** String
 **Default:** `""`
-**Used with:** `ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)`
+**Used with:** ReactOnRails::TestHelper (`configure_rspec_to_compile_assets` for RSpec or `ensure_assets_compiled` for Minitest)
 
 **Important:** This option is only needed if you're using the React on Rails test helper. The two approaches below are **mutually exclusive** - use one or the other, not both.
 
-#### Recommended Approach: Shakapacker Auto-Compilation
+#### Recommended Approach: React on Rails Test Helper + build_test_command
 
-Set `compile: true` in `config/shakapacker.yml` for the test environment. Shakapacker will automatically compile assets before running tests:
+Set `build_test_command` and wire TestHelper into your test framework. Keep `compile: false` in `config/shakapacker.yml` test section.
+Keep test `public_output_path` separate from development (for example, `webpack/test` vs `webpack/dev`) so test and development manifests never overwrite each other.
 
-```yaml
-test:
-  compile: true
-  public_output_path: webpack/test
-```
+If your project uses both RSpec and Minitest, configure both helper files.
+If you are also running `bin/dev`, run `bin/dev test-watch` in a separate terminal for fast test iteration.
+Use `--test-watch-mode=full` or `--test-watch-mode=client-only` to override auto mode when needed.
+This shared-writer issue exists because server bundles usually go to `private_output_path` (default: `ssr-generated`) across environments.
 
-**Pros:**
+Advanced static-only workflow (optional):
 
-- Simpler configuration (no extra setup in spec helpers)
-- Managed by Shakapacker directly
-- Automatically integrates with Rails test environment
-
-**Cons:**
-
-- Less explicit control over when compilation happens
-- May compile more often than necessary
-
-#### Alternative Approach: React on Rails Test Helper
-
-Use `build_test_command` with `ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)` if you need explicit control:
+- If you intentionally run `bin/dev static`, you may set `test.public_output_path` equal to development so tests reuse static build output.
+- Do not use shared test/development output paths with `bin/dev` (HMR mode), or manifests can collide.
 
 ```ruby
 # config/initializers/react_on_rails.rb
@@ -405,11 +401,22 @@ config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 ```
 
 ```ruby
-# spec/rails_helper.rb (or spec_helper.rb)
+# spec/rails_helper.rb (RSpec)
 require "react_on_rails/test_helper"
 
 RSpec.configure do |config|
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+end
+```
+
+```ruby
+# test/test_helper.rb (Minitest)
+require "react_on_rails/test_helper"
+
+class ActiveSupport::TestCase
+  setup do
+    ReactOnRails::TestHelper.ensure_assets_compiled
+  end
 end
 ```
 
@@ -418,11 +425,27 @@ end
 - Explicit control over compilation timing
 - Only compiles once before test suite runs
 - Can customize the build command
+- Reliable for SSR tests because bundles are built before first render
 
 **Cons:**
 
 - Requires additional setup in spec helpers
 - More configuration to maintain
+
+#### Alternative Approach: Shakapacker Auto-Compilation
+
+Set `compile: true` in `config/shakapacker.yml` and remove TestHelper wiring:
+
+```yaml
+test:
+  compile: true
+  public_output_path: webpack/test
+```
+
+This is simpler but less explicit, and may be less reliable for SSR test ordering if server bundles are not prebuilt.
+
+Use `bundle exec rake react_on_rails:doctor` to verify your current setup, or
+`FIX=true bundle exec rake react_on_rails:doctor` to auto-apply supported test setup fixes.
 
 For more details on testing configuration, see the [Testing Configuration Guide](../building-features/testing-configuration.md).
 

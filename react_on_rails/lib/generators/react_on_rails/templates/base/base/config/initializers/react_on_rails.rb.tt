@@ -32,20 +32,21 @@ ReactOnRails.configure do |config|
   config.enforce_private_server_bundles = true
 
   ################################################################################
-  # Test Configuration (Optional)
+  # Test Configuration (Recommended)
   ################################################################################
   # ⚠️ IMPORTANT: Two mutually exclusive approaches - use ONLY ONE:
   #
-  # RECOMMENDED APPROACH: Set `compile: true` in config/shakapacker.yml test section
-  # - Simpler configuration (no additional setup needed)
-  # - Handled automatically by Shakapacker
+  # RECOMMENDED APPROACH: Use ReactOnRails::TestHelper with build_test_command
+  # - Compiles test assets before first render (reliable for SSR and client tests)
+  # - Compiles at most once per test run
+  # - Works with RSpec and Minitest
   #
-  # ALTERNATIVE APPROACH: Uncomment below AND configure ReactOnRails::TestHelper
-  # - Provides explicit control over test asset compilation timing
-  # - Requires adding ReactOnRails::TestHelper to spec/rails_helper.rb
+  # ALTERNATIVE APPROACH: Set `compile: true` in config/shakapacker.yml test section
+  # - Simpler setup, but less explicit control
+  # - Can be slower due to on-demand recompilation
   # - See: https://github.com/shakacode/react_on_rails/blob/master/docs/oss/building-features/testing-configuration.md
   #
-  # config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
 
   config.auto_load_bundle = true
   config.components_subdirectory = "ror_components"

@@ -455,6 +455,55 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     it "displays help information" do
       expect { described_class.show_help }.to output(%r{Usage: bin/dev \[command\]}).to_stdout_from_any_process
     end
+
+    it "documents test asset workflows" do
+      expect { described_class.show_help }.to output(/TEST ASSET WORKFLOWS/).to_stdout_from_any_process
+      expect { described_class.show_help }.to output(%r{bin/dev test-watch}).to_stdout_from_any_process
+      expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
+    end
+  end
+
+  describe ".run_test_watch" do
+    before do
+      allow(described_class).to receive(:puts)
+    end
+
+    it "uses full mode in auto mode when no watcher is running" do
+      allow(described_class).to receive(:find_process_pids).and_return([])
+
+      expect(described_class).to receive(:exec).with({ "RAILS_ENV" => "test" }, "bin/shakapacker", "--watch")
+
+      described_class.send(:run_test_watch, test_watch_mode: "auto")
+    end
+
+    it "uses client-only mode in auto mode when watcher is already running" do
+      allow(described_class).to receive(:find_process_pids)
+        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .and_return([12_345])
+
+      expect(described_class).to receive(:exec).with(
+        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "yes" },
+        "bin/shakapacker",
+        "--watch"
+      )
+
+      described_class.send(:run_test_watch, test_watch_mode: "auto")
+    end
+
+    it "accepts explicit full mode" do
+      allow(described_class).to receive(:find_process_pids).and_return([12_345])
+
+      expect(described_class).to receive(:exec).with({ "RAILS_ENV" => "test" }, "bin/shakapacker", "--watch")
+
+      described_class.send(:run_test_watch, test_watch_mode: "full")
+    end
+  end
+
+  describe ".extract_command_from_args" do
+    it "treats --test-watch-mode value as a flag value, not a command" do
+      command = described_class.send(:extract_command_from_args, ["--test-watch-mode", "client-only", "test-watch"])
+      expect(command).to eq("test-watch")
+    end
   end
 
   describe ".run_from_command_line with precompile hook" do
