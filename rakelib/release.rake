@@ -883,9 +883,6 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
         otp: current_rubygems_otp
       )
 
-      puts "\n⏳ Waiting 5 seconds before next publication to ensure OTP separation..."
-      sleep 5
-
       publish_gem_with_retry(
         release_paths_hash[:pro_gem_root],
         "react_on_rails_pro",
@@ -914,33 +911,36 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
   else
     sync_github_release_after_publish(monorepo_root: monorepo_root, gem_version: released_gem_version, dry_run: false)
 
-    msg = <<~MSG
+    changelog_path = File.join(monorepo_root, "CHANGELOG.md")
+    has_changelog_section = extract_changelog_section(changelog_path: changelog_path, version: released_gem_version)
 
-      #{'=' * 80}
-      RELEASE COMPLETE!
-      #{'=' * 80}
+    puts "\n#{'=' * 80}"
+    puts "RELEASE COMPLETE!"
+    puts "=" * 80
+    puts ""
+    puts "Published to npmjs.org:"
+    puts "  - react-on-rails@#{released_npm_version}"
+    puts "  - react-on-rails-pro@#{released_npm_version}"
+    puts "  - react-on-rails-pro-node-renderer@#{released_npm_version}"
+    puts "  - create-react-on-rails-app@#{released_npm_version}"
+    puts ""
+    puts "Ruby Gems (RubyGems.org):"
+    puts "  - react_on_rails #{released_gem_version}"
+    puts "  - react_on_rails_pro #{released_gem_version}"
+    puts ""
 
-      Published to npmjs.org:
-        - react-on-rails@#{released_npm_version}
-        - react-on-rails-pro@#{released_npm_version}
-        - react-on-rails-pro-node-renderer@#{released_npm_version}
-        - create-react-on-rails-app@#{released_npm_version}
-
-      Ruby Gems (RubyGems.org):
-        - react_on_rails #{released_gem_version}
-        - react_on_rails_pro #{released_gem_version}
-
-      Next steps:
-        Option A - Use Claude Code (recommended):
-          Run /update-changelog to analyze commits, write entries, and create a PR
-
-        Option B - Manual:
-          1. Ensure CHANGELOG.md entries are complete
-          2. Push any follow-up changelog fixes if needed
-
-    MSG
-
-    puts msg
+    if has_changelog_section
+      puts "Changelog: ✓ CHANGELOG.md section found for #{released_gem_version}"
+    else
+      puts "Next steps:"
+      puts "  Option A - Use Claude Code (recommended):"
+      puts "    Run /update-changelog to analyze commits, write entries, and create a PR"
+      puts ""
+      puts "  Option B - Manual:"
+      puts "    1. Ensure CHANGELOG.md entries are complete"
+      puts "    2. Push any follow-up changelog fixes if needed"
+    end
+    puts ""
   end
 end
 
