@@ -14,6 +14,7 @@ Here are the options available for the JavaScript renderer configuration object,
    [On Heroku](https://devcenter.heroku.com/articles/dyno-startup-behavior#port-binding-of-web-dynos) or [ControlPlane](https://docs.controlplane.com/reference/workload/containers#port-variable) you may want to use `process.env.PORT`.
 1. **host** (default: `process.env.RENDERER_HOST || 'localhost'`) - The host/IP address the renderer should bind to.
    Set it to `0.0.0.0` for containerized environments where external health checks need to reach the server.
+   **Security caution:** binding `host` to `0.0.0.0` exposes the renderer on all network interfaces. Use this only behind private networking, firewall/ALB rules, or with `password` authentication enabled. If those protections are not in place, keep `host` on `localhost`/loopback.
 1. **logLevel** (default: `process.env.RENDERER_LOG_LEVEL || 'info'`) - The renderer log level. Set it to `silent` to turn logging off.
    [Available levels](https://getpino.io/#/docs/api?id=levels): `{ fatal: 60, error: 50, warn: 40, info: 30, debug: 20, trace: 10 }`. `silent` can be used as well.
 1. **logHttpLevel** (default: `process.env.RENDERER_LOG_HTTP_LEVEL || 'error'`) - The HTTP server log level (same allowed values as `logLevel`).
