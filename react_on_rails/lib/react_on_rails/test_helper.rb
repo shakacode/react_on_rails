@@ -26,7 +26,7 @@ module ReactOnRails
     # faster. The helper looks for these processes and will abort recompiling if it finds them
     # to be running.
     #
-    # See docs/oss/building-features/testing-configuration.md for more info
+    # See https://github.com/shakacode/react_on_rails/blob/master/docs/oss/building-features/testing-configuration.md for more info
     #
     # Params:
     # config - config for rspec
