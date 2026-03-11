@@ -25,7 +25,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-### [16.4.0.rc.7] - 2026-03-08
+### [16.4.0.rc.8] - 2026-03-10
 
 Changes since the last non-beta release.
 
@@ -85,8 +85,6 @@ Changes since the last non-beta release.
 ##### Improved
 
 - **Better error messages when component is missing `'use client'` with RSC**. When RSC support is enabled, components without `'use client'` silently crash at runtime with confusing errors. Improved error messages at multiple layers: runtime server and client bundles now include the component name and suggest adding `'use client'`, build-time heuristic scans for client-only patterns and emits warnings, and generated server component pack files explain the classification. [PR 2403](https://github.com/shakacode/react_on_rails/pull/2403) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-#### Pro
 
 ##### Fixed
 
@@ -2036,8 +2034,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.7...master
-[16.4.0.rc.7]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.7
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.8...master
+[16.4.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0.rc.8
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0
