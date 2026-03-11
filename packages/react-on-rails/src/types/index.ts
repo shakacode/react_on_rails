@@ -26,7 +26,7 @@ export type RailsContext = {
   i18nDefaultLocale: string;
   rorVersion: string;
   // True when React on Rails Pro is installed on the server.
-  // This is not a signal that the current license token is valid.
+  // This does not indicate whether the current license token is valid.
   rorPro: boolean;
   rorProVersion?: string;
   href: string;

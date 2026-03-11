@@ -102,7 +102,7 @@ class ComponentRenderer {
     // railsContext.rorPro reflects Pro package availability, not license validity.
     const hasProInstalled = railsContext.rorPro;
 
-    // Handle immediate_hydration feature usage without Pro license
+    // Handle immediate_hydration feature usage without Pro installed
     if (isImmediateHydrationRequested && !hasProInstalled) {
       console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
 
