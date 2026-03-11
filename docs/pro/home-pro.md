@@ -24,7 +24,7 @@ See the README.md in those sample apps for more details.
 
 React on Rails Pro supports React 18's Streaming Server-Side Rendering, allowing you to progressively render and stream HTML content to the client. This enables faster page loads and better user experience.
 
-See [docs/streaming-server-rendering](./streaming-server-rendering.md) for more details.
+See [Streaming Server Rendering](./streaming-server-rendering.md) for more details.
 
 ### Caching
 
@@ -33,7 +33,7 @@ Caching of SSR is critical for achieving optimum performance.
 - **Fragment Caching**: for `react_component` and `react_component_hash`, including lazy evaluation of props.
 - **Prerender Caching**: Server rendering JavaScript evaluation is cached if `prerender_caching` is turned on in your Rails config. This applies to all JavaScript evaluation methods.
 
-See [docs/caching](./caching.md) for more details.
+See [Fragment Caching](./caching.md) for more details.
 
 ### Clearing of Global State
 
