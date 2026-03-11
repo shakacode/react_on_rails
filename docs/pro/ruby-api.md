@@ -25,7 +25,7 @@ end %>
 
 ### `cached_react_component_hash(component_name, options = {}, &block)`
 
-Fragment-cached version of `react_component_hash`. Automatically sets `prerender: true`. Returns a hash with `"html"` and `"consoleReplayScript"` keys.
+Fragment-cached version of `react_component_hash`. Automatically sets `prerender: true` (required because the hash return value splits server-rendered HTML from the console replay script). Returns a hash with `"html"` and `"consoleReplayScript"` keys.
 
 Same caching options as `cached_react_component`.
 

@@ -25,14 +25,15 @@ The core React on Rails gem and npm package.
 
 ### Categories
 
-- [Getting Started](./oss/getting-started/) - Installation, quick start, tutorial
+- [Getting Started](./oss/getting-started/README.md) - Installation, quick start, tutorial
 - [Core Concepts](./oss/core-concepts/) - How React on Rails works, SSR, auto-bundling
 - [Building Features](./oss/building-features/) - Redux, routing, i18n, testing
-- [Configuration](./oss/configuration/) - All configuration options
+- [Configuration](./oss/configuration/README.md) - All configuration options
 - [API Reference](./oss/api-reference/) - View helpers and JavaScript API
-- [Deployment](./oss/deployment/) - Production deployment and troubleshooting
+- [Deployment](./oss/deployment/README.md) - Production deployment and troubleshooting
 - [Upgrading](./oss/upgrading/) - Version upgrade guides
 - [Migrating](./oss/migrating/) - From other frameworks
+- [Misc](./oss/misc/) - Articles, tips, credits, and other resources
 
 ### Quick Reference
 

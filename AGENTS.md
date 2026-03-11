@@ -97,6 +97,7 @@ cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 | `docs/oss/`                          | OSS documentation — published to the [ShakaCode website](https://www.shakacode.com/react-on-rails/docs/) |
 | `docs/pro/`                          | Pro documentation — installation, configuration, RSC, node renderer, caching                             |
 | `analysis/`                          | Investigation and analysis documents (kebab-case `.md` files)                                            |
+| `internal/`                          | Contributor guides, planning docs, and testimonials (not published to the website)                       |
 
 ## Code Style
 
@@ -180,7 +181,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Skip pre-commit hooks (`--no-verify`)
 - Commit secrets, credentials, or `.env` files
 - Commit `package-lock.json`, `yarn.lock`, or other non-pnpm lock files
-- Add files to the `docs/` root — OSS docs go in `docs/oss/` subdirectories (`getting-started/`, `core-concepts/`, `building-features/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `misc/`); Pro docs go in `docs/pro/`
+- Add files to the `docs/` root — OSS docs go in `docs/oss/` subdirectories (`getting-started/`, `core-concepts/`, `building-features/`, `configuration/`, `api-reference/`, `deployment/`, `migrating/`, `upgrading/`, `misc/`); Pro docs go in `docs/pro/`
 - Force push to `main` or `master`
 
 ## Key Concept: File Suffixes vs. RSC Directive

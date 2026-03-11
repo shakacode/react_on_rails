@@ -9,7 +9,7 @@ For general React on Rails configuration options, see [Configuration](README.md)
 React Server Components and Streaming SSR are React on Rails Pro features.
 
 For detailed configuration of RSC and streaming features, see the Pro package documentation:
-[docs/pro/configuration.md](../pro/configuration.md)
+[docs/pro/configuration.md](../../pro/configuration.md)
 
 ### Key Pro Configurations
 

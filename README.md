@@ -148,7 +148,7 @@ To provide a high-performance framework for integrating Ruby on Rails with React
 | 📦 **Easy Props Passing**     | Direct Rails → React data flow without separate API calls                                                                                                                                               |
 | 🗺️ **Router Integration**     | [React Router](https://reactrouter.com/) with SSR support                                                                                                                                               |
 | 🏪 **State Management**       | [Redux](https://redux.js.org/) integration with server-side rendering                                                                                                                                   |
-| 🌍 **Internationalization**   | [I18n and localization support](https://www.shakacode.com/react-on-rails/docs/building-features/i18n) for global apps                                                                                   |
+| 🌍 **Internationalization**   | [I18n and localization support](./docs/oss/building-features/i18n.md) for global apps                                                                                                                   |
 | 🎨 **Modern React**           | React 18+ with enhanced React Server Components and latest patterns                                                                                                                                     |
 | 🦄 **ReScript Support**       | [ReScript integration](https://github.com/shakacode/rescript-react-on-rails-example) for type-safe development                                                                                          |
 

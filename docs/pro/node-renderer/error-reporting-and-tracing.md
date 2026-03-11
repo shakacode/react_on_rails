@@ -1,6 +1,6 @@
 # Error Reporting and Tracing
 
-For versions before 4.0.0, error reporting was configured via `honeybadgerApiKey` and `sentryDsn` options which are now deprecated. See the current integration approach below.
+For versions before 4.0.0, error reporting was configured via `honeybadgerApiKey` and `sentryDsn` options. These options were removed in 4.0.0 and will cause an error if used. See the current integration approach below.
 
 To integrate with error reporting and tracing services,
 you need a custom configuration script as described in [Node Renderer JavaScript Configuration](./js-configuration.md).
