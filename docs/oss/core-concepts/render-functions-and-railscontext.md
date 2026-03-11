@@ -90,6 +90,7 @@ The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https:
     i18nLocale: I18n.locale,
     i18nDefaultLocale: I18n.default_locale,
     rorVersion: ReactOnRails::VERSION,
+    # Pro package installed (not license-valid state)
     rorPro: ReactOnRails::Utils.react_on_rails_pro?,
 
     # URL settings

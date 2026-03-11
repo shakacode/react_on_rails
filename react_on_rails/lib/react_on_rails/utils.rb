@@ -251,9 +251,8 @@ module ReactOnRails
       end
     end
 
-    # Checks if React on Rails Pro is installed and licensed.
-    # Checks if React on Rails Pro gem is installed
-    # Note: This only checks gem presence, not license validity
+    # Checks if the React on Rails Pro gem is installed.
+    # Note: This checks gem presence only, not license validity.
     #
     # @return [Boolean] true if Pro gem is available
     def self.react_on_rails_pro?

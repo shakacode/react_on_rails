@@ -81,7 +81,7 @@ The license is validated at multiple points:
 
 1. **Ruby Gem**: When Rails application starts
 2. **Node Renderer**: When the Node renderer process starts
-3. **Browser Package**: Trusts server-side validation (via `railsContext.rorPro`)
+3. **Browser Package**: Receives Pro-installed signal via `railsContext.rorPro` (not license-valid state)
 
 When no license is present, the application runs in **unlicensed mode**. This is fine for development, testing, and CI/CD. Production deployments should always have a valid paid license.
 

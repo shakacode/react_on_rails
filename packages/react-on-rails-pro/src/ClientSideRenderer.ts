@@ -99,10 +99,11 @@ class ComponentRenderer {
    */
   private async render(el: Element, railsContext: RailsContext): Promise<void> {
     const isImmediateHydrationRequested = el.getAttribute('data-immediate-hydration') === 'true';
-    const hasProLicense = railsContext.rorPro;
+    // railsContext.rorPro reflects Pro package availability, not license validity.
+    const hasProInstalled = railsContext.rorPro;
 
     // Handle immediate_hydration feature usage without Pro license
-    if (isImmediateHydrationRequested && !hasProLicense) {
+    if (isImmediateHydrationRequested && !hasProInstalled) {
       console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
 
       // Fallback to standard behavior: wait for page load before hydrating
