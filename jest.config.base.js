@@ -39,6 +39,9 @@ export default {
   // Default test pattern - packages can override this
   testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)'],
 
+  // Clear mock call history and implementations between tests.
+  clearMocks: true,
+
   // === Common Module File Extensions ===
   // Include cts/mts for CommonJS/ES module TypeScript files
   moduleFileExtensions: ['js', 'jsx', 'ts', 'tsx', 'cts', 'mts', 'json'],
