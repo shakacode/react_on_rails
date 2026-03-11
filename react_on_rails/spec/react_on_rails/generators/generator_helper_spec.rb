@@ -7,8 +7,12 @@ RSpec.describe GeneratorHelper, type: :generator do
 
   # The module is exercised in isolation here (without Thor::Shell),
   # so provide minimal shell methods used by generator helpers.
-  def say(message = "", _color = nil)
-    puts message
+  def say(message = "", color = nil, force_new_line = nil)
+    say_calls << { message: message, color: color, force_new_line: force_new_line }
+  end
+
+  def say_calls
+    @say_calls ||= []
   end
 
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
@@ -49,14 +53,15 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
 
       context "when package_json gem raises an error" do
-        it "returns false and prints a warning" do
+        it "returns false and logs a warning via say" do
           packages = ["react"]
 
           allow(mock_manager).to receive(:add).and_raise(StandardError, "Installation failed")
-          expect { add_npm_dependencies(packages) }.to output(/Warning: Could not add packages/).to_stdout
 
           result = add_npm_dependencies(packages)
           expect(result).to be false
+          expect(say_calls).to include(a_hash_including(message: a_string_matching(/Warning: Could not add packages/)))
+          expect(say_calls).to include(a_hash_including(message: "Will fall back to direct npm commands."))
         end
       end
     end
@@ -109,9 +114,16 @@ RSpec.describe GeneratorHelper, type: :generator do
         end)
       end
 
-      it "returns nil and prints a warning" do
-        expect { package_json }.to output(/Warning: Could not read package\.json/).to_stdout
-        expect(package_json).to be_nil
+      it "returns nil and logs a warning via say" do
+        result = package_json
+
+        expect(result).to be_nil
+        expect(say_calls).to include(
+          a_hash_including(message: a_string_matching(/Warning: Could not read package\.json/))
+        )
+        expect(say_calls).to include(
+          a_hash_including(message: "This is normal before Shakapacker creates the package.json file.")
+        )
       end
     end
   end

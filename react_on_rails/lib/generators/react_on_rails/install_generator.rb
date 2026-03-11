@@ -360,9 +360,9 @@ module ReactOnRails
       end
 
       def print_shakapacker_setup_banner
-        say "\n#{'=' * 80}", :cyan
-        say "🔧 SHAKAPACKER SETUP", :cyan
-        say "=" * 80, :cyan
+        say "\n#{set_color('=' * 80, :cyan, :bold)}"
+        say set_color("🔧 SHAKAPACKER SETUP", :cyan, :bold)
+        say set_color("=" * 80, :cyan, :bold)
       end
 
       def ensure_shakapacker_in_gemfile

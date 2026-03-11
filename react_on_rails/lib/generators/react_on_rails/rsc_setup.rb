@@ -126,15 +126,15 @@ module ReactOnRails
       end
 
       def print_rsc_setup_banner
-        say "\n#{'=' * 80}", :magenta
-        say "🚀 REACT SERVER COMPONENTS SETUP", :magenta
-        say "=" * 80, :magenta
+        say "\n#{set_color('=' * 80, :magenta, :bold)}"
+        say set_color("🚀 REACT SERVER COMPONENTS SETUP", :magenta, :bold)
+        say set_color("=" * 80, :magenta, :bold)
       end
 
       def print_rsc_complete_banner
-        say "=" * 80, :magenta
+        say set_color("=" * 80, :magenta, :bold)
         say "✅ React Server Components setup complete!", :green
-        say "=" * 80, :magenta
+        say set_color("=" * 80, :magenta, :bold)
       end
 
       def create_rsc_webpack_config

@@ -38,18 +38,18 @@ module ReactOnRails
       #
       # @note NPM dependencies are handled separately by JsDependencyManager
       def setup_pro
-        say "\n#{'=' * 80}", :cyan
-        say "🚀 REACT ON RAILS PRO SETUP", :cyan
-        say "=" * 80, :cyan
+        say "\n#{set_color('=' * 80, :cyan, :bold)}"
+        say set_color("🚀 REACT ON RAILS PRO SETUP", :cyan, :bold)
+        say set_color("=" * 80, :cyan, :bold)
 
         create_pro_initializer
         create_node_renderer
         add_pro_to_procfile
         update_webpack_config_for_pro
 
-        say "=" * 80, :cyan
+        say set_color("=" * 80, :cyan, :bold)
         say "✅ React on Rails Pro setup complete!", :green
-        say "=" * 80, :cyan
+        say set_color("=" * 80, :cyan, :bold)
       end
 
       # Check if Pro gem is missing. Attempts auto-install via bundle add.
