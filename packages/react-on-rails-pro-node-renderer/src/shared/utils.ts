@@ -94,6 +94,8 @@ export interface Asset {
   filename: string;
 }
 
+export const BUNDLE_COMPLETE_MARKER_FILE = '.react-on-rails-node-renderer-bundle-completed';
+
 export function moveUploadedAsset(
   asset: Asset,
   destinationPath: string,
@@ -113,10 +115,7 @@ export function copyUploadedAsset(
 export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirectory: string): Promise<void> {
   const filteredAssets = uploadedAssets.filter((asset) => {
     if (asset.filename === BUNDLE_COMPLETE_MARKER_FILE) {
-      log.warn(
-        'Skipping uploaded asset with reserved bundle-completion marker filename: %s',
-        asset.filename,
-      );
+      log.warn('Skipping uploaded asset with reserved bundle-completion marker filename: %s', asset.filename);
       return false;
     }
     return true;
@@ -209,8 +208,6 @@ export function getBundleDirectory(bundleTimestamp: string | number) {
 
   return bundleDirectory;
 }
-
-export const BUNDLE_COMPLETE_MARKER_FILE = '.react-on-rails-node-renderer-bundle-completed';
 
 export function getBundleCompleteMarkerPath(bundleTimestamp: string | number) {
   const bundleDirectory = getBundleDirectory(bundleTimestamp);
