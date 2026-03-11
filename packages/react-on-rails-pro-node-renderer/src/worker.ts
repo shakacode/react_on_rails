@@ -462,9 +462,13 @@ export default function run(config: Partial<Config>) {
   // we are extracting worker from cluster to avoid false TS error
   const { worker } = cluster;
   if (workersCount === 0 || cluster.isWorker) {
-    app.listen({ port, host }, () => {
+    app.listen({ port, host }, (err, address) => {
+      if (err) {
+        log.error({ err }, `Node renderer failed to start`);
+        process.exit(1);
+      }
       const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
-      log.info(`Node renderer ${workerName} listening on ${host}:${port}!`);
+      log.info(`Node renderer ${workerName} listening on ${address}!`);
     });
   }
 
