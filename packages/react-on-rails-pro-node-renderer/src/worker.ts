@@ -464,7 +464,7 @@ export default function run(config: Partial<Config>) {
   if (workersCount === 0 || cluster.isWorker) {
     app.listen({ port, host }, (err, address) => {
       if (err) {
-        log.error({ err, host, port }, `Node renderer failed to start on ${host}:${port}`);
+        log.error({ err, host, port }, 'Node renderer failed to start');
         process.exit(1);
       }
       const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
