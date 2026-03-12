@@ -20,6 +20,11 @@ module ReactOnRails
         "Visit https://www.shakacode.com/react-on-rails-pro/ for installation details."
     end
 
+    # Backward-compatible alias for callers using the prior method name.
+    def self.immediate_hydration_pro_license_warning(name, type = "Component")
+      immediate_hydration_pro_install_warning(name, type)
+    end
+
     # Normalizes the immediate_hydration option value, enforcing Pro gem-availability requirements.
     # Returns the normalized boolean value for immediate_hydration.
     #

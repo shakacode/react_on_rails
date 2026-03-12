@@ -1010,6 +1010,16 @@ module ReactOnRails
       end
     end
 
+    describe ".immediate_hydration_pro_license_warning" do
+      it "delegates to the installation warning method for backward compatibility" do
+        warning = described_class.immediate_hydration_pro_license_warning("TestComponent", "Component")
+
+        expect(warning).to eq(
+          described_class.immediate_hydration_pro_install_warning("TestComponent", "Component")
+        )
+      end
+    end
+
     describe ".normalize_immediate_hydration" do
       context "with Pro license" do
         before do

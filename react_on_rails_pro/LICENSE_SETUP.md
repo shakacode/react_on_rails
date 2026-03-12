@@ -83,7 +83,8 @@ License-related checks and signals occur at multiple points:
 2. **Node Renderer**: When the Node renderer process starts
 3. **Browser Package**: Receives Pro-installed signal via `railsContext.rorPro` (not license-valid state)
 
-The browser package does not perform independent license validation.
+The browser package does not perform independent license validation. A valid paid license is still required for
+production deployments.
 
 When no license is present, the application runs in **unlicensed mode**. This is fine for development, testing, and CI/CD. Production deployments should always have a valid paid license.
 
