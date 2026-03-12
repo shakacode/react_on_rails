@@ -111,6 +111,9 @@ The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https:
   }
 ```
 
+When the Pro gem is installed, `railsContext` also includes `rorProVersion` with the installed Pro gem
+version. Like `rorPro`, this is an installation signal and not a license-validity indicator.
+
 Plus, you can add your customizations to this. See "rendering extension" below.
 
 ## Rails Context
