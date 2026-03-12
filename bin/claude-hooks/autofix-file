@@ -15,6 +15,9 @@ if [ -t 0 ]; then
 else
   INPUT="$(cat)"
   FILE="$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)"
+  if [ -z "$FILE" ] && ! command -v jq > /dev/null 2>&1; then
+    echo "autofix-file: jq not found, skipping auto-fix" >&2
+  fi
 fi
 
 if [ -z "$FILE" ]; then
