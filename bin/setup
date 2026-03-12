@@ -165,7 +165,7 @@ install_dependencies() {
     fi
     print_success "JavaScript dependencies installed"
   elif [ -f "package.json" ]; then
-    print_warning "Skipping JavaScript dependencies in $name (no pnpm-lock.yaml); assuming workspace root manages them"
+    echo "  JavaScript dependencies in $name are managed by the workspace root (no local pnpm-lock.yaml)"
   fi
 
   cd "$ROOT_DIR"
