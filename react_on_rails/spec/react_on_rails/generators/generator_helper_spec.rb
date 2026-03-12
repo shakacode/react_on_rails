@@ -23,7 +23,43 @@ RSpec.describe GeneratorHelper, type: :generator do
     @say_status_calls ||= []
   end
 
+  def options
+    {}
+  end
+
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
+
+  describe "#print_generator_messages" do
+    before do
+      GeneratorMessages.clear
+      say_calls.clear
+    end
+
+    after do
+      GeneratorMessages.clear
+      say_calls.clear
+    end
+
+    it "strips ANSI escape sequences when no_color is enabled" do
+      allow(self).to receive(:options).and_return({ no_color: true })
+      GeneratorMessages.add_warning("Needs attention")
+
+      print_generator_messages
+
+      expect(say_calls.first[:message]).to eq("WARNING: Needs attention")
+      expect(say_calls.first[:message]).not_to match(/\e\[/)
+    end
+
+    it "keeps ANSI escape sequences when no_color is disabled" do
+      allow(self).to receive(:options).and_return({ no_color: false })
+      GeneratorMessages.add_warning("Needs attention")
+      raw_message = GeneratorMessages.messages.first.to_s
+
+      print_generator_messages
+
+      expect(say_calls.first[:message].to_s).to eq(raw_message)
+    end
+  end
 
   describe "#add_npm_dependencies" do
     context "when package_json gem is available" do
