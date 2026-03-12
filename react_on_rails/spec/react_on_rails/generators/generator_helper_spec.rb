@@ -15,6 +15,14 @@ RSpec.describe GeneratorHelper, type: :generator do
     @say_calls ||= []
   end
 
+  def say_status(status, message, log_status = nil)
+    say_status_calls << { status: status, message: message, log_status: log_status }
+  end
+
+  def say_status_calls
+    @say_status_calls ||= []
+  end
+
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
 
   describe "#add_npm_dependencies" do
@@ -53,15 +61,15 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
 
       context "when package_json gem raises an error" do
-        it "returns false and logs a warning via say" do
+        it "returns false and logs warnings via say_status" do
           packages = ["react"]
 
           allow(mock_manager).to receive(:add).and_raise(StandardError, "Installation failed")
 
           result = add_npm_dependencies(packages)
           expect(result).to be false
-          expect(say_calls).to include(a_hash_including(message: a_string_matching(/Warning: Could not add packages/)))
-          expect(say_calls).to include(a_hash_including(message: "Will fall back to direct npm commands."))
+          expect(say_status_calls).to include(a_hash_including(message: a_string_matching(/Could not add packages/)))
+          expect(say_status_calls).to include(a_hash_including(message: "Will fall back to direct npm commands."))
         end
       end
     end
@@ -114,14 +122,14 @@ RSpec.describe GeneratorHelper, type: :generator do
         end)
       end
 
-      it "returns nil and logs a warning via say" do
+      it "returns nil and logs warnings via say_status" do
         result = package_json
 
         expect(result).to be_nil
-        expect(say_calls).to include(
-          a_hash_including(message: a_string_matching(/Warning: Could not read package\.json/))
+        expect(say_status_calls).to include(
+          a_hash_including(message: a_string_matching(/Could not read package\.json/))
         )
-        expect(say_calls).to include(
+        expect(say_status_calls).to include(
           a_hash_including(message: "This is normal before Shakapacker creates the package.json file.")
         )
       end

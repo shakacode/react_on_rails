@@ -408,7 +408,7 @@ module ReactOnRails
       def finalize_shakapacker_setup(yml_content_before)
         say "✅ Shakapacker installed successfully!", :green
         say "=" * 80, :cyan
-        say "🚀 CONTINUING WITH REACT ON RAILS SETUP", :cyan
+        say set_color("🚀 CONTINUING WITH REACT ON RAILS SETUP", :cyan, :bold)
         say "#{'=' * 80}\n", :cyan
 
         yml_content_after = File.exist?(SHAKAPACKER_YML_PATH) ? File.read(SHAKAPACKER_YML_PATH) : nil
