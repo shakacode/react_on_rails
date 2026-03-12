@@ -39,7 +39,8 @@ export default {
   // Default test pattern - packages can override this
   testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)'],
 
-  // Clear mock call history and implementations between tests.
+  // Clear mock call history (calls, instances, results, contexts) between tests.
+  // Does not reset mock implementations; use resetMocks: true for that.
   clearMocks: true,
 
   // === Common Module File Extensions ===
