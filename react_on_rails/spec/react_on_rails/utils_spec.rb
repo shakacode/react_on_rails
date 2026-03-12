@@ -1040,14 +1040,14 @@ module ReactOnRails
         end
       end
 
-      context "without Pro license" do
+      context "without Pro gem installed" do
         before do
           allow(described_class).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it "returns false and logs warning when value is explicitly true" do
           expect(Rails.logger).to receive(:warn)
-            .with(/immediate_hydration: true requires a React on Rails Pro license/)
+            .with(/immediate_hydration: true requires the React on Rails Pro gem to be installed/)
 
           result = described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
           expect(result).to be false
@@ -1060,7 +1060,7 @@ module ReactOnRails
           expect(result).to be false
         end
 
-        it "returns false when value is nil (non-Pro default)" do
+        it "returns false when value is nil (non-Pro-install default)" do
           expect(Rails.logger).not_to receive(:warn)
 
           result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")

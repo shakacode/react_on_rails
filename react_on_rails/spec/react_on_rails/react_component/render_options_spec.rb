@@ -203,7 +203,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       end
     end
 
-    context "without Pro license" do
+    context "without Pro gem installed" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
       end
@@ -213,7 +213,8 @@ describe ReactOnRails::ReactComponent::RenderOptions do
           options = { immediate_hydration: true }
           attrs = the_attrs(options: options)
 
-          expect(Rails.logger).to receive(:warn).with(/immediate_hydration: true requires a React on Rails Pro license/)
+          expect(Rails.logger).to receive(:warn)
+            .with(/immediate_hydration: true requires the React on Rails Pro gem to be installed/)
 
           opts = described_class.new(**attrs)
 
@@ -233,7 +234,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       end
 
       context "without immediate_hydration option" do
-        it "returns false (non-Pro default)" do
+        it "returns false (non-Pro-install default)" do
           attrs = the_attrs
 
           opts = described_class.new(**attrs)
