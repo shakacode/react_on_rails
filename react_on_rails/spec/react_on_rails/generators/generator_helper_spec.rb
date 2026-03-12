@@ -33,11 +33,13 @@ RSpec.describe GeneratorHelper, type: :generator do
     before do
       GeneratorMessages.clear
       say_calls.clear
+      say_status_calls.clear
     end
 
     after do
       GeneratorMessages.clear
       say_calls.clear
+      say_status_calls.clear
     end
 
     it "strips ANSI escape sequences when no_color is enabled" do
