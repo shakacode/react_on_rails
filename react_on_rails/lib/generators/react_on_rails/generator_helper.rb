@@ -95,7 +95,7 @@ module GeneratorHelper
 
   def print_generator_messages
     # GeneratorMessages stores pre-colored strings, so we strip ANSI manually for --no-color output.
-    no_color = options[:no_color]
+    no_color = shell.is_a?(Thor::Shell::Basic) && !shell.is_a?(Thor::Shell::Color)
     GeneratorMessages.messages.each do |message|
       say(no_color ? message.to_s.gsub(/\e\[[0-9;]*m/, "") : message)
       say "" # Blank line after each message for readability

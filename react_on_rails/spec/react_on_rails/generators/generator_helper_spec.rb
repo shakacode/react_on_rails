@@ -23,8 +23,8 @@ RSpec.describe GeneratorHelper, type: :generator do
     @say_status_calls ||= []
   end
 
-  def options
-    {}
+  def shell
+    @shell ||= Thor::Shell::Color.new
   end
 
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
@@ -41,8 +41,7 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
 
     it "strips ANSI escape sequences when no_color is enabled" do
-      # Override the generator options hash for this example.
-      allow(self).to receive(:options).and_return({ no_color: true })
+      allow(self).to receive(:shell).and_return(Thor::Shell::Basic.new)
       GeneratorMessages.add_warning("Needs attention")
 
       print_generator_messages
@@ -52,8 +51,7 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
 
     it "keeps ANSI escape sequences when no_color is disabled" do
-      # Override the generator options hash for this example.
-      allow(self).to receive(:options).and_return({ no_color: false })
+      allow(self).to receive(:shell).and_return(Thor::Shell::Color.new)
       GeneratorMessages.add_warning("Needs attention")
       raw_message = GeneratorMessages.messages.first.to_s
 
