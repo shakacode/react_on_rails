@@ -6,12 +6,15 @@
 
 ## Plan
 
-1. Reproduce current test behavior and confirm where existing `addBarrier()` synchronization still allows serialized writes.
-2. Update `uploadRaceCondition.test.ts` assertions to prove truly concurrent write paths and verify resilience under contention.
+1. Run the existing `uploadRaceCondition.test.ts` as-is, then re-run with the race-condition fix reverted, to confirm what the current
+   `addBarrier()` coverage does and does not prove.
+2. Update `uploadRaceCondition.test.ts` assertions with explicit write-order evidence (for example, request/write event recording) so
+   concurrency expectations are objective and reproducible.
 3. Validate with focused test runs and update related test comments/documentation as needed.
 
 ## Success Criteria
 
 1. `uploadRaceCondition.test.ts` fails without the race-condition fix and passes with it.
-2. The test asserts concurrent write behavior explicitly (not only eventual file correctness).
-3. Focused local test run and CI job for the updated test both pass.
+2. The test proves same-bundle uploads serialize correctly under contention.
+3. The test proves different-bundle uploads can still proceed concurrently (no global single-mutex regression).
+4. Focused local test run and CI job for the updated test both pass.
