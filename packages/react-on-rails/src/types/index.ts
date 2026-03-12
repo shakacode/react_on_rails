@@ -28,6 +28,7 @@ export type RailsContext = {
   // True when React on Rails Pro is installed on the server.
   // This does not indicate whether the current license token is valid.
   rorPro: boolean;
+  // Present when rorPro is true; contains the installed React on Rails Pro version string.
   rorProVersion?: string;
   href: string;
   location: string;
