@@ -40,9 +40,9 @@ case "$REL_PATH" in
   *.js|*.jsx|*.ts|*.tsx|*.json|*.md|*.yml|*.yaml)
     if [[ "$REL_PATH" == react_on_rails_pro/* ]]; then
       PRO_REL="${REL_PATH#react_on_rails_pro/}"
-      (cd react_on_rails_pro && pnpm exec prettier --write -- "$PRO_REL" 2>&1 | tail -1)
+      (cd react_on_rails_pro && pnpm exec prettier --write -- "$PRO_REL" 2>&1 | tail -1 || true)
     else
-      pnpm exec prettier --write -- "$REL_PATH" 2>&1 | tail -1
+      pnpm exec prettier --write -- "$REL_PATH" 2>&1 | tail -1 || true
     fi
     ;;
 esac
