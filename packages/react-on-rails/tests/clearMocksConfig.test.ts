@@ -11,7 +11,7 @@ describe('Jest base config clearMocks', () => {
     expect(sharedMock).toHaveBeenCalledTimes(1);
   });
 
-  it('clears call history before the next test', () => {
+  it('does not retain call history from previous test', () => {
     expect(sharedMock).not.toHaveBeenCalled();
   });
 
