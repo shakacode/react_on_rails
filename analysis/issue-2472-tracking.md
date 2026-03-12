@@ -2,12 +2,12 @@
 
 - Issue: https://github.com/shakacode/react_on_rails/issues/2472
 - Title: Improve uploadRaceCondition.test.ts to verify truly concurrent asset writes
-- Status: Draft tracking PR opened to coordinate implementation work while issue #2472 remains open.
+- Status: Coordination artifact added while issue #2472 was open; see that issue for implementation progress.
 
 ## Plan
 
-1. Run the existing `uploadRaceCondition.test.ts` as-is, then re-run with the per-bundle lock behavior in
-   `packages/react-on-rails-pro-node-renderer/src/worker.ts` reverted in the `/upload-assets` handler (specifically the
+1. Run the existing `uploadRaceCondition.test.ts` as-is, then re-run with a temporary local-only revert of the per-bundle lock behavior in
+   `packages/react-on-rails-pro-node-renderer/src/worker.ts` inside the `/upload-assets` handler (specifically the
    `lock(bundleFilePath)` / `unlock(lockfileName)` calls inside `copyPromises.map`), to confirm exactly what current
    `addBarrier()` coverage does and does not prove.
 2. Add one new same-bundle upload-vs-upload contention case in `uploadRaceCondition.test.ts`, and augment the existing
