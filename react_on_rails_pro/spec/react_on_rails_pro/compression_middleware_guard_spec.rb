@@ -106,6 +106,39 @@ RSpec.describe ReactOnRailsPro::CompressionMiddlewareGuard do
       expect(guard.findings.map(&:middleware_name)).to eq(["Rack::Deflater"])
     end
 
+    it "flags callbacks that rescue StandardError after iterating body.each" do
+      condition = lambda { |*, body|
+        begin
+          body.each(&:bytesize)
+        rescue StandardError
+          true
+        end
+      }
+
+      guard = described_class.new(
+        middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: condition }])]
+      )
+
+      expect(guard.findings.map(&:middleware_name)).to eq(["Rack::Deflater"])
+    end
+
+    it "flags callbacks that only iterate when Brotli is accepted" do
+      stub_const("Rack::Brotli", Class.new)
+
+      condition = lambda { |env, _status, _headers, body|
+        next false unless env["HTTP_ACCEPT_ENCODING"].include?("br")
+
+        body.each(&:bytesize)
+        true
+      }
+
+      guard = described_class.new(
+        middlewares: [middleware_entry_class.new(Rack::Brotli, [{ if: condition }])]
+      )
+
+      expect(guard.findings.map(&:middleware_name)).to eq(["Rack::Brotli"])
+    end
+
     it "logs probe failures at debug and returns no findings" do
       condition = lambda { |_env, *_rest|
         raise ArgumentError, "unexpected"

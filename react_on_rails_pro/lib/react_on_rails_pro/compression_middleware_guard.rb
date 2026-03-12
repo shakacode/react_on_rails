@@ -71,16 +71,22 @@ module ReactOnRailsPro
     end
 
     def destructively_iterates_stream?(condition)
+      probe = StreamingBodyProbe.new
+
       Timeout.timeout(PROBE_TIMEOUT_SECONDS) do
-        condition.call(probe_env, 200, probe_headers, StreamingBodyProbe.new)
+        condition.call(probe_env, 200, probe_headers, probe)
       end
-      false
+      probe.iterated?
     rescue StreamingBodyProbe::BodyIteratedError
       true
     rescue Timeout::Error => e
+      return true if probe.iterated?
+
       log_probe_failure(condition, e, reason: "timed out after #{PROBE_TIMEOUT_SECONDS}s")
       false
     rescue StandardError => e
+      return true if probe.iterated?
+
       log_probe_failure(condition, e)
       false
     end
@@ -95,7 +101,7 @@ module ReactOnRailsPro
         "HTTP_ACCEPT" => "text/html",
         "REQUEST_METHOD" => "GET",
         "PATH_INFO" => "/__react_on_rails_pro_stream_probe__",
-        "HTTP_ACCEPT_ENCODING" => "gzip,identity",
+        "HTTP_ACCEPT_ENCODING" => "br,gzip,identity",
         "HTTP_HOST" => "example.test",
         "SERVER_NAME" => "example.test",
         "rack.url_scheme" => "https",
@@ -145,7 +151,12 @@ module ReactOnRailsPro
 
       class BodyIteratedError < StandardError; end
 
+      def iterated?
+        @iterated == true
+      end
+
       def each
+        @iterated = true
         raise BodyIteratedError, "Compression middleware `:if` callback called `body.each` on a streaming body."
       end
     end
