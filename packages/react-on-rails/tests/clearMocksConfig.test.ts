@@ -16,6 +16,7 @@ describe('Jest base config clearMocks', () => {
   });
 
   it('preserves mock implementations across tests', () => {
+    expect(sharedMock.getMockImplementation()).toBeDefined();
     expect(sharedMock()).toBe('first');
     expect(sharedMock).toHaveBeenCalledTimes(1);
   });
