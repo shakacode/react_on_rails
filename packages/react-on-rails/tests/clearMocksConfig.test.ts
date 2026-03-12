@@ -12,6 +12,8 @@ describe('Jest base config clearMocks', () => {
   });
 
   it('preserves mock implementations across tests', () => {
+    // Intentional cross-test dependency: the previous test only clears calls.
+    // This verifies clearMocks keeps the implementation set in the first test.
     expect(sharedMock()).toBe('first');
     expect(sharedMock).toHaveBeenCalledTimes(1);
   });
