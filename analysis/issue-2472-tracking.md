@@ -7,8 +7,9 @@
 ## Plan
 
 1. Run the existing `uploadRaceCondition.test.ts` as-is, then re-run with the per-bundle lock behavior in
-   `packages/react-on-rails-pro-node-renderer/src/worker.ts` reverted in the upload path (the `lock(bundleFilePath)` section), to
-   confirm exactly what current `addBarrier()` coverage does and does not prove.
+   `packages/react-on-rails-pro-node-renderer/src/worker.ts` reverted in the `/upload-assets` handler (specifically the
+   `lock(bundleFilePath)` / `unlock(lockfileName)` calls inside `copyPromises.map`), to confirm exactly what current
+   `addBarrier()` coverage does and does not prove.
 2. Add one new same-bundle upload-vs-upload contention case in `uploadRaceCondition.test.ts`, and augment the existing
    different-bundle upload-vs-upload cases with explicit overlap instrumentation (event markers around write start/end)
    so concurrency assertions rely on objective evidence, not timing heuristics alone.
