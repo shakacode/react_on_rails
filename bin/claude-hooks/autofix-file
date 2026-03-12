@@ -35,14 +35,14 @@ REL_PATH="${FILE#"$REPO_ROOT/"}"
 
 case "$REL_PATH" in
   *.rb|*.rake|*.ru)
-    bundle exec rubocop -a --force-exclusion -- "$REL_PATH" 2>&1 | tail -3 || true
+    (cd "$REPO_ROOT" && bundle exec rubocop -a --force-exclusion -- "$REL_PATH" 2>&1 | tail -3 || true)
     ;;
   *.js|*.jsx|*.ts|*.tsx|*.json|*.md|*.yml|*.yaml)
     if [[ "$REL_PATH" == react_on_rails_pro/* ]]; then
       PRO_REL="${REL_PATH#react_on_rails_pro/}"
-      (cd react_on_rails_pro && pnpm exec prettier --write -- "$PRO_REL" 2>&1 | tail -1 || true)
+      (cd "$REPO_ROOT/react_on_rails_pro" && pnpm exec prettier --write -- "$PRO_REL" 2>&1 | tail -1 || true)
     else
-      pnpm exec prettier --write -- "$REL_PATH" 2>&1 | tail -1 || true
+      (cd "$REPO_ROOT" && pnpm exec prettier --write -- "$REL_PATH" 2>&1 | tail -1 || true)
     fi
     ;;
 esac
