@@ -40,7 +40,8 @@ export default {
   testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)'],
 
   // Clear mock call history (calls, instances, results, contexts) between tests.
-  // Does not reset mock implementations; use resetMocks: true for that.
+  // Mock implementations from mockReturnValue/mockImplementation persist.
+  // Use resetMocks: true when implementation reset is required.
   clearMocks: true,
 
   // === Common Module File Extensions ===
