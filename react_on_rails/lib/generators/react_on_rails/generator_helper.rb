@@ -94,7 +94,8 @@ module GeneratorHelper
   end
 
   def print_generator_messages
-    no_color = respond_to?(:options) && options[:no_color]
+    # GeneratorMessages stores pre-colored strings, so we strip ANSI manually for --no-color output.
+    no_color = options[:no_color]
     GeneratorMessages.messages.each do |message|
       say(no_color ? message.to_s.gsub(/\e\[[0-9;]*m/, "") : message)
       say "" # Blank line after each message for readability
