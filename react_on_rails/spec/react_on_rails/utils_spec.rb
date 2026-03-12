@@ -1021,7 +1021,7 @@ module ReactOnRails
     end
 
     describe ".normalize_immediate_hydration" do
-      context "with Pro license" do
+      context "with Pro gem installed" do
         before do
           allow(described_class).to receive(:react_on_rails_pro?).and_return(true)
         end
@@ -1036,7 +1036,7 @@ module ReactOnRails
           expect(result).to be false
         end
 
-        it "returns true when value is nil (Pro default)" do
+        it "returns true when value is nil (Pro-install default)" do
           result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
           expect(result).to be true
         end

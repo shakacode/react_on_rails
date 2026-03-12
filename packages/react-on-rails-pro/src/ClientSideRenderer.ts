@@ -99,7 +99,7 @@ class ComponentRenderer {
    */
   private async render(el: Element, railsContext: RailsContext): Promise<void> {
     const isImmediateHydrationRequested = el.getAttribute('data-immediate-hydration') === 'true';
-    // railsContext.rorPro is a server-provided signal for Pro gem availability, not license validity.
+    // rorPro signals gem presence on the server, not license validity.
     const hasProGemInstalled = railsContext.rorPro;
 
     // Handle immediate_hydration feature usage without Pro gem installed
