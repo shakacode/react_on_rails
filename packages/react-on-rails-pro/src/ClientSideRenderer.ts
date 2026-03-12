@@ -29,8 +29,8 @@ import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 const IMMEDIATE_HYDRATION_PRO_WARNING =
-  "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
-  'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
+  "[REACT ON RAILS] The 'immediate_hydration' feature requires the React on Rails Pro package to be installed. " +
+  'Please visit https://shakacode.com/react-on-rails-pro for installation details.';
 
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
