@@ -19,7 +19,6 @@ module ReactOnRails
         "#{type} '#{name}' will fall back to standard hydration behavior.\n" \
         "Visit https://www.shakacode.com/react-on-rails-pro/ for installation details."
     end
-    private_class_method :immediate_hydration_pro_install_warning
 
     # Normalizes the immediate_hydration option value, enforcing Pro gem-availability requirements.
     # Returns the normalized boolean value for immediate_hydration.
