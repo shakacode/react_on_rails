@@ -101,7 +101,7 @@ module ReactOnRailsPro
         "HTTP_ACCEPT" => "text/html",
         "REQUEST_METHOD" => "GET",
         "PATH_INFO" => "/__react_on_rails_pro_stream_probe__",
-        "HTTP_ACCEPT_ENCODING" => "br,gzip,identity",
+        "HTTP_ACCEPT_ENCODING" => "br, gzip, identity",
         "HTTP_HOST" => "example.test",
         "SERVER_NAME" => "example.test",
         "rack.url_scheme" => "https",
