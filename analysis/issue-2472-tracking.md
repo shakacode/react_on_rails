@@ -6,10 +6,11 @@
 
 ## Plan
 
-1. Run the existing `uploadRaceCondition.test.ts` as-is, then re-run with the race-condition fix reverted, to confirm what the current
-   `addBarrier()` coverage does and does not prove.
-2. Update `uploadRaceCondition.test.ts` assertions with explicit write-order evidence (for example, request/write event recording) so
-   concurrency expectations are objective and reproducible.
+1. Run the existing `uploadRaceCondition.test.ts` as-is, then re-run with the per-bundle lock behavior in
+   `packages/react-on-rails-pro-node-renderer/src/worker.ts` reverted in the upload path (the `lock(bundleFilePath)` section), to
+   confirm exactly what current `addBarrier()` coverage does and does not prove.
+2. Add new same-bundle and different-bundle concurrent upload test cases in `uploadRaceCondition.test.ts` (current cases use different
+   bundle hashes only), with explicit write-order evidence so concurrency expectations are objective and reproducible.
 3. Validate with focused test runs and update related test comments/documentation as needed.
 
 ## Success Criteria
