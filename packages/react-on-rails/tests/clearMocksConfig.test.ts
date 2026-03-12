@@ -16,7 +16,7 @@ describe('Jest base config clearMocks', () => {
   });
 
   it('preserves mock implementations across tests', () => {
-    expect(sharedMock.getMockImplementation()).toBeDefined();
+    // clearMocks does not call mockReset(), so the return value from beforeAll should persist.
     expect(sharedMock()).toBe('first');
     expect(sharedMock).toHaveBeenCalledTimes(1);
   });
