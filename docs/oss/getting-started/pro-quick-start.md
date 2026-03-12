@@ -23,6 +23,9 @@ gem "shakapacker", "~> 9.5"
 gem "react_on_rails_pro", "~> 16.4"
 ```
 
+Version constraints above are examples; check [React on Rails releases](https://github.com/shakacode/react_on_rails/releases)
+and [Shakapacker releases](https://github.com/shakacode/shakapacker/releases) for current versions.
+
 Since v16.4.0.rc.5, `react_on_rails_pro` automatically requires `react_on_rails` — you only need the Pro gem. On older versions, add both gems explicitly:
 
 ```ruby
