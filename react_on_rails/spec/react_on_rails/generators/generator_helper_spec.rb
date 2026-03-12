@@ -41,6 +41,7 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
 
     it "strips ANSI escape sequences when no_color is enabled" do
+      # Override the generator options hash for this example.
       allow(self).to receive(:options).and_return({ no_color: true })
       GeneratorMessages.add_warning("Needs attention")
 
@@ -51,6 +52,7 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
 
     it "keeps ANSI escape sequences when no_color is disabled" do
+      # Override the generator options hash for this example.
       allow(self).to receive(:options).and_return({ no_color: false })
       GeneratorMessages.add_warning("Needs attention")
       raw_message = GeneratorMessages.messages.first.to_s
