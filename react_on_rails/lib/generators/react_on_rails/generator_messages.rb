@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "rainbow"
+
 module GeneratorMessages
   class << self
     def output

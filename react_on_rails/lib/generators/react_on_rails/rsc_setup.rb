@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "rainbow"
 require_relative "generator_messages"
 
 module ReactOnRails
@@ -106,11 +105,11 @@ module ReactOnRails
         content = File.read(full_path)
 
         if content.include?("enable_rsc_support")
-          puts Rainbow("ℹ️  RSC config already in Pro initializer, skipping").yellow
+          say "ℹ️  RSC config already in Pro initializer, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Adding RSC config to Pro initializer...").yellow
+        say "📝 Adding RSC config to Pro initializer...", :yellow
 
         rsc_config = <<-CONFIG
 
@@ -123,35 +122,35 @@ module ReactOnRails
         # Insert before the final 'end'
         gsub_file(initializer_path, /^end\s*\z/, "#{rsc_config}end")
 
-        puts Rainbow("✅ Added RSC config to #{initializer_path}").green
+        say "✅ Added RSC config to #{initializer_path}", :green
       end
 
       def print_rsc_setup_banner
-        puts Rainbow("\n#{'=' * 80}").magenta
-        puts Rainbow("🚀 REACT SERVER COMPONENTS SETUP").magenta.bold
-        puts Rainbow("=" * 80).magenta
+        say "\n#{set_color('=' * 80, :magenta)}"
+        say set_color("🚀 REACT SERVER COMPONENTS SETUP", :magenta, :bold)
+        say set_color("=" * 80, :magenta)
       end
 
       def print_rsc_complete_banner
-        puts Rainbow("=" * 80).magenta
-        puts Rainbow("✅ React Server Components setup complete!").green
-        puts Rainbow("=" * 80).magenta
+        say set_color("=" * 80, :magenta)
+        say "✅ React Server Components setup complete!", :green
+        say set_color("=" * 80, :magenta)
       end
 
       def create_rsc_webpack_config
         webpack_config_path = destination_config_path("config/webpack/rscWebpackConfig.js")
 
         if File.exist?(File.join(destination_root, webpack_config_path))
-          puts Rainbow("ℹ️  #{webpack_config_path} already exists, skipping").yellow
+          say "ℹ️  #{webpack_config_path} already exists, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Creating RSC webpack config...").yellow
+        say "📝 Creating RSC webpack config...", :yellow
 
         rsc_template_path = "templates/rsc/base/config/webpack/rscWebpackConfig.js.tt"
         template(rsc_template_path, webpack_config_path)
 
-        puts Rainbow("✅ Created #{webpack_config_path}").green
+        say "✅ Created #{webpack_config_path}", :green
       end
 
       def add_rsc_to_procfile
@@ -168,11 +167,11 @@ module ReactOnRails
         end
 
         if File.read(procfile_path).include?("RSC_BUNDLE_ONLY")
-          puts Rainbow("ℹ️  RSC bundle watcher already in Procfile.dev, skipping").yellow
+          say "ℹ️  RSC bundle watcher already in Procfile.dev, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Adding RSC bundle watcher to Procfile.dev...").yellow
+        say "📝 Adding RSC bundle watcher to Procfile.dev...", :yellow
 
         rsc_watcher_line = <<~PROCFILE
 
@@ -182,7 +181,7 @@ module ReactOnRails
 
         append_to_file("Procfile.dev", rsc_watcher_line)
 
-        puts Rainbow("✅ Added RSC bundle watcher to Procfile.dev").green
+        say "✅ Added RSC bundle watcher to Procfile.dev", :green
       end
 
       def create_hello_server_component
@@ -194,11 +193,11 @@ module ReactOnRails
         # Check if HelloServer already exists (check both jsx and tsx)
         if File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.jsx")) ||
            File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.tsx"))
-          puts Rainbow("ℹ️  HelloServer component already exists, skipping").yellow
+          say "ℹ️  HelloServer component already exists, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Creating HelloServer component...").yellow
+        say "📝 Creating HelloServer component...", :yellow
 
         # Create directories
         empty_directory(ror_components_dir)
@@ -212,40 +211,40 @@ module ReactOnRails
         copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/LikeButton.#{ext}",
                   "#{components_dir}/LikeButton.#{ext}")
 
-        puts Rainbow("✅ Created HelloServer component").green
+        say "✅ Created HelloServer component", :green
       end
 
       def create_hello_server_controller
         controller_path = "app/controllers/hello_server_controller.rb"
 
         if File.exist?(File.join(destination_root, controller_path))
-          puts Rainbow("ℹ️  HelloServerController already exists, skipping").yellow
+          say "ℹ️  HelloServerController already exists, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Creating HelloServerController...").yellow
+        say "📝 Creating HelloServerController...", :yellow
 
         copy_file("templates/rsc/base/app/controllers/hello_server_controller.rb", controller_path)
 
-        puts Rainbow("✅ Created #{controller_path}").green
+        say "✅ Created #{controller_path}", :green
       end
 
       def create_hello_server_view
         view_path = "app/views/hello_server/index.html.erb"
 
         if File.exist?(File.join(destination_root, view_path))
-          puts Rainbow("ℹ️  HelloServer view already exists, skipping").yellow
+          say "ℹ️  HelloServer view already exists, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Creating HelloServer view...").yellow
+        say "📝 Creating HelloServer view...", :yellow
 
         # Create views directory if needed
         empty_directory("app/views/hello_server")
 
         copy_file("templates/rsc/base/app/views/hello_server/index.html.erb", view_path)
 
-        puts Rainbow("✅ Created #{view_path}").green
+        say "✅ Created #{view_path}", :green
       end
 
       def add_rsc_routes
@@ -265,11 +264,11 @@ module ReactOnRails
         routes_content = File.read(routes_file)
 
         if routes_content.include?("rsc_payload_route")
-          puts Rainbow("ℹ️  RSC routes already exist, skipping").yellow
+          say "ℹ️  RSC routes already exist, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Adding RSC routes...").yellow
+        say "📝 Adding RSC routes...", :yellow
 
         # Add rsc_payload_route (required for RSC payload requests)
         route "rsc_payload_route"
@@ -277,7 +276,7 @@ module ReactOnRails
         # Add HelloServer route (RSC counterpart to hello_world)
         route "get 'hello_server', to: 'hello_server#index'"
 
-        puts Rainbow("✅ Added RSC routes to config/routes.rb").green
+        say "✅ Added RSC routes to config/routes.rb", :green
       end
 
       # Update webpack configs to enable RSC support.
@@ -289,14 +288,14 @@ module ReactOnRails
       # - serverWebpackConfig.js: RSCWebpackPlugin import, rscBundle param, plugin
       # - clientWebpackConfig.js: RSCWebpackPlugin import, plugin
       def update_webpack_configs_for_rsc
-        puts Rainbow("📝 Updating webpack configs for RSC...").yellow
+        say "📝 Updating webpack configs for RSC...", :yellow
 
         update_server_client_or_both_for_rsc
         update_server_webpack_config_for_rsc
         update_client_webpack_config_for_rsc
 
         verify_rsc_webpack_transforms
-        puts Rainbow("✅ Updated webpack configs for RSC").green
+        say "✅ Updated webpack configs for RSC", :green
       end
 
       def update_server_client_or_both_for_rsc

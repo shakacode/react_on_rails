@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "rainbow"
 require "json"
 
 # rubocop:disable Metrics/ModuleLength
@@ -11,12 +10,13 @@ module GeneratorHelper
     require "package_json" unless defined?(PackageJson)
     @package_json ||= PackageJson.read
   rescue LoadError
-    puts "Warning: package_json gem not available. This is expected before Shakapacker installation."
-    puts "Dependencies will be installed using the default package manager after Shakapacker setup."
+    say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
+    say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
+               :yellow
     nil
   rescue StandardError => e
-    puts "Warning: Could not read package.json: #{e.message}"
-    puts "This is normal before Shakapacker creates the package.json file."
+    say_status :warning, "Could not read package.json: #{e.message}", :yellow
+    say_status :warning, "This is normal before Shakapacker creates the package.json file.", :yellow
     nil
   end
 
@@ -33,8 +33,8 @@ module GeneratorHelper
       end
       true
     rescue StandardError => e
-      puts "Warning: Could not add packages via package_json gem: #{e.message}"
-      puts "Will fall back to direct npm commands."
+      say_status :warning, "Could not add packages via package_json gem: #{e.message}", :yellow
+      say_status :warning, "Will fall back to direct npm commands.", :yellow
       false
     end
   end
@@ -94,9 +94,11 @@ module GeneratorHelper
   end
 
   def print_generator_messages
+    # GeneratorMessages stores pre-colored strings, so we strip ANSI manually for --no-color output.
+    no_color = !shell.is_a?(Thor::Shell::Color)
     GeneratorMessages.messages.each do |message|
-      puts message
-      puts "" # Blank line after each message for readability
+      say(no_color ? message.to_s.gsub(/\e\[[0-9;]*m/, "") : message)
+      say "" # Blank line after each message for readability
     end
   end
 
