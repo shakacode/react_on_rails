@@ -104,6 +104,62 @@ RSpec.describe "update_changelog.rake helper methods" do
     end
   end
 
+  describe "#cleanup_collapsed_prerelease_links" do
+    it "removes orphaned prerelease compare links and updates [unreleased] to point to stable" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        #### Added
+        - Merged content from rc.1 and rc.0
+
+        ### [16.3.0] - 2026-02-01
+        #### Fixed
+        - Older fix
+
+        [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.1...master
+        [16.4.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.0...16.4.0.rc.1
+        [16.4.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0.rc.0
+        [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
+      CHANGELOG
+
+      result = cleanup_collapsed_prerelease_links(changelog, "16.4.0")
+
+      expect(result).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master")
+      expect(result).not_to include("[16.4.0.rc.1]:")
+      expect(result).not_to include("[16.4.0.rc.0]:")
+      expect(result).to include("[16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0")
+    end
+
+    it "handles a single prerelease link" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.8...master
+        [16.4.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0.rc.8
+        [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
+      CHANGELOG
+
+      result = cleanup_collapsed_prerelease_links(changelog, "16.4.0")
+
+      expect(result).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master")
+      expect(result).not_to include("[16.4.0.rc.8]:")
+      expect(result).to include("[16.3.0]:")
+    end
+
+    it "returns changelog unchanged when no prerelease links exist" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        [unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master
+        [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
+      CHANGELOG
+
+      result = cleanup_collapsed_prerelease_links(changelog, "16.4.0")
+
+      expect(result).to eq(changelog)
+    end
+  end
+
   describe "#fetch_git_tags!" do
     it "refreshes local tags from origin when a remote exists" do
       Dir.mktmpdir do |dir|

@@ -25,9 +25,16 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [16.4.0.rc.9] - 2026-03-12
+
 #### Improved
 
+- **Auto-install `react_on_rails_pro` gem for `--rsc`/`--pro` generator flags**: Running `rails g react_on_rails:install --rsc` or `--pro` now automatically installs the `react_on_rails_pro` gem via `bundle add` instead of only printing an error, matching how Shakapacker is handled in the same generator. [PR 2439](https://github.com/shakacode/react_on_rails/pull/2439) by [justin808](https://github.com/justin808).
 - **create-react-on-rails-app validation and test coverage**: Tightened app name validation (must start with a letter), added Rails 7.0+ prerequisite validation, and expanded validator/setup test coverage (including `validateAll` success path). [PR 2571](https://github.com/shakacode/react_on_rails/pull/2571) by [justin808](https://github.com/justin808).
+
+#### Fixed
+
+- **Fixed `bin/setup` failing on pnpm workspace member directories**: `bin/setup` now checks for the presence of `pnpm-lock.yaml` before running `pnpm install --frozen-lockfile`, preventing failures in workspace member directories (e.g., `spec/dummy`) where dependencies are managed by the workspace root. [PR 2477](https://github.com/shakacode/react_on_rails/pull/2477) by [justin808](https://github.com/justin808).
 
 #### Changed
 
@@ -37,9 +44,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ##### Added
 
+- **Startup warning for unsafe compression middleware callbacks**: Added a startup guard that detects `Rack::Deflater` or `Rack::Brotli` middleware with `:if` callbacks that iterate the response body via `body.each`, which can break streaming SSR/RSC and deadlock `ActionController::Live`. The warning includes the middleware source location and remediation guidance. [PR 2554](https://github.com/shakacode/react_on_rails/pull/2554) by [justin808](https://github.com/justin808).
 - **Configurable host binding for Node Renderer Fastify worker**: Added a `host` setting (default: `process.env.RENDERER_HOST || 'localhost'`) to control the bind address for the Pro Node Renderer. Set it to `0.0.0.0` in containerized environments where external health checks need to reach the renderer. [PR 2585](https://github.com/shakacode/react_on_rails/pull/2585) by [justin808](https://github.com/justin808).
-
-### [16.4.0.rc.8] - 2026-03-10
 
 Changes since the last non-beta release.
 
@@ -102,8 +108,6 @@ Changes since the last non-beta release.
 - **Precompile Hook Detection**: Fixed `shakapacker_precompile_hook_configured?` always returning `false` for apps created with the React on Rails generator. The detection logic only matched the rake task pattern (`react_on_rails:generate_packs`) but the generator template uses the Ruby method (`generate_packs_if_stale`). Now correctly detects both patterns, including resolving script file contents. [PR 2282](https://github.com/shakacode/react_on_rails/pull/2282) by [ihabadham](https://github.com/ihabadham).
 - **Precompile Hook Self-Guard for HMR**: Added self-guard to the generator template's `bin/shakapacker-precompile-hook` to prevent duplicate execution in HMR mode where two webpack processes (client dev-server + server watcher) each trigger the hook. The script now exits early when `SHAKAPACKER_SKIP_PRECOMPILE_HOOK=true` is set by `bin/dev`, regardless of Shakapacker version. The version warning is now smarter: it only warns for hooks that lack the self-guard or use direct commands. **Existing users**: add `exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"` near the top of your `bin/shakapacker-precompile-hook` script. [PR 2388](https://github.com/shakacode/react_on_rails/pull/2388) by [justin808](https://github.com/justin808).
 - **Fix generator inheriting BUNDLE_GEMFILE from parent process**: The `react_on_rails:install` generator now wraps bundler commands with `Bundler.with_unbundled_env` to prevent inheriting `BUNDLE_GEMFILE` from the parent process, which caused "injected gems" conflicts when running generators inside a bundled context. [PR 2288](https://github.com/shakacode/react_on_rails/pull/2288) by [ihabadham](https://github.com/ihabadham).
-
-#### Pro
 
 ##### Added
 
@@ -2066,8 +2070,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.8...master
-[16.4.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0.rc.8
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.9...master
+[16.4.0.rc.9]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0.rc.9
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0
