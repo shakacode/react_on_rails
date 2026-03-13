@@ -542,14 +542,6 @@ describe ReactOnRailsHelper do
       allow(ReactOnRails::ServerRenderingPool)
         .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
           runtime_context.call("runGeneratedCode", js_code)
-          # Defensive fallback: if runtime does not raise, force ProgramError path.
-          raise ExecJS::ProgramError, "Expected generated JS to throw"
-        rescue ExecJS::ProgramError
-          # Preserve original ProgramError; must precede the StandardError rescue.
-          raise
-        rescue StandardError => e
-          # Normalize non-ExecJS exceptions so server_render_js rescues consistently.
-          raise ExecJS::ProgramError, e.message
         end
 
       expect do

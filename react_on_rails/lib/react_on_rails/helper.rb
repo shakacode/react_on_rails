@@ -239,6 +239,7 @@ module ReactOnRails
               if ('message' in renderingError) {
                 errorMessage = String(renderingError.message);
               }
+              // Use != (not !==) to guard both null and undefined stack values.
               if ('stack' in renderingError && renderingError.stack != null) {
                 errorStack = String(renderingError.stack);
               }
@@ -246,7 +247,7 @@ module ReactOnRails
             renderingErrorObject = {
               message: errorMessage,
               stack: errorStack,
-            }
+            };
           }
 
           consoleReplayScript = ReactOnRails.getConsoleReplayScript();
