@@ -379,7 +379,7 @@ module ReactOnRails
       end
 
       def all_dotfiles?(entries)
-        entries.all? { |entry| entry.start_with?(".") }
+        entries.any? && entries.all? { |entry| entry.start_with?(".") }
       end
 
       def warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, all_entries)
@@ -546,7 +546,8 @@ module ReactOnRails
       def normalize_config_content(content, strip_comments: false)
         normalized_content = content
         if strip_comments
-          normalized_content = normalized_content.gsub(%r{^\s*//.*$}, "")
+          # Replacement detection historically removed inline // comments too.
+          normalized_content = normalized_content.gsub(%r{//.*$}, "")
                                                  .gsub(%r{/\*.*?\*/}m, "")
         end
 
