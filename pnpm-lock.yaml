@@ -161,7 +161,7 @@ importers:
         specifier: ^19.0.3
         version: 19.2.3(react@19.2.3)
       react-on-rails-rsc:
-        specifier: https://github.com/shakacode/react_on_rails_rsc.git#fix/chunk-merge-bug-v19.0.3
+        specifier: https://github.com/shakacode/react_on_rails_rsc.git#ef99ec08ad108e9b2fcb87fd40db85c59d3284d9
         version: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/ef99ec08ad108e9b2fcb87fd40db85c59d3284d9(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.103.0(@swc/core@1.15.3))
       redux:
         specifier: ^4.2.1
@@ -232,7 +232,7 @@ importers:
         specifier: ^19.0.3
         version: 19.2.0(react@19.2.0)
       react-on-rails-rsc:
-        specifier: https://github.com/shakacode/react_on_rails_rsc.git#fix/chunk-merge-bug-v19.0.3
+        specifier: https://github.com/shakacode/react_on_rails_rsc.git#ef99ec08ad108e9b2fcb87fd40db85c59d3284d9
         version: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/ef99ec08ad108e9b2fcb87fd40db85c59d3284d9(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3))
 
   packages/react-on-rails-pro-node-renderer:
@@ -648,7 +648,7 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/react-on-rails-pro-node-renderer
       react-on-rails-rsc:
-        specifier: https://github.com/shakacode/react_on_rails_rsc.git#fix/chunk-merge-bug-v19.0.3
+        specifier: https://github.com/shakacode/react_on_rails_rsc.git#ef99ec08ad108e9b2fcb87fd40db85c59d3284d9
         version: https://codeload.github.com/shakacode/react_on_rails_rsc/tar.gz/ef99ec08ad108e9b2fcb87fd40db85c59d3284d9(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(webpack@5.103.0)
       react-proptypes:
         specifier: ^1.0.0

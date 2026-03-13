@@ -69,7 +69,7 @@
     "publint": "^0.3.4",
     "react": "^19.0.3",
     "react-dom": "^19.0.3",
-    "react-on-rails-rsc": "https://github.com/shakacode/react_on_rails_rsc.git#fix/chunk-merge-bug-v19.0.3",
+    "react-on-rails-rsc": "https://github.com/shakacode/react_on_rails_rsc.git#ef99ec08ad108e9b2fcb87fd40db85c59d3284d9",
     "redux": "^4.2.1",
     "size-limit": "^12.0.0",
     "stylelint": "^16.14.0",
