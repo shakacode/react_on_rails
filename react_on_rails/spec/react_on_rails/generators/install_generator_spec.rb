@@ -591,12 +591,11 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "with --rspack and custom webpack files" do
+  shared_context "with webpack to rspack migration base" do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
       simulate_npm_files(package_json: true)
-
       simulate_existing_file("config/shakapacker.yml", <<~YAML)
         default: &default
           source_path: app/javascript
@@ -617,6 +616,13 @@ describe InstallGenerator, type: :generator do
       YAML
       simulate_existing_file("bin/shakapacker", "")
       simulate_existing_file("bin/shakapacker-dev-server", "")
+    end
+  end
+
+  context "with --rspack and custom webpack files" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
       simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
         const { generateWebpackConfig } = require('shakapacker')
         const webpackConfig = generateWebpackConfig()
@@ -636,30 +642,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --rspack and dotfiles in config/webpack" do
+    include_context "with webpack to rspack migration base"
+
     before(:all) do
-      prepare_destination
-      simulate_existing_rails_files(package_json: true)
-      simulate_npm_files(package_json: true)
-
-      simulate_existing_file("config/shakapacker.yml", <<~YAML)
-        default: &default
-          source_path: app/javascript
-          source_entry_path: packs
-          javascript_transpiler: "babel"
-          assets_bundler: "webpack"
-
-        development:
-          <<: *default
-
-        test:
-          <<: *default
-          compile: true
-
-        production:
-          <<: *default
-      YAML
-      simulate_existing_file("bin/shakapacker", "")
-      simulate_existing_file("bin/shakapacker-dev-server", "")
       simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
         const { generateWebpackConfig } = require('shakapacker')
         const webpackConfig = generateWebpackConfig()
@@ -678,31 +663,32 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "with --rspack and customized webpack.config.js only" do
+  context "with --rspack and nested config/webpack directory" do
+    include_context "with webpack to rspack migration base"
+
     before(:all) do
-      prepare_destination
-      simulate_existing_rails_files(package_json: true)
-      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_existing_file("config/webpack/custom/.keep", "")
 
-      simulate_existing_file("config/shakapacker.yml", <<~YAML)
-        default: &default
-          source_path: app/javascript
-          source_entry_path: packs
-          javascript_transpiler: "babel"
-          assets_bundler: "webpack"
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
 
-        development:
-          <<: *default
+    it "keeps config/webpack when nested directories are present" do
+      assert_file "config/webpack/custom/.keep"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
 
-        test:
-          <<: *default
-          compile: true
+  context "with --rspack and customized webpack.config.js only" do
+    include_context "with webpack to rspack migration base"
 
-        production:
-          <<: *default
-      YAML
-      simulate_existing_file("bin/shakapacker", "")
-      simulate_existing_file("bin/shakapacker-dev-server", "")
+    before(:all) do
       simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
         const { env } = require('shakapacker')
         const { existsSync } = require('fs')
@@ -731,30 +717,9 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with --rspack and legacy generateWebpackConfigs.js" do
+    include_context "with webpack to rspack migration base"
+
     before(:all) do
-      prepare_destination
-      simulate_existing_rails_files(package_json: true)
-      simulate_npm_files(package_json: true)
-
-      simulate_existing_file("config/shakapacker.yml", <<~YAML)
-        default: &default
-          source_path: app/javascript
-          source_entry_path: packs
-          javascript_transpiler: "babel"
-          assets_bundler: "webpack"
-
-        development:
-          <<: *default
-
-        test:
-          <<: *default
-          compile: true
-
-        production:
-          <<: *default
-      YAML
-      simulate_existing_file("bin/shakapacker", "")
-      simulate_existing_file("bin/shakapacker-dev-server", "")
       simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
         const { generateWebpackConfig } = require('shakapacker')
         const webpackConfig = generateWebpackConfig()
@@ -811,31 +776,46 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "with --rsc app switching from webpack to rspack" do
+  context "with --rspack and legacy generateWebpackConfigs.js generated with --rsc" do
+    include_context "with webpack to rspack migration base"
+
     before(:all) do
-      prepare_destination
-      simulate_existing_rails_files(package_json: true)
-      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_existing_file("config/webpack/generateWebpackConfigs.js", <<~JS)
+        const clientWebpackConfig = require('./clientWebpackConfig');
+        const serverWebpackConfig = require('./serverWebpackConfig');
+        const rscWebpackConfig = require('./rscWebpackConfig');
 
-      simulate_existing_file("config/shakapacker.yml", <<~YAML)
-        default: &default
-          source_path: app/javascript
-          source_entry_path: packs
-          javascript_transpiler: "babel"
-          assets_bundler: "webpack"
+        const serverClientOrBoth = (envSpecific) => {
+          const clientConfig = clientWebpackConfig();
+          const serverConfig = serverWebpackConfig();
+          const rscConfig = rscWebpackConfig();
+          if (envSpecific) envSpecific(clientConfig, serverConfig, rscConfig);
+          return [clientConfig, serverConfig, rscConfig];
+        };
 
-        development:
-          <<: *default
+        module.exports = serverClientOrBoth;
+      JS
 
-        test:
-          <<: *default
-          compile: true
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
 
-        production:
-          <<: *default
-      YAML
-      simulate_existing_file("bin/shakapacker", "")
-      simulate_existing_file("bin/shakapacker-dev-server", "")
+    it "keeps config/webpack when legacy content no longer matches current options" do
+      assert_file "config/webpack/generateWebpackConfigs.js"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rsc app switching from webpack to rspack" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
       templates_root = File.expand_path("../../../lib/generators/react_on_rails/templates", __dir__)
       simulate_existing_file(
         "config/webpack/webpack.config.js",
