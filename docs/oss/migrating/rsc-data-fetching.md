@@ -759,8 +759,11 @@ export async function createComment(formData) {
   // In React on Rails, Server Actions run in Node.js and cannot access
   // Rails models directly. Call your Rails API endpoint instead.
   // Use an absolute URL and an API-only route or another non-session auth
-  // mechanism, because this server-side fetch does not have the browser's
-  // CSRF token.
+  // boundary, because this server-side fetch does not have the browser's
+  // CSRF token. If you use `protect_from_forgery with: :null_session`,
+  // add another trust check (for example signed tokens, API keys, or
+  // same-origin validation) because `null_session` avoids the CSRF failure
+  // but does not authenticate the request.
   const railsBaseUrl = process.env.RAILS_BASE_URL || 'http://localhost:3000';
   const response = await fetch(new URL('/api/comments', railsBaseUrl), {
     method: 'POST',

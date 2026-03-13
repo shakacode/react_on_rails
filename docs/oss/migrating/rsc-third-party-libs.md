@@ -155,9 +155,13 @@ export async function submitForm(formData) {
   // Point RAILS_BASE_URL at your Rails app (for example http://localhost:3000
   // in development).
   const railsBaseUrl = process.env.RAILS_BASE_URL || 'http://localhost:3000';
-  // Note: This fetch runs server-side. The Rails endpoint must skip CSRF
-  // protection (e.g., `protect_from_forgery with: :null_session` for API
-  // routes) since there is no browser session to provide a CSRF token.
+  // Note: This fetch runs server-side, so the Rails endpoint will not receive
+  // the browser's CSRF token. Use an API-only route or another non-session
+  // auth boundary. If you switch a Rails endpoint to
+  // `protect_from_forgery with: :null_session`, add another trust check
+  // (for example signed tokens, API keys, or same-origin validation) because
+  // `null_session` avoids the CSRF failure but does not authenticate the
+  // request.
   const res = await fetch(new URL('/api/users', railsBaseUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
