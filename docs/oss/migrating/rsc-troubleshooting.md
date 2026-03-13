@@ -56,14 +56,18 @@ async function Page() {
     // In React on Rails, Server Actions run in Node.js and cannot access
     // Rails models directly. Call your Rails API endpoint instead:
     // Server-side fetch needs an absolute URL. Point RAILS_BASE_URL at your
-    // Rails app (for example http://localhost:3000 in development).
+    // internal Rails URL (for example http://127.0.0.1:3000 in development),
+    // not the public-facing domain.
     // This server-side fetch will not include the browser's CSRF token, so
     // use an API-only route or another non-session auth boundary. If you use
     // `protect_from_forgery with: :null_session`, add another trust check
     // (for example signed tokens, API keys, or same-origin validation)
     // because `null_session` avoids the CSRF failure but does not
     // authenticate the request.
-    const railsBaseUrl = process.env.RAILS_BASE_URL || 'http://localhost:3000';
+    const railsBaseUrl = process.env.RAILS_BASE_URL;
+    if (!railsBaseUrl) {
+      throw new Error('RAILS_BASE_URL environment variable is required for Server Actions');
+    }
     await fetch(new URL('/api/items', railsBaseUrl), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

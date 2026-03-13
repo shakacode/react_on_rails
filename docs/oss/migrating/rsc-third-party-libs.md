@@ -152,9 +152,12 @@ All components include `'use client'` directives. Cannot use compound components
 export async function submitForm(formData) {
   const name = formData.get('name');
   // Server Actions run in Node.js, so this fetch needs an absolute URL.
-  // Point RAILS_BASE_URL at your Rails app (for example http://localhost:3000
-  // in development).
-  const railsBaseUrl = process.env.RAILS_BASE_URL || 'http://localhost:3000';
+  // Point RAILS_BASE_URL at Rails' internal URL (for example
+  // http://127.0.0.1:3000 in development), not the public-facing domain.
+  const railsBaseUrl = process.env.RAILS_BASE_URL;
+  if (!railsBaseUrl) {
+    throw new Error('RAILS_BASE_URL environment variable is required for Server Actions');
+  }
   // Note: This fetch runs server-side, so the Rails endpoint will not receive
   // the browser's CSRF token. Use an API-only route or another non-session
   // auth boundary. If you switch a Rails endpoint to

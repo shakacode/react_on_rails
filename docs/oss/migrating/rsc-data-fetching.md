@@ -760,11 +760,16 @@ export async function createComment(formData) {
   // Rails models directly. Call your Rails API endpoint instead.
   // Use an absolute URL and an API-only route or another non-session auth
   // boundary, because this server-side fetch does not have the browser's
-  // CSRF token. If you use `protect_from_forgery with: :null_session`,
-  // add another trust check (for example signed tokens, API keys, or
-  // same-origin validation) because `null_session` avoids the CSRF failure
-  // but does not authenticate the request.
-  const railsBaseUrl = process.env.RAILS_BASE_URL || 'http://localhost:3000';
+  // CSRF token. Point RAILS_BASE_URL at Rails' internal URL (for example
+  // http://127.0.0.1:3000 in development), not the public-facing domain.
+  // If you use `protect_from_forgery with: :null_session`, add another trust
+  // check (for example signed tokens, API keys, or same-origin validation)
+  // because `null_session` avoids the CSRF failure but does not authenticate
+  // the request.
+  const railsBaseUrl = process.env.RAILS_BASE_URL;
+  if (!railsBaseUrl) {
+    throw new Error('RAILS_BASE_URL environment variable is required for Server Actions');
+  }
   const response = await fetch(new URL('/api/comments', railsBaseUrl), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
