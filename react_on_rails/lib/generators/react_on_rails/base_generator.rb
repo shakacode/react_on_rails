@@ -375,13 +375,15 @@ module ReactOnRails
       def rendered_template_for_cleanup(template_path)
         @rendered_template_cache ||= {}
         @rendered_template_cache[template_path] ||= begin
-          config = { message: "// The source code including full typescript support is available at:" }
+          template_doc_config = { message: "// The source code including full typescript support is available at:" }
           template_content = File.read(File.join(self.class.source_root, template_path))
           # Render against current generator options. Any mismatch is treated as non-removable,
           # which is intentional because cleanup should be conservative.
           # Note: files originally generated with --pro or --rsc will not match when the
           # current run omits those options; in that case, we preserve the directory.
-          ERB.new(template_content, trim_mode: "-").result(binding)
+          template_binding = binding
+          template_binding.local_variable_set(:config, template_doc_config)
+          ERB.new(template_content, trim_mode: "-").result(template_binding)
         end
       end
 
