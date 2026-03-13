@@ -39,6 +39,18 @@ describe InstallGenerator, type: :generator do
         end
       end
     end
+
+    it "enables build_test_command by default" do
+      assert_file "config/initializers/react_on_rails.rb" do |content|
+        expect(content).to include('config.build_test_command = "RAILS_ENV=test bin/shakapacker"')
+      end
+    end
+
+    it "sets shakapacker test compile to false by default" do
+      assert_file "config/shakapacker.yml" do |content|
+        expect(content).to match(/^test:.*?^\s+compile:\s*false/m)
+      end
+    end
   end
 
   context "with --redux" do
@@ -163,6 +175,51 @@ describe InstallGenerator, type: :generator do
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)" do
       expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
       assert_file("spec/rails_helper.rb") { |contents| expect(contents).to match(expected) }
+    end
+  end
+
+  context "with minitest test_helper and no rspec files" do
+    before(:all) do
+      run_generator_test_with_args([], spec: false, package_json: true) do
+        simulate_existing_file("test/test_helper.rb", <<~RUBY)
+          ENV["RAILS_ENV"] ||= "test"
+          require_relative "../config/environment"
+          require "rails/test_help"
+
+          class ActiveSupport::TestCase
+          end
+        RUBY
+      end
+    end
+
+    it "adds ReactOnRails::TestHelper.ensure_assets_compiled for minitest" do
+      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_MINITEST_TO_COMPILE_ASSETS
+      assert_file("test/test_helper.rb") { |contents| expect(contents).to match(expected) }
+    end
+  end
+
+  context "with both rspec and minitest helpers present" do
+    before(:all) do
+      run_generator_test_with_args([], spec: true, package_json: true) do
+        simulate_existing_file("test/test_helper.rb", <<~RUBY)
+          ENV["RAILS_ENV"] ||= "test"
+          require_relative "../config/environment"
+          require "rails/test_help"
+
+          class ActiveSupport::TestCase
+          end
+        RUBY
+      end
+    end
+
+    it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config) for rspec" do
+      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
+      assert_file("spec/rails_helper.rb") { |contents| expect(contents).to match(expected) }
+    end
+
+    it "adds ReactOnRails::TestHelper.ensure_assets_compiled for minitest" do
+      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_MINITEST_TO_COMPILE_ASSETS
+      assert_file("test/test_helper.rb") { |contents| expect(contents).to match(expected) }
     end
   end
 

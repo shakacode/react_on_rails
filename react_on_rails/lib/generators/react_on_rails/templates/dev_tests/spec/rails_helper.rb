@@ -13,10 +13,9 @@ require_relative "spec_helper"
 require "rspec/rails"
 require "capybara/rspec"
 require "capybara/rails"
-Capybara.register_driver :selenium_chrome do |app|
+Capybara.register_driver :selenium_chrome_headless do |app|
   options = Selenium::WebDriver::Chrome::Options.new
-  options.add_argument("--headless")
-  options.add_argument("--disable-gpu")
+  options.add_argument("--headless=new")
   Capybara::Selenium::Driver.new(app, browser: :chrome, options: options)
 end
 
@@ -41,17 +40,20 @@ end
 
 RSpec.configure do |config|
   config.before(:each, :js, type: :system) do
-    driven_by :selenium_chrome
+    driven_by :selenium_chrome_headless
   end
 
   # Ensure that if we are running js tests, we are using latest webpack assets
   # This will use the defaults of :js and :server_rendering meta tags
+  #
+  # Requires config.build_test_command in config/initializers/react_on_rails.rb.
+  # This is the default setup for React on Rails generated apps.
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
 
-  # Remove this line if you"re not using ActiveRecord or ActiveRecord fixtures
-  config.fixture_path = "#{Rails.root}/spec/fixtures"
+  # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
+  config.fixture_paths = ["#{Rails.root}/spec/fixtures"]
 
-  # If you"re not using ActiveRecord, or you"d prefer not to run each of your
+  # If you're not using ActiveRecord, or you'd prefer not to run each of your
   # examples within a transaction, remove the following line or assign false
   # instead of true.
   config.use_transactional_fixtures = true

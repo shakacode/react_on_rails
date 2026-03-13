@@ -176,24 +176,41 @@ module ReactOnRails
       end
 
       def append_to_spec_rails_helper
-        rails_helper = File.join(destination_root, "spec/rails_helper.rb")
-        if File.exist?(rails_helper)
-          add_configure_rspec_to_compile_assets(rails_helper)
-        else
-          spec_helper = File.join(destination_root, "spec/spec_helper.rb")
-          add_configure_rspec_to_compile_assets(spec_helper) if File.exist?(spec_helper)
-        end
+        rspec_helper = preferred_rspec_helper_file
+        add_configure_rspec_to_compile_assets(rspec_helper) if rspec_helper
+
+        test_helper = File.join(destination_root, "test/test_helper.rb")
+        add_configure_minitest_to_compile_assets(test_helper) if File.exist?(test_helper)
       end
 
       CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
         RSpec.configure do |config|
           # Ensure that if we are running js tests, we are using latest webpack assets
           # This will use the defaults of :js and :server_rendering meta tags
+          # Requires config.build_test_command in config/initializers/react_on_rails.rb.
+          # This is the default setup for React on Rails generated apps.
           ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
         end
       STR
 
+      CONFIGURE_MINITEST_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
+        # Ensure that tests run against fresh webpack assets.
+        ActiveSupport::TestCase.setup do
+          ReactOnRails::TestHelper.ensure_assets_compiled
+        end
+      STR
+
       private
+
+      def preferred_rspec_helper_file
+        rails_helper = File.join(destination_root, "spec/rails_helper.rb")
+        return rails_helper if File.exist?(rails_helper)
+
+        spec_helper = File.join(destination_root, "spec/spec_helper.rb")
+        return spec_helper if File.exist?(spec_helper)
+
+        nil
+      end
 
       def copy_webpack_main_config(base_path, config)
         webpack_config_path = bundler_main_config_path
@@ -359,8 +376,20 @@ module ReactOnRails
       end
 
       def add_configure_rspec_to_compile_assets(helper_file)
-        search_str = "RSpec.configure do |config|"
-        gsub_file(helper_file, search_str, CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+        content = File.read(helper_file)
+        return if content.match?(/^\s*[^#\s][^#]*ReactOnRails::TestHelper\.configure_rspec_to_compile_assets/)
+
+        updated_content = content.sub("RSpec.configure do |config|", CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+        return if updated_content == content
+
+        File.write(helper_file, updated_content)
+      end
+
+      def add_configure_minitest_to_compile_assets(helper_file)
+        content = File.read(helper_file)
+        return if content.match?(/^\s*[^#\s][^#]*ReactOnRails::TestHelper\.ensure_assets_compiled/)
+
+        append_to_file(helper_file, "\n\n#{CONFIGURE_MINITEST_TO_COMPILE_ASSETS}\n")
       end
 
       def configure_rspack_in_shakapacker

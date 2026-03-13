@@ -19,6 +19,18 @@ describe DevTestsGenerator, type: :generator do
          .rspec].each { |file| assert_file(file) }
     end
 
+    it "enables the default RSpec test asset hook in copied helpers" do
+      assert_file("spec/rails_helper.rb") do |contents|
+        expect(contents).to include("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+        expect(contents).not_to include("# ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      end
+
+      assert_file("spec/spec_helper.rb") do |contents|
+        expect(contents).to include("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+        expect(contents).not_to include("# ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      end
+    end
+
     it "copies tests" do
       %w[spec/system/hello_world_spec.rb].each { |file| assert_file(file) }
     end

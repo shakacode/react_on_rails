@@ -3,6 +3,8 @@
 require "English"
 require "open3"
 require "rainbow"
+require "erb"
+require "yaml"
 require_relative "../packer_utils"
 require_relative "database_checker"
 require_relative "service_checker"
@@ -11,6 +13,7 @@ module ReactOnRails
   module Dev
     class ServerManager
       HELP_FLAGS = ["-h", "--help"].freeze
+      TEST_WATCH_MODES = %w[auto full client-only].freeze
 
       class << self
         def start(mode = :development, procfile = nil, verbose: false, route: nil, rails_env: nil,
@@ -154,7 +157,7 @@ module ReactOnRails
         end
 
         # Flags that take a value as the next argument (not using = syntax)
-        FLAGS_WITH_VALUES = %w[--route --rails-env].freeze
+        FLAGS_WITH_VALUES = %w[--route --rails-env --test-watch-mode].freeze
 
         # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
         def run_from_command_line(args = ARGV)
@@ -168,7 +171,7 @@ module ReactOnRails
           # Check if help flags are present in args (before OptionParser processes them)
           help_requested = args.any? { |arg| HELP_FLAGS.include?(arg) }
 
-          options = { route: nil, rails_env: nil, verbose: false, skip_database_check: false }
+          options = { route: nil, rails_env: nil, verbose: false, skip_database_check: false, test_watch_mode: "auto" }
 
           OptionParser.new do |opts|
             opts.banner = "Usage: dev [command] [options]"
@@ -187,6 +190,11 @@ module ReactOnRails
 
             opts.on("--skip-database-check", "Skip database connectivity check (saves ~1-2s startup time)") do
               options[:skip_database_check] = true
+            end
+
+            opts.on("--test-watch-mode MODE",
+                    "For `bin/dev test-watch`: auto (default), full, or client-only") do |mode|
+              options[:test_watch_mode] = mode
             end
 
             opts.on("-h", "--help", "Prints this help") do
@@ -218,6 +226,8 @@ module ReactOnRails
             kill_processes
           when "help"
             show_help
+          when "test-watch"
+            run_test_watch(test_watch_mode: options[:test_watch_mode])
           when "hmr", nil
             start(:development, "Procfile.dev", verbose: options[:verbose], route: options[:route],
                                                 skip_database_check: options[:skip_database_check])
@@ -282,6 +292,100 @@ module ReactOnRails
           else
             handle_precompile_hook_failure(hook_value, stdout, stderr)
           end
+        end
+
+        def run_test_watch(test_watch_mode: "auto")
+          resolved_mode = resolve_test_watch_mode(test_watch_mode)
+          return unless resolved_mode
+
+          env = { "RAILS_ENV" => "test" }
+          if resolved_mode == "client-only"
+            env["CLIENT_BUNDLE_ONLY"] = "yes"
+            puts Rainbow("🧪 Starting test watch (client-only mode)...").cyan
+            puts Rainbow("   Reusing server bundle from existing watcher if available.").cyan
+          else
+            puts Rainbow("🧪 Starting test watch (full mode)...").cyan
+            puts Rainbow("   Building both client and server test bundles.").cyan
+          end
+          puts Rainbow("   Command: #{env.map { |k, v| "#{k}=#{v}" }.join(' ')} bin/shakapacker --watch").cyan
+          puts ""
+
+          exec(env, "bin/shakapacker", "--watch")
+        end
+
+        def resolve_test_watch_mode(mode)
+          normalized_mode = mode.to_s.strip
+          normalized_mode = "auto" if normalized_mode.empty?
+
+          unless TEST_WATCH_MODES.include?(normalized_mode)
+            puts "❌ Invalid --test-watch-mode '#{mode}'. Use one of: #{TEST_WATCH_MODES.join(', ')}"
+            exit 1
+          end
+
+          return normalized_mode unless normalized_mode == "auto"
+
+          shakapacker_watch_process_running? ? "client-only" : "full"
+        end
+
+        def shakapacker_watch_process_running?
+          # Detect existing shakapacker watcher processes (from either bin/dev or bin/dev static).
+          # If one is already running, client-only test watch avoids duplicate server-bundle rebuilds.
+          server_only_watchers = find_process_pids("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+          if server_only_watchers.any?
+            return true if shared_private_output_paths?
+
+            puts Rainbow(
+              "   Existing server-bundle-only watcher found, " \
+              "but test/development private outputs differ; using full mode."
+            ).yellow
+            return false
+          end
+
+          full_watchers = find_process_pids("bin/shakapacker --watch")
+          if full_watchers.any? && shakapacker_dev_server_running?
+            return true if shared_private_output_paths?
+
+            puts Rainbow(
+              "   Existing dev-server/watcher pair found, " \
+              "but test/development private outputs differ; using full mode."
+            ).yellow
+            return false
+          end
+
+          return false if full_watchers.empty?
+          return true if shared_private_output_paths?
+
+          puts Rainbow("   Existing shakapacker watcher found, but bundle sharing is unclear; using full mode.").yellow
+
+          false
+        end
+
+        def shakapacker_dev_server_running?
+          find_process_pids("bin/shakapacker-dev-server").any?
+        end
+
+        def shared_private_output_paths?
+          shakapacker_config = parsed_shakapacker_config
+          return false unless shakapacker_config.is_a?(Hash)
+
+          default_config = shakapacker_config["default"] || {}
+          development_config = default_config.merge(shakapacker_config["development"] || {})
+          test_config = default_config.merge(shakapacker_config["test"] || {})
+          development_private = development_config["private_output_path"]
+          test_private = test_config["private_output_path"]
+
+          return false unless development_private && test_private
+
+          development_private == test_private
+        end
+
+        def parsed_shakapacker_config
+          config_path = ENV["SHAKAPACKER_CONFIG"] || "config/shakapacker.yml"
+          return nil unless File.exist?(config_path)
+
+          YAML.safe_load(ERB.new(File.read(config_path)).result, aliases: true, permitted_classes: [Symbol])
+        rescue StandardError
+          nil
         end
 
         # rubocop:disable Metrics/AbcSize
@@ -376,6 +480,9 @@ module ReactOnRails
               #{Rainbow('prod').green.bold}                #{Rainbow('Alias for production-assets').white}
                                   #{Rainbow('→ Uses:').yellow} Procfile.dev-prod-assets
 
+              #{Rainbow('test-watch').green.bold}          #{Rainbow('Watch and rebuild test assets with smart defaults').white}
+                                  #{Rainbow('→ Uses:').yellow} bin/shakapacker --watch (RAILS_ENV=test)
+
               #{Rainbow('kill').red.bold}                #{Rainbow('Kill all development processes for a clean start').white}
               #{Rainbow('help').blue.bold}                #{Rainbow('Show this help message').white}
           COMMANDS
@@ -390,12 +497,15 @@ module ReactOnRails
               #{Rainbow('--rails-env ENV').green.bold}      #{Rainbow('Override RAILS_ENV for assets:precompile step only (prod mode only)').white}
               #{Rainbow('--verbose, -v').green.bold}        #{Rainbow('Enable verbose output for pack generation').white}
               #{Rainbow('--skip-database-check').green.bold} #{Rainbow('Skip database connectivity check (saves ~1-2s startup time)').white}
+              #{Rainbow('--test-watch-mode MODE').green.bold} #{Rainbow('For test-watch: auto, full, or client-only').white}
 
             #{Rainbow('📝 EXAMPLES:').cyan.bold}
               #{Rainbow('bin/dev prod').green.bold}                    #{Rainbow('# NODE_ENV=production, RAILS_ENV=development').white}
               #{Rainbow('bin/dev prod --rails-env=production').green.bold}  #{Rainbow('# NODE_ENV=production, RAILS_ENV=production').white}
               #{Rainbow('bin/dev prod --route=dashboard').green.bold}       #{Rainbow('# Custom route in URLs').white}
               #{Rainbow('bin/dev --skip-database-check').green.bold}        #{Rainbow('# Skip DB check for faster startup').white}
+              #{Rainbow('bin/dev test-watch').green.bold}                    #{Rainbow('# Auto-select full/client-only test watch').white}
+              #{Rainbow('bin/dev test-watch --test-watch-mode=full').green.bold} #{Rainbow('# Always build server+client test bundles').white}
           OPTIONS
         end
         # rubocop:enable Metrics/AbcSize
@@ -428,6 +538,17 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Supports Redis, PostgreSQL, Elasticsearch, and custom services').white}
             #{Rainbow('•').yellow} #{Rainbow('Shows helpful errors with start commands if services are missing').white}
 
+            #{Rainbow('🧪 TEST ASSET WORKFLOWS:').cyan.bold}
+            #{Rainbow('Recommended default (separate outputs):').white}
+            #{Rainbow('•').yellow} #{Rainbow('Keep test public_output_path different from development (for example, packs-test vs packs)').white}
+            #{Rainbow('•').yellow} #{Rainbow('Use').white} #{Rainbow('bin/dev').green.bold} #{Rainbow('for HMR').white}
+            #{Rainbow('•').yellow} #{Rainbow('Use').white} #{Rainbow('bin/dev test-watch').green.bold} #{Rainbow('to watch test assets').white}
+            #{Rainbow('•').yellow} #{Rainbow('Override mode when needed:').white} #{Rainbow('--test-watch-mode=full').green.bold} #{Rainbow('or').white} #{Rainbow('--test-watch-mode=client-only').green.bold}
+
+            #{Rainbow('Advanced static-only workflow (shared output):').white}
+            #{Rainbow('•').yellow} #{Rainbow('Only use shared test/dev output with').white} #{Rainbow('bin/dev static').green.bold}
+            #{Rainbow('•').yellow} #{Rainbow('Do not combine shared output path with').white} #{Rainbow('bin/dev').red.bold} #{Rainbow('(HMR)').white}
+
             #{Rainbow('Example .dev-services.yml:').white}
             #{Rainbow('  services:').cyan}
             #{Rainbow('    redis:').cyan}
@@ -457,6 +578,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('CSS extracted to separate files (no FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('Development environment (faster builds than production)').white}
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
+            #{Rainbow('•').yellow} #{Rainbow('Optional advanced testing: share output path with tests only in this mode').white}
             #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
 
             #{Rainbow('🏭 Production-assets mode').cyan.bold} - #{Rainbow('Procfile.dev-prod-assets').green}:
@@ -764,7 +886,10 @@ module ReactOnRails
             #{Rainbow('•').red} #{Rainbow('"Process manager not found"').white} #{Rainbow('→ Install:').yellow} #{Rainbow('brew install overmind').green.bold} #{Rainbow('(or').white} #{Rainbow('gem install foreman').green.bold}#{Rainbow(')').white}
             #{Rainbow('•').red} #{Rainbow('"Assets not loading"').white} #{Rainbow('→ Verify Procfile.dev is present and check server logs').white}
 
-            #{Rainbow('📚 Need help? Visit:').blue.bold} #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
+            #{Rainbow('📖 DOCUMENTATION:').cyan.bold}
+            #{Rainbow('•').yellow} #{Rainbow('Testing & dev server guide:').white} #{Rainbow('docs/oss/building-features/dev-server-and-testing.md').green}
+            #{Rainbow('•').yellow} #{Rainbow('Testing configuration:').white} #{Rainbow('docs/oss/building-features/testing-configuration.md').green}
+            #{Rainbow('•').yellow} #{Rainbow('Full docs:').white} #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
           TROUBLESHOOTING
         end
         # rubocop:enable Metrics/AbcSize

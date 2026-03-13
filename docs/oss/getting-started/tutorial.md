@@ -249,7 +249,7 @@ Then visit https://your-shared-addr.c9users.io:8080/hello_world
 
 It's super important to exclude certain directories from RubyMine or else it will slow to a crawl as it tries to parse all the npm files.
 
-- Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test`
+- Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test` (kept separate so test and development manifests do not overwrite each other)
 - `node_modules`
 
 ## Conclusion

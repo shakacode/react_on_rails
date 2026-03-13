@@ -21,8 +21,47 @@ describe ReactOnRails::TestHelper::EnsureAssetsCompiled do
                                                      %w[client-bundle.js server-bundle.js])
       end
 
+      before do
+        allow(ReactOnRails::TestHelper::DevAssetsDetector).to receive(:try_activate_dev_assets!).and_return(false)
+      end
+
       it "compiles the webpack assets" do
         expect(compiler).to receive(:compile_assets).once
+        invoke_ensurer_with_doubles
+      end
+    end
+
+    context "when assets are not up to date with non-manifest stale files and dev assets are reusable" do
+      let(:assets_checker) do
+        double_assets_checker(stale_generated_webpack_files:
+                                                     %w[client-bundle.js server-bundle.js])
+      end
+
+      before do
+        allow(ReactOnRails::TestHelper::DevAssetsDetector).to receive(:try_activate_dev_assets!)
+      end
+
+      it "still compiles to refresh non-manifest stale bundles" do
+        expect(compiler).to receive(:compile_assets).once
+        invoke_ensurer_with_doubles
+      end
+
+      it "does not mutate shakapacker config via dev asset reuse" do
+        expect(ReactOnRails::TestHelper::DevAssetsDetector).not_to receive(:try_activate_dev_assets!)
+        expect(compiler).to receive(:compile_assets).once
+        invoke_ensurer_with_doubles
+      end
+    end
+
+    context "when only manifest is stale and dev assets are reusable" do
+      let(:assets_checker) { double_assets_checker(stale_generated_webpack_files: ["manifest.json"]) }
+
+      before do
+        allow(ReactOnRails::TestHelper::DevAssetsDetector).to receive(:try_activate_dev_assets!).and_return(true)
+      end
+
+      it "skips compilation and reuses dev assets" do
+        expect(compiler).not_to receive(:compile_assets)
         invoke_ensurer_with_doubles
       end
     end

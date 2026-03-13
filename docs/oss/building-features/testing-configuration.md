@@ -4,69 +4,48 @@ This guide explains how to configure React on Rails for optimal testing with RSp
 
 ## Quick Start
 
-For most applications, the simplest approach is to let Shakapacker handle asset compilation automatically:
+For most applications, the recommended approach is React on Rails TestHelper with `build_test_command`:
 
-```yaml
-# config/shakapacker.yml
-test:
-  compile: true
-  public_output_path: webpack/test
+```ruby
+# config/initializers/react_on_rails.rb
+ReactOnRails.configure do |config|
+  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+end
 ```
 
-That's it! Shakapacker will automatically compile assets before running tests.
+Then wire TestHelper into your test framework. If your app uses both RSpec and Minitest, wire both files.
+
+**RSpec** — add to `spec/rails_helper.rb`:
+
+```ruby
+require "react_on_rails/test_helper"
+
+RSpec.configure do |config|
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+end
+```
+
+**Minitest** — add to `test/test_helper.rb`:
+
+```ruby
+require "react_on_rails/test_helper"
+
+class ActiveSupport::TestCase
+  setup do
+    ReactOnRails::TestHelper.ensure_assets_compiled
+  end
+end
+```
 
 ## Two Approaches to Test Asset Compilation
 
 React on Rails supports two mutually exclusive approaches for compiling webpack assets during tests:
 
-### Approach 1: Shakapacker Auto-Compilation (Recommended)
+### Approach 1: React on Rails Test Helper + build_test_command (Recommended)
 
-**Best for:** Most applications, especially simpler test setups
-
-**Configuration:**
-
-```yaml
-# config/shakapacker.yml
-test:
-  <<: *default
-  compile: true
-  public_output_path: webpack/test
-```
-
-> **Note:** Ensure that `source_path` is correctly configured in your `config/shakapacker.yml`, or Shakapacker won't correctly detect source changes. This is only necessary if you're not using Shakapacker's defaults.
-
-**How it works:**
-
-- Shakapacker automatically compiles assets when they're requested
-- No additional configuration in React on Rails or test helpers needed
-- Assets are compiled on-demand during test runs
-
-**Pros:**
-
-- ✅ Simplest configuration
-- ✅ No extra setup in spec helpers
-- ✅ Automatically integrates with Rails test environment
-- ✅ Works with any test framework (RSpec, Minitest, etc.)
-
-**Cons:**
-
-- ⚠️ May compile assets multiple times during test runs
-- ⚠️ Less explicit control over when compilation happens
-- ⚠️ Can slow down tests if assets change frequently
-
-**When to use:**
-
-- You want the simplest possible configuration
-- Your test suite is relatively fast
-- You don't mind automatic compilation on-demand
-
-### Approach 2: React on Rails Test Helper (Explicit Control)
-
-**Best for:** Applications needing precise control over compilation timing
+**Best for:** Most applications, especially SSR, large suites, and explicit build control
 
 **Configuration:**
-
-Set your build command:
 
 ```ruby
 # config/initializers/react_on_rails.rb
@@ -76,6 +55,15 @@ ReactOnRails.configure do |config|
   # Or use your project's package manager with a custom script:
   # config.build_test_command = "pnpm run build:test"  # or: npm run build:test, yarn run build:test
 end
+```
+
+In `config/shakapacker.yml`, keep test compilation off to avoid mixing approaches:
+
+```yaml
+test:
+  <<: *default
+  compile: false
+  public_output_path: webpack/test
 ```
 
 Then configure your test framework:
@@ -163,6 +151,7 @@ end
 - ✅ Assets compiled only once per test run
 - ✅ Clear error messages if compilation fails
 - ✅ Can customize the build command
+- ✅ Reliable for SSR tests because assets are built before first render
 
 **Cons:**
 
@@ -176,6 +165,42 @@ end
 - You need to customize the build command
 - You want explicit error handling for compilation failures
 - Your test suite is slow and you want to optimize compilation
+- You run SSR tests and need server bundles available before first request
+
+### Approach 2: Shakapacker Auto-Compilation (Alternative)
+
+**Best for:** Simpler non-SSR test setups or teams that prefer minimal configuration
+
+**Configuration:**
+
+```yaml
+# config/shakapacker.yml
+test:
+  <<: *default
+  compile: true
+  public_output_path: webpack/test
+```
+
+And remove React on Rails TestHelper wiring:
+
+- Remove `config.build_test_command`
+- Remove `ReactOnRails::TestHelper` calls in `spec/rails_helper.rb` or `test/test_helper.rb`
+
+**How it works:**
+
+- Shakapacker compiles assets on demand when packs are requested
+- No React on Rails TestHelper setup is required
+
+**Pros:**
+
+- ✅ Simpler setup
+- ✅ Works across frameworks without helper wiring
+
+**Cons:**
+
+- ⚠️ Less explicit compilation timing
+- ⚠️ May compile multiple times in long or parallel runs
+- ⚠️ For SSR tests, first-request ordering can matter if server bundles are not prebuilt
 
 ## Don't Mix Approaches
 
@@ -259,11 +284,18 @@ Use the React on Rails doctor command to verify your test configuration:
 bundle exec rake react_on_rails:doctor
 ```
 
+To auto-apply supported test-setup fixes (recommended path), run:
+
+```bash
+FIX=true bundle exec rake react_on_rails:doctor
+```
+
 The doctor will check:
 
 - Whether `compile: true` is set in shakapacker.yml
 - Whether `build_test_command` is configured
 - Whether test helpers are properly set up
+- Whether each detected framework (RSpec/Minitest) is wired independently
 - Whether you're accidentally using both approaches
 
 ## Troubleshooting
@@ -383,6 +415,110 @@ This keeps webpack running and recompiling automatically when files change, so y
 
 > **Note:** The `--watch` flag should only be used in a separate terminal process — never include it in `build_test_command`, which must exit after compilation.
 
+### Automatic Dev Asset Reuse (Static Mode)
+
+When you run `bin/dev static`, React on Rails automatically detects the fresh development assets and reuses them for tests — **no extra commands or environment variables needed**.
+
+```bash
+# Terminal 1: Start static development
+bin/dev static
+
+# Terminal 2: Just run tests — they automatically use dev assets
+bundle exec rspec
+```
+
+**How it works:** When `bundle exec rspec` (or Minitest) runs and test assets are stale or missing, the TestHelper checks if development assets in `public/packs/` are:
+
+1. Present (manifest.json exists)
+2. Static mode (not HMR — no `http://` URLs in manifest entries)
+3. Fresh (manifest newer than all source files)
+
+If all checks pass, React on Rails temporarily overrides Shakapacker's test config to point at the development output. You'll see:
+
+```
+====> React on Rails: Reusing development assets from packs
+      (detected fresh static-mode webpack output, skipping test compilation)
+```
+
+No `shakapacker.yml` changes are needed. The override only lasts for the test process.
+
+### Running `bin/dev` (HMR) and Tests Together
+
+HMR assets are served from webpack-dev-server memory and contain `http://` URLs in the manifest, so they **cannot** be reused by tests. When using HMR mode, you have two options:
+
+**Option A: Let TestHelper compile on demand (simplest)**
+
+```bash
+# Terminal 1
+bin/dev
+
+# Terminal 2 — TestHelper runs build_test_command automatically if assets are stale
+bundle exec rspec
+```
+
+This works but adds compilation time to the first test run.
+
+**Option B: Use a test watcher for fast iteration**
+
+```bash
+# Terminal 1
+bin/dev
+
+# Terminal 2 — keeps test assets fresh in the background
+bin/dev test-watch
+
+# Terminal 3
+bundle exec rspec
+```
+
+`bin/dev test-watch` auto-selects watch mode:
+
+- `auto` (default): picks `client-only` if another shakapacker watcher is already running; otherwise `full`
+- `full`: always builds test client + server bundles (`--test-watch-mode=full`)
+- `client-only`: only builds test client bundles (`--test-watch-mode=client-only`)
+
+### Which Mode Should I Use?
+
+| Scenario                    | Recommendation                                               |
+| --------------------------- | ------------------------------------------------------------ |
+| General development         | `bin/dev static` — simpler, no FOUC, tests just work         |
+| Need Hot Module Replacement | `bin/dev` + `bin/dev test-watch` for fast test iteration     |
+| CI / no dev server running  | Just `bundle exec rspec` — TestHelper compiles automatically |
+| Only running a few tests    | `bin/dev static` + `bundle exec rspec spec/path/to_spec.rb`  |
+
+### Migration to `bin/dev test-watch`
+
+If you previously ran manual test watcher commands, migrate to the new wrapper:
+
+- Old: `RAILS_ENV=test bin/shakapacker --watch`
+- New: `bin/dev test-watch`
+
+- Old: `RAILS_ENV=test CLIENT_BUNDLE_ONLY=yes bin/shakapacker --watch`
+- New: `bin/dev test-watch --test-watch-mode=client-only`
+
+### Advanced: Manual Shared Output (Alternative)
+
+If you prefer to manually share output paths instead of using automatic detection:
+
+1. Set the test output path equal to development in `config/shakapacker.yml`:
+
+   ```yaml
+   development:
+     public_output_path: packs
+
+   test:
+     public_output_path: packs
+   ```
+
+2. Run static development mode and tests:
+
+   ```bash
+   bin/dev static    # Terminal 1
+   bundle exec rspec # Terminal 2
+   ```
+
+> **Warning:** Do not share output paths with `bin/dev` (HMR mode) — HMR manifests will cause test failures.
+
 ### Caching Strategies
 
 Improve compilation speed with caching:
@@ -457,7 +593,8 @@ When running tests in Docker, consider:
 
 | Scenario             | Recommendation                           |
 | -------------------- | ---------------------------------------- |
-| Simple test setup    | Shakapacker `compile: true`              |
+| Default setup        | React on Rails test helper               |
+| SSR test coverage    | React on Rails test helper               |
 | Large test suite     | React on Rails test helper               |
 | Parallel testing     | React on Rails test helper or precompile |
 | CI/CD pipeline       | Precompile before tests                  |
@@ -466,6 +603,7 @@ When running tests in Docker, consider:
 
 ## Related Documentation
 
+- [Dev Server and Testing](./dev-server-and-testing.md) — How `bin/dev` (HMR vs static) interacts with Capybara, Playwright, Minitest system tests, and SSR request specs
 - [Configuration Reference](../configuration/README.md#build_test_command)
 - [Shakapacker Configuration](https://github.com/shakacode/shakapacker#configuration)
 - [TestHelper Source Code](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/lib/react_on_rails/test_helper.rb)
