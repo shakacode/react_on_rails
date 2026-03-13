@@ -69,6 +69,20 @@ describe('validateRails', () => {
     expect(result.message).toBe('Rails 7.2.1');
   });
 
+  it('returns invalid for Rails 6.1', () => {
+    mockedGetCommandVersion.mockReturnValue('Rails 6.1.7.10');
+    const result = validateRails();
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('requires Rails 7.0+');
+  });
+
+  it('returns valid for Rails 7.0.x', () => {
+    mockedGetCommandVersion.mockReturnValue('Rails 7.0.8.7');
+    const result = validateRails();
+    expect(result.valid).toBe(true);
+    expect(result.message).toBe('Rails 7.0.8.7');
+  });
+
   it('returns invalid for Rails 6.x', () => {
     mockedGetCommandVersion.mockReturnValue('Rails 6.1.7');
     const result = validateRails();

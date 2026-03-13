@@ -84,11 +84,17 @@ function printSuccessMessage(appName: string, route: string): void {
 }
 
 export function validateAppName(name: string): { success: boolean; error?: string } {
-  if (!name || name.trim() === '') {
+  if (!name) {
     return { success: false, error: 'App name is required.' };
   }
 
-  if (!/^[a-zA-Z][a-zA-Z0-9]*([_-][a-zA-Z0-9]+)*$/.test(name)) {
+  const trimmedName = name.trim();
+
+  if (!trimmedName) {
+    return { success: false, error: 'App name is required.' };
+  }
+
+  if (!/^[a-zA-Z][a-zA-Z0-9]*([_-][a-zA-Z0-9]+)*$/.test(trimmedName)) {
     return {
       success: false,
       error:
@@ -96,11 +102,11 @@ export function validateAppName(name: string): { success: boolean; error?: strin
     };
   }
 
-  const appPath = path.resolve(process.cwd(), name);
+  const appPath = path.resolve(process.cwd(), trimmedName);
   if (fs.existsSync(appPath)) {
     return {
       success: false,
-      error: `Directory "${name}" already exists. Please choose a different name or remove it.`,
+      error: `Directory "${trimmedName}" already exists. Please choose a different name or remove it.`,
     };
   }
 
