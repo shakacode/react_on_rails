@@ -12,7 +12,7 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { PassThrough, Readable } from 'stream';
+import { PassThrough } from 'stream';
 import { finished } from 'stream/promises';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
 import { createRSCPayloadKey } from './utils.ts';
@@ -79,15 +79,6 @@ export default function injectRSCPayload(
 ) {
   const htmlStream = new PassThrough();
   pipeableHtmlStream.pipe(htmlStream);
-  // When the source is destroyed, pipe() unpipes but does NOT end htmlStream.
-  // Listen for 'close' to ensure htmlStream ends, which triggers the cleanup chain.
-  if (typeof (pipeableHtmlStream as Readable).on === 'function') {
-    (pipeableHtmlStream as Readable).on('close', () => {
-      if (!htmlStream.writableEnded) {
-        htmlStream.end();
-      }
-    });
-  }
   const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
 
@@ -199,6 +190,7 @@ export default function injectRSCPayload(
   const endResultStream = () => {
     if (flushTimeout) clearTimeout(flushTimeout);
     flush();
+    rscRequestTracker.clear();
     if (!resultStream.writableEnded) {
       resultStream.end();
     }
@@ -334,12 +326,7 @@ export default function injectRSCPayload(
       return;
     }
 
-    rscPromise
-      .then(cleanup)
-      .finally(() => {
-        rscRequestTracker.clear();
-      })
-      .catch(() => endResultStream());
+    rscPromise.then(cleanup).catch(() => endResultStream());
   });
 
   return resultStream;

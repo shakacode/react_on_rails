@@ -19,7 +19,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     session[:something_useful] = "REALLY USEFUL"
   end
 
-  before_action :apply_config_overrides, only: %i[
+  around_action :with_config_overrides, only: %i[
     error_scenarios_hub
     server_side_log_throw
     server_router
@@ -245,6 +245,23 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   helper_method :calc_slow_app_props_server_render
 
   private
+
+  def with_config_overrides
+    previous = {
+      raise_on_prerender_error: ReactOnRails.configuration.raise_on_prerender_error,
+      throw_js_errors: ReactOnRailsPro.configuration.throw_js_errors,
+      raise_non_shell_server_rendering_errors:
+        ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors
+    }
+
+    apply_config_overrides
+    yield
+  ensure
+    ReactOnRails.configuration.raise_on_prerender_error = previous[:raise_on_prerender_error]
+    ReactOnRailsPro.configuration.throw_js_errors = previous[:throw_js_errors]
+    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors =
+      previous[:raise_non_shell_server_rendering_errors]
+  end
 
   def calc_slow_app_props_server_render
     msg = <<-MSG.strip_heredoc

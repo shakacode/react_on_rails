@@ -29,7 +29,6 @@ Changes since the last non-beta release.
 
 #### Fixed
 
-- **Fix streaming SSR renders hanging forever when errors occur**: When a rendering stream errored during SSR, the HTTP response from the Node renderer would hang indefinitely because Node.js `stream.pipe()` does not propagate errors or closure from source to destination. Fixed by using the `'close'` event as the reliable termination signal across all layers of the streaming pipeline (Node renderer, RSC payload injection, transform streams, and Ruby async task). Also added a Ruby safety net to prevent Rails request hangs if the async rendering task raises before yielding the first chunk. [PR 2407](https://github.com/shakacode/react_on_rails/pull/2407) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **RSC WebpackLoader with SWC transpiler**: Fixed RSC WebpackLoader never being injected when using SWC (Shakapacker's default transpiler). The RSC config only handled array-based `rule.use` (Babel) but SWC uses a function-based `rule.use`, so `'use client'` files passed through untransformed into the RSC bundle. Now handles both array and function loader declarations. [PR 2476](https://github.com/shakacode/react_on_rails/pull/2476) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **RSC Generator Layout Wiring**: Fixed `MissingEntryError` on fresh RSC installs where `HelloServerController` fell back to Rails' `application.html.erb` (which uses `javascript_pack_tag "application"` that is not created by the RSC flow). The generator now always copies `hello_world.html.erb`, `HelloServerController` explicitly uses `layout "hello_world"`, and post-install output now shows `stream_react_component` for RSC installs. [PR 2429](https://github.com/shakacode/react_on_rails/pull/2429) by [justin808](https://github.com/justin808).
 
@@ -38,6 +37,10 @@ Changes since the last non-beta release.
 ##### Changed
 
 - **Breaking: removed legacy key-file license fallback**: `config/react_on_rails_pro_license.key` is no longer read. Move your token to the `REACT_ON_RAILS_PRO_LICENSE` environment variable. A migration warning is logged at startup when the legacy file is detected and the environment variable is missing. [PR 2454](https://github.com/shakacode/react_on_rails/pull/2454) by [ihabadham](https://github.com/ihabadham).
+
+##### Fixed
+
+- **Fix streaming SSR renders hanging forever when errors occur**: When a rendering stream errored during SSR, the HTTP response from the Node renderer would hang indefinitely because Node.js `stream.pipe()` does not propagate errors or closure from source to destination. Fixed by using the `'close'` event as the reliable termination signal across all layers of the streaming pipeline (Node renderer, RSC payload injection, transform streams, and Ruby async task). Also added a Ruby safety net to prevent Rails request hangs if the async rendering task raises before yielding the first chunk. [PR 2407](https://github.com/shakacode/react_on_rails/pull/2407) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 ### [16.4.0.rc.4] - 2026-02-22
 
