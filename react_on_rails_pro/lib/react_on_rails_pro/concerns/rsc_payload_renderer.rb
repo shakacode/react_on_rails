@@ -22,6 +22,12 @@ module ReactOnRailsPro
         formats: [:text],
         content_type: "application/x-ndjson"
       )
+    rescue JSON::ParserError => e
+      Rails.logger.warn(
+        "[React on Rails Pro] Invalid JSON passed to the RSC payload endpoint " \
+        "for component '#{@rsc_payload_component_name}': #{e.message}"
+      )
+      render plain: "Invalid props JSON", status: :bad_request
     rescue ActionView::MissingTemplate => e
       raise e.exception(
         "[React on Rails Pro] RSC payload templates are now rendered with format :text. " \
