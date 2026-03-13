@@ -889,21 +889,13 @@ describe InstallGenerator, type: :generator do
     include_context "with webpack to rspack migration base"
 
     before(:all) do
-      templates_root = File.expand_path("../../../lib/generators/react_on_rails/templates", __dir__)
-      rsc_tt_path = File.join(templates_root, "rsc/base/config/webpack/rscWebpackConfig.js.tt")
-      if File.read(rsc_tt_path).include?("<%")
-        raise "rscWebpackConfig.js.tt now contains ERB directives; update this fixture to render template content."
-      end
-
       simulate_existing_file(
         "config/webpack/webpack.config.js",
-        File.read(File.join(templates_root, "base/base/config/webpack/webpack.config.js.tt"))
+        render_stock_webpack_template("base/base/config/webpack/webpack.config.js.tt", rsc: true)
       )
-      # This template currently has no ERB directives. If that changes, render the
-      # template for the fixture instead of copying raw .tt bytes.
       simulate_existing_file(
         "config/webpack/rscWebpackConfig.js",
-        File.read(File.join(templates_root, "rsc/base/config/webpack/rscWebpackConfig.js.tt"))
+        render_stock_webpack_template("rsc/base/config/webpack/rscWebpackConfig.js.tt", rsc: true)
       )
 
       Dir.chdir(destination_root) do

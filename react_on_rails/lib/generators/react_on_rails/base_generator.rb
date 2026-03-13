@@ -65,6 +65,9 @@ module ReactOnRails
         "generateWebpackConfigs.js" => "base/base/config/webpack/ServerClientOrBoth.js.tt"
       }.freeze
 
+      # Keep these helper delegates in sync with ERB calls in managed webpack
+      # templates. Missing delegates intentionally fail rendering and keep cleanup
+      # conservative by treating files as non-removable.
       TemplateRenderContext = Struct.new(:generator, :config) do
         def erb_binding
           binding
@@ -89,9 +92,10 @@ module ReactOnRails
 
       REMOVABLE_WEBPACK_FILES = (MANAGED_WEBPACK_FILE_TEMPLATES.keys +
         %w[webpack.config.js]).freeze
+      DOCS_REFERENCE_MESSAGE = "// The source code including full typescript support is available at:"
       TEMPLATE_RENDER_FAILED = Object.new.freeze
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
-                       :TEMPLATE_RENDER_FAILED
+                       :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
 
       def add_hello_world_route
         # RSC uses HelloServer instead of HelloWorld, but Redux still needs hello_world route
@@ -162,9 +166,7 @@ module ReactOnRails
                         config/webpack/production.js
                         config/webpack/serverWebpackConfig.js
                         config/webpack/ServerClientOrBoth.js]
-        config = {
-          message: "// The source code including full typescript support is available at:"
-        }
+        config = { message: DOCS_REFERENCE_MESSAGE }
         base_files.each do |file|
           template("#{base_path}/#{file}.tt", destination_config_path(file), config)
         end
@@ -388,24 +390,23 @@ module ReactOnRails
       end
 
       def warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries)
-        if all_dotfiles?(non_removable_entries)
-          warn_dotfiles_in_webpack_dir(webpack_config_relative_dir, non_removable_entries, [])
-          return
+        non_dotfile_entries = non_removable_entries.reject { |entry| entry.start_with?(".") }
+        dotfiles = non_removable_entries.select { |entry| entry.start_with?(".") }
+        non_removable_directories, non_removable_files = non_dotfile_entries.partition do |entry|
+          directory_entry?(entry)
         end
 
-        unknown_entries = non_removable_entries.reject { |entry| entry.start_with?(".") }
-        dotfiles = non_removable_entries.select { |entry| entry.start_with?(".") }
-        unknown_directories, unknown_files = unknown_entries.partition { |entry| directory_entry?(entry) }
+        non_removable_sections = []
+        non_removable_sections << "files: #{non_removable_files.join(', ')}" if non_removable_files.any?
+        if non_removable_directories.any?
+          non_removable_sections << "directories: #{non_removable_directories.join(', ')}"
+        end
+        non_removable_sections << "dotfiles: #{dotfiles.join(', ')}" if dotfiles.any?
 
-        unknown_sections = []
-        unknown_sections << "files: #{unknown_files.join(', ')}" if unknown_files.any?
-        unknown_sections << "directories: #{unknown_directories.join(', ')}" if unknown_directories.any?
-        unknown_sections << "dotfiles: #{dotfiles.join(', ')}" if dotfiles.any?
-
-        unknown_sections_message = unknown_sections.join("; ")
+        non_removable_sections_message = non_removable_sections.join("; ")
         say_status :warning,
                    "Keeping #{webpack_config_relative_dir}; " \
-                   "custom/unknown entries detected: #{unknown_sections_message}",
+                   "custom/non-removable entries detected: #{non_removable_sections_message}",
                    :yellow
       end
 
@@ -463,6 +464,8 @@ module ReactOnRails
         webpack_template = rendered_template_for_cleanup("base/base/config/webpack/webpack.config.js.tt")
         return standard_shakapacker_config?(content) if webpack_template.equal?(TEMPLATE_RENDER_FAILED)
 
+        # Cleanup is deliberately comment-sensitive (unlike copy_webpack_main_config)
+        # so comment-only edits keep the file as a potential customization.
         standard_shakapacker_config?(content) || content_matches_template?(content, webpack_template)
       end
 
@@ -482,15 +485,17 @@ module ReactOnRails
           # Cleanup comparisons only need the injected documentation comment. If a
           # template starts reading other config keys, rendering will fail and we
           # intentionally preserve the directory by treating the file as non-removable.
-          template_doc_config = { message: "// The source code including full typescript support is available at:" }
+          template_doc_config = { message: DOCS_REFERENCE_MESSAGE }
           template_content = File.read(File.join(self.class.source_root, template_path))
           # Render against current generator options. Any mismatch is treated as non-removable,
           # which is intentional because cleanup should be conservative.
           # Note: files originally generated with --pro or --rsc will not match when the
           # current run omits those options; in that case, we preserve the directory.
-          # Templates rely on config[:message] plus generator helper methods (for example
-          # use_pro?, use_rsc?, add_documentation_reference), so we evaluate within a
-          # minimal context that exposes config and delegates helper calls back to self.
+          # Templates rely on config[:message] plus a small helper subset exposed by
+          # TemplateRenderContext (add_documentation_reference, use_pro?, use_rsc?,
+          # shakapacker_version_9_or_higher?). If a template starts calling another
+          # helper, rendering fails and cleanup keeps files as non-removable.
+          # This is intentional and conservative.
           # Use TemplateRenderContext#erb_binding to avoid leaking method-local
           # variables from rendered_template_for_cleanup into the ERB scope.
           template_render_context = TemplateRenderContext.new(self, template_doc_config)
