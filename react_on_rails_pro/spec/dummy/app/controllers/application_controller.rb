@@ -48,6 +48,7 @@ class ApplicationController < ActionController::Base
     HTML
 
     response.stream.write(error_message + js_redirect + meta_refresh)
+  ensure
     response.stream.close
   end
 

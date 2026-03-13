@@ -231,6 +231,8 @@ module ReactOnRails
             htmlResult = ReactOnRails.handleError({e: e, name: null,
               jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
             hasErrors = true;
+            // Non-Error throws (null/undefined/primitives) are serialized via String(...)
+            // and only treated as objects when properties are safely present.
             var errorMessage = String(renderingError);
             var errorStack = null;
             if (renderingError && typeof renderingError === 'object') {

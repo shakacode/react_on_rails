@@ -483,6 +483,19 @@ describe ReactOnRailsHelper do
           expect(js_code).to include("var errorMessage = String(renderingError);")
           expect(js_code).to include("if ('message' in renderingError)")
           expect(js_code).to include("if ('stack' in renderingError && renderingError.stack != null)")
+          runtime_context = ExecJS.compile(<<~JS)
+            function runGeneratedCode(generatedCode) {
+              var ReactOnRails = {
+                handleError: function() { return ''; },
+                getConsoleReplayScript: function() { return ''; }
+              };
+              return eval(generatedCode);
+            }
+          JS
+          runtime_result = runtime_context.call("runGeneratedCode", js_code)
+          parsed_result = JSON.parse(runtime_result)
+          expect(parsed_result["hasErrors"]).to be(true)
+          expect(parsed_result.dig("renderingError", "message")).to eq("null")
           {
             "html" => "",
             "consoleReplayScript" => "",
