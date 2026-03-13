@@ -79,11 +79,13 @@ jest.mock('../src/shared/locks', () => {
     lock: async (...args: any[]) => {
       const filename = args[0] as string;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
-      const result = await mockActualLocks.lock(...args);
+      const result = (await mockActualLocks.lock(...args)) as { wasLockAcquired: boolean };
       // Record which bundle acquired the lock (use last path segment as key)
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
       const bundleKey = mockPath.basename(mockPath.dirname(filename)) as string;
-      mockEventLog.push({ label: `${bundleKey}:lock-acquired`, timestamp: Date.now() });
+      if (result.wasLockAcquired) {
+        mockEventLog.push({ label: `${bundleKey}:lock-acquired`, timestamp: Date.now() });
+      }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return
       return result;
     },
@@ -254,11 +256,8 @@ describe('concurrent upload isolation (issue #2449)', () => {
       const bothCompleted =
         releaseA.timestamp >= acquireA.timestamp && releaseB.timestamp >= acquireB.timestamp;
       expect(bothCompleted).toBe(true);
-      // If overlap was observed, that is strong concurrent evidence
-      if (aOverlapsB) {
-        // Overlap confirmed — lock regions interleaved in time
-        expect(aOverlapsB).toBe(true);
-      }
+      // Overlap confirmed — lock regions interleaved in time
+      expect(aOverlapsB).toBe(true);
     });
 
     test('concurrent requests with multiple assets each deliver all correct assets', async () => {
