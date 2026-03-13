@@ -482,21 +482,24 @@ describe ReactOnRailsHelper do
       false
     end
 
-    before do
-      skip "ExecJS runtime not available" unless runtime_available
-    end
-
-    it "generates JS with safe error property access for non-Error throws" do
-      runtime_context = ExecJS.compile(<<~JS)
+    let(:runtime_context) do
+      ExecJS.compile(<<~JS)
         function runGeneratedCode(generatedCode) {
           var ReactOnRails = {
             handleError: function() { return ''; },
             getConsoleReplayScript: function() { return ''; }
           };
-          // Test-only: evaluate generated helper JS (no user-provided input).
+          // Evaluate generated wrapper JS in a test sandbox before Ruby post-processing.
           return eval(generatedCode);
         }
       JS
+    end
+
+    before do
+      skip "ExecJS runtime not available" unless runtime_available
+    end
+
+    it "generates JS with safe error property access for non-Error throws" do
       captured_results = []
 
       allow(ReactOnRails::ServerRenderingPool)
@@ -536,24 +539,14 @@ describe ReactOnRailsHelper do
     end
 
     it "raises PrerenderError when throw_js_errors is true and JS throws a non-Error value" do
-      runtime_context = ExecJS.compile(<<~JS)
-        function runGeneratedCode(generatedCode) {
-          var ReactOnRails = {
-            handleError: function() { return ''; },
-            getConsoleReplayScript: function() { return ''; }
-          };
-          // Test-only: evaluate generated helper JS (no user-provided input).
-          return eval(generatedCode);
-        }
-      JS
-
       allow(ReactOnRails::ServerRenderingPool)
         .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
           runtime_context.call("runGeneratedCode", js_code)
           # Defensive fallback: if runtime does not raise, force ProgramError path.
           raise ExecJS::ProgramError, "Expected generated JS to throw"
-        rescue ExecJS::ProgramError => e
-          raise e
+        rescue ExecJS::ProgramError
+          # Preserve original ProgramError; must precede the StandardError rescue.
+          raise
         rescue StandardError => e
           # Normalize non-ExecJS exceptions so server_render_js rescues consistently.
           raise ExecJS::ProgramError, e.message
