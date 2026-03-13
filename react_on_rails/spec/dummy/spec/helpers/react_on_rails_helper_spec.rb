@@ -503,8 +503,8 @@ describe ReactOnRailsHelper do
         {
           "html" => "",
           "consoleReplayScript" => "",
-          "hasErrors" => false,
-          "renderingError" => {}
+          "hasErrors" => true,
+          "renderingError" => { "message" => "null", "stack" => nil }
         }
       end
 
