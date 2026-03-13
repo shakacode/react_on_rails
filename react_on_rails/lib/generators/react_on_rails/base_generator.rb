@@ -316,7 +316,7 @@ module ReactOnRails
           return
         end
 
-        warn_non_removable_webpack_entries(webpack_config_relative_dir, all_entries, non_removable_entries)
+        warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries)
       end
 
       def cleanup_stale_webpack_config_dir?
@@ -333,13 +333,9 @@ module ReactOnRails
                    :yellow
       end
 
-      def warn_non_removable_webpack_entries(webpack_config_relative_dir, all_entries, non_removable_entries)
+      def warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries)
         if all_dotfiles?(non_removable_entries)
-          if all_dotfiles?(all_entries)
-            warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, non_removable_entries)
-          else
-            warn_dotfiles_in_webpack_dir(webpack_config_relative_dir, non_removable_entries)
-          end
+          warn_dotfiles_in_webpack_dir(webpack_config_relative_dir, non_removable_entries)
           return
         end
 
@@ -404,7 +400,11 @@ module ReactOnRails
           template_binding = binding
           template_binding.local_variable_set(:config, template_doc_config)
           ERB.new(template_content, trim_mode: "-").result(template_binding)
-        rescue StandardError
+        rescue StandardError => e
+          say_status :warning,
+                     "Could not render template #{template_path} for cleanup check (#{e.class}: #{e.message}); " \
+                     "treating as non-removable",
+                     :yellow
           # Rendering failures should never abort installation. Returning a sentinel
           # guarantees a non-match so the file is treated as non-removable.
           "__render_failed__:#{template_path}"
@@ -417,7 +417,7 @@ module ReactOnRails
 
       def safe_read_cleanup_file(path)
         File.read(path)
-      rescue Errno::EACCES
+      rescue Errno::EACCES, Errno::ENOENT
         nil
       end
 
