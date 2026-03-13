@@ -2124,6 +2124,20 @@ describe InstallGenerator, type: :generator do
         {}
       )
     end
+
+    it "uses rspack template when target config path is rspack config" do
+      allow(generator).to receive(:bundler_main_config_path).and_return("config/rspack/rspack.config.ts")
+      allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
+      allow(generator).to receive(:template)
+
+      generator.send(:copy_webpack_main_config, "base/base", {})
+
+      expect(generator).to have_received(:template).with(
+        "base/base/config/webpack/rspack.config.ts.tt",
+        "config/rspack/rspack.config.ts",
+        {}
+      )
+    end
   end
 
   describe "#using_rspack?" do
