@@ -13,6 +13,7 @@ shared_examples "rsc_hello_server_controller" do
     assert_file "app/views/hello_server/index.html.erb" do |content|
       expect(content).to include("HelloServer")
       expect(content).to include("stream_react_component")
+      expect(content).not_to include("prerender: true")
     end
   end
 end
