@@ -234,6 +234,7 @@ module ReactOnRails
             var errorMessage = String(renderingError);
             var errorStack = null;
             // Guard against non-Error throws (e.g., throw null / throw "string").
+            // Boxed primitives (for example new Boolean(false)) are objects too.
             if (renderingError && typeof renderingError === 'object') {
               if ('message' in renderingError) {
                 errorMessage = String(renderingError.message);

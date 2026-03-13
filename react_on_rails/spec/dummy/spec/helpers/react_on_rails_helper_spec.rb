@@ -493,26 +493,43 @@ describe ReactOnRailsHelper do
           return eval(generatedCode);
         }
       JS
-      captured_result = nil
+      captured_results = []
 
       allow(ReactOnRails::ServerRenderingPool)
-        .to receive(:server_render_js_with_console_logging)
-        .and_wrap_original do |_m, js_code, _opts|
+        .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
           # Validate generated JS behavior directly before Ruby-side post-processing.
           runtime_result = runtime_context.call("runGeneratedCode", js_code)
-          captured_result = JSON.parse(runtime_result)
+          captured_results << JSON.parse(runtime_result)
           {
             "html" => "",
             "consoleReplayScript" => "",
             "hasErrors" => true,
-            "renderingError" => { "message" => "null", "stack" => nil }
+            "renderingError" => { "message" => "stub", "stack" => nil }
           }
         end
 
-      expect { server_render_js("(function() { throw null; })()") }.not_to raise_error
-      expect(captured_result).to be_a(Hash)
-      expect(captured_result["hasErrors"]).to be(true)
-      expect(captured_result.dig("renderingError", "message")).to eq("null")
+      throw_cases = [
+        { expression: "(function() { throw null; })()", message: "null", stack: nil },
+        { expression: "(function() { throw { code: 42 }; })()", message: "[object Object]", stack: nil },
+        { expression: "(function() { throw new Error(\"boom\"); })()", message: "boom", stack: :present }
+      ]
+
+      throw_cases.each do |throw_case|
+        expect { server_render_js(throw_case[:expression]) }.not_to raise_error
+      end
+
+      expect(captured_results.length).to eq(throw_cases.length)
+      throw_cases.zip(captured_results).each do |throw_case, captured_result|
+        expect(captured_result).to be_a(Hash)
+        expect(captured_result["hasErrors"]).to be(true)
+        expect(captured_result.dig("renderingError", "message")).to eq(throw_case[:message])
+
+        if throw_case[:stack] == :present
+          expect(captured_result.dig("renderingError", "stack")).to include("Error: boom")
+        else
+          expect(captured_result.dig("renderingError", "stack")).to be_nil
+        end
+      end
     end
   end
 

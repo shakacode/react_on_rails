@@ -19,7 +19,7 @@ class ApplicationController < ActionController::Base
   def log_prerender_error(err)
     Rails.logger.error("Caught ReactOnRails::PrerenderError in ApplicationController error handler.")
     Rails.logger.error(err.message)
-    Rails.logger.error(err.backtrace&.join("\n").to_s)
+    Rails.logger.error(err.backtrace&.join("\n") || "")
   end
 
   def stream_prerender_error_response
