@@ -128,6 +128,16 @@ verify_root_directory() {
   fi
 }
 
+extract_required_ruby_version() {
+  local gemfile="$1"
+  sed -nE "s/^[[:space:]]*ruby[[:space:]]+['\"]([0-9]+\.[0-9]+\.[0-9]+)['\"].*/\1/p" "$gemfile" | head -1
+}
+
+is_optional_setup_directory() {
+  local dir="$1"
+  [ "$dir" = "$ROOT_DIR/react_on_rails_pro/spec/execjs-compatible-dummy" ]
+}
+
 install_dependencies() {
   local dir="$1"
   local name="$2"
@@ -142,6 +152,27 @@ install_dependencies() {
 
   # Install Ruby dependencies if Gemfile exists
   if [ -f "Gemfile" ]; then
+    local required_ruby_version
+    local current_ruby_version
+
+    required_ruby_version="$(extract_required_ruby_version "Gemfile")"
+    current_ruby_version="$(ruby -e 'print RUBY_VERSION')"
+
+    if [ -n "$required_ruby_version" ] && [ "$current_ruby_version" != "$required_ruby_version" ]; then
+      if is_optional_setup_directory "$dir"; then
+        print_warning "Skipping $name: requires Ruby $required_ruby_version, current Ruby is $current_ruby_version"
+        echo "  To set up this app later, switch to Ruby $required_ruby_version and rerun bin/setup."
+        cd "$ROOT_DIR"
+        return 0
+      fi
+
+      print_error "Ruby $required_ruby_version is required for $name, current Ruby is $current_ruby_version"
+      if command -v mise &> /dev/null; then
+        echo "  Try: PATH=\"\$(mise where ruby@$required_ruby_version)/bin:\$PATH\" bin/setup"
+      fi
+      exit 1
+    fi
+
     echo "  Installing Ruby dependencies..."
     if bundle check &> /dev/null; then
       print_success "Ruby dependencies already satisfied"
