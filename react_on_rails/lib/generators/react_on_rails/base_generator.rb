@@ -93,7 +93,7 @@ module ReactOnRails
       REMOVABLE_WEBPACK_FILES = (MANAGED_WEBPACK_FILE_TEMPLATES.keys +
         %w[webpack.config.js]).freeze
       DOCS_REFERENCE_MESSAGE = "// The source code including full typescript support is available at:"
-      TEMPLATE_RENDER_FAILED = Object.new.freeze
+      TEMPLATE_RENDER_FAILED = Object.new.freeze # unique sentinel compared by identity via .equal?
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
 
@@ -503,9 +503,7 @@ module ReactOnRails
       def rendered_template_for_cleanup(template_path)
         @rendered_template_cache ||= {}
         @rendered_template_cache[template_path] ||= begin
-          # Cleanup comparisons only need the injected documentation comment. If a
-          # template starts reading other config keys, rendering will fail and we
-          # intentionally preserve the directory by treating the file as non-removable.
+          # Cleanup comparisons only need the injected documentation comment.
           template_doc_config = { message: DOCS_REFERENCE_MESSAGE }
           template_content = File.read(File.join(self.class.source_root, template_path))
           # Render against current generator options. Any mismatch is treated as non-removable,
@@ -514,9 +512,10 @@ module ReactOnRails
           # current run omits those options; in that case, we preserve the directory.
           # Templates rely on config[:message] plus a small helper subset exposed by
           # TemplateRenderContext (add_documentation_reference, use_pro?, use_rsc?,
-          # shakapacker_version_9_or_higher?). If a template starts calling another
-          # helper, rendering fails and cleanup keeps files as non-removable.
-          # This is intentional and conservative.
+          # shakapacker_version_9_or_higher?). Missing method delegates raise
+          # NoMethodError and are caught below, treating the file as non-removable.
+          # Missing config hash keys return nil silently, so any new config key
+          # required by templates must be added to template_doc_config above.
           # Use TemplateRenderContext#erb_binding to avoid leaking method-local
           # variables from rendered_template_for_cleanup into the ERB scope.
           template_render_context = TemplateRenderContext.new(self, template_doc_config)
@@ -552,6 +551,9 @@ module ReactOnRails
       end
 
       def standard_shakapacker_config?(content, strip_comments: false)
+        # Keep strip_comments false by default so comment-only edits are treated as
+        # potential customizations during cleanup. Callers can pass true when they
+        # need historical comment-insensitive replacement matching.
         # Get the expected default config based on Shakapacker version
         expected_configs = shakapacker_default_configs
 
