@@ -1,6 +1,8 @@
-# Using the Dev Server for Testing
+# HMR, Dev Server Modes, and Testing
 
 > Run `bin/dev --help` for all development server modes and options.
+
+`bin/dev` starts your Rails server alongside webpack-dev-server with Hot Module Replacement (HMR) by default. HMR is great for development — changes appear instantly in the browser — but it affects how tests find compiled assets. This guide covers how each `bin/dev` mode interacts with your test framework and how to configure things so tests work reliably.
 
 Your test setup depends on which testing framework you use. Pick your path:
 
@@ -58,16 +60,16 @@ class ActiveSupport::TestCase
 end
 ```
 
-**3. Use separate output paths** (the default):
+**3. Use separate output paths** (the default). These are the key settings — see your full `shakapacker.yml` for the complete config:
 
 ```yaml
-# config/shakapacker.yml
+# config/shakapacker.yml (key differences only)
 development:
   public_output_path: webpack/development
 
 test:
-  compile: false
-  public_output_path: webpack/test
+  compile: false # TestHelper handles compilation
+  public_output_path: webpack/test # Must differ from development
 ```
 
 That's it. Now:
@@ -182,15 +184,36 @@ end
 
 ## Advanced: External Server Mode
 
-If you want Capybara to connect to your running dev server instead of starting its own:
+If you want Capybara to connect to your running dev server instead of starting its own, you get the benefit of HMR working during tests — the browser goes through the full dev stack. The tradeoff: `bin/dev` must be running for tests to pass.
+
+Use an environment variable to toggle this so CI still boots its own server:
 
 ```ruby
 # spec/rails_helper.rb
-Capybara.app_host = "http://localhost:3000"
-Capybara.run_server = false
+if ENV["CAPYBARA_EXTERNAL_SERVER"]
+  # Local development: connect to your running `bin/dev` server.
+  # Start `bin/dev` first, then run tests with:
+  #   CAPYBARA_EXTERNAL_SERVER=1 bundle exec rspec
+  Capybara.app_host = "http://localhost:3000"
+  Capybara.run_server = false
+else
+  # CI and default: Capybara boots its own Puma server.
+  # TestHelper compiles test assets automatically.
+end
 ```
 
-In this mode HMR works with Capybara because the browser goes through the full dev stack. The tradeoff: `bin/dev` must be running for tests to pass. This is useful during active development but not suitable for CI.
+**Local usage** — start your dev server, then run tests with the env var:
+
+```bash
+bin/dev                                          # Terminal 1 — HMR running
+CAPYBARA_EXTERNAL_SERVER=1 bundle exec rspec     # Terminal 2 — tests use your dev server
+```
+
+**CI** — no env var needed, tests run as normal:
+
+```bash
+bundle exec rspec    # Capybara boots its own server, TestHelper compiles assets
+```
 
 ## Verifying Your Setup
 
