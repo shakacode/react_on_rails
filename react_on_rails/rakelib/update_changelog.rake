@@ -194,7 +194,32 @@ def prepare_changelog_for_auto_version(changelog, monorepo_root)
   active_base_version = active_prerelease_base_version(monorepo_root, changelog)
   return changelog unless active_base_version
 
-  collapse_prerelease_series(changelog, active_base_version)
+  changelog = collapse_prerelease_series(changelog, active_base_version)
+  cleanup_collapsed_prerelease_links(changelog, active_base_version)
+end
+
+# After collapsing prerelease sections, remove their orphaned compare links
+# and update [unreleased] to compare from the last stable version.
+def cleanup_collapsed_prerelease_links(changelog, base_version)
+  compare_prefix = Regexp.escape("https://github.com/shakacode/react_on_rails/compare/")
+  prerelease_pattern = /#{Regexp.escape(base_version)}\.(?:test|beta|alpha|rc|pre)\.\d+/i
+
+  # Find the "from" version in prerelease links that points to a non-prerelease (stable) version
+  stable_from = nil
+  changelog.scan(/^\[#{prerelease_pattern}\]:\s*#{compare_prefix}(\S+)\.\.\./i) do |from_version,|
+    stable_from = from_version unless from_version.match?(prerelease_pattern)
+  end
+
+  if stable_from
+    # Update [unreleased] link to compare from the stable version instead of the old prerelease
+    changelog = changelog.sub(
+      /^(\[unreleased\]:\s*#{compare_prefix})\S+(\.\.\.master)/i,
+      "\\1#{stable_from}\\2"
+    )
+  end
+
+  # Remove all prerelease compare link lines for this base version
+  changelog.gsub(/^\[#{prerelease_pattern}\]:.*\n/i, "")
 end
 
 def changelog_section_blocks(section_body)
