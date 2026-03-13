@@ -42,8 +42,6 @@ class ApplicationController < ActionController::Base
         }, 5000);
       </script>
     JAVASCRIPT
-    puts "js_redirect"
-    puts js_redirect
 
     meta_refresh = <<~HTML
       <meta http-equiv='refresh' content='5;url=#{server_side_log_throw_raise_invoker_path}'>
