@@ -516,10 +516,7 @@ describe ReactOnRailsHelper do
 
       throw_cases.each do |throw_case|
         expect { server_render_js(throw_case[:expression]) }.not_to raise_error
-      end
-
-      expect(captured_results.length).to eq(throw_cases.length)
-      throw_cases.zip(captured_results).each do |throw_case, captured_result|
+        captured_result = captured_results.last
         expect(captured_result).to be_a(Hash)
         expect(captured_result["hasErrors"]).to be(true)
         expect(captured_result.dig("renderingError", "message")).to eq(throw_case[:message])
@@ -530,6 +527,42 @@ describe ReactOnRailsHelper do
           expect(captured_result.dig("renderingError", "stack")).to be_nil
         end
       end
+
+      expect(captured_results.length).to eq(throw_cases.length)
+    end
+
+    it "raises PrerenderError when throw_js_errors is true and JS throws a non-Error value" do
+      runtime_available = begin
+        ExecJS.runtime&.available?
+      rescue ExecJS::RuntimeUnavailable
+        false
+      end
+      skip "ExecJS runtime not available" unless runtime_available
+
+      runtime_context = ExecJS.compile(<<~JS)
+        function runGeneratedCode(generatedCode) {
+          var ReactOnRails = {
+            handleError: function() { return ''; },
+            getConsoleReplayScript: function() { return ''; }
+          };
+          return eval(generatedCode);
+        }
+      JS
+
+      allow(ReactOnRails::ServerRenderingPool)
+        .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
+          runtime_context.call("runGeneratedCode", js_code)
+          raise ExecJS::ProgramError, "Expected generated JS to throw"
+        rescue ExecJS::ProgramError => e
+          raise e
+        rescue StandardError => e
+          # Normalize non-ExecJS exceptions so server_render_js rescues consistently.
+          raise ExecJS::ProgramError, e.message
+        end
+
+      expect do
+        server_render_js("(function() { throw 42; })()", throw_js_errors: true)
+      end.to raise_error(ReactOnRails::PrerenderError)
     end
   end
 
