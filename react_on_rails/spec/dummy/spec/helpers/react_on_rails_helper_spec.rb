@@ -476,20 +476,24 @@ describe ReactOnRailsHelper do
   end
 
   describe "#server_render_js error serialization" do
-    it "generates JS with safe error property access for non-Error throws" do
-      runtime_available = begin
-        ExecJS.runtime&.available?
-      rescue ExecJS::RuntimeUnavailable
-        false
-      end
-      skip "ExecJS runtime not available" unless runtime_available
+    let(:runtime_available) do
+      ExecJS.runtime&.available?
+    rescue ExecJS::RuntimeUnavailable
+      false
+    end
 
+    before do
+      skip "ExecJS runtime not available" unless runtime_available
+    end
+
+    it "generates JS with safe error property access for non-Error throws" do
       runtime_context = ExecJS.compile(<<~JS)
         function runGeneratedCode(generatedCode) {
           var ReactOnRails = {
             handleError: function() { return ''; },
             getConsoleReplayScript: function() { return ''; }
           };
+          // Test-only: evaluate generated helper JS (no user-provided input).
           return eval(generatedCode);
         }
       JS
@@ -532,19 +536,13 @@ describe ReactOnRailsHelper do
     end
 
     it "raises PrerenderError when throw_js_errors is true and JS throws a non-Error value" do
-      runtime_available = begin
-        ExecJS.runtime&.available?
-      rescue ExecJS::RuntimeUnavailable
-        false
-      end
-      skip "ExecJS runtime not available" unless runtime_available
-
       runtime_context = ExecJS.compile(<<~JS)
         function runGeneratedCode(generatedCode) {
           var ReactOnRails = {
             handleError: function() { return ''; },
             getConsoleReplayScript: function() { return ''; }
           };
+          // Test-only: evaluate generated helper JS (no user-provided input).
           return eval(generatedCode);
         }
       JS
@@ -552,6 +550,7 @@ describe ReactOnRailsHelper do
       allow(ReactOnRails::ServerRenderingPool)
         .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
           runtime_context.call("runGeneratedCode", js_code)
+          # Defensive fallback: if runtime does not raise, force ProgramError path.
           raise ExecJS::ProgramError, "Expected generated JS to throw"
         rescue ExecJS::ProgramError => e
           raise e
