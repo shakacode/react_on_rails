@@ -672,8 +672,9 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "keeps config/webpack when dotfiles are present" do
+    it "removes stale managed files but keeps config/webpack when dotfiles are present" do
       assert_file "config/webpack/.gitkeep"
+      assert_no_file "config/webpack/webpack.config.js"
       assert_file "config/rspack/rspack.config.js"
     end
   end
