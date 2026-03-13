@@ -717,6 +717,36 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rspack and symlinked webpack entries" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      symlink_target = File.join(destination_root, "tmp/clientWebpackConfig.js")
+      FileUtils.mkdir_p(File.dirname(symlink_target))
+      File.write(
+        symlink_target,
+        render_stock_webpack_template("base/base/config/webpack/clientWebpackConfig.js.tt")
+      )
+      File.symlink(symlink_target, File.join(destination_root, "config/webpack/clientWebpackConfig.js"))
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when symlink entries are present" do
+      assert_directory "config/webpack"
+      expect(File.symlink?(File.join(destination_root, "config/webpack/clientWebpackConfig.js"))).to be(true)
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
   context "with --rspack and nested config/webpack directory" do
     include_context "with webpack to rspack migration base"
 

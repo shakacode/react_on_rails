@@ -66,7 +66,7 @@ module ReactOnRails
       }.freeze
 
       TemplateRenderContext = Struct.new(:generator, :config) do
-        def template_binding
+        def erb_binding
           binding
         end
 
@@ -366,13 +366,26 @@ module ReactOnRails
           return
         end
 
-        unknown_files = non_removable_entries.reject { |entry| entry.start_with?(".") }
+        unknown_entries = non_removable_entries.reject { |entry| entry.start_with?(".") }
         dotfiles = non_removable_entries.select { |entry| entry.start_with?(".") }
-        unknown_files_message = unknown_files.join(", ")
-        unknown_files_message += " (plus dotfiles: #{dotfiles.join(', ')})" if dotfiles.any?
+        unknown_directories, unknown_files = unknown_entries.partition { |entry| directory_entry?(entry) }
+
+        unknown_sections = []
+        unknown_sections << "files: #{unknown_files.join(', ')}" if unknown_files.any?
+        unknown_sections << "directories: #{unknown_directories.join(', ')}" if unknown_directories.any?
+        unknown_sections << "dotfiles: #{dotfiles.join(', ')}" if dotfiles.any?
+
+        unknown_sections_message = unknown_sections.join("; ")
         say_status :warning,
-                   "Keeping #{webpack_config_relative_dir}; custom/unknown files detected: #{unknown_files_message}",
+                   "Keeping #{webpack_config_relative_dir}; " \
+                   "custom/unknown entries detected: #{unknown_sections_message}",
                    :yellow
+      end
+
+      def directory_entry?(entry)
+        File.directory?(File.join(stale_webpack_config_dir, entry))
+      rescue Errno::EACCES, Errno::ELOOP, Errno::ENOENT
+        false
       end
 
       def warn_dotfiles_in_webpack_dir(webpack_config_relative_dir, dotfiles)
@@ -392,6 +405,7 @@ module ReactOnRails
         return false unless REMOVABLE_WEBPACK_FILES.include?(entry)
 
         full_path = File.join(stale_webpack_config_dir, entry)
+        return false if File.symlink?(full_path)
         return false unless File.file?(full_path)
 
         content = safe_read_cleanup_file(full_path)
@@ -427,10 +441,10 @@ module ReactOnRails
           # Templates rely on config[:message] plus generator helper methods (for example
           # use_pro?, use_rsc?, add_documentation_reference), so we evaluate within a
           # minimal context that exposes config and delegates helper calls back to self.
-          # Use TemplateRenderContext#template_binding to avoid leaking method-local
+          # Use TemplateRenderContext#erb_binding to avoid leaking method-local
           # variables from rendered_template_for_cleanup into the ERB scope.
           template_render_context = TemplateRenderContext.new(self, template_doc_config)
-          ERB.new(template_content, trim_mode: "-").result(template_render_context.template_binding)
+          ERB.new(template_content, trim_mode: "-").result(template_render_context.erb_binding)
         rescue StandardError => e
           say_status :warning,
                      "Could not render template #{template_path} for cleanup check (#{e.class}: #{e.message}); " \
@@ -456,7 +470,7 @@ module ReactOnRails
 
       def safe_read_cleanup_file(path)
         File.read(path)
-      rescue Errno::EACCES, Errno::ENOENT, Errno::EISDIR
+      rescue Errno::EACCES, Errno::ELOOP, Errno::ENOENT, Errno::EISDIR
         nil
       end
 
