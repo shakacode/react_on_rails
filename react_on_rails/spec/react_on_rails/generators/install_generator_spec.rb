@@ -690,6 +690,87 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rspack and legacy generateWebpackConfigs.js" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_existing_file("config/webpack/generateWebpackConfigs.js", <<~JS)
+        // The source code including full typescript support is available at:
+        // https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/ServerClientOrBoth.js
+
+        const clientWebpackConfig = require('./clientWebpackConfig');
+        const serverWebpackConfig = require('./serverWebpackConfig');
+
+        const serverClientOrBoth = (envSpecific) => {
+          const clientConfig = clientWebpackConfig();
+          const serverConfig = serverWebpackConfig();
+
+          if (envSpecific) {
+            envSpecific(clientConfig, serverConfig);
+          }
+
+          let result;
+          // For HMR, need to separate the the client and server webpack configurations
+          if (process.env.WEBPACK_SERVE || process.env.CLIENT_BUNDLE_ONLY) {
+            // eslint-disable-next-line no-console
+            console.log('[React on Rails] Creating only the client bundles.');
+            result = clientConfig;
+          } else if (process.env.SERVER_BUNDLE_ONLY) {
+            // eslint-disable-next-line no-console
+            console.log('[React on Rails] Creating only the server bundle.');
+            result = serverConfig;
+          } else {
+            // default is the standard client and server build
+            // eslint-disable-next-line no-console
+            console.log('[React on Rails] Creating both client and server bundles.');
+            result = [clientConfig, serverConfig];
+          }
+
+          // To debug, uncomment next line and inspect "result"
+          // debugger
+          return result;
+        };
+
+        module.exports = serverClientOrBoth;
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "removes legacy generateWebpackConfigs.js along with stale config/webpack directory" do
+      expect(File).not_to exist(File.join(destination_root, "config/webpack"))
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
   # Tests a fresh rspack install where Shakapacker was installed directly with rspack
   # (no prior webpack config). This exercises different code paths than "with --rspack":
   # - shakapacker_config_file_exists? falls through to the rspack branches (lines 333-334)
