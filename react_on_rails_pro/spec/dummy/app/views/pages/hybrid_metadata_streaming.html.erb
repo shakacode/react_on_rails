@@ -1,4 +1,5 @@
 <%# Rails-side metadata: set from controller data, appears in <head> from the first byte %>
+<%# This dummy layout yields :title directly. Layouts that wrap yield(:title) in <title> should pass only text here. %>
 <% content_for :title do %>
   <title><%= @page_title %></title>
 <% end %>

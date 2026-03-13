@@ -11,7 +11,16 @@ module ReactOnRailsPro
 
     def rsc_payload
       @rsc_payload_component_name = rsc_payload_component_name
-      @rsc_payload_component_props = rsc_payload_component_props
+      @rsc_payload_component_props =
+        begin
+          rsc_payload_component_props
+        rescue JSON::ParserError => e
+          Rails.logger.warn(
+            "[React on Rails Pro] Invalid JSON passed to the RSC payload endpoint " \
+            "for component '#{@rsc_payload_component_name}': #{e.message}"
+          )
+          return render plain: "Invalid props JSON", status: :bad_request
+        end
 
       stream_view_containing_react_components(
         template: custom_rsc_payload_template,
@@ -22,12 +31,6 @@ module ReactOnRailsPro
         formats: [:text],
         content_type: "application/x-ndjson"
       )
-    rescue JSON::ParserError => e
-      Rails.logger.warn(
-        "[React on Rails Pro] Invalid JSON passed to the RSC payload endpoint " \
-        "for component '#{@rsc_payload_component_name}': #{e.message}"
-      )
-      render plain: "Invalid props JSON", status: :bad_request
     rescue ActionView::MissingTemplate => e
       raise e.exception(
         "[React on Rails Pro] RSC payload templates are now rendered with format :text. " \
