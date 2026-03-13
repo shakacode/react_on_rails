@@ -132,7 +132,7 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
     end
 
     it "logs a skip message when config/webpack exists but is empty" do
-      expect(generator).to receive(:say_status).with(:skip, "config/webpack is empty; leaving it in place", :yellow)
+      expect(generator).to receive(:say_status).with(:skip, "config/webpack (empty directory, leaving as-is)", :yellow)
 
       generator.send(:cleanup_stale_webpack_config_dir_for_rspack)
 

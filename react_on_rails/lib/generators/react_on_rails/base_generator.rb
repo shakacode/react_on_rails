@@ -89,7 +89,9 @@ module ReactOnRails
 
       REMOVABLE_WEBPACK_FILES = (MANAGED_WEBPACK_FILE_TEMPLATES.keys +
         %w[webpack.config.js]).freeze
-      private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext
+      TEMPLATE_RENDER_FAILED = Object.new.freeze
+      private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
+                       :TEMPLATE_RENDER_FAILED
 
       def add_hello_world_route
         # RSC uses HelloServer instead of HelloWorld, but Redux still needs hello_world route
@@ -332,7 +334,7 @@ module ReactOnRails
           return
         end
         if all_entries.empty?
-          say_status :skip, "#{webpack_config_relative_dir} is empty; leaving it in place", :yellow
+          say_status :skip, "#{webpack_config_relative_dir} (empty directory, leaving as-is)", :yellow
           return
         end
 
@@ -419,19 +421,26 @@ module ReactOnRails
         content = safe_read_cleanup_file(full_path)
         return false unless content
 
-        case entry
-        when "webpack.config.js"
-          webpack_template = rendered_template_for_cleanup(
-            "base/base/config/webpack/webpack.config.js.tt"
-          )
-          standard_shakapacker_config?(content) ||
-            content_matches_template?(content, webpack_template)
-        else
-          template_path = MANAGED_WEBPACK_FILE_TEMPLATES[entry]
-          return false unless template_path
+        return removable_webpack_main_config?(content) if entry == "webpack.config.js"
 
-          content_matches_template?(content, rendered_template_for_cleanup(template_path))
-        end
+        removable_managed_webpack_entry?(entry, content)
+      end
+
+      def removable_webpack_main_config?(content)
+        webpack_template = rendered_template_for_cleanup("base/base/config/webpack/webpack.config.js.tt")
+        return standard_shakapacker_config?(content) if webpack_template.equal?(TEMPLATE_RENDER_FAILED)
+
+        standard_shakapacker_config?(content) || content_matches_template?(content, webpack_template)
+      end
+
+      def removable_managed_webpack_entry?(entry, content)
+        template_path = MANAGED_WEBPACK_FILE_TEMPLATES[entry]
+        return false unless template_path
+
+        rendered_template = rendered_template_for_cleanup(template_path)
+        return false if rendered_template.equal?(TEMPLATE_RENDER_FAILED)
+
+        content_matches_template?(content, rendered_template)
       end
 
       def rendered_template_for_cleanup(template_path)
@@ -462,7 +471,7 @@ module ReactOnRails
           # guarantees a non-match so the file is treated as non-removable.
           # We cache the sentinel intentionally (same options within one generator run)
           # so repeated checks stay consistent and avoid noisy duplicate warnings.
-          "__render_failed__:#{template_path}"
+          TEMPLATE_RENDER_FAILED
         end
       end
 
@@ -503,7 +512,8 @@ module ReactOnRails
                                                  .gsub(%r{/\*.*?\*/}m, "")
         end
 
-        # Normalize whitespace while preserving non-comment content.
+        # Normalize whitespace while preserving comments by default so added comments
+        # count as potential customizations and keep cleanup conservative.
         normalized_content.gsub(/\s+/, " ").strip
       end
 
