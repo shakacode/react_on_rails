@@ -136,7 +136,41 @@ module ReactOnRails
       end
 
       def manifest_usable?(manifest_path)
-        manifest_path.exist? && !hmr_manifest?(manifest_path) && assets_fresh?(manifest_path)
+        return false unless manifest_path.exist?
+
+        if hmr_manifest?(manifest_path)
+          print_hmr_warning
+          return false
+        end
+
+        assets_fresh?(manifest_path)
+      end
+
+      HMR_WARNING_PRINTED = :@hmr_warning_printed
+
+      def print_hmr_warning
+        # Only print once per process
+        return if self.class.instance_variable_get(HMR_WARNING_PRINTED)
+
+        self.class.instance_variable_set(HMR_WARNING_PRINTED, true)
+
+        warn <<~MSG
+
+          React on Rails: Development assets use HMR (manifest contains http:// URLs).
+          HMR assets cannot be reused for tests — they exist in webpack-dev-server memory, not on disk.
+
+          To provide test assets, use one of:
+            • bin/dev static       (writes files to disk, auto-reused by tests)
+            • bin/dev test-watch   (keeps test assets fresh alongside HMR)
+            • RAILS_ENV=test bin/shakapacker  (compile once manually)
+
+          If using Capybara with run_server = false, HMR works — the browser connects
+          to your running dev server directly.
+
+          See: #{WebpackAssetsCompiler::TESTING_DOCS_URL}
+          Run 'bin/dev --help' for all development modes.
+
+        MSG
       end
 
       def resolve_env_config(yml, env)

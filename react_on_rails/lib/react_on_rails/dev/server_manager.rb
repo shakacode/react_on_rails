@@ -872,7 +872,10 @@ module ReactOnRails
             #{Rainbow('•').red} #{Rainbow('"Process manager not found"').white} #{Rainbow('→ Install:').yellow} #{Rainbow('brew install overmind').green.bold} #{Rainbow('(or').white} #{Rainbow('gem install foreman').green.bold}#{Rainbow(')').white}
             #{Rainbow('•').red} #{Rainbow('"Assets not loading"').white} #{Rainbow('→ Verify Procfile.dev is present and check server logs').white}
 
-            #{Rainbow('📚 Need help? Visit:').blue.bold} #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
+            #{Rainbow('📖 DOCUMENTATION:').cyan.bold}
+            #{Rainbow('•').yellow} #{Rainbow('Testing & dev server guide:').white} #{Rainbow('docs/oss/building-features/dev-server-and-testing.md').green}
+            #{Rainbow('•').yellow} #{Rainbow('Testing configuration:').white} #{Rainbow('docs/oss/building-features/testing-configuration.md').green}
+            #{Rainbow('•').yellow} #{Rainbow('Full docs:').white} #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
           TROUBLESHOOTING
         end
         # rubocop:enable Metrics/AbcSize

@@ -62,11 +62,13 @@ module ReactOnRails
       def puts_start_compile_check_message(stale_files)
         puts <<~MSG
 
-          Detected the following stale generated files:
+          React on Rails: Stale test assets detected:
             #{stale_files.join("\n  ")}
 
-          React on Rails will ensure your JavaScript generated files are up to date, using your
-          `#{ReactOnRails::Utils.prepend_cd_node_modules_directory(ReactOnRails.configuration.build_test_command)}` command.
+          Compiling with: `#{ReactOnRails::Utils.prepend_cd_node_modules_directory(ReactOnRails.configuration.build_test_command)}`
+
+          Tip: To skip this wait, run 'bin/dev static' or 'bin/dev test-watch' in another terminal.
+          See: #{WebpackAssetsCompiler::TESTING_DOCS_URL}
 
         MSG
       end

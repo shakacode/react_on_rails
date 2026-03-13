@@ -838,6 +838,254 @@ RSpec.describe ReactOnRails::Doctor do
       expect(warning_messages).to include(a_string_including("Both build_test_command and shakapacker compile: true"))
       expect(warning_messages).not_to include(a_string_including("no test helper files were found"))
     end
+
+    describe "#check_shared_output_paths_with_hmr" do
+      let(:shared_hmr_shakapacker) do
+        <<~YAML
+          default: &default
+            source_path: client/app
+
+          development:
+            <<: *default
+            public_output_path: packs
+            dev_server:
+              hmr: true
+
+          test:
+            <<: *default
+            public_output_path: packs
+            compile: false
+        YAML
+      end
+
+      let(:default_initializer) do
+        <<~RUBY
+          ReactOnRails.configure do |config|
+            config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+          end
+        RUBY
+      end
+
+      def setup_shared_hmr_config
+        write_project_file("config/shakapacker.yml", shared_hmr_shakapacker)
+        write_project_file("config/initializers/react_on_rails.rb", default_initializer)
+      end
+
+      it "warns when shared output paths AND hmr: true AND Capybara uses own server" do
+        setup_shared_hmr_config
+        write_project_file("spec/rails_helper.rb", <<~RUBY)
+          require "capybara/rails"
+          require "react_on_rails/test_helper"
+          Capybara.register_driver :selenium_chrome_headless do |app|
+            Capybara::Selenium::Driver.new(app, browser: :chrome)
+          end
+          RSpec.configure do |config|
+            ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+          end
+        RUBY
+
+        doctor.send(:check_build_test_configuration)
+        doctor.send(:check_shared_output_paths_with_hmr)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(warning_messages).to include(a_string_including("Shared output paths with dev_server.hmr: true"))
+      end
+
+      it "does not warn when separate output paths AND hmr: true" do
+        write_project_file("config/shakapacker.yml", <<~YAML)
+          development:
+            public_output_path: packs
+            dev_server:
+              hmr: true
+
+          test:
+            public_output_path: packs-test
+            compile: false
+        YAML
+        write_project_file("config/initializers/react_on_rails.rb", default_initializer)
+        write_project_file("spec/rails_helper.rb", <<~RUBY)
+          require "capybara/rails"
+          require "react_on_rails/test_helper"
+          RSpec.configure do |config|
+            ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+          end
+        RUBY
+
+        doctor.send(:check_build_test_configuration)
+        doctor.send(:check_shared_output_paths_with_hmr)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(warning_messages).not_to include(a_string_including("Shared output paths with dev_server.hmr"))
+      end
+
+      it "does not warn when Capybara uses run_server = false (external server mode)" do
+        setup_shared_hmr_config
+        write_project_file("spec/rails_helper.rb", <<~RUBY)
+          require "capybara/rails"
+          require "react_on_rails/test_helper"
+          Capybara.app_host = "http://localhost:3000"
+          Capybara.run_server = false
+          RSpec.configure do |config|
+            ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+          end
+        RUBY
+
+        doctor.send(:check_build_test_configuration)
+        doctor.send(:check_shared_output_paths_with_hmr)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(warning_messages).not_to include(a_string_including("Shared output paths with dev_server.hmr"))
+      end
+
+      it "does not warn when no Capybara is configured (Playwright/Cypress only)" do
+        setup_shared_hmr_config
+        write_project_file("spec/rails_helper.rb", <<~RUBY)
+          require "react_on_rails/test_helper"
+          RSpec.configure do |config|
+            ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+          end
+        RUBY
+
+        doctor.send(:check_build_test_configuration)
+        doctor.send(:check_shared_output_paths_with_hmr)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(warning_messages).not_to include(a_string_including("Shared output paths with dev_server.hmr"))
+      end
+
+      it "does not warn when no test helper files exist (Playwright/Cypress only)" do
+        setup_shared_hmr_config
+
+        doctor.send(:check_build_test_configuration)
+        doctor.send(:check_shared_output_paths_with_hmr)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(warning_messages).not_to include(a_string_including("Shared output paths with dev_server.hmr"))
+      end
+    end
+
+    describe "#check_minitest_system_test_wiring" do
+      it "warns when application_system_test_case.rb exists but ensure_assets_compiled is missing" do
+        write_project_file("test/application_system_test_case.rb", <<~RUBY)
+          class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+            driven_by :selenium, using: :chrome
+          end
+        RUBY
+        write_project_file("test/test_helper.rb", <<~RUBY)
+          require "rails/test_help"
+        RUBY
+
+        doctor.send(:check_minitest_system_test_wiring)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(warning_messages).to include(
+          a_string_including("ensure_assets_compiled")
+        )
+      end
+
+      it "reports success when system test case and ensure_assets_compiled are both present" do
+        write_project_file("test/application_system_test_case.rb", <<~RUBY)
+          class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+            driven_by :selenium, using: :chrome
+          end
+        RUBY
+        write_project_file("test/test_helper.rb", <<~RUBY)
+          require "react_on_rails/test_helper"
+          ActiveSupport::TestCase.setup do
+            ReactOnRails::TestHelper.ensure_assets_compiled
+          end
+        RUBY
+
+        doctor.send(:check_minitest_system_test_wiring)
+
+        success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+        expect(success_messages).to include(
+          a_string_including("Minitest system tests detected with ensure_assets_compiled")
+        )
+      end
+
+      it "does nothing when no application_system_test_case.rb exists" do
+        initial_count = checker.messages.length
+        doctor.send(:check_minitest_system_test_wiring)
+        expect(checker.messages.length).to eq(initial_count)
+      end
+
+      context "with fix enabled" do
+        let(:fix_mode) { true }
+
+        it "adds ensure_assets_compiled to test_helper.rb" do
+          write_project_file("test/application_system_test_case.rb", <<~RUBY)
+            class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+              driven_by :selenium, using: :chrome
+            end
+          RUBY
+          write_project_file("test/test_helper.rb", <<~RUBY)
+            require "rails/test_help"
+          RUBY
+
+          doctor.send(:check_minitest_system_test_wiring)
+
+          helper_content = File.read("test/test_helper.rb")
+          expect(helper_content).to include("ensure_assets_compiled")
+        end
+      end
+    end
+
+    describe "#check_capybara_external_server_mode" do
+      it "detects Capybara.run_server = false in rails_helper.rb" do
+        write_project_file("spec/rails_helper.rb", <<~RUBY)
+          require "capybara/rails"
+          Capybara.app_host = "http://localhost:3000"
+          Capybara.run_server = false
+        RUBY
+
+        doctor.send(:check_capybara_external_server_mode)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(
+          a_string_including("Capybara.run_server = false")
+        )
+        expect(info_messages).to include(
+          a_string_including("bin/dev")
+        )
+      end
+
+      it "reports custom driver registrations" do
+        write_project_file("spec/rails_helper.rb", <<~RUBY)
+          require "capybara/rails"
+          Capybara.register_driver :selenium_chrome_headless do |app|
+            Capybara::Selenium::Driver.new(app, browser: :chrome)
+          end
+        RUBY
+
+        doctor.send(:check_capybara_external_server_mode)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(
+          a_string_including(":selenium_chrome_headless")
+        )
+      end
+
+      it "notes HMR limitation for standard Capybara mode" do
+        write_project_file("spec/rails_helper.rb", <<~RUBY)
+          require "capybara/rails"
+          Capybara.default_driver = :selenium_chrome_headless
+        RUBY
+
+        doctor.send(:check_capybara_external_server_mode)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(
+          a_string_including("HMR assets won't work")
+        )
+      end
+
+      it "does nothing when no helper files mention capybara" do
+        initial_count = checker.messages.length
+        doctor.send(:check_capybara_external_server_mode)
+        expect(checker.messages.length).to eq(initial_count)
+      end
+    end
   end
 
   describe "server bundle path Shakapacker integration" do

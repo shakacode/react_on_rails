@@ -176,6 +176,9 @@ module ReactOnRails
     def check_testing_setup
       check_test_helper_setup
       check_build_test_configuration
+      check_shared_output_paths_with_hmr
+      check_minitest_system_test_wiring
+      check_capybara_external_server_mode
     end
 
     def check_development
@@ -1409,6 +1412,187 @@ module ReactOnRails
         "  💡 Server bundles share this path; full dev/test watchers can duplicate server-bundle rebuilds"
       )
       checker.add_info("  💡 Use ./bin/dev test-watch to auto-select full vs client-only test watch mode")
+    end
+
+    # Warns when development and test share public_output_path AND HMR is enabled,
+    # but only if the project uses Capybara in standard server mode (where Capybara
+    # starts its own Puma and reads assets from the filesystem).
+    #
+    # This is NOT a problem when:
+    # - Only using Playwright/Cypress E2E (browser connects to running dev server)
+    # - Capybara uses run_server = false (browser connects to running dev server)
+    # - Only running request/controller specs (no browser, no manifest lookup)
+    # - No Capybara at all
+    def check_shared_output_paths_with_hmr
+      return unless @test_output_path_strategy == :shared
+      return unless hmr_enabled_in_shakapacker?
+      return unless capybara_uses_own_server?
+
+      checker.add_warning(
+        "  ⚠️  Shared output paths with dev_server.hmr: true detected"
+      )
+      checker.add_info(
+        "  💡 HMR manifests contain http:// URLs that break Capybara system tests"
+      )
+      checker.add_info(
+        "  💡 This does NOT affect Playwright/Cypress E2E or Capybara with run_server = false"
+      )
+      checker.add_info(
+        "  💡 Fix: use separate public_output_path values for development and test,"
+      )
+      checker.add_info(
+        "     or only run bin/dev static (not bin/dev) when running Capybara tests"
+      )
+      checker.add_info(
+        "  📖 See: https://github.com/shakacode/react_on_rails/blob/master/" \
+        "docs/oss/building-features/dev-server-and-testing.md"
+      )
+    end
+
+    def hmr_enabled_in_shakapacker?
+      shakapacker_yml = shakapacker_config_path
+      return false unless File.exist?(shakapacker_yml)
+
+      shakapacker_config = parse_shakapacker_config(File.read(shakapacker_yml))
+      return false unless shakapacker_config.is_a?(Hash)
+
+      dev_config = (shakapacker_config["default"] || {}).merge(shakapacker_config["development"] || {})
+      dev_server = dev_config["dev_server"]
+      return false unless dev_server.is_a?(Hash)
+
+      dev_server["hmr"].to_s == "true"
+    end
+
+    # Returns true if Capybara is configured but NOT in external server mode.
+    # External server mode (run_server = false) connects to a running dev server,
+    # so HMR manifests work fine — the browser fetches assets through the full stack.
+    def capybara_uses_own_server?
+      helper_files = RSPEC_HELPER_FILES + [MINITEST_HELPER_FILE]
+      helper_files.any? do |file|
+        next false unless File.exist?(file)
+
+        content = File.read(file)
+        next false unless content.match?(/capybara/i)
+
+        # If run_server = false, Capybara connects to external server (HMR works)
+        !content.match?(/Capybara\.run_server\s*=\s*false/)
+      end
+    rescue StandardError
+      false
+    end
+
+    # Detects Minitest system tests (ActionDispatch::SystemTestCase) and checks
+    # that ensure_assets_compiled is wired into test/test_helper.rb.
+    def check_minitest_system_test_wiring
+      system_test_file = "test/application_system_test_case.rb"
+      test_helper_file = MINITEST_HELPER_FILE
+      return unless File.exist?(system_test_file)
+
+      checker.add_info("\n🧪 Minitest System Tests:")
+
+      unless File.exist?(test_helper_file)
+        checker.add_warning("  ⚠️  #{system_test_file} found but #{test_helper_file} is missing")
+        return
+      end
+
+      content = File.read(test_helper_file)
+      if helper_call_present?(content, "ensure_assets_compiled")
+        checker.add_success("  ✅ Minitest system tests detected with ensure_assets_compiled wired in")
+      else
+        warn_missing_minitest_system_test_helper(system_test_file, test_helper_file)
+      end
+    rescue StandardError => e
+      checker.add_warning("  ⚠️  Could not check Minitest system test setup: #{e.message}")
+    end
+
+    def warn_missing_minitest_system_test_helper(system_test_file, test_helper_file)
+      checker.add_warning(
+        "  ⚠️  #{system_test_file} found but ReactOnRails::TestHelper.ensure_assets_compiled " \
+        "is not called in #{test_helper_file}"
+      )
+      checker.add_info("  💡 Add to #{test_helper_file}:")
+      checker.add_info("      require 'react_on_rails/test_helper'")
+      checker.add_info("      ActiveSupport::TestCase.setup do")
+      checker.add_info("        ReactOnRails::TestHelper.ensure_assets_compiled")
+      checker.add_info("      end")
+
+      if fix
+        if ensure_minitest_test_helper_setup(test_helper_file)
+          checker.add_success("  ✅ FIX=true: Added ensure_assets_compiled to #{test_helper_file}")
+        else
+          checker.add_warning("  ⚠️  FIX=true: Could not auto-update #{test_helper_file}")
+        end
+      else
+        checker.add_info("  💡 To auto-fix, run: FIX=true rake react_on_rails:doctor")
+      end
+    end
+
+    # Detects Capybara configuration patterns that affect how tests interact with
+    # webpack assets and dev servers. Reports custom driver setups as informational
+    # context (users often have bespoke Capybara configurations).
+    def check_capybara_external_server_mode
+      helper_files = RSPEC_HELPER_FILES + [MINITEST_HELPER_FILE]
+      found_external_server = false
+
+      helper_files.each do |file|
+        next unless File.exist?(file)
+
+        content = File.read(file)
+        report_capybara_custom_drivers(file, content)
+        next unless content.match?(/Capybara\.run_server\s*=\s*false/)
+
+        found_external_server = true
+        report_capybara_external_server(file)
+        break
+      end
+
+      report_capybara_standard_mode unless found_external_server
+    rescue StandardError
+      # Non-critical check, skip silently
+    end
+
+    def report_capybara_custom_drivers(file, content)
+      drivers = content.scan(/Capybara\.register_driver\s+:(\w+)/).flatten
+      return if drivers.empty?
+
+      checker.add_info("\n🔧 Capybara Drivers (#{file}):")
+      checker.add_info("  ℹ️  Custom drivers registered: #{drivers.map { |d| ":#{d}" }.join(', ')}")
+
+      return unless @test_output_path_strategy == :shared
+
+      checker.add_info(
+        "  💡 With shared output paths, only use bin/dev static (not HMR) when running Capybara tests"
+      )
+    end
+
+    def report_capybara_external_server(file)
+      checker.add_info("\n🔗 External Server Mode:")
+      checker.add_info(
+        "  ℹ️  #{file} sets Capybara.run_server = false (external server mode)"
+      )
+      checker.add_info(
+        "  💡 Tests require bin/dev (or another server) to be running at the configured app_host"
+      )
+      checker.add_info(
+        "  💡 Both bin/dev (HMR) and bin/dev static work in this mode"
+      )
+    end
+
+    def report_capybara_standard_mode
+      return unless capybara_configured?
+
+      checker.add_info(
+        "  💡 Capybara starts its own server — HMR assets won't work. Use bin/dev static or precompile."
+      )
+    end
+
+    def capybara_configured?
+      helper_files = RSPEC_HELPER_FILES + [MINITEST_HELPER_FILE]
+      helper_files.any? do |file|
+        File.exist?(file) && File.read(file).match?(/capybara/i)
+      end
+    rescue StandardError
+      false
     end
 
     def extract_env_config_value(content, env_name, key, shakapacker_config = nil)

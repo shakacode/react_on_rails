@@ -13,12 +13,29 @@ ReactOnRails.configure do |config|
 end
 ```
 
-Then wire TestHelper into your test framework:
+Then wire TestHelper into your test framework. If your app uses both RSpec and Minitest, wire both files.
 
-- `RSpec`: `ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)`
-- `Minitest`: `ReactOnRails::TestHelper.ensure_assets_compiled` in `setup`
+**RSpec** — add to `spec/rails_helper.rb`:
 
-If your app runs both RSpec and Minitest, wire both helper files (`spec/rails_helper.rb` and `test/test_helper.rb`).
+```ruby
+require "react_on_rails/test_helper"
+
+RSpec.configure do |config|
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+end
+```
+
+**Minitest** — add to `test/test_helper.rb`:
+
+```ruby
+require "react_on_rails/test_helper"
+
+class ActiveSupport::TestCase
+  setup do
+    ReactOnRails::TestHelper.ensure_assets_compiled
+  end
+end
+```
 
 ## Two Approaches to Test Asset Compilation
 
@@ -586,6 +603,7 @@ When running tests in Docker, consider:
 
 ## Related Documentation
 
+- [Dev Server and Testing](./dev-server-and-testing.md) — How `bin/dev` (HMR vs static) interacts with Capybara, Playwright, Minitest system tests, and SSR request specs
 - [Configuration Reference](../configuration/README.md#build_test_command)
 - [Shakapacker Configuration](https://github.com/shakacode/shakapacker#configuration)
 - [TestHelper Source Code](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/lib/react_on_rails/test_helper.rb)
