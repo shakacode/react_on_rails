@@ -307,6 +307,8 @@ module ReactOnRails
                      :yellow
           return
         end
+        # Preserve an empty directory as-is; only populated directories are candidates
+        # for managed cleanup.
         return if all_entries.empty?
 
         return warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, all_entries) if all_dotfiles?(all_entries)
@@ -396,6 +398,9 @@ module ReactOnRails
       def rendered_template_for_cleanup(template_path)
         @rendered_template_cache ||= {}
         @rendered_template_cache[template_path] ||= begin
+          # Cleanup comparisons only need the injected documentation comment. If a
+          # template starts reading other config keys, rendering will fail and we
+          # intentionally preserve the directory by treating the file as non-removable.
           template_doc_config = { message: "// The source code including full typescript support is available at:" }
           template_content = File.read(File.join(self.class.source_root, template_path))
           # Render against current generator options. Any mismatch is treated as non-removable,
@@ -405,6 +410,8 @@ module ReactOnRails
           # Templates rely on config[:message] for documentation comments, so we inject a
           # dedicated local :config while still evaluating in generator context for helper
           # methods such as use_pro?, use_rsc?, and add_documentation_reference.
+          # Using method binding also exposes local variables from this scope, which is
+          # acceptable because these templates are gem-controlled.
           template_binding = binding
           template_binding.local_variable_set(:config, template_doc_config)
           ERB.new(template_content, trim_mode: "-").result(template_binding)

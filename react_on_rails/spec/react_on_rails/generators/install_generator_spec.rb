@@ -663,6 +663,23 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rspack and empty config/webpack directory" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      FileUtils.mkdir_p(File.join(destination_root, "config/webpack"))
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when directory is empty" do
+      assert_directory "config/webpack"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
   context "with --rspack and nested config/webpack directory" do
     include_context "with webpack to rspack migration base"
 
