@@ -30,7 +30,10 @@ module ReactOnRailsPro
         token = load_token_from_env_or_file
         return unless token
 
-        expires_at = Time.at(license_data["exp"])
+        exp_timestamp = Integer(license_data["exp"], exception: false)
+        return if exp_timestamp.nil?
+
+        expires_at = Time.at(exp_timestamp)
 
         LicenseCache.write(
           "token" => token,

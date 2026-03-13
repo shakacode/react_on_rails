@@ -3,6 +3,7 @@
 require "json"
 require "digest"
 require "fileutils"
+require "time"
 
 module ReactOnRailsPro
   # Caches fetched license tokens to disk.

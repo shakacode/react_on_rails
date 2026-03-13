@@ -596,6 +596,18 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
             ReactOnRailsPro::LicenseRefreshChecker.seed_cache_if_needed(license_data)
           end
         end
+
+        context "when cache is empty and exp claim is invalid" do
+          before do
+            allow(ReactOnRailsPro::LicenseCache).to receive(:token).and_return(nil)
+            ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
+          end
+
+          it "does not write invalid expiry data to cache" do
+            expect(ReactOnRailsPro::LicenseCache).not_to receive(:write)
+            ReactOnRailsPro::LicenseRefreshChecker.seed_cache_if_needed({ "exp" => "not-a-number" })
+          end
+        end
       end
     end
   end

@@ -158,6 +158,49 @@ describe('LicenseFetcher', () => {
       expect(fetchSpy).toHaveBeenCalledTimes(3);
     });
 
+    it('returns null when requests time out and are aborted after retries', async () => {
+      jest.useFakeTimers();
+      process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
+
+      fetchSpy.mockImplementation((_url, init?: RequestInit) => {
+        const signal = init?.signal as AbortSignal | undefined;
+
+        return new Promise((_resolve, reject) => {
+          const abortError = new Error('The operation was aborted');
+          abortError.name = 'AbortError';
+
+          if (!signal) {
+            reject(abortError);
+            return;
+          }
+
+          if (signal.aborted) {
+            reject(abortError);
+            return;
+          }
+
+          signal.addEventListener(
+            'abort',
+            () => {
+              reject(abortError);
+            },
+            { once: true },
+          );
+        });
+      });
+
+      const resultPromise = fetchLicense();
+      await jest.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result).toBeNull();
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('License fetch failed: The operation was aborted'),
+      );
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
     it('returns null on non-200 status after retries', async () => {
       jest.useFakeTimers();
       process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';

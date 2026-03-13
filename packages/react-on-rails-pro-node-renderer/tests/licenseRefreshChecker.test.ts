@@ -149,6 +149,32 @@ describe('LicenseRefreshChecker', () => {
       });
     });
 
+    it('coalesces concurrent refresh calls into a single fetch', async () => {
+      jest.mocked(isAutoRefreshEnabled).mockReturnValue(true);
+      jest.mocked(getExpiresAt).mockReturnValue(new Date(Date.now() + 5 * ONE_DAY_MS));
+      jest.mocked(getFetchedAt).mockReturnValue(null);
+
+      let resolveFetch: (value: any) => void = () => {};
+      const fetchPromise = new Promise<any>((resolve) => {
+        resolveFetch = resolve;
+      });
+      jest.mocked(fetchLicense).mockReturnValue(fetchPromise);
+
+      const firstCall = maybeRefreshLicense();
+      const secondCall = maybeRefreshLicense();
+
+      expect(fetchLicense).toHaveBeenCalledTimes(1);
+
+      resolveFetch({
+        token: 'new-token',
+        expires_at: '2026-12-09T00:00:00Z',
+      });
+
+      await Promise.all([firstCall, secondCall]);
+
+      expect(writeCache).toHaveBeenCalledTimes(1);
+    });
+
     it('does not write cache when fetch fails', async () => {
       jest.mocked(isAutoRefreshEnabled).mockReturnValue(true);
       jest.mocked(getExpiresAt).mockReturnValue(new Date(Date.now() + 5 * ONE_DAY_MS));

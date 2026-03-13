@@ -17,6 +17,7 @@ import { getCachedToken, getFetchedAt, getExpiresAt, writeCache } from './licens
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const SEVEN_DAYS_MS = 7 * ONE_DAY_MS;
+let refreshInFlight: Promise<void> | null = null;
 
 /**
  * Checks if the last fetch was older than the specified duration.
@@ -59,23 +60,39 @@ export function shouldCheckForRefresh(): boolean {
  * This is an async operation that fetches from the API and updates the cache.
  */
 export async function maybeRefreshLicense(): Promise<void> {
-  if (!isAutoRefreshEnabled()) {
-    return;
+  if (refreshInFlight) {
+    return refreshInFlight;
   }
 
-  if (!shouldCheckForRefresh()) {
-    return;
-  }
+  const refreshPromise = (async () => {
+    if (!isAutoRefreshEnabled()) {
+      return;
+    }
 
-  const response = await fetchLicense();
-  if (!response) {
-    return;
-  }
+    if (!shouldCheckForRefresh()) {
+      return;
+    }
 
-  writeCache({
-    token: response.token,
-    expires_at: response.expires_at,
-  });
+    const response = await fetchLicense();
+    if (!response) {
+      return;
+    }
+
+    writeCache({
+      token: response.token,
+      expires_at: response.expires_at,
+    });
+  })();
+
+  refreshInFlight = refreshPromise;
+
+  try {
+    await refreshPromise;
+  } finally {
+    if (refreshInFlight === refreshPromise) {
+      refreshInFlight = null;
+    }
+  }
 }
 
 /**
