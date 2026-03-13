@@ -27,7 +27,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Improved
 
+- **Auto-install `react_on_rails_pro` gem for `--rsc`/`--pro` generator flags**: Running `rails g react_on_rails:install --rsc` or `--pro` now automatically installs the `react_on_rails_pro` gem via `bundle add` instead of only printing an error, matching how Shakapacker is handled in the same generator. [PR 2439](https://github.com/shakacode/react_on_rails/pull/2439) by [justin808](https://github.com/justin808).
 - **create-react-on-rails-app validation and test coverage**: Tightened app name validation (must start with a letter), added Rails 7.0+ prerequisite validation, and expanded validator/setup test coverage (including `validateAll` success path). [PR 2571](https://github.com/shakacode/react_on_rails/pull/2571) by [justin808](https://github.com/justin808).
+
+#### Fixed
+
+- **Fixed `bin/setup` failing on pnpm workspace member directories**: `bin/setup` now checks for the presence of `pnpm-lock.yaml` before running `pnpm install --frozen-lockfile`, preventing failures in workspace member directories (e.g., `spec/dummy`) where dependencies are managed by the workspace root. [PR 2477](https://github.com/shakacode/react_on_rails/pull/2477) by [justin808](https://github.com/justin808).
 
 #### Changed
 
@@ -37,6 +42,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ##### Added
 
+- **Startup warning for unsafe compression middleware callbacks**: Added a startup guard that detects `Rack::Deflater` or `Rack::Brotli` middleware with `:if` callbacks that iterate the response body via `body.each`, which can break streaming SSR/RSC and deadlock `ActionController::Live`. The warning includes the middleware source location and remediation guidance. [PR 2554](https://github.com/shakacode/react_on_rails/pull/2554) by [justin808](https://github.com/justin808).
 - **Configurable host binding for Node Renderer Fastify worker**: Added a `host` setting (default: `process.env.RENDERER_HOST || 'localhost'`) to control the bind address for the Pro Node Renderer. Set it to `0.0.0.0` in containerized environments where external health checks need to reach the renderer. [PR 2585](https://github.com/shakacode/react_on_rails/pull/2585) by [justin808](https://github.com/justin808).
 
 ### [16.4.0.rc.8] - 2026-03-10
