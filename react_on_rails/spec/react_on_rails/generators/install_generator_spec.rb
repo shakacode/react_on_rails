@@ -7,6 +7,21 @@ describe InstallGenerator, type: :generator do
 
   destination File.expand_path("../dummy-for-generators", __dir__)
 
+  def base_generator_fixture(options = {})
+    ReactOnRails::Generators::BaseGenerator.new([], options, destination_root: destination_root)
+  end
+
+  def render_stock_webpack_template(template_path, options = {})
+    base_generator_fixture(options).send(:rendered_template_for_cleanup, template_path)
+  end
+
+  def simulate_managed_stock_webpack_files(options = {})
+    managed_template_map = ReactOnRails::Generators::BaseGenerator.const_get(:MANAGED_WEBPACK_FILE_TEMPLATES)
+    managed_template_map.each do |filename, template_path|
+      simulate_existing_file("config/webpack/#{filename}", render_stock_webpack_template(template_path, options))
+    end
+  end
+
   context "without args" do
     before(:all) { run_generator_test_with_args(%w[], package_json: true) }
 
@@ -680,6 +695,28 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rspack and full managed stock webpack files" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_managed_stock_webpack_files
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "removes config/webpack when only managed stock files are present" do
+      expect(File).not_to exist(File.join(destination_root, "config/webpack"))
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
   context "with --rspack and nested config/webpack directory" do
     include_context "with webpack to rspack migration base"
 
@@ -733,6 +770,28 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rspack and comment-only notes in webpack.config.js" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        // Team note: keep webpack fallback while validating rspack migration.
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when files include comment-only customizations" do
+      assert_file "config/webpack/webpack.config.js"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
   context "with --rspack and legacy generateWebpackConfigs.js" do
     include_context "with webpack to rspack migration base"
 
@@ -742,47 +801,11 @@ describe InstallGenerator, type: :generator do
         const webpackConfig = generateWebpackConfig()
         module.exports = webpackConfig
       JS
-      # Hardcoded rendering of ServerClientOrBoth.js.tt without --pro or --rsc.
-      # If that template's non-comment output changes, update this fixture.
-      simulate_existing_file("config/webpack/generateWebpackConfigs.js", <<~JS)
-        // The source code including full typescript support is available at:
-        // https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/ServerClientOrBoth.js
-
-        const clientWebpackConfig = require('./clientWebpackConfig');
-        const serverWebpackConfig = require('./serverWebpackConfig');
-
-        const serverClientOrBoth = (envSpecific) => {
-          const clientConfig = clientWebpackConfig();
-          const serverConfig = serverWebpackConfig();
-
-          if (envSpecific) {
-            envSpecific(clientConfig, serverConfig);
-          }
-
-          let result;
-          // For HMR, need to separate the the client and server webpack configurations
-          if (process.env.WEBPACK_SERVE || process.env.CLIENT_BUNDLE_ONLY) {
-            // eslint-disable-next-line no-console
-            console.log('[React on Rails] Creating only the client bundles.');
-            result = clientConfig;
-          } else if (process.env.SERVER_BUNDLE_ONLY) {
-            // eslint-disable-next-line no-console
-            console.log('[React on Rails] Creating only the server bundle.');
-            result = serverConfig;
-          } else {
-            // default is the standard client and server build
-            // eslint-disable-next-line no-console
-            console.log('[React on Rails] Creating both client and server bundles.');
-            result = [clientConfig, serverConfig];
-          }
-
-          // To debug, uncomment next line and inspect "result"
-          // debugger
-          return result;
-        };
-
-        module.exports = serverClientOrBoth;
-      JS
+      # Render from the current template so fixture content stays in sync with generator output.
+      simulate_existing_file(
+        "config/webpack/generateWebpackConfigs.js",
+        render_stock_webpack_template("base/base/config/webpack/ServerClientOrBoth.js.tt")
+      )
 
       Dir.chdir(destination_root) do
         run_generator(["--rspack", "--ignore-warnings", "--skip"])

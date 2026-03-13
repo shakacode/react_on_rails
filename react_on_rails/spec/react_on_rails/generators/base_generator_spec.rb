@@ -3,6 +3,20 @@
 require_relative "../support/generator_spec_helper"
 
 RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
+  describe "managed webpack template map" do
+    it "covers all webpack templates except explicitly handled files" do
+      templates_root = described_class.source_root
+      discovered_templates = Dir.glob(File.join(templates_root, "**/config/webpack/*.tt"))
+                                .map { |path| path.delete_prefix("#{templates_root}/") }
+                                .sort
+
+      explicitly_handled_templates = %w[base/base/config/webpack/webpack.config.js.tt]
+      managed_templates = described_class.const_get(:MANAGED_WEBPACK_FILE_TEMPLATES).values.uniq.sort
+
+      expect(discovered_templates - explicitly_handled_templates).to match_array(managed_templates)
+    end
+  end
+
   describe "#copy_base_files in --pretend mode" do
     let(:base_generator) { described_class.new([], { pretend: true }) }
 

@@ -66,6 +66,10 @@ module ReactOnRails
       }.freeze
 
       TemplateRenderContext = Struct.new(:generator, :config) do
+        def template_binding
+          binding
+        end
+
         def method_missing(method_name, ...)
           return generator.__send__(method_name, ...) if generator.respond_to?(method_name, true)
 
@@ -334,12 +338,8 @@ module ReactOnRails
           # Thor's remove_dir uses paths relative to destination_root.
           remove_dir(webpack_config_relative_dir, verbose: false)
           say_status :remove,
-                     "#{webpack_config_relative_dir} (stale webpack configs after switching to --rspack; " \
-                     "comment-only edits are treated as stock)",
+                     "#{webpack_config_relative_dir} (stale webpack configs after switching to --rspack)",
                      :green
-          say_status :info,
-                     "If you had comment-only notes, recover them with git diff -- #{webpack_config_relative_dir}",
-                     :blue
           return
         end
 
@@ -427,8 +427,10 @@ module ReactOnRails
           # Templates rely on config[:message] plus generator helper methods (for example
           # use_pro?, use_rsc?, add_documentation_reference), so we evaluate within a
           # minimal context that exposes config and delegates helper calls back to self.
+          # Use TemplateRenderContext#template_binding to avoid leaking method-local
+          # variables from rendered_template_for_cleanup into the ERB scope.
           template_render_context = TemplateRenderContext.new(self, template_doc_config)
-          ERB.new(template_content, trim_mode: "-").result(template_render_context.instance_eval { binding })
+          ERB.new(template_content, trim_mode: "-").result(template_render_context.template_binding)
         rescue StandardError => e
           say_status :warning,
                      "Could not render template #{template_path} for cleanup check (#{e.class}: #{e.message}); " \
@@ -436,8 +438,8 @@ module ReactOnRails
                      :yellow
           # Rendering failures should never abort installation. Returning a sentinel
           # guarantees a non-match so the file is treated as non-removable.
-          # We cache the sentinel intentionally so repeated checks stay consistent and
-          # avoid re-emitting the same warning within one generator run.
+          # We cache the sentinel intentionally (same options within one generator run)
+          # so repeated checks stay consistent and avoid noisy duplicate warnings.
           "__render_failed__:#{template_path}"
         end
       end
@@ -472,10 +474,8 @@ module ReactOnRails
       end
 
       def normalize_config_content(content)
-        # Remove comments, normalize whitespace, and clean up for comparison
-        content.gsub(%r{//.*$}, "")                    # Remove single-line comments
-               .gsub(%r{/\*.*?\*/}m, "")               # Remove multi-line comments
-               .gsub(/\s+/, " ")                       # Normalize whitespace
+        # Normalize whitespace while preserving comments as potential customizations.
+        content.gsub(/\s+/, " ")
                .strip
       end
 
