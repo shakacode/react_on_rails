@@ -495,6 +495,9 @@ describe InstallGenerator, type: :generator do
         const webpackConfig = generateWebpackConfig()
         module.exports = webpackConfig
       JS
+      unless File.exist?(File.join(destination_root, "config/webpack"))
+        raise "Expected config/webpack to exist before running --rspack generator"
+      end
 
       Dir.chdir(destination_root) do
         run_generator(["--rspack", "--ignore-warnings", "--skip"])
@@ -631,6 +634,58 @@ describe InstallGenerator, type: :generator do
 
     it "keeps config/webpack when custom files are detected" do
       assert_file "config/webpack/custom-banner.js"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and customized webpack.config.js only" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { env } = require('shakapacker')
+        const { existsSync } = require('fs')
+        const { resolve } = require('path')
+
+        const envSpecificConfig = () => {
+          const path = resolve(__dirname, `${env.nodeEnv}.js`)
+          if (existsSync(path)) return require(path)
+          throw new Error(`Could not find file to load ${path}`)
+        }
+
+        const config = envSpecificConfig()
+        config.resolve = config.resolve || {}
+        module.exports = config
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when webpack.config.js is customized" do
+      assert_file "config/webpack/webpack.config.js"
       assert_file "config/rspack/rspack.config.js"
     end
   end

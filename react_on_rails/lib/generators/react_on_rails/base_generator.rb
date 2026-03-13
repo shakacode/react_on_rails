@@ -55,8 +55,7 @@ module ReactOnRails
         "development.js" => "base/base/config/webpack/development.js.tt",
         "production.js" => "base/base/config/webpack/production.js.tt",
         "serverWebpackConfig.js" => "base/base/config/webpack/serverWebpackConfig.js.tt",
-        "ServerClientOrBoth.js" => "base/base/config/webpack/ServerClientOrBoth.js.tt",
-        "rscWebpackConfig.js" => "rsc/base/config/webpack/rscWebpackConfig.js.tt"
+        "ServerClientOrBoth.js" => "base/base/config/webpack/ServerClientOrBoth.js.tt"
       }.freeze
 
       REMOVABLE_WEBPACK_FILES = (MANAGED_WEBPACK_FILE_TEMPLATES.keys +
@@ -294,6 +293,7 @@ module ReactOnRails
         return unless using_rspack?
         return unless Dir.exist?(stale_webpack_config_dir)
 
+        # Dir.children excludes "." and ".."; this additionally excludes dotfiles.
         entries = Dir.children(stale_webpack_config_dir).reject { |entry| entry.start_with?(".") }.sort
         return if entries.empty?
 
@@ -319,7 +319,11 @@ module ReactOnRails
 
         case entry
         when "webpack.config.js", "generateWebpackConfigs.js"
-          standard_shakapacker_config?(content) || react_on_rails_config?(content)
+          webpack_template = rendered_template_for_cleanup(
+            "base/base/config/webpack/webpack.config.js.tt"
+          )
+          standard_shakapacker_config?(content) ||
+            content_matches_template?(content, webpack_template)
         else
           template_path = MANAGED_WEBPACK_FILE_TEMPLATES.fetch(entry, nil)
           return false unless template_path
@@ -333,6 +337,8 @@ module ReactOnRails
         @rendered_template_cache[template_path] ||= begin
           config = { message: "// The source code including full typescript support is available at:" }
           template_content = File.read(File.join(self.class.source_root, template_path))
+          # Render against current generator options. Any mismatch is treated as non-removable,
+          # which is intentional because cleanup should be conservative.
           ERB.new(template_content, trim_mode: "-").result(binding)
         end
       end
