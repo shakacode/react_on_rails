@@ -295,19 +295,32 @@ module ReactOnRails
         return unless using_rspack?
         return unless Dir.exist?(stale_webpack_config_dir)
 
-        # Dir.children excludes "." and ".."; this additionally excludes dotfiles.
-        entries = Dir.children(stale_webpack_config_dir).reject { |entry| entry.start_with?(".") }.sort
-        return if entries.empty?
+        webpack_config_relative_dir = "config/webpack"
+        all_entries = Dir.children(stale_webpack_config_dir).sort
+        return if all_entries.empty?
 
-        non_removable_entries = entries.reject { |entry| removable_webpack_entry?(entry) }
-        if non_removable_entries.empty?
-          remove_dir("config/webpack", verbose: false)
-          say_status :remove, "config/webpack (stale webpack configs after switching to --rspack)", :green
+        # Dir.children excludes "." and ".."; this additionally excludes dotfiles.
+        entries = all_entries.reject { |entry| entry.start_with?(".") }
+        if entries.empty?
+          say_status :warning,
+                     "Keeping #{webpack_config_relative_dir}; only dotfiles detected: #{all_entries.join(', ')}",
+                     :yellow
           return
         end
 
+        non_removable_entries = entries.reject { |entry| removable_webpack_entry?(entry) }
+        if non_removable_entries.empty?
+          # Thor's remove_dir uses paths relative to destination_root.
+          remove_dir(webpack_config_relative_dir, verbose: false)
+          say_status :remove,
+                     "#{webpack_config_relative_dir} (stale webpack configs after switching to --rspack)",
+                     :green
+          return
+        end
+
+        unknown_files = non_removable_entries.join(", ")
         say_status :warning,
-                   "Keeping config/webpack; custom/unknown files detected: #{non_removable_entries.join(', ')}",
+                   "Keeping #{webpack_config_relative_dir}; custom/unknown files detected: #{unknown_files}",
                    :yellow
       end
 
@@ -327,7 +340,7 @@ module ReactOnRails
           standard_shakapacker_config?(content) ||
             content_matches_template?(content, webpack_template)
         else
-          template_path = MANAGED_WEBPACK_FILE_TEMPLATES.fetch(entry, nil)
+          template_path = MANAGED_WEBPACK_FILE_TEMPLATES[entry]
           return false unless template_path
 
           content_matches_template?(content, rendered_template_for_cleanup(template_path))
@@ -341,6 +354,8 @@ module ReactOnRails
           template_content = File.read(File.join(self.class.source_root, template_path))
           # Render against current generator options. Any mismatch is treated as non-removable,
           # which is intentional because cleanup should be conservative.
+          # Note: files originally generated with --pro or --rsc will not match when the
+          # current run omits those options; in that case, we preserve the directory.
           ERB.new(template_content, trim_mode: "-").result(binding)
         end
       end

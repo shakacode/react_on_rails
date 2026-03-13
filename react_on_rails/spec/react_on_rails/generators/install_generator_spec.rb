@@ -495,8 +495,8 @@ describe InstallGenerator, type: :generator do
         const webpackConfig = generateWebpackConfig()
         module.exports = webpackConfig
       JS
-      unless File.exist?(File.join(destination_root, "config/webpack"))
-        raise "Expected config/webpack to exist before running --rspack generator"
+      if File.exist?(File.join(destination_root, "config/webpack"))
+        simulate_existing_file("tmp/webpack-seeded-before-rspack.flag", "true\n")
       end
 
       Dir.chdir(destination_root) do
@@ -560,6 +560,7 @@ describe InstallGenerator, type: :generator do
     end
 
     it "removes stale stock config/webpack files after switching to rspack" do
+      expect(File).to exist(File.join(destination_root, "tmp/webpack-seeded-before-rspack.flag"))
       expect(File).not_to exist(File.join(destination_root, "config/webpack"))
     end
 
