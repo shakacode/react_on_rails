@@ -498,15 +498,16 @@ describe ReactOnRailsHelper do
       allow(ReactOnRails::ServerRenderingPool)
         .to receive(:server_render_js_with_console_logging)
         .and_wrap_original do |_m, js_code, _opts|
-        runtime_result = runtime_context.call("runGeneratedCode", js_code)
-        captured_result = JSON.parse(runtime_result)
-        {
-          "html" => "",
-          "consoleReplayScript" => "",
-          "hasErrors" => true,
-          "renderingError" => { "message" => "null", "stack" => nil }
-        }
-      end
+          # Validate generated JS behavior directly before Ruby-side post-processing.
+          runtime_result = runtime_context.call("runGeneratedCode", js_code)
+          captured_result = JSON.parse(runtime_result)
+          {
+            "html" => "",
+            "consoleReplayScript" => "",
+            "hasErrors" => true,
+            "renderingError" => { "message" => "null", "stack" => nil }
+          }
+        end
 
       expect { server_render_js("(function() { throw null; })()") }.not_to raise_error
       expect(captured_result).to be_a(Hash)
