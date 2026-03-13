@@ -38,10 +38,16 @@ describe ReactOnRails::TestHelper::EnsureAssetsCompiled do
       end
 
       before do
-        allow(ReactOnRails::TestHelper::DevAssetsDetector).to receive(:try_activate_dev_assets!).and_return(true)
+        allow(ReactOnRails::TestHelper::DevAssetsDetector).to receive(:try_activate_dev_assets!)
       end
 
       it "still compiles to refresh non-manifest stale bundles" do
+        expect(compiler).to receive(:compile_assets).once
+        invoke_ensurer_with_doubles
+      end
+
+      it "does not mutate shakapacker config via dev asset reuse" do
+        expect(ReactOnRails::TestHelper::DevAssetsDetector).not_to receive(:try_activate_dev_assets!)
         expect(compiler).to receive(:compile_assets).once
         invoke_ensurer_with_doubles
       end

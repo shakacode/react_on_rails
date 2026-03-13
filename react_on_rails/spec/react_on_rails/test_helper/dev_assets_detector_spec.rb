@@ -227,7 +227,6 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
     let(:mock_config) do
       instance_double(Shakapacker::Configuration,
                       instance_variable_set: nil,
-                      instance_variable_defined?: true,
                       send: frozen_data)
     end
     let(:mock_instance) do
@@ -315,6 +314,25 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
       end
 
       it "returns false without raising" do
+        expect(described_class.try_activate_dev_assets!).to be false
+      end
+    end
+
+    context "when shakapacker config data is unavailable" do
+      before do
+        allow(mock_config).to receive(:send).with(:data).and_return(nil)
+        detector = instance_double(described_class)
+        allow(described_class).to receive(:new).and_return(detector)
+        allow(detector).to receive(:check).and_return(
+          dev_public_root_relative: "public",
+          dev_output_relative: "packs",
+          dev_full_path: Pathname.new(dev_output_dir),
+          manifest_path: Pathname.new(File.join(dev_output_dir, "manifest.json"))
+        )
+      end
+
+      it "returns false without mutating shakapacker config" do
+        expect(mock_config).not_to receive(:instance_variable_set)
         expect(described_class.try_activate_dev_assets!).to be false
       end
     end

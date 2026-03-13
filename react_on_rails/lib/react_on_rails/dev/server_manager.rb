@@ -342,12 +342,26 @@ module ReactOnRails
           end
 
           full_watchers = find_process_pids("bin/shakapacker --watch")
+          if full_watchers.any? && shakapacker_dev_server_running?
+            return true if shared_private_output_paths?
+
+            puts Rainbow(
+              "   Existing dev-server/watcher pair found, " \
+              "but test/development private outputs differ; using full mode."
+            ).yellow
+            return false
+          end
+
           return false if full_watchers.empty?
           return true if shared_private_output_paths?
 
           puts Rainbow("   Existing shakapacker watcher found, but bundle sharing is unclear; using full mode.").yellow
 
           false
+        end
+
+        def shakapacker_dev_server_running?
+          find_process_pids("bin/shakapacker-dev-server").any?
         end
 
         def shared_private_output_paths?

@@ -507,6 +507,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
         .and_return([])
       allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker-dev-server")
+        .and_return([])
+      allow(described_class).to receive(:find_process_pids)
         .with("bin/shakapacker --watch")
         .and_return([12_345])
       allow(described_class).to receive(:shared_private_output_paths?).and_return(true)
@@ -525,11 +528,35 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
         .and_return([])
       allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker-dev-server")
+        .and_return([])
+      allow(described_class).to receive(:find_process_pids)
         .with("bin/shakapacker --watch")
         .and_return([12_345])
       allow(described_class).to receive(:shared_private_output_paths?).and_return(false)
 
       expect(described_class).to receive(:exec).with({ "RAILS_ENV" => "test" }, "bin/shakapacker", "--watch")
+
+      described_class.send(:run_test_watch, test_watch_mode: "auto")
+    end
+
+    it "uses client-only mode when a dev-server/watcher pair is running" do
+      allow(described_class).to receive(:find_process_pids)
+        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .and_return([])
+      allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker-dev-server")
+        .and_return([54_321])
+      allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker --watch")
+        .and_return([12_345])
+      allow(described_class).to receive(:shared_private_output_paths?).and_return(true)
+
+      expect(described_class).to receive(:exec).with(
+        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "yes" },
+        "bin/shakapacker",
+        "--watch"
+      )
 
       described_class.send(:run_test_watch, test_watch_mode: "auto")
     end

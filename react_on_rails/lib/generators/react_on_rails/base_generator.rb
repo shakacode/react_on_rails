@@ -188,8 +188,8 @@ module ReactOnRails
           # Ensure that if we are running js tests, we are using latest webpack assets
           # This will use the defaults of :js and :server_rendering meta tags
           # Requires config.build_test_command in config/initializers/react_on_rails.rb.
-          # Uncomment the next line if you set config.build_test_command:
-          # ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+          # This is the default setup for React on Rails generated apps.
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
         end
       STR
 
@@ -382,7 +382,7 @@ module ReactOnRails
 
       def add_configure_minitest_to_compile_assets(helper_file)
         content = File.read(helper_file)
-        return if content.match?(/^\s*(?!#).*ReactOnRails::TestHelper\.ensure_assets_compiled/)
+        return if content.match?(/^\s*[^#\s][^#]*ReactOnRails::TestHelper\.ensure_assets_compiled/)
 
         append_to_file(helper_file, "\n\n#{CONFIGURE_MINITEST_TO_COMPILE_ASSETS}\n")
       end

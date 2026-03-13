@@ -41,15 +41,12 @@ module ReactOnRails
         # All done if no stale files!
         return if stale_gen_files.empty?
 
-        # If test assets are stale, check if development assets can be reused.
+        # If only the manifest is stale, check if development assets can be reused.
         # This handles the common case where bin/dev static is running and has
-        # already compiled fresh assets. Instead of running build_test_command
-        # (which would duplicate that work), we override Shakapacker's test config
-        # to point at the dev output directory.
-        # Shakapacker config now points at dev output.
-        # If only the manifest was stale, dev assets fully cover the stale state.
-        return if DevAssetsDetector.try_activate_dev_assets! &&
-                  stale_gen_files.all? { |path| File.basename(path.to_s) == "manifest.json" }
+        # already compiled fresh assets. In that case, we can safely point
+        # Shakapacker's test config at the dev output and skip test compilation.
+        return if stale_gen_files.all? { |path| File.basename(path.to_s) == "manifest.json" } &&
+                  DevAssetsDetector.try_activate_dev_assets!
 
         ReactOnRails::PacksGenerator.instance.generate_packs_if_stale if ReactOnRails.configuration.auto_load_bundle
 

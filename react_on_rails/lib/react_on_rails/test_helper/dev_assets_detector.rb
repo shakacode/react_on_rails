@@ -47,12 +47,15 @@ module ReactOnRails
         def apply_shakapacker_override!(result)
           config = ::Shakapacker.config
           return false unless config.respond_to?(:data, true)
-          return false unless config.instance_variable_defined?(:@data)
 
+          # Called from EnsureAssetsCompiled while holding its class-level mutex.
           # Uses Shakapacker private internals (`data`/`@data`) to temporarily point
           # test lookups at dev output. Tested against Shakapacker 8.x and 9.x.
           # Keep this defensive for future Shakapacker changes.
-          new_data = config.send(:data).dup
+          config_data = config.send(:data)
+          return false unless config_data.is_a?(Hash)
+
+          new_data = config_data.dup
           override_config_value!(new_data, :public_root_path, result[:dev_public_root_relative])
           override_config_value!(new_data, :public_output_path, result[:dev_output_relative])
           config.instance_variable_set(:@data, new_data.freeze)
