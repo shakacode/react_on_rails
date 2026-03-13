@@ -292,23 +292,15 @@ module ReactOnRails
       end
 
       def cleanup_stale_webpack_config_dir_for_rspack
-        return unless using_rspack?
-        return unless Dir.exist?(stale_webpack_config_dir)
+        return unless cleanup_stale_webpack_config_dir?
 
         webpack_config_relative_dir = "config/webpack"
         all_entries = Dir.children(stale_webpack_config_dir).sort
         return if all_entries.empty?
 
-        # Dir.children excludes "." and ".."; this additionally excludes dotfiles.
-        entries = all_entries.reject { |entry| entry.start_with?(".") }
-        if entries.empty?
-          say_status :warning,
-                     "Keeping #{webpack_config_relative_dir}; only dotfiles detected: #{all_entries.join(', ')}",
-                     :yellow
-          return
-        end
+        return warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, all_entries) if all_dotfiles?(all_entries)
 
-        non_removable_entries = entries.reject { |entry| removable_webpack_entry?(entry) }
+        non_removable_entries = non_removable_webpack_entries(all_entries)
         if non_removable_entries.empty?
           # Thor's remove_dir uses paths relative to destination_root.
           remove_dir(webpack_config_relative_dir, verbose: false)
@@ -322,6 +314,26 @@ module ReactOnRails
         say_status :warning,
                    "Keeping #{webpack_config_relative_dir}; custom/unknown files detected: #{unknown_files}",
                    :yellow
+      end
+
+      def cleanup_stale_webpack_config_dir?
+        using_rspack? && Dir.exist?(stale_webpack_config_dir)
+      end
+
+      def all_dotfiles?(entries)
+        entries.all? { |entry| entry.start_with?(".") }
+      end
+
+      def warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, all_entries)
+        say_status :warning,
+                   "Keeping #{webpack_config_relative_dir}; only dotfiles detected: #{all_entries.join(', ')}",
+                   :yellow
+      end
+
+      def non_removable_webpack_entries(all_entries)
+        all_entries.reject do |entry|
+          !entry.start_with?(".") && removable_webpack_entry?(entry)
+        end
       end
 
       def removable_webpack_entry?(entry)

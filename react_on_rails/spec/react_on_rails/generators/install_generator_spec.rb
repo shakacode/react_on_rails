@@ -495,9 +495,7 @@ describe InstallGenerator, type: :generator do
         const webpackConfig = generateWebpackConfig()
         module.exports = webpackConfig
       JS
-      if File.exist?(File.join(destination_root, "config/webpack"))
-        simulate_existing_file("tmp/webpack-seeded-before-rspack.flag", "true\n")
-      end
+      simulate_existing_file("tmp/webpack-seeded-before-rspack.flag", "true\n")
 
       Dir.chdir(destination_root) do
         run_generator(["--rspack", "--ignore-warnings", "--skip"])
