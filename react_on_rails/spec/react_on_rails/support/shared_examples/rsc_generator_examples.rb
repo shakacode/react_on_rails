@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-shared_examples "rsc_hello_server_controller" do
+shared_examples "rsc_hello_server_files" do
   it "creates HelloServer controller with hello_world layout" do
     assert_file "app/controllers/hello_server_controller.rb" do |content|
       expect(content).to include("class HelloServerController")

@@ -1192,7 +1192,7 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
-    include_examples "rsc_hello_server_controller"
+    include_examples "rsc_hello_server_files"
 
     it "adds HelloServer route" do
       assert_file "config/routes.rb" do |content|
@@ -1251,7 +1251,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    include_examples "rsc_hello_server_controller"
+    include_examples "rsc_hello_server_files"
   end
 
   context "with --rsc --typescript" do
@@ -1297,7 +1297,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    include_examples "rsc_hello_server_controller"
+    include_examples "rsc_hello_server_files"
   end
 
   context "with --rsc --rspack" do
@@ -1357,7 +1357,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    include_examples "rsc_hello_server_controller"
+    include_examples "rsc_hello_server_files"
   end
 
   context "when rscWebpackConfig.js already exists" do
