@@ -48,6 +48,8 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      # Keep this map in sync with templates under:
+      # lib/generators/react_on_rails/templates/**/config/webpack/*.tt
       MANAGED_WEBPACK_FILE_TEMPLATES = {
         "clientWebpackConfig.js" => "base/base/config/webpack/clientWebpackConfig.js.tt",
         "commonWebpackConfig.js" => "base/base/config/webpack/commonWebpackConfig.js.tt",
@@ -63,9 +65,21 @@ module ReactOnRails
         "generateWebpackConfigs.js" => "base/base/config/webpack/ServerClientOrBoth.js.tt"
       }.freeze
 
+      TemplateRenderContext = Struct.new(:generator, :config) do
+        def method_missing(method_name, ...)
+          return generator.__send__(method_name, ...) if generator.respond_to?(method_name, true)
+
+          super
+        end
+
+        def respond_to_missing?(method_name, include_private = false)
+          generator.respond_to?(method_name, true) || super
+        end
+      end
+
       REMOVABLE_WEBPACK_FILES = (MANAGED_WEBPACK_FILE_TEMPLATES.keys +
         %w[webpack.config.js]).freeze
-      private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES
+      private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext
 
       def add_hello_world_route
         # RSC uses HelloServer instead of HelloWorld, but Redux still needs hello_world route
@@ -323,6 +337,9 @@ module ReactOnRails
                      "#{webpack_config_relative_dir} (stale webpack configs after switching to --rspack; " \
                      "comment-only edits are treated as stock)",
                      :green
+          say_status :info,
+                     "If you had comment-only notes, recover them with git diff -- #{webpack_config_relative_dir}",
+                     :blue
           return
         end
 
@@ -407,14 +424,11 @@ module ReactOnRails
           # which is intentional because cleanup should be conservative.
           # Note: files originally generated with --pro or --rsc will not match when the
           # current run omits those options; in that case, we preserve the directory.
-          # Templates rely on config[:message] for documentation comments, so we inject a
-          # dedicated local :config while still evaluating in generator context for helper
-          # methods such as use_pro?, use_rsc?, and add_documentation_reference.
-          # Using method binding also exposes local variables from this scope, which is
-          # acceptable because these templates are gem-controlled.
-          template_binding = binding
-          template_binding.local_variable_set(:config, template_doc_config)
-          ERB.new(template_content, trim_mode: "-").result(template_binding)
+          # Templates rely on config[:message] plus generator helper methods (for example
+          # use_pro?, use_rsc?, add_documentation_reference), so we evaluate within a
+          # minimal context that exposes config and delegates helper calls back to self.
+          template_render_context = TemplateRenderContext.new(self, template_doc_config)
+          ERB.new(template_content, trim_mode: "-").result(template_render_context.instance_eval { binding })
         rescue StandardError => e
           say_status :warning,
                      "Could not render template #{template_path} for cleanup check (#{e.class}: #{e.message}); " \
@@ -422,6 +436,8 @@ module ReactOnRails
                      :yellow
           # Rendering failures should never abort installation. Returning a sentinel
           # guarantees a non-match so the file is treated as non-removable.
+          # We cache the sentinel intentionally so repeated checks stay consistent and
+          # avoid re-emitting the same warning within one generator run.
           "__render_failed__:#{template_path}"
         end
       end
@@ -432,13 +448,13 @@ module ReactOnRails
 
       def stale_webpack_config_entries
         Dir.children(stale_webpack_config_dir).sort
-      rescue Errno::EACCES, Errno::ENOENT
+      rescue Errno::EACCES, Errno::ENOENT # TOCTOU: directory may disappear between exist? check and read
         nil
       end
 
       def safe_read_cleanup_file(path)
         File.read(path)
-      rescue Errno::EACCES, Errno::ENOENT
+      rescue Errno::EACCES, Errno::ENOENT, Errno::EISDIR
         nil
       end
 
