@@ -25,6 +25,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **`server_render_js` now handles non-Error throws safely**: Defensive error serialization now supports thrown primitives and `null` values without raising secondary `TypeError` exceptions while building SSR error payloads. [PR 2599](https://github.com/shakacode/react_on_rails/pull/2599) by [justin808](https://github.com/justin808).
+
 ### [16.4.0.rc.9] - 2026-03-12
 
 #### Improved

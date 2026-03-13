@@ -485,7 +485,9 @@ describe ReactOnRailsHelper do
           expect(js_code).to include("if ('stack' in renderingError && renderingError.stack != null)")
           {
             "html" => "",
-            "consoleReplayScript" => ""
+            "consoleReplayScript" => "",
+            "hasErrors" => false,
+            "renderingError" => {}
           }
         end
 
