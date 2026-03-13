@@ -267,6 +267,7 @@ module ReactOnRails
 
       def copy_webpack_main_config(base_path, config)
         webpack_config_path = bundler_main_config_path
+        template_path = bundler_main_config_template_path(base_path, webpack_config_path)
 
         if File.exist?(webpack_config_path)
           existing_content = File.read(webpack_config_path)
@@ -279,7 +280,7 @@ module ReactOnRails
             say_status :replace,
                        "#{webpack_config_path} (auto-upgrading from standard Shakapacker to React on Rails config)",
                        :green
-            template("#{base_path}/config/webpack/webpack.config.js.tt", webpack_config_path, config)
+            template(template_path, webpack_config_path, config)
           elsif react_on_rails_config?(existing_content)
             say_status :identical, "#{webpack_config_path} (already React on Rails compatible)", :blue
             # Skip - don't need to do anything
@@ -288,7 +289,7 @@ module ReactOnRails
           end
         else
           # File doesn't exist, create it
-          template("#{base_path}/config/webpack/webpack.config.js.tt", webpack_config_path, config)
+          template(template_path, webpack_config_path, config)
         end
       end
 
@@ -309,7 +310,7 @@ module ReactOnRails
             say_status :create, "#{backup_path} (backup of your custom config)", :green
           end
 
-          template("#{base_path}/config/webpack/webpack.config.js.tt", webpack_config_path, config)
+          template(bundler_main_config_template_path(base_path, webpack_config_path), webpack_config_path, config)
         else
           say_status :skip, webpack_config_path, :yellow
           say_status :warning,
@@ -590,7 +591,14 @@ module ReactOnRails
 
         # Normalize whitespace while preserving comments by default so added comments
         # count as potential customizations and keep cleanup conservative.
-        normalized_content.gsub(/\s+/, " ").strip
+        normalized_content.gsub(/\s+/, " ")
+                          .tr('"', "'") # Normalize quote style for import/require statements
+                          .strip
+      end
+
+      def bundler_main_config_template_path(base_path, config_path)
+        template_file_name = config_path.end_with?(".ts") ? "webpack.config.ts.tt" : "webpack.config.js.tt"
+        "#{base_path}/config/webpack/#{template_file_name}"
       end
 
       def shakapacker_default_configs
@@ -664,6 +672,11 @@ module ReactOnRails
         configs << <<~CONFIG
           import { generateWebpackConfig } from 'shakapacker'
           const webpackConfig = generateWebpackConfig()
+          export default webpackConfig
+        CONFIG
+
+        configs << <<~CONFIG
+          import { webpackConfig } from 'shakapacker'
           export default webpackConfig
         CONFIG
 

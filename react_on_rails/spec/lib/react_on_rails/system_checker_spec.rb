@@ -692,6 +692,51 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
     end
 
+    describe "#detect_bundler_config_path" do
+      before do
+        allow(File).to receive(:exist?).and_return(false)
+      end
+
+      it "returns the existing webpack TypeScript config when only webpack exists" do
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
+      end
+
+      it "prefers the bundler configured in shakapacker.yml when both bundlers exist" do
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("default:\n  assets_bundler: rspack\n")
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/rspack/rspack.config.ts")
+        expect(checker.messages.any? do |msg|
+          msg[:content].include?("Using rspack from config/shakapacker.yml")
+        end).to be true
+      end
+
+      it "warns and defaults to rspack when both bundlers exist and config is ambiguous" do
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(false)
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/rspack/rspack.config.ts")
+        expect(checker.messages.any? { |msg| msg[:content].include?("defaulting to rspack") }).to be true
+      end
+    end
+
+    describe "#suggest_webpack_inspection" do
+      it "adapts tips for rspack TypeScript config paths" do
+        checker.send(:suggest_webpack_inspection, "config/rspack/rspack.config.ts")
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
+
+        expect(info_messages).to include("config/rspack/rspack.config.ts")
+        expect(info_messages).to include("export default")
+        expect(info_messages).to include("rspack-stats.json")
+      end
+    end
+
     describe "#standard_shakapacker_config?" do
       it "recognizes CommonJS webpack config" do
         content = <<~JS
@@ -716,6 +761,14 @@ RSpec.describe ReactOnRails::SystemChecker do
           import { generateWebpackConfig } from 'shakapacker'
           import type { Configuration } from 'webpack'
           const webpackConfig: Configuration = generateWebpackConfig()
+          export default webpackConfig
+        TS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "recognizes TypeScript ESM webpack config that imports webpackConfig directly" do
+        content = <<~TS
+          import { webpackConfig } from 'shakapacker'
           export default webpackConfig
         TS
         expect(checker.send(:standard_shakapacker_config?, content)).to be true

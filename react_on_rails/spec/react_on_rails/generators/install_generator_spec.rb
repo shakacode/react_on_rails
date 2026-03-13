@@ -2023,6 +2023,23 @@ describe InstallGenerator, type: :generator do
       expect(generator.send(:standard_shakapacker_config?, content)).to be true
     end
 
+    it "recognizes stock TypeScript webpack config using webpackConfig export" do
+      content = <<~TS
+        import { webpackConfig } from 'shakapacker'
+        export default webpackConfig
+      TS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "recognizes stock TypeScript configs with double quotes" do
+      content = <<~TS
+        import { generateWebpackConfig } from "shakapacker"
+        const webpackConfig = generateWebpackConfig()
+        export default webpackConfig
+      TS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
     it "recognizes stock TypeScript rspack config with type import (Shakapacker 9.4+)" do
       content = <<~TS
         import { generateRspackConfig } from 'shakapacker/rspack'
@@ -2087,6 +2104,25 @@ describe InstallGenerator, type: :generator do
         allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
         expect(generator.send(:bundler_main_config_path)).to eq("config/rspack/rspack.config.js")
       end
+    end
+  end
+
+  describe "#copy_webpack_main_config" do
+    let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
+    let(:generator) { BaseGenerator.new([], {}, { destination_root: destination }) }
+
+    it "uses TypeScript template when target config path ends with .ts" do
+      allow(generator).to receive(:bundler_main_config_path).and_return("config/webpack/webpack.config.ts")
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
+      allow(generator).to receive(:template)
+
+      generator.send(:copy_webpack_main_config, "base/base", {})
+
+      expect(generator).to have_received(:template).with(
+        "base/base/config/webpack/webpack.config.ts.tt",
+        "config/webpack/webpack.config.ts",
+        {}
+      )
     end
   end
 
