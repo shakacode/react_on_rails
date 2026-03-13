@@ -1,5 +1,5 @@
 <%= react_component("NativeMetadataSyncApp",
-                    props: @app_props_server_render.merge(canonicalUrl: request.original_url),
+                    props: @app_props_server_render.merge(canonicalUrl: request.base_url + request.path),
                     prerender: true,
                     trace: true,
                     id: "NativeMetadataSyncApp-react-component-0") %>
