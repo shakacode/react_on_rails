@@ -24,11 +24,19 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Optional directories that should be skipped (not hard-fail) when Ruby doesn't match Gemfile.
+OPTIONAL_SETUP_DIRS=(
+  "$ROOT_DIR/react_on_rails_pro/spec/execjs-compatible-dummy"
+)
+
 # Track start time for elapsed time display
 START_TIME=$(date +%s)
 
 # Flags
 SKIP_PRO=false
+
+# Populated once in check_prerequisites and reused throughout setup.
+CURRENT_RUBY_VERSION=""
 
 show_help() {
   echo "Usage: bin/setup [OPTIONS]"
@@ -107,8 +115,10 @@ check_prerequisites() {
     exit 1
   fi
 
+  CURRENT_RUBY_VERSION="$(ruby -e 'print RUBY_VERSION')"
+
   # Display versions found
-  echo "  Ruby:    $(ruby -v | head -1)"
+  echo "  Ruby:    $CURRENT_RUBY_VERSION"
   echo "  Node:    $(node -v)"
   echo "  pnpm:    $(pnpm -v)"
   echo "  Bundler: $(bundle -v)"
@@ -130,12 +140,26 @@ verify_root_directory() {
 
 extract_required_ruby_version() {
   local gemfile="$1"
-  sed -nE "s/^[[:space:]]*ruby[[:space:]]+['\"]([0-9]+\.[0-9]+\.[0-9]+)['\"].*/\1/p" "$gemfile" | head -1
+
+  # Only matches exact inline versions: ruby "x.y.z" or ruby 'x.y.z'.
+  # Other forms (ruby file: ".ruby-version", ruby "~> 3.1", etc.) return empty,
+  # which safely bypasses the version check.
+  sed -nE \
+    "/^[[:space:]]*ruby[[:space:]]+['\"][0-9]+\.[0-9]+\.[0-9]+['\"]/{
+      s/^[[:space:]]*ruby[[:space:]]+['\"]([0-9]+\.[0-9]+\.[0-9]+)['\"].*/\\1/p
+      q
+    }" "$gemfile"
 }
 
 is_optional_setup_directory() {
   local dir="$1"
-  [ "$dir" = "$ROOT_DIR/react_on_rails_pro/spec/execjs-compatible-dummy" ]
+  local optional_dir
+
+  for optional_dir in "${OPTIONAL_SETUP_DIRS[@]}"; do
+    [ "$dir" = "$optional_dir" ] && return 0
+  done
+
+  return 1
 }
 
 install_dependencies() {
@@ -156,7 +180,7 @@ install_dependencies() {
     local current_ruby_version
 
     required_ruby_version="$(extract_required_ruby_version "Gemfile")"
-    current_ruby_version="$(ruby -e 'print RUBY_VERSION')"
+    current_ruby_version="$CURRENT_RUBY_VERSION"
 
     if [ -n "$required_ruby_version" ] && [ "$current_ruby_version" != "$required_ruby_version" ]; then
       if is_optional_setup_directory "$dir"; then
@@ -168,8 +192,15 @@ install_dependencies() {
 
       print_error "Ruby $required_ruby_version is required for $name, current Ruby is $current_ruby_version"
       if command -v mise &> /dev/null; then
-        echo "  Try: PATH=\"\$(mise where ruby@$required_ruby_version)/bin:\$PATH\" bin/setup"
+        echo "  With mise:  PATH=\"\$(mise where ruby@$required_ruby_version)/bin:\$PATH\" bin/setup"
+      elif command -v rbenv &> /dev/null; then
+        echo "  With rbenv: RBENV_VERSION=$required_ruby_version bin/setup"
+      elif command -v rvm &> /dev/null; then
+        echo "  With rvm:   rvm use $required_ruby_version && bin/setup"
+      elif command -v asdf &> /dev/null; then
+        echo "  With asdf:  asdf shell ruby $required_ruby_version && bin/setup"
       fi
+      echo "  Switch to Ruby $required_ruby_version using your version manager and rerun bin/setup."
       exit 1
     fi
 
