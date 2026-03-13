@@ -60,4 +60,46 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
       expect(helper_content.scan("ReactOnRails::TestHelper.ensure_assets_compiled").size).to eq(1)
     end
   end
+
+  describe "#add_configure_rspec_to_compile_assets" do
+    let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
+    let(:generator) { described_class.new([], {}, { destination_root: destination }) }
+    let(:helper_path) { File.join(destination, "spec/rails_helper.rb") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(helper_path))
+    end
+
+    it "preserves an existing active helper call" do
+      File.write(helper_path, <<~RUBY)
+        RSpec.configure do |config|
+          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+        end
+      RUBY
+
+      generator.send(:add_configure_rspec_to_compile_assets, helper_path)
+
+      helper_content = File.read(helper_path)
+      expect(helper_content.scan("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)").size).to eq(1)
+    end
+
+    it "replaces only the first RSpec.configure block when wiring is missing" do
+      File.write(helper_path, <<~RUBY)
+        RSpec.configure do |config|
+          config.before(:suite) { nil }
+        end
+
+        RSpec.configure do |config|
+          config.example_status_persistence_file_path = "spec/examples.txt"
+        end
+      RUBY
+
+      generator.send(:add_configure_rspec_to_compile_assets, helper_path)
+
+      helper_content = File.read(helper_path)
+      expect(helper_content.scan("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)").size).to eq(1)
+      expect(helper_content.scan("RSpec.configure do |config|").size).to eq(2)
+      expect(helper_content).to include('config.example_status_persistence_file_path = "spec/examples.txt"')
+    end
+  end
 end

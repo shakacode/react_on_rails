@@ -376,8 +376,13 @@ module ReactOnRails
       end
 
       def add_configure_rspec_to_compile_assets(helper_file)
-        search_str = "RSpec.configure do |config|"
-        gsub_file(helper_file, search_str, CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+        content = File.read(helper_file)
+        return if content.match?(/^\s*[^#\s][^#]*ReactOnRails::TestHelper\.configure_rspec_to_compile_assets/)
+
+        updated_content = content.sub("RSpec.configure do |config|", CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+        return if updated_content == content
+
+        File.write(helper_file, updated_content)
       end
 
       def add_configure_minitest_to_compile_assets(helper_file)

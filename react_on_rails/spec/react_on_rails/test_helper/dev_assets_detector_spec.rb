@@ -336,6 +336,17 @@ describe ReactOnRails::TestHelper::DevAssetsDetector do
         expect(described_class.try_activate_dev_assets!).to be false
       end
     end
+
+    it "resets the HMR warning flag before each activation attempt" do
+      described_class.instance_variable_set(described_class::HMR_WARNING_PRINTED, true)
+      detector = instance_double(described_class)
+      allow(described_class).to receive(:new).and_return(detector)
+      allow(detector).to receive(:check).and_return(nil)
+
+      described_class.try_activate_dev_assets!
+
+      expect(described_class.instance_variable_defined?(described_class::HMR_WARNING_PRINTED)).to be(false)
+    end
   end
 end
 # rubocop:enable RSpec/SubjectStub

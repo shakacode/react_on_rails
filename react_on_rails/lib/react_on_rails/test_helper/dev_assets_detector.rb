@@ -29,6 +29,7 @@ module ReactOnRails
         # When dev assets aren't usable (HMR mode, stale, missing):
         # - Returns false with no side effects
         def try_activate_dev_assets!
+          reset_hmr_warning_state!
           detector = new
           result = detector.check
           return false unless result
@@ -43,6 +44,10 @@ module ReactOnRails
         end
 
         private
+
+        def reset_hmr_warning_state!
+          remove_instance_variable(HMR_WARNING_PRINTED) if instance_variable_defined?(HMR_WARNING_PRINTED)
+        end
 
         def apply_shakapacker_override!(result)
           config = ::Shakapacker.config
