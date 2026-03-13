@@ -742,6 +742,8 @@ describe InstallGenerator, type: :generator do
         const webpackConfig = generateWebpackConfig()
         module.exports = webpackConfig
       JS
+      # Hardcoded rendering of ServerClientOrBoth.js.tt without --pro or --rsc.
+      # If that template's non-comment output changes, update this fixture.
       simulate_existing_file("config/webpack/generateWebpackConfigs.js", <<~JS)
         // The source code including full typescript support is available at:
         // https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/ServerClientOrBoth.js
