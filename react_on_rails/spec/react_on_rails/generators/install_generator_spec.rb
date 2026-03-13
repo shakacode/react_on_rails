@@ -821,6 +821,8 @@ describe InstallGenerator, type: :generator do
         "config/webpack/webpack.config.js",
         File.read(File.join(templates_root, "base/base/config/webpack/webpack.config.js.tt"))
       )
+      # This template currently has no ERB directives. If that changes, render the
+      # template for the fixture instead of copying raw .tt bytes.
       simulate_existing_file(
         "config/webpack/rscWebpackConfig.js",
         File.read(File.join(templates_root, "rsc/base/config/webpack/rscWebpackConfig.js.tt"))

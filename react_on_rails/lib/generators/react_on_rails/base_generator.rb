@@ -299,7 +299,14 @@ module ReactOnRails
         return unless cleanup_stale_webpack_config_dir?
 
         webpack_config_relative_dir = "config/webpack"
-        all_entries = Dir.children(stale_webpack_config_dir).sort
+        all_entries = stale_webpack_config_entries
+        unless all_entries
+          say_status :warning,
+                     "Keeping #{webpack_config_relative_dir}; could not read directory entries " \
+                     "(permission denied or path changed)",
+                     :yellow
+          return
+        end
         return if all_entries.empty?
 
         return warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, all_entries) if all_dotfiles?(all_entries)
@@ -311,7 +318,8 @@ module ReactOnRails
           # Thor's remove_dir uses paths relative to destination_root.
           remove_dir(webpack_config_relative_dir, verbose: false)
           say_status :remove,
-                     "#{webpack_config_relative_dir} (stale webpack configs after switching to --rspack)",
+                     "#{webpack_config_relative_dir} (stale webpack configs after switching to --rspack; " \
+                     "comment-only edits are treated as stock)",
                      :green
           return
         end
@@ -413,6 +421,12 @@ module ReactOnRails
 
       def stale_webpack_config_dir
         File.join(destination_root, "config/webpack")
+      end
+
+      def stale_webpack_config_entries
+        Dir.children(stale_webpack_config_dir).sort
+      rescue Errno::EACCES, Errno::ENOENT
+        nil
       end
 
       def safe_read_cleanup_file(path)
