@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code PostToolUse hook: auto-fix a single file after Edit/Write.
-# Runs Prettier (JS/TS/JSON/MD/YAML) or RuboCop -A (Ruby) depending on extension.
+# Runs Prettier (JS/TS/JSON/MD/YAML) or RuboCop -a (Ruby) depending on extension.
 #
 # Claude Code pipes a JSON object on stdin with tool_input.file_path.
 # Falls back to $1 for manual testing.
@@ -14,7 +14,10 @@ if [ -t 0 ]; then
   FILE="${1:-}"
 else
   INPUT="$(cat)"
-  FILE="$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tool_input',{}).get('file_path',''))" 2>/dev/null || true)"
+  FILE="$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)"
+  if [ -z "$FILE" ] && ! command -v jq > /dev/null 2>&1; then
+    echo "autofix-file: jq not found, skipping auto-fix" >&2
+  fi
 fi
 
 if [ -z "$FILE" ]; then
@@ -32,14 +35,14 @@ REL_PATH="${FILE#"$REPO_ROOT/"}"
 
 case "$REL_PATH" in
   *.rb|*.rake|*.ru)
-    bundle exec rubocop -A --force-exclusion -- "$REL_PATH" 2>&1 | tail -3
+    (cd "$REPO_ROOT" && bundle exec rubocop -a --force-exclusion -- "$REL_PATH" 2>&1 | tail -3 || true)
     ;;
   *.js|*.jsx|*.ts|*.tsx|*.json|*.md|*.yml|*.yaml)
     if [[ "$REL_PATH" == react_on_rails_pro/* ]]; then
       PRO_REL="${REL_PATH#react_on_rails_pro/}"
-      (cd react_on_rails_pro && pnpm exec prettier --write "$PRO_REL" 2>&1 | tail -1)
+      (cd "$REPO_ROOT/react_on_rails_pro" && pnpm exec prettier --write -- "$PRO_REL" 2>&1 | tail -1 || true)
     else
-      pnpm exec prettier --write "$REL_PATH" 2>&1 | tail -1
+      (cd "$REPO_ROOT" && pnpm exec prettier --write -- "$REL_PATH" 2>&1 | tail -1 || true)
     fi
     ;;
 esac
