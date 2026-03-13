@@ -770,6 +770,53 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --rsc app switching from webpack to rspack" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      templates_root = File.expand_path("../../../lib/generators/react_on_rails/templates", __dir__)
+      simulate_existing_file(
+        "config/webpack/webpack.config.js",
+        File.read(File.join(templates_root, "base/base/config/webpack/webpack.config.js.tt"))
+      )
+      simulate_existing_file(
+        "config/webpack/rscWebpackConfig.js",
+        File.read(File.join(templates_root, "rsc/base/config/webpack/rscWebpackConfig.js.tt"))
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rsc", "--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "removes stale stock config/webpack files including rscWebpackConfig.js" do
+      assert_no_file "config/webpack"
+      assert_file "config/rspack/rspack.config.js"
+      assert_file "config/rspack/rscWebpackConfig.js"
+    end
+  end
+
   # Tests a fresh rspack install where Shakapacker was installed directly with rspack
   # (no prior webpack config). This exercises different code paths than "with --rspack":
   # - shakapacker_config_file_exists? falls through to the rspack branches (lines 333-334)
