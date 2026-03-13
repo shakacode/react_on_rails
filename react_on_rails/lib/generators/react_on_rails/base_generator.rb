@@ -482,6 +482,8 @@ module ReactOnRails
         return removable_webpack_main_config?(content) if entry == "webpack.config.js"
 
         removable_managed_webpack_entry?(entry, content)
+      rescue Errno::EACCES, Errno::ELOOP, Errno::ENOENT, Errno::ENOTDIR
+        false
       end
 
       def removable_webpack_main_config?(content)
