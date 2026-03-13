@@ -66,8 +66,9 @@ module ReactOnRails
       }.freeze
 
       # Keep these helper delegates in sync with ERB calls in managed webpack
-      # templates. Missing delegates intentionally fail rendering and keep cleanup
-      # conservative by treating files as non-removable.
+      # templates. This is the intended template-facing API; missing delegates
+      # intentionally fail rendering and keep cleanup conservative by treating
+      # files as non-removable.
       TemplateRenderContext = Struct.new(:generator, :config) do
         def erb_binding
           binding
@@ -154,6 +155,8 @@ module ReactOnRails
       end
 
       def copy_webpack_config
+        # Cleanup must run before writing new webpack/rspack configs so we only
+        # evaluate pre-existing stale entries, never files generated in this run.
         cleanup_stale_webpack_config_dir_for_rspack
 
         say "Adding #{using_rspack? ? 'Rspack' : 'Webpack'} config"
@@ -460,7 +463,7 @@ module ReactOnRails
           full_path = File.join(destination_root, relative_path)
           remove_file(relative_path, verbose: false)
           removed_entries << entry unless File.exist?(full_path)
-        rescue Errno::EACCES, Errno::ELOOP, Errno::ENOTDIR
+        rescue Errno::EACCES, Errno::ELOOP, Errno::ENOENT, Errno::ENOTDIR
           # If we cannot stat after removal attempt, conservatively report as not removed.
           nil
         end
