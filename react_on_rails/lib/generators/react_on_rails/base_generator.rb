@@ -344,8 +344,8 @@ module ReactOnRails
       end
 
       def non_removable_webpack_entries(all_entries)
-        all_entries.reject do |entry|
-          !entry.start_with?(".") && removable_webpack_entry?(entry)
+        all_entries.select do |entry|
+          entry.start_with?(".") || !removable_webpack_entry?(entry)
         end
       end
 
@@ -381,6 +381,8 @@ module ReactOnRails
           # which is intentional because cleanup should be conservative.
           # Note: files originally generated with --pro or --rsc will not match when the
           # current run omits those options; in that case, we preserve the directory.
+          # Templates rely on config[:message] for documentation comments, so we inject a
+          # dedicated local :config while still evaluating in generator context for helpers.
           template_binding = binding
           template_binding.local_variable_set(:config, template_doc_config)
           ERB.new(template_content, trim_mode: "-").result(template_binding)
