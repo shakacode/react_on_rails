@@ -29,8 +29,8 @@ import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 const IMMEDIATE_HYDRATION_PRO_WARNING =
-  "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
-  'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
+  "[REACT ON RAILS] The 'immediate_hydration' feature requires the React on Rails Pro gem to be installed on the server. " +
+  'Please visit https://www.shakacode.com/react-on-rails-pro/ for installation details.';
 
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
@@ -99,10 +99,11 @@ class ComponentRenderer {
    */
   private async render(el: Element, railsContext: RailsContext): Promise<void> {
     const isImmediateHydrationRequested = el.getAttribute('data-immediate-hydration') === 'true';
-    const hasProLicense = railsContext.rorPro;
+    // rorPro signals gem presence on the server, not license validity.
+    const hasProGemInstalled = railsContext.rorPro;
 
-    // Handle immediate_hydration feature usage without Pro license
-    if (isImmediateHydrationRequested && !hasProLicense) {
+    // Handle immediate_hydration feature usage without Pro gem installed
+    if (isImmediateHydrationRequested && !hasProGemInstalled) {
       console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
 
       // Fallback to standard behavior: wait for page load before hydrating

@@ -14,13 +14,13 @@ module ReactOnRails
       Rainbow('To see the full output, set FULL_TEXT_ERRORS=true.').red
     } ...\n".freeze
 
-    def self.immediate_hydration_pro_license_warning(name, type = "Component")
-      "[REACT ON RAILS] Warning: immediate_hydration: true requires a React on Rails Pro license.\n" \
+    def self.immediate_hydration_pro_install_warning(name, type = "Component")
+      "[REACT ON RAILS] Warning: immediate_hydration: true requires the React on Rails Pro gem to be installed.\n" \
         "#{type} '#{name}' will fall back to standard hydration behavior.\n" \
-        "Visit https://www.shakacode.com/react-on-rails-pro/ for licensing information."
+        "Visit https://www.shakacode.com/react-on-rails-pro/ for installation details."
     end
 
-    # Normalizes the immediate_hydration option value, enforcing Pro license requirements.
+    # Normalizes the immediate_hydration option value, enforcing Pro gem-availability requirements.
     # Returns the normalized boolean value for immediate_hydration.
     #
     # @param value [Boolean, nil] The immediate_hydration option value
@@ -31,8 +31,8 @@ module ReactOnRails
     #
     # Logic:
     # - Validates that value is true, false, or nil
-    # - If value is explicitly true (boolean) and no Pro license: warn and return false
-    # - If value is nil: return true for Pro users, false for non-Pro users
+    # - If value is explicitly true (boolean) and Pro gem is not installed: warn and return false
+    # - If value is nil: return true for Pro installs, false for non-Pro installs
     # - Otherwise: return the value as-is (allows explicit false to work)
     def self.normalize_immediate_hydration(value, name, type = "Component")
       # Type validation: only accept boolean or nil
@@ -43,11 +43,11 @@ module ReactOnRails
 
       # Strict equality check: only trigger warning for explicit boolean true
       if value == true && !react_on_rails_pro?
-        Rails.logger.warn immediate_hydration_pro_license_warning(name, type)
+        Rails.logger.warn immediate_hydration_pro_install_warning(name, type)
         return false
       end
 
-      # If nil, default based on Pro license status
+      # If nil, default based on Pro gem availability
       return react_on_rails_pro? if value.nil?
 
       # Return explicit value (including false)
@@ -251,9 +251,8 @@ module ReactOnRails
       end
     end
 
-    # Checks if React on Rails Pro is installed and licensed.
-    # Checks if React on Rails Pro gem is installed
-    # Note: This only checks gem presence, not license validity
+    # Checks if the React on Rails Pro gem is installed.
+    # Note: This checks gem presence only, not license validity.
     #
     # @return [Boolean] true if Pro gem is available
     def self.react_on_rails_pro?

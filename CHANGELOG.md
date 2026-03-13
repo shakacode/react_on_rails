@@ -25,6 +25,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **Clarified Pro-installation signaling for immediate hydration warnings**: Updated Ruby/TypeScript warning text and related docs to state that `railsContext.rorPro` indicates Pro gem installation (not license validity), and renamed `immediate_hydration_pro_license_warning` to `immediate_hydration_pro_install_warning` (no backward-compatible alias needed since the method had no external callers). [PR 2590](https://github.com/shakacode/react_on_rails/pull/2590) by [justin808](https://github.com/justin808).
+
 #### Pro
 
 ##### Added

@@ -75,13 +75,16 @@ heroku config:set REACT_ON_RAILS_PRO_LICENSE="your_token"
 Configure your license token via the `REACT_ON_RAILS_PRO_LICENSE` environment variable.
 Never commit license tokens to version control.
 
-## License Validation
+## License Validation and Signals
 
-The license is validated at multiple points:
+License-related checks and signals occur at multiple points:
 
 1. **Ruby Gem**: When Rails application starts
 2. **Node Renderer**: When the Node renderer process starts
-3. **Browser Package**: Trusts server-side validation (via `railsContext.rorPro`)
+3. **Browser Package**: Receives Pro-installed signal via `railsContext.rorPro` (not license-valid state)
+
+The browser package does not perform independent license validation. A valid paid license is still required for
+production deployments.
 
 When no license is present, the application runs in **unlicensed mode**. This is fine for development, testing, and CI/CD. Production deployments should always have a valid paid license.
 
