@@ -16,7 +16,7 @@ module ReactOnRailsPro
     # TODO: Add a prepublish check to ensure this key matches the latest public key from the API.
     #       This should be implemented after publishing the API endpoint on the ShakaCode website.
     KEY = OpenSSL::PKey::RSA.new(<<~PEM.strip)
-            -----BEGIN PUBLIC KEY-----
+      -----BEGIN PUBLIC KEY-----
       MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzcS/fpHz5CbnTQxb4Zot
       khjzXu7xNS+Y9VKfapMaHOMzNoCMfy1++hxHJatRedr+YQfZRCjfiN168Cpe+dhe
       yfNtOoLU9/+/5jTsxH+WQJWNRswyKms5HNajlIMN1GEYdZmZbvOPaZvh6ENsT+EV

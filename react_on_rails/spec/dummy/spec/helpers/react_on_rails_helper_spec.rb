@@ -475,6 +475,22 @@ describe ReactOnRailsHelper do
     end
   end
 
+  describe "#server_render_js error serialization" do
+    it "guards renderingError message/stack access for non-Error throws" do
+      allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_wrap_original do |_m, js_code, _opts|
+        expect(js_code).to include("var errorMessage = String(renderingError);")
+        expect(js_code).to include("if ('message' in renderingError)")
+        expect(js_code).to include("if ('stack' in renderingError && renderingError.stack != null)")
+        {
+          "html" => "",
+          "consoleReplayScript" => ""
+        }
+      end
+
+      expect { server_render_js("(function() { throw null; })()") }.not_to raise_error
+    end
+  end
+
   describe "#redux_store" do
     subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
 

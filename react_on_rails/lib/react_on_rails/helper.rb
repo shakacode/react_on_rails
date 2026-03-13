@@ -231,9 +231,19 @@ module ReactOnRails
             htmlResult = ReactOnRails.handleError({e: e, name: null,
               jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
             hasErrors = true;
+            var errorMessage = String(renderingError);
+            var errorStack = null;
+            if (renderingError && typeof renderingError === 'object') {
+              if ('message' in renderingError) {
+                errorMessage = String(renderingError.message);
+              }
+              if ('stack' in renderingError && renderingError.stack != null) {
+                errorStack = String(renderingError.stack);
+              }
+            }
             renderingErrorObject = {
-              message: renderingError.message,
-              stack: renderingError.stack,
+              message: errorMessage,
+              stack: errorStack,
             }
           }
 
