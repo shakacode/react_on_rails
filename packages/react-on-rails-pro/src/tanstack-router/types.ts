@@ -31,14 +31,8 @@ export interface TanStackRouter {
   };
   dehydrate?: () => unknown;
   hydrate?: (data: unknown) => void;
-  options?: {
-    hydrate?: (dehydratedData: unknown) => Promise<unknown> | unknown;
-  };
-  // TanStack Router's Transitioner checks this field (truthiness only) to skip
-  // auto-loading on mount.  The canonical shape is { manifest?: unknown }.
-  // Set during client hydration to prevent a duplicate initial load that
-  // causes hydration mismatch.
-  ssr?: { manifest?: unknown };
+  // TanStack Router uses this internal field during SSR hydration.
+  ssr?: boolean | { manifest: unknown };
 }
 
 export interface TanStackHistory {

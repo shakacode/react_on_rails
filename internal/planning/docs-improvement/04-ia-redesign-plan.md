@@ -928,7 +928,7 @@ rm -rf docs/testimonials
 git checkout -b archive/outdated-docs
 git mv docs/outdated /
 git commit -m "Archive outdated docs"
-git checkout main
+git checkout master
 rm -rf docs/outdated
 ```
 
@@ -1141,7 +1141,7 @@ find docs -name "*.md" -exec markdown-link-check {} \;
 
 ```bash
 # Visit actual site
-open https://reactonrails.com/docs/
+open https://www.shakacode.com/react-on-rails/docs/
 
 # Check Google Search Console (after a few days)
 # - Are old URLs redirecting?

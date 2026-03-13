@@ -1,7 +1,5 @@
 # Shakapacker (Rails/Webpacker) React Integration Options
 
-> **Looking for a comparison of React on Rails with alternatives like Inertia.js, Hotwire, and react-rails?** See [Comparison with Alternatives](../getting-started/comparison-with-alternatives.md).
-
 You only _need_ props hydration if you need SSR. However, there's no good reason to
 have your app make a second round trip to the Rails server to get initialization props.
 
@@ -15,7 +13,7 @@ These gems provide advanced integration of React with [shakacode/shakapacker](ht
 | [react-rails](https://github.com/reactjs/react-rails)                   | ✅              | ✅                          |              |                       |                         |          |
 | [webpacker-react](https://github.com/renchap/webpacker-react)           | ✅              |                             |              |                       |                         |          |
 
-Note, Node SSR for React on Rails requires [React on Rails Pro](../../pro/react-on-rails-pro.md).
+Note, Node SSR for React on Rails requires [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/).
 
 ---
 
@@ -62,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 You may see a warning like this when building a Webpack bundle using any version of React below 18:
 
-```text
+```
 Module not found: Error: Can't resolve 'react-dom/client' in ....
 ```
 

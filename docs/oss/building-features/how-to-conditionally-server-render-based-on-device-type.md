@@ -31,7 +31,7 @@ end
 
 # Shown below are the defaults for configuration
 ReactOnRails.configure do |config|
-  # See https://reactonrails.com/docs/configuration/ for the rest
+  # See https://github.com/shakacode/react_on_rails/blob/master/docs/configuration/README.md for the rest
 
   # This allows you to add additional values to the Rails Context. Implement one static method
   # called `custom_context(view_context)` and return a Hash.
@@ -39,6 +39,6 @@ ReactOnRails.configure do |config|
 end
 ```
 
-Note, full details of the React on Rails configuration are [available here](../configuration/README.md).
+Note, full details of the React on Rails configuration are [available here](https://www.shakacode.com/react-on-rails/docs/configuration/).
 
 See the doc file [render-functions-and-railscontext.md](../core-concepts/render-functions-and-railscontext.md#rails-context) for how your client-side code uses the device information

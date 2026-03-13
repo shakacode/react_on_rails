@@ -8,7 +8,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 **Cause**: A compression middleware (`Rack::Deflater`, `Rack::Brotli`) is configured with an `:if` condition that calls `body.each` to check the response size. This destructively consumes streaming chunks from the `SizedQueue`, causing a deadlock.
 
-**Fix**: See the [Compression Middleware Compatibility](./streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
+**Fix**: See the "Compression Middleware Compatibility" section in the [Streaming Server Rendering guide](./streaming-server-rendering.md).
 
 ## Node Renderer
 
@@ -20,25 +20,17 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 - Verify the renderer is running: `curl http://localhost:3800/`
 - Check that `config.renderer_url` in `config/initializers/react_on_rails_pro.rb` matches the renderer's actual port
-- On Heroku, ensure the renderer is started via `Procfile.web` (see [Heroku deployment](../oss/building-features/node-renderer/heroku.md))
+- On Heroku, ensure the renderer is started via `Procfile.web` (see [Heroku deployment](./node-renderer/heroku.md))
 
 ### Workers crashing with memory leaks
 
-**Symptom**: Node renderer workers restart frequently or OOM. Memory grows monotonically over time.
+**Symptom**: Node renderer workers restart frequently or OOM.
 
-**Root cause**: The Node Renderer reuses V8 VM contexts across requests. Any module-level state in your server bundle (caches, Sets, memoized functions) persists across all requests and can grow unboundedly. This is the most common cause of OOM in the Node Renderer.
+**Fixes**:
 
-**Immediate mitigations**:
-
-- Set `NODE_OPTIONS=--max-old-space-size=<MB>` to cap V8 heap size and force more aggressive garbage collection
-- Enable rolling restarts with `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts` — these periodically kill and restart workers, reclaiming all accumulated memory
-
-**Investigation**:
-
-- Profile memory using `node --inspect` and heap snapshots (see [Profiling guide](./profiling-server-side-rendering-code.md))
-- Search your server bundle code for module-level `Map`, `Set`, `{}` caches, and `_.memoize` calls — these are the most common leak sources
-- Use `config.ssr_pre_hook_js` to run cleanup code before each render (e.g., clearing global state)
-- See the [Memory Leaks guide](./js-memory-leaks.md) for detailed patterns, an audit checklist, and fixes
+- Enable rolling restarts with `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts` — use high values to avoid all workers being down simultaneously
+- Profile memory using `node --inspect` (see [Profiling guide](./profiling-server-side-rendering-code.md))
+- Check for global state leaks and use `config.ssr_pre_hook_js` to clear them
 
 ### Workers killed during streaming
 
@@ -56,7 +48,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 - Verify Rails cache store is configured (not `:null_store`)
 - Check `cache_key` values — if they change every request, the cache will never hit
-- If your component depends on URL or locale, include those in the `cache_key` (see [Caching docs](../oss/building-features/caching.md))
+- If your component depends on URL or locale, include those in the `cache_key` (see [Caching docs](./caching.md))
 
 ### Stale cached content after deploy
 
@@ -72,10 +64,9 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 **Fixes**:
 
-- In production, ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set
-- Run `bundle exec rake react_on_rails_pro:verify_license` to check license status (use `FORMAT=json` for CI/CD)
+- Ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set
 - Check that the license key is not expired — contact [justin@shakacode.com](mailto:justin@shakacode.com) for renewal
-- For evaluation/non-production use, no license token is required — the app runs in unlicensed mode
+- For evaluation/non-production use, a free license is available at [shakacode.com/react-on-rails-pro](https://www.shakacode.com/react-on-rails-pro/)
 
 ## React Server Components
 

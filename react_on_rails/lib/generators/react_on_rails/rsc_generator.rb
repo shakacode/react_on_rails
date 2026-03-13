@@ -32,16 +32,6 @@ module ReactOnRails
                    default: false,
                    hide: true
 
-      class_option :new_app,
-                   type: :boolean,
-                   default: false,
-                   hide: true
-
-      class_option :redux,
-                   type: :boolean,
-                   default: false,
-                   hide: true
-
       def run_generator
         # When invoked by install_generator, skip prerequisites (parent already validated)
         if options[:invoked_by_install] || prerequisites_met?
@@ -90,9 +80,9 @@ module ReactOnRails
       end
 
       def add_rsc_npm_dependencies
-        say "📝 Adding RSC npm dependencies...", :yellow
+        puts Rainbow("📝 Adding RSC npm dependencies...").yellow
         add_rsc_dependencies
-        say "✅ RSC npm dependencies added", :green
+        puts Rainbow("✅ RSC npm dependencies added").green
       end
 
       def print_success_message
@@ -102,7 +92,7 @@ module ReactOnRails
           2. Visit http://localhost:3000/hello_server to see RSC in action
           3. The RSC bundle watcher will compile server components
 
-          Documentation: https://reactonrails.com/docs/pro/react-server-components/
+          Documentation: https://www.shakacode.com/react-on-rails-pro/docs/rsc/
         MSG
       end
     end

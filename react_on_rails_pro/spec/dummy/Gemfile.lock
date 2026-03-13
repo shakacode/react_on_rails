@@ -9,7 +9,7 @@ GIT
 PATH
   remote: ../../..
   specs:
-    react_on_rails (16.6.0.rc.0)
+    react_on_rails (16.4.0.rc.8)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -20,16 +20,16 @@ PATH
 PATH
   remote: ../..
   specs:
-    react_on_rails_pro (16.6.0.rc.0)
+    react_on_rails_pro (16.4.0.rc.8)
       addressable
-      async (>= 2.29)
+      async (>= 2.6)
       connection_pool
       execjs (~> 2.9)
       http-2 (>= 1.1.1)
       httpx (~> 1.5)
       jwt (~> 2.7)
       rainbow
-      react_on_rails (= 16.6.0.rc.0)
+      react_on_rails (= 16.4.0.rc.8)
 
 GEM
   remote: https://rubygems.org/
@@ -227,7 +227,7 @@ GEM
       rb-fsevent (~> 0.10, >= 0.10.3)
       rb-inotify (~> 0.9, >= 0.9.10)
     logger (1.7.0)
-    loofah (2.25.1)
+    loofah (2.25.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
     mail (2.9.0)
@@ -260,24 +260,24 @@ GEM
     net-smtp (0.5.1)
       net-protocol
     nio4r (2.7.5)
-    nokogiri (1.19.2)
+    nokogiri (1.19.1)
       mini_portile2 (~> 2.8.2)
       racc (~> 1.4)
-    nokogiri (1.19.2-aarch64-linux-gnu)
+    nokogiri (1.19.1-aarch64-linux-gnu)
       racc (~> 1.4)
-    nokogiri (1.19.2-aarch64-linux-musl)
+    nokogiri (1.19.1-aarch64-linux-musl)
       racc (~> 1.4)
-    nokogiri (1.19.2-arm-linux-gnu)
+    nokogiri (1.19.1-arm-linux-gnu)
       racc (~> 1.4)
-    nokogiri (1.19.2-arm-linux-musl)
+    nokogiri (1.19.1-arm-linux-musl)
       racc (~> 1.4)
-    nokogiri (1.19.2-arm64-darwin)
+    nokogiri (1.19.1-arm64-darwin)
       racc (~> 1.4)
-    nokogiri (1.19.2-x86_64-darwin)
+    nokogiri (1.19.1-x86_64-darwin)
       racc (~> 1.4)
-    nokogiri (1.19.2-x86_64-linux-gnu)
+    nokogiri (1.19.1-x86_64-linux-gnu)
       racc (~> 1.4)
-    nokogiri (1.19.2-x86_64-linux-musl)
+    nokogiri (1.19.1-x86_64-linux-musl)
       racc (~> 1.4)
     package_json (0.2.0)
     parallel (1.27.0)
@@ -470,18 +470,14 @@ GEM
       actionpack (>= 6.1)
       activesupport (>= 6.1)
       sprockets (>= 3.0.0)
-    sqlite3 (2.9.2)
+    sqlite3 (1.7.3)
       mini_portile2 (~> 2.8.0)
-    sqlite3 (2.9.2-aarch64-linux-gnu)
-    sqlite3 (2.9.2-aarch64-linux-musl)
-    sqlite3 (2.9.2-arm-linux-gnu)
-    sqlite3 (2.9.2-arm-linux-musl)
-    sqlite3 (2.9.2-arm64-darwin)
-    sqlite3 (2.9.2-x86-linux-gnu)
-    sqlite3 (2.9.2-x86-linux-musl)
-    sqlite3 (2.9.2-x86_64-darwin)
-    sqlite3 (2.9.2-x86_64-linux-gnu)
-    sqlite3 (2.9.2-x86_64-linux-musl)
+    sqlite3 (1.7.3-aarch64-linux)
+    sqlite3 (1.7.3-arm-linux)
+    sqlite3 (1.7.3-arm64-darwin)
+    sqlite3 (1.7.3-x86-linux)
+    sqlite3 (1.7.3-x86_64-darwin)
+    sqlite3 (1.7.3-x86_64-linux)
     stringio (3.2.0)
     sync (0.5.0)
     term-ansicolor (1.10.2)
@@ -589,7 +585,7 @@ DEPENDENCIES
   spring
   spring-watcher-listen
   sprockets
-  sqlite3 (~> 2.0)
+  sqlite3 (~> 1.4)
   turbolinks
   web-console
   webdrivers (= 5.3.0)

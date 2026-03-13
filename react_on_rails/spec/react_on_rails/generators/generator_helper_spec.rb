@@ -5,68 +5,7 @@ require_relative "../support/generator_spec_helper"
 RSpec.describe GeneratorHelper, type: :generator do
   include described_class
 
-  # The module is exercised in isolation here (without Thor::Shell),
-  # so provide minimal shell methods used by generator helpers.
-  def say(message = "", color = nil, force_new_line = nil)
-    say_calls << { message: message, color: color, force_new_line: force_new_line }
-  end
-
-  def say_calls
-    @say_calls ||= []
-  end
-
-  def say_status(status, message, log_status = nil)
-    say_status_calls << { status: status, message: message, log_status: log_status }
-  end
-
-  def say_status_calls
-    @say_status_calls ||= []
-  end
-
-  def shell
-    @shell ||= Thor::Shell::Color.new
-  end
-
-  # GeneratorHelper methods expect an options hash as provided by Thor generators.
-  def options
-    @options ||= {}
-  end
-
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
-
-  describe "#print_generator_messages" do
-    before do
-      GeneratorMessages.clear
-      say_calls.clear
-      say_status_calls.clear
-    end
-
-    after do
-      GeneratorMessages.clear
-      say_calls.clear
-      say_status_calls.clear
-    end
-
-    it "strips ANSI escape sequences when no_color is enabled" do
-      allow(self).to receive(:shell).and_return(Thor::Shell::Basic.new)
-      GeneratorMessages.add_warning("Needs attention")
-
-      print_generator_messages
-
-      expect(say_calls.first[:message]).to eq("WARNING: Needs attention")
-      expect(say_calls.first[:message]).not_to match(/\e\[/)
-    end
-
-    it "keeps ANSI escape sequences when no_color is disabled" do
-      allow(self).to receive(:shell).and_return(Thor::Shell::Color.new)
-      GeneratorMessages.add_warning("Needs attention")
-      raw_message = GeneratorMessages.messages.first.to_s
-
-      print_generator_messages
-
-      expect(say_calls.first[:message].to_s).to eq(raw_message)
-    end
-  end
 
   describe "#add_npm_dependencies" do
     context "when package_json gem is available" do
@@ -128,15 +67,14 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
 
       context "when package_json gem raises an error" do
-        it "returns false and logs warnings via say_status" do
+        it "returns false and prints a warning" do
           packages = ["react"]
 
           allow(mock_manager).to receive(:add).and_raise(StandardError, "Installation failed")
+          expect { add_npm_dependencies(packages) }.to output(/Warning: Could not add packages/).to_stdout
 
           result = add_npm_dependencies(packages)
           expect(result).to be false
-          expect(say_status_calls).to include(a_hash_including(message: a_string_matching(/Could not add packages/)))
-          expect(say_status_calls).to include(a_hash_including(message: "Will fall back to direct npm commands."))
         end
       end
     end
@@ -189,16 +127,9 @@ RSpec.describe GeneratorHelper, type: :generator do
         end)
       end
 
-      it "returns nil and logs warnings via say_status" do
-        result = package_json
-
-        expect(result).to be_nil
-        expect(say_status_calls).to include(
-          a_hash_including(message: a_string_matching(/Could not read package\.json/))
-        )
-        expect(say_status_calls).to include(
-          a_hash_including(message: "This is normal before Shakapacker creates the package.json file.")
-        )
+      it "returns nil and prints a warning" do
+        expect { package_json }.to output(/Warning: Could not read package\.json/).to_stdout
+        expect(package_json).to be_nil
       end
     end
   end
@@ -369,45 +300,6 @@ RSpec.describe GeneratorHelper, type: :generator do
           expect(using_swc?).to be true
         end
       end
-    end
-  end
-
-  describe "#root_route_present?" do
-    let(:routes_path) { File.join(destination_root, "config/routes.rb") }
-
-    before do
-      FileUtils.mkdir_p(File.dirname(routes_path))
-    end
-
-    after do
-      FileUtils.rm_rf(File.join(destination_root, "config"))
-    end
-
-    it "returns false when routes.rb is missing" do
-      FileUtils.rm_f(routes_path)
-
-      expect(root_route_present?).to be(false)
-    end
-
-    it "returns false when routes.rb has no root route" do
-      File.write(routes_path, <<~RUBY)
-        Rails.application.routes.draw do
-          get "about", to: "pages#about"
-        end
-      RUBY
-
-      expect(root_route_present?).to be(false)
-    end
-
-    it "ignores commented root lines and matches active root routes" do
-      File.write(routes_path, <<~RUBY)
-        Rails.application.routes.draw do
-          # root to: "ignored#comment"
-          root to: "home#index"
-        end
-      RUBY
-
-      expect(root_route_present?).to be(true)
     end
   end
 end

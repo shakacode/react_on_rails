@@ -5,7 +5,7 @@
 
 ## Need Help Migrating?
 
-If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information about our [React on Rails Pro Support](../../pro/react-on-rails-pro.md).
+If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information about our [React on Rails Pro Support](https://www.shakacode.com/react-on-rails-pro).
 
 We specialize in helping companies to quickly and efficiently upgrade. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4+ for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 
@@ -23,26 +23,6 @@ rails generate react_on_rails:install
 - webpack configurations
 - `shakapacker.yml` settings
 - other configuration files
-
-## Upgrade Preflight
-
-Before changing versions, check these first:
-
-1. **Ruby and Node requirements**: React on Rails v16 requires Ruby 3.0+ and Node 18+.
-2. **Bundler age**: legacy apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
-3. **Rails version**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 apps need a Rails upgrade before they can bundle v16.
-4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.
-5. **Version pinning**: use exact gem and npm package versions for React on Rails-related packages. Avoid `^`, `~`, or `*`.
-
-If your app is both Ruby/Bundler-old and Webpacker-old, do those upgrades first. Trying to jump directly from a Rails 5 / Webpacker 3 / Bundler 1 stack to current React on Rails is usually more than one migration.
-
-If the first failure is a Bundler 1.x lockfile, refresh that lockfile with Bundler 2.x before changing React on Rails:
-
-```bash
-gem install bundler   # if Bundler 2.x is not already available
-bundle lock --update
-bundle install
-```
 
 ## Upgrading Precompile Hooks for SSR + HMR
 
@@ -85,26 +65,6 @@ Use a script-based hook with an explicit self-guard. This pattern is reliable ac
 
 In CI, run precompile preparation explicitly once before webpack compilation or test startup, rather than relying on hook timing in watch-like flows.
 
-## Upgrading to v16.4.0 (from v16.3.x)
-
-This release includes major generator improvements, development workflow enhancements, and Pro stability fixes. See the [v16.4.0 Release Notes](release-notes/16.4.0.md) for full details.
-
-**Key actions required:**
-
-1. **Update gem and npm package versions** to 16.4.0
-2. **Pro users: remove legacy license key file** — `config/react_on_rails_pro_license.key` is no longer read. Move the token to the `REACT_ON_RAILS_PRO_LICENSE` environment variable
-3. **Pro RSC users: check `custom_rsc_payload_template` overrides** — the template is now rendered with `formats: [:text]`. If your override is `.html.erb`, rename it to `.text.erb`
-4. **Pro users upgrading from 3.x:** See the [Pro Upgrade Guide](../../pro/updating.md) for package rename steps, changed defaults, and version alignment notes
-
-## Upgrading to v16.3.0 (from v16.2.x)
-
-This is a minor release. Update your gem and npm package versions, then run `bundle install` and your package manager's install command. See the [v16.3.0 Release Notes](release-notes/16.3.0.md) for details.
-
-**Key changes:**
-
-1. **Simplified Shakapacker version handling** — obsolete minimum version checks removed
-2. **Pro license model changed** — Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments
-
 ## Upgrading to v16.2.x (from v16.1.x)
 
 This release focuses on clear separation between open-source and Pro features. See the [v16.2.x Release Notes](release-notes/16.2.0.md) for full details.
@@ -136,18 +96,16 @@ This is a minor release - update your gem and npm package versions, then run `bu
 
 1. **Update Dependencies**
 
-   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest stable release and substitute accordingly.
-
    ```ruby
    # Gemfile
-   gem "react_on_rails", "16.4.0"
+   gem "react_on_rails", "~> 16.0"
    ```
 
    ```json
-   // package.json — use the npm equivalent of the same release
+   // package.json
    {
      "dependencies": {
-       "react-on-rails": "16.4.0"
+       "react-on-rails": "^16.0.0"
      }
    }
    ```
@@ -155,19 +113,17 @@ This is a minor release - update your gem and npm package versions, then run `bu
 2. **Install Updates**
 
    ```bash
-   bundle update react_on_rails shakapacker
-   # then run your package manager's install command
-   npm install   # or: yarn install / pnpm install
+   bundle update react_on_rails
+   npm install
    ```
 
 3. **Run Generator**
 
    ```bash
-   bundle exec rails generate react_on_rails:install
+   rails generate react_on_rails:install
    ```
 
 4. **Review and Apply Changes**
-   - If your app was still on `webpacker`, finish that migration first
    - Check webpack configuration exports (function naming may have changed)
    - Review `shakapacker.yml` settings
    - Update `bin/dev` if needed
@@ -260,7 +216,7 @@ Registered Objects are of the following type:
 
 2. **Function that takes only zero or one params and returns an Object (_not a React Element_)**. If the function takes zero or one params, **you need to add one or two unused params so you have exactly 2 params** and then that function will be treated as a render function and it can return an Object rather than a React element. If you don't do this, you'll see this obscure error message:
 
-```text
+```
   [SERVER] message: Objects are not valid as a React child (found: object with keys {renderedHtml}). If you meant to render a collection of children, use an array instead.
   in YourComponentRenderFunction
 ```
@@ -382,7 +338,7 @@ Reason for doing this: This enables your Webpack bundles to bypass the Rails ass
 
 - You'll need the following code to read data from the webpacker config:
 
-```javascript
+```
 const path = require('path');
 const ManifestPlugin = require('webpack-manifest-plugin'); // we'll use this later
 
@@ -393,7 +349,7 @@ const { output } = webpackConfigLoader(configPath);
 
 - That output variable will be used for Webpack's `output` rules:
 
-```javascript
+```
   output: {
     filename: '[name]-[chunkhash].js', // [chunkhash] because we've got to do our own cache-busting now
     path: output.path,
@@ -403,7 +359,7 @@ const { output } = webpackConfigLoader(configPath);
 
 - ...as well as for the output of plugins like `webpack-manifest-plugin`:
 
-```javascript
+```
 
       new ManifestPlugin({
         publicPath: output.publicPath,
@@ -463,7 +419,7 @@ gem "webpacker"
 - Edit your Webpack.config files:
   - Change your Webpack output to be like this. **Be sure to have the hash or chunkhash in the filename,** unless the bundle is server side.:
 
-    ```javascript
+    ```
     const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
     const configPath = resolve('..', 'config');
     const { output, settings } = webpackConfigLoader(configPath);
@@ -481,7 +437,7 @@ gem "webpacker"
 
   - Change your ManifestPlugin definition to something like the following
 
-    ```javascript
+    ```
     new ManifestPlugin({
         publicPath: output.publicPath,
         writeToFileEmit: true
@@ -494,15 +450,15 @@ gem "webpacker"
   - If you are not using the webpacker Webpack setup, be sure to put in `compile: false` in the `default` section.
   - Alternately, if you are updating from webpacker_lite, you can manually change these:
   - Add a default setting
-    ```yaml
+    ```
     cache_manifest: false
     ```
   - For production, set:
-    ```yaml
+    ```
     cache_manifest: true
     ```
   - Add a section like this under your development env:
-    ```yaml
+    ```
     dev_server:
       host: localhost
       port: 3035

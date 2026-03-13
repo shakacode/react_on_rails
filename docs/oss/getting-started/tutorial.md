@@ -40,7 +40,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
     - [Moving from the Rails default `/app/javascript` to the recommended `/client` structure](#moving-from-the-rails-default-appjavascript-to-the-recommended-client-structure)
     - [Custom IP & PORT setup (Cloud9 example)](#custom-ip--port-setup-cloud9-example)
     - [RubyMine performance tip](#rubymine-performance-tip)
-- [What's Next?](#whats-next)
+- [Conclusion](#conclusion)
 
 ## Installation
 
@@ -95,7 +95,7 @@ bundle exec rails shakapacker:install
 Commit all the changes so far to avoid getting errors in the next step.
 
 ```bash
-git add . && git commit -m "Initial commit"
+git commit -am "Initial commit"
 ```
 
 Alternatively, you can use `--ignore-warnings` in the next step.
@@ -122,7 +122,7 @@ If you prefer to use React Hooks instead of Redux, run the basic installer witho
 
 Add the following variable to your environment:
 
-```text
+```
 EXECJS_RUNTIME=Node
 ```
 
@@ -252,13 +252,10 @@ It's super important to exclude certain directories from RubyMine or else it wil
 - Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test` (kept separate so test and development manifests do not overwrite each other)
 - `node_modules`
 
-## What's Next?
+## Conclusion
 
-Now that you have React on Rails running, here are ways to level up:
+- Browse the docs on [our documentation website](https://www.shakacode.com/react-on-rails/docs/)
 
-- **Add server-side rendering** — [SSR guide](../core-concepts/react-server-rendering.md)
-- **See the feature comparison** — [OSS vs Pro](./oss-vs-pro.md)
-- **Upgrade to Pro** for React Server Components, streaming SSR, and 3-10x faster SSR — [3-step upgrade guide](../../pro/upgrading-to-pro.md)
-- **Explore the full docs** — [Documentation index](../../README.md)
+Feedback is greatly appreciated! As are stars on github!
 
-Feedback is greatly appreciated! As are stars on GitHub. If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
+If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com). We offer [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) and consulting so you can focus on your app and not on how to make Webpack plus Rails work optimally.

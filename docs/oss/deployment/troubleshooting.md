@@ -35,15 +35,15 @@ bin/rails generate react_on_rails:install
 
 **Why:** The generator needs clean git state to show you exactly what it changed.
 
-### "Node or package manager not found"
+### "Node/Yarn not found"
 
-**Error:** `Node.js not found`, `npm executable was not detected`, or `Yarn executable was not detected`
+**Error:** `Yarn executable was not detected` or `Node.js not found`
 
 **Solution:**
 
-- Install Node.js 18+ from [nodejs.org](https://nodejs.org)
-- Use the bundled `npm`, or install another package manager such as `pnpm`, `yarn`, or `bun`
-- On macOS, for example: `brew install node pnpm`
+- Install Node.js 20+ from [nodejs.org](https://nodejs.org)
+- Install Yarn: `npm install -g yarn`
+- Or use system package manager: `brew install node yarn`
 
 ## 🔧 Build Issues
 
@@ -54,10 +54,8 @@ bin/rails generate react_on_rails:install
 **Solution:**
 
 ```bash
-# Make sure the npm package is installed
-pnpm add react-on-rails
-# or: npm install react-on-rails --save
-# or: yarn add react-on-rails
+# Make sure the NPM package is installed
+yarn add react-on-rails
 
 # If using local development with yalc
 cd react_on_rails/
@@ -443,8 +441,6 @@ console.log('Client render time:', new Date());
 
 ## 🛠️ Advanced Debugging
 
-For a comprehensive debugging guide covering SSR issues, hydration mismatches, and log analysis, see the [Debugging Guide](../building-features/debugging.md).
-
 ### Enable verbose logging
 
 ```ruby
@@ -466,7 +462,7 @@ bin/webpack --config-dump
 
 ```javascript
 // In browser console
-console.log(ReactOnRails.registeredComponents());
+console.log(ReactOnRails.getComponents());
 ```
 
 ## 🆘 Still Stuck?
@@ -484,12 +480,12 @@ console.log(ReactOnRails.registeredComponents());
 
 - **[GitHub Issues](https://github.com/shakacode/react_on_rails/issues)** - Bug reports and feature requests
 - **[GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)** - Questions and help
-- **[React + Rails Slack](https://invite.reactrails.com)** - Real-time community support
+- **[React + Rails Slack](https://reactrails.slack.com)** - Real-time community support
 
 ### Professional support
 
 - **[ShakaCode](https://www.shakacode.com)** offers consulting and support services
-- **[React on Rails Pro](../../pro/react-on-rails-pro.md)** includes priority support
+- **[React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)** includes priority support
 
 ---
 

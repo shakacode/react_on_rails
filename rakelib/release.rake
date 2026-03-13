@@ -208,21 +208,10 @@ def compute_target_gem_version(current_gem_version:, version_input:)
   version = parse_gem_version_components(current_gem_version)
   case version_input.to_s.strip.downcase
   when "patch"
-    if version[:prerelease_type]
-      # Pre-release → stable: strip the pre-release suffix (e.g., 16.5.0.rc.0 → 16.5.0).
-      # This matches `gem bump --version patch` behavior from the gem-release gem.
-      "#{version[:major]}.#{version[:minor]}.#{version[:patch]}"
-    else
-      "#{version[:major]}.#{version[:minor]}.#{version[:patch] + 1}"
-    end
+    "#{version[:major]}.#{version[:minor]}.#{version[:patch] + 1}"
   when "minor"
-    # NOTE: From a pre-release (e.g., 16.5.0.rc.0), this produces 16.6.0, not 16.5.0.
-    # To promote a pre-release to its stable version, use "patch" instead.
-    # This matches `gem bump --version minor` behavior from the gem-release gem.
     "#{version[:major]}.#{version[:minor] + 1}.0"
   when "major"
-    # NOTE: From a pre-release (e.g., 16.5.0.rc.0), this produces 17.0.0.
-    # To promote a pre-release to its stable version, use "patch" instead.
     "#{version[:major] + 1}.0.0"
   else
     abort "❌ Unsupported semver bump keyword #{version_input.inspect}"
@@ -301,10 +290,7 @@ def extract_changelog_section(changelog_path:, version:)
 
   end_index = ((start_index + 1)...lines.length).find { |idx| lines[idx].start_with?("### [") } || lines.length
   # Skip the version header line itself; GitHub release title already contains the version.
-  content = lines[(start_index + 1)...end_index].join.strip
-  return nil if content.empty?
-
-  content
+  lines[(start_index + 1)...end_index].join.strip
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
@@ -395,26 +381,16 @@ def extract_latest_changelog_version(monorepo_root:)
   nil
 end
 
-def confirm_release!(version:, monorepo_root:)
+def warn_changelog_missing(monorepo_root:, version:)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
-  has_changelog = extract_changelog_section(changelog_path: changelog_path, version: version)
+  section = extract_changelog_section(changelog_path: changelog_path, version: version)
+  return if section
 
-  puts ""
   puts "################################################################################"
-  puts "RELEASE CONFIRMATION"
+  puts "WARNING: No CHANGELOG.md section found for #{version}."
+  puts "Consider running /update-changelog to add entries before releasing."
+  puts "sync_github_release will fail without a matching changelog section."
   puts "################################################################################"
-  puts "  Version:   #{version}"
-  if has_changelog
-    puts "  Changelog: ✓ section found"
-  else
-    puts "  Changelog: ✗ MISSING — no GitHub release will be created"
-    puts "             Run /update-changelog to add entries before releasing."
-  end
-  puts "################################################################################"
-  print "Proceed with release? [y/N] "
-  $stdout.flush
-  answer = $stdin.gets&.strip&.downcase
-  abort "Release aborted." unless answer == "y"
 end
 
 def changelog_dirty?(monorepo_root:)
@@ -534,11 +510,6 @@ def with_release_checkout(monorepo_root:, dry_run:)
   end
 end
 
-def version_tagged?(monorepo_root, version)
-  tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags: true)
-  tagged_versions.include?(version)
-end
-
 def resolve_version_input(version_input, monorepo_root)
   stripped = version_input.to_s.strip
   return stripped unless stripped.empty?
@@ -548,16 +519,6 @@ def resolve_version_input(version_input, monorepo_root)
 
   if changelog_version && Gem::Version.new(changelog_version) > Gem::Version.new(current_version)
     puts "Found CHANGELOG.md version: #{changelog_version} (current: #{current_version})"
-    return changelog_version
-  end
-
-  # If the latest changelog version matches the current version but hasn't been
-  # tagged yet, use it. This handles the case where the changelog was updated
-  # and the version bumped in a prior step (e.g., RC → stable promotion).
-  if changelog_version &&
-     Gem::Version.new(changelog_version) == Gem::Version.new(current_version) &&
-     !version_tagged?(monorepo_root, changelog_version)
-    puts "Found untagged CHANGELOG.md version: #{changelog_version} (current: #{current_version})"
     return changelog_version
   end
 
@@ -658,7 +619,7 @@ Version argument can be:
   - Pre-release version: '16.2.0.beta.1' (rubygem format with dots, converted to 16.2.0-beta.1 for NPM)
 
 Note: Pre-release versions (containing .test., .beta., .alpha., .rc., or .pre.) automatically
-skip git branch checks, allowing releases from non-main branches.
+skip git branch checks, allowing releases from non-master branches.
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
@@ -736,28 +697,27 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
     )
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
 
-    unless is_prerelease || current_branch == "main"
+    unless is_prerelease || current_branch == "master"
       abort <<~ERROR
-        ❌ Release must be run from the main branch!
+        ❌ Release must be run from the master branch!
 
         Current branch: #{current_branch}
 
-        To release a stable version, please switch to main:
-          git checkout main && git pull --rebase
+        To release a stable version, please switch to master:
+          git checkout master && git pull --rebase
 
         For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
           rake release[#{resolved_target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]
       ERROR
     end
 
+    warn_changelog_missing(monorepo_root: release_root, version: resolved_target_gem_version)
     validate_release_version_policy!(
       monorepo_root: release_root,
       target_gem_version: resolved_target_gem_version,
       allow_override: allow_version_policy_override,
       fetch_tags: true
     )
-
-    confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run
 
     # Having generated examples in-tree can interfere with publishing.
     sh_in_dir_for_release(release_root, "rm -rf gen-examples/examples")

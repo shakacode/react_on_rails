@@ -6,8 +6,8 @@
 accept = ["200", "301", "308"]
 
 # Retry failed requests (handles transient 502/503/504/429 errors)
-max_retries = 6
-retry_wait_time = 20
+max_retries = 4
+retry_wait_time = 15
 
 # Timeout for each request
 timeout = 20
@@ -63,9 +63,6 @@ exclude = [
   '^https://redux\.js\.org/?$',            # Intermittent connection resets from CI
   '^https://angularjs\.org/?$',            # Connection failed from CI
   '^https://frigade\.com/blog/bundle-size-reduction-with-rsc-and-frigade/?$', # Connection failed from CI
-  '^https://tanstack\.com/router',           # Connection failed from CI
-  '^https://lodash\.com',                    # Connection reset from CI
-  '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE
@@ -85,8 +82,6 @@ exclude = [
   '^https://(www\.)?estately\.com', # Returns 403
   '^https://hiring\.careerbuilder\.com',  # Returns 403
   '^https://(www\.)?yourmechanic\.com',  # Returns 403/503
-  '^https?://(www\.)?hvmn\.com',  # Returns 503 from CI
-  '^https://(www\.)?hawaiichee\.com/?$', # Intermittent 500 from CI
 
   # ============================================================================
   # EXTERNAL SITES THAT TIMEOUT DURING CI CHECKS
@@ -95,8 +90,6 @@ exclude = [
   '^https?://(www\.)?undeveloped\.com',  # Timeout in CI
   '^https://devchat\.tv',  # Ruby Rogues podcast - times out in CI
   '^https?://chlg\.co',  # URL shortener - times out in CI
-  '^https?://contributor-covenant\.org',  # Timeout in CI
-  '^https://www\.diva-portal\.org/smash/get/diva2:1903931/FULLTEXT01\.pdf$',  # Intermittent timeout in CI
 
   # ============================================================================
   # CHANGELOG COMPARE LINKS
@@ -108,7 +101,7 @@ exclude = [
   '^https://github\.com/shakacode/react_on_rails/compare/',
 
   # ============================================================================
-  # DELETED GITHUB USER ACCOUNTS (return 502/404 from CI)
+  # DELETED GITHUB USER ACCOUNTS
   # ============================================================================
   # Contributors whose accounts no longer exist
   '^https://github\.com/(alleycat-at-git|Conturbo|jblasco3|nostophilia|railsme|samphilipd|wouldntsavezion)$',

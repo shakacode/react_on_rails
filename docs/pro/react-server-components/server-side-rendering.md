@@ -22,13 +22,13 @@ Update the `react_server_component_without_ssr.html.erb` view to pass `prerender
 
 Now, when you visit the page, you should see part of the React Server Component page rendered in the browser. Then, we get the error:
 
-```text
+```
 The server did not finish this Suspense boundary: The server used "renderToString" which does not support Suspense. If you intended for this Suspense boundary to render the fallback content on the server consider throwing an Error somewhere within the Suspense boundary. If you intended to have the server wait for the suspended component please switch to "renderToPipeableStream" which supports Suspense on the server
 ```
 
 This error occurs because the `react_component` helper uses React's `renderToString` function, which renders the React page synchronously in a single pass. This approach isn't suitable for React Server Components, which can contain asynchronous operations and need progressive streaming of content.
 
-Instead, we need to use the streaming capabilities provided by React on Rails Pro, as detailed in the [Streaming SSR guide](../streaming-ssr.md). These helpers internally use React's `renderToPipeableStream` API, which supports:
+Instead, we need to use the streaming capabilities provided by React on Rails Pro, as detailed in the [streaming server rendering documentation](../streaming-server-rendering.md). These helpers internally use React's `renderToPipeableStream` API, which supports:
 
 1. Server-side rendering of async components
 2. Progressive streaming of HTML chunks to the client as components finish rendering

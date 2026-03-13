@@ -1,11 +1,8 @@
 name: Check Markdown Links
 
-permissions:
-  contents: read
-
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - '**.md'
       - '.github/workflows/check-markdown-links.yml'

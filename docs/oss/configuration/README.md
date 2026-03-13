@@ -2,14 +2,7 @@
 
 This document describes all configuration options for React on Rails. Configuration is done in `/config/initializers/react_on_rails.rb`.
 
-> [!NOTE]
-> **Summary for AI agents:** Use this page for OSS configuration options. Most apps only need 2-3 settings. For Pro-specific options (Node renderer, fragment caching, prerender caching, streaming SSR), see [Pro configuration](./configuration-pro.md).
-
-> **Good News!** Most applications only need 2-3 configuration options. React on Rails provides sensible defaults for everything else.
-
-:::tip Pro Configuration
-React on Rails Pro adds additional configuration options for the Node renderer, fragment caching, prerender caching, and streaming SSR. See [Pro configuration options](./configuration-pro.md) for the full reference.
-:::
+> **💡 Good News!** Most applications only need 2-3 configuration options. React on Rails provides sensible defaults for everything else.
 
 ## Quick Start
 
@@ -110,7 +103,7 @@ ReactOnRails.configure do |config|
   #
   # React Server Components and Streaming SSR are React on Rails Pro features.
   # For detailed configuration of RSC and streaming features, see:
-  # See docs/oss/configuration/configuration-pro.md for complete Pro configuration reference
+  # https://github.com/shakacode/react_on_rails/blob/master/docs/pro/configuration.md
   #
   # Key Pro configurations (configured in ReactOnRailsPro.configure block):
   # - rsc_bundle_js_file: Path to RSC bundle
@@ -298,7 +291,7 @@ ReactOnRails.configure do |config|
   # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
   # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
   # Migration: `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
-  # See [16.0.0 Release Notes](../upgrading/release-notes/16.0.0.md) for more details.
+  # See [16.0.0 Release Notes](docs/release-notes/16.0.0.md) for more details.
   # config.defer_generated_component_packs = false
 
   ################################################################################
@@ -995,8 +988,8 @@ Access methods:
 
 ## Need Help?
 
-- **Documentation:** [React on Rails Guides](https://reactonrails.com/docs/)
-- **Pro Features:** [React on Rails Pro](../../pro/react-on-rails-pro.md)
+- **Documentation:** [React on Rails Guides](https://www.shakacode.com/react-on-rails/docs/)
+- **Pro Features:** [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)
 - **Support:** [ShakaCode Forum](https://forum.shakacode.com/)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)
 

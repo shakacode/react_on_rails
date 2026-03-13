@@ -190,15 +190,13 @@ module ReactOnRails
 
                                "react-on-rails@#{npm_version}"
                              else
-                               say_status :warning,
-                                          "Unrecognized version format #{ReactOnRails::VERSION}. " \
-                                          "Adding the latest react-on-rails NPM module. " \
-                                          "Double check this is correct in package.json",
-                                          :yellow
+                               puts "WARNING: Unrecognized version format #{ReactOnRails::VERSION}. " \
+                                    "Adding the latest react-on-rails NPM module. " \
+                                    "Double check this is correct in package.json"
                                "react-on-rails"
                              end
 
-        say "Installing React on Rails package..."
+        puts "Installing React on Rails package..."
         return if add_package(react_on_rails_pkg)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -217,7 +215,7 @@ module ReactOnRails
       end
 
       def add_react_dependencies
-        say "Installing React dependencies..."
+        puts "Installing React dependencies..."
 
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
         # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
@@ -245,7 +243,7 @@ module ReactOnRails
       end
 
       def add_css_dependencies
-        say "Installing CSS handling dependencies..."
+        puts "Installing CSS handling dependencies..."
         return if add_packages(CSS_DEPENDENCIES)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -264,7 +262,7 @@ module ReactOnRails
       end
 
       def add_rspack_dependencies
-        say "Installing Rspack core dependencies..."
+        puts "Installing Rspack core dependencies..."
         return if add_packages(RSPACK_DEPENDENCIES)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -283,7 +281,7 @@ module ReactOnRails
       end
 
       def add_swc_dependencies
-        say "Installing SWC transpiler dependencies (20x faster than Babel)..."
+        puts "Installing SWC transpiler dependencies (20x faster than Babel)..."
         return if add_packages(SWC_DEPENDENCIES, dev: true)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -303,8 +301,8 @@ module ReactOnRails
       end
 
       def add_babel_react_dependencies
-        say "Installing Babel React preset dependency..."
-        return true if add_packages(BABEL_REACT_DEPENDENCIES, dev: true)
+        puts "Installing Babel React preset dependency..."
+        return if add_packages(BABEL_REACT_DEPENDENCIES, dev: true)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add Babel React preset dependency.
@@ -324,7 +322,7 @@ module ReactOnRails
       end
 
       def add_typescript_dependencies
-        say "Installing TypeScript dependencies..."
+        puts "Installing TypeScript dependencies..."
         return if add_packages(TYPESCRIPT_DEPENDENCIES, dev: true)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -343,7 +341,7 @@ module ReactOnRails
       end
 
       def add_pro_dependencies
-        say "Installing React on Rails Pro dependencies..."
+        puts "Installing React on Rails Pro dependencies..."
 
         # When upgrading from base React on Rails to Pro, remove the base package first
         # Pro package includes all base functionality, so having both causes validation errors
@@ -381,29 +379,13 @@ module ReactOnRails
         npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
         PRO_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }
       rescue StandardError
-        say_status :warning, "Could not determine Pro package version. Installing latest.", :yellow
+        puts "WARNING: Could not determine Pro package version. Installing latest."
         PRO_DEPENDENCIES
       end
 
       def add_rsc_dependencies
-        say "Installing React Server Components dependencies..."
-        rsc_packages, used_version_pins = rsc_packages_with_version
-        return if add_packages(rsc_packages)
-
-        manual_install_packages = rsc_packages
-        if used_version_pins
-          warning_msg = "Could not install version-pinned RSC dependency. Retrying latest available package."
-          say_status :warning,
-                     warning_msg,
-                     :yellow
-          GeneratorMessages.add_warning(
-            "Warning: #{warning_msg} " \
-            "The installed react-on-rails-rsc version may not match the expected compatibility pin."
-          )
-          return if add_packages(RSC_DEPENDENCIES)
-
-          manual_install_packages = RSC_DEPENDENCIES
-        end
+        puts "Installing React Server Components dependencies..."
+        return if add_packages(RSC_DEPENDENCIES)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add React Server Components dependencies.
@@ -433,9 +415,9 @@ module ReactOnRails
         dependencies = pj.fetch("dependencies", {})
         return unless dependencies.key?("react-on-rails")
 
-        say "Removing base 'react-on-rails' package (Pro package includes all base functionality)..."
+        puts "Removing base 'react-on-rails' package (Pro package includes all base functionality)..."
         pj.manager.remove(["react-on-rails"])
-        say "✅ Removed 'react-on-rails' package"
+        puts "✅ Removed 'react-on-rails' package"
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Could not remove base 'react-on-rails' package: #{e.message}
@@ -446,7 +428,7 @@ module ReactOnRails
       end
 
       def add_dev_dependencies
-        say "Installing development dependencies..."
+        puts "Installing development dependencies..."
 
         # Use Rspack-specific dev dependencies if rspack is configured
         dev_deps = using_rspack? ? RSPACK_DEV_DEPENDENCIES : DEV_DEPENDENCIES

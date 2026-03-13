@@ -62,8 +62,6 @@ const MyComponent = (props, _railsContext) => {
 
 ### 3. Objects with `renderedHtml` as a React element
 
-> **React 19 Alternative:** For metadata use cases (titles, meta tags), consider using [React 19 Native Metadata](../building-features/react-19-native-metadata.md) instead of this pattern. React 19 hoists `<title>`, `<meta>`, and `<link>` to `<head>` automatically, eliminating the need for server-side hash render-functions.
-
 ```jsx
 const MyComponent = (props, _railsContext) => {
   return {
@@ -137,7 +135,7 @@ const MyComponent = (props, _railsContext) => {
 
 ## Important Rendering Behavior
 
-Take a look at [serverRenderReactComponent.test.ts](https://github.com/shakacode/react_on_rails/blob/main/packages/react-on-rails/tests/serverRenderReactComponent.test.ts):
+Take a look at [serverRenderReactComponent.test.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/tests/serverRenderReactComponent.test.ts):
 
 1. **Direct String Returns Don't Work** - Returning a raw HTML string directly from a render function causes an error. Always wrap HTML strings in `{ renderedHtml: '...' }`.
 

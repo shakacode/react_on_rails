@@ -1,38 +1,30 @@
 # Profiling Server-Side Renderer In RORP
 
-This guide helps you profile the server-side code running in the React on Rails Pro (RORP) Node
-Renderer so you can find slow paths and bottlenecks.
+This guide helps you profile the server-side code running in RORP node-renderer. It may help you find slow parts or bottlenecks in code.
 
-The examples below use the sample app in `react_on_rails_pro/spec/dummy`.
-
-**Prerequisite:** This guide assumes you have [Overmind](https://github.com/DarthSim/overmind)
-installed. On macOS, you can install it with `brew install overmind`.
+This guide uses the RORP dummy app in profiling the server-side code.
 
 ## Profiling Server-Side Code Running On Node Renderer
 
-1. Start the sample app with Overmind.
+1. Run node-renderer using the `--inspect` node option.
+
+   Open the `spec/dummy/Procfile.dev` file and update the `node-renderer` process to run the renderer using `node --inspect` command. Change the following line
 
    ```bash
-   cd react_on_rails_pro/spec/dummy
-   overmind start -f Procfile.dev
+   node-renderer: RENDERER_LOG_LEVEL=debug yarn run node-renderer
    ```
 
-1. In a second terminal, stop only the managed `node-renderer` process.
+   To
 
    ```bash
-   cd react_on_rails_pro/spec/dummy
-   overmind stop node-renderer
+   node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
    ```
 
-1. In that second terminal, restart the renderer manually with the Node inspector enabled.
+1. Run the App
 
    ```bash
-   cd react_on_rails_pro/spec/dummy
-   RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
+   bin/dev
    ```
-
-   Keep this terminal open while you profile. If your app usually starts the renderer through a
-   package script, temporarily switch to this direct `node --inspect` command while profiling.
 
 1. Visit `chrome://inspect` on Chrome browser and you should see something like this:
 
@@ -46,7 +38,7 @@ installed. On macOS, you can install it with `brew install overmind`.
 
    ![Chrome Performance Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/20848091-d446-4690-988b-09db59ddf9e0)
 
-1. Open the web app you want to test and refresh it multiple times. In the sample app, that means visiting [http://localhost:3000](http://localhost:3000).
+1. Open the web app you want to test and refresh it multiple times. We use the React on Rails Pro dummy app for this tutorial. So, we will open it in the browser by going to [http://localhost:3000](http://localhost:3000)
 
    ![RORP Dummy App](https://github.com/shakacode/react_on_rails_pro/assets/7099193/8dc1ef3d-62e4-492d-a5b4-c693b7f7e08c)
 
@@ -102,7 +94,7 @@ To see the renderer behavior while there are many requests coming to it, you can
    sudo apt-get install apache2-utils
    ```
 
-1. Do all steps in `Profiling Server-Side Code Running On Node Renderer` section except the step where you open the page in the browser. Instead of opening the page in the browser, let the `ab` tool make many HTTP requests for you by running the following command.
+1. Do all steps in `Profiling Server-Side Code Running On Node Renderer` section except the step number 6. Instead of opening the page in the browser, let the `ab` tool make many HTTP requests for you by running the following command.
 
    ```bash
    ab -n 100 -c 10 http://localhost:3000/

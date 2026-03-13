@@ -55,7 +55,7 @@ module ReactOnRails
                                   script_options = nonce.present? ? { nonce: nonce } : {}
                                   immediate_script = content_tag(
                                     :script,
-                                    <<~JS.html_safe,
+                                    <<~JS.strip_heredoc.html_safe,
                                       typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsStoreLoaded('#{escaped_store_name}');
                                     JS
                                     script_options

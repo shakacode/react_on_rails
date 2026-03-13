@@ -22,9 +22,9 @@ See the example apps under `/spec`
 
 For non-doc fixes:
 
-- Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/CHANGELOG.md#unreleased).
+- Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/CHANGELOG.md#unreleased).
 - Ensure CI passes and that you added a test that passes with the fix and fails without the fix.
-- Squash all commits down to one with a nice commit message _ONLY_ once final review is given. Make sure this single commit is rebased on top of main.
+- Squash all commits down to one with a nice commit message _ONLY_ once final review is given. Make sure this single commit is rebased on top of master.
 - Please address all code review comments.
 - Ensure that docs are updated accordingly if a feature is added.
 
@@ -46,8 +46,8 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 
 ## Doc Changes
 
-When making doc changes, we want the change to work on both [the React on Rails docs site](https://reactonrails.com/docs/pro/) and when browsing the GitHub repo.
-For links from docs pages to non-doc files, use full GitHub URLs so links resolve correctly in both contexts.
+When making doc changes, we want the change to work on both [the ShakaCode docs site](https://www.shakacode.com/react-on-rails-pro/docs/) and when browsing the GitHub repo.
+The issue is that the ShakaCode site is generated only from files in [`../docs/pro`](../docs/pro), so any references from them to non-doc files must use the full GitHub URL.
 
 ### Links to other docs:
 
@@ -55,7 +55,7 @@ For links from docs pages to non-doc files, use full GitHub URLs so links resolv
   `[Installation Guide](../docs/pro/installation.md)`
 
 - When making references to source code files, use a full url path like:
-  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails.rb)`
+  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails.rb)`
 
 ## To run tests:
 
@@ -70,7 +70,7 @@ React on Rails Pro shares the optimized CI pipeline with the main gem. The CI sy
 ### CI Behavior
 
 - **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback
-- **On Main**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
+- **On Master**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
 - **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
 
 ### Local CI Tools
@@ -88,7 +88,7 @@ cd ..
 # Auto-detect what to test (includes Pro tests if Pro files changed)
 bin/ci-local
 
-# Run all CI checks (same as main branch)
+# Run all CI checks (same as master branch)
 bin/ci-local --all
 
 # Quick check - only fast tests
@@ -103,7 +103,7 @@ Analyzes changes to both main gem and Pro:
 
 ```bash
 # From repository root
-script/ci-changes-detector origin/main
+script/ci-changes-detector origin/master
 ```
 
 ### CI Best Practices for Pro

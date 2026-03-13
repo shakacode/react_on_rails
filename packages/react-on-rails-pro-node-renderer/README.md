@@ -12,7 +12,7 @@ yarn add react-on-rails-pro-node-renderer
 pnpm add react-on-rails-pro-node-renderer
 ```
 
-**Prerequisites:** This package is used with the `react_on_rails_pro` Ruby gem and the `react-on-rails-pro` npm package. See the [full installation guide](https://reactonrails.com/docs/pro/installation).
+**Prerequisites:** This package is used with the `react_on_rails_pro` Ruby gem and the `react-on-rails-pro` npm package. See the [full installation guide](https://www.shakacode.com/react-on-rails-pro/docs/installation/).
 
 ## Quick Start
 
@@ -22,7 +22,7 @@ Create `node-renderer.js` in your project root:
 
 ```js
 const path = require('path');
-const { reactOnRailsProNodeRenderer, parseWorkersCount } = require('react-on-rails-pro-node-renderer');
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 reactOnRailsProNodeRenderer({
   // Directory where the renderer caches uploaded server bundles
@@ -41,8 +41,7 @@ reactOnRailsProNodeRenderer({
   password: process.env.RENDERER_PASSWORD,
 
   // Number of worker processes (defaults to CPU count - 1)
-  // Set to 0 for single-process mode (useful for debugging)
-  workersCount: parseWorkersCount(process.env.RENDERER_WORKERS_COUNT) ?? 3,
+  workersCount: Number(process.env.RENDERER_WORKERS_COUNT) || 3,
 });
 ```
 
@@ -94,19 +93,19 @@ rails generate react_on_rails:install --pro
 
 All options can be set via the config object or environment variables. Config object values take precedence over environment variables.
 
-| Option                                 | Env Variable                                        | Default                     | Description                                                                                               |
-| -------------------------------------- | --------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `port`                                 | `RENDERER_PORT`                                     | `3800`                      | Port the renderer listens on                                                                              |
-| `logLevel`                             | `RENDERER_LOG_LEVEL`                                | `'info'`                    | Log level (`fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`)                                  |
-| `logHttpLevel`                         | `RENDERER_LOG_HTTP_LEVEL`                           | `'error'`                   | HTTP server log level                                                                                     |
-| `serverBundleCachePath`                | `RENDERER_SERVER_BUNDLE_CACHE_PATH`                 | Auto-detected or `/tmp/...` | Directory for cached server bundles                                                                       |
-| `supportModules`                       | `RENDERER_SUPPORT_MODULES`                          | `false`                     | Enable Node.js globals in VM context (`Buffer`, `process`, `setTimeout`, etc.)                            |
-| `workersCount`                         | `RENDERER_WORKERS_COUNT`                            | CPU count - 1               | Number of worker processes. Legacy `NODE_RENDERER_CONCURRENCY` is still supported in generated templates. |
-| `password`                             | `RENDERER_PASSWORD`                                 | (none)                      | Shared secret for Rails authentication                                                                    |
-| `stubTimers`                           | `RENDERER_STUB_TIMERS`                              | `true`                      | Stub timer functions during SSR                                                                           |
-| `allWorkersRestartInterval`            | `RENDERER_ALL_WORKERS_RESTART_INTERVAL`             | (disabled)                  | Minutes between restarting all workers                                                                    |
-| `delayBetweenIndividualWorkerRestarts` | `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS` | (disabled)                  | Minutes between each worker restart                                                                       |
-| `fastifyServerOptions`                 | —                                                   | `{}`                        | Additional [Fastify server options](https://fastify.dev/docs/latest/Reference/Server/#factory)            |
+| Option                                 | Env Variable                                        | Default                     | Description                                                                                    |
+| -------------------------------------- | --------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
+| `port`                                 | `RENDERER_PORT`                                     | `3800`                      | Port the renderer listens on                                                                   |
+| `logLevel`                             | `RENDERER_LOG_LEVEL`                                | `'info'`                    | Log level (`fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`)                       |
+| `logHttpLevel`                         | `RENDERER_LOG_HTTP_LEVEL`                           | `'error'`                   | HTTP server log level                                                                          |
+| `serverBundleCachePath`                | `RENDERER_SERVER_BUNDLE_CACHE_PATH`                 | Auto-detected or `/tmp/...` | Directory for cached server bundles                                                            |
+| `supportModules`                       | `RENDERER_SUPPORT_MODULES`                          | `false`                     | Enable Node.js globals in VM context (`Buffer`, `process`, `setTimeout`, etc.)                 |
+| `workersCount`                         | `RENDERER_WORKERS_COUNT`                            | CPU count - 1               | Number of worker processes. The `--pro` generator uses `NODE_RENDERER_CONCURRENCY` instead.    |
+| `password`                             | `RENDERER_PASSWORD`                                 | (none)                      | Shared secret for Rails authentication                                                         |
+| `stubTimers`                           | `RENDERER_STUB_TIMERS`                              | `true`                      | Stub timer functions during SSR                                                                |
+| `allWorkersRestartInterval`            | `RENDERER_ALL_WORKERS_RESTART_INTERVAL`             | (disabled)                  | Minutes between restarting all workers                                                         |
+| `delayBetweenIndividualWorkerRestarts` | `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS` | (disabled)                  | Minutes between each worker restart                                                            |
+| `fastifyServerOptions`                 | —                                                   | `{}`                        | Additional [Fastify server options](https://fastify.dev/docs/latest/Reference/Server/#factory) |
 
 ## Advanced: Custom Fastify Configuration
 
@@ -146,15 +145,15 @@ addNotifier((error) => {
 });
 ```
 
-See [Error Reporting and Tracing docs](https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing).
+See [Error Reporting and Tracing docs](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing/).
 
 ## Documentation
 
-- [Node Renderer Basics](https://reactonrails.com/docs/building-features/node-renderer/basics)
-- [JavaScript Configuration](https://reactonrails.com/docs/building-features/node-renderer/js-configuration)
-- [Rails Configuration](https://reactonrails.com/docs/configuration/configuration-pro)
-- [Debugging](https://reactonrails.com/docs/building-features/node-renderer/debugging)
-- [Troubleshooting](https://reactonrails.com/docs/building-features/node-renderer/troubleshooting)
+- [Node Renderer Basics](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/basics/)
+- [JavaScript Configuration](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/)
+- [Rails Configuration](https://www.shakacode.com/react-on-rails-pro/docs/configuration/)
+- [Debugging](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/debugging/)
+- [Troubleshooting](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/troubleshooting/)
 
 ## Package Relationships
 

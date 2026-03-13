@@ -4,15 +4,15 @@ React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org
 
 **Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
-Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) to see what version you want.
+Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) to see what version you want.
 
 ## Version Format
 
-For the commands below, choose versions 16.4.0 or greater from the CHANGELOG and replace placeholders like
+For the commands below, choose versions from the CHANGELOG and replace placeholders like
 `<gem_version>` and `<npm_version>`. Note that for pre-release versions:
 
-- Gems use all periods: `16.4.0.beta.1`
-- NPM packages use dashes: `16.4.0-beta.1`
+- Gems use all periods: `16.2.0.beta.1`
+- NPM packages use dashes: `16.2.0-beta.1`
 
 # Generator Installation (Recommended)
 
@@ -76,7 +76,7 @@ See [License Configuration](#license-configuration-production-only) below for ot
 
 ## Adding React Server Components
 
-RSC requires React on Rails Pro and React 19 with a compatible `react-on-rails-rsc` version. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
+RSC requires React on Rails Pro and React 19.0.x. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
 
 ```bash
 # Fresh install with RSC
@@ -98,7 +98,7 @@ The sections below describe manual installation steps. Use these if you need fin
 
 ## Prerequisites
 
-Ensure your **Rails** app is using the **react_on_rails** gem, version 16.4.0 or higher.
+Ensure your **Rails** app is using the **react_on_rails** gem, version 16.0.0 or higher.
 
 ## Install react_on_rails_pro Gem
 
@@ -132,11 +132,11 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 ⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
-For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
+For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
 
 ## Rails Configuration
 
-You don't need to create an initializer if you are satisfied with the defaults as described in [Configuration](../oss/configuration/configuration-pro.md).
+You don't need to create an initializer if you are satisfied with the defaults as described in [Configuration](./configuration.md).
 
 For basic setup:
 
@@ -144,7 +144,7 @@ For basic setup:
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   # Your configuration here
-  # See docs/oss/configuration/configuration-pro.md for all options
+  # See docs/configuration.md for all options
 end
 ```
 
@@ -308,7 +308,7 @@ end
 
 ### Configuration Options
 
-See [Rails Configuration Options](../oss/configuration/configuration-pro.md) for all available settings.
+See [Rails Configuration Options](./configuration.md) for all available settings.
 
 Pay attention to:
 
@@ -323,7 +323,7 @@ Set your server bundle webpack configuration to use a target of `node` per the [
 
 ## Additional Documentation
 
-- [Node Renderer Basics](../oss/building-features/node-renderer/basics.md)
-- [Node Renderer JavaScript Configuration](../oss/building-features/node-renderer/js-configuration.md)
-- [Rails Configuration Options](../oss/configuration/configuration-pro.md)
-- [Error Reporting and Tracing](../oss/building-features/node-renderer/error-reporting-and-tracing.md)
+- [Node Renderer Basics](./node-renderer/basics.md)
+- [Node Renderer JavaScript Configuration](./node-renderer/js-configuration.md)
+- [Rails Configuration Options](./configuration.md)
+- [Error Reporting and Tracing](./node-renderer/error-reporting-and-tracing.md)

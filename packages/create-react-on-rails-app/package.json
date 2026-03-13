@@ -1,6 +1,6 @@
 {
   "name": "create-react-on-rails-app",
-  "version": "16.6.0-rc.0",
+  "version": "16.4.0-rc.8",
   "description": "Create React on Rails applications with a single command",
   "bin": {
     "create-react-on-rails-app": "./bin/create-react-on-rails-app.js"
@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm run clean && tsc",
     "build-watch": "pnpm run clean && tsc --watch",
-    "clean": "node -e \"require('fs').rmSync('./lib', { recursive: true, force: true })\"",
+    "clean": "node -e \"require('fs').rmSync('./lib',{recursive:true,force:true})\"",
     "test": "jest tests",
     "type-check": "tsc --noEmit --noErrorTruncation",
     "prepublishOnly": "pnpm run build"

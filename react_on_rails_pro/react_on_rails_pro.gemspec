@@ -22,7 +22,7 @@ Gem::Specification.new do |s|
 
   s.files = Dir.chdir(__dir__) do
     `git ls-files -z`.split("\x0").reject do |f|
-      f.match(%r{^(test|spec|features|tmp|node_modules|packages|coverage|Gemfile.lock)/})
+      f.match(%r{^(test|spec|features|tmp|node_modules|packages|coverage|Gemfile.lock|lib/tasks)/})
     end
   end
   s.bindir        = "exe"
@@ -39,7 +39,7 @@ Gem::Specification.new do |s|
   #   https://github.com/HoneyryderChuck/httpx/issues/118
   s.add_runtime_dependency "http-2", ">= 1.1.1"
   s.add_runtime_dependency "jwt", "~> 2.7"
-  s.add_runtime_dependency "async", ">= 2.29"
+  s.add_runtime_dependency "async", ">= 2.6"
   s.add_runtime_dependency "rainbow"
   s.add_runtime_dependency "react_on_rails", ReactOnRails::VERSION
   s.add_development_dependency "bundler"

@@ -2,7 +2,6 @@ import {
   validateNode,
   validateRuby,
   validateRails,
-  validateGit,
   validatePackageManager,
   validateAll,
 } from '../src/validators';
@@ -70,20 +69,6 @@ describe('validateRails', () => {
     expect(result.message).toBe('Rails 7.2.1');
   });
 
-  it('returns invalid for Rails 6.1', () => {
-    mockedGetCommandVersion.mockReturnValue('Rails 6.1.7.10');
-    const result = validateRails();
-    expect(result.valid).toBe(false);
-    expect(result.message).toContain('requires Rails 7.0+');
-  });
-
-  it('returns valid for Rails 7.0.x', () => {
-    mockedGetCommandVersion.mockReturnValue('Rails 7.0.8.7');
-    const result = validateRails();
-    expect(result.valid).toBe(true);
-    expect(result.message).toBe('Rails 7.0.8.7');
-  });
-
   it('returns invalid for Rails 6.x', () => {
     mockedGetCommandVersion.mockReturnValue('Rails 6.1.7');
     const result = validateRails();
@@ -96,22 +81,6 @@ describe('validateRails', () => {
     const result = validateRails();
     expect(result.valid).toBe(false);
     expect(result.message).toContain('Could not parse Rails version');
-  });
-});
-
-describe('validateGit', () => {
-  it('returns invalid when git is not found', () => {
-    mockedGetCommandVersion.mockReturnValue(null);
-    const result = validateGit();
-    expect(result.valid).toBe(false);
-    expect(result.message).toContain('git is not installed');
-  });
-
-  it('returns valid when git is available', () => {
-    mockedGetCommandVersion.mockReturnValue('git version 2.49.0');
-    const result = validateGit();
-    expect(result.valid).toBe(true);
-    expect(result.message).toBe('git version 2.49.0');
   });
 });
 
@@ -147,9 +116,6 @@ describe('validateAll', () => {
       if (command === 'rails') {
         return 'Rails 7.2.1';
       }
-      if (command === 'git') {
-        return 'git version 2.49.0';
-      }
       if (command === 'npm') {
         return '10.8.2';
       }
@@ -169,10 +135,10 @@ describe('validateAll', () => {
     expect(allValid).toBe(true);
   });
 
-  it('checks all five prerequisites', () => {
+  it('checks all four prerequisites', () => {
     mockAllCommandsValid();
     const { results } = validateAll('npm');
-    expect(results).toHaveLength(5);
-    expect(results.map((r) => r.name)).toEqual(['Node.js', 'Ruby', 'Rails', 'git', 'Package Manager']);
+    expect(results).toHaveLength(4);
+    expect(results.map((r) => r.name)).toEqual(['Node.js', 'Ruby', 'Rails', 'Package Manager']);
   });
 });

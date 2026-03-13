@@ -100,10 +100,10 @@ function preloadMatchedRouteChunks(
  *
  * Flow:
  * 1. Create router with browser history
- * 2. If SSR payload exists, synchronously inject route matches to match server output
- * 3. Set router.ssr to prevent Transitioner auto-load during hydration
- * 4. Hydrate with dehydrated router state if available
- * 5. After mount, trigger router.load() and clear SSR flag once settled
+ * 2. Hydrate from dehydrated state provided by serverRenderTanStackAppAsync
+ * 3. Set router.ssr = true to skip auto-load on mount (Transitioner behavior)
+ * 4. After hydration, trigger router.load() to enable client-side navigation
+ * 5. Return a React component that renders RouterProvider
  */
 
 interface TanStackHydrationAppProps {
@@ -182,28 +182,7 @@ function TanStackHydrationApp({
 
   const routerRef = useRef<TanStackRouter | null>(null);
   const didTriggerPostHydrationLoadRef = useRef(false);
-  const didSetSsrFlagRef = useRef(false);
-  const routeChunkPreloadPromiseRef = useRef<Promise<void> | null>(null);
-  const routeChunkPreloadSettledRef = useRef(true);
-  const hydrationCallbackPromiseRef = useRef<Promise<void> | null>(null);
-  const didWarnPrivateInternalsRef = useRef(false);
-  const warnedMissingSsrMatchIdsRef = useRef<Set<string>>(new Set());
-
-  const warnMissingSsrMatch = (match: Record<string, unknown>): void => {
-    if (process.env.NODE_ENV !== 'development') {
-      return;
-    }
-    const routeId =
-      typeof match.id === 'string' || typeof match.id === 'number' ? String(match.id) : '<unknown>';
-    if (warnedMissingSsrMatchIdsRef.current.has(routeId)) {
-      return;
-    }
-    warnedMissingSsrMatchIdsRef.current.add(routeId);
-    console.warn(
-      `react-on-rails-pro/tanstack-router: No server match found for route "${routeId}". ` +
-        'Overriding match.status from "pending" to "success" to prevent hydration suspension.',
-    );
-  };
+  const didInitializeSsrGlobalRef = useRef(false);
 
   if (routerRef.current === null) {
     // Intentionally initialize the hydration router during render so the very
@@ -235,96 +214,10 @@ function TanStackHydrationApp({
         );
       }
 
-      // Validate internal APIs before using them.
-      if (typeof router.matchRoutes !== 'function' || !router.__store?.setState) {
-        throw new Error(
-          'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store are required ' +
-            'but not available. Ensure @tanstack/react-router >=1.139.0 <2.0.0 is installed.',
-        );
-      }
-      const hydrationRouter = router as TanStackRouterHydrationInternals;
-
-      // Synchronously inject route matches to match server-rendered output.
-      // The server fully loads routes (via router.load()) before rendering, so
-      // all matches are resolved. We replicate this on the client so the initial
-      // render produces the same component tree as the server HTML.
-      //
-      // When ssrRouter match data is available (from serverRenderTanStackAppAsync),
-      // we apply loaderData, beforeLoadContext, status, etc. from the server payload
-      // so routes that render from loader results can hydrate correctly.
-      // Otherwise we override 'pending' to 'success' to prevent MatchInner from
-      // throwing loadPromise (which would cause Suspense suspension).
-      const rawMatches = hydrationRouter.matchRoutes(hydrationRouter.state.location);
-      routeChunkPreloadPromiseRef.current = preloadMatchedRouteChunks(
-        router as TanStackRouterChunkPreloadInternals,
-        rawMatches,
-      );
-      if (routeChunkPreloadPromiseRef.current) {
-        routeChunkPreloadSettledRef.current = false;
-        void routeChunkPreloadPromiseRef.current.finally(() => {
-          routeChunkPreloadSettledRef.current = true;
-        });
-      } else {
-        routeChunkPreloadSettledRef.current = true;
-      }
-      const ssrMatches = dehydratedState?.ssrRouter?.matches;
-      const matches = ssrMatches?.length
-        ? applyDehydratedMatchData(rawMatches, ssrMatches, warnMissingSsrMatch)
-        : rawMatches.map((match) => {
-            const m = match as Record<string, unknown>;
-            if (m.status === 'pending') {
-              warnMissingSsrMatch(m);
-              return { ...m, status: 'success' };
-            }
-            return m;
-          });
-
-      // Render-phase store injection is required for hydration parity: this
-      // must happen before the first RouterProvider render.
-      hydrationRouter.__store.setState((s: Record<string, unknown>) => ({
-        ...s,
-        status: 'idle',
-        resolvedLocation: (s as { location: unknown }).location,
-        matches,
-      }));
-
-      // Set SSR flag so the Transitioner skips its initial router.load() call,
-      // preventing a state update during hydration that would cause a mismatch.
-      // The shape matches TanStack Router's internal $_TSR hydration contract
-      // (the Transitioner only checks truthiness).
-      // Preserve user-set values from createRouter() (e.g. TanStack Start).
-      if (!router.ssr) {
-        router.ssr = { manifest: undefined };
-        didSetSsrFlagRef.current = true;
-      }
-
-      try {
-        // Run user-defined hydration callback for custom dehydratedData
-        // (for example external query/cache payloads), matching TanStack
-        // Router's ssr-client behavior.
-        if (typeof router.options?.hydrate === 'function') {
-          const hydrationResult = router.options.hydrate(
-            extractDehydratedData(dehydratedState?.dehydratedRouter),
-          );
-          // Let async hydration failures reject so we do not continue into
-          // router.load() with partially hydrated client state.
-          hydrationCallbackPromiseRef.current = Promise.resolve(hydrationResult).then(() => undefined);
-        }
-
-        // Backward-compatibility hook: if user router exposes router.hydrate(),
-        // invoke it with the full dehydrated router payload.
-        if (hasDehydratedRouter && typeof router.hydrate === 'function') {
-          router.hydrate(dehydratedState.dehydratedRouter);
-        }
-      } catch (error) {
-        // If render-phase hydration throws, clear only the temporary SSR flag
-        // created by this module so retries are not blocked.
-        if (didSetSsrFlagRef.current) {
-          router.ssr = undefined;
-          didSetSsrFlagRef.current = false;
-        }
-        throw error;
-      }
+    // Keep SSR mode enabled on hydration paths so Transitioner does not run
+    // a client-only initial load before hydration settles.
+    if (!hasSsrRouter && hasSsrPayload && router.ssr !== true) {
+      router.ssr = true;
     }
 
     routerRef.current = router;
@@ -345,44 +238,13 @@ function TanStackHydrationApp({
     didTriggerPostHydrationLoadRef.current = true;
 
     let cancelled = false;
-    const runPostHydrationLoad = async (): Promise<void> => {
-      if (hydrationCallbackPromiseRef.current) {
-        await hydrationCallbackPromiseRef.current;
-        if (cancelled) {
-          return;
-        }
+    // `cancelled` only suppresses logging for a discarded mount. The in-flight load still
+    // completes unless the router exposes a best-effort cancelLoad() hook.
+    router.load().catch((err: unknown) => {
+      if (!cancelled) {
+        console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);
       }
-      if (routeChunkPreloadPromiseRef.current) {
-        await routeChunkPreloadPromiseRef.current;
-        if (cancelled) {
-          return;
-        }
-      }
-      if (cancelled) {
-        return;
-      }
-      await router.load();
-    };
-
-    void runPostHydrationLoad()
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);
-        }
-      })
-      .finally(() => {
-        // Always clear temporary router.ssr set by this module, regardless of
-        // cancellation state. In React 18 StrictMode, the effect cleanup sets
-        // cancelled=true and didTriggerPostHydrationLoadRef prevents re-trigger
-        // on re-mount — if we skip cleanup here the SSR flag stays set
-        // permanently, blocking the Transitioner from ever calling router.load().
-        // The didSetSsrFlagRef guard ensures we only clear values this module
-        // created, preserving user-provided router.ssr from createRouter().
-        if (didSetSsrFlagRef.current) {
-          router.ssr = undefined;
-          didSetSsrFlagRef.current = false;
-        }
-      });
+    });
 
     return () => {
       cancelled = true;

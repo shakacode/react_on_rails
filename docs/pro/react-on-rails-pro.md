@@ -4,59 +4,54 @@ slug: /pro
 
 # React on Rails Pro
 
-React on Rails Pro is the advanced rendering and performance tier for React on Rails. Start with the open-source integration, then add Pro when you need higher SSR throughput, React Server Components, streaming SSR, fragment caching, or dedicated Node renderer tooling.
+Support React on Rails development [by becoming a Github sponsor](https://github.com/sponsors/shakacode) and get these benefits:
 
-> [!NOTE]
-> **Summary for AI agents:** This is the canonical Pro hub after the docs IA cleanup. Use it for installation, upgrades, streaming SSR, Node renderer, fragment caching, profiling, and troubleshooting. Route RSC-specific requests to the nested [React Server Components index](./react-server-components/index.md).
+1. 1-hour per month of support via Slack, PR reviews, and Zoom for React on Rails,
+   React-Rails, Shakapacker, rails/webpacker, ReScript (ReasonML), TypeScript, Rust, etc.
+2. React on Rails Pro Software that extends React on Rails with Node server rendering,
+   fragment caching, code-splitting, and other performance enhancements for React on Rails.
 
-## Start Here
+See the [React on Rails Pro Support Plan](https://www.shakacode.com/react-on-rails-pro/).
 
-- [Installation](./installation.md) - Fresh install or manual setup
-- [Upgrade from OSS to Pro](./upgrading-to-pro.md) - Three-step upgrade path
-- [Configuration](../oss/configuration/configuration-pro.md) - Pro-specific runtime settings
-- [Troubleshooting](./troubleshooting.md) - Common setup and runtime issues
+ShakaCode can also help you with your custom software development needs. We specialize in
+marketplace and e-commerce applications that utilize both Rails and React.
+Because we own [HiChee.com](https://hichee.com), we can leverage that code for your app!
 
-## Route Map
+Please email Justin Gordon [justin@shakacode.com](mailto:justin@shakacode.com), the
+maintainer of React on Rails, for more information.
 
-| Need                    | Start here                                                    | Then read                                                                        |
-| ----------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Compare OSS and Pro     | [OSS vs Pro comparison](../oss/getting-started/oss-vs-pro.md) | [Upgrade to Pro](./upgrading-to-pro.md)                                          |
-| Dedicated Node.js SSR   | [Node Renderer](./node-renderer.md)                           | [Node Renderer technical docs](../oss/building-features/node-renderer/basics.md) |
-| Progressive SSR         | [Streaming SSR](./streaming-ssr.md)                           | [Streaming SSR guide](../oss/building-features/streaming-server-rendering.md)    |
-| Cache rendered output   | [Fragment Caching](./fragment-caching.md)                     | [SSR caching guide](../oss/building-features/caching.md)                         |
-| React Server Components | [RSC overview](./react-server-components/index.md)            | [RSC tutorial](./react-server-components/tutorial.md)                            |
+### Pro: Docs
 
-## What Pro Adds
+See https://www.shakacode.com/react-on-rails-pro/docs/.
 
-- [React Server Components](./react-server-components/tutorial.md)
-- [Streaming SSR](./streaming-ssr.md)
-- [Fragment caching](./fragment-caching.md)
-- [Node renderer](./node-renderer.md)
-- [Code splitting and bundle caching](../oss/building-features/code-splitting.md)
+### Pro: React Server Components
 
-## Evaluation and Licensing
+See the [performance breakthroughs guide here](./major-performance-breakthroughs-upgrade-guide.md).
 
-No license token is required for local development, evaluation, testing, CI/CD, or staging. Production deployments require a paid license.
+Yes! Big performance gains for the newest React features!
 
-If your organization is budget-constrained, email [justin@shakacode.com](mailto:justin@shakacode.com). We can provide free or low-cost licenses in qualifying cases. For larger companies, paid licenses support continued React on Rails development.
+### Pro: Fragment Caching
 
-See [Upgrading to Pro](./upgrading-to-pro.md#try-pro-risk-free) for the current licensing and upgrade details.
+Fragment caching is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
 
-## Explore the Dummy App
+1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
+1. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken. Suppose you put your props calculation into some method called `some_slow_method_that_returns_props`:
 
-The fastest way to understand how the Pro feature set fits together is to inspect the example app in this repo:
+```ruby
+<%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
+  some_slow_method_that_returns_props
+end %>
+```
 
-- [react_on_rails_pro/spec/dummy](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/README.md)
+Such fragment caching saves CPU work for your web server and greatly reduces the request time. It completely skips the evaluation costs of:
 
-It demonstrates the Node renderer, caching, and SSR-oriented workflows in a real Rails app.
+1. Database calls to compute the props.
+2. Serialization the props values hash into a JSON string for evaluating JavaScript to server render.
+3. Costs associated with evaluating JavaScript from your Ruby code.
+4. Creating the HTML string containing the props and the server-rendered JavaScript code.
 
-## References
+Note, even without server rendering (without step 3 above), fragment caching is still effective.
 
-- [Installation](./installation.md)
-- [Upgrade from OSS to Pro](./upgrading-to-pro.md)
-- [Node Renderer](./node-renderer.md)
-- [Streaming SSR](./streaming-ssr.md)
-- [Fragment Caching](./fragment-caching.md)
-- [React Server Components](./react-server-components/index.md)
-- [Pro configuration](../oss/configuration/configuration-pro.md)
-- [ShakaCode consulting](mailto:react_on_rails@shakacode.com)
+### Pro: Integration with Node.js for Server Rendering
+
+Default server rendering is done by ExecJS. If you want to use a Node.js server for better performing server rendering, [email justin@shakacode.com](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server that is part of [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).

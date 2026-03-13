@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "rainbow"
 require_relative "generator_messages"
 
 module ReactOnRails
@@ -38,18 +39,18 @@ module ReactOnRails
       #
       # @note NPM dependencies are handled separately by JsDependencyManager
       def setup_pro
-        say "\n#{set_color('=' * 80, :cyan)}"
-        say set_color("🚀 REACT ON RAILS PRO SETUP", :cyan, :bold)
-        say set_color("=" * 80, :cyan)
+        puts Rainbow("\n#{'=' * 80}").cyan
+        puts Rainbow("🚀 REACT ON RAILS PRO SETUP").cyan.bold
+        puts Rainbow("=" * 80).cyan
 
         create_pro_initializer
         create_node_renderer
         add_pro_to_procfile
         update_webpack_config_for_pro
 
-        say set_color("=" * 80, :cyan)
-        say "✅ React on Rails Pro setup complete!", :green
-        say set_color("=" * 80, :cyan)
+        puts Rainbow("=" * 80).cyan
+        puts Rainbow("✅ React on Rails Pro setup complete!").green
+        puts Rainbow("=" * 80).cyan
       end
 
       # Check if Pro gem is missing. Attempts auto-install via bundle add.
@@ -63,6 +64,7 @@ module ReactOnRails
         context_line = pro_gem_requirement_context_line
         prerelease_note = rsc_pro_prerelease_note
 
+        # TODO(#2575): Replace temporary email CTA after react-unrails.com flow is live.
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
 
@@ -74,9 +76,8 @@ module ReactOnRails
 
           Then run: bundle install
 
-          No license needed for evaluation or non-production use.
-          Free or low-cost production licenses available for startups and small companies.
-          See the upgrade guide: https://reactonrails.com/docs/pro/upgrading-to-pro/
+          Try Pro free! Email justin@shakacode.com for an evaluation license.
+          For evaluation licenses or more info, see: https://www.shakacode.com/react-on-rails-pro/
         MSG
         true
       end
@@ -115,12 +116,12 @@ module ReactOnRails
       # Bundler.with_unbundled_env's ENV restoration.
       # @return [Boolean] true if the gem was successfully installed
       def attempt_pro_gem_auto_install
-        say "📝 Adding #{PRO_GEM_NAME} to Gemfile...", :yellow
+        puts Rainbow("📝 Adding #{PRO_GEM_NAME} to Gemfile...").yellow
 
         status, output = run_bundle_add_with_captured_output
         return timeout_install_failure unless status
 
-        say output unless output.to_s.strip.empty?
+        puts output unless output.to_s.strip.empty?
         return false unless status.success?
 
         # The gem is now in Gemfile/lockfile but not loaded in the current Ruby process.
@@ -128,7 +129,7 @@ module ReactOnRails
         mark_pro_gem_installed!
         true
       rescue StandardError => e
-        say "⚠️  Failed to run bundle add: #{e.message}", :red
+        puts Rainbow("⚠️  Failed to run bundle add: #{e.message}").red
         false
       end
 
@@ -161,7 +162,7 @@ module ReactOnRails
       end
 
       def timeout_install_failure
-        say "⏱️  bundle add timed out after #{AUTO_INSTALL_TIMEOUT} seconds.", :red
+        puts Rainbow("⏱️  bundle add timed out after #{AUTO_INSTALL_TIMEOUT} seconds.").red
         false
       end
 
@@ -199,26 +200,26 @@ module ReactOnRails
         initializer_path = "config/initializers/react_on_rails_pro.rb"
 
         if File.exist?(File.join(destination_root, initializer_path))
-          say "ℹ️  #{initializer_path} already exists, skipping", :yellow
+          puts Rainbow("ℹ️  #{initializer_path} already exists, skipping").yellow
           return
         end
 
-        say "📝 Creating React on Rails Pro initializer...", :yellow
+        puts Rainbow("📝 Creating React on Rails Pro initializer...").yellow
 
         template("templates/pro/base/config/initializers/react_on_rails_pro.rb.tt", initializer_path)
 
-        say "✅ Created #{initializer_path}", :green
+        puts Rainbow("✅ Created #{initializer_path}").green
       end
 
       def create_node_renderer
         node_renderer_path = "client/node-renderer.js"
 
         if File.exist?(File.join(destination_root, node_renderer_path))
-          say "ℹ️  #{node_renderer_path} already exists, skipping", :yellow
+          puts Rainbow("ℹ️  #{node_renderer_path} already exists, skipping").yellow
           return
         end
 
-        say "📝 Creating Node Renderer bootstrap...", :yellow
+        puts Rainbow("📝 Creating Node Renderer bootstrap...").yellow
 
         # Ensure client directory exists
         FileUtils.mkdir_p(File.join(destination_root, "client"))
@@ -226,7 +227,7 @@ module ReactOnRails
         template_path = "templates/pro/base/client/node-renderer.js"
         copy_file(template_path, node_renderer_path)
 
-        say "✅ Created #{node_renderer_path}", :green
+        puts Rainbow("✅ Created #{node_renderer_path}").green
       end
 
       def add_pro_to_procfile
@@ -243,11 +244,11 @@ module ReactOnRails
         end
 
         if File.read(procfile_path).include?("node-renderer:")
-          say "ℹ️  Node Renderer already in Procfile.dev, skipping", :yellow
+          puts Rainbow("ℹ️  Node Renderer already in Procfile.dev, skipping").yellow
           return
         end
 
-        say "📝 Adding Node Renderer to Procfile.dev...", :yellow
+        puts Rainbow("📝 Adding Node Renderer to Procfile.dev...").yellow
 
         node_renderer_line = <<~PROCFILE
 
@@ -257,7 +258,7 @@ module ReactOnRails
 
         append_to_file("Procfile.dev", node_renderer_line)
 
-        say "✅ Added Node Renderer to Procfile.dev", :green
+        puts Rainbow("✅ Added Node Renderer to Procfile.dev").green
       end
 
       # Update webpack configs to enable Pro settings.
@@ -278,7 +279,7 @@ module ReactOnRails
         webpack_config, webpack_config_path = webpack_config_paths
 
         unless File.exist?(webpack_config_path)
-          say "ℹ️  serverWebpackConfig.js not found, skipping webpack update", :yellow
+          puts Rainbow("ℹ️  serverWebpackConfig.js not found, skipping webpack update").yellow
           return
         end
 
@@ -288,11 +289,11 @@ module ReactOnRails
 
         # Skip only when both server config and import style are already updated.
         if server_config_ready && import_ready
-          say "ℹ️  Webpack config already has Pro settings enabled, skipping", :yellow
+          puts Rainbow("ℹ️  Webpack config already has Pro settings enabled, skipping").yellow
           return
         end
 
-        say "📝 Updating serverWebpackConfig.js for Pro...", :yellow
+        puts Rainbow("📝 Updating serverWebpackConfig.js for Pro...").yellow
 
         unless server_config_ready
           # Add extractLoader helper function after bundler require
@@ -329,7 +330,7 @@ module ReactOnRails
         update_server_client_or_both_import
 
         verify_pro_webpack_transforms(webpack_config)
-        say "✅ Updated webpack configs for Pro", :green
+        puts Rainbow("✅ Updated webpack configs for Pro").green
       end
 
       def webpack_config_paths

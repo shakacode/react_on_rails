@@ -27,8 +27,12 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
     packageManager = detectPackageManager() ?? 'npm';
   }
 
-  let pro = Boolean(rawOpts.pro);
-  let rsc = Boolean(rawOpts.rsc);
+  const options: CliOptions = {
+    template,
+    packageManager: packageManager as 'npm' | 'pnpm',
+    rspack: Boolean(rawOpts.rspack),
+    rsc: Boolean(rawOpts.rsc),
+  };
 
   console.log('');
   console.log(`${chalk.bold('create-react-on-rails-app')} v${packageJson.version}`);
@@ -40,41 +44,12 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
     process.exit(1);
   }
 
-  // When no mode flag is explicitly passed, prompt interactively (TTY only).
-  // Non-interactive environments (CI, pipes) fall back to standard mode.
-  const modeExplicit =
-    rawOpts.pro !== undefined || rawOpts.rsc !== undefined || rawOpts.standard !== undefined;
-  if (!modeExplicit) {
-    if (process.stdin.isTTY && process.stdout.isTTY) {
-      const choice = await promptForMode();
-      pro = choice.pro;
-      rsc = choice.rsc;
-    } else {
-      logInfo(
-        'No mode flag specified and not running interactively (stdin/stdout is not a TTY); using standard mode.',
-      );
-    }
-  }
-
-  const options: CliOptions = {
-    template,
-    packageManager: packageManager as 'npm' | 'pnpm',
-    rspack: Boolean(rawOpts.rspack),
-    pro,
-    rsc,
-  };
-
-  if (options.rsc && options.pro) {
-    logInfo('Note: --rsc takes precedence over --pro; --pro will be ignored.');
-  }
-
-  if (options.rsc || options.pro) {
-    const modeFlag = options.rsc ? '--rsc' : '--pro';
-    logInfo(`Note: ${modeFlag} installs react_on_rails_pro and requires that gem to be installable.`);
+  if (options.rsc) {
+    logInfo('Note: --rsc installs react_on_rails_pro and requires that gem to be installable.');
     logInfo(
-      `If installation fails, verify your Bundler/RubyGems setup for react_on_rails_pro, then rerun with ${modeFlag}.`,
+      'If installation fails, verify your Bundler/RubyGems setup for react_on_rails_pro, then rerun with --rsc.',
     );
-    logInfo('Pro setup docs: https://reactonrails.com/docs/pro/installation/');
+    logInfo('Pro setup docs: https://www.shakacode.com/react-on-rails-pro/docs/installation/');
     console.log('');
   }
 
@@ -100,14 +75,8 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
   }
 
   console.log('');
-  let modeLabel = '';
-  if (options.rsc) {
-    modeLabel = ', mode: rsc';
-  } else if (options.pro) {
-    modeLabel = ', mode: pro';
-  }
   logInfo(
-    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${modeLabel}`,
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${options.rsc ? ', mode: rsc' : ''}`,
   );
 
   createApp(appName, options);
@@ -127,9 +96,7 @@ program
   .option('-t, --template <type>', 'javascript or typescript', 'typescript')
   .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
   .option('--rspack', 'Use Rspack instead of Webpack (~20x faster builds)', false)
-  .option('--standard', 'Generate open-source React on Rails setup (skip prompt)')
-  .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)')
-  .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)')
+  .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)', false)
   .addHelpText(
     'after',
     `
@@ -140,6 +107,7 @@ Examples:
   $ npx create-react-on-rails-app my-app --standard             # skip prompt, use Standard
   $ npx create-react-on-rails-app my-app --template javascript
   $ npx create-react-on-rails-app my-app --rspack
+  $ npx create-react-on-rails-app my-app --rsc
   $ npx create-react-on-rails-app my-app --rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
@@ -150,26 +118,16 @@ standard mode is used automatically.
 
 What it does:
   1. Creates a new Rails app with PostgreSQL
-  2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for Pro/RSC)
+  2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for --rsc)
   3. Runs the React on Rails generator (Shakapacker, components, webpack config)
-  4. Creates educational git commits for each major scaffold step
 
 After setup, run bin/dev and visit:
-  - http://localhost:3000 (generated home page)
-  - /hello_world (default and --pro example page)
-  - /hello_server (--rsc example page)
+  - http://localhost:3000/hello_world (default)
+  - http://localhost:3000/hello_server (--rsc)
 
-Inspect the generated setup history with:
-  - git log --oneline --reverse
+--rsc supports both JavaScript and TypeScript templates.
 
-The generated app includes one git commit per logical setup step.`,
-  )
-  .addHelpText(
-    'after',
-    `
---pro and --rsc support both JavaScript and TypeScript templates.
-
-Documentation: https://reactonrails.com/docs/`,
+Documentation: https://www.shakacode.com/react-on-rails/docs/`,
   )
   .action(async (appName: string, opts: Record<string, unknown>) => {
     try {

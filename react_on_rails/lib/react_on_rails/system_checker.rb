@@ -3,18 +3,13 @@
 require "erb"
 require "open3"
 require "yaml"
-require_relative "config_path_resolver"
 
 module ReactOnRails
   # SystemChecker provides validation methods for React on Rails setup
   # Used by install generator and doctor rake task
   # rubocop:disable Metrics/ClassLength
   class SystemChecker
-    include ConfigPathResolver
-
     attr_reader :messages
-
-    SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
 
     def initialize
       @messages = []
@@ -139,9 +134,7 @@ module ReactOnRails
           • bin/shakapacker
           • bin/shakapacker-dev-server
           • config/shakapacker.yml
-          • config/webpack/webpack.config.{js,ts}
-          • config/rspack/rspack.config.{js,ts}
-          • assets_bundler_config_path target declared by Shakapacker (when configured)
+          • config/webpack/webpack.config.js
 
           Run: bundle exec rails shakapacker:install
         MSG
@@ -191,7 +184,7 @@ module ReactOnRails
     end
 
     def check_react_on_rails_npm_package
-      package_json_path = resolved_package_json_path
+      package_json_path = "package.json"
       return unless File.exist?(package_json_path)
 
       package_json = JSON.parse(File.read(package_json_path))
@@ -212,11 +205,10 @@ module ReactOnRails
     end
 
     def check_package_version_sync
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      return unless File.exist?("package.json")
 
       begin
-        package_json = JSON.parse(File.read(package_json_path))
+        package_json = JSON.parse(File.read("package.json"))
         package_name, npm_version = react_on_rails_npm_package_details(package_json)
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
@@ -264,7 +256,7 @@ module ReactOnRails
 
     # React dependencies validation
     def check_react_dependencies
-      return unless File.exist?(resolved_package_json_path)
+      return unless File.exist?("package.json")
 
       package_json = parse_package_json
       return unless package_json
@@ -299,81 +291,56 @@ module ReactOnRails
 
     # Webpack configuration validation
     def check_webpack_configuration
-      config_path = detect_bundler_config_path
-      if config_path
-        add_success("✅ Bundler configuration exists (#{config_path})")
-        check_webpack_config_content(config_path)
-        suggest_webpack_inspection(config_path)
+      webpack_config_path = "config/webpack/webpack.config.js"
+      if File.exist?(webpack_config_path)
+        add_success("✅ Webpack configuration exists")
+        check_webpack_config_content
+        suggest_webpack_inspection
       else
         add_error(<<~MSG.strip)
-          🚫 Bundler configuration not found.
+          🚫 Webpack configuration not found.
 
-          Expected one of: config/webpack/webpack.config.{js,ts} or config/rspack/rspack.config.{js,ts}
-          Also checks Shakapacker's configured assets_bundler_config_path when available.
+          Expected: config/webpack/webpack.config.js
           Run: rails generate react_on_rails:install
         MSG
       end
     end
 
-    def detect_bundler_config_path
-      resolved_config_path = resolved_webpack_config_path
-      return nil unless resolved_config_path
-      # Explicit shakapacker assets_bundler_config_path matches are treated as
-      # authoritative and intentionally bypass cross-bundler ambiguity warnings.
-      return resolved_config_path if explicit_shakapacker_bundler_config_path?(resolved_config_path)
-
-      # Re-scan candidate configs by bundler so we can emit clear warnings when
-      # both webpack and rspack configs exist in the project. If a future
-      # candidate falls outside the `<bundler>.config.*` naming convention used
-      # by `existing_bundler_config_paths`, fall back to the originally
-      # discovered file.
-      resolve_default_bundler_config_path || resolved_config_path
-    end
-
-    def suggest_webpack_inspection(config_path)
-      bundler_name = bundler_name_for_config_path(config_path)
-      export_style = config_path.end_with?(".ts") ? "export default" : "module.exports"
-
-      add_info("💡 To debug #{bundler_name} builds:")
+    def suggest_webpack_inspection
+      add_info("💡 To debug webpack builds:")
       add_info("    bin/shakapacker --mode=development --progress")
       add_info("    bin/shakapacker --mode=production --progress")
       add_info("    bin/shakapacker --debug-shakapacker  # Debug Shakapacker configuration")
 
-      add_info("💡 Advanced #{bundler_name} debugging:")
-      add_info("    1. Add 'debugger;' before '#{export_style}' in #{config_path}")
+      add_info("💡 Advanced webpack debugging:")
+      add_info("    1. Add 'debugger;' before 'module.exports' in config/webpack/webpack.config.js")
       add_info("    2. Run: ./bin/shakapacker --debug-shakapacker")
       add_info("    3. Open Chrome DevTools to inspect config object")
-      add_info(
-        "    📖 See: https://github.com/shakacode/shakapacker/blob/main/docs/troubleshooting.md#debugging-your-webpack-config"
-      )
+      add_info("    📖 See: https://github.com/shakacode/shakapacker/blob/main/docs/troubleshooting.md#debugging-your-webpack-config")
 
       add_info("💡 To analyze bundle size:")
       if bundle_analyzer_available?
         add_info("    ANALYZE=true bin/shakapacker")
-        add_info("    This opens the configured bundle analyzer in your browser")
-      elsif bundler_name == "webpack"
+        add_info("    This opens webpack-bundle-analyzer in your browser")
+      else
         add_info("    1. yarn add --dev webpack-bundle-analyzer")
-        add_info("    2. Add to #{config_path}:")
+        add_info("    2. Add to config/webpack/webpack.config.js:")
         add_info("       const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');")
         add_info("       // Add to plugins array when process.env.ANALYZE")
         add_info("    3. ANALYZE=true bin/shakapacker")
-      else
-        add_info("    1. Install a compatible analyzer for your rspack setup")
-        add_info("    2. Run: ANALYZE=true bin/shakapacker")
+        add_info("    Or use Shakapacker's built-in support if available")
       end
 
-      stats_file = bundler_name == "rspack" ? "rspack-stats.json" : "webpack-stats.json"
-      add_info("💡 Generate #{bundler_name} stats for analysis:")
-      add_info("    bin/shakapacker --json > #{stats_file}")
+      add_info("💡 Generate webpack stats for analysis:")
+      add_info("    bin/shakapacker --json > webpack-stats.json")
       add_info("    Upload to webpack.github.io/analyse or webpack-bundle-analyzer.com")
     end
 
     def bundle_analyzer_available?
-      package_json_path = resolved_package_json_path
-      return false unless File.exist?(package_json_path)
+      return false unless File.exist?("package.json")
 
       begin
-        package_json = JSON.parse(File.read(package_json_path))
+        package_json = JSON.parse(File.read("package.json"))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
         all_deps["webpack-bundle-analyzer"]
       rescue StandardError
@@ -381,23 +348,23 @@ module ReactOnRails
       end
     end
 
-    def check_webpack_config_content(config_path)
-      content = File.read(config_path)
-      bundler_name = bundler_name_for_config_path(config_path)
+    def check_webpack_config_content
+      webpack_config_path = "config/webpack/webpack.config.js"
+      content = File.read(webpack_config_path)
 
       if react_on_rails_config?(content)
-        add_success("✅ #{bundler_name.capitalize} config includes React on Rails environment configuration")
+        add_success("✅ Webpack config includes React on Rails environment configuration")
         add_info("    ℹ️  Environment-specific configs detected for optimal React on Rails integration")
       elsif standard_shakapacker_config?(content)
         add_warning(<<~MSG.strip)
-          ⚠️  Standard Shakapacker #{bundler_name} config detected.
+          ⚠️  Standard Shakapacker webpack config detected.
 
           React on Rails works better with environment-specific configuration.
           Consider running: rails generate react_on_rails:install --force
           This adds client and server environment configs for better performance.
         MSG
       else
-        add_info("ℹ️  Custom #{bundler_name} config detected")
+        add_info("ℹ️  Custom webpack config detected")
         add_info("    💡 Ensure config supports both client and server rendering")
         add_info("    💡 Verify React JSX transformation is configured")
         add_info("    💡 Check that asset output paths match Rails expectations")
@@ -432,7 +399,7 @@ module ReactOnRails
         "yarn"
       elsif File.exist?("pnpm-lock.yaml")
         "pnpm"
-      elsif File.exist?("bun.lock") || File.exist?("bun.lockb")
+      elsif File.exist?("bun.lockb")
         "bun"
       elsif File.exist?("package-lock.json")
         "npm"
@@ -460,16 +427,7 @@ module ReactOnRails
       File.exist?("bin/shakapacker") &&
         File.exist?("bin/shakapacker-dev-server") &&
         File.exist?("config/shakapacker.yml") &&
-        bundler_config_file_exists?
-    end
-
-    def bundler_config_file_exists?
-      # Fast path for common generator-default layouts (.js/.ts only). If none
-      # of these paths exist, we fall back to full candidate probing, which can
-      # include .cjs/.mjs variants in shakapacker-derived directories.
-      return true if ALL_DEFAULT_CONFIG_CANDIDATES.any? { |path| File.file?(path) }
-
-      !resolved_webpack_config_path.nil?
+        File.exist?("config/webpack/webpack.config.js")
     end
 
     def shakapacker_in_gemfile?
@@ -483,18 +441,10 @@ module ReactOnRails
     end
 
     def standard_shakapacker_config?(content)
-      # NOTE: Uses loose regex matching, unlike base_generator.rb's exact-string matching.
-      # Intentional: the system checker only needs to detect whether a config is
-      # "Shakapacker-flavored", not whether it's byte-for-byte identical to a default template.
       normalized = normalize_config_content(content)
       shakapacker_patterns = [
-        # CommonJS patterns (JS configs)
         /generateWebpackConfig.*require.*shakapacker/,
-        /webpackConfig.*require.*shakapacker/,
-        /generateRspackConfig.*require.*shakapacker/,
-        # ESM patterns (TS configs)
-        /generateWebpackConfig.*from ['"]shakapacker['"]/,
-        %r{generateRspackConfig.*from ['"]shakapacker/rspack['"]}
+        /webpackConfig.*require.*shakapacker/
       ]
       shakapacker_patterns.any? { |pattern| normalized.match?(pattern) }
     end
@@ -504,107 +454,6 @@ module ReactOnRails
              .gsub(%r{/\*.*?\*/}m, "")               # Remove multi-line comments
              .gsub(/\s+/, " ")                       # Normalize whitespace
              .strip
-    end
-
-    def resolve_default_bundler_config_path
-      paths_by_bundler = {
-        "rspack" => existing_bundler_config_paths("rspack"),
-        "webpack" => existing_bundler_config_paths("webpack")
-      }
-
-      present_paths = paths_by_bundler.select { |_bundler, paths| paths.any? }
-      return nil if present_paths.empty?
-      return present_paths.values.first.first if present_paths.one?
-
-      configured_bundler = configured_assets_bundler
-      if configured_bundler && paths_by_bundler[configured_bundler].any?
-        return warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
-      end
-
-      # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
-      # Webpack is the longer-established default; rspack users typically set
-      # assets_bundler explicitly in shakapacker.yml.
-      add_warning(
-        "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
-      )
-      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first
-    end
-
-    def warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
-      add_warning(
-        "⚠️  Found both webpack and rspack configs. Using #{configured_bundler} from config/shakapacker.yml."
-      )
-      paths_by_bundler[configured_bundler].first
-    end
-
-    def existing_bundler_config_paths(bundler)
-      # This runs only after detect_bundler_config_path has ruled out an exact
-      # explicit shakapacker path match, so directory-derived fallback
-      # candidates are intentionally considered here.
-      # Custom shakapacker config paths (non-standard basenames) are handled
-      # earlier via explicit_shakapacker_bundler_config_path? and intentionally
-      # excluded from this `<bundler>.config.*` classifier.
-      # webpack_config_candidates may consult Shakapacker config paths, but that
-      # lookup is memoized by shakapacker_assets_bundler_config_path.
-      bundler_prefix = "#{bundler}.config."
-      webpack_config_candidates.select do |path|
-        next false unless File.file?(path)
-
-        File.basename(path).start_with?(bundler_prefix)
-      end
-    end
-
-    def bundler_name_for_config_path(config_path)
-      return inferred_bundler_name(config_path) unless explicit_shakapacker_bundler_config_path?(config_path)
-
-      configured_bundler = configured_assets_bundler
-      return configured_bundler if configured_bundler
-
-      # For explicit custom shakapacker paths without assets_bundler in
-      # shakapacker.yml, fallback inference uses path heuristics and can
-      # misclassify non-standard filenames.
-      add_inferred_bundler_notice_once
-      inferred_bundler_name(config_path)
-    end
-
-    def inferred_bundler_name(config_path)
-      # Heuristic only: paths containing "rspack" are treated as rspack and all
-      # others as webpack. This is accurate for standard generator-created paths.
-      config_path.include?("rspack") ? "rspack" : "webpack"
-    end
-
-    def explicit_shakapacker_bundler_config_path?(resolved_config_path)
-      shakapacker_path = shakapacker_assets_bundler_config_path
-      !shakapacker_path.nil? && shakapacker_path == resolved_config_path
-    end
-
-    def add_inferred_bundler_notice_once
-      return if @inferred_bundler_notice_shown
-
-      add_info("ℹ️  assets_bundler not set in config/shakapacker.yml; inferring bundler from config path name.")
-      @inferred_bundler_notice_shown = true
-    end
-
-    def configured_assets_bundler
-      config = parsed_shakapacker_config
-      return nil unless config
-
-      rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
-      bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
-    rescue StandardError, ScriptError
-      nil
-    end
-
-    def bundler_from_shakapacker_section(config, section_name)
-      section = config[section_name] || config[section_name.to_sym]
-      return nil unless section.is_a?(Hash)
-
-      normalize_assets_bundler(section["assets_bundler"] || section[:assets_bundler])
-    end
-
-    def normalize_assets_bundler(value)
-      normalized = value.to_s.strip.downcase
-      SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
     end
 
     def required_react_dependencies
@@ -700,8 +549,8 @@ module ReactOnRails
     # rubocop:enable Metrics/CyclomaticComplexity
 
     def parse_package_json
-      JSON.parse(File.read(resolved_package_json_path))
-    rescue Errno::ENOENT, JSON::ParserError
+      JSON.parse(File.read("package.json"))
+    rescue JSON::ParserError
       add_warning("⚠️  Could not parse package.json to check React dependencies")
       nil
     end
@@ -840,11 +689,10 @@ module ReactOnRails
     end
 
     def report_webpack_version
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      return unless File.exist?("package.json")
 
       begin
-        package_json = JSON.parse(File.read(package_json_path))
+        package_json = JSON.parse(File.read("package.json"))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
         webpack_version = all_deps["webpack"]

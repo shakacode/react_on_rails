@@ -310,7 +310,7 @@ describe ReactOnRailsProHelper do
     end
     let(:chunks_read) { [] }
     let(:react_component_specification_tag) do
-      <<~SCRIPT
+      <<-SCRIPT.strip_heredoc
         <script type="application/json"
           id="js-react-on-rails-component-TestingStreamableComponent-react-component-0"
           class="js-react-on-rails-component"
@@ -322,7 +322,7 @@ describe ReactOnRailsProHelper do
       SCRIPT
     end
     let(:rails_context_tag) do
-      <<~SCRIPT
+      <<-SCRIPT.strip_heredoc
         <script type="application/json" id="js-react-on-rails-context">{"componentRegistryTimeout":5000,"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":true,"rorProVersion":"#{ReactOnRailsPro::VERSION}","rscPayloadGenerationUrlPath":"rsc_payload/","href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
       SCRIPT
     end
@@ -411,7 +411,7 @@ describe ReactOnRailsProHelper do
         expect(initial_result).to include(react_component_div_with_initial_chunk)
 
         # Wait for async task to complete
-        Async::Task.current.with_timeout(5) { @async_barrier.wait }
+        @async_barrier.wait
         @main_output_queue.close
 
         # Subsequent chunks should be in the output queue
@@ -520,27 +520,7 @@ describe ReactOnRailsProHelper do
           **component_options
         )
 
-        Async::Task.current.with_timeout(5) { @async_barrier.wait }
-        @main_output_queue.close
-        while @main_output_queue.dequeue; end
-
-        expect(on_complete_called).to be false
-      end
-
-      it "propagates pre-first-chunk errors to the caller" do
-        allow(self).to receive(:internal_stream_react_component)
-          .and_raise(StandardError, "node renderer crashed before first chunk")
-
-        on_complete_called = false
-        on_complete = lambda { |_chunks|
-          on_complete_called = true
-        }
-
-        expect do
-          stream_react_component(component_name, props: props, on_complete: on_complete, **component_options)
-        end.to raise_error(StandardError, "node renderer crashed before first chunk")
-
-        Async::Task.current.with_timeout(5) { @async_barrier.wait }
+        @async_barrier.wait
         @main_output_queue.close
         while @main_output_queue.dequeue; end
 

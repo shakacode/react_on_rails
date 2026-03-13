@@ -4,11 +4,11 @@ _Also, see [our React server-rendering documentation](../core-concepts/react-ser
 
 In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
 
-Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. ExecJS auto-detects the best available runtime, preferring mini_racer and Bun over Node.js when installed. You can override the runtime with the `EXECJS_RUNTIME` environment variable. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes. For details on ExecJS constraints with timers, async, and browser APIs, see [ExecJS Limitations](./execjs-limitations.md).
+Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. By default, ExecJS uses the Node.js runtime. You can use alternative runtimes as outlined in [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md).
 
 Note: if you use the [mini_racer](https://github.com/rubyjs/mini_racer) runtime and run into a `ReferenceError: TextEncoder is not defined` error, see [this comment](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717) for a solution.
 
-If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](../../pro/react-on-rails-pro.md).
+If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
 
 If you open the HTML source of any web page using React on Rails, you'll see the 3 parts of React on Rails rendering:
 

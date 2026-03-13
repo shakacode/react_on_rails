@@ -15,7 +15,7 @@ If you are only rendering one React component on a page, as is typical to do a "
 Consider using the `redux_store` helper for the two following use cases:
 
 1. You want to have multiple React components accessing the same store at once.
-2. You want to place the props to hydrate the client side stores at the very end of your HTML, probably server rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](../../pro/react-on-rails-pro.md) if you're at all concerned about performance.
+2. You want to place the props to hydrate the client side stores at the very end of your HTML, probably server rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) if you're at all concerned about performance.
 
 ## Multiple React Components on a Page with One Store
 
@@ -90,7 +90,7 @@ Include the module `ReactOnRails::Controller` in your controller, probably in Ap
   2. In your component definition, you'll call `ReactOnRails.getStore('storeName')` to get the hydrated Redux store to attach to your components.
 - **props:** Named parameter `props`. ReactOnRails takes care of setting up the hydration of your store with props from the view.
 
-For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy/app/controllers/pages_controller.rb). Note: this is preferable to using the equivalent view_helper `redux_store` in that you can be assured that the store is initialized before your components.
+For an example, see [spec/dummy/app/controllers/pages_controller.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/app/controllers/pages_controller.rb). Note: this is preferable to using the equivalent view_helper `redux_store` in that you can be assured that the store is initialized before your components.
 
 ## View Helper
 
@@ -100,9 +100,9 @@ This method has the same API as the controller extension. **HOWEVER**, we recomm
 
 `redux_store_hydration_data`
 
-Place this view helper (no parameters) at the end of your shared layout so ReactOnRails will render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client-side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy/app/views/layouts/application.html.erb).
+Place this view helper (no parameters) at the end of your shared layout so ReactOnRails will render the redux store hydration data. Since we're going to be setting up the stores in the controllers, we need to know where on the view to put the client-side rendering of this hydration data, which is a hidden div with a matching class that contains a data props. For an example, see [spec/dummy/app/views/layouts/application.html.erb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/app/views/layouts/application.html.erb).
 
 ## More Details
 
-- [lib/react_on_rails/controller.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/lib/react_on_rails/controller.rb) source
-- [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/lib/react_on_rails/helper.rb) source
+- [lib/react_on_rails/controller.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/controller.rb) source
+- [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/helper.rb) source

@@ -1,24 +1,15 @@
 name: React on Rails Pro - Package Tests
 
-permissions:
-  contents: read
-
 on:
   push:
     branches:
-      - 'main'
-    paths-ignore:
-      - 'AGENTS_USER_GUIDE.md'
-      - 'llms.txt'
-      - 'llms-full.txt'
+      - 'master'
+    # Always trigger on master; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
       - 'AGENTS_USER_GUIDE.md'
       - 'docs/**'
-      - 'llms.txt'
-      - 'llms-full.txt'
-      - '.lychee.toml'
       - 'react_on_rails/lib/**'
       - 'react_on_rails/spec/**'
       - 'packages/react_on_rails/**'
@@ -36,9 +27,6 @@ defaults:
 
 jobs:
   detect-changes:
-    # Skip Dependabot PRs — they can't access the Pro license secret.
-    # Scoped to pull_request so push-to-main after merge still runs Pro CI.
-    if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
     permissions:
       contents: read
       actions: read
@@ -68,12 +56,12 @@ jobs:
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
-      - name: Guard docs-only main pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: ./.github/actions/ensure-main-docs-safety
+      - name: Guard docs-only master pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: ./.github/actions/ensure-master-docs-safety
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
@@ -84,10 +72,10 @@ jobs:
     if: |
       !(
         github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
+        github.ref == 'refs/heads/master' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
+        github.ref == 'refs/heads/master' ||
         github.event_name == 'workflow_dispatch' ||
         needs.detect-changes.outputs.run_pro_tests == 'true'
       )
@@ -191,10 +179,10 @@ jobs:
     if: |
       !(
         github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
+        github.ref == 'refs/heads/master' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
+        github.ref == 'refs/heads/master' ||
         github.event_name == 'workflow_dispatch' ||
         needs.detect-changes.outputs.run_pro_tests == 'true'
       )
@@ -291,10 +279,10 @@ jobs:
     if: |
       !(
         github.event_name == 'push' &&
-        github.ref == 'refs/heads/main' &&
+        github.ref == 'refs/heads/master' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/main' ||
+        github.ref == 'refs/heads/master' ||
         github.event_name == 'workflow_dispatch' ||
         needs.detect-changes.outputs.run_pro_tests == 'true'
       )

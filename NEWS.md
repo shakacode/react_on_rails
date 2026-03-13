@@ -5,7 +5,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 - **October 14, 2020**: [RUBY ROGUES
   RR 474: React on Rails V12 – Don’t Shave That Yak! with Justin Gordon](https://devchat.tv/ruby-rogues/rr-474-react-on-rails-v12-dont-shave-that-yak-with-justin-gordon/).
 
-- **October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy) example repo for a simple configuration of Webpack via the rails/webpacker gem
+- **October 1, 2020**: See the [spec/dummy](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy) example repo for a simple configuration of Webpack via the rails/webpacker gem
   that supports SSR.
 - **August 2, 2020**: See the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr) for a new way to set up the creation of your SSR bundle with `rails/webpacker`.
 - July 8, 2020: Release **v12**.
@@ -27,9 +27,12 @@ _A history of the news. A few bullets at the top will also show on the [README.m
 - 2016-11-03: Spoke at [LA Ruby: "React on Rails: Why, What, and How?"](http://www.meetup.com/laruby/events/234825187/). [Video and pictures in this article](https://blog.shakacode.com/my-react-on-rails-talk-at-the-la-ruby-rails-meetup-november-10-2016-eaaa83aff800#.ej6h4eglp).
 - 2016-12-20: New Video on Egghead.io: [Creating a component with React on Rails](https://egghead.io/lessons/react-creating-a-component-with-react-on-rails)
 - 2016-11-03: Spoke at [LA Ruby, 7pm, Thursday, November 10 in Venice, CA: "React on Rails: Why, What, and How?"](http://www.meetup.com/laruby/events/234825187/). [Video and pictures in this article](https://blog.shakacode.com/my-react-on-rails-talk-at-the-la-ruby-rails-meetup-november-10-2016-eaaa83aff800#.ej6h4eglp).
-- 2016-08-27: We now have a [Documentation Gitbook](https://reactonrails.com/docs/) for improved readability & reference.
+- 2016-08-27: We now have a [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference.
 - 2016-08-21: v6.1 ships with several new features and bug fixes. See the [Changelog](CHANGELOG.md).
 - 2016-07-28: If you're doing server rendering, be sure to use mini_racer! See [issues/428](https://github.com/shakacode/react_on_rails/issues/428). It's supposedly much faster than `therubyracer`.
+
+- 2016-08-27: We now have a [Documentation Gitbook](https://shakacode.gitbooks.io/react-on-rails/content/) for improved readability & reference.
+- 2016-08-21: v6.1 ships with several new features and bug fixes. See the [Changelog](CHANGELOG.md).
 - 2016-06-13: 6.0.4 shipped with a critical fix regarding a missing polyfill for `clearTimeout`, used by babel-polyfill.
 - 2016-06-06: 6.0.2 shipped with a critical fix if you are fragment caching the server generated React.
 - 2016-05-24: 6.0.0 Released! Simplified generator and install process! See the [CHANGELOG.md](./CHANGELOG.md) for details.
@@ -43,7 +46,7 @@ _A history of the news. A few bullets at the top will also show on the [README.m
   - See [#311](https://github.com/shakacode/react_on_rails/pull/311/files).
   - Some breaking changes! See [CHANGELOG.md](./CHANGELOG.md) for details.
 - 2016-02-28: We added a [Projects page](PROJECTS.md). Please edit the page your project or [email us](mailto:contact@shakacode.com) and we'll add you. We also love stars as it helps us attract new users and contributors. [jbhatab](https://github.com/jbhatab) is leading an effort to ease the onboarding process for newbies with simpler project generators. See [#245](https://github.com/shakacode/react_on_rails/issues/245).
-- 3.0.6 shipped on Tuesday, 2016-03-01. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md#migration-steps-v1-to-v2). [Migration steps from 2.x](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md#migration-steps-v2-to-v3).
+- 3.0.6 shipped on Tuesday, 2016-03-01. Please see the [Changelog](CHANGELOG.md) for details, and let us know if you see any issues! [Migration steps from 1.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v1-to-v2). [Migration steps from 2.x](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#migration-steps-v2-to-v3).
   - [RubyGems](https://rubygems.org/gems/react_on_rails/)
   - [NPM](https://www.npmjs.com/package/react-on-rails)
 - 3.0.0 Highlights:

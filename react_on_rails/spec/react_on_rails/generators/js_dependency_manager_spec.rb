@@ -28,22 +28,6 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
         "/test/path"
       end
 
-      def say(message = "", color = nil, force_new_line = nil)
-        @say_calls ||= []
-        @say_calls << { message: message, color: color, force_new_line: force_new_line }
-      end
-
-      def say_status(status, message, log_status = nil)
-        @say_status_calls ||= []
-        @say_status_calls << { status: status, message: message, log_status: log_status }
-      end
-
-      def system(*args)
-        @system_calls ||= []
-        @system_calls << args
-        @system_result.nil? ? true : @system_result
-      end
-
       # Mock using_swc? from GeneratorHelper (defaults to true for SWC testing)
       def using_swc?
         @using_swc.nil? ? true : @using_swc
@@ -86,8 +70,6 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       end
 
       attr_writer :package_json
-
-      attr_reader :say_calls, :say_status_calls
     end
   end
 
@@ -382,14 +364,11 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "warns about invalid version format when version doesn't match semver" do
       stub_const("ReactOnRails::VERSION", "invalid-version")
-      allow(instance).to receive(:say_status).and_call_original
 
-      instance.send(:add_react_on_rails_package)
-      expect(instance).to have_received(:say_status).with(
-        :warning,
-        a_string_including("Unrecognized version format invalid-version"),
-        :yellow
-      )
+      # Capture stdout to verify the warning message
+      expect do
+        instance.send(:add_react_on_rails_package)
+      end.to output(/WARNING: Unrecognized version format invalid-version/).to_stdout
     end
 
     it "adds warning when add_package fails" do

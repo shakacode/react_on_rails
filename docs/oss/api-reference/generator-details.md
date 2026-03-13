@@ -4,7 +4,7 @@ The `react_on_rails:install` generator combined with the example pull requests o
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
-```text
+```
 Usage:
   rails generate react_on_rails:install [options]
 
@@ -58,7 +58,7 @@ can pass the redux option if you'd like to have redux setup for you automaticall
     Passing the --rsc generator option sets up React Server Components support.
     This automatically includes Pro setup (--rsc implies --pro). Creates RSC
     webpack configuration, a HelloServer example component, and RSC routes.
-    Requires React 19 with a compatible `react-on-rails-rsc` version.
+    Requires React 19.0.x.
 
 *******************************************************************************
 
@@ -78,7 +78,7 @@ The React on Rails generator creates different directory structures depending on
 
 The basic generator creates a simple, flat structure optimized for auto-bundling:
 
-```text
+```
 app/javascript/
 └── src/
     └── HelloWorld/
@@ -98,7 +98,7 @@ For components that need different client vs. server implementations, use `.clie
 
 The Redux generator creates a more structured organization with familiar Redux patterns:
 
-```text
+```
 app/javascript/
 └── src/
     └── HelloWorldApp/
@@ -209,7 +209,7 @@ rails generate react_on_rails:install --pro
 
 **Prerequisites:**
 
-- Add `gem 'react_on_rails_pro'` to your Gemfile and run `bundle install` (check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version)
+- Add `gem 'react_on_rails_pro', '>= 16.3.0'` to your Gemfile and run `bundle install`
 - Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license
 
 **What gets created:**
@@ -221,7 +221,7 @@ rails generate react_on_rails:install --pro
 
 **After installation:**
 
-Configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md) for all options.
+Configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md) for all options.
 
 **Combining with other options:**
 
@@ -261,7 +261,7 @@ rails generate react_on_rails:install --rsc
 **Prerequisites:**
 
 - React on Rails Pro gem installed (see Pro prerequisites above)
-- React 19 with a compatible `react-on-rails-rsc` version
+- React 19.0.x (RSC is not yet supported on React 19.1.x or later)
 
 RSC builds on React on Rails Pro's Node rendering infrastructure. The generator adds a separate webpack entry point for server components, configures the `RSCWebpackPlugin` in both client and server webpack configs, and sets up the `RSC_BUNDLE_ONLY` environment variable handling in `ServerClientOrBoth.js` for independent RSC bundle compilation.
 

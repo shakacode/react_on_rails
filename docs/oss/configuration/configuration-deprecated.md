@@ -21,7 +21,7 @@ react_component("MyComponent", immediate_hydration: false)
 # Non-Pro users: immediate_hydration is ignored
 ```
 
-See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for details.
+See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details.
 
 ## Deprecated Options
 
@@ -43,10 +43,10 @@ config.defer_generated_component_packs = true
 config.generated_component_packs_loading_strategy = :defer
 ```
 
-See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for more details.
+See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for more details.
 
 ## Need Help?
 
-- **Documentation:** [React on Rails Guides](https://reactonrails.com/docs/)
+- **Documentation:** [React on Rails Guides](https://www.shakacode.com/react-on-rails/docs/)
 - **Support:** [ShakaCode Forum](https://forum.shakacode.com/)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)

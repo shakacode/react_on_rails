@@ -18,7 +18,7 @@ If you are using [jquery-ujs](https://github.com/rails/jquery-ujs) for AJAX call
 
 ## API
 
-The best source of docs is the `interface ReactOnRails` in [types/index.ts](https://github.com/shakacode/react_on_rails/blob/main/packages/react-on-rails/src/types/index.ts). Here's a quick summary. No guarantees that this won't be outdated!
+The best source of docs is the `interface ReactOnRails` in [types/index.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/types/index.ts). Here's a quick summary. No guarantees that this won't be outdated!
 
 ```js
 /**
@@ -34,7 +34,7 @@ The best source of docs is the `interface ReactOnRails` in [types/index.ts](http
  * Your Ruby code with get this object as a Hash containing keys componentHtml and any other
  * custom keys that you added:
  * { renderedHtml: { componentHtml, customKey1, customKey2 } }
- * See the example in https://reactonrails.com/docs/building-features/react-helmet
+ * See the example in https://www.shakacode.com/react-on-rails/docs/javascript/react-helmet
  * @param components (key is component name, value is component)
  */
 register(components);
@@ -78,7 +78,7 @@ setOptions(options);
  * Allow directly calling the page loaded script in case the default events that trigger React
  * rendering are not sufficient, such as when loading JavaScript asynchronously with TurboLinks:
  * More details can be found here:
- * https://reactonrails.com/docs/building-features/turbolinks
+ * https://www.shakacode.com/react-on-rails/docs/building-features/turbolinks
  */
 reactOnRailsPageLoaded();
 

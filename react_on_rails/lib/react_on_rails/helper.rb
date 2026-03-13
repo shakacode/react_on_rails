@@ -74,7 +74,7 @@ module ReactOnRails
       when Hash
         msg = <<~MSG
           Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
-          https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
+          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
           for an example of the necessary javascript configuration.
         MSG
         raise ReactOnRails::Error, msg
@@ -88,7 +88,7 @@ module ReactOnRails
 
           If you're trying to use a Render-Function to return a Hash to your ruby view code, then use
           react_component_hash instead of react_component and see
-          https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
+          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
           for an example of the JavaScript code.
         MSG
         raise ReactOnRails::Error, msg
@@ -135,7 +135,7 @@ module ReactOnRails
       else
         msg = <<~MSG
           Render-Function used by react_component_hash for #{component_name} is expected to return
-          an Object. See https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
+          an Object. See https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
           for an example of the JavaScript code.
           Note, your Render-Function must either take 2 params or have the property
           `.renderFunction = true` added to it to distinguish it from a React Function Component.
@@ -210,56 +210,43 @@ module ReactOnRails
       render_options = ReactOnRails::ReactComponent::RenderOptions
                        .new(react_component_name: "generic-js", options: options)
 
-      js_code = <<~JS
-        (function() {
-          var htmlResult = '';
-          var consoleReplayScript = '';
-          var hasErrors = false;
-          var renderingError = null;
-          var renderingErrorObject = {};
+      js_code = <<-JS.strip_heredoc
+      (function() {
+        var htmlResult = '';
+        var consoleReplayScript = '';
+        var hasErrors = false;
+        var renderingError = null;
+        var renderingErrorObject = {};
 
-          try {
-            htmlResult =
-              (function() {
-                return #{js_expression};
-              })();
-          } catch(e) {
-            renderingError = e;
-            if (#{render_options.throw_js_errors}) {
-              throw e;
-            }
-            htmlResult = ReactOnRails.handleError({e: e, name: null,
-              jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
-            hasErrors = true;
-            var errorMessage = String(renderingError);
-            var errorStack = null;
-            // Guard against non-Error throws (e.g., throw null / throw "string").
-            // Boxed primitives (for example new Boolean(false)) are objects too.
-            if (renderingError && typeof renderingError === 'object') {
-              if ('message' in renderingError) {
-                errorMessage = String(renderingError.message);
-              }
-              // Use != (not !==) to guard both null and undefined stack values.
-              if ('stack' in renderingError && renderingError.stack != null) {
-                errorStack = String(renderingError.stack);
-              }
-            }
-            renderingErrorObject = {
-              message: errorMessage,
-              stack: errorStack,
-            };
+        try {
+          htmlResult =
+            (function() {
+              return #{js_expression};
+            })();
+        } catch(e) {
+          renderingError = e;
+          if (#{render_options.throw_js_errors}) {
+            throw e;
           }
+          htmlResult = ReactOnRails.handleError({e: e, name: null,
+            jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
+          hasErrors = true;
+          renderingErrorObject = {
+            message: renderingError.message,
+            stack: renderingError.stack,
+          }
+        }
 
-          consoleReplayScript = ReactOnRails.getConsoleReplayScript();
+        consoleReplayScript = ReactOnRails.getConsoleReplayScript();
 
-          return JSON.stringify({
-              html: htmlResult,
-              consoleReplayScript: consoleReplayScript,
-              hasErrors: hasErrors,
-              renderingError: renderingErrorObject
-          });
+        return JSON.stringify({
+            html: htmlResult,
+            consoleReplayScript: consoleReplayScript,
+            hasErrors: hasErrors,
+            renderingError: renderingErrorObject
+        });
 
-        })()
+      })()
       JS
 
       result = ReactOnRails::ServerRenderingPool
@@ -780,11 +767,11 @@ module ReactOnRails
       result << store_objects.each_with_object(declarations) do |redux_store_data, memo|
         store_name = redux_store_data[:store_name]
         props = props_string(redux_store_data[:props])
-        memo << <<~JS
-          reduxProps = #{props};
-          storeGenerator = ReactOnRails.getStoreGenerator(#{store_name.to_json});
-          store = storeGenerator(reduxProps, railsContext);
-          ReactOnRails.setStore(#{store_name.to_json}, store);
+        memo << <<-JS.strip_heredoc
+        reduxProps = #{props};
+        storeGenerator = ReactOnRails.getStoreGenerator(#{store_name.to_json});
+        store = storeGenerator(reduxProps, railsContext);
+        ReactOnRails.setStore(#{store_name.to_json}, store);
         JS
       end
       result

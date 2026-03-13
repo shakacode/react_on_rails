@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "rainbow"
 require "json"
 
 # rubocop:disable Metrics/ModuleLength
@@ -10,16 +11,12 @@ module GeneratorHelper
     require "package_json" unless defined?(PackageJson)
     @package_json ||= PackageJson.read
   rescue LoadError
-    unless @package_json_unavailable_warned
-      say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
-      say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
-                 :yellow
-      @package_json_unavailable_warned = true
-    end
+    puts "Warning: package_json gem not available. This is expected before Shakapacker installation."
+    puts "Dependencies will be installed using the default package manager after Shakapacker setup."
     nil
   rescue StandardError => e
-    say_status :warning, "Could not read package.json: #{e.message}", :yellow
-    say_status :warning, "This is normal before Shakapacker creates the package.json file.", :yellow
+    puts "Warning: Could not read package.json: #{e.message}"
+    puts "This is normal before Shakapacker creates the package.json file."
     nil
   end
 
@@ -37,8 +34,8 @@ module GeneratorHelper
       # package_json#add can return nil for successful side-effect operations.
       result != false
     rescue StandardError => e
-      say_status :warning, "Could not add packages via package_json gem: #{e.message}", :yellow
-      say_status :warning, "Will fall back to direct npm commands.", :yellow
+      puts "Warning: Could not add packages via package_json gem: #{e.message}"
+      puts "Will fall back to direct npm commands."
       false
     end
   end
@@ -52,18 +49,6 @@ module GeneratorHelper
   def dest_dir_exists?(dir)
     dest_dir = File.join(destination_root, dir)
     Dir.exist?(dest_dir) ? dest_dir : nil
-  end
-
-  # Detect whether config/routes.rb defines any non-commented root route.
-  #
-  # @param routes_path [String] absolute path to routes.rb
-  # @return [Boolean] true when a root route exists
-  def root_route_present?(routes_path = File.join(destination_root, "config/routes.rb"))
-    return false unless File.file?(routes_path)
-
-    File.foreach(routes_path).any? do |line|
-      !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
-    end
   end
 
   def setup_file_error(file, data)
@@ -110,11 +95,9 @@ module GeneratorHelper
   end
 
   def print_generator_messages
-    # GeneratorMessages stores pre-colored strings, so we strip ANSI manually for --no-color output.
-    no_color = !shell.is_a?(Thor::Shell::Color)
     GeneratorMessages.messages.each do |message|
-      say(no_color ? message.to_s.gsub(/\e\[[0-9;]*m/, "") : message)
-      say "" # Blank line after each message for readability
+      puts message
+      puts "" # Blank line after each message for readability
     end
   end
 

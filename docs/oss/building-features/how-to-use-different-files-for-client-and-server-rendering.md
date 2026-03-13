@@ -50,9 +50,9 @@ function setResolve(builderConfig, webpackConfig) {
 
  const resolve = {
     alias: {
-      // ... other aliases
+      ... // blah blah
       SomeJsFile,
-      // ... other aliases
+      ... // blah blah
     },
 ```
 
@@ -72,16 +72,16 @@ function setResolve(builderConfig, webpackConfig) {
   // Use a different resolution for Client and Server file
   let variant;
   if (builderConfig.serverRendering) {
-    variant = path.resolve(__dirname, "../bundles/variant/ServerOnly");
-  } else {
     variant = path.resolve(__dirname, "../bundles/variant/ClientOnly");
+  } else {
+    variant = path.resolve(__dirname, "../bundles/variant/serverOnly");
   }
 
  const resolve = {
     alias: {
-      // ... other aliases
-      variant,
-      // ... other aliases
+      ... // blah blah
+      variant
+      ... // blah blah
     },
 ```
 

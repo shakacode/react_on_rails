@@ -35,7 +35,7 @@
 # 2. Remove precompile_hook from config/shakapacker.yml if present
 # 3. Uncomment the run_precompile_tasks call near the bottom of this file
 #
-# See documentation: https://reactonrails.com/docs/building-features/extensible-precompile-pattern
+# See documentation: https://www.shakacode.com/react-on-rails/docs/building-features/extensible-precompile-pattern
 #
 # def run_precompile_tasks
 #   require_relative "../config/environment"
@@ -69,18 +69,10 @@ require "react_on_rails/dev"
 # Change this to your preferred default route, or pass --route=<route> to override.
 DEFAULT_ROUTE = "hello_world"
 
-# Fresh apps created by create-react-on-rails-app open the generated landing page
-# on first successful boot. Pass --no-open-browser to disable for a given run.
-AUTO_OPEN_BROWSER_ONCE = false
-
 # Main execution
 # Add the default route to ARGV if no --route option is provided
 argv_with_defaults = ARGV.dup
 argv_with_defaults.push("--route=#{DEFAULT_ROUTE}") unless argv_with_defaults.any? { |arg| arg.start_with?("--route") }
-browser_flags = %w[--open-browser --open-browser-once --no-open-browser]
-if AUTO_OPEN_BROWSER_ONCE && browser_flags.none? { |flag| argv_with_defaults.include?(flag) }
-  argv_with_defaults.push("--open-browser-once")
-end
 
 # Uncomment to run custom precompile tasks before starting the server
 # Only run for server start commands (not kill/help)

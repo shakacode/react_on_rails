@@ -91,7 +91,7 @@ module ReactOnRails
 
           # Set to anything to print generated code.
           File.write(file_name, js_code)
-          msg = <<~MSG
+          msg = <<-MSG.strip_heredoc
             #{'Z' * 80}
             [react_on_rails] #{msg}
             JavaScript code used: #{file_name}

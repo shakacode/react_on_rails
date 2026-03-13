@@ -17,7 +17,7 @@ module ReactOnRails
     def self.immediate_hydration_pro_install_warning(name, type = "Component")
       "[REACT ON RAILS] Warning: immediate_hydration: true requires the React on Rails Pro gem to be installed.\n" \
         "#{type} '#{name}' will fall back to standard hydration behavior.\n" \
-        "Visit https://reactonrails.com/docs/pro/ for installation details."
+        "Visit https://www.shakacode.com/react-on-rails-pro/ for installation details."
     end
 
     # Normalizes the immediate_hydration option value, enforcing Pro gem-availability requirements.
@@ -387,7 +387,7 @@ module ReactOnRails
       root = Rails.root
       return :yarn if File.exist?(File.join(root, "yarn.lock"))
       return :pnpm if File.exist?(File.join(root, "pnpm-lock.yaml"))
-      return :bun if File.exist?(File.join(root, "bun.lock")) || File.exist?(File.join(root, "bun.lockb"))
+      return :bun if File.exist?(File.join(root, "bun.lockb"))
       return :npm if File.exist?(File.join(root, "package-lock.json"))
 
       nil
