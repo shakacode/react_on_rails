@@ -20,7 +20,7 @@ npx create-react-on-rails-app my-app [options]
 - `--tailwind` - Add Tailwind CSS
 - `--pro` - Install React on Rails Pro with RSC demo (future enhancement)
 - `--skip-install` - Skip dependency installation
-- `--interactive` - Future enhancement: interactive mode with prompts (not in Phase 1)
+- `--interactive` - Interactive mode with prompts (future enhancement; not in Phase 1)
 
 ### Example Usage
 
@@ -36,9 +36,6 @@ npx create-react-on-rails-app my-app --template=redux-typescript --package-manag
 
 # Using Rspack bundler
 npx create-react-on-rails-app my-app --template=typescript --bundler=rspack
-
-# Future: interactive mode (prompts for all options)
-npx create-react-on-rails-app my-app --interactive
 
 # Future: React on Rails Pro with RSC
 npx create-react-on-rails-app my-app --pro
@@ -307,7 +304,7 @@ rails generate react_on_rails:install [--typescript] [--redux] [--rspack]
 - `--typescript` if template includes TypeScript
 - `--redux` if template is redux or redux-typescript
 - `--rspack` if bundler is rspack
-- `--ignore-warnings` for non-interactive mode
+- `--ignore-warnings` to bypass generator warnings in scripted runs
 
 ### Step 5: Apply Additional Templates
 

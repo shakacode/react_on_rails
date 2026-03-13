@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm run clean && tsc",
     "build-watch": "pnpm run clean && tsc --watch",
-    "clean": "node -e \"require('fs').rmSync('./lib',{recursive:true,force:true})\"",
+    "clean": "node -e \"require('fs').rmSync('./lib', { recursive: true, force: true })\"",
     "test": "jest tests",
     "type-check": "tsc --noEmit --noErrorTruncation",
     "prepublishOnly": "pnpm run build"
