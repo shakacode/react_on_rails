@@ -39,21 +39,21 @@ def simulate_npm_files(options)
   return unless options.fetch(:package_json, false)
 
   package_json = "package.json"
-  package_json_data = <<-JSON.strip_heredoc
-      {
-        "name": "foo",
-        "private": true,
-        "scripts": {
-          "foo": "bar"
-        },
-        "dependencies": {
-          "foo": "^0",
-          "react-on-rails": "5.2.0",
-          "bar": "^0"
-        },
-        "devDependencies": {
-        }
+  package_json_data = <<~JSON
+    {
+      "name": "foo",
+      "private": true,
+      "scripts": {
+        "foo": "bar"
+      },
+      "dependencies": {
+        "foo": "^0",
+        "react-on-rails": "5.2.0",
+        "bar": "^0"
+      },
+      "devDependencies": {
       }
+    }
   JSON
   simulate_existing_file(package_json, package_json_data)
 end

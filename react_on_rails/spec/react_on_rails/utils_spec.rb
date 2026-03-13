@@ -470,18 +470,18 @@ module ReactOnRails
 
       describe ".wrap_message" do
         subject(:stripped_heredoc) do
-          <<-MSG.strip_heredoc
-          Something to wrap
-          with 2 lines
+          <<~MSG
+            Something to wrap
+            with 2 lines
           MSG
         end
 
         let(:expected) do
-          msg = <<-MSG.strip_heredoc
-          ================================================================================
-          Something to wrap
-          with 2 lines
-          ================================================================================
+          msg = <<~MSG
+            ================================================================================
+            Something to wrap
+            with 2 lines
+            ================================================================================
           MSG
           Rainbow(msg).red
         end

@@ -183,7 +183,7 @@ module ReactOnRails
         add_configure_minitest_to_compile_assets(test_helper) if File.exist?(test_helper)
       end
 
-      CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
+      CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<~STR
         RSpec.configure do |config|
           # Ensure that if we are running js tests, we are using latest webpack assets
           # This will use the defaults of :js and :server_rendering meta tags
@@ -193,7 +193,7 @@ module ReactOnRails
         end
       STR
 
-      CONFIGURE_MINITEST_TO_COMPILE_ASSETS = <<-STR.strip_heredoc
+      CONFIGURE_MINITEST_TO_COMPILE_ASSETS = <<~STR
         # Ensure that tests run against fresh webpack assets.
         ActiveSupport::TestCase.setup do
           ReactOnRails::TestHelper.ensure_assets_compiled

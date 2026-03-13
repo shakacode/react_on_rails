@@ -208,7 +208,7 @@ describe ReactOnRailsHelper do
     let(:id) { "App-react-component-0" }
 
     let(:react_definition_script) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
@@ -217,7 +217,7 @@ describe ReactOnRailsHelper do
     end
 
     let(:react_definition_script_no_params) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
@@ -331,7 +331,7 @@ describe ReactOnRailsHelper do
       subject(:react_app) { react_component("App", props: props, random_dom_id: false) }
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
@@ -347,7 +347,7 @@ describe ReactOnRailsHelper do
       subject(:react_app) { react_component("App", props: props, random_dom_id: true) }
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component-0" \
           data-component-name="App" data-dom-id="App-react-component-0"
@@ -369,7 +369,7 @@ describe ReactOnRailsHelper do
       end
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
@@ -387,7 +387,7 @@ describe ReactOnRailsHelper do
       let(:id) { "shaka_div" }
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-shaka_div" \
           data-component-name="App" data-dom-id="shaka_div"

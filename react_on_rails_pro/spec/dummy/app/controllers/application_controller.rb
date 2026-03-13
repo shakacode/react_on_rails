@@ -5,6 +5,7 @@ class ApplicationController < ActionController::Base
   # For APIs, you may want to use :null_session instead.
   protect_from_forgery with: :exception
 
+  # rubocop:disable Metrics/BlockLength
   rescue_from ReactOnRails::PrerenderError do |err|
     Rails.logger.error("Caught ReactOnRails::PrerenderError in ApplicationController error handler.")
     Rails.logger.error(err.message)
@@ -44,7 +45,7 @@ class ApplicationController < ActionController::Base
 
       response.stream.close
     else
-      msg = <<-MSG.strip_heredoc
+      msg = <<~MSG
         Error prerendering in react_on_rails.
         Redirected back to '/server_side_log_throw_raise_invoker'.
         See server logs for output.
@@ -52,5 +53,6 @@ class ApplicationController < ActionController::Base
       redirect_to server_side_log_throw_raise_invoker_path,
                   flash: { error: msg }
     end
+    # rubocop:enable Metrics/BlockLength
   end
 end
