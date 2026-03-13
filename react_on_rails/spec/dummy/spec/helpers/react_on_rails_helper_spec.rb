@@ -498,17 +498,18 @@ describe ReactOnRailsHelper do
       allow(ReactOnRails::ServerRenderingPool)
         .to receive(:server_render_js_with_console_logging)
         .and_wrap_original do |_m, js_code, _opts|
-          runtime_result = runtime_context.call("runGeneratedCode", js_code)
-          captured_result = JSON.parse(runtime_result)
-          {
-            "html" => "",
-            "consoleReplayScript" => "",
-            "hasErrors" => false,
-            "renderingError" => {}
-          }
-        end
+        runtime_result = runtime_context.call("runGeneratedCode", js_code)
+        captured_result = JSON.parse(runtime_result)
+        {
+          "html" => "",
+          "consoleReplayScript" => "",
+          "hasErrors" => false,
+          "renderingError" => {}
+        }
+      end
 
       expect { server_render_js("(function() { throw null; })()") }.not_to raise_error
+      expect(captured_result).to be_a(Hash)
       expect(captured_result["hasErrors"]).to be(true)
       expect(captured_result.dig("renderingError", "message")).to eq("null")
     end

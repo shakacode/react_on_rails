@@ -7,9 +7,11 @@ class ApplicationController < ActionController::Base
 
   rescue_from ReactOnRails::PrerenderError do |err|
     log_prerender_error(err)
-    return stream_prerender_error_response if response.committed?
-
-    redirect_prerender_error_response
+    if response.committed?
+      stream_prerender_error_response
+    else
+      redirect_prerender_error_response
+    end
   end
 
   private
