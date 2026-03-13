@@ -70,14 +70,20 @@ module ReactOnRails
           binding
         end
 
-        def method_missing(method_name, ...)
-          return generator.__send__(method_name, ...) if generator.respond_to?(method_name, true)
-
-          super
+        def add_documentation_reference(*args)
+          generator.__send__(:add_documentation_reference, *args)
         end
 
-        def respond_to_missing?(method_name, include_private = false)
-          generator.respond_to?(method_name, true) || super
+        def use_pro?
+          generator.__send__(:use_pro?)
+        end
+
+        def use_rsc?
+          generator.__send__(:use_rsc?)
+        end
+
+        def shakapacker_version_9_or_higher?
+          generator.__send__(:shakapacker_version_9_or_higher?)
         end
       end
 
@@ -259,7 +265,7 @@ module ReactOnRails
           existing_content = File.read(webpack_config_path)
 
           # Check if it's the standard Shakapacker config that we can safely replace
-          if standard_shakapacker_config?(existing_content)
+          if standard_shakapacker_config?(existing_content, strip_comments: true)
             # Remove the file first to avoid conflict prompt, then recreate it
             remove_file(webpack_config_path, verbose: false)
             # Show what we're doing
@@ -325,9 +331,10 @@ module ReactOnRails
                      :yellow
           return
         end
-        # Preserve an empty directory as-is; only populated directories are candidates
-        # for managed cleanup.
-        return if all_entries.empty?
+        if all_entries.empty?
+          say_status :skip, "#{webpack_config_relative_dir} is empty; leaving it in place", :yellow
+          return
+        end
 
         return warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, all_entries) if all_dotfiles?(all_entries)
 
@@ -356,7 +363,8 @@ module ReactOnRails
 
       def warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, all_entries)
         say_status :warning,
-                   "Keeping #{webpack_config_relative_dir}; only dotfiles detected: #{all_entries.join(', ')}",
+                   "Keeping #{webpack_config_relative_dir}; only dotfiles found (e.g. .gitkeep): " \
+                   "#{all_entries.join(', ')}",
                    :yellow
       end
 
@@ -474,23 +482,29 @@ module ReactOnRails
         nil
       end
 
-      def standard_shakapacker_config?(content)
+      def standard_shakapacker_config?(content, strip_comments: false)
         # Get the expected default config based on Shakapacker version
         expected_configs = shakapacker_default_configs
 
         # Check if the content matches any of the known default configurations
-        expected_configs.any? { |config| content_matches_template?(content, config) }
+        expected_configs.any? { |config| content_matches_template?(content, config, strip_comments: strip_comments) }
       end
 
-      def content_matches_template?(content, template)
+      def content_matches_template?(content, template, strip_comments: false)
         # Normalize whitespace and compare
-        normalize_config_content(content) == normalize_config_content(template)
+        normalize_config_content(content, strip_comments: strip_comments) ==
+          normalize_config_content(template, strip_comments: strip_comments)
       end
 
-      def normalize_config_content(content)
-        # Normalize whitespace while preserving comments as potential customizations.
-        content.gsub(/\s+/, " ")
-               .strip
+      def normalize_config_content(content, strip_comments: false)
+        normalized_content = content
+        if strip_comments
+          normalized_content = normalized_content.gsub(%r{^\s*//.*$}, "")
+                                                 .gsub(%r{/\*.*?\*/}m, "")
+        end
+
+        # Normalize whitespace while preserving non-comment content.
+        normalized_content.gsub(/\s+/, " ").strip
       end
 
       def shakapacker_default_configs

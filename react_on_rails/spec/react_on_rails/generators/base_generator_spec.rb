@@ -116,4 +116,37 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
       expect(helper_content).to include('config.example_status_persistence_file_path = "spec/examples.txt"')
     end
   end
+
+  describe "#cleanup_stale_webpack_config_dir_for_rspack messaging" do
+    let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
+    let(:generator) { described_class.new([], { rspack: true }, { destination_root: destination }) }
+    let(:webpack_dir) { File.join(destination, "config/webpack") }
+
+    before do
+      FileUtils.rm_rf(destination)
+      FileUtils.mkdir_p(webpack_dir)
+    end
+
+    after do
+      FileUtils.rm_rf(destination)
+    end
+
+    it "logs a skip message when config/webpack exists but is empty" do
+      expect(generator).to receive(:say_status).with(:skip, "config/webpack is empty; leaving it in place", :yellow)
+
+      generator.send(:cleanup_stale_webpack_config_dir_for_rspack)
+
+      expect(File.directory?(webpack_dir)).to be(true)
+    end
+
+    it "logs a clearer warning when only dotfiles are present" do
+      File.write(File.join(webpack_dir, ".gitkeep"), "")
+      expect(generator).to receive(:say_status)
+        .with(:warning, "Keeping config/webpack; only dotfiles found (e.g. .gitkeep): .gitkeep", :yellow)
+
+      generator.send(:cleanup_stale_webpack_config_dir_for_rspack)
+
+      expect(File.directory?(webpack_dir)).to be(true)
+    end
+  end
 end

@@ -2068,6 +2068,17 @@ describe InstallGenerator, type: :generator do
       expect(generator.send(:standard_shakapacker_config?, content)).to be true
     end
 
+    it "recognizes stock webpack config with extra comments when comment-insensitive matching is enabled" do
+      content = <<~JS
+        // team-specific note
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be false
+      expect(generator.send(:standard_shakapacker_config?, content, strip_comments: true)).to be true
+    end
+
     it "recognizes stock rspack config with comments (Shakapacker 9.x)" do
       # Exact content from shakapacker 9.4.0 lib/install/config/rspack/rspack.config.js
       content = <<~JS
