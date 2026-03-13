@@ -2,7 +2,7 @@
 
 This guide covers the React-side challenges of migrating an existing React on Rails application to React Server Components (RSC). It focuses on how to restructure your component tree, handle Context and state management, migrate data fetching patterns, deal with third-party library compatibility, and avoid common pitfalls.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `rsc_payload_react_component`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/). For upgrade steps, see the [performance breakthroughs guide](../pro/major-performance-breakthroughs-upgrade-guide.md).
+> **React on Rails Pro required:** RSC support requires [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `rsc_payload_react_component`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
 
 ## Why Migrate?
 
