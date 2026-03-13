@@ -55,7 +55,7 @@
 <div style="padding: 1em; border: 2px solid #4caf50; border-radius: 6px; background: #e8f5e9; margin-bottom: 1.5em;">
   <h3 style="margin-top: 0;">Override Configs (runtime)</h3>
   <p style="margin-top: 0; font-size: 0.9em;">
-    Change values and click <strong>Apply</strong> to mutate the global config singletons.
+    Change values to automatically apply and mutate the global config singletons.
     Linked "Open page" test pages will use the overridden values.
   </p>
 
@@ -98,7 +98,7 @@
     </noscript>
   <% end %>
 
-  <%= button_to "Reset to defaults", reset_error_configs_path, method: :post,
+  <%= button_to "Reset to dummy defaults", reset_error_configs_path, method: :post,
         style: "margin-top: 0.5em; padding: 0.3em 1em; font-size: 0.9em; cursor: pointer;" %>
 </div>
 
@@ -195,7 +195,8 @@ end</pre>
     <span class="<%= throw_js_errors ? 'config-val-true' : 'config-val-false' %>"><%= throw_js_errors %></span>
   </h4>
   <p><strong>Gem:</strong> <code>react_on_rails_pro</code> &nbsp;|&nbsp;
-     <strong>Default:</strong> <code>true</code> &nbsp;|&nbsp;
+     <strong>Gem default:</strong> <code>true</code> &nbsp;|&nbsp;
+     <strong>Dummy app default:</strong> <code>false</code> &nbsp;|&nbsp;
      <strong>Set in:</strong> <code>config/initializers/react_on_rails_pro.rb</code></p>
 
   <div class="history">

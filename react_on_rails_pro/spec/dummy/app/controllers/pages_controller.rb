@@ -19,7 +19,21 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     session[:something_useful] = "REALLY USEFUL"
   end
 
-  before_action :apply_config_overrides
+  before_action :apply_config_overrides, only: %i[
+    error_scenarios_hub
+    server_side_log_throw
+    server_router
+    ssr_shell_error
+    ssr_async_error
+    ssr_sync_error
+    ssr_async_prop_error
+    rsc_component_error
+    non_existing_react_component
+    non_existing_stream_react_component
+    non_existing_rsc_payload
+    stream_error_demo
+    stream_shell_error_demo
+  ]
   before_action :data
 
   before_action :initialize_shared_store, only: %i[client_side_hello_world_shared_store_controller
@@ -244,6 +258,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   end
 
   def apply_config_overrides
+    # NOTE: This mutates global React on Rails config singletons and is not thread-safe.
+    # It is intended only for manual debugging in the dummy app.
     bool = ActiveModel::Type::Boolean.new
 
     if params[:raise_on_prerender_error].present?
