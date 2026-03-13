@@ -21,7 +21,14 @@ module ReactOnRails
     # - use_pro?, use_rsc?: Feature flag helpers
     # - pro_gem_installed?: Pro gem detection
     #
+    # rubocop:disable Metrics/ModuleLength
     module ProSetup
+      PRO_GEM_NAME = "react_on_rails_pro"
+      # Version is appended dynamically via pro_gem_auto_install_command to ensure
+      # the installed version matches the current react_on_rails gem version.
+      AUTO_INSTALL_TIMEOUT = 120
+      TERMINATION_GRACE_PERIOD = 5
+
       # Main entry point for Pro setup.
       # Orchestrates creation of all Pro-related files and configuration.
       #
@@ -46,17 +53,14 @@ module ReactOnRails
         puts Rainbow("=" * 80).cyan
       end
 
-      # Check if Pro gem is missing.
-      #
-      # @param force [Boolean] When true, always performs the check.
-      #   When false (default), only checks if Pro is required (use_pro? returns true).
-      #   Use force: true in standalone generators where Pro is always required.
-      # @return [Boolean] true if Pro gem is missing
+      # Check if Pro gem is missing. Attempts auto-install via bundle add.
+      # @param force [Boolean] When true, always checks (default: only if use_pro?).
+      # @return [Boolean] true if Pro gem is missing and could not be installed
       def missing_pro_gem?(force: false)
         return false unless force || use_pro?
         return false if pro_gem_installed?
+        return false if attempt_pro_gem_auto_install
 
-        # Detect context: install_generator defines :pro/:rsc options, standalone generators don't
         context_line = if options.key?(:pro) || options.key?(:rsc)
                          flag = options[:rsc] ? "--rsc" : "--pro"
                          "You specified #{flag}, which requires the react_on_rails_pro gem."
@@ -64,23 +68,109 @@ module ReactOnRails
                          "This generator requires the react_on_rails_pro gem."
                        end
 
+        # TODO(#2575): Replace temporary email CTA after react-unrails.com flow is live.
         GeneratorMessages.add_error(<<~MSG.strip)
-          🚫 React on Rails Pro gem is not installed.
+          🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
 
           #{context_line}
 
-          Add to your Gemfile:
-            gem 'react_on_rails_pro', '>= 16.3.0'
+          Please add manually to your Gemfile:
+            gem '#{PRO_GEM_NAME}', '~> #{recommended_pro_gem_version}'
 
           Then run: bundle install
 
           Try Pro free! Email justin@shakacode.com for an evaluation license.
-          More info: https://www.shakacode.com/react-on-rails-pro/
+          For evaluation licenses or more info, see: https://www.shakacode.com/react-on-rails-pro/
         MSG
         true
       end
 
       private
+
+      # Attempt to auto-install the Pro gem via bundle add.
+      # Uses Process.spawn instead of Timeout.timeout to avoid Thread#raise corrupting
+      # Bundler.with_unbundled_env's ENV restoration.
+      # @return [Boolean] true if the gem was successfully installed
+      def attempt_pro_gem_auto_install
+        puts Rainbow("📝 Adding #{PRO_GEM_NAME} to Gemfile...").yellow
+
+        status, output = run_bundle_add_with_captured_output
+        return timeout_install_failure unless status
+
+        puts output unless output.to_s.strip.empty?
+        return false unless status.success?
+
+        # The gem is now in Gemfile/lockfile but not loaded in the current Ruby process.
+        # Generator code that follows must not reference ReactOnRailsPro constants directly.
+        mark_pro_gem_installed!
+        true
+      rescue StandardError => e
+        puts Rainbow("⚠️  Failed to run bundle add: #{e.message}").red
+        false
+      end
+
+      def run_bundle_add_with_captured_output
+        output_r, output_w = IO.pipe
+        output_thread = nil
+
+        begin
+          pid = Bundler.with_unbundled_env do
+            Process.spawn(pro_gem_auto_install_command, out: output_w, err: output_w)
+          end
+          output_w.close
+          output_w = nil
+
+          # Read in a thread to prevent pipe buffer deadlock.
+          output_thread = Thread.new do
+            output_r.read
+          rescue IOError
+            ""
+          end
+
+          status = wait_for_bundle_process(pid)
+          output = output_thread.value
+          [status, output]
+        ensure
+          output_w.close if output_w && !output_w.closed?
+          output_r.close if output_r && !output_r.closed?
+          output_thread&.join(0.1)
+        end
+      end
+
+      def timeout_install_failure
+        puts Rainbow("⏱️  bundle add timed out after #{AUTO_INSTALL_TIMEOUT} seconds.").red
+        false
+      end
+
+      # Wait for a process to finish, killing it if it exceeds AUTO_INSTALL_TIMEOUT.
+      # @return [Process::Status, nil] status if process exited, nil if timed out
+      def wait_for_bundle_process(pid)
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + AUTO_INSTALL_TIMEOUT
+        loop do
+          _pid, status = Process.wait2(pid, Process::WNOHANG)
+          return status if status
+
+          if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+            Process.kill("TERM", pid)
+            term_deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + TERMINATION_GRACE_PERIOD
+            loop do
+              _term_pid, term_status = Process.wait2(pid, Process::WNOHANG)
+              return nil if term_status
+              break if Process.clock_gettime(Process::CLOCK_MONOTONIC) > term_deadline
+
+              sleep 0.2
+            end
+
+            Process.kill("KILL", pid)
+            Process.wait(pid)
+            return nil
+          end
+
+          sleep 0.5
+        end
+      rescue Errno::ECHILD, Errno::ESRCH
+        nil
+      end
 
       def create_pro_initializer
         initializer_path = "config/initializers/react_on_rails_pro.rb"
@@ -170,44 +260,47 @@ module ReactOnRails
         end
 
         content = File.read(webpack_config_path)
+        server_config_ready = pro_server_config_ready?(content)
+        import_ready = server_client_import_ready?
 
-        # Check if Pro settings are already enabled (not commented)
-        if content.include?("libraryTarget: 'commonjs2',") &&
-           !content.include?("// libraryTarget: 'commonjs2',")
+        # Skip only when both server config and import style are already updated.
+        if server_config_ready && import_ready
           puts Rainbow("ℹ️  Webpack config already has Pro settings enabled, skipping").yellow
           return
         end
 
         puts Rainbow("📝 Updating serverWebpackConfig.js for Pro...").yellow
 
-        # Add extractLoader helper function after bundler require
-        add_extract_loader_to_server_config(webpack_config, content)
+        unless server_config_ready
+          # Add extractLoader helper function after bundler require
+          add_extract_loader_to_server_config(webpack_config, content)
 
-        # Add Babel SSR caller setup (uses extractLoader, so must come after)
-        add_babel_ssr_caller_to_server_config(webpack_config, content)
+          # Add Babel SSR caller setup (uses extractLoader, so must come after)
+          add_babel_ssr_caller_to_server_config(webpack_config, content)
 
-        # Uncomment libraryTarget: 'commonjs2'
-        library_target_pattern = %r{// If using the React on Rails Pro.*\n\s*// libraryTarget: 'commonjs2',}
-        library_target_replacement = "// Required for React on Rails Pro Node Renderer\n    " \
-                                     "libraryTarget: 'commonjs2',"
-        gsub_file(webpack_config, library_target_pattern, library_target_replacement)
+          # Uncomment libraryTarget: 'commonjs2'
+          library_target_pattern = %r{// If using the React on Rails Pro.*\n\s*// libraryTarget: 'commonjs2',}
+          library_target_replacement = "// Required for React on Rails Pro Node Renderer\n    " \
+                                       "libraryTarget: 'commonjs2',"
+          gsub_file(webpack_config, library_target_pattern, library_target_replacement)
 
-        # Replace stale comments and uncomment target = 'node', add node = false
-        # The base template has 4 lines: 2 explanatory comments + "uncomment" hint + commented code
-        # Replace with clean Pro output matching the template's use_pro? branch
-        # rubocop:disable Layout/LineLength
-        target_node_pattern = %r{\s*// If using the default 'web',.*\n\s*// break with SSR\..*\n\s*// If using the React on Rails Pro.*\n\s*// serverWebpackConfig\.target = 'node'}
-        # rubocop:enable Layout/LineLength
-        target_node_replacement = "\n\n  " \
-                                  "// React on Rails Pro uses Node renderer, so target must be 'node'\n  " \
-                                  "// This fixes issues with libraries like Emotion and loadable-components\n  " \
-                                  "serverWebpackConfig.target = 'node';\n\n  " \
-                                  "// Disable Node.js polyfills - not needed when targeting Node\n  " \
-                                  "serverWebpackConfig.node = false;"
-        gsub_file(webpack_config, target_node_pattern, target_node_replacement)
+          # Replace stale comments and uncomment target = 'node', add node = false
+          # The base template has 4 lines: 2 explanatory comments + "uncomment" hint + commented code
+          # Replace with clean Pro output matching the template's use_pro? branch
+          # rubocop:disable Layout/LineLength
+          target_node_pattern = %r{\s*// If using the default 'web',.*\n\s*// break with SSR\..*\n\s*// If using the React on Rails Pro.*\n\s*// serverWebpackConfig\.target = 'node'}
+          # rubocop:enable Layout/LineLength
+          target_node_replacement = "\n\n  " \
+                                    "// React on Rails Pro uses Node renderer, so target must be 'node'\n  " \
+                                    "// This fixes issues with libraries like Emotion and loadable-components\n  " \
+                                    "serverWebpackConfig.target = 'node';\n\n  " \
+                                    "// Disable Node.js polyfills - not needed when targeting Node\n  " \
+                                    "serverWebpackConfig.node = false;"
+          gsub_file(webpack_config, target_node_pattern, target_node_replacement)
 
-        # Change module.exports to Pro style (exports object with default and extractLoader)
-        update_server_config_exports(webpack_config)
+          # Change module.exports to Pro style (exports object with default and extractLoader)
+          update_server_config_exports(webpack_config)
+        end
 
         # Update ServerClientOrBoth.js import style
         update_server_client_or_both_import
@@ -280,11 +373,8 @@ module ReactOnRails
 
       def verify_pro_webpack_transforms(webpack_config)
         content = File.read(File.join(destination_root, webpack_config))
-        missing = []
-        missing << "libraryTarget: 'commonjs2'" unless content.include?("libraryTarget: 'commonjs2',")
-        missing << "function extractLoader" unless content.include?("function extractLoader")
-        missing << "serverWebpackConfig.target = 'node'" unless content.include?("serverWebpackConfig.target = 'node'")
-        missing << "module.exports = {" unless content.include?("module.exports = {")
+        missing = missing_server_config_transforms(content)
+        missing.concat(missing_server_client_import_transform)
         return if missing.empty?
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -296,6 +386,30 @@ module ReactOnRails
           This can happen if your webpack config has been customized.
           Please verify #{webpack_config} manually.
         MSG
+      end
+
+      def missing_server_config_transforms(content)
+        checks = [
+          "libraryTarget: 'commonjs2',",
+          "function extractLoader",
+          "babelLoader.options.caller = { ssr: true }",
+          "serverWebpackConfig.target = 'node'",
+          "serverWebpackConfig.node = false",
+          "default: configureServer",
+          "extractLoader,"
+        ]
+
+        checks.reject { |pattern| content.include?(pattern) }
+      end
+
+      def missing_server_client_import_transform
+        server_client_path = resolve_server_client_or_both_path
+        return [] unless server_client_path
+
+        content = File.read(File.join(destination_root, server_client_path))
+        return [] if content.include?("{ default: serverWebpackConfig }")
+
+        ["{ default: serverWebpackConfig }"]
       end
 
       def update_server_client_or_both_import
@@ -314,7 +428,50 @@ module ReactOnRails
           %r{^const serverWebpackConfig = require\('\./serverWebpackConfig'\);$},
           "const { default: serverWebpackConfig } = require('./serverWebpackConfig');"
         )
+
+        new_content = File.read(File.join(destination_root, server_client_path))
+        return if new_content.include?("{ default: serverWebpackConfig }")
+
+        say_status(
+          :warning,
+          "ServerClientOrBoth import update failed in #{server_client_path}; manual edit required.",
+          :yellow
+        )
+      end
+
+      def pro_server_config_ready?(content)
+        # Check for the Pro-specific comment marker (written by the transform) to avoid
+        # false-negatives when commented-out lines also contain the pattern string.
+        content.include?("// Required for React on Rails Pro Node Renderer") &&
+          content.include?("function extractLoader") &&
+          content.include?("babelLoader.options.caller = { ssr: true }") &&
+          content.include?("serverWebpackConfig.target = 'node'") &&
+          content.include?("serverWebpackConfig.node = false") &&
+          content.include?("default: configureServer") &&
+          content.include?("extractLoader,")
+      end
+
+      def server_client_import_ready?
+        server_client_path = resolve_server_client_or_both_path
+        return true unless server_client_path
+
+        content = File.read(File.join(destination_root, server_client_path))
+        content.include?("{ default: serverWebpackConfig }")
+      end
+
+      def pro_gem_auto_install_command
+        "bundle add #{PRO_GEM_NAME} --version='~> #{recommended_pro_gem_version}' --strict"
+      end
+
+      # Keep manual fallback pinned to the latest stable release (drop pre-release suffixes like .rc.N).
+      # react_on_rails_pro follows the same version number as react_on_rails by policy.
+      # Both gems are released in lockstep; if this ever changes, replace with a dedicated constant.
+      def recommended_pro_gem_version
+        Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      rescue StandardError
+        ReactOnRails::VERSION
       end
     end
+    # rubocop:enable Metrics/ModuleLength
   end
 end

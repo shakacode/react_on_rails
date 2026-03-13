@@ -3,6 +3,7 @@
 require "rainbow"
 require "json"
 
+# rubocop:disable Metrics/ModuleLength
 module GeneratorHelper
   def package_json
     # Lazy load package_json gem only when actually needed for dependency management
@@ -127,6 +128,10 @@ module GeneratorHelper
     return @pro_gem_installed if defined?(@pro_gem_installed)
 
     @pro_gem_installed = Gem.loaded_specs.key?("react_on_rails_pro") || gem_in_lockfile?("react_on_rails_pro")
+  end
+
+  def mark_pro_gem_installed!
+    @pro_gem_installed = true
   end
 
   # Check if Pro features should be enabled
@@ -347,3 +352,4 @@ module GeneratorHelper
     config.dig("default", "assets_bundler") == "rspack"
   end
 end
+# rubocop:enable Metrics/ModuleLength

@@ -187,8 +187,10 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
-        !(missing_node? || missing_package_manager? || missing_pro_gem? ||
-          ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages))
+        # Check uncommitted_changes? before missing_pro_gem? so that
+        # auto-install does not mutate the Gemfile on a dirty working tree.
+        !(missing_node? || missing_package_manager? ||
+          ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages) || missing_pro_gem?)
       end
 
       def missing_node?

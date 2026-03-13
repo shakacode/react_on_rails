@@ -30,14 +30,23 @@ describe ProGenerator, type: :generator do
 
   context "when Pro gem is not installed" do
     let(:generator) { described_class.new }
+    let(:fake_pid) { 12_345 }
 
     before do
       allow(Gem).to receive(:loaded_specs).and_return({})
       allow(generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+      allow(generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: false))
     end
 
     specify "missing_pro_gem? returns true with standalone error message" do
       expect(generator.send(:missing_pro_gem?, force: true)).to be true
+      expect(Bundler).to have_received(:with_unbundled_env)
+      expect(Process).to have_received(:spawn)
+        .with(a_string_matching(/\Abundle add react_on_rails_pro --version='~> [\d.]+' --strict\z/),
+              out: anything, err: anything)
       error_text = GeneratorMessages.messages.join("\n")
       # Standalone message should NOT mention --pro flag
       expect(error_text).to include("This generator requires the react_on_rails_pro gem")
@@ -141,6 +150,41 @@ describe ProGenerator, type: :generator do
           expect(content).to include("{ default: serverWebpackConfig }")
           expect(content).not_to match(/^const serverWebpackConfig = require/)
         end
+      end
+    end
+  end
+
+  context "when server webpack has only libraryTarget uncommented" do
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_base_webpack_files
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      server_webpack_path = File.join(destination_root, "config/webpack/serverWebpackConfig.js")
+      partially_updated_content = File.read(server_webpack_path)
+                                      .sub("// libraryTarget: 'commonjs2',", "libraryTarget: 'commonjs2',")
+      File.write(server_webpack_path, partially_updated_content)
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "applies remaining Pro transforms instead of skipping as fully configured" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to include("function extractLoader")
+        expect(content).to include("babelLoader.options.caller = { ssr: true };")
+        expect(content).to include("serverWebpackConfig.target = 'node';")
+        expect(content).to include("serverWebpackConfig.node = false;")
+        expect(content).to include("module.exports = {")
+      end
+
+      assert_file "config/webpack/ServerClientOrBoth.js" do |content|
+        expect(content).to include("{ default: serverWebpackConfig }")
       end
     end
   end
