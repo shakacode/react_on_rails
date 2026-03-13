@@ -16,6 +16,8 @@ describe InstallGenerator, type: :generator do
   end
 
   def simulate_managed_stock_webpack_files(options = {})
+    # MANAGED_WEBPACK_FILE_TEMPLATES is private_constant; this fixture helper
+    # intentionally introspects it so tests track managed-file coverage.
     managed_template_map = ReactOnRails::Generators::BaseGenerator.const_get(:MANAGED_WEBPACK_FILE_TEMPLATES)
     managed_template_map.each do |filename, template_path|
       simulate_existing_file("config/webpack/#{filename}", render_stock_webpack_template(template_path, options))

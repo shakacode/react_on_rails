@@ -345,6 +345,7 @@ module ReactOnRails
         # We only clean up known top-level files. Any directory or unknown entry is
         # treated as non-removable so we don't recurse into user-managed content.
         non_removable_entries = non_removable_webpack_entries(all_entries)
+        removable_entries = removable_webpack_entries(all_entries)
         if non_removable_entries.empty?
           remove_stale_webpack_dir(webpack_config_relative_dir)
           return
@@ -355,7 +356,8 @@ module ReactOnRails
           return
         end
 
-        warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries)
+        remove_stale_webpack_files(webpack_config_relative_dir, removable_entries)
+        warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries, removable_entries)
       end
 
       def remove_stale_webpack_dir(webpack_config_relative_dir)
@@ -389,7 +391,7 @@ module ReactOnRails
                    :yellow
       end
 
-      def warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries)
+      def warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries, removed_entries = [])
         non_dotfile_entries = non_removable_entries.reject { |entry| entry.start_with?(".") }
         dotfiles = non_removable_entries.select { |entry| entry.start_with?(".") }
         non_removable_directories, non_removable_files = non_dotfile_entries.partition do |entry|
@@ -404,9 +406,15 @@ module ReactOnRails
         non_removable_sections << "dotfiles: #{dotfiles.join(', ')}" if dotfiles.any?
 
         non_removable_sections_message = non_removable_sections.join("; ")
+        removed_entries_message = if removed_entries.any?
+                                    " Removed stale managed files: #{removed_entries.join(', ')}."
+                                  else
+                                    ""
+                                  end
         say_status :warning,
                    "Keeping #{webpack_config_relative_dir}; " \
-                   "custom/non-removable entries detected: #{non_removable_sections_message}",
+                   "custom/non-removable entries detected: #{non_removable_sections_message}." \
+                   "#{removed_entries_message}",
                    :yellow
       end
 
@@ -519,7 +527,8 @@ module ReactOnRails
 
       def stale_webpack_config_entries
         Dir.children(stale_webpack_config_dir).sort
-      rescue Errno::EACCES, Errno::ENOENT # TOCTOU: directory may disappear between exist? check and read
+      rescue Errno::EACCES, Errno::ENOENT, Errno::ENOTDIR
+        # TOCTOU: directory may disappear between exist? check and read
         nil
       end
 
@@ -547,6 +556,8 @@ module ReactOnRails
         normalized_content = content
         if strip_comments
           # Replacement detection historically removed inline // comments too.
+          # Note: this also strips `//` in string literals (for example URLs),
+          # which can yield false-negatives and prompt for replacement.
           normalized_content = normalized_content.gsub(%r{//.*$}, "")
                                                  .gsub(%r{/\*.*?\*/}m, "")
         end
