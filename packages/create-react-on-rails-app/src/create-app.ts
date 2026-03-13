@@ -84,9 +84,13 @@ function printSuccessMessage(appName: string, route: string): void {
 }
 
 export function validateAppName(name: string): { success: boolean; error?: string } {
+  if (!name) {
+    return { success: false, error: 'App name is required.' };
+  }
+
   const trimmedName = name.trim();
 
-  if (!name || trimmedName === '') {
+  if (!trimmedName) {
     return { success: false, error: 'App name is required.' };
   }
 

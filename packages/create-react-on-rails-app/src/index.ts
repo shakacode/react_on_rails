@@ -10,7 +10,6 @@ import { detectPackageManager, logError, logInfo } from './utils.js';
 const packageJson = require('../package.json') as { version: string };
 
 function run(appName: string, rawOpts: Record<string, unknown>): void {
-  const normalizedAppName = appName.trim();
   const { template } = rawOpts;
   if (typeof template !== 'string' || (template !== 'javascript' && template !== 'typescript')) {
     logError(`Invalid template "${String(template)}". Must be "javascript" or "typescript".`);
@@ -38,7 +37,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
   console.log(`${chalk.bold('create-react-on-rails-app')} v${packageJson.version}`);
   console.log('');
 
-  const nameValidation = validateAppName(normalizedAppName);
+  const nameValidation = validateAppName(appName);
   if (!nameValidation.success) {
     logError(nameValidation.error ?? 'Invalid app name');
     process.exit(1);
@@ -76,10 +75,10 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
 
   console.log('');
   logInfo(
-    `Creating "${normalizedAppName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${options.rsc ? ', mode: rsc' : ''}`,
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${options.rsc ? ', mode: rsc' : ''}`,
   );
 
-  createApp(normalizedAppName, options);
+  createApp(appName, options);
 }
 
 const program = new Command();

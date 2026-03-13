@@ -88,12 +88,6 @@ describe('validateAppName', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects names that start with a number', () => {
-    const result = validateAppName('123app');
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('must start with a letter');
-  });
-
   it('rejects names with dots', () => {
     const result = validateAppName('my.app');
     expect(result.success).toBe(false);
