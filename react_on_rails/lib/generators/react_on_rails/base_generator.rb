@@ -597,8 +597,13 @@ module ReactOnRails
       end
 
       def bundler_main_config_template_path(base_path, config_path)
-        template_file_name = config_path.end_with?(".ts") ? "webpack.config.ts.tt" : "webpack.config.js.tt"
-        "#{base_path}/config/webpack/#{template_file_name}"
+        template_ext = config_path.end_with?(".ts") ? "ts.tt" : "js.tt"
+        template_base = if config_path.include?("/rspack/") || File.basename(config_path).start_with?("rspack.config")
+                          "rspack.config"
+                        else
+                          "webpack.config"
+                        end
+        "#{base_path}/config/webpack/#{template_base}.#{template_ext}"
       end
 
       def shakapacker_default_configs
