@@ -352,12 +352,16 @@ module ReactOnRails
         end
 
         if all_dotfiles?(non_removable_entries)
-          handle_dotfile_only_non_removable_entries(webpack_config_relative_dir, all_entries, non_removable_entries)
+          handle_dotfile_only_non_removable_entries(
+            webpack_config_relative_dir,
+            removable_entries,
+            non_removable_entries
+          )
           return
         end
 
-        remove_stale_webpack_files(webpack_config_relative_dir, removable_entries)
-        warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries, removable_entries)
+        removed_entries = remove_stale_webpack_files(webpack_config_relative_dir, removable_entries)
+        warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries, removed_entries)
       end
 
       def remove_stale_webpack_dir(webpack_config_relative_dir)
@@ -370,10 +374,13 @@ module ReactOnRails
                    :green
       end
 
-      def handle_dotfile_only_non_removable_entries(webpack_config_relative_dir, all_entries, non_removable_entries)
-        removable_entries = removable_webpack_entries(all_entries)
-        remove_stale_webpack_files(webpack_config_relative_dir, removable_entries)
-        warn_dotfiles_in_webpack_dir(webpack_config_relative_dir, non_removable_entries, removable_entries)
+      def handle_dotfile_only_non_removable_entries(
+        webpack_config_relative_dir,
+        removable_entries,
+        non_removable_entries
+      )
+        removed_entries = remove_stale_webpack_files(webpack_config_relative_dir, removable_entries)
+        warn_dotfiles_in_webpack_dir(webpack_config_relative_dir, non_removable_entries, removed_entries)
       end
 
       def cleanup_stale_webpack_config_dir?
@@ -386,7 +393,7 @@ module ReactOnRails
 
       def warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, all_entries)
         say_status :warning,
-                   "Keeping #{webpack_config_relative_dir}; only dotfiles found (e.g. .gitkeep): " \
+                   "Keeping #{webpack_config_relative_dir}; only dotfiles found: " \
                    "#{all_entries.join(', ')}",
                    :yellow
       end
@@ -448,8 +455,14 @@ module ReactOnRails
       end
 
       def remove_stale_webpack_files(webpack_config_relative_dir, entries)
-        entries.each do |entry|
-          remove_file(File.join(webpack_config_relative_dir, entry), verbose: false)
+        entries.each_with_object([]) do |entry, removed_entries|
+          relative_path = File.join(webpack_config_relative_dir, entry)
+          full_path = File.join(destination_root, relative_path)
+          remove_file(relative_path, verbose: false)
+          removed_entries << entry unless File.exist?(full_path)
+        rescue Errno::EACCES, Errno::ELOOP, Errno::ENOTDIR
+          # If we cannot stat after removal attempt, conservatively report as not removed.
+          nil
         end
       end
 
@@ -534,7 +547,7 @@ module ReactOnRails
 
       def safe_read_cleanup_file(path)
         File.read(path)
-      rescue Errno::EACCES, Errno::ELOOP, Errno::ENOENT, Errno::EISDIR
+      rescue Errno::EACCES, Errno::ELOOP, Errno::ENOENT, Errno::EISDIR, Errno::ENOTDIR
         nil
       end
 

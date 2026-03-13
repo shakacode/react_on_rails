@@ -142,7 +142,7 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
     it "logs a clearer warning when only dotfiles are present" do
       File.write(File.join(webpack_dir, ".gitkeep"), "")
       expect(generator).to receive(:say_status)
-        .with(:warning, "Keeping config/webpack; only dotfiles found (e.g. .gitkeep): .gitkeep", :yellow)
+        .with(:warning, "Keeping config/webpack; only dotfiles found: .gitkeep", :yellow)
 
       generator.send(:cleanup_stale_webpack_config_dir_for_rspack)
 
