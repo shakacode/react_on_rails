@@ -311,10 +311,7 @@ module ReactOnRails
           return
         end
 
-        unknown_files = non_removable_entries.join(", ")
-        say_status :warning,
-                   "Keeping #{webpack_config_relative_dir}; custom/unknown files detected: #{unknown_files}",
-                   :yellow
+        warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries)
       end
 
       def cleanup_stale_webpack_config_dir?
@@ -328,6 +325,21 @@ module ReactOnRails
       def warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, all_entries)
         say_status :warning,
                    "Keeping #{webpack_config_relative_dir}; only dotfiles detected: #{all_entries.join(', ')}",
+                   :yellow
+      end
+
+      def warn_non_removable_webpack_entries(webpack_config_relative_dir, non_removable_entries)
+        if all_dotfiles?(non_removable_entries)
+          warn_dotfiles_only_webpack_dir(webpack_config_relative_dir, non_removable_entries)
+          return
+        end
+
+        unknown_files = non_removable_entries.reject { |entry| entry.start_with?(".") }
+        dotfiles = non_removable_entries.select { |entry| entry.start_with?(".") }
+        unknown_files_message = unknown_files.join(", ")
+        unknown_files_message += " (plus dotfiles: #{dotfiles.join(', ')})" if dotfiles.any?
+        say_status :warning,
+                   "Keeping #{webpack_config_relative_dir}; custom/unknown files detected: #{unknown_files_message}",
                    :yellow
       end
 

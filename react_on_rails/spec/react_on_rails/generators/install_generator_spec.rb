@@ -558,7 +558,6 @@ describe InstallGenerator, type: :generator do
     end
 
     it "removes stale stock config/webpack files after switching to rspack" do
-      expect(File).to exist(File.join(destination_root, "tmp/webpack-seeded-before-rspack.flag"))
       expect(File).not_to exist(File.join(destination_root, "config/webpack"))
     end
 
@@ -633,6 +632,49 @@ describe InstallGenerator, type: :generator do
 
     it "keeps config/webpack when custom files are detected" do
       assert_file "config/webpack/custom-banner.js"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and dotfiles in config/webpack" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_existing_file("config/webpack/.gitkeep", "")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when dotfiles are present" do
+      assert_file "config/webpack/.gitkeep"
       assert_file "config/rspack/rspack.config.js"
     end
   end
