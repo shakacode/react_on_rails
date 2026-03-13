@@ -91,12 +91,12 @@ module ReactOnRails
       # Bundler.with_unbundled_env's ENV restoration.
       # @return [Boolean] true if the gem was successfully installed
       def attempt_pro_gem_auto_install
-        puts Rainbow("📝 Adding #{PRO_GEM_NAME} to Gemfile...").yellow
+        say "📝 Adding #{PRO_GEM_NAME} to Gemfile...", :yellow
 
         status, output = run_bundle_add_with_captured_output
         return timeout_install_failure unless status
 
-        puts output unless output.to_s.strip.empty?
+        say output unless output.to_s.strip.empty?
         return false unless status.success?
 
         # The gem is now in Gemfile/lockfile but not loaded in the current Ruby process.
@@ -104,7 +104,7 @@ module ReactOnRails
         mark_pro_gem_installed!
         true
       rescue StandardError => e
-        puts Rainbow("⚠️  Failed to run bundle add: #{e.message}").red
+        say "⚠️  Failed to run bundle add: #{e.message}", :red
         false
       end
 
@@ -137,7 +137,7 @@ module ReactOnRails
       end
 
       def timeout_install_failure
-        puts Rainbow("⏱️  bundle add timed out after #{AUTO_INSTALL_TIMEOUT} seconds.").red
+        say "⏱️  bundle add timed out after #{AUTO_INSTALL_TIMEOUT} seconds.", :red
         false
       end
 
