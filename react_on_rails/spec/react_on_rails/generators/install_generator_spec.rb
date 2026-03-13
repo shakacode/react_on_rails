@@ -556,6 +556,10 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "removes stale stock config/webpack files after switching to rspack" do
+      expect(File).not_to exist(File.join(destination_root, "config/webpack"))
+    end
+
     it "configures rspack in shakapacker.yml" do
       assert_file "config/shakapacker.yml" do |content|
         # Should have rspack as the bundler (inherited by all environments via YAML anchor)
@@ -584,6 +588,50 @@ describe InstallGenerator, type: :generator do
         # Comments should be preserved
         expect(content).to include("# Note: You must restart")
       end
+    end
+  end
+
+  context "with --rspack and custom webpack files" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+          # precompile_hook: ~
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_existing_file("config/webpack/custom-banner.js", "module.exports = { custom: true };\n")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when custom files are detected" do
+      assert_file "config/webpack/custom-banner.js"
+      assert_file "config/rspack/rspack.config.js"
     end
   end
 

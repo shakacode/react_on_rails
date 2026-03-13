@@ -2,6 +2,7 @@
 
 require "rails/generators"
 require "fileutils"
+require "erb"
 require_relative "generator_messages"
 require_relative "generator_helper"
 require_relative "js_dependency_manager"
@@ -46,6 +47,20 @@ module ReactOnRails
                    type: :boolean,
                    default: false,
                    hide: true
+
+      MANAGED_WEBPACK_FILE_TEMPLATES = {
+        "clientWebpackConfig.js" => "base/base/config/webpack/clientWebpackConfig.js.tt",
+        "commonWebpackConfig.js" => "base/base/config/webpack/commonWebpackConfig.js.tt",
+        "test.js" => "base/base/config/webpack/test.js.tt",
+        "development.js" => "base/base/config/webpack/development.js.tt",
+        "production.js" => "base/base/config/webpack/production.js.tt",
+        "serverWebpackConfig.js" => "base/base/config/webpack/serverWebpackConfig.js.tt",
+        "ServerClientOrBoth.js" => "base/base/config/webpack/ServerClientOrBoth.js.tt",
+        "rscWebpackConfig.js" => "rsc/base/config/webpack/rscWebpackConfig.js.tt"
+      }.freeze
+
+      REMOVABLE_WEBPACK_FILES = (MANAGED_WEBPACK_FILE_TEMPLATES.keys +
+        %w[webpack.config.js generateWebpackConfigs.js]).freeze
 
       def add_hello_world_route
         # RSC uses HelloServer instead of HelloWorld, but Redux still needs hello_world route
@@ -104,6 +119,8 @@ module ReactOnRails
       end
 
       def copy_webpack_config
+        cleanup_stale_webpack_config_dir_for_rspack
+
         say "Adding #{using_rspack? ? 'Rspack' : 'Webpack'} config"
         base_path = "base/base"
         base_files = %w[babel.config.js
@@ -271,6 +288,57 @@ module ReactOnRails
         else
           "config/webpack/webpack.config.js"
         end
+      end
+
+      def cleanup_stale_webpack_config_dir_for_rspack
+        return unless using_rspack?
+        return unless Dir.exist?(stale_webpack_config_dir)
+
+        entries = Dir.children(stale_webpack_config_dir).reject { |entry| entry.start_with?(".") }.sort
+        return if entries.empty?
+
+        non_removable_entries = entries.reject { |entry| removable_webpack_entry?(entry) }
+        if non_removable_entries.empty?
+          remove_dir("config/webpack", verbose: false)
+          say_status :remove, "config/webpack (stale webpack configs after switching to --rspack)", :green
+          return
+        end
+
+        say_status :warning,
+                   "Keeping config/webpack; custom/unknown files detected: #{non_removable_entries.join(', ')}",
+                   :yellow
+      end
+
+      def removable_webpack_entry?(entry)
+        return false unless REMOVABLE_WEBPACK_FILES.include?(entry)
+
+        full_path = File.join(stale_webpack_config_dir, entry)
+        return false unless File.file?(full_path)
+
+        content = File.read(full_path)
+
+        case entry
+        when "webpack.config.js", "generateWebpackConfigs.js"
+          standard_shakapacker_config?(content) || react_on_rails_config?(content)
+        else
+          template_path = MANAGED_WEBPACK_FILE_TEMPLATES.fetch(entry, nil)
+          return false unless template_path
+
+          content_matches_template?(content, rendered_template_for_cleanup(template_path))
+        end
+      end
+
+      def rendered_template_for_cleanup(template_path)
+        @rendered_template_cache ||= {}
+        @rendered_template_cache[template_path] ||= begin
+          config = { message: "// The source code including full typescript support is available at:" }
+          template_content = File.read(File.join(self.class.source_root, template_path))
+          ERB.new(template_content, trim_mode: "-").result(binding)
+        end
+      end
+
+      def stale_webpack_config_dir
+        File.join(destination_root, "config/webpack")
       end
 
       def standard_shakapacker_config?(content)
