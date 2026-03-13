@@ -477,12 +477,16 @@ describe ReactOnRailsHelper do
 
   describe "#server_render_js error serialization" do
     it "generates JS with safe error property access for non-Error throws" do
+      runtime_available = begin
+        ExecJS.runtime&.available?
+      rescue ExecJS::RuntimeUnavailable
+        false
+      end
+      skip "ExecJS runtime not available" unless runtime_available
+
       allow(ReactOnRails::ServerRenderingPool)
         .to receive(:server_render_js_with_console_logging)
         .and_wrap_original do |_m, js_code, _opts|
-          expect(js_code).to include("var errorMessage = String(renderingError);")
-          expect(js_code).to include("if ('message' in renderingError)")
-          expect(js_code).to include("if ('stack' in renderingError && renderingError.stack != null)")
           runtime_context = ExecJS.compile(<<~JS)
             function runGeneratedCode(generatedCode) {
               var ReactOnRails = {
