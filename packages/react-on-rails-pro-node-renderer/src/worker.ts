@@ -30,6 +30,9 @@ import {
   getAssetPath,
   getBundleDirectory,
   getRequestBundleFilePath,
+  cleanIncompleteBundleDirectory,
+  isBundleComplete,
+  markBundleComplete,
 } from './shared/utils.js';
 import { lock, unlock } from './shared/locks.js';
 import { startSsrRequestOptions, trace } from './shared/tracing.js';
@@ -361,7 +364,27 @@ export default function run(config: Partial<Config>) {
         }
 
         try {
+          const cleanedIncompleteDirectory = await cleanIncompleteBundleDirectory(bundleTimestamp);
+          if (cleanedIncompleteDirectory) {
+            log.warn(`Removed incomplete bundle directory before asset upload: ${bundleDirectory}`);
+          }
+
           await copyUploadedAssets(assets, bundleDirectory);
+
+          // Mark complete only when the bundle JS exists after copy.
+          // This covers fresh directories and cleaned incomplete directories.
+          // Asset-only uploads intentionally remain incomplete so render requests
+          // can still recover safely by requesting a full bundle upload.
+          const bundleFileExistsAfterCopy = await fileExistsAsync(bundleFilePath);
+          if (bundleFileExistsAfterCopy && !(await isBundleComplete(bundleTimestamp))) {
+            await markBundleComplete(bundleTimestamp);
+          } else if (!bundleFileExistsAfterCopy) {
+            log.warn(
+              'Asset-only upload to %s: bundle JS not present, directory remains incomplete until full bundle upload.',
+              bundleDirectory,
+            );
+          }
+
           log.info(`Copied assets to bundle directory: ${bundleDirectory}`);
         } finally {
           try {
@@ -377,9 +400,26 @@ export default function run(config: Partial<Config>) {
       });
 
       const results = await Promise.allSettled(copyPromises);
-      const firstFailure = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-      if (firstFailure) {
-        throw firstFailure.reason;
+      const failures = results.filter(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      );
+      if (failures.length > 0) {
+        failures.forEach((failure, index) => {
+          log.error({
+            msg: `Asset upload failed for target bundle ${index + 1}/${targetBundles.length}`,
+            err: failure.reason,
+            task: taskDescription,
+          });
+        });
+
+        const failureMessages = failures
+          .map((failure) =>
+            failure.reason instanceof Error ? failure.reason.message : String(failure.reason),
+          )
+          .join('; ');
+        throw new Error(
+          `Asset upload failed for ${failures.length}/${targetBundles.length} target bundles: ${failureMessages}`,
+        );
       }
 
       await setResponse(
@@ -432,10 +472,18 @@ export default function run(config: Partial<Config>) {
     const results = await Promise.all(
       targetBundles.map(async (bundleHash) => {
         const assetPath = getAssetPath(bundleHash, filename);
-        const exists = await fileExistsAsync(assetPath);
+        const [assetExists, bundleComplete] = await Promise.all([
+          fileExistsAsync(assetPath),
+          isBundleComplete(bundleHash),
+        ]);
+        const exists = assetExists && bundleComplete;
 
         if (exists) {
           log.info(`/asset-exists Uploaded asset DOES exist in bundle ${bundleHash}: ${assetPath}`);
+        } else if (assetExists) {
+          log.info(
+            `/asset-exists Uploaded asset exists in incomplete bundle ${bundleHash}, treating it as missing: ${assetPath}`,
+          );
         } else {
           log.info(`/asset-exists Uploaded asset DOES NOT exist in bundle ${bundleHash}: ${assetPath}`);
         }

@@ -1,11 +1,13 @@
 import cluster from 'cluster';
 import path from 'path';
+import { readdir, rm, writeFile } from 'fs/promises';
 import { MultipartFile } from '@fastify/multipart';
 import { createWriteStream, ensureDir, move, MoveOptions, copy, CopyOptions } from 'fs-extra';
 import { Readable, Writable, pipeline, PassThrough } from 'stream';
 import { promisify } from 'util';
 import * as errorReporter from './errorReporter.js';
 import { getConfig } from './configBuilder.js';
+import fileExistsAsync from './fileExistsAsync.js';
 import log from './log.js';
 import type { TracingContext } from './tracing.js';
 import type { RenderResult } from '../worker/vm.js';
@@ -92,6 +94,8 @@ export interface Asset {
   filename: string;
 }
 
+export const BUNDLE_COMPLETE_MARKER_FILE = '.react-on-rails-node-renderer-bundle-completed';
+
 export function moveUploadedAsset(
   asset: Asset,
   destinationPath: string,
@@ -109,13 +113,27 @@ export function copyUploadedAsset(
 }
 
 export async function copyUploadedAssets(uploadedAssets: Asset[], targetDirectory: string): Promise<void> {
-  const copyMultipleAssets = uploadedAssets.map((asset) => {
+  const filteredAssets = uploadedAssets.filter((asset) => {
+    if (asset.filename === BUNDLE_COMPLETE_MARKER_FILE) {
+      log.warn('Skipping uploaded asset with reserved bundle-completion marker filename: %s', asset.filename);
+      return false;
+    }
+    return true;
+  });
+  const copyMultipleAssets = filteredAssets.map((asset) => {
     const destinationAssetFilePath = path.join(targetDirectory, asset.filename);
-    return copyUploadedAsset(asset, destinationAssetFilePath, { overwrite: true });
+    return copyUploadedAsset(asset, destinationAssetFilePath, {
+      // Bundle directories become immutable once complete. Keep existing files
+      // so concurrent or duplicate uploads cannot partially overwrite good assets.
+      // In incomplete directories, cleanIncompleteBundleDirectory runs first, so
+      // pre-existing files here indicate a concurrent duplicate copy, not stale data.
+      overwrite: false,
+      errorOnExist: false,
+    });
   });
   await Promise.all(copyMultipleAssets);
   log.info(
-    `Copied assets ${JSON.stringify(uploadedAssets.map((fileDescriptor) => fileDescriptor.filename))}`,
+    `Copied assets ${JSON.stringify(filteredAssets.map((fileDescriptor) => fileDescriptor.filename))}`,
   );
 }
 
@@ -180,7 +198,74 @@ export const delay = (milliseconds: number) =>
 
 export function getBundleDirectory(bundleTimestamp: string | number) {
   const { serverBundleCachePath } = getConfig();
-  return path.join(serverBundleCachePath, `${bundleTimestamp}`);
+  const cacheRoot = path.resolve(serverBundleCachePath);
+  const bundleDirectory = path.resolve(serverBundleCachePath, `${bundleTimestamp}`);
+  const cacheRootPrefix = cacheRoot.endsWith(path.sep) ? cacheRoot : `${cacheRoot}${path.sep}`;
+
+  if (!bundleDirectory.startsWith(cacheRootPrefix)) {
+    throw new Error(`Refusing to access bundle directory outside cache root: ${bundleDirectory}`);
+  }
+
+  return bundleDirectory;
+}
+
+export function getBundleCompleteMarkerPath(bundleTimestamp: string | number) {
+  const bundleDirectory = getBundleDirectory(bundleTimestamp);
+  return path.join(bundleDirectory, BUNDLE_COMPLETE_MARKER_FILE);
+}
+
+export async function isBundleComplete(bundleTimestamp: string | number): Promise<boolean> {
+  return fileExistsAsync(getBundleCompleteMarkerPath(bundleTimestamp));
+}
+
+// Deletes partial uploads while preserving in-progress lockfiles.
+export async function cleanIncompleteBundleDirectory(bundleTimestamp: string | number): Promise<boolean> {
+  if (await isBundleComplete(bundleTimestamp)) {
+    return false;
+  }
+
+  const bundleDirectory = getBundleDirectory(bundleTimestamp);
+  if (!(await fileExistsAsync(bundleDirectory))) {
+    return false;
+  }
+
+  let entries: string[];
+  try {
+    entries = await readdir(bundleDirectory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+
+  // Re-check completeness after directory read to reduce a race window where
+  // another writer can finish and mark complete while this cleaner is in-flight.
+  //
+  // Contract: callers must hold the per-bundle lock (keyed by the bundle JS
+  // path) before invoking this helper. Under that lock, concurrent writers to
+  // the same bundle directory are serialized, so a complete marker cannot be
+  // written mid-cleanup on valid call paths.
+  if (await isBundleComplete(bundleTimestamp)) {
+    return false;
+  }
+
+  const entriesToRemove = entries.filter(
+    (entry) => !entry.endsWith('.lock') && entry !== BUNDLE_COMPLETE_MARKER_FILE,
+  );
+  if (entriesToRemove.length === 0) {
+    return false;
+  }
+
+  await Promise.all(
+    entriesToRemove.map((entry) => rm(path.join(bundleDirectory, entry), { recursive: true, force: true })),
+  );
+
+  return true;
+}
+
+export async function markBundleComplete(bundleTimestamp: string | number): Promise<void> {
+  await writeFile(getBundleCompleteMarkerPath(bundleTimestamp), '');
 }
 
 export function getRequestBundleFilePath(bundleTimestamp: string | number) {

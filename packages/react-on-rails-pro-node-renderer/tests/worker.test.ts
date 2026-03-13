@@ -1,5 +1,7 @@
 import formAutoContent from 'form-auto-content';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import querystring from 'querystring';
 import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
@@ -21,6 +23,8 @@ import {
   serverBundleCachePath,
   assetPath,
   assetPathOther,
+  bundleCompleteMarkerPath,
+  BUNDLE_COMPLETE_MARKER_FILE,
 } from './helper';
 
 const testName = 'worker';
@@ -249,6 +253,7 @@ describe('worker', () => {
   test('post /asset-exists when asset exists', async () => {
     const bundleHash = 'some-bundle-hash';
     await createAsset(testName, bundleHash);
+    fs.writeFileSync(bundleCompleteMarkerPath(testName, bundleHash), '');
 
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
@@ -269,6 +274,32 @@ describe('worker', () => {
     expect(res.json()).toEqual({
       exists: true,
       results: [{ bundleHash, exists: true }],
+    });
+  });
+
+  test('post /asset-exists treats assets in incomplete bundles as missing', async () => {
+    const bundleHash = 'some-bundle-hash';
+    await createAsset(testName, bundleHash);
+
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+      password: 'my_password',
+    });
+
+    const query = querystring.stringify({ filename: 'loadable-stats.json' });
+
+    const res = await app
+      .inject()
+      .post(`/asset-exists?${query}`)
+      .payload({
+        password: 'my_password',
+        targetBundles: [bundleHash],
+      })
+      .end();
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      exists: false,
+      results: [{ bundleHash, exists: false }],
     });
   });
 
@@ -367,6 +398,130 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
     expect(fs.existsSync(assetPath(testName, bundleHashOther))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, bundleHashOther))).toBe(true);
+  });
+
+  test('post /upload-assets writes bundle-completed marker when bundle file exists', async () => {
+    const bundleHash = 'some-bundle-hash';
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rorp-upload-assets-marker-'));
+    const tempBundlePath = path.join(tempDir, `${bundleHash}.js`);
+    fs.copyFileSync(getFixtureBundle(), tempBundlePath);
+
+    try {
+      const app = worker({
+        serverBundleCachePath: serverBundleCachePathForTest(),
+        password: 'my_password',
+      });
+
+      const form = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        password: 'my_password',
+        targetBundles: [bundleHash],
+        bundle: createReadStream(tempBundlePath),
+        asset1: createReadStream(getFixtureAsset()),
+      });
+
+      const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+
+      expect(res.statusCode).toBe(200);
+      expect(fs.existsSync(bundleCompleteMarkerPath(testName, bundleHash))).toBe(true);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('post /upload-assets clears stale files for incomplete directories when bundle file is not present', async () => {
+    const bundleHash = 'some-bundle-hash';
+    const bundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
+    const staleAssetPath = assetPath(testName, bundleHash);
+    const staleExtraPath = path.join(bundleDir, 'pre-uploaded.json');
+    const staleLockPath = path.join(bundleDir, 'stale.lock');
+    fs.mkdirSync(bundleDir, { recursive: true });
+    fs.writeFileSync(staleAssetPath, '{"source":"stale-upload"}');
+    fs.writeFileSync(staleExtraPath, '{"source":"stale-extra"}');
+    fs.writeFileSync(staleLockPath, 'stale-lock');
+
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      password: 'my_password',
+      targetBundles: [bundleHash],
+      asset1: createReadStream(getFixtureAsset()),
+    });
+
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+
+    expect(res.statusCode).toBe(200);
+    expect(fs.existsSync(staleExtraPath)).toBe(false);
+    expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
+    expect(fs.existsSync(staleLockPath)).toBe(true);
+    expect(fs.readFileSync(assetPath(testName, bundleHash), 'utf8')).toBe(
+      fs.readFileSync(getFixtureAsset(), 'utf8'),
+    );
+    expect(fs.existsSync(bundleCompleteMarkerPath(testName, bundleHash))).toBe(false);
+  });
+
+  test('post /upload-assets rejects targetBundles path traversal outside cache root', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      password: 'my_password',
+      targetBundles: ['../../outside-cache-root'],
+      asset1: createReadStream(getFixtureAsset()),
+    });
+
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('outside cache root');
+  });
+
+  test('post /upload-assets skips uploaded file with reserved bundle-completed marker filename', async () => {
+    const bundleHash = 'some-bundle-hash';
+    const bundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
+    fs.mkdirSync(bundleDir, { recursive: true });
+
+    // Create a temp file pretending to be the marker filename
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rorp-upload-marker-skip-'));
+    const markerAssetPath = path.join(tempDir, BUNDLE_COMPLETE_MARKER_FILE);
+    fs.writeFileSync(markerAssetPath, 'should-not-be-copied');
+
+    try {
+      const app = worker({
+        serverBundleCachePath: serverBundleCachePathForTest(),
+        password: 'my_password',
+      });
+
+      const form = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        password: 'my_password',
+        targetBundles: [bundleHash],
+        asset1: createReadStream(markerAssetPath),
+      });
+
+      const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+
+      expect(res.statusCode).toBe(200);
+      // The marker file should NOT have been copied into the bundle directory
+      expect(fs.existsSync(path.join(bundleDir, BUNDLE_COMPLETE_MARKER_FILE))).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   describe('gem version validation', () => {
