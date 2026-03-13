@@ -484,22 +484,22 @@ describe ReactOnRailsHelper do
       end
       skip "ExecJS runtime not available" unless runtime_available
 
+      runtime_context = ExecJS.compile(<<~JS)
+        function runGeneratedCode(generatedCode) {
+          var ReactOnRails = {
+            handleError: function() { return ''; },
+            getConsoleReplayScript: function() { return ''; }
+          };
+          return eval(generatedCode);
+        }
+      JS
+      captured_result = nil
+
       allow(ReactOnRails::ServerRenderingPool)
         .to receive(:server_render_js_with_console_logging)
         .and_wrap_original do |_m, js_code, _opts|
-          runtime_context = ExecJS.compile(<<~JS)
-            function runGeneratedCode(generatedCode) {
-              var ReactOnRails = {
-                handleError: function() { return ''; },
-                getConsoleReplayScript: function() { return ''; }
-              };
-              return eval(generatedCode);
-            }
-          JS
           runtime_result = runtime_context.call("runGeneratedCode", js_code)
-          parsed_result = JSON.parse(runtime_result)
-          expect(parsed_result["hasErrors"]).to be(true)
-          expect(parsed_result.dig("renderingError", "message")).to eq("null")
+          captured_result = JSON.parse(runtime_result)
           {
             "html" => "",
             "consoleReplayScript" => "",
@@ -509,6 +509,8 @@ describe ReactOnRailsHelper do
         end
 
       expect { server_render_js("(function() { throw null; })()") }.not_to raise_error
+      expect(captured_result["hasErrors"]).to be(true)
+      expect(captured_result.dig("renderingError", "message")).to eq("null")
     end
   end
 
