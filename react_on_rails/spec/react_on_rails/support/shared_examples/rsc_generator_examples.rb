@@ -19,11 +19,11 @@ shared_examples "rsc_common_files" do
   end
 end
 
-shared_examples "rsc_hello_server_files" do
-  it "creates HelloServer controller with react_on_rails_default layout" do
+shared_examples "rsc_hello_server_files" do |layout_name = "react_on_rails_default"|
+  it "creates HelloServer controller with #{layout_name} layout" do
     assert_file "app/controllers/hello_server_controller.rb" do |content|
       expect(content).to include("class HelloServerController")
-      expect(content).to include('layout "react_on_rails_default"')
+      expect(content).to include(%(layout "#{layout_name}"))
       expect(content).to include("ReactOnRailsPro::Stream")
     end
   end

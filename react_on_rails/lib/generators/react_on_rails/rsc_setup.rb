@@ -22,6 +22,10 @@ module ReactOnRails
     # - detect_react_version: Detects installed React version
     #
     module RscSetup # rubocop:disable Metrics/ModuleLength
+      DEFAULT_LAYOUT_NAME = "react_on_rails_default"
+      LEGACY_LAYOUT_NAME = "hello_world"
+      RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
+
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.
       #
@@ -224,7 +228,10 @@ module ReactOnRails
 
         say "📝 Creating HelloServerController...", :yellow
 
-        copy_file("templates/rsc/base/app/controllers/hello_server_controller.rb", controller_path)
+        layout_name = resolve_hello_server_layout_name
+        template("templates/rsc/base/app/controllers/hello_server_controller.rb.tt",
+                 controller_path,
+                 layout_name: layout_name)
 
         say "✅ Created #{controller_path}", :green
       end
@@ -464,6 +471,109 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, scob_path))
         content.include?("rscWebpackConfig") ? [] : ["rscWebpackConfig in ServerClientOrBoth.js"]
+      end
+
+      def resolve_hello_server_layout_name
+        compatible_layout_name = find_compatible_hello_server_layout_name
+        return compatible_layout_name if compatible_layout_name
+
+        create_new_hello_server_layout
+      end
+
+      def find_compatible_hello_server_layout_name
+        candidate_layout_names.each do |layout_name|
+          next unless compatible_layout?(layout_name)
+
+          say "ℹ️  Reusing compatible existing #{layout_name} layout for HelloServerController", :yellow
+          return layout_name
+        end
+
+        nil
+      end
+
+      def candidate_layout_names
+        [hello_world_controller_layout_name, DEFAULT_LAYOUT_NAME, LEGACY_LAYOUT_NAME].compact.uniq
+      end
+
+      def hello_world_controller_layout_name
+        controller_path = File.join(destination_root, "app/controllers/hello_world_controller.rb")
+        return nil unless File.exist?(controller_path)
+
+        extract_declared_layout_name(File.read(controller_path))
+      end
+
+      def extract_declared_layout_name(controller_content)
+        match = controller_content.match(/^\s*layout\s+(?:"([^"]+)"|'([^']+)'|:([A-Za-z_]\w*))(?=,|\s*$)/)
+        match&.captures&.compact&.first
+      end
+
+      def compatible_layout?(layout_name)
+        layout_path = layout_destination_path(layout_name)
+        return false unless File.exist?(File.join(destination_root, layout_path))
+
+        layout_content = File.read(File.join(destination_root, layout_path))
+        layout_uses_auto_registration_pack_tags?(layout_content)
+      end
+
+      def layout_destination_path(layout_name)
+        "app/views/layouts/#{layout_name}.html.erb"
+      end
+
+      def layout_uses_auto_registration_pack_tags?(layout_content)
+        pack_tag_without_names?(layout_content, "javascript_pack_tag") &&
+          pack_tag_without_names?(layout_content, "stylesheet_pack_tag")
+      end
+
+      def pack_tag_without_names?(layout_content, helper_name)
+        pattern = /<%=\s*#{helper_name}(?<arguments>\s*(?:\([^%]*?\)|[^%]*?))?\s*%>/m
+
+        layout_content.scan(pattern) do
+          return true if pack_tag_arguments_without_names?(Regexp.last_match[:arguments])
+        end
+
+        false
+      end
+
+      def pack_tag_arguments_without_names?(arguments)
+        normalized_arguments = strip_wrapping_parentheses(arguments.to_s.strip)
+        return true if normalized_arguments.empty?
+
+        normalized_arguments.match?(/\A(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:.*)\z/m)
+      end
+
+      def strip_wrapping_parentheses(arguments)
+        return arguments unless arguments.start_with?("(") && arguments.end_with?(")")
+
+        arguments[1...-1].strip
+      end
+
+      def create_new_hello_server_layout
+        layout_name = next_available_hello_server_layout_name
+        layout_path = layout_destination_path(layout_name)
+
+        say "📝 Creating #{layout_path} for HelloServerController...", :yellow
+        empty_directory("app/views/layouts")
+        copy_file("templates/base/base/app/views/layouts/react_on_rails_default.html.erb", layout_path)
+        say "✅ Created #{layout_path}", :green
+
+        layout_name
+      end
+
+      def next_available_hello_server_layout_name
+        default_layout_path = File.join(destination_root, layout_destination_path(DEFAULT_LAYOUT_NAME))
+        return DEFAULT_LAYOUT_NAME unless File.exist?(default_layout_path)
+
+        fallback_layout_path = File.join(destination_root, layout_destination_path(RSC_FALLBACK_LAYOUT_NAME))
+        return RSC_FALLBACK_LAYOUT_NAME unless File.exist?(fallback_layout_path)
+
+        suffix = 2
+
+        loop do
+          layout_name = "#{RSC_FALLBACK_LAYOUT_NAME}_#{suffix}"
+          return layout_name unless File.exist?(File.join(destination_root, layout_destination_path(layout_name)))
+
+          suffix += 1
+        end
       end
     end
   end

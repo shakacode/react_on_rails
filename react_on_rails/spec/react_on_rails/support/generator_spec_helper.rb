@@ -88,6 +88,51 @@ def simulate_existing_dir(dirname)
   mkdir_p(path)
 end
 
+def simulate_existing_layout(layout_name, content)
+  simulate_existing_file("app/views/layouts/#{layout_name}.html.erb", content)
+end
+
+def simulate_compatible_auto_registration_layout(layout_name = "hello_world")
+  simulate_existing_layout(layout_name, <<~ERB)
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <%= stylesheet_pack_tag %>
+        <%= javascript_pack_tag %>
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+  ERB
+end
+
+def simulate_incompatible_pack_named_layout(layout_name = "hello_world")
+  simulate_existing_layout(layout_name, <<~ERB)
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <%= stylesheet_pack_tag "application" %>
+        <%= javascript_pack_tag "application" %>
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+  ERB
+end
+
+def simulate_hello_world_controller(layout_name = "hello_world")
+  simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+    class HelloWorldController < ApplicationController
+      layout "#{layout_name}"
+
+      def index
+      end
+    end
+  RUBY
+end
+
 def assert_directory_with_keep_file(dir)
   assert_directory dir
   assert_file File.join(dir, ".keep")
