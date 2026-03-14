@@ -1,5 +1,24 @@
 # frozen_string_literal: true
 
+shared_examples "rsc_common_files" do
+  it "copies common files" do
+    %w[config/initializers/react_on_rails.rb
+       Procfile.dev
+       Procfile.dev-static-assets
+       Procfile.dev-prod-assets
+       app/views/layouts/hello_world.html.erb].each { |file| assert_file(file) }
+  end
+
+  it "creates Pro initializer with RSC configuration" do
+    assert_file "config/initializers/react_on_rails_pro.rb" do |content|
+      expect(content).to include("ReactOnRailsPro.configure")
+      expect(content).to include("enable_rsc_support = true")
+      expect(content).to include('rsc_bundle_js_file = "rsc-bundle.js"')
+      expect(content).to include('rsc_payload_generation_url_path = "rsc_payload/"')
+    end
+  end
+end
+
 shared_examples "rsc_hello_server_files" do
   it "creates HelloServer controller with hello_world layout" do
     assert_file "app/controllers/hello_server_controller.rb" do |content|

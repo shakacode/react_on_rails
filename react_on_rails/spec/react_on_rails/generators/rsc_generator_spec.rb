@@ -71,17 +71,7 @@ describe RscGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
-    it "creates HelloServerController" do
-      assert_file "app/controllers/hello_server_controller.rb" do |content|
-        expect(content).to include("HelloServerController")
-      end
-    end
-
-    it "creates HelloServer view" do
-      assert_file "app/views/hello_server/index.html.erb" do |content|
-        expect(content).to include("HelloServer")
-      end
-    end
+    include_examples "rsc_hello_server_files"
 
     it "adds RSC routes" do
       assert_file "config/routes.rb" do |content|
