@@ -477,7 +477,7 @@ module ReactOnRails
         compatible_layout_name = find_compatible_hello_server_layout_name
         return compatible_layout_name if compatible_layout_name
 
-        create_new_hello_server_layout
+        create_new_hello_server_layout(incompatible_layout_paths: incompatible_existing_layout_paths)
       end
 
       def find_compatible_hello_server_layout_name
@@ -515,6 +515,18 @@ module ReactOnRails
         layout_uses_auto_registration_pack_tags?(layout_content)
       end
 
+      def incompatible_existing_layout_paths
+        candidate_layout_names.filter_map do |layout_name|
+          layout_path = layout_destination_path(layout_name)
+          full_path = File.join(destination_root, layout_path)
+
+          next unless File.exist?(full_path)
+          next if compatible_layout?(layout_name)
+
+          layout_path
+        end
+      end
+
       def layout_destination_path(layout_name)
         "app/views/layouts/#{layout_name}.html.erb"
       end
@@ -547,9 +559,11 @@ module ReactOnRails
         arguments[1...-1].strip
       end
 
-      def create_new_hello_server_layout
+      def create_new_hello_server_layout(incompatible_layout_paths: [])
         layout_name = next_available_hello_server_layout_name
         layout_path = layout_destination_path(layout_name)
+
+        announce_incompatible_layout_fallback(incompatible_layout_paths, layout_path) if incompatible_layout_paths.any?
 
         say "📝 Creating #{layout_path} for HelloServerController...", :yellow
         empty_directory("app/views/layouts")
@@ -557,6 +571,20 @@ module ReactOnRails
         say "✅ Created #{layout_path}", :green
 
         layout_name
+      end
+
+      def announce_incompatible_layout_fallback(incompatible_layout_paths, new_layout_path)
+        skipped_paths = incompatible_layout_paths.map { |path| "  - #{path}" }.join("\n")
+
+        say <<~MSG, :yellow
+          ℹ️  Found existing layout file(s) in your app that were not reused for HelloServerController:
+          #{skipped_paths}
+
+          Here, "your file" means the layout file already present in the app at the path(s) above.
+          Those file(s) do not contain the empty `stylesheet_pack_tag` and `javascript_pack_tag` calls
+          that React on Rails auto-registration requires, so the generator will create #{new_layout_path}
+          instead of overwriting them.
+        MSG
       end
 
       def next_available_hello_server_layout_name
