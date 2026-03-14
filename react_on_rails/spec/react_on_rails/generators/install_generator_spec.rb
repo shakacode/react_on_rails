@@ -881,8 +881,6 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    # TODO: When --rsc tests are added, evaluate if this negative test is redundant.
-    #       If the positive RSC tests adequately cover the template conditional, remove this.
     it "Pro initializer does not include RSC configuration" do
       assert_file "config/initializers/react_on_rails_pro.rb" do |content|
         expect(content).not_to include("enable_rsc_support")
@@ -896,24 +894,7 @@ describe InstallGenerator, type: :generator do
 
     include_examples "base_generator_common", application_js: true
     include_examples "react_with_redux_generator"
-
-    it "creates Pro initializer" do
-      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
-        expect(content).to include("ReactOnRailsPro.configure")
-      end
-    end
-
-    it "creates node-renderer.js" do
-      assert_file "client/node-renderer.js" do |content|
-        expect(content).to include("reactOnRailsProNodeRenderer")
-      end
-    end
-
-    it "adds node-renderer to Procfile.dev" do
-      assert_file "Procfile.dev" do |content|
-        expect(content).to include("node-renderer:")
-      end
-    end
+    include_examples "pro_common_files"
 
     it "installs both Pro and Redux dependencies" do
       assert_file "package.json" do |content|
@@ -930,16 +911,7 @@ describe InstallGenerator, type: :generator do
 
     include_examples "base_generator_common", application_js: true
     include_examples "no_redux_generator"
-
-    it "creates Pro initializer" do
-      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
-        expect(content).to include("ReactOnRailsPro.configure")
-      end
-    end
-
-    it "creates node-renderer.js" do
-      assert_file "client/node-renderer.js"
-    end
+    include_examples "pro_common_files"
 
     it "creates TypeScript component files with .tsx extension" do
       assert_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
@@ -1006,16 +978,7 @@ describe InstallGenerator, type: :generator do
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
-
-    it "creates Pro initializer" do
-      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
-        expect(content).to include("ReactOnRailsPro.configure")
-      end
-    end
-
-    it "creates node-renderer.js" do
-      assert_file "client/node-renderer.js"
-    end
+    include_examples "pro_common_files"
 
     it "installs both Pro and Rspack dependencies" do
       assert_file "package.json" do |content|
@@ -1112,22 +1075,7 @@ describe InstallGenerator, type: :generator do
   context "with --rsc" do
     before(:all) { run_generator_test_with_args(%w[--rsc], package_json: true) }
 
-    it "copies common files" do
-      %w[config/initializers/react_on_rails.rb
-         Procfile.dev
-         Procfile.dev-static-assets
-         Procfile.dev-prod-assets
-         app/views/layouts/hello_world.html.erb].each { |file| assert_file(file) }
-    end
-
-    it "creates Pro initializer with RSC configuration" do
-      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
-        expect(content).to include("ReactOnRailsPro.configure")
-        expect(content).to include("enable_rsc_support = true")
-        expect(content).to include('rsc_bundle_js_file = "rsc-bundle.js"')
-        expect(content).to include('rsc_payload_generation_url_path = "rsc_payload/"')
-      end
-    end
+    include_examples "rsc_common_files"
 
     it "creates node-renderer.js" do
       assert_file "client/node-renderer.js" do |content|
@@ -1192,18 +1140,7 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
-    it "creates HelloServer controller and view" do
-      assert_file "app/controllers/hello_server_controller.rb" do |content|
-        expect(content).to include("class HelloServerController")
-        expect(content).to include('layout "hello_world"')
-        expect(content).to include("ReactOnRailsPro::Stream")
-      end
-
-      assert_file "app/views/hello_server/index.html.erb" do |content|
-        expect(content).to include("HelloServer")
-        expect(content).to include("stream_react_component")
-      end
-    end
+    include_examples "rsc_hello_server_files"
 
     it "adds HelloServer route" do
       assert_file "config/routes.rb" do |content|
@@ -1223,20 +1160,7 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args(%w[--rsc --redux], package_json: true) }
 
     include_examples "react_with_redux_generator"
-
-    it "copies common files" do
-      %w[config/initializers/react_on_rails.rb
-         Procfile.dev
-         Procfile.dev-static-assets
-         Procfile.dev-prod-assets
-         app/views/layouts/hello_world.html.erb].each { |file| assert_file(file) }
-    end
-
-    it "creates Pro initializer with RSC configuration" do
-      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
-        expect(content).to include("enable_rsc_support = true")
-      end
-    end
+    include_examples "rsc_common_files"
 
     it "creates both HelloWorldApp and HelloServer" do
       assert_file "app/javascript/src/HelloWorldApp/ror_components/HelloWorldApp.client.jsx"
@@ -1262,31 +1186,13 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates HelloServer controller with hello_world layout" do
-      assert_file "app/controllers/hello_server_controller.rb" do |content|
-        expect(content).to include("class HelloServerController")
-        expect(content).to include('layout "hello_world"')
-        expect(content).to include("ReactOnRailsPro::Stream")
-      end
-    end
+    include_examples "rsc_hello_server_files"
   end
 
   context "with --rsc --typescript" do
     before(:all) { run_generator_test_with_args(%w[--rsc --typescript], package_json: true) }
 
-    it "copies common files" do
-      %w[config/initializers/react_on_rails.rb
-         Procfile.dev
-         Procfile.dev-static-assets
-         Procfile.dev-prod-assets
-         app/views/layouts/hello_world.html.erb].each { |file| assert_file(file) }
-    end
-
-    it "creates Pro initializer with RSC configuration" do
-      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
-        expect(content).to include("enable_rsc_support = true")
-      end
-    end
+    include_examples "rsc_common_files"
 
     it "creates TypeScript HelloServer component" do
       assert_no_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
@@ -1314,31 +1220,13 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates HelloServer controller with hello_world layout" do
-      assert_file "app/controllers/hello_server_controller.rb" do |content|
-        expect(content).to include("class HelloServerController")
-        expect(content).to include('layout "hello_world"')
-        expect(content).to include("ReactOnRailsPro::Stream")
-      end
-    end
+    include_examples "rsc_hello_server_files"
   end
 
   context "with --rsc --rspack" do
     before(:all) { run_generator_test_with_args(%w[--rsc --rspack], package_json: true) }
 
-    it "copies common files" do
-      %w[config/initializers/react_on_rails.rb
-         Procfile.dev
-         Procfile.dev-static-assets
-         Procfile.dev-prod-assets
-         app/views/layouts/hello_world.html.erb].each { |file| assert_file(file) }
-    end
-
-    it "creates Pro initializer with RSC configuration" do
-      assert_file "config/initializers/react_on_rails_pro.rb" do |content|
-        expect(content).to include("enable_rsc_support = true")
-      end
-    end
+    include_examples "rsc_common_files"
 
     it "creates rscWebpackConfig.js in config/rspack/ (not config/webpack/)" do
       assert_file "config/rspack/rscWebpackConfig.js" do |content|
@@ -1380,13 +1268,7 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates HelloServer controller with hello_world layout" do
-      assert_file "app/controllers/hello_server_controller.rb" do |content|
-        expect(content).to include("class HelloServerController")
-        expect(content).to include('layout "hello_world"')
-        expect(content).to include("ReactOnRailsPro::Stream")
-      end
-    end
+    include_examples "rsc_hello_server_files"
   end
 
   context "when rscWebpackConfig.js already exists" do
@@ -1423,10 +1305,6 @@ describe InstallGenerator, type: :generator do
   end
 
   context "with helpful message" do
-    let(:expected) do
-      GeneratorMessages.format_info(GeneratorMessages.helpful_message_after_installation)
-    end
-
     before do
       # Clear any previous messages to ensure clean test state
       GeneratorMessages.clear
