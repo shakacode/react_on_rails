@@ -102,9 +102,7 @@ module ReactOnRails
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
           add_bin_scripts
-          # Only add the post install message if not using Redux
-          # Redux generator handles its own messages
-          add_post_install_message unless options.redux?
+          add_post_install_message
         else
           error = <<~MSG.strip
             🚫 React on Rails generator prerequisites not met!
@@ -150,6 +148,7 @@ module ReactOnRails
         # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
+                                                          invoked_by_install: true,
                                                           force: options[:force], skip: options[:skip],
                                                           pretend: options[:pretend] }
         elsif !use_rsc?
@@ -328,7 +327,7 @@ module ReactOnRails
       end
 
       def shakapacker_setup_incomplete?
-        !!@shakapacker_setup_incomplete
+        @shakapacker_setup_incomplete == true
       end
 
       def incomplete_installation_message
@@ -345,7 +344,8 @@ module ReactOnRails
           1. #{Rainbow('bundle install').cyan}
           2. #{Rainbow('bundle exec rails shakapacker:install').cyan}
           3. #{Rainbow("#{package_manager} install").cyan}
-          4. Re-run #{Rainbow('rails generate react_on_rails:install --skip').cyan} if needed
+          4. Re-run #{Rainbow('rails generate react_on_rails:install').cyan}
+             (add #{Rainbow('--force').cyan} to overwrite files if needed)
 
           Troubleshooting:
           • https://github.com/shakacode/shakapacker/blob/main/docs/installation.md

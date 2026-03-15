@@ -1661,6 +1661,17 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("💡 TIP: Run 'bin/dev help'")
     end
 
+    specify "run_generators adds post-install messaging for redux installs" do
+      install_generator = described_class.new([], { redux: true })
+      allow(install_generator).to receive(:installation_prerequisites_met?).and_return(true)
+      allow(install_generator).to receive(:invoke_generators)
+      allow(install_generator).to receive(:add_bin_scripts)
+      allow(install_generator).to receive(:print_generator_messages)
+
+      expect(install_generator).to receive(:add_post_install_message)
+      install_generator.run_generators
+    end
+
     specify "shows incomplete-installation guidance when shakapacker setup fails" do
       install_generator = described_class.new
       install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
