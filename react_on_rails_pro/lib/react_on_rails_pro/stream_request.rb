@@ -178,62 +178,91 @@ module ReactOnRailsPro
     #
     # The length-prefixed format avoids JSON.stringify on the HTML content (the bulk
     # of the data), eliminating ~30% escaping overhead for typical payloads.
-    def loop_response_chunks(response) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-      return enum_for(__method__, response) unless block_given?
+    def loop_response_chunks(response, &block) # rubocop:disable Metrics/CyclomaticComplexity
+      return enum_for(__method__, response) unless block
 
-      buf = "".b
-      state = :header # :header (reading metadata line) or :content (reading raw bytes)
-      content_len = 0
-      metadata = nil
-
+      parser = LengthPrefixedParser.new
       response.each do |chunk|
         response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-        buf << chunk
+        parser.feed(chunk, &block)
+      end
+    ensure
+      parser&.flush(&block)
+    end
+
+    # State machine parser for the length-prefixed streaming protocol.
+    # Buffers incoming bytes and yields complete chunks (Hash for length-prefixed,
+    # String for legacy NDJSON).
+    class LengthPrefixedParser
+      def initialize
+        @buf = "".b
+        @state = :header
+        @content_len = 0
+        @metadata = nil
+      end
+
+      def feed(chunk) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+        @buf << chunk
 
         loop do
-          case state
+          case @state
           when :header
-            idx = buf.index("\n")
-            break unless idx # header line incomplete, need more data
+            break unless (result = try_parse_header)
 
-            header = buf.byteslice(0, idx)
-            buf = buf.byteslice(idx + 1, buf.bytesize - idx - 1) || "".b
-
-            tab_idx = header.index("\t")
-            if tab_idx
-              # Length-prefixed format: metadata\tcontent_length\n<raw content bytes>
-              meta_json = header.byteslice(0, tab_idx)
-              len_hex = header.byteslice(tab_idx + 1, header.bytesize - tab_idx - 1)
-              metadata = JSON.parse(meta_json.force_encoding("UTF-8"))
-              content_len = len_hex.to_i(16)
-              state = :content
-            else
-              # Legacy NDJSON format: complete JSON line
-              line = header.force_encoding("UTF-8")
-              yield line unless line.strip.empty?
-              # Stay in :header state for next line
-            end
-
+            yield result if result.is_a?(String) # Legacy NDJSON line
           when :content
-            break if buf.bytesize < content_len # content incomplete, need more data
+            break unless (result = try_read_content)
 
-            content = buf.byteslice(0, content_len)
-            buf = buf.byteslice(content_len, buf.bytesize - content_len) || "".b
-
-            yield({ "html" => content.force_encoding("UTF-8") }.merge!(metadata))
-
-            metadata = nil
-            state = :header
+            yield result
           end
         end
       end
-    ensure
-      # Handle remaining data when stream ends (normal or error)
-      case state
-      when :content
-        yield({ "html" => buf.force_encoding("UTF-8") }.merge!(metadata)) if metadata
-      when :header
-        yield buf.force_encoding("UTF-8") unless buf.empty?
+
+      def flush
+        case @state
+        when :content
+          yield({ "html" => @buf.force_encoding("UTF-8") }.merge!(@metadata)) if @metadata
+        when :header
+          yield @buf.force_encoding("UTF-8") unless @buf.empty?
+        end
+      end
+
+      private
+
+      def try_parse_header
+        idx = @buf.index("\n")
+        return nil unless idx
+
+        header = @buf.byteslice(0, idx)
+        @buf = @buf.byteslice(idx + 1, @buf.bytesize - idx - 1) || "".b
+        tab_idx = header.index("\t")
+
+        if tab_idx
+          parse_length_prefixed_header(header, tab_idx)
+          true # Signal state changed to :content; no value to yield
+        else
+          line = header.force_encoding("UTF-8")
+          line.strip.empty? ? true : line
+        end
+      end
+
+      def parse_length_prefixed_header(header, tab_idx)
+        meta_json = header.byteslice(0, tab_idx)
+        len_hex = header.byteslice(tab_idx + 1, header.bytesize - tab_idx - 1)
+        @metadata = JSON.parse(meta_json.force_encoding("UTF-8"))
+        @content_len = len_hex.to_i(16)
+        @state = :content
+      end
+
+      def try_read_content
+        return nil if @buf.bytesize < @content_len
+
+        content = @buf.byteslice(0, @content_len)
+        @buf = @buf.byteslice(@content_len, @buf.bytesize - @content_len) || "".b
+        result = { "html" => content.force_encoding("UTF-8") }.merge!(@metadata)
+        @metadata = nil
+        @state = :header
+        result
       end
     end
   end
