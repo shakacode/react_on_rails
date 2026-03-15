@@ -226,7 +226,7 @@ This resulted in tasks like `react_on_rails:assets:webpack`, `react_on_rails:gen
 
 ```bash
 # Update Gemfile
-gem 'react_on_rails', '>= 16.2.0'
+gem 'react_on_rails', '~> 16.2'
 
 # Install
 bundle update react_on_rails
