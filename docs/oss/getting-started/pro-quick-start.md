@@ -132,10 +132,9 @@ reactOnRailsProNodeRenderer({
   port: Number(env.RENDERER_PORT) || 3800,
   password: env.RENDERER_PASSWORD || 'devPassword',
   supportModules: true,
+  // Set workersCount to 0 for single-process mode (useful for debugging).
   workersCount:
-    parseWorkersCount(env.RENDERER_WORKERS_COUNT) ??
-    parseWorkersCount(env.NODE_RENDERER_CONCURRENCY) ??
-    3,
+    parseWorkersCount(env.RENDERER_WORKERS_COUNT) ?? parseWorkersCount(env.NODE_RENDERER_CONCURRENCY) ?? 3,
 });
 ```
 
