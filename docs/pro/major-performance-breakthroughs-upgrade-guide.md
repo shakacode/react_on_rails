@@ -104,7 +104,7 @@ Adopting these features in React on Rails Pro v4 and React on Rails v15 will hel
 
 1. Update to React on Rails v15
 2. Update to React on Rails Pro v4
-3. Follow our [RSC & SSR Streaming migration guide](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/)
+3. Follow our [RSC & SSR Streaming migration guide](./react-server-components/tutorial.md)
 
 Let's make your apps faster—together.
 

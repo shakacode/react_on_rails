@@ -3,7 +3,7 @@
 `config/initializers/react_on_rails_pro.rb`
 
 1. You don't need to create a initializer if you are satisfied with the defaults as described below.
-1. Values beginning with `renderer` pertain only to using an external rendering server. You will need to ensure these values are consistent with your configuration for the external rendering server, as given in [JS configuration](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/)
+1. Values beginning with `renderer` pertain only to using an external rendering server. You will need to ensure these values are consistent with your configuration for the external rendering server, as given in [JS configuration](./node-renderer/js-configuration.md)
 1. `config.prerender_caching` works for standard mini_racer server rendering and using an external rendering server.
 
 ## Example of Configuration
