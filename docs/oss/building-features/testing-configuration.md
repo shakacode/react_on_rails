@@ -374,7 +374,7 @@ rm -rf public/webpack/test
 
 ```ruby
 # Gemfile
-gem "react_on_rails", ">= 16.4.0"  # Not in a specific group
+gem "react_on_rails", "16.4.0"  # Not in a specific group
 
 # Or explicitly in test group:
 group :test do
