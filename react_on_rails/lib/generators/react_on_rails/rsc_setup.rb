@@ -25,6 +25,7 @@ module ReactOnRails
       DEFAULT_LAYOUT_NAME = "react_on_rails_default"
       LEGACY_LAYOUT_NAME = "hello_world"
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
+      MAX_LAYOUT_NAME_ATTEMPTS = 99
 
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.
@@ -474,15 +475,21 @@ module ReactOnRails
       end
 
       def resolve_hello_server_layout_name
-        compatible_layout_name = find_compatible_hello_server_layout_name
+        compatibility_by_layout = candidate_layout_names.to_h do |layout_name|
+          [layout_name, compatible_layout?(layout_name)]
+        end
+
+        compatible_layout_name = find_compatible_hello_server_layout_name(compatibility_by_layout)
         return compatible_layout_name if compatible_layout_name
 
-        create_new_hello_server_layout(incompatible_layout_paths: incompatible_existing_layout_paths)
+        create_new_hello_server_layout(
+          incompatible_layout_paths: incompatible_existing_layout_paths(compatibility_by_layout)
+        )
       end
 
-      def find_compatible_hello_server_layout_name
-        candidate_layout_names.each do |layout_name|
-          next unless compatible_layout?(layout_name)
+      def find_compatible_hello_server_layout_name(compatibility_by_layout)
+        compatibility_by_layout.each do |layout_name, is_compatible|
+          next unless is_compatible
 
           say "ℹ️  Reusing compatible existing #{layout_name} layout for HelloServerController", :yellow
           return layout_name
@@ -503,7 +510,7 @@ module ReactOnRails
       end
 
       def extract_declared_layout_name(controller_content)
-        match = controller_content.match(/^\s*layout\s+(?:"([^"]+)"|'([^']+)'|:([A-Za-z_]\w*))(?=,|\s*$)/)
+        match = controller_content.match(/^\s*layout\s+(?:"([^"]+)"|'([^']+)')(?=,|\s*$)/)
         match&.captures&.compact&.first
       end
 
@@ -515,13 +522,13 @@ module ReactOnRails
         layout_uses_auto_registration_pack_tags?(layout_content)
       end
 
-      def incompatible_existing_layout_paths
-        candidate_layout_names.filter_map do |layout_name|
+      def incompatible_existing_layout_paths(compatibility_by_layout)
+        compatibility_by_layout.filter_map do |layout_name, is_compatible|
           layout_path = layout_destination_path(layout_name)
           full_path = File.join(destination_root, layout_path)
 
           next unless File.exist?(full_path)
-          next if compatible_layout?(layout_name)
+          next if is_compatible
 
           layout_path
         end
@@ -537,7 +544,7 @@ module ReactOnRails
       end
 
       def pack_tag_without_names?(layout_content, helper_name)
-        pattern = /<%=\s*#{helper_name}(?<arguments>\s*(?:\([^%]*?\)|[^%]*?))?\s*%>/m
+        pattern = /<%=\s*#{Regexp.escape(helper_name)}(?<arguments>\s*(?:\([^%]*?\)|[^%]*?))?\s*%>/
 
         layout_content.scan(pattern) do
           return true if pack_tag_arguments_without_names?(Regexp.last_match[:arguments])
@@ -594,14 +601,12 @@ module ReactOnRails
         fallback_layout_path = File.join(destination_root, layout_destination_path(RSC_FALLBACK_LAYOUT_NAME))
         return RSC_FALLBACK_LAYOUT_NAME unless File.exist?(fallback_layout_path)
 
-        suffix = 2
-
-        loop do
+        (2..MAX_LAYOUT_NAME_ATTEMPTS).each do |suffix|
           layout_name = "#{RSC_FALLBACK_LAYOUT_NAME}_#{suffix}"
           return layout_name unless File.exist?(File.join(destination_root, layout_destination_path(layout_name)))
-
-          suffix += 1
         end
+
+        raise "Could not find an available RSC layout name after #{MAX_LAYOUT_NAME_ATTEMPTS} attempts."
       end
     end
   end
