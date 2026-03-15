@@ -327,11 +327,13 @@ module ReactOnRails
       end
 
       def shakapacker_setup_incomplete?
+        # Strict comparison keeps nil (unset) distinct from true.
         @shakapacker_setup_incomplete == true
       end
 
       def incomplete_installation_message
-        package_manager = GeneratorMessages.detect_package_manager
+        package_manager = GeneratorMessages.send(:detect_package_manager)
+        package_install_step = package_manager ? "#{package_manager} install" : "install JavaScript dependencies"
 
         <<~MSG
 
@@ -339,11 +341,12 @@ module ReactOnRails
           ─────────────────────────────────────────────────────────────────────────
           Shakapacker setup failed, so this app is not ready to run yet.
           Avoid running ./bin/dev until Shakapacker is installed successfully.
+          Note: Some generator files may have been partially created during this run.
 
           Next steps:
           1. #{Rainbow('bundle install').cyan}
           2. #{Rainbow('bundle exec rails shakapacker:install').cyan}
-          3. #{Rainbow("#{package_manager} install").cyan}
+          3. #{Rainbow(package_install_step).cyan}
           4. Re-run #{Rainbow('rails generate react_on_rails:install').cyan}
              (add #{Rainbow('--force').cyan} to overwrite files if needed)
 

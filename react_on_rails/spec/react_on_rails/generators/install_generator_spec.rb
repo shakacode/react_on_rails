@@ -1681,8 +1681,20 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("React on Rails installation is incomplete")
       expect(output_text).to include("Avoid running ./bin/dev")
+      expect(output_text).to include("Some generator files may have been partially created during this run")
       expect(output_text).not_to include("🎉 React on Rails Successfully Installed!")
       expect(output_text).not_to include("📋 QUICK START:")
+    end
+
+    specify "incomplete-installation guidance has a fallback install step when package manager is unknown" do
+      install_generator = described_class.new
+      install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
+      allow(GeneratorMessages).to receive(:detect_package_manager).and_return(nil)
+
+      install_generator.send(:add_post_install_message)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("install JavaScript dependencies")
     end
   end
 
