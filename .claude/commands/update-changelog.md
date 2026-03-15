@@ -10,6 +10,7 @@ This command accepts an optional argument: `$ARGUMENTS`
 - **`release`** (`/update-changelog release`): Add entries and stamp a version header. Auto-compute the next version based on changes (breaking -> major, added features -> minor, fixes -> patch). Then `rake release` (with no args) will pick up this version automatically.
 - **`rc`** (`/update-changelog rc`): Same as `release`, but stamps an RC prerelease version (e.g., `16.5.0.rc.0`). Auto-increments the RC index if prior RCs exist for the same base version.
 - **`beta`** (`/update-changelog beta`): Same as `rc`, but stamps a beta prerelease version (e.g., `16.5.0.beta.0`).
+- **Explicit version** (`/update-changelog 16.5.0.rc.10`): Add entries and stamp the exact version provided. Skips auto-computation — use this when you already know the target version. The version string must look like a semver version (with optional `.rc.N` or `.beta.N` suffix).
 
 ## When to Use This
 
@@ -271,9 +272,11 @@ When a new version is released:
    - Validate that the change is user-visible (per the criteria above). Skip CI, lint, refactoring, test-only changes.
    - Add the entry to `### [Unreleased]` under the appropriate category heading
 
-#### Step 4: Stamp version header (only for `release`, `rc`, or `beta` modes)
+#### Step 4: Stamp version header (only when a version mode or explicit version is given)
 
-If the user passed `release`, `rc`, or `beta` as an argument:
+If the user passed `release`, `rc`, `beta`, or an explicit version string as an argument:
+
+**For `release`, `rc`, or `beta` keywords:**
 
 1. Run the rake task to stamp the version header:
 
@@ -288,6 +291,21 @@ If the user passed `release`, `rc`, or `beta` as an argument:
    - For `rc`/`beta`: collapse prior prerelease sections
 
 3. **Verify** the computed version looks correct. If not, the user can manually adjust.
+
+**For an explicit version string** (e.g., `16.5.0.rc.10`):
+
+1. Determine the mode from the version string:
+   - Contains `.rc.` -> use `rc` mode
+   - Contains `.beta.` -> use `beta` mode
+   - Otherwise -> use `release` mode
+
+2. Run the rake task with the appropriate mode:
+
+   ```bash
+   bundle exec rake "update_changelog[rc]"   # or release, or beta
+   ```
+
+3. **Verify** the rake task produced the expected version. If the auto-computed version differs from the user's requested version, manually adjust the header and diff links to match the explicit version the user requested.
 
 If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
 
