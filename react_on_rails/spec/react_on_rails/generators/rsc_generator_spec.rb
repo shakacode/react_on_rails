@@ -573,6 +573,35 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when earlier layouts are unusable and a compatible react_on_rails_rsc_10 layout already exists" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_layout_missing_stylesheet_pack_tag("hello_world")
+      simulate_canonical_pack_tag_layout("react_on_rails_rsc_10")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_rsc_10"
+
+    it "reuses the existing react_on_rails_rsc_10 layout instead of minting a new fallback" do
+      assert_file "app/views/layouts/react_on_rails_rsc_10.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_rsc_11.html.erb"
+    end
+  end
+
   # Rspack variant — verifies that standalone RSC generator writes to config/rspack/
   # when it detects an existing rspack project via config/shakapacker.yml.
   # RscGenerator has no --rspack option; detection is via rspack_configured_in_project?.

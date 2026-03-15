@@ -25,7 +25,7 @@ module ReactOnRails
       DEFAULT_LAYOUT_NAME = "react_on_rails_default"
       LEGACY_LAYOUT_NAME = "hello_world"
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
-      RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_[2-9]\d*)?\z/
+      RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_(?:[2-9]|[1-9]\d+))?\z/
       MAX_LAYOUT_NAME_ATTEMPTS = 99
 
       # Main entry point for RSC setup.
