@@ -251,8 +251,9 @@ end
 # (e.g. two "#### Fixed" blocks) are combined into one.  Header-only blocks
 # like "#### Pro" are kept at their first-seen position, ensuring they remain
 # as parent headings for any ##### sub-sections that follow.
-# Also strips the "Changes since the last non-beta release." marker text.
-# rubocop:disable Metrics/AbcSize
+# Also strips the "Changes since the last non-beta release." marker text
+# and deduplicates entries that share the same PR number.
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 def consolidate_changelog_blocks(blocks)
   consolidated = []
   heading_indices = {}
@@ -283,9 +284,55 @@ def consolidate_changelog_blocks(blocks)
     end
   end
 
-  consolidated
+  # Deduplicate entries within each block by PR number
+  consolidated.map { |block| deduplicate_block_entries(block) }
 end
-# rubocop:enable Metrics/AbcSize
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+# Remove duplicate changelog entries within a single block.
+# Entries are grouped by PR number; only the first occurrence is kept.
+# Multi-line entries (continuation lines not starting with "- ") are
+# kept together with their parent entry.
+# rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+def deduplicate_block_entries(block)
+  lines = block.lines
+  first_line = lines.first&.rstrip || ""
+  return block unless first_line.match?(/\A####+\s+/)
+
+  # Split into heading + entries
+  heading = first_line
+  body_lines = lines.drop(1)
+
+  # Group body lines into logical entries (each starts with "- ")
+  entries = []
+  body_lines.each do |line|
+    if line.match?(/\A\s*- \*\*/) || entries.empty?
+      entries << line
+    else
+      entries[-1] = "#{entries[-1]}#{line}"
+    end
+  end
+
+  # Deduplicate by PR number (keep first occurrence)
+  seen_prs = {}
+  unique_entries = entries.select do |entry|
+    pr_numbers = entry.scan(/\[PR (\d+)\]/).flatten
+    if pr_numbers.empty?
+      true # Keep entries without PR numbers (blank lines, etc.)
+    else
+      key = pr_numbers.sort.join(",")
+      if seen_prs.key?(key)
+        false
+      else
+        seen_prs[key] = true
+        true
+      end
+    end
+  end
+
+  "#{heading}\n#{unique_entries.join}"
+end
+# rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # rubocop:disable Metrics/AbcSize
 def collapse_prerelease_sections(changelog, base_version, channel)

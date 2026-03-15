@@ -319,7 +319,7 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Which entries were moved from Unreleased
    - Which new entries were added
    - Which PRs were skipped (and why)
-5. If in `release`/`rc`/`beta` mode, **automatically commit, push, and open a PR**:
+5. If in `release`/`rc`/`beta` mode or explicit-version mode, **automatically commit, push, and open a PR**:
    - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
    - Commit CHANGELOG.md (and the skill file if it was also modified)
    - Push and open a PR with the changelog diff as the body

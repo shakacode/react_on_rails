@@ -177,6 +177,33 @@ RSpec.describe "update_changelog.rake helper methods" do
       expect(collapsed).to include("- Pro fix from rc.0")
     end
 
+    it "deduplicates entries with the same PR number across collapsed sections" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        #### Fixed
+        - **Bug fix A**. [PR 2489](https://github.com/shakacode/react_on_rails/pull/2489) by [user](https://github.com/user).
+
+        ### [16.4.0.rc.1] - 2026-03-01
+        #### Fixed
+        - **Bug fix A**. [PR 2489](https://github.com/shakacode/react_on_rails/pull/2489) by [user](https://github.com/user).
+        - **Bug fix B**. [PR 2490](https://github.com/shakacode/react_on_rails/pull/2490) by [user](https://github.com/user).
+
+        ### [16.3.0] - 2026-02-01
+        #### Fixed
+        - Older fix
+      CHANGELOG
+
+      collapsed = collapse_prerelease_sections(changelog, "16.4.0", "rc")
+
+      # PR 2489 should appear only once (deduplicated)
+      expect(collapsed.scan("PR 2489").count).to eq(1)
+      # PR 2490 should still be present
+      expect(collapsed).to include("PR 2490")
+      expect(collapsed).to include("- **Bug fix A**")
+      expect(collapsed).to include("- **Bug fix B**")
+    end
+
     it "strips 'Changes since the last non-beta release.' marker text" do
       changelog = <<~CHANGELOG
         ### [Unreleased]
