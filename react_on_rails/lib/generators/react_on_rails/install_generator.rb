@@ -346,6 +346,22 @@ module ReactOnRails
         ["rails generate react_on_rails:install", *flags].join(" ")
       end
 
+      def recovery_working_tree_note
+        <<~MSG
+          If this run created or changed files, clean up your working tree before rerunning
+          (commit, stash, or discard the partial changes), or re-run with --ignore-warnings
+          if you intentionally want to continue on a dirty tree.
+        MSG
+      end
+
+      def recovery_working_tree_step(step_number)
+        <<~MSG.chomp
+          #{step_number}. If this run created or changed files, clean up your working tree before rerunning
+             (commit, stash, or discard the partial changes), or re-run with --ignore-warnings
+             if you intentionally want to continue on a dirty tree.
+        MSG
+      end
+
       def incomplete_installation_message
         package_install_step = "#{GeneratorMessages.detect_package_manager} install"
 
@@ -361,7 +377,8 @@ module ReactOnRails
           1. #{Rainbow('bundle install').cyan}
           2. #{Rainbow('bundle exec rails shakapacker:install').cyan}
           3. #{Rainbow(package_install_step).cyan}
-          4. Re-run #{Rainbow(recovery_install_command).cyan}
+          #{recovery_working_tree_step(4)}
+          5. Re-run #{Rainbow(recovery_install_command).cyan}
              (add #{Rainbow('--force').cyan} to overwrite files if needed)
 
           Troubleshooting:
@@ -497,6 +514,7 @@ module ReactOnRails
           Please try manually:
               bundle add shakapacker --strict
 
+          #{recovery_working_tree_note}
           Then re-run: #{recovery_install_command}
         MSG
         GeneratorMessages.add_error(error)
@@ -518,7 +536,8 @@ module ReactOnRails
           2. Run: bundle install
           3. Try manually: bundle exec rails shakapacker:install
           4. Check for error output above
-          5. Re-run: #{recovery_install_command}
+          #{recovery_working_tree_step(5)}
+          6. Re-run: #{recovery_install_command}
 
           Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
         MSG

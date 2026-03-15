@@ -1688,6 +1688,9 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("React on Rails installation is incomplete")
       expect(output_text).to include("Avoid running ./bin/dev")
       expect(output_text).to include("Some generator files may have been partially created during this run")
+      expect(output_text).to include("clean up your working tree before rerunning")
+      expect(output_text).to include("commit, stash, or discard the partial changes")
+      expect(output_text).to include("--ignore-warnings")
       expect(output_text).not_to include("🎉 React on Rails Successfully Installed!")
       expect(output_text).not_to include("📋 QUICK START:")
     end
@@ -1711,7 +1714,9 @@ describe InstallGenerator, type: :generator do
       output_text = GeneratorMessages.output.join("\n")
 
       expect(output_text).to include("rails generate react_on_rails:install --redux --typescript --rspack --rsc")
-      expect(output_text).not_to include("--ignore-warnings")
+      expect(output_text).not_to include(
+        "rails generate react_on_rails:install --redux --typescript --rspack --rsc --ignore-warnings"
+      )
     end
 
     specify "recovery_install_command keeps meaningful flags only" do
@@ -1745,6 +1750,7 @@ describe InstallGenerator, type: :generator do
       install_generator.send(:handle_shakapacker_install_error)
       output_text = GeneratorMessages.output.join("\n")
 
+      expect(output_text).to include("clean up your working tree before rerunning")
       expect(output_text).to include("Re-run: rails generate react_on_rails:install --redux --typescript")
     end
 
@@ -1754,6 +1760,7 @@ describe InstallGenerator, type: :generator do
       install_generator.send(:handle_shakapacker_gemfile_error)
       output_text = GeneratorMessages.output.join("\n")
 
+      expect(output_text).to include("clean up your working tree before rerunning")
       expect(output_text).to include("Then re-run: rails generate react_on_rails:install --rspack --pro")
     end
   end
