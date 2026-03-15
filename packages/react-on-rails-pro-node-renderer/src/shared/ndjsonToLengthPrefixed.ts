@@ -27,9 +27,8 @@ export default function ndjsonToLengthPrefixed(ndjsonStream: Readable): Readable
         const lines = decoded.split('\n');
         lastIncompleteChunk = lines.pop() ?? '';
 
-        for (const line of lines) {
-          if (line.trim() === '') continue;
-
+        const nonEmptyLines = lines.filter((line) => line.trim() !== '');
+        for (const line of nonEmptyLines) {
           const parsed = JSON.parse(line);
           const { html, ...metadata } = parsed;
           const htmlContent = html ?? '';
