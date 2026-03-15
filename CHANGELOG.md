@@ -33,15 +33,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **Fix install generator load path for `ReactOnRails::GitUtils`**: Added an explicit `require "react_on_rails/git_utils"` so generator execution does not rely on broader app boot side effects for this constant to be available. [PR 2599](https://github.com/shakacode/react_on_rails/pull/2599) by [justin808](https://github.com/justin808).
 - **`server_render_js` now handles non-Error throws safely**: Defensive error serialization now supports thrown primitives and `null` values without raising secondary `TypeError` exceptions while building SSR error payloads. [PR 2599](https://github.com/shakacode/react_on_rails/pull/2599) by [justin808](https://github.com/justin808).
 - **Clean stale webpack config on `--rspack` install**: Running `rails g react_on_rails:install --rspack` now removes leftover `config/webpack/` files when switching from webpack to rspack, preventing Shakapacker deprecation warnings. Only known stock/generated webpack configs are removed; custom files are preserved with a warning. [PR 2597](https://github.com/shakacode/react_on_rails/pull/2597) by [justin808](https://github.com/justin808). Fixes [Issue 2549](https://github.com/shakacode/react_on_rails/issues/2549).
+- **Fixed `bin/setup` failing on pnpm workspace member directories**: `bin/setup` now checks for the presence of `pnpm-lock.yaml` before running `pnpm install --frozen-lockfile`, preventing failures in workspace member directories (e.g., `spec/dummy`) where dependencies are managed by the workspace root. [PR 2477](https://github.com/shakacode/react_on_rails/pull/2477) by [justin808](https://github.com/justin808).
 
 #### Improved
 
 - **Auto-install `react_on_rails_pro` gem for `--rsc`/`--pro` generator flags**: Running `rails g react_on_rails:install --rsc` or `--pro` now automatically installs the `react_on_rails_pro` gem via `bundle add` instead of only printing an error, matching how Shakapacker is handled in the same generator. [PR 2439](https://github.com/shakacode/react_on_rails/pull/2439) by [justin808](https://github.com/justin808).
 - **create-react-on-rails-app validation and test coverage**: Tightened app name validation (must start with a letter), added Rails 7.0+ prerequisite validation, and expanded validator/setup test coverage (including `validateAll` success path). [PR 2571](https://github.com/shakacode/react_on_rails/pull/2571) by [justin808](https://github.com/justin808).
-
-#### Fixed
-
-- **Fixed `bin/setup` failing on pnpm workspace member directories**: `bin/setup` now checks for the presence of `pnpm-lock.yaml` before running `pnpm install --frozen-lockfile`, preventing failures in workspace member directories (e.g., `spec/dummy`) where dependencies are managed by the workspace root. [PR 2477](https://github.com/shakacode/react_on_rails/pull/2477) by [justin808](https://github.com/justin808).
 
 #### Changed
 
