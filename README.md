@@ -109,22 +109,22 @@ For detailed upgrade instructions, see [upgrade guide documentation](docs/oss/up
 
 React on Rails Pro adds performance and advanced rendering features on top of the open-source gem. The subscription is **free for evaluation and non-production use**.
 
-| Feature                             |    OSS     |        Pro        |
-| ----------------------------------- | :--------: | :---------------: |
-| React in Rails views                |     ✓      |         ✓         |
-| Hot Module Replacement              |     ✓      |         ✓         |
-| Server-side rendering               | ✓ (ExecJS) | ✓ (Node renderer) |
-| Auto-bundling                       |     ✓      |         ✓         |
-| Rspack support (~20x faster builds) |     ✓      |         ✓         |
-| Redux integration                   |     ✓      |         ✓         |
-| I18n                                |     ✓      |         ✓         |
-| React Server Components             |            |         ✓         |
-| Streaming SSR                       |            |         ✓         |
-| Fragment caching                    |            |         ✓         |
-| Code splitting with SSR             |            |         ✓         |
-| Loadable Components                 |            |         ✓         |
-| Node renderer (10-100x faster SSR)  |            |         ✓         |
-| TanStack Router SSR                 |            |         ✓         |
+| Feature                              |    OSS     |        Pro        |
+| ------------------------------------ | :--------: | :---------------: |
+| React in Rails views                 |     ✓      |         ✓         |
+| Hot Module Replacement               |     ✓      |         ✓         |
+| Server-side rendering                | ✓ (ExecJS) | ✓ (Node renderer) |
+| Auto-bundling                        |     ✓      |         ✓         |
+| Rspack support (~20x faster builds)  |     ✓      |         ✓         |
+| Redux integration                    |     ✓      |         ✓         |
+| I18n                                 |     ✓      |         ✓         |
+| React Server Components              |            |         ✓         |
+| Streaming SSR                        |            |         ✓         |
+| Fragment caching                     |            |         ✓         |
+| Code splitting / Loadable Components |            |         ✓         |
+| Node renderer (10-100x faster SSR)   |            |         ✓         |
+| TanStack Router SSR                  |            |         ✓         |
+| Bundle caching                       |            |         ✓         |
 
 For a detailed comparison with feature descriptions, see the [OSS vs Pro comparison](docs/oss/getting-started/oss-vs-pro.md).
 
