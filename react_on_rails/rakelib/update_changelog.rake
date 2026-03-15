@@ -247,6 +247,16 @@ def normalize_changelog_block(lines)
   normalized_lines.join("\n")
 end
 
+def normalize_heading_key(line)
+  normalized = line.to_s.strip
+  heading_level = normalized[/\A(#+)/, 1] || ""
+  heading_text = normalized.sub(/\A#+\s+/, "")
+                           .gsub(/\A(?:⚠️|⚠)\s*/u, "")
+                           .downcase
+                           .gsub(/\s+/, " ")
+  "#{heading_level} #{heading_text}".strip
+end
+
 # Merge an array of changelog blocks so that blocks with the same heading
 # (e.g. two "#### Fixed" blocks) are combined into one.  Header-only blocks
 # like "#### Pro" are kept at their first-seen position, ensuring they remain
@@ -266,7 +276,7 @@ def consolidate_changelog_blocks(blocks)
     heading_match = first_line.match(/\A(####+\s+.+)/)
 
     if heading_match
-      heading_key = heading_match[1].strip.downcase.gsub(/\s+/, " ")
+      heading_key = normalize_heading_key(heading_match[1])
 
       if heading_indices.key?(heading_key)
         # Append this block's content (lines after heading) to existing block
@@ -280,6 +290,8 @@ def consolidate_changelog_blocks(blocks)
         consolidated << cleaned
       end
     else
+      # Keep non-heading prose blocks (for example explanatory text). Marker-only
+      # blocks are already stripped by the cleanup + empty guard above.
       consolidated << cleaned
     end
   end
@@ -293,7 +305,7 @@ end
 # Entries are grouped by PR number; only the first occurrence is kept.
 # Multi-line entries (continuation lines not starting with "- ") are
 # kept together with their parent entry.
-# rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 def deduplicate_block_entries(block)
   lines = block.lines
   first_line = lines.first&.rstrip || ""
@@ -306,6 +318,8 @@ def deduplicate_block_entries(block)
   # Group body lines into logical entries (each starts with "- ")
   entries = []
   body_lines.each do |line|
+    next if line.strip.empty? && entries.empty?
+
     if line.match?(/\A\s*- /) || entries.empty?
       entries << line
     else
@@ -332,7 +346,7 @@ def deduplicate_block_entries(block)
 
   "#{heading}\n#{unique_entries.join}"
 end
-# rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # rubocop:disable Metrics/AbcSize
 def collapse_prerelease_sections(changelog, base_version, channel)

@@ -228,6 +228,40 @@ RSpec.describe "update_changelog.rake helper methods" do
       expect(collapsed).to include("- RC-specific feature")
       expect(collapsed).to include("- Accumulated fix")
     end
+
+    it "consolidates ⚠️ and non-emoji breaking-change headings together" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        #### ⚠️ Breaking Changes
+        - Breaking change from unreleased
+
+        ### [16.4.0.rc.0] - 2026-02-28
+        #### Breaking Changes
+        - Breaking change from rc
+      CHANGELOG
+
+      collapsed = collapse_prerelease_sections(changelog, "16.4.0", "rc")
+
+      expect(collapsed.scan(/^####\s+(?:⚠️\s*)?Breaking Changes\b/).count).to eq(1)
+      expect(collapsed).to include("- Breaking change from unreleased")
+      expect(collapsed).to include("- Breaking change from rc")
+    end
+
+    it "does not add extra blank entries when a block body starts with blank lines" do
+      block = <<~BLOCK
+        #### Fixed
+
+        - **Bug fix A**. [PR 2489](https://github.com/shakacode/react_on_rails/pull/2489) by [user](https://github.com/user).
+      BLOCK
+
+      deduped = deduplicate_block_entries(block)
+
+      expect(deduped).to eq(<<~EXPECTED)
+        #### Fixed
+        - **Bug fix A**. [PR 2489](https://github.com/shakacode/react_on_rails/pull/2489) by [user](https://github.com/user).
+      EXPECTED
+    end
   end
 
   describe "#cleanup_collapsed_prerelease_links" do
