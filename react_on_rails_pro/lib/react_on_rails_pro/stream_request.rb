@@ -178,7 +178,7 @@ module ReactOnRailsPro
     #
     # The length-prefixed format avoids JSON.stringify on the HTML content (the bulk
     # of the data), eliminating ~30% escaping overhead for typical payloads.
-    def loop_response_chunks(response, &block) # rubocop:disable Metrics/CyclomaticComplexity
+    def loop_response_chunks(response, &block)
       return enum_for(__method__, response) unless block
 
       parser = LengthPrefixedParser.new
@@ -201,7 +201,7 @@ module ReactOnRailsPro
         @metadata = nil
       end
 
-      def feed(chunk) # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def feed(chunk)
         @buf << chunk
 
         loop do
