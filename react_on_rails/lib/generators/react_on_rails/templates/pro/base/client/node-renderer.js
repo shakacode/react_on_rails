@@ -9,6 +9,8 @@ const parseWorkersCount = (value) => {
   const parsed = Number(normalized);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 };
+const configuredWorkersCount =
+  parseWorkersCount(env.RENDERER_WORKERS_COUNT) ?? parseWorkersCount(env.NODE_RENDERER_CONCURRENCY);
 
 const config = {
   serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
@@ -22,8 +24,7 @@ const config = {
   // Set RENDERER_WORKERS_COUNT env var to override (e.g., for production tuning)
   // Set to 0 for single-process mode (useful for debugging).
   // Legacy fallback: NODE_RENDERER_CONCURRENCY
-  workersCount:
-    parseWorkersCount(env.RENDERER_WORKERS_COUNT) ?? parseWorkersCount(env.NODE_RENDERER_CONCURRENCY) ?? 3,
+  workersCount: configuredWorkersCount ?? 3,
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
   // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.
@@ -44,7 +45,7 @@ const config = {
 // Renderer detects a total number of CPUs on virtual hostings like Heroku or CircleCI instead
 // of CPUs number allocated for current container. This results in spawning many workers while
 // only 1-2 of them really needed.
-if (env.CI) {
+if (env.CI && configuredWorkersCount == null) {
   config.workersCount = 2;
 }
 
