@@ -9,7 +9,7 @@ Pro adds performance and rendering features on top of everything in React on Rai
 - **[React Server Components](./react-server-components/tutorial.md)** - RSC with full Rails integration
 - **[Streaming SSR](./streaming-server-rendering.md)** - Progressive server rendering with React 18+
 - **[Fragment Caching](./caching.md)** - Cache rendered components and skip prop evaluation entirely
-- **[Prerender Caching](./configuration.md)** - Cache JavaScript evaluation results across requests
+- **Prerender Caching** ([`config.prerender_caching`](./configuration.md#example-of-configuration)) - Cache JavaScript evaluation results across requests
 - **[Node Renderer](./node-renderer/basics.md)** - Dedicated Node.js rendering server for better performance and tooling
 - **[Code Splitting](./code-splitting-loadable-components.md)** - Loadable components with SSR support
 - **[Bundle Caching](./bundle-caching.md)** - Skip redundant webpack builds during deployment
@@ -21,13 +21,13 @@ All OSS features continue to work. Pro re-exports everything from the core packa
 ### 1. Add the Pro gem
 
 ```bash
-bundle add react_on_rails_pro --version="<gem_version>" --strict
+bundle add react_on_rails_pro --version="<gem_version>"
 ```
 
 Or add it to your Gemfile directly:
 
 ```ruby
-gem "react_on_rails_pro", "= <gem_version>"
+gem "react_on_rails_pro", ">= <gem_version>"
 ```
 
 Then run `bundle install`.
@@ -58,13 +58,13 @@ Then update your imports to use `react-on-rails-pro` instead of `react-on-rails`
 
 The Pro package re-exports everything from core, so no other import changes are needed.
 
-### 3. Run the Pro generator
+### 3. Run the Pro generator and enable the Node renderer
 
 ```bash
 bundle exec rails generate react_on_rails:pro
 ```
 
-This adds the Pro initializer, configures webpack for Pro features, and sets up the Node renderer entry point.
+This adds the Pro initializer, configures webpack for Pro features, and sets up the Node renderer entry point and configuration.
 
 After the generator runs, verify everything works:
 
@@ -80,7 +80,7 @@ That's it. Your app is now running React on Rails Pro.
 If you're setting up a new app (not upgrading an existing one), use the `--pro` flag:
 
 ```bash
-bundle add react_on_rails_pro --version="<gem_version>" --strict
+bundle add react_on_rails_pro --version="<gem_version>"
 bundle exec rails generate react_on_rails:install --pro
 ```
 
