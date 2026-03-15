@@ -3,6 +3,7 @@ import buildApp from '../src/worker';
 import { createTestConfig } from './testingNodeRendererConfigs';
 import * as errorReporter from '../src/shared/errorReporter';
 import { createForm, SERVER_BUNDLE_TIMESTAMP } from './httpRequestUtils';
+import { LengthPrefixedStreamParser } from './parseLengthPrefixedStream';
 
 const { config } = createTestConfig('htmlStreaming');
 const app = buildApp(config);
@@ -30,73 +31,16 @@ const makeRequest = async (options = {}) => {
   });
   request.setEncoding('utf8');
 
-  const chunks = [];
-  const jsonChunks = [];
+  const parser = new LengthPrefixedStreamParser();
   let firstByteTime;
   let status;
-
-  // Length-prefixed parser state: accumulates raw bytes and extracts
-  // complete chunks in the format: <metadata JSON>\t<hex length>\n<raw content>
-  let parserBuf = Buffer.alloc(0);
-  let parserState = 'header'; // 'header' or 'content'
-  let parserContentLen = 0;
-  let parserMetadata = null;
-
-  const parseChunks = () => {
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      if (parserState === 'header') {
-        const idx = parserBuf.indexOf(0x0a); // \n
-        if (idx < 0) break;
-
-        const header = parserBuf.subarray(0, idx);
-        parserBuf = parserBuf.subarray(idx + 1);
-        const tabIdx = header.indexOf(0x09); // \t
-
-        if (tabIdx >= 0) {
-          // Length-prefixed format
-          const metaJson = header.subarray(0, tabIdx).toString('utf8');
-          const lenHex = header.subarray(tabIdx + 1).toString('utf8');
-          parserMetadata = JSON.parse(metaJson);
-          parserContentLen = parseInt(lenHex, 16);
-          parserState = 'content';
-        } else {
-          // Legacy NDJSON format fallback
-          const line = header.toString('utf8').trim();
-          if (line.length > 0) {
-            try {
-              const parsed = JSON.parse(line);
-              chunks.push(parsed.html || '');
-              jsonChunks.push(parsed);
-            } catch (e) {
-              chunks.push(line);
-              jsonChunks.push({ hasErrors: true, error: `JSON parsing failed: ${e.message}` });
-            }
-          }
-        }
-      } else {
-        // parserState === 'content'
-        if (parserBuf.length < parserContentLen) break;
-
-        const content = parserBuf.subarray(0, parserContentLen).toString('utf8');
-        parserBuf = parserBuf.subarray(parserContentLen);
-        const parsed = { html: content, ...parserMetadata };
-        chunks.push(content);
-        jsonChunks.push(parsed);
-        parserMetadata = null;
-        parserState = 'header';
-      }
-    }
-  };
 
   request.on('response', (headers) => {
     status = headers[':status'];
   });
 
   request.on('data', (data) => {
-    const buf = typeof data === 'string' ? Buffer.from(data, 'utf8') : data;
-    parserBuf = Buffer.concat([parserBuf, buf]);
-    parseChunks();
+    parser.feed(data);
     if (!firstByteTime) {
       firstByteTime = Date.now();
     }
@@ -119,6 +63,7 @@ const makeRequest = async (options = {}) => {
   });
 
   const endTime = Date.now();
+  const { htmlChunks: chunks, parsedChunks: jsonChunks } = parser;
   const fullBody = chunks.join('');
   const timeToFirstByte = firstByteTime - startTime;
   const streamingTime = endTime - firstByteTime;
