@@ -18,7 +18,7 @@ maintainer of React on Rails, for more information.
 
 ### Pro: Docs
 
-See https://www.shakacode.com/react-on-rails-pro/docs/.
+See the [React on Rails Pro docs home](./home-pro.md).
 
 ### Pro: React Server Components
 
