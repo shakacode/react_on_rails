@@ -475,27 +475,67 @@ module ReactOnRails
       end
 
       def resolve_hello_server_layout_name
-        compatibility_by_layout = candidate_layout_names.to_h do |layout_name|
-          [layout_name, compatible_layout?(layout_name)]
+        classification_by_layout = candidate_layout_names.to_h do |layout_name|
+          [layout_name, classify_hello_server_layout(layout_name)]
         end
 
-        compatible_layout_name = find_compatible_hello_server_layout_name(compatibility_by_layout)
-        return compatible_layout_name if compatible_layout_name
+        reusable_layout_name = find_reusable_hello_server_layout_name(classification_by_layout)
+        return reusable_layout_name if reusable_layout_name
 
         create_new_hello_server_layout(
-          incompatible_layout_paths: incompatible_existing_layout_paths(compatibility_by_layout)
+          skipped_layout_paths: skipped_existing_layout_paths(classification_by_layout)
         )
       end
 
-      def find_compatible_hello_server_layout_name(compatibility_by_layout)
-        compatibility_by_layout.each do |layout_name, is_compatible|
-          next unless is_compatible
+      def find_reusable_hello_server_layout_name(classification_by_layout)
+        declared_layout_name = hello_world_controller_layout_name
 
-          say "ℹ️  Reusing compatible existing #{layout_name} layout for HelloServerController", :yellow
+        if reusable_layout_classification?(classification_by_layout[declared_layout_name])
+          announce_reused_hello_server_layout(declared_layout_name, classification_by_layout[declared_layout_name])
+          return declared_layout_name
+        end
+
+        preferred_layout_name = first_layout_name_with_classification(
+          classification_by_layout,
+          :canonical,
+          excluding: declared_layout_name
+        )
+        return preferred_layout_name if preferred_layout_name
+
+        first_layout_name_with_reusable_classification(
+          classification_by_layout,
+          excluding: declared_layout_name
+        )
+      end
+
+      def first_layout_name_with_classification(classification_by_layout, expected_classification, excluding: nil)
+        classification_by_layout.each do |layout_name, classification|
+          next if layout_name == excluding
+          next unless classification == expected_classification
+
+          announce_reused_hello_server_layout(layout_name, classification)
           return layout_name
         end
 
         nil
+      end
+
+      def first_layout_name_with_reusable_classification(classification_by_layout, excluding: nil)
+        classification_by_layout.each do |layout_name, classification|
+          next if layout_name == excluding
+          next unless reusable_layout_classification?(classification)
+
+          announce_reused_hello_server_layout(layout_name, classification)
+          return layout_name
+        end
+
+        nil
+      end
+
+      def announce_reused_hello_server_layout(layout_name, classification)
+        message = +"ℹ️  Reusing existing #{layout_name} layout for HelloServerController"
+        message << " (new generated layouts use empty pack tags by default)" if classification == :reusable
+        say message, :yellow
       end
 
       def candidate_layout_names
@@ -524,21 +564,26 @@ module ReactOnRails
            .map { |path| File.basename(path, ".html.erb") }
       end
 
-      def compatible_layout?(layout_name)
+      def classify_hello_server_layout(layout_name)
         layout_path = layout_destination_path(layout_name)
-        return false unless File.exist?(File.join(destination_root, layout_path))
+        full_path = File.join(destination_root, layout_path)
+        return :missing unless File.exist?(full_path)
 
-        layout_content = File.read(File.join(destination_root, layout_path))
-        layout_uses_auto_registration_pack_tags?(layout_content)
+        layout_content = File.read(full_path)
+        return :missing_pack_tags unless layout_has_required_pack_tags?(layout_content)
+
+        return :canonical if layout_uses_canonical_pack_tags?(layout_content)
+
+        :reusable
       end
 
-      def incompatible_existing_layout_paths(compatibility_by_layout)
-        compatibility_by_layout.filter_map do |layout_name, is_compatible|
+      def skipped_existing_layout_paths(classification_by_layout)
+        classification_by_layout.filter_map do |layout_name, classification|
           layout_path = layout_destination_path(layout_name)
           full_path = File.join(destination_root, layout_path)
 
           next unless File.exist?(full_path)
-          next if is_compatible
+          next if reusable_layout_classification?(classification)
 
           layout_path
         end
@@ -548,19 +593,39 @@ module ReactOnRails
         "app/views/layouts/#{layout_name}.html.erb"
       end
 
-      def layout_uses_auto_registration_pack_tags?(layout_content)
+      def layout_has_required_pack_tags?(layout_content)
+        pack_tag_present?(layout_content, "javascript_pack_tag") &&
+          pack_tag_present?(layout_content, "stylesheet_pack_tag")
+      end
+
+      def layout_uses_canonical_pack_tags?(layout_content)
         pack_tag_without_names?(layout_content, "javascript_pack_tag") &&
           pack_tag_without_names?(layout_content, "stylesheet_pack_tag")
       end
 
+      def reusable_layout_classification?(classification)
+        %i[canonical reusable].include?(classification)
+      end
+
+      def pack_tag_present?(layout_content, helper_name)
+        pack_tag_arguments(layout_content, helper_name).any?
+      end
+
       def pack_tag_without_names?(layout_content, helper_name)
+        pack_tag_arguments(layout_content, helper_name).any? do |arguments|
+          pack_tag_arguments_without_names?(arguments)
+        end
+      end
+
+      def pack_tag_arguments(layout_content, helper_name)
         pattern = /<%=\s*#{Regexp.escape(helper_name)}(?<arguments>\s*(?:\([^%]*?\)|[^%]*?))?\s*%>/
 
+        arguments = []
         layout_content.scan(pattern) do
-          return true if pack_tag_arguments_without_names?(Regexp.last_match[:arguments])
+          arguments << Regexp.last_match[:arguments]
         end
 
-        false
+        arguments
       end
 
       def pack_tag_arguments_without_names?(arguments)
@@ -576,11 +641,11 @@ module ReactOnRails
         arguments[1...-1].strip
       end
 
-      def create_new_hello_server_layout(incompatible_layout_paths: [])
+      def create_new_hello_server_layout(skipped_layout_paths: [])
         layout_name = next_available_hello_server_layout_name
         layout_path = layout_destination_path(layout_name)
 
-        announce_incompatible_layout_fallback(incompatible_layout_paths, layout_path) if incompatible_layout_paths.any?
+        announce_skipped_layout_fallback(skipped_layout_paths, layout_path) if skipped_layout_paths.any?
 
         say "📝 Creating #{layout_path} for HelloServerController...", :yellow
         empty_directory("app/views/layouts")
@@ -590,17 +655,17 @@ module ReactOnRails
         layout_name
       end
 
-      def announce_incompatible_layout_fallback(incompatible_layout_paths, new_layout_path)
-        skipped_paths = incompatible_layout_paths.map { |path| "  - #{path}" }.join("\n")
+      def announce_skipped_layout_fallback(skipped_layout_paths, new_layout_path)
+        skipped_paths = skipped_layout_paths.map { |path| "  - #{path}" }.join("\n")
 
         say <<~MSG, :yellow
           ℹ️  Found existing layout file(s) in your app that were not reused for HelloServerController:
           #{skipped_paths}
 
           Here, "your file" means the layout file already present in the app at the path(s) above.
-          Those file(s) do not contain the empty `stylesheet_pack_tag` and `javascript_pack_tag` calls
-          that React on Rails auto-registration requires, so the generator will create #{new_layout_path}
-          instead of overwriting them.
+          Those file(s) do not include both `stylesheet_pack_tag` and `javascript_pack_tag`, so the generator
+          will create #{new_layout_path} instead of overwriting them.
+          New generated layouts use empty pack tags by default.
         MSG
       end
 

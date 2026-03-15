@@ -126,7 +126,7 @@ describe RscGenerator, type: :generator do
     end
   end
 
-  context "when Pro is installed with a compatible legacy hello_world layout" do
+  context "when Pro is installed with a canonical legacy hello_world layout" do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
@@ -139,7 +139,7 @@ describe RscGenerator, type: :generator do
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
       simulate_pro_webpack_files
       simulate_hello_world_controller("hello_world")
-      simulate_compatible_auto_registration_layout("hello_world")
+      simulate_canonical_pack_tag_layout("hello_world")
 
       Dir.chdir(destination_root) do
         run_generator(["--force"])
@@ -154,7 +154,7 @@ describe RscGenerator, type: :generator do
     end
   end
 
-  context "when Pro is installed with a compatible custom HelloWorld layout" do
+  context "when Pro is installed with a canonical custom HelloWorld layout" do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
@@ -167,7 +167,7 @@ describe RscGenerator, type: :generator do
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
       simulate_pro_webpack_files
       simulate_hello_world_controller("marketing")
-      simulate_compatible_auto_registration_layout("marketing")
+      simulate_canonical_pack_tag_layout("marketing")
 
       Dir.chdir(destination_root) do
         run_generator(["--force"])
@@ -202,7 +202,7 @@ describe RscGenerator, type: :generator do
           end
         end
       RUBY
-      simulate_compatible_auto_registration_layout("marketing")
+      simulate_canonical_pack_tag_layout("marketing")
 
       Dir.chdir(destination_root) do
         run_generator(["--force"])
@@ -237,7 +237,7 @@ describe RscGenerator, type: :generator do
           end
         end
       RUBY
-      simulate_compatible_auto_registration_layout("marketing_layout")
+      simulate_canonical_pack_tag_layout("marketing_layout")
 
       Dir.chdir(destination_root) do
         run_generator(["--force"])
@@ -252,7 +252,7 @@ describe RscGenerator, type: :generator do
     end
   end
 
-  context "when Pro is installed with an incompatible hello_world layout" do
+  context "when Pro is installed with a named-pack hello_world layout" do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
@@ -265,29 +265,26 @@ describe RscGenerator, type: :generator do
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
       simulate_pro_webpack_files
       simulate_hello_world_controller("hello_world")
-      simulate_incompatible_pack_named_layout("hello_world")
+      simulate_named_pack_tag_layout("hello_world")
 
       Dir.chdir(destination_root) do
         run_generator(["--force"])
       end
     end
 
-    include_examples "rsc_hello_server_files"
+    include_examples "rsc_hello_server_files", "hello_world"
 
-    it "creates a compatible react_on_rails_default layout instead of reusing hello_world by name alone" do
-      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
-        expect(content).to include("<%= stylesheet_pack_tag %>")
-        expect(content).to include("<%= javascript_pack_tag %>")
-      end
-
+    it "reuses hello_world when it already has both pack tags" do
       assert_file "app/views/layouts/hello_world.html.erb" do |content|
         expect(content).to include('<%= stylesheet_pack_tag "application" %>')
         expect(content).to include('<%= javascript_pack_tag "application" %>')
       end
+
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
     end
   end
 
-  context "when Pro is installed with an incompatible react_on_rails_default layout" do
+  context "when Pro is installed with a named-pack react_on_rails_default layout" do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
@@ -300,29 +297,26 @@ describe RscGenerator, type: :generator do
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
       simulate_pro_webpack_files
       simulate_hello_world_controller("react_on_rails_default")
-      simulate_incompatible_pack_named_layout("react_on_rails_default")
+      simulate_named_pack_tag_layout("react_on_rails_default")
 
       Dir.chdir(destination_root) do
         run_generator(["--force"])
       end
     end
 
-    include_examples "rsc_hello_server_files", "react_on_rails_rsc"
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
 
-    it "creates a dedicated compatible layout without overwriting the incompatible react_on_rails_default file" do
-      assert_file "app/views/layouts/react_on_rails_rsc.html.erb" do |content|
-        expect(content).to include("<%= stylesheet_pack_tag %>")
-        expect(content).to include("<%= javascript_pack_tag %>")
-      end
-
+    it "reuses react_on_rails_default when it already has both pack tags" do
       assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
         expect(content).to include('<%= stylesheet_pack_tag "application" %>')
         expect(content).to include('<%= javascript_pack_tag "application" %>')
       end
+
+      assert_no_file "app/views/layouts/react_on_rails_rsc.html.erb"
     end
   end
 
-  context "when Pro is installed and a compatible react_on_rails_rsc layout already exists" do
+  context "when Pro is installed with a hello_world layout missing a required pack tag" do
     before(:all) do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
@@ -335,8 +329,43 @@ describe RscGenerator, type: :generator do
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
       simulate_pro_webpack_files
       simulate_hello_world_controller("hello_world")
-      simulate_incompatible_pack_named_layout("hello_world")
-      simulate_compatible_auto_registration_layout("react_on_rails_rsc")
+      simulate_layout_missing_stylesheet_pack_tag("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "creates react_on_rails_default instead of reusing the incomplete hello_world layout" do
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include("<%= stylesheet_pack_tag %>")
+        expect(content).to include("<%= javascript_pack_tag %>")
+      end
+
+      assert_file "app/views/layouts/hello_world.html.erb" do |content|
+        expect(content).to include('<%= javascript_pack_tag "application" %>')
+        expect(content).not_to include("stylesheet_pack_tag")
+      end
+    end
+  end
+
+  context "when earlier layouts are unusable and a compatible react_on_rails_rsc layout already exists" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_layout_missing_stylesheet_pack_tag("hello_world")
+      simulate_canonical_pack_tag_layout("react_on_rails_rsc")
 
       Dir.chdir(destination_root) do
         run_generator(["--force"])
