@@ -24,6 +24,7 @@ import {
   getRequestBundleFilePath,
   validateBundlesExist,
 } from '../shared/utils.js';
+import ndjsonToLengthPrefixed from '../shared/ndjsonToLengthPrefixed.js';
 import { getConfig } from '../shared/configBuilder.js';
 import type { TracingContext } from '../shared/tracing.js';
 import { buildExecutionContext, ExecutionContext, VMContextNotFoundError } from './vm.js';
@@ -57,7 +58,11 @@ async function prepareResult(
       return {
         headers: { 'Cache-Control': 'public, max-age=31536000' },
         status: 200,
-        stream: result,
+        // Convert NDJSON to length-prefixed protocol at the HTTP boundary.
+        // This avoids JSON.stringify escaping on the bulk HTML content (~30% overhead),
+        // while keeping the internal Node.js pipeline (RSC tee, injectRSCPayload,
+        // transformRSCNodeStream) on the original NDJSON format.
+        stream: ndjsonToLengthPrefixed(result),
       };
     }
 

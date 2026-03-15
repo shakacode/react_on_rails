@@ -56,48 +56,15 @@ describe('streamServerRenderedReactComponent', () => {
     ComponentRegistry.components().clear();
   });
 
-  // Parses a stream chunk in the length-prefixed format:
-  // <metadata JSON>\t<content byte length hex>\n<raw content>
-  const parseStreamChunk = (text) => {
-    const newlineIdx = text.indexOf('\n');
-    expect(newlineIdx).toBeGreaterThan(0);
-
-    const header = text.slice(0, newlineIdx);
-    const tabIdx = header.indexOf('\t');
-    expect(tabIdx).toBeGreaterThan(0);
-
-    const metaJson = header.slice(0, tabIdx);
-    const metadata = JSON.parse(metaJson);
-    const contentLenHex = header.slice(tabIdx + 1);
-    const contentLen = parseInt(contentLenHex, 16);
-    const contentBytes = new TextEncoder().encode(text.slice(newlineIdx + 1));
-    const content = new TextDecoder().decode(contentBytes.slice(0, contentLen));
-
-    return { html: content, ...metadata };
-  };
-
   const expectStreamChunk = (chunk) => {
     expect(typeof chunk).toBe('string');
-    const parsed = parseStreamChunk(chunk);
-    expect(typeof parsed.html).toBe('string');
-    expect(typeof parsed.consoleReplayScript).toBe('string');
-    expect(typeof parsed.hasErrors).toBe('boolean');
-    expect(typeof parsed.isShellReady).toBe('boolean');
-    return parsed;
+    const jsonChunk = JSON.parse(chunk);
+    expect(typeof jsonChunk.html).toBe('string');
+    expect(typeof jsonChunk.consoleReplayScript).toBe('string');
+    expect(typeof jsonChunk.hasErrors).toBe('boolean');
+    expect(typeof jsonChunk.isShellReady).toBe('boolean');
+    return jsonChunk;
   };
-
-  it('parses UTF-8 multibyte HTML chunks using byte length', () => {
-    const html = '<div>Olá 👋</div>';
-    const metadata = {
-      hasErrors: false,
-      isShellReady: true,
-      consoleReplayScript: '',
-    };
-    const contentLenHex = new TextEncoder().encode(html).length.toString(16);
-    const chunk = `${JSON.stringify(metadata)}\t${contentLenHex}\n${html}`;
-
-    expect(parseStreamChunk(chunk)).toEqual({ html, ...metadata });
-  });
 
   const setupStreamTest = ({
     throwSyncError = false,
