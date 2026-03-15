@@ -621,7 +621,8 @@ module ReactOnRails
       end
 
       def pack_tag_arguments(layout_content, helper_name)
-        pattern = /<%=\s*#{Regexp.escape(helper_name)}(?<arguments>\s*(?:\((?:(?!%>).)*?\)|(?:(?!%>).)*?))?\s*%>/m
+        arguments_pattern = '\s*(?:\((?:(?!%>).)*?\)|(?:(?!%>).)*?)'
+        pattern = /<%=\s*#{Regexp.escape(helper_name)}(?=\s|\(|%>)(?<arguments>#{arguments_pattern})?\s*%>/m
 
         arguments = []
         layout_content.scan(pattern) do
