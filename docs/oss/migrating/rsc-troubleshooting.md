@@ -372,24 +372,26 @@ export default function PageErrorBoundary({ children }) {
 
 ### Must Be at the Very Top
 
+<!-- prettier-ignore -->
 ```jsx
 // BAD: Directive after imports
 import { useState } from 'react';
-('use client'); // Too late -- will not work
+'use client'; // Too late -- will not work
 
 // GOOD: Directive before everything (comments allowed above)
-('use client');
+'use client';
 import { useState } from 'react';
 ```
 
 ### Must Use Quotes, Not Backticks
 
+<!-- prettier-ignore -->
 ```jsx
 // BAD
 `use client`;
 
 // GOOD
-('use client');
+'use client';
 ```
 
 ### Confusing `'use client'` with `'use server'`

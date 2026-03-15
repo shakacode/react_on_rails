@@ -308,7 +308,7 @@ module ReactOnRails
       end
     end
 
-    def suggest_webpack_inspection(webpack_config_path = "config/webpack/webpack.config.js")
+    def suggest_webpack_inspection(webpack_config_path)
       add_info("💡 To debug webpack builds:")
       add_info("    bin/shakapacker --mode=development --progress")
       add_info("    bin/shakapacker --mode=production --progress")
