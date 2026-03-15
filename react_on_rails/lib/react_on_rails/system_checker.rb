@@ -184,7 +184,7 @@ module ReactOnRails
     end
 
     def check_react_on_rails_npm_package
-      package_json_path = "package.json"
+      package_json_path = resolved_package_json_path
       return unless File.exist?(package_json_path)
 
       package_json = JSON.parse(File.read(package_json_path))
@@ -205,10 +205,11 @@ module ReactOnRails
     end
 
     def check_package_version_sync
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         package_name, npm_version = react_on_rails_npm_package_details(package_json)
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
@@ -256,7 +257,7 @@ module ReactOnRails
 
     # React dependencies validation
     def check_react_dependencies
-      return unless File.exist?("package.json")
+      return unless File.exist?(resolved_package_json_path)
 
       package_json = parse_package_json
       return unless package_json
@@ -291,29 +292,30 @@ module ReactOnRails
 
     # Webpack configuration validation
     def check_webpack_configuration
-      webpack_config_path = "config/webpack/webpack.config.js"
-      if File.exist?(webpack_config_path)
-        add_success("✅ Webpack configuration exists")
-        check_webpack_config_content
-        suggest_webpack_inspection
+      webpack_config_path = resolved_webpack_config_path
+      if webpack_config_path
+        add_success("✅ Webpack configuration exists: #{webpack_config_path}")
+        check_webpack_config_content(webpack_config_path)
+        suggest_webpack_inspection(webpack_config_path)
       else
-        add_error(<<~MSG.strip)
-          🚫 Webpack configuration not found.
+        add_warning(<<~MSG.strip)
+          ⚠️  Webpack configuration not found at common paths.
 
-          Expected: config/webpack/webpack.config.js
+          Expected default: config/webpack/webpack.config.js
+          If your app uses a custom webpack config location, this may be informational.
           Run: rails generate react_on_rails:install
         MSG
       end
     end
 
-    def suggest_webpack_inspection
+    def suggest_webpack_inspection(webpack_config_path = "config/webpack/webpack.config.js")
       add_info("💡 To debug webpack builds:")
       add_info("    bin/shakapacker --mode=development --progress")
       add_info("    bin/shakapacker --mode=production --progress")
       add_info("    bin/shakapacker --debug-shakapacker  # Debug Shakapacker configuration")
 
       add_info("💡 Advanced webpack debugging:")
-      add_info("    1. Add 'debugger;' before 'module.exports' in config/webpack/webpack.config.js")
+      add_info("    1. Add 'debugger;' before 'module.exports' in #{webpack_config_path}")
       add_info("    2. Run: ./bin/shakapacker --debug-shakapacker")
       add_info("    3. Open Chrome DevTools to inspect config object")
       add_info("    📖 See: https://github.com/shakacode/shakapacker/blob/main/docs/troubleshooting.md#debugging-your-webpack-config")
@@ -324,7 +326,7 @@ module ReactOnRails
         add_info("    This opens webpack-bundle-analyzer in your browser")
       else
         add_info("    1. yarn add --dev webpack-bundle-analyzer")
-        add_info("    2. Add to config/webpack/webpack.config.js:")
+        add_info("    2. Add to #{webpack_config_path}:")
         add_info("       const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');")
         add_info("       // Add to plugins array when process.env.ANALYZE")
         add_info("    3. ANALYZE=true bin/shakapacker")
@@ -337,10 +339,11 @@ module ReactOnRails
     end
 
     def bundle_analyzer_available?
-      return false unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return false unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
         all_deps["webpack-bundle-analyzer"]
       rescue StandardError
@@ -348,8 +351,9 @@ module ReactOnRails
       end
     end
 
-    def check_webpack_config_content
-      webpack_config_path = "config/webpack/webpack.config.js"
+    def check_webpack_config_content(webpack_config_path = resolved_webpack_config_path)
+      return unless webpack_config_path
+
       content = File.read(webpack_config_path)
 
       if react_on_rails_config?(content)
@@ -427,7 +431,7 @@ module ReactOnRails
       File.exist?("bin/shakapacker") &&
         File.exist?("bin/shakapacker-dev-server") &&
         File.exist?("config/shakapacker.yml") &&
-        File.exist?("config/webpack/webpack.config.js")
+        !resolved_webpack_config_path.nil?
     end
 
     def shakapacker_in_gemfile?
@@ -549,7 +553,7 @@ module ReactOnRails
     # rubocop:enable Metrics/CyclomaticComplexity
 
     def parse_package_json
-      JSON.parse(File.read("package.json"))
+      JSON.parse(File.read(resolved_package_json_path))
     rescue JSON::ParserError
       add_warning("⚠️  Could not parse package.json to check React dependencies")
       nil
@@ -689,10 +693,11 @@ module ReactOnRails
     end
 
     def report_webpack_version
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
         webpack_version = all_deps["webpack"]
@@ -702,6 +707,42 @@ module ReactOnRails
       rescue StandardError
         # Handle other file/access errors
       end
+    end
+
+    def resolved_package_json_path
+      node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
+      return "package.json" if node_modules_location.empty? || node_modules_location == Rails.root.to_s
+
+      File.join(node_modules_location, "package.json")
+    rescue StandardError
+      "package.json"
+    end
+
+    def resolved_webpack_config_path
+      webpack_config_candidates.find { |path| File.exist?(path) }
+    end
+
+    def webpack_config_candidates
+      candidates = ["config/webpack/webpack.config.js"]
+
+      shakapacker_config_dir = shakapacker_webpack_config_directory
+      if shakapacker_config_dir
+        candidates.concat(%w[js ts cjs mjs].map { |ext| File.join(shakapacker_config_dir, "webpack.config.#{ext}") })
+      end
+
+      candidates.concat(Dir.glob("config/**/webpack.config.{js,ts,cjs,mjs}"))
+      candidates.uniq
+    end
+
+    def shakapacker_webpack_config_directory
+      require "shakapacker"
+      path = Shakapacker.config.assets_bundler_config_path.to_s
+      return nil if path.empty?
+
+      rails_root = Rails.root.to_s
+      path.start_with?("#{rails_root}/") ? path.sub("#{rails_root}/", "") : path
+    rescue LoadError, StandardError
+      nil
     end
   end
   # rubocop:enable Metrics/ClassLength

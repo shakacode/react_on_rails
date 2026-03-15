@@ -473,10 +473,11 @@ module ReactOnRails
     end
 
     def check_npm_package_version
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
 
         npm_version = all_deps["react-on-rails"]
@@ -520,10 +521,11 @@ module ReactOnRails
     end
 
     def check_npm_wildcards
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
 
         npm_version = all_deps["react-on-rails"]
@@ -542,9 +544,10 @@ module ReactOnRails
     end
 
     def check_pro_package_consistency
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
-      package_json = JSON.parse(File.read("package.json"))
+      package_json = JSON.parse(File.read(package_json_path))
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
       has_base = all_deps.key?("react-on-rails")
       has_pro = all_deps.key?("react-on-rails-pro")
@@ -606,8 +609,7 @@ module ReactOnRails
         "config/initializers/react_on_rails.rb" => "React on Rails initializer",
         "bin/dev" => "Development server launcher",
         "bin/shakapacker" => "Shakapacker binary",
-        "bin/shakapacker-dev-server" => "Shakapacker dev server binary",
-        "config/webpack/webpack.config.js" => "Webpack configuration"
+        "bin/shakapacker-dev-server" => "Shakapacker dev server binary"
       }
 
       files_to_check.each do |file_path, description|
@@ -616,6 +618,16 @@ module ReactOnRails
         else
           checker.add_warning("⚠️  Missing #{description}: #{file_path}")
         end
+      end
+
+      webpack_config_path = resolved_webpack_config_path
+      if webpack_config_path
+        checker.add_success("✅ Webpack configuration: #{webpack_config_path}")
+      else
+        checker.add_warning("⚠️  Missing Webpack configuration: config/webpack/webpack.config.js")
+        checker.add_info(
+          "ℹ️  If your app uses a custom webpack config location, this warning may be informational."
+        )
       end
 
       check_layout_files
@@ -1117,10 +1129,11 @@ module ReactOnRails
     end
 
     def npm_test_script?
-      return false unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return false unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         test_script = package_json.dig("scripts", "test")
         test_script && !test_script.empty?
       rescue StandardError
@@ -1163,6 +1176,37 @@ module ReactOnRails
       # Handle missing Shakapacker gem or other configuration errors
       bundle_filename = server_bundle_filename
       "app/javascript/packs/#{bundle_filename}"
+    end
+
+    def resolved_package_json_path
+      node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
+      return "package.json" if node_modules_location.empty? || node_modules_location == Rails.root.to_s
+
+      File.join(node_modules_location, "package.json")
+    rescue StandardError
+      "package.json"
+    end
+
+    def resolved_webpack_config_path
+      candidates = ["config/webpack/webpack.config.js"]
+      candidates.concat(Dir.glob("config/**/webpack.config.{js,ts,cjs,mjs}"))
+      shakapacker_dir = shakapacker_webpack_config_directory
+      if shakapacker_dir
+        candidates.concat(%w[js ts cjs mjs].map { |ext| File.join(shakapacker_dir, "webpack.config.#{ext}") })
+      end
+
+      candidates.uniq.find { |path| File.exist?(path) }
+    end
+
+    def shakapacker_webpack_config_directory
+      require "shakapacker"
+      path = Shakapacker.config.assets_bundler_config_path.to_s
+      return nil if path.empty?
+
+      rails_root = Rails.root.to_s
+      path.start_with?("#{rails_root}/") ? path.sub("#{rails_root}/", "") : path
+    rescue LoadError, StandardError
+      nil
     end
 
     def server_bundle_filename
