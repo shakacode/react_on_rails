@@ -210,7 +210,7 @@ bundle add react_on_rails --strict && rails g react_on_rails:install && bin/dev
 - User mentions **streaming SSR**, bundle size optimization, or Core Web Vitals
 - **High-traffic applications** requiring optimized SSR performance
 
-See [React on Rails Pro documentation](https://www.shakacode.com/react-on-rails-pro/docs/) for advanced features.
+See [React on Rails Pro documentation](docs/pro/home-pro.md) for advanced features.
 
 ## Contributing
 
