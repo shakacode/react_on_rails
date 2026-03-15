@@ -1633,14 +1633,15 @@ describe InstallGenerator, type: :generator do
     before do
       # Clear any previous messages to ensure clean test state
       GeneratorMessages.clear
-      # Mock Shakapacker installation to succeed so we get the success message
-      allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
-      allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
     end
 
     specify "base generator contains a helpful message" do
-      run_generator_test_with_args(%w[], package_json: true)
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/shakapacker.yml", "default: {}\n")
+        simulate_existing_file("config/webpack/webpack.config.js", "// mock webpack config\n")
+      end
       # Check that the success message is present (flexible matching)
       output_text = GeneratorMessages.output.join("\n")
       expect(output_text).to include("🎉 React on Rails Successfully Installed!")
@@ -1651,7 +1652,12 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "react with redux generator contains a helpful message" do
-      run_generator_test_with_args(%w[--redux], package_json: true)
+      run_generator_test_with_args(%w[--redux], package_json: true) do
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/shakapacker.yml", "default: {}\n")
+        simulate_existing_file("config/webpack/webpack.config.js", "// mock webpack config\n")
+      end
       # Check that the success message is present (flexible matching)
       output_text = GeneratorMessages.output.join("\n")
       expect(output_text).to include("🎉 React on Rails Successfully Installed!")
