@@ -182,6 +182,41 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when Pro is installed with a parenthesized HelloWorldController layout declaration" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          layout("marketing")
+
+          def index
+          end
+        end
+      RUBY
+      simulate_compatible_auto_registration_layout("marketing")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "marketing"
+
+    it "reuses the parenthesized-layout declaration target" do
+      assert_file "app/views/layouts/marketing.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
   context "when Pro is installed with an incompatible hello_world layout" do
     before(:all) do
       prepare_destination
@@ -249,6 +284,35 @@ describe RscGenerator, type: :generator do
         expect(content).to include('<%= stylesheet_pack_tag "application" %>')
         expect(content).to include('<%= javascript_pack_tag "application" %>')
       end
+    end
+  end
+
+  context "when Pro is installed and a compatible react_on_rails_rsc layout already exists" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_incompatible_pack_named_layout("hello_world")
+      simulate_compatible_auto_registration_layout("react_on_rails_rsc")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_rsc"
+
+    it "reuses the existing react_on_rails_rsc layout instead of minting react_on_rails_rsc_2" do
+      assert_file "app/views/layouts/react_on_rails_rsc.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_rsc_2.html.erb"
     end
   end
 

@@ -499,7 +499,12 @@ module ReactOnRails
       end
 
       def candidate_layout_names
-        [hello_world_controller_layout_name, DEFAULT_LAYOUT_NAME, LEGACY_LAYOUT_NAME].compact.uniq
+        [
+          hello_world_controller_layout_name,
+          DEFAULT_LAYOUT_NAME,
+          LEGACY_LAYOUT_NAME,
+          *existing_rsc_layout_names
+        ].compact.uniq
       end
 
       def hello_world_controller_layout_name
@@ -510,8 +515,13 @@ module ReactOnRails
       end
 
       def extract_declared_layout_name(controller_content)
-        match = controller_content.match(/^\s*layout\s+(?:"([^"]+)"|'([^']+)')(?=,|\s*$)/)
+        match = controller_content.match(/^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|$))/)
         match&.captures&.compact&.first
+      end
+
+      def existing_rsc_layout_names
+        Dir.glob(File.join(destination_root, "app/views/layouts/react_on_rails_rsc*.html.erb"))
+           .map { |path| File.basename(path, ".html.erb") }
       end
 
       def compatible_layout?(layout_name)
