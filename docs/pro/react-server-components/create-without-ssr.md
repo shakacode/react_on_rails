@@ -11,9 +11,12 @@ To use Server Components in your React on Rails Pro project, you need to follow 
 1. Install the latest version of React on Rails and React on Rails Pro:
 
 ```bash
+# Pick one JS package manager command:
 yarn add react-on-rails@^16.4.0 react-on-rails-pro@^16.4.0
-npm install react-on-rails@^16.4.0 react-on-rails-pro@^16.4.0
-pnpm add react-on-rails@^16.4.0 react-on-rails-pro@^16.4.0
+# npm install react-on-rails@^16.4.0 react-on-rails-pro@^16.4.0
+# pnpm add react-on-rails@^16.4.0 react-on-rails-pro@^16.4.0
+
+# Then add the Ruby gems:
 bundle add react_on_rails --version "~> 16.4"
 bundle add react_on_rails_pro --version "~> 16.4"
 ```
