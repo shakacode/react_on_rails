@@ -23,7 +23,7 @@ Pro includes core React on Rails as a dependency — just swap the packages and 
 Replace `react_on_rails` with `react_on_rails_pro` in your Gemfile. Pro depends on the core gem, so you only need the Pro entry:
 
 ```ruby
-gem "react_on_rails_pro", "~> 16.4"
+gem "react_on_rails_pro", "~> 16.4.0"
 ```
 
 Then run `bundle install`.
