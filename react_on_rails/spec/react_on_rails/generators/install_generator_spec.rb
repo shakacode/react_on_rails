@@ -7,6 +7,23 @@ describe InstallGenerator, type: :generator do
 
   destination File.expand_path("../dummy-for-generators", __dir__)
 
+  def base_generator_fixture(options = {})
+    ReactOnRails::Generators::BaseGenerator.new([], options, destination_root: destination_root)
+  end
+
+  def render_stock_webpack_template(template_path, options = {})
+    base_generator_fixture(options).send(:rendered_template_for_cleanup, template_path)
+  end
+
+  def simulate_managed_stock_webpack_files(options = {})
+    # MANAGED_WEBPACK_FILE_TEMPLATES is private_constant; this fixture helper
+    # intentionally introspects it so tests track managed-file coverage.
+    managed_template_map = ReactOnRails::Generators::BaseGenerator.const_get(:MANAGED_WEBPACK_FILE_TEMPLATES)
+    managed_template_map.each do |filename, template_path|
+      simulate_existing_file("config/webpack/#{filename}", render_stock_webpack_template(template_path, options))
+    end
+  end
+
   context "without args" do
     before(:all) { run_generator_test_with_args(%w[], package_json: true) }
 
@@ -556,6 +573,10 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "removes stale stock config/webpack files after switching to rspack" do
+      expect(File).not_to exist(File.join(destination_root, "config/webpack"))
+    end
+
     it "configures rspack in shakapacker.yml" do
       assert_file "config/shakapacker.yml" do |content|
         # Should have rspack as the bundler (inherited by all environments via YAML anchor)
@@ -584,6 +605,310 @@ describe InstallGenerator, type: :generator do
         # Comments should be preserved
         expect(content).to include("# Note: You must restart")
       end
+    end
+  end
+
+  shared_context "with webpack to rspack migration base" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/shakapacker.yml", <<~YAML)
+        default: &default
+          source_path: app/javascript
+          source_entry_path: packs
+          javascript_transpiler: "babel"
+          assets_bundler: "webpack"
+          # precompile_hook: ~
+
+        development:
+          <<: *default
+
+        test:
+          <<: *default
+          compile: true
+
+        production:
+          <<: *default
+      YAML
+      simulate_existing_file("bin/shakapacker", "")
+      simulate_existing_file("bin/shakapacker-dev-server", "")
+    end
+  end
+
+  context "with --rspack and custom webpack files" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_existing_file("config/webpack/custom-banner.js", "module.exports = { custom: true };\n")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when custom files are detected" do
+      assert_file "config/webpack/custom-banner.js"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and dotfiles in config/webpack" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_existing_file("config/webpack/.gitkeep", "")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "removes stale managed files but keeps config/webpack when dotfiles are present" do
+      assert_file "config/webpack/.gitkeep"
+      assert_no_file "config/webpack/webpack.config.js"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and empty config/webpack directory" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      FileUtils.mkdir_p(File.join(destination_root, "config/webpack"))
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when directory is empty" do
+      assert_directory "config/webpack"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and full managed stock webpack files" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_managed_stock_webpack_files
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "removes config/webpack when only managed stock files are present" do
+      expect(File).not_to exist(File.join(destination_root, "config/webpack"))
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and symlinked webpack entries" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      symlink_target = File.join(destination_root, "tmp/clientWebpackConfig.js")
+      FileUtils.mkdir_p(File.dirname(symlink_target))
+      File.write(
+        symlink_target,
+        render_stock_webpack_template("base/base/config/webpack/clientWebpackConfig.js.tt")
+      )
+      File.symlink(symlink_target, File.join(destination_root, "config/webpack/clientWebpackConfig.js"))
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when symlink entries are present" do
+      assert_directory "config/webpack"
+      expect(File.symlink?(File.join(destination_root, "config/webpack/clientWebpackConfig.js"))).to be(true)
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and nested config/webpack directory" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_existing_file("config/webpack/custom/.keep", "")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when nested directories are present" do
+      assert_file "config/webpack/custom/.keep"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and customized webpack.config.js only" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { env } = require('shakapacker')
+        const { existsSync } = require('fs')
+        const { resolve } = require('path')
+
+        const envSpecificConfig = () => {
+          const path = resolve(__dirname, `${env.nodeEnv}.js`)
+          if (existsSync(path)) return require(path)
+          throw new Error(`Could not find file to load ${path}`)
+        }
+
+        const config = envSpecificConfig()
+        config.resolve = config.resolve || {}
+        module.exports = config
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when webpack.config.js is customized" do
+      assert_file "config/webpack/webpack.config.js"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and comment-only notes in webpack.config.js" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        // Team note: keep webpack fallback while validating rspack migration.
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when files include comment-only customizations" do
+      assert_file "config/webpack/webpack.config.js"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and legacy generateWebpackConfigs.js" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      # Render from the current template so fixture content stays in sync with generator output.
+      simulate_existing_file(
+        "config/webpack/generateWebpackConfigs.js",
+        render_stock_webpack_template("base/base/config/webpack/ServerClientOrBoth.js.tt")
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "removes legacy generateWebpackConfigs.js along with stale config/webpack directory" do
+      expect(File).not_to exist(File.join(destination_root, "config/webpack"))
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rspack and legacy generateWebpackConfigs.js generated with --rsc" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file("config/webpack/webpack.config.js", <<~JS)
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      simulate_existing_file("config/webpack/generateWebpackConfigs.js", <<~JS)
+        const clientWebpackConfig = require('./clientWebpackConfig');
+        const serverWebpackConfig = require('./serverWebpackConfig');
+        const rscWebpackConfig = require('./rscWebpackConfig');
+
+        const serverClientOrBoth = (envSpecific) => {
+          const clientConfig = clientWebpackConfig();
+          const serverConfig = serverWebpackConfig();
+          const rscConfig = rscWebpackConfig();
+          if (envSpecific) envSpecific(clientConfig, serverConfig, rscConfig);
+          return [clientConfig, serverConfig, rscConfig];
+        };
+
+        module.exports = serverClientOrBoth;
+      JS
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "keeps config/webpack when legacy content no longer matches current options" do
+      assert_file "config/webpack/generateWebpackConfigs.js"
+      assert_file "config/rspack/rspack.config.js"
+    end
+  end
+
+  context "with --rsc app switching from webpack to rspack" do
+    include_context "with webpack to rspack migration base"
+
+    before(:all) do
+      simulate_existing_file(
+        "config/webpack/webpack.config.js",
+        render_stock_webpack_template("base/base/config/webpack/webpack.config.js.tt", rsc: true)
+      )
+      simulate_existing_file(
+        "config/webpack/rscWebpackConfig.js",
+        render_stock_webpack_template("rsc/base/config/webpack/rscWebpackConfig.js.tt", rsc: true)
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--rsc", "--rspack", "--ignore-warnings", "--skip"])
+      end
+    end
+
+    it "removes stale stock config/webpack files including rscWebpackConfig.js" do
+      assert_no_file "config/webpack"
+      assert_file "config/rspack/rspack.config.js"
+      assert_file "config/rspack/rscWebpackConfig.js"
     end
   end
 
@@ -1619,6 +1944,17 @@ describe InstallGenerator, type: :generator do
         module.exports = webpackConfig
       JS
       expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "recognizes stock webpack config with extra comments when comment-insensitive matching is enabled" do
+      content = <<~JS
+        // team-specific note
+        const { generateWebpackConfig } = require('shakapacker')
+        const webpackConfig = generateWebpackConfig()
+        module.exports = webpackConfig
+      JS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be false
+      expect(generator.send(:standard_shakapacker_config?, content, strip_comments: true)).to be true
     end
 
     it "recognizes stock rspack config with comments (Shakapacker 9.x)" do
