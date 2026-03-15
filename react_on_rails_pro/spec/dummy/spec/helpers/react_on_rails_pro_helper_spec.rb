@@ -310,7 +310,7 @@ describe ReactOnRailsProHelper do
     end
     let(:chunks_read) { [] }
     let(:react_component_specification_tag) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json"
           id="js-react-on-rails-component-TestingStreamableComponent-react-component-0"
           class="js-react-on-rails-component"
@@ -322,7 +322,7 @@ describe ReactOnRailsProHelper do
       SCRIPT
     end
     let(:rails_context_tag) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json" id="js-react-on-rails-context">{"componentRegistryTimeout":5000,"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":true,"rorProVersion":"#{ReactOnRailsPro::VERSION}","rscPayloadGenerationUrlPath":"rsc_payload/","href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
       SCRIPT
     end

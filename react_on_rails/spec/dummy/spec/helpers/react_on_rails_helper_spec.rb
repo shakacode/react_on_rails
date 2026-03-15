@@ -208,7 +208,7 @@ describe ReactOnRailsHelper do
     let(:id) { "App-react-component-0" }
 
     let(:react_definition_script) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
@@ -217,7 +217,7 @@ describe ReactOnRailsHelper do
     end
 
     let(:react_definition_script_no_params) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
@@ -331,7 +331,7 @@ describe ReactOnRailsHelper do
       subject(:react_app) { react_component("App", props: props, random_dom_id: false) }
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
@@ -347,7 +347,7 @@ describe ReactOnRailsHelper do
       subject(:react_app) { react_component("App", props: props, random_dom_id: true) }
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component-0" \
           data-component-name="App" data-dom-id="App-react-component-0"
@@ -369,7 +369,7 @@ describe ReactOnRailsHelper do
       end
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
@@ -387,7 +387,7 @@ describe ReactOnRailsHelper do
       let(:id) { "shaka_div" }
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-shaka_div" \
           data-component-name="App" data-dom-id="shaka_div"
@@ -472,6 +472,81 @@ describe ReactOnRailsHelper do
       expect(react_app).to be_a(Hash)
       expect(react_app).to have_key("componentHtml")
       expect(react_app).to have_key("title")
+    end
+  end
+
+  describe "#server_render_js error serialization" do
+    let(:runtime_available) do
+      ExecJS.runtime&.available?
+    rescue ExecJS::RuntimeUnavailable
+      false
+    end
+
+    let(:runtime_context) do
+      ExecJS.compile(<<~JS)
+        function runGeneratedCode(generatedCode) {
+          var ReactOnRails = {
+            handleError: function() { return ''; },
+            getConsoleReplayScript: function() { return ''; }
+          };
+          // Evaluate generated wrapper JS in a test sandbox before Ruby post-processing.
+          return eval(generatedCode);
+        }
+      JS
+    end
+
+    before do
+      skip "ExecJS runtime not available" unless runtime_available
+    end
+
+    it "generates JS with safe error property access for non-Error throws" do
+      captured_results = []
+
+      allow(ReactOnRails::ServerRenderingPool)
+        .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
+          # Validate generated JS behavior directly before Ruby-side post-processing.
+          runtime_result = runtime_context.call("runGeneratedCode", js_code)
+          captured_results << JSON.parse(runtime_result)
+          {
+            "html" => "",
+            "consoleReplayScript" => "",
+            "hasErrors" => true,
+            "renderingError" => { "message" => "stub", "stack" => nil }
+          }
+        end
+
+      throw_cases = [
+        { expression: "(function() { throw null; })()", message: "null", stack: nil },
+        { expression: "(function() { throw { code: 42 }; })()", message: "[object Object]", stack: nil },
+        { expression: "(function() { throw new Error(\"boom\"); })()", message: "boom", stack: :present }
+      ]
+
+      throw_cases.each do |throw_case|
+        expect { server_render_js(throw_case[:expression]) }.not_to raise_error
+        captured_result = captured_results.last
+        expect(captured_result).to be_a(Hash)
+        expect(captured_result["hasErrors"]).to be(true)
+        expect(captured_result.dig("renderingError", "message")).to eq(throw_case[:message])
+
+        if throw_case[:stack] == :present
+          expect(captured_result.dig("renderingError", "stack")).to include("Error: boom")
+        else
+          expect(captured_result.dig("renderingError", "stack")).to be_nil
+        end
+      end
+
+      expect(captured_results.length).to eq(throw_cases.length)
+    end
+
+    it "raises PrerenderError when throw_js_errors is true and JS throws a non-Error value" do
+      allow(ReactOnRails::ServerRenderingPool)
+        .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
+          runtime_context.call("runGeneratedCode", js_code)
+        end
+
+      expect do
+        server_render_js("(function() { throw 42; })()", throw_js_errors: true)
+      end.to raise_error(ReactOnRails::PrerenderError)
     end
   end
 
