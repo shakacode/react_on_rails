@@ -222,11 +222,11 @@ This resulted in tasks like `react_on_rails:assets:webpack`, `react_on_rails:gen
 
 ### Solution
 
-**Upgrade to React on Rails 16.2.0 or later:**
+**Upgrade to React on Rails 16.4.0 or later:**
 
 ```bash
 # Update Gemfile
-gem 'react_on_rails', '~> 16.2'
+gem 'react_on_rails', '~> 16.4'
 
 # Install
 bundle update react_on_rails
@@ -258,7 +258,7 @@ Rails.application.config.after_initialize do
 end
 ```
 
-**Note:** This workaround is not recommended for production. Upgrade to 16.2.0+ for the proper fix.
+**Note:** This workaround is not recommended for production. Upgrade to 16.4.0+ for the proper fix.
 
 ## For Coding Agents
 

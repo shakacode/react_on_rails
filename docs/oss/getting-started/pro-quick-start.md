@@ -27,8 +27,8 @@ Since v16.4.0.rc.5, `react_on_rails_pro` automatically requires `react_on_rails`
 
 ```ruby
 gem "shakapacker", "~> 9.5"
-gem "react_on_rails", "~> 16.3"
-gem "react_on_rails_pro", "~> 16.3"
+gem "react_on_rails", "<same_version_as_react_on_rails_pro>"
+gem "react_on_rails_pro", "<same_version>"
 ```
 
 Then install:
