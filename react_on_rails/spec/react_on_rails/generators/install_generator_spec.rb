@@ -1177,7 +1177,9 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("serverBundleCachePath")
         expect(content).to include("port:")
         expect(content).to include("password:")
+        expect(content).to include("const configuredWorkersCount =")
         expect(content).to include("workersCount:")
+        expect(content).to include("if (env.CI && configuredWorkersCount == null)")
       end
     end
 

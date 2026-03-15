@@ -117,14 +117,34 @@ end
 ```js
 const path = require('path');
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+const { env } = process;
 
-reactOnRailsProNodeRenderer({
+const parseWorkersCount = (value) => {
+  if (value == null) return null;
+  const normalized = value.trim();
+  if (normalized === '') return null;
+  const parsed = Number(normalized);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+};
+const configuredWorkersCount =
+  parseWorkersCount(env.RENDERER_WORKERS_COUNT) ?? parseWorkersCount(env.NODE_RENDERER_CONCURRENCY);
+
+const config = {
   serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
-  port: Number(process.env.RENDERER_PORT) || 3800,
-  password: process.env.RENDERER_PASSWORD || 'devPassword',
+  port: Number(env.RENDERER_PORT) || 3800,
+  password: env.RENDERER_PASSWORD || 'devPassword',
   supportModules: true,
-  workersCount: Number(process.env.NODE_RENDERER_CONCURRENCY) || 3,
-});
+  // Priority: RENDERER_WORKERS_COUNT (canonical), NODE_RENDERER_CONCURRENCY (legacy), default: 3
+  // Set workersCount to 0 for single-process mode (useful for debugging).
+  workersCount: configuredWorkersCount ?? 3,
+};
+
+// On CI, the generated template defaults to 2 workers only when no env override is set.
+if (env.CI && configuredWorkersCount == null) {
+  config.workersCount = 2;
+}
+
+reactOnRailsProNodeRenderer(config);
 ```
 
 ### Key configuration options
