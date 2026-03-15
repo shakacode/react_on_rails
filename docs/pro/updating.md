@@ -99,7 +99,7 @@ const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails
 - source "https://rubygems.pkg.github.com/shakacode-tools" do
 -   gem "react_on_rails_pro", "16.1.1"
 - end
-+ gem "react_on_rails_pro", "16.4.0"
++ gem "react_on_rails_pro", "~> 16.4"
 ```
 
 Then run:
@@ -129,9 +129,9 @@ rm .npmrc
 ```diff
 {
   "dependencies": {
-+   "react-on-rails-pro": "16.4.0",
++   "react-on-rails-pro": "^16.4.0",
 -   "@shakacode-tools/react-on-rails-pro-node-renderer": "16.1.1"
-+   "react-on-rails-pro-node-renderer": "16.4.0"
++   "react-on-rails-pro-node-renderer": "^16.4.0"
   }
 }
 ```
