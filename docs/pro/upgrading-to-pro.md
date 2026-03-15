@@ -23,7 +23,7 @@ Pro includes core React on Rails as a dependency — just swap the packages and 
 Replace `react_on_rails` with `react_on_rails_pro` in your Gemfile. Pro depends on the core gem, so you only need the Pro entry:
 
 ```ruby
-gem "react_on_rails_pro", "~> 16.4.0"
+gem "react_on_rails_pro", "= 16.4.0"
 ```
 
 Then run `bundle install`.
@@ -31,7 +31,7 @@ Then run `bundle install`.
 Or use `bundle add`, which handles both the Gemfile edit and install:
 
 ```bash
-bundle add react_on_rails_pro --version="16.4.0" --strict
+bundle add react_on_rails_pro --version="= 16.4.0"
 ```
 
 Check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest version.
@@ -82,7 +82,7 @@ That's it. Your app is now running React on Rails Pro.
 If you're setting up a new app (not upgrading an existing one), use the `--pro` flag:
 
 ```bash
-bundle add react_on_rails_pro --version="16.4.0" --strict
+bundle add react_on_rails_pro --version="= 16.4.0"
 bundle exec rails generate react_on_rails:install --pro
 ```
 
