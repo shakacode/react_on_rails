@@ -88,7 +88,7 @@ This is the recommended data fetching pattern for React on Rails because:
 end %>
 ```
 
-> **See also:** [`stream_react_component_with_async_props` RSC tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/) for setup instructions and configuration options.
+> **See also:** [`stream_react_component_with_async_props` RSC tutorial](../../pro/react-server-components/tutorial.md) for setup instructions and configuration options.
 
 **React component (Server Component):**
 
@@ -181,7 +181,7 @@ type Props = WithAsyncProps<AsyncProps, SyncProps>;
 
 `getReactOnRailsAsyncProp` is fully typed -- calling `getReactOnRailsAsyncProp('users')` returns `Promise<User[]>`, and passing an invalid key is a compile-time error.
 
-> **More details:** For setup instructions, configuration options, and the RSC payload variant (`rsc_payload_react_component_with_async_props`), see the [React on Rails Pro RSC documentation](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/).
+> **More details:** For setup instructions, configuration options, and the RSC payload variant (`rsc_payload_react_component_with_async_props`), see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
 
 ## Migrating from React Query / TanStack Query
 

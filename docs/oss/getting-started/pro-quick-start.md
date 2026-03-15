@@ -150,15 +150,15 @@ Or for a fresh app with RSC from the start:
 rails generate react_on_rails:install --rsc
 ```
 
-See the [RSC tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/) for details.
+See the [RSC tutorial](../../pro/react-server-components/tutorial.md) for details.
 
 ## Next Steps
 
-- [Configuration Reference](https://www.shakacode.com/react-on-rails-pro/docs/configuration/) — All Pro config options
-- [Node Renderer Configuration](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/) — All Node Renderer options
-- [Caching Guide](https://www.shakacode.com/react-on-rails-pro/docs/caching/) — Fragment and prerender caching
-- [Streaming SSR](https://www.shakacode.com/react-on-rails-pro/docs/streaming-server-rendering/) — Progressive rendering
-- [Code Splitting](https://www.shakacode.com/react-on-rails-pro/docs/code-splitting-loadable-components/) — Loadable components with SSR
+- [Configuration Reference](../../pro/configuration.md) — All Pro config options
+- [Node Renderer Configuration](../../pro/node-renderer/js-configuration.md) — All Node Renderer options
+- [Caching Guide](../../pro/caching.md) — Fragment and prerender caching
+- [Streaming SSR](../../pro/streaming-server-rendering.md) — Progressive rendering
+- [Code Splitting](../../pro/code-splitting-loadable-components.md) — Loadable components with SSR
 
 ## Troubleshooting
 
