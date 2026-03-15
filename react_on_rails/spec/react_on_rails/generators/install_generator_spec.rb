@@ -1755,6 +1755,8 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "shakapacker gemfile error preserves original install flags" do
+      # ignore_warnings: true is required so handle_shakapacker_gemfile_error logs
+      # the error instead of raising Thor::Error, which lets this example inspect output.
       install_generator = described_class.new([], { rspack: true, pro: true, ignore_warnings: true })
 
       install_generator.send(:handle_shakapacker_gemfile_error)
@@ -1976,6 +1978,19 @@ describe InstallGenerator, type: :generator do
         Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
         expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be_nil
         expect(install_generator.instance_variable_get(:@shakapacker_setup_incomplete)).to be true
+      end
+    end
+
+    it "keeps setup incomplete when adding shakapacker to Gemfile fails, even if install succeeds" do
+      Dir.mktmpdir do |dir|
+        allow(install_generator).to receive_messages(ensure_shakapacker_in_gemfile: false, install_shakapacker: true)
+        allow(install_generator).to receive(:finalize_shakapacker_setup)
+
+        Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
+
+        expect(install_generator.instance_variable_get(:@shakapacker_setup_incomplete)).to be true
+        expect(install_generator).to have_received(:install_shakapacker)
+        expect(install_generator).to have_received(:finalize_shakapacker_setup)
       end
     end
   end

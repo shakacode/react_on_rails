@@ -86,6 +86,8 @@ module GeneratorMessages
       MSG
     end
 
+    # Uses relative lockfile paths resolved against Dir.pwd, so callers must invoke
+    # this while the current working directory is the target Rails app root.
     def detect_package_manager
       # Check for lock files to determine package manager
       return "yarn" if File.exist?("yarn.lock")

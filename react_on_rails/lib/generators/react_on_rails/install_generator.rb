@@ -252,7 +252,8 @@ module ReactOnRails
         end
 
         print_shakapacker_setup_banner
-        ensure_shakapacker_in_gemfile
+        gemfile_ok = ensure_shakapacker_in_gemfile
+        @shakapacker_setup_incomplete = true unless gemfile_ok
 
         # NOTE: File.exist?/File.read use Dir.pwd (not destination_root) because
         # Rails generators always run from the destination root. This is consistent
@@ -346,20 +347,21 @@ module ReactOnRails
         ["rails generate react_on_rails:install", *flags].join(" ")
       end
 
+      def recovery_working_tree_lines
+        [
+          "If this run created or changed files, clean up your working tree before rerunning",
+          "(commit, stash, or discard the partial changes), or re-run with --ignore-warnings",
+          "if you intentionally want to continue on a dirty tree."
+        ]
+      end
+
       def recovery_working_tree_note
-        <<~MSG
-          If this run created or changed files, clean up your working tree before rerunning
-          (commit, stash, or discard the partial changes), or re-run with --ignore-warnings
-          if you intentionally want to continue on a dirty tree.
-        MSG
+        "#{recovery_working_tree_lines.join("\n")}\n"
       end
 
       def recovery_working_tree_step(step_number)
-        <<~MSG.chomp
-          #{step_number}. If this run created or changed files, clean up your working tree before rerunning
-             (commit, stash, or discard the partial changes), or re-run with --ignore-warnings
-             if you intentionally want to continue on a dirty tree.
-        MSG
+        first_line, *remaining_lines = recovery_working_tree_lines
+        (["#{step_number}. #{first_line}"] + remaining_lines.map { |line| "   #{line}" }).join("\n")
       end
 
       def incomplete_installation_message
@@ -437,15 +439,16 @@ module ReactOnRails
       end
 
       def ensure_shakapacker_in_gemfile
-        return if shakapacker_in_gemfile?
+        return true if shakapacker_in_gemfile?
 
         say "📝 Adding Shakapacker to Gemfile...", :yellow
         # Use with_unbundled_env to prevent inheriting BUNDLE_GEMFILE from parent process
         # See: https://github.com/shakacode/react_on_rails/issues/2287
         success = Bundler.with_unbundled_env { system("bundle add shakapacker --strict") }
-        return if success
+        return true if success
 
         handle_shakapacker_gemfile_error
+        false
       end
 
       def install_shakapacker
