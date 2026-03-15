@@ -17,8 +17,8 @@ React on Rails Pro extends the open-source gem with performance optimizations an
 | Streaming SSR                        |            |         ✓         | [Progressive server rendering](../../pro/streaming-server-rendering.md) using React 18's `renderToPipeableStream` for faster page loads                                    |
 | Fragment caching                     |            |         ✓         | [Cache rendered components](../../pro/caching.md) with `cached_react_component` — skips prop computation, serialization, and JS evaluation on cache hit                    |
 | Code splitting / Loadable Components |            |         ✓         | [Route-based code splitting](../../pro/code-splitting-loadable-components.md) with Loadable Components and server-side rendering for optimized bundle sizes                |
-| Node renderer                        |            |         ✓         | [Dedicated Node.js rendering server](../../pro/node-renderer/basics.md) — eliminates ExecJS overhead, enables proper Node tooling for profiling and memory management      |
-| TanStack Router SSR                  |            |         ✓         | Server-side rendering with [TanStack Router](../building-features/tanstack-router.md) for type-safe routing                                                                |
+| Node renderer for better SSR         |            |         ✓         | [Dedicated Node.js rendering server](../../pro/node-renderer/basics.md) — eliminates ExecJS overhead, enables proper Node tooling for profiling and memory management      |
+| TanStack Router SSR                  |            |         ✓         | SSR via [`react-on-rails-pro/tanstack-router`](../building-features/tanstack-router.md) (Pro only); client-side-only TanStack Router works with OSS                        |
 | Bundle caching                       |            |         ✓         | [Avoid redundant webpack builds](../../pro/bundle-caching.md) across deployments                                                                                           |
 
 ## When to Choose Pro
@@ -31,8 +31,8 @@ React on Rails Pro extends the open-source gem with performance optimizations an
 
 **Choose Pro if you:**
 
-- Need React Server Components (RSC) support
-- Want streaming SSR for faster Time to First Byte
+- Need React Server Components (RSC) support for better SEO score
+- Want streaming SSR for faster Time to First Byte for better SEO score
 - Have high-traffic pages where SSR caching matters
 - Need code splitting with SSR for optimized bundle sizes
 - Want a dedicated Node renderer to avoid ExecJS limitations
