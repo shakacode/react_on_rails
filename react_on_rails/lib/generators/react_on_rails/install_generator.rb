@@ -244,6 +244,7 @@ module ReactOnRails
       end
 
       def ensure_shakapacker_installed
+        @shakapacker_setup_incomplete = false
         return if shakapacker_configured?
 
         if options[:pretend]
@@ -259,7 +260,11 @@ module ReactOnRails
         # with other relative-path file checks in this generator (e.g. shakapacker_configured?).
         yml_content_before = File.exist?(SHAKAPACKER_YML_PATH) ? File.read(SHAKAPACKER_YML_PATH) : nil
 
-        finalize_shakapacker_setup(yml_content_before) if install_shakapacker
+        if install_shakapacker
+          finalize_shakapacker_setup(yml_content_before)
+        else
+          @shakapacker_setup_incomplete = true
+        end
       end
 
       # Checks whether "shakapacker" is explicitly declared in this project's Gemfile.
@@ -299,6 +304,11 @@ module ReactOnRails
       end
 
       def add_post_install_message
+        if shakapacker_setup_incomplete?
+          GeneratorMessages.add_warning(incomplete_installation_message)
+          return
+        end
+
         # Determine what route and component will be created by the generator
         if use_rsc? && !options.redux?
           # RSC without Redux: HelloServer replaces HelloWorld
@@ -315,6 +325,31 @@ module ReactOnRails
                                      rsc: use_rsc?,
                                      shakapacker_just_installed: shakapacker_just_installed?
                                    ))
+      end
+
+      def shakapacker_setup_incomplete?
+        !!@shakapacker_setup_incomplete
+      end
+
+      def incomplete_installation_message
+        package_manager = GeneratorMessages.detect_package_manager
+
+        <<~MSG
+
+          ⚠️  React on Rails installation is incomplete.
+          ─────────────────────────────────────────────────────────────────────────
+          Shakapacker setup failed, so this app is not ready to run yet.
+          Avoid running ./bin/dev until Shakapacker is installed successfully.
+
+          Next steps:
+          1. #{Rainbow('bundle install').cyan}
+          2. #{Rainbow('bundle exec rails shakapacker:install').cyan}
+          3. #{Rainbow("#{package_manager} install").cyan}
+          4. Re-run #{Rainbow('rails generate react_on_rails:install --skip').cyan} if needed
+
+          Troubleshooting:
+          • https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
+        MSG
       end
 
       def shakapacker_loaded_in_process?(gem_name)

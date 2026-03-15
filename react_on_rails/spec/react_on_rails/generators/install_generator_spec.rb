@@ -1660,6 +1660,19 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to match(/bundle && (npm|yarn|pnpm) install/)
       expect(output_text).to include("💡 TIP: Run 'bin/dev help'")
     end
+
+    specify "shows incomplete-installation guidance when shakapacker setup fails" do
+      install_generator = described_class.new
+      install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
+
+      install_generator.send(:add_post_install_message)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("React on Rails installation is incomplete")
+      expect(output_text).to include("Avoid running ./bin/dev")
+      expect(output_text).not_to include("🎉 React on Rails Successfully Installed!")
+      expect(output_text).not_to include("📋 QUICK START:")
+    end
   end
 
   describe "--pretend mode behavior" do
@@ -1872,6 +1885,7 @@ describe InstallGenerator, type: :generator do
 
         Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
         expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be_nil
+        expect(install_generator.instance_variable_get(:@shakapacker_setup_incomplete)).to be true
       end
     end
   end
