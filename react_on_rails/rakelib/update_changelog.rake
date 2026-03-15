@@ -251,7 +251,7 @@ def normalize_heading_key(line)
   normalized = line.to_s.strip
   heading_level = normalized[/\A(#+)/, 1] || ""
   heading_text = normalized.sub(/\A#+\s+/, "")
-                           .gsub(/\A(?:⚠️|⚠)\s*/u, "")
+                           .gsub(/\A(?:⚠️|⚠)\s*/, "")
                            .downcase
                            .gsub(/\s+/, " ")
   "#{heading_level} #{heading_text}".strip
@@ -282,9 +282,7 @@ def consolidate_changelog_blocks(blocks)
         # Append this block's content (lines after heading) to existing block
         idx = heading_indices[heading_key]
         content_after_heading = cleaned.lines.drop(1).join.gsub(/\A\n+/, "").rstrip
-        unless content_after_heading.empty?
-          consolidated[idx] = "#{consolidated[idx].rstrip}\n\n#{content_after_heading}"
-        end
+        consolidated[idx] = "#{consolidated[idx].rstrip}\n#{content_after_heading}" unless content_after_heading.empty?
       else
         heading_indices[heading_key] = consolidated.length
         consolidated << cleaned
