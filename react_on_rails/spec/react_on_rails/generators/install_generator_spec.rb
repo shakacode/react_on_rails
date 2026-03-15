@@ -2178,6 +2178,39 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "TypeScript bundler main config templates" do
+    let(:webpack_ts_template_path) do
+      File.expand_path(
+        "../../../lib/generators/react_on_rails/templates/base/base/config/webpack/webpack.config.ts.tt",
+        __dir__
+      )
+    end
+    let(:rspack_ts_template_path) do
+      File.expand_path(
+        "../../../lib/generators/react_on_rails/templates/base/base/config/webpack/rspack.config.ts.tt",
+        __dir__
+      )
+    end
+
+    it "keeps the webpack TypeScript template compatible with Shakapacker's require-based loader" do
+      content = File.read(webpack_ts_template_path)
+
+      expect(content).to include("resolve(__dirname, `${env.nodeEnv}.js`)")
+      expect(content).to include("return require(path)")
+      expect(content).not_to include("import.meta.url")
+      expect(content).not_to include("createRequire")
+    end
+
+    it "keeps the rspack TypeScript template compatible with Shakapacker's require-based loader" do
+      content = File.read(rspack_ts_template_path)
+
+      expect(content).to include("resolve(__dirname, `${env.nodeEnv}.js`)")
+      expect(content).to include("return require(path)")
+      expect(content).not_to include("import.meta.url")
+      expect(content).not_to include("createRequire")
+    end
+  end
+
   describe "#using_rspack?" do
     context "when --rspack option is provided" do
       let(:install_generator) { described_class.new([], { rspack: true }) }
