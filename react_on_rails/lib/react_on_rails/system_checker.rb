@@ -351,9 +351,7 @@ module ReactOnRails
       end
     end
 
-    def check_webpack_config_content(webpack_config_path = resolved_webpack_config_path)
-      return unless webpack_config_path
-
+    def check_webpack_config_content(webpack_config_path)
       content = File.read(webpack_config_path)
 
       if react_on_rails_config?(content)
@@ -554,7 +552,7 @@ module ReactOnRails
 
     def parse_package_json
       JSON.parse(File.read(resolved_package_json_path))
-    rescue JSON::ParserError
+    rescue Errno::ENOENT, JSON::ParserError
       add_warning("⚠️  Could not parse package.json to check React dependencies")
       nil
     end
