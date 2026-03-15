@@ -85,13 +85,9 @@ module ReactOnRails
           # Chunks are either Strings (legacy NDJSON from ExecJS or old node renderers)
           # or Hashes (length-prefixed protocol from new node renderers).
           # We parse JSON strings and replay console messages for both formats.
-          result.transform { |chunk|
-            if chunk.is_a?(Hash)
-              replay_console_messages_from_hash(chunk, render_options)
-            else
-              parse_result_and_replay_console_messages(chunk, render_options)
-            end
-          }
+          result.transform do |chunk|
+            parse_streaming_chunk(chunk, render_options)
+          end
         end
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
@@ -230,6 +226,14 @@ module ReactOnRails
         rescue StandardError => e
           msg = "file_url_to_string #{url} failed\nError is: #{e}\n\n#{Utils.default_troubleshooting_section}"
           raise ReactOnRails::Error, msg
+        end
+
+        def parse_streaming_chunk(chunk, render_options)
+          if chunk.is_a?(Hash)
+            replay_console_messages_from_hash(chunk, render_options)
+          else
+            parse_result_and_replay_console_messages(chunk, render_options)
+          end
         end
 
         def parse_result_and_replay_console_messages(result_string, render_options)
