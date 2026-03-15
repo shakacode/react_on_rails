@@ -123,7 +123,7 @@ reactOnRailsProNodeRenderer({
   port: Number(process.env.RENDERER_PORT) || 3800,
   password: process.env.RENDERER_PASSWORD || 'devPassword',
   supportModules: true,
-  workersCount: Number(process.env.NODE_RENDERER_CONCURRENCY) || 3,
+  workersCount: Number(process.env.RENDERER_WORKERS_COUNT ?? process.env.NODE_RENDERER_CONCURRENCY) || 3,
 });
 ```
 
