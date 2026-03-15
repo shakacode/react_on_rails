@@ -555,7 +555,7 @@ module ReactOnRails
       end
 
       def extract_declared_layout_name(controller_content)
-        match = controller_content.match(/^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|$))/)
+        match = controller_content.match(/^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|#|$))/)
         match&.captures&.compact&.first
       end
 
@@ -618,7 +618,7 @@ module ReactOnRails
       end
 
       def pack_tag_arguments(layout_content, helper_name)
-        pattern = /<%=\s*#{Regexp.escape(helper_name)}(?<arguments>\s*(?:\([^%]*?\)|[^%]*?))?\s*%>/
+        pattern = /<%=\s*#{Regexp.escape(helper_name)}(?<arguments>\s*(?:\((?:(?!%>).)*?\)|(?:(?!%>).)*?))?\s*%>/m
 
         arguments = []
         layout_content.scan(pattern) do
