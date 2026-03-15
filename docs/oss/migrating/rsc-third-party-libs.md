@@ -94,10 +94,10 @@ CSS-in-JS is the most impactful compatibility challenge for RSC migration. Runti
 
 ### Runtime CSS-in-JS (Problematic)
 
-| Library               | RSC Status                                                                                                                                                                                                                         | Notes                                                                                                                                              |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **styled-components** | In maintenance mode. The v6.3.x series added incremental RSC compatibility fixes (e.g., suppressing server-side warnings in v6.3.3, fixing `createGlobalStyle` unmount behavior with React 19's `precedence` attribute in v6.3.9). | The maintainer stated: "For new projects, I would not recommend adopting styled-components." React Context dependency is the root incompatibility. |
-| **Emotion**           | No native RSC support                                                                                                                                                                                                              | Workaround: wrap all Emotion-styled components in `'use client'` files.                                                                            |
+| Library               | RSC Status                                                                                                          | Notes                                                                                                                                              |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **styled-components** | In maintenance mode. v6.3.0+ added RSC support via React's `<style>` tag hoisting before entering maintenance mode. | The maintainer stated: "For new projects, I would not recommend adopting styled-components." React Context dependency is the root incompatibility. |
+| **Emotion**           | No native RSC support                                                                                               | Workaround: wrap all Emotion-styled components in `'use client'` files.                                                                            |
 
 ### Zero-Runtime CSS-in-JS (RSC Compatible)
 
@@ -137,66 +137,60 @@ All components include `'use client'` directives. Cannot use compound components
 
 ## Form Libraries
 
-| Library             | RSC Pattern                                                                                                                                         | Notes                               |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| **React Hook Form** | Client-only (uses Context). Create a `'use client'` form component, import into Server Component. Submit to Rails controller endpoints via `fetch`. | Most popular option.                |
-| **TanStack Form**   | Emerging alternative with RSC-aware architecture. Submit to Rails controller endpoints.                                                             | Framework-agnostic.                 |
-| **Standard forms**  | Use Rails' standard form helpers (`form_with`, `form_tag`) for non-React forms. For React forms, submit via `fetch` to Rails API endpoints.         | No library needed for simple forms. |
+| Library               | RSC Pattern                                                                                                                                       | Notes                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **React Hook Form**   | Client-only (uses Context). Create a `'use client'` form component, import into Server Component. Can combine with Server Actions for submission. | Most popular option.                         |
+| **TanStack Form**     | Emerging alternative with RSC-aware architecture.                                                                                                 | Framework-agnostic.                          |
+| **React 19 built-in** | `useActionState` + `useFormStatus` hooks work natively with Server Actions.                                                                       | Reduces need for third-party form libraries. |
 
-### Form Submission Pattern
-
-> **Important:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controllers for all form submissions.
+### Server Action Form Pattern
 
 ```jsx
-// UserForm.jsx -- Client Component
-'use client';
+// actions.js
+'use server';
 
-import { useState } from 'react';
-import ReactOnRails from 'react-on-rails';
-
-export default function UserForm() {
-  const [name, setName] = useState('');
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const response = await fetch('/api/users', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': ReactOnRails.authenticityToken(),
-      },
-      body: JSON.stringify({ user: { name } }),
-    });
-    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-    setName('');
+export async function submitForm(formData) {
+  const name = formData.get('name');
+  // Server Actions run in Node.js, so this fetch needs an absolute URL.
+  // Point RAILS_BASE_URL at Rails' internal URL (for example
+  // http://127.0.0.1:3000 in development), not the public-facing domain.
+  const railsBaseUrl = process.env.RAILS_BASE_URL;
+  if (!railsBaseUrl) {
+    throw new Error('RAILS_BASE_URL environment variable is required for Server Actions');
   }
+  // Note: This fetch runs server-side, so the Rails endpoint will not receive
+  // the browser's CSRF token. Use an API-only route or another non-session
+  // auth boundary. If you switch a Rails endpoint to
+  // `protect_from_forgery with: :null_session`, add another trust check
+  // (for example signed tokens, API keys, or same-origin validation) because
+  // `null_session` avoids the CSRF failure but does not authenticate the
+  // request.
+  const res = await fetch(new URL('/api/users', railsBaseUrl), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user: { name } }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to create user: ${res.status}`);
+  }
+}
+```
 
+```jsx
+// Page.jsx -- Server Component (works without JavaScript)
+import { submitForm } from './actions';
+
+export default function Page() {
   return (
-    <form onSubmit={handleSubmit}>
-      <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+    <form action={submitForm}>
+      <input type="text" name="name" />
       <button type="submit">Submit</button>
     </form>
   );
 }
 ```
 
-```erb
-<%# ERB view %>
-<%= stream_react_component("UserForm") %>
-```
-
-**Pattern 2: Standard Rails form (no JavaScript required)**
-
-```erb
-<%= form_with(model: @user, url: users_path, local: true) do |f| %>
-  <%= f.text_field :name %>
-  <%= f.submit "Submit" %>
-<% end %>
-```
-
-> **Note:** `local: true` is required for Rails 5.1–6.0, where `form_with` defaults to `remote: true` (Ajax). Rails 6.1+ defaults to `local: true`, so it can be omitted on newer versions.
-
-Both patterns leverage Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
+> **React on Rails note:** In most React on Rails applications, form submissions go through Rails controllers via standard form posts or API endpoints. Server Actions are a React concept that can complement this, but they are not a replacement for Rails' controller/model layer. For most mutations, continue using your existing Rails API endpoints.
 
 ## Animation Libraries
 
@@ -242,12 +236,12 @@ All major date libraries work in Server Components since they are pure utility f
 
 ## Data Fetching Libraries
 
-| Library                          | RSC Pattern                                                                                        | Notes                                                                                                |
-| -------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **React on Rails Pro streaming** | Recommended for React on Rails. Rails streams components via `stream_react_component`.             | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
-| **TanStack Query**               | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`. | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
-| **Apollo Client**                | Server-side queries in Server Components, `ApolloProvider` for client queries.                     | Requires `'use client'` wrapper for provider.                                                        |
-| **SWR**                          | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props.           | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
+| Library                            | RSC Pattern                                                                                                      | Notes                                                                                                |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **React on Rails Pro async props** | Recommended for React on Rails. Rails streams props incrementally via `stream_react_component_with_async_props`. | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
+| **TanStack Query**                 | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`.               | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
+| **Apollo Client**                  | Server-side queries in Server Components, `ApolloProvider` for client queries.                                   | Requires `'use client'` wrapper for provider.                                                        |
+| **SWR**                            | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props.                         | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
 
 ## Internationalization
 
@@ -262,7 +256,7 @@ In React on Rails, authentication is handled by Rails (Devise, OmniAuth, etc.) b
 
 ```ruby
 # Rails controller handles auth, passes user to component
-stream_react_component("Dashboard", props: { user: current_user.as_json(only: [:id, :name, :email]) })
+stream_react_component("Dashboard", props: { user: current_user.as_json })
 ```
 
 This is a simpler model than client-side auth libraries -- Rails middleware handles sessions, CSRF protection, and authorization before any React code executes. See the [auth provider pattern](rsc-context-and-state.md#auth-provider) for passing auth data to nested Client Components via Context.
@@ -310,7 +304,7 @@ For third-party packages, check if the library provides direct import paths (mos
 
 Avoid creating barrel files that mix server and client components. If you must use a barrel file, keep separate barrels for server and client exports:
 
-```text
+```
 components/
 ├── server/index.js    # Only server components
 ├── client/index.js    # Only 'use client' components
@@ -355,69 +349,18 @@ Use `client-only` for:
 
 ## Library Compatibility Decision Matrix
 
-| Category          | RSC-Native Choices                                                | Requires `'use client'` Wrapper              | Avoid / Migrate Away From                          |
-| ----------------- | ----------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
-| **Styling**       | Tailwind, CSS Modules, Panda CSS                                  | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
-| **UI Components** | shadcn/ui, Radix (non-interactive)                                | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
-| **Forms**         | Rails controller endpoints + standard forms                       | React Hook Form, TanStack Form               | Formik (less maintained)                           |
-| **Animation**     | CSS animations, Tailwind animate                                  | Framer Motion/Motion, React Spring           | --                                                 |
-| **Charts**        | Nivo (SSR support)                                                | Recharts, Tremor, Chart.js                   | --                                                 |
-| **Data Fetching** | React on Rails Pro streaming, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | --                                                 |
-| **State**         | Server Component props, `React.cache`                             | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
-| **i18n**          | Rails I18n + react-intl                                           | react-i18next, i18next                       | --                                                 |
-| **Auth**          | Rails auth (Devise, etc.) via controller props                    | --                                           | --                                                 |
-| **Date Utils**    | date-fns, dayjs (pure functions)                                  | --                                           | Moment.js (not tree-shakable)                      |
-
-## Common Mistakes
-
-### Mistake 1: Adding `'use client'` to a barrel file
-
-Marking a barrel file (e.g., `components/index.js`) with `'use client'` forces every export into the client bundle, even components that could be Server Components:
-
-```jsx
-// BAD: All 50 exported components become Client Components
-'use client';
-export { Header } from './Header';
-export { Footer } from './Footer';
-export { ProductCard } from './ProductCard';
-// ... 47 more
-```
-
-**Fix:** Add `'use client'` only to individual component files that actually need it. Better yet, avoid barrel files entirely and use direct imports.
-
-### Mistake 2: Not checking library RSC compatibility before migrating
-
-Starting a component migration only to discover that a deeply nested dependency uses hooks wastes significant time.
-
-**Fix:** Before removing `'use client'` from a component, audit its import tree. Run a build with the change and look for errors like _"You're importing a component that needs useState."_ The [React Working Group compatibility list](https://github.com/reactwg/server-components/discussions/6) tracks library status.
-
-### Mistake 3: Using barrel imports across `'use client'` boundaries
-
-In standard (non-RSC) builds, modern bundlers tree-shake barrel imports effectively -- `import { Button } from '@mui/material'` produces roughly the same output as the direct path import. However, **at `'use client'` boundaries**, the full transitive import graph is included in the client bundle because webpack must serialize the entire module for the RSC manifest. This makes import granularity matter specifically in RSC:
-
-```jsx
-// AVOID at 'use client' boundaries: pulls in the full import graph
-import { Button } from '@mui/material';
-
-// PREFER: direct import keeps the client boundary small
-import Button from '@mui/material/Button';
-```
-
-```jsx
-// AVOID at 'use client' boundaries
-import { debounce } from 'lodash';
-
-// PREFER: imports only what's needed
-import debounce from 'lodash-es/debounce';
-```
-
-> **Note:** Outside of `'use client'` files, barrel imports are generally fine with modern bundlers. This advice is specific to files that form RSC client boundaries.
-
-### Mistake 4: Continuing to use runtime CSS-in-JS without a plan
-
-Styled-components and Emotion work inside `'use client'` boundaries, but they prevent those components from ever becoming Server Components. If your migration goal includes reducing JavaScript bundle size, CSS-in-JS will be the bottleneck.
-
-**Fix:** For new components, use Tailwind CSS, CSS Modules, or another zero-runtime solution. For existing styled-components/Emotion code, create a migration plan or accept that those components will remain Client Components.
+| Category          | RSC-Native Choices                                                  | Requires `'use client'` Wrapper              | Avoid / Migrate Away From                          |
+| ----------------- | ------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| **Styling**       | Tailwind, CSS Modules, Panda CSS                                    | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
+| **UI Components** | shadcn/ui, Radix (non-interactive)                                  | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
+| **Forms**         | React 19 `useActionState` + Server Actions                          | React Hook Form, TanStack Form               | Formik (less maintained)                           |
+| **Animation**     | CSS animations, Tailwind animate                                    | Framer Motion/Motion, React Spring           | --                                                 |
+| **Charts**        | Nivo (SSR support)                                                  | Recharts, Tremor, Chart.js                   | --                                                 |
+| **Data Fetching** | React on Rails Pro async props, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | --                                                 |
+| **State**         | Server Component props, `React.cache`                               | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
+| **i18n**          | Rails I18n + react-intl                                             | react-i18next, i18next                       | --                                                 |
+| **Auth**          | Rails auth (Devise, etc.) via controller props                      | --                                           | --                                                 |
+| **Date Utils**    | date-fns, dayjs (pure functions)                                    | --                                           | Moment.js (not tree-shakable)                      |
 
 ## Next Steps
 

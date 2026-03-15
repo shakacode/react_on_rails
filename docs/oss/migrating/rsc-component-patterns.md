@@ -164,19 +164,15 @@ export default function ProductPage({ productId }) {
 }
 ```
 
-### After: State pushed to a leaf, data from Rails props
-
-```erb
-<%# ERB view — Rails passes the data as props %>
-<%= stream_react_component("ProductPage",
-      props: { product: @product.as_json(
-                 include: { specs: { only: [:id, :label, :value] },
-                            reviews: { only: [:id, :text, :rating] } }) }) %>
-```
+### After: State pushed to a leaf, data fetched on server
 
 ```jsx
 // ProductPage.jsx -- Server Component (no directive)
-export default function ProductPage({ product }) {
+// Generic RSC example: in React on Rails, this data would typically come from
+// Rails props or async props. See Part 4 for the recommended fetching patterns.
+export default async function ProductPage({ productId }) {
+  const product = await getProduct(productId);
+
   return (
     <div>
       <h1>{product.name}</h1>
@@ -194,7 +190,7 @@ export default function ProductPage({ product }) {
 'use client';
 
 import { useState } from 'react';
-import { addToCart } from '../api'; // Calls a Rails controller endpoint
+import { addToCart } from '../actions'; // Server Action or API call for mutation
 
 export default function AddToCartButton({ productId }) {
   const [quantity, setQuantity] = useState(1);
@@ -331,34 +327,38 @@ export default function Homepage() {
 
 **Key insight:** `Homepage` (a Server Component) is the component that imports and renders `Header`, `MainContent`, and `Footer`. Since `Homepage` owns these children, they remain Server Components -- even though they're visually nested inside the Client Component `ColorProvider`.
 
-## Pattern 4: Streaming with `stream_react_component`
+## Pattern 4: Async Server Components with Suspense
 
-In React on Rails, `stream_react_component` uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree. Rails loads all data synchronously and passes it as props:
-
-```erb
-<%# ERB view — Rails passes all data as props %>
-<%= stream_react_component("Dashboard",
-      props: { title: "Dashboard",
-               stats: DashboardStats.compute.as_json,
-               revenue: RevenueChart.data.as_json,
-               orders: Order.recent.as_json }) %>
-```
+Server Components can be `async` functions that fetch data directly. Wrap them in `<Suspense>` to stream content progressively:
 
 ```jsx
 // Dashboard.jsx -- Server Component
-export default function Dashboard({ title, stats, revenue, orders }) {
+import { Suspense } from 'react';
+import Stats from './Stats';
+import RevenueChart from './RevenueChart';
+import RecentOrders from './RecentOrders';
+import { StatsSkeleton, ChartSkeleton, TableSkeleton } from './Skeletons';
+
+export default function Dashboard() {
   return (
     <div>
-      <h1>{title}</h1>
-      <Stats stats={stats} />
-      <RevenueChart revenue={revenue} />
-      <RecentOrders orders={orders} />
+      <h1>Dashboard</h1>
+      <Suspense fallback={<StatsSkeleton />}>
+        <Stats />     {/* Fetches and renders independently */}
+      </Suspense>
+      <Suspense fallback={<ChartSkeleton />}>
+        <RevenueChart />  {/* Fetches and renders independently */}
+      </Suspense>
+      <Suspense fallback={<TableSkeleton />}>
+        <RecentOrders />  {/* Fetches and renders independently */}
+      </Suspense>
     </div>
   );
 }
 
-// Stats.jsx -- Server Component (renders directly from props)
-export default function Stats({ stats }) {
+// Stats.jsx -- Async Server Component
+export default async function Stats() {
+  const stats = await getStats();  // Direct server-side fetch
   return (
     <div>
       <span>Revenue: {stats.revenue}</span>
@@ -368,60 +368,56 @@ export default function Stats({ stats }) {
 }
 ```
 
-Rails loads all data as props before rendering begins. `stream_react_component` then streams the rendered HTML to the browser as React processes the component tree — no client-side fetching or loading states needed.
+Each `<Suspense>` boundary enables independent streaming -- the user sees content progressively as each data fetch completes, rather than waiting for the slowest query.
 
-## Pattern 5: Server Data to Interactive Client Components
+## Pattern 5: Server-to-Client Promise Handoff
 
-Pass server-fetched data from Rails to a Client Component that adds interactivity. The Server Component receives the data as props and passes it to the Client Component:
-
-```erb
-<%# ERB view — Rails passes all data as props %>
-<%= stream_react_component("PostPage",
-      props: { title: post.title,
-               body: post.body,
-               comments: post.comments.includes(:author).as_json }) %>
-```
+Start a data fetch on the server but let the client resolve it. This avoids blocking the server render while still starting the fetch early:
 
 ```jsx
-// PostPage.jsx -- Server Component
+// Page.jsx -- Server Component
+import { Suspense } from 'react';
 import Comments from './Comments';
 
-export default function PostPage({ title, body, comments }) {
+export default async function Page({ id }) {
+  const post = await getPost(id); // Await critical data
+  const commentsPromise = getComments(id); // Start but DON'T await
+
   return (
     <article>
-      <h1>{title}</h1>
-      <p>{body}</p>
-      <Comments comments={comments} />
+      <h1>{post.title}</h1>
+      <p>{post.body}</p>
+      <Suspense fallback={<p>Loading comments...</p>}>
+        <Comments commentsPromise={commentsPromise} />
+      </Suspense>
     </article>
   );
 }
 ```
 
+> **Requires React 19+.** The `use(promise)` pattern for server-to-client promise handoff is not available in React 18.
+
 ```jsx
-// Comments.jsx -- Client Component (adds interactivity like reply buttons)
+// Comments.jsx -- Client Component
 'use client';
 
-import { useState } from 'react';
+import { use } from 'react';
 
-export default function Comments({ comments }) {
-  const [expanded, setExpanded] = useState({});
-
+export default function Comments({ commentsPromise }) {
+  const comments = use(commentsPromise); // Resolves the promise
   return (
     <ul>
       {comments.map((c) => (
-        <li key={c.id}>
-          {c.text}
-          <button onClick={() => setExpanded((prev) => ({ ...prev, [c.id]: !prev[c.id] }))}>
-            {expanded[c.id] ? 'Collapse' : 'Reply'}
-          </button>
-        </li>
+        <li key={c.id}>{c.text}</li>
       ))}
     </ul>
   );
 }
 ```
 
-**Benefits:** The Server Component handles data display with zero JavaScript cost. The Client Component receives pre-fetched data as props and adds only the interactivity it needs (reply buttons, expand/collapse).
+**Benefits:** The post renders immediately. Comments stream in when ready. The promise starts on the server (close to the data source) but resolves on the client.
+
+> **Warning:** Never create promises inside Client Components for `use()` -- this causes the "uncached promise" runtime error. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components) for why and what to do instead.
 
 ## Decision Guide: Server or Client Component?
 
@@ -433,11 +429,9 @@ export default function Comments({ comments }) {
 | `window`, `document`, `localStorage`              | Client         | Browser APIs                          |
 | Custom hooks using the above                      | Client         | Transitively client                   |
 | Data fetching (database, API)                     | Server         | Direct backend access, no bundle cost |
-| Rendering static/display-only content             | Server\*       | No JavaScript shipped                 |
+| Rendering static/display-only content             | Server         | No JavaScript shipped                 |
 | Using server-only secrets (API keys)              | Server         | Never exposed to client               |
 | Heavy dependencies (Markdown parsers, formatters) | Server         | Dependencies stay off client bundle   |
-
-_\*For components repeated many times with verbose markup (e.g., Tailwind utility classes), Server Component rendering can inflate the Flight payload. In those cases, a Client Component may produce a smaller page. See [Flight Payload Optimization](rsc-flight-payload.md) for details._
 
 ## Common Mistakes
 
@@ -505,15 +499,13 @@ export function ClientWrapper({ children }) {
 
 ### Mistake 3: Chunk contamination from shared `'use client'` files
 
-If your RSC page downloads unexpectedly large chunks, a shared `'use client'` component may accumulate chunks from multiple entry paths (including heavy SSR/client paths with unrelated dependencies). This can cause the browser to download hundreds of kilobytes of JavaScript it doesn't need. See [Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) for wrapper and prop-injection fixes.
+If your RSC page downloads unexpectedly large chunks, a shared `'use client'` component may be mapped to a heavy chunk group containing unrelated dependencies. This can cause the browser to download hundreds of kilobytes of JavaScript it doesn't need. See [Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) for how to detect and fix it.
 
 ### Mistake 4: Confusing `'use client'` with `'use server'`
 
 - `'use client'` marks a file's components as **Client Components**
 - `'use server'` marks **Server Actions** (functions callable from the client) -- NOT Server Components
 - Server Components are the **default** and need no directive
-
-> **React on Rails note:** Server Actions (`'use server'`) are **not supported** in React on Rails. Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controllers for all mutations. See [Mutations: Rails Controllers, Not Server Actions](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions).
 
 ## Next Steps
 
