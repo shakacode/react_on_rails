@@ -247,7 +247,45 @@ def normalize_changelog_block(lines)
   normalized_lines.join("\n")
 end
 
-# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+# Merge an array of changelog blocks so that blocks with the same heading
+# (e.g. two "#### Fixed" blocks) are combined into one.  Header-only blocks
+# like "#### Pro" are kept at their first-seen position, ensuring they remain
+# as parent headings for any ##### sub-sections that follow.
+# Also strips the "Changes since the last non-beta release." marker text.
+# rubocop:disable Metrics/AbcSize
+def consolidate_changelog_blocks(blocks)
+  consolidated = []
+  heading_indices = {}
+
+  blocks.each do |block|
+    cleaned = block.gsub(/\n*Changes since the last non-beta release\.\s*/, "\n").strip
+    next if cleaned.empty?
+
+    first_line = cleaned.lines.first&.rstrip || ""
+    heading_match = first_line.match(/\A(####+\s+.+)/)
+
+    if heading_match
+      heading_key = heading_match[1].strip.downcase.gsub(/\s+/, " ")
+
+      if heading_indices.key?(heading_key)
+        # Append this block's content (lines after heading) to existing block
+        idx = heading_indices[heading_key]
+        content_after_heading = cleaned.lines.drop(1).join.gsub(/\A\n+/, "").rstrip
+        consolidated[idx] = "#{consolidated[idx].rstrip}\n#{content_after_heading}" unless content_after_heading.empty?
+      else
+        heading_indices[heading_key] = consolidated.length
+        consolidated << cleaned
+      end
+    else
+      consolidated << cleaned
+    end
+  end
+
+  consolidated
+end
+# rubocop:enable Metrics/AbcSize
+
+# rubocop:disable Metrics/AbcSize
 def collapse_prerelease_sections(changelog, base_version, channel)
   parsed = parse_changelog_sections(changelog)
   sections = parsed[:sections]
@@ -258,25 +296,20 @@ def collapse_prerelease_sections(changelog, base_version, channel)
   matching_sections = sections.select { |section| section[:version].match?(target_regex) }
   return changelog if matching_sections.empty?
 
-  merged_body = matching_sections
-                .flat_map { |section| changelog_section_blocks(section[:body]) }
-                .uniq
-                .join("\n\n")
-                .strip
-  sections.reject! { |section| section[:version].match?(target_regex) }
+  # Collect blocks from Unreleased and all matching prerelease sections
+  all_blocks = changelog_section_blocks(unreleased_section[:body]) +
+               matching_sections.flat_map { |section| changelog_section_blocks(section[:body]) }
 
-  unless merged_body.empty?
-    unreleased_body = unreleased_section[:body].rstrip
-    unreleased_section[:body] = if unreleased_body.empty?
-                                  "#{merged_body}\n"
-                                else
-                                  "#{unreleased_body}\n\n#{merged_body}\n"
-                                end
-  end
+  # Merge blocks with the same heading instead of simple .uniq
+  consolidated = consolidate_changelog_blocks(all_blocks)
+  merged_body = consolidated.join("\n\n").strip
+
+  sections.reject! { |section| section[:version].match?(target_regex) }
+  unreleased_section[:body] = merged_body.empty? ? "\n" : "\n\n#{merged_body}\n"
 
   render_changelog_sections(parsed[:prefix], sections)
 end
-# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+# rubocop:enable Metrics/AbcSize
 
 def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: changelog)
   bump_type = inferred_bump_type_from_unreleased(changelog_for_bump)

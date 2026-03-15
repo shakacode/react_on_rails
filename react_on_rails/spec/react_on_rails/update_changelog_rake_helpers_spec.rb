@@ -68,7 +68,7 @@ RSpec.describe "update_changelog.rake helper methods" do
   end
 
   describe "#collapse_prerelease_sections" do
-    it "preserves heading structure and indentation while collapsing sections" do
+    it "consolidates blocks with the same heading while preserving content" do
       changelog = <<~CHANGELOG
         ### [Unreleased]
 
@@ -96,11 +96,110 @@ RSpec.describe "update_changelog.rake helper methods" do
 
       expect(collapsed).not_to include("### [16.4.0.rc.1]")
       expect(collapsed).not_to include("### [16.4.0.rc.0]")
-      expect(collapsed).to include("#### Added\n- First rc change\n  - Nested detail")
-      expect(collapsed).to include("#### Added\n- Second rc change")
-      expect(collapsed).to include("#### Fixed\n- Shared fix")
-      expect(collapsed).to include("#### Fixed\n    code line")
+      # Both Added entries should be under a single #### Added heading
+      expect(collapsed).to include("- First rc change\n  - Nested detail")
+      expect(collapsed).to include("- Second rc change")
+      expect(collapsed.scan(/^#### Added\b/).count).to eq(1)
+      # Both Fixed entries should be under a single #### Fixed heading
+      expect(collapsed).to include("- Shared fix")
+      expect(collapsed).to include("    code line")
+      # 1 consolidated in Unreleased + 1 in 16.3.0
+      expect(collapsed.scan(/^#### Fixed\b/).count).to eq(2)
       expect(collapsed).to include("### [16.3.0] - 2026-02-01")
+    end
+
+    it "preserves #### Pro header for ##### sub-sections" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        #### Fixed
+        - OSS fix from unreleased
+
+        ### [16.4.0.rc.1] - 2026-03-01
+
+        #### Fixed
+        - OSS fix from rc.1
+
+        #### Pro
+
+        ##### Fixed
+        - Pro fix from rc.1
+
+        ### [16.3.0] - 2026-02-01
+        #### Fixed
+        - Older fix
+      CHANGELOG
+
+      collapsed = collapse_prerelease_sections(changelog, "16.4.0", "rc")
+
+      # OSS Fixed entries should be consolidated (1 in Unreleased + 1 in 16.3.0)
+      expect(collapsed.scan(/^#### Fixed\b/).count).to eq(2)
+      expect(collapsed).to include("- OSS fix from unreleased")
+      expect(collapsed).to include("- OSS fix from rc.1")
+      # Pro header must be preserved before ##### sub-sections
+      expect(collapsed).to include("#### Pro")
+      expect(collapsed).to include("##### Fixed\n- Pro fix from rc.1")
+      # #### Pro should appear before ##### Fixed in the output
+      pro_pos = collapsed.index("#### Pro")
+      pro_fixed_pos = collapsed.index("##### Fixed")
+      expect(pro_pos).to be < pro_fixed_pos
+    end
+
+    it "preserves #### Pro when it appears in multiple collapsed sections" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        ### [16.4.0.rc.1] - 2026-03-01
+
+        #### Pro
+
+        ##### Added
+        - Pro feature from rc.1
+
+        ### [16.4.0.rc.0] - 2026-02-28
+
+        #### Pro
+
+        ##### Fixed
+        - Pro fix from rc.0
+
+        ### [16.3.0] - 2026-02-01
+        #### Fixed
+        - Older fix
+      CHANGELOG
+
+      collapsed = collapse_prerelease_sections(changelog, "16.4.0", "rc")
+
+      # Only one #### Pro header should remain
+      expect(collapsed.scan("#### Pro").count).to eq(1)
+      # Both Pro sub-sections should be present
+      expect(collapsed).to include("- Pro feature from rc.1")
+      expect(collapsed).to include("- Pro fix from rc.0")
+    end
+
+    it "strips 'Changes since the last non-beta release.' marker text" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        ### [16.4.0.rc.0] - 2026-02-28
+        #### Added
+        - RC-specific feature
+
+        Changes since the last non-beta release.
+
+        #### Fixed
+        - Accumulated fix
+
+        ### [16.3.0] - 2026-02-01
+        #### Fixed
+        - Older fix
+      CHANGELOG
+
+      collapsed = collapse_prerelease_sections(changelog, "16.4.0", "rc")
+
+      expect(collapsed).not_to include("Changes since the last non-beta release")
+      expect(collapsed).to include("- RC-specific feature")
+      expect(collapsed).to include("- Accumulated fix")
     end
   end
 
