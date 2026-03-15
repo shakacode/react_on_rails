@@ -23,7 +23,7 @@ Before starting, ensure you have:
 
 - **React on Rails Pro 4+** with **React on Rails 15+**
 - **React 19** (`react` and `react-dom` both at 19.x)
-- **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/basics/).
+- **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](../../pro/node-renderer/basics.md).
 - **Shakapacker** (or webpack configured via Shakapacker)
 - **Node.js 20+**
 
@@ -134,7 +134,7 @@ Create `config/webpack/rscWebpackConfig.js`:
 ```js
 // React Server Components webpack configuration
 // Creates the RSC bundle based on the server webpack config
-// See: https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/
+// See: ../../pro/react-server-components/how-react-server-components-work.md
 
 const serverWebpackModule = require('./serverWebpackConfig');
 
@@ -341,7 +341,7 @@ rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
 node-renderer: node client/node-renderer.js
 ```
 
-> **For full webpack configuration details**, including the technical background on how the RSC loader, plugin, and manifests work together, see [How React Server Components Work](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/how-react-server-components-work/).
+> **For full webpack configuration details**, including the technical background on how the RSC loader, plugin, and manifests work together, see [How React Server Components Work](../../pro/react-server-components/how-react-server-components-work.md).
 
 ## Step 5: Add `'use client'` to All Registered Component Entry Points
 
