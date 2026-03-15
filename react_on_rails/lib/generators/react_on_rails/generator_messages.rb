@@ -86,6 +86,18 @@ module GeneratorMessages
       MSG
     end
 
+    def detect_package_manager
+      # Check for lock files to determine package manager
+      if File.exist?("yarn.lock")
+        "yarn"
+      elsif File.exist?("pnpm-lock.yaml")
+        "pnpm"
+      else
+        # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
+        "npm"
+      end
+    end
+
     private
 
     def build_render_example(component_name:, route:, rsc:)
@@ -197,18 +209,5 @@ module GeneratorMessages
       # If version detection fails, don't show a warning to avoid noise
       ""
     end
-
-    def detect_package_manager
-      # Check for lock files to determine package manager
-      if File.exist?("yarn.lock")
-        "yarn"
-      elsif File.exist?("pnpm-lock.yaml")
-        "pnpm"
-      else
-        # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
-        "npm"
-      end
-    end
-    public :detect_package_manager
   end
 end
