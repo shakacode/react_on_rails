@@ -95,14 +95,14 @@ This is a minor release - update your gem and npm package versions, then run `bu
 
    ```ruby
    # Gemfile
-   gem "react_on_rails", "~> 16.0"
+   gem "react_on_rails", "~> 16.4"
    ```
 
    ```json
    // package.json
    {
      "dependencies": {
-       "react-on-rails": "^16.0.0"
+       "react-on-rails": "^16.4.0"
      }
    }
    ```

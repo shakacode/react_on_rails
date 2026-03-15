@@ -11,8 +11,8 @@ Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CH
 For the commands below, choose versions from the CHANGELOG and replace placeholders like
 `<gem_version>` and `<npm_version>`. Note that for pre-release versions:
 
-- Gems use all periods: `16.2.0.beta.1`
-- NPM packages use dashes: `16.2.0-beta.1`
+- Gems use all periods: `16.4.0.beta.1`
+- NPM packages use dashes: `16.4.0-beta.1`
 
 # Generator Installation (Recommended)
 
@@ -98,7 +98,7 @@ The sections below describe manual installation steps. Use these if you need fin
 
 ## Prerequisites
 
-Ensure your **Rails** app is using the **react_on_rails** gem, version 16.0.0 or higher.
+Ensure your **Rails** app is using the **react_on_rails** gem, version 16.4.0 or higher.
 
 ## Install react_on_rails_pro Gem
 
