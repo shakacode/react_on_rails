@@ -2,6 +2,11 @@ const path = require('path');
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 const { env } = process;
+const parseWorkersCount = (value) => {
+  if (value == null || value === '') return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+};
 
 const config = {
   serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
@@ -15,11 +20,9 @@ const config = {
   // Set RENDERER_WORKERS_COUNT env var to override (e.g., for production tuning)
   // Legacy fallback: NODE_RENDERER_CONCURRENCY
   workersCount:
-    env.RENDERER_WORKERS_COUNT != null
-      ? Number(env.RENDERER_WORKERS_COUNT)
-      : env.NODE_RENDERER_CONCURRENCY != null
-        ? Number(env.NODE_RENDERER_CONCURRENCY)
-        : 3,
+    parseWorkersCount(env.RENDERER_WORKERS_COUNT) ??
+    parseWorkersCount(env.NODE_RENDERER_CONCURRENCY) ??
+    3,
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
   // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.

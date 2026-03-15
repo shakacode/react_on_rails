@@ -123,7 +123,21 @@ reactOnRailsProNodeRenderer({
   port: Number(process.env.RENDERER_PORT) || 3800,
   password: process.env.RENDERER_PASSWORD || 'devPassword',
   supportModules: true,
-  workersCount: Number(process.env.RENDERER_WORKERS_COUNT ?? process.env.NODE_RENDERER_CONCURRENCY) || 3,
+  workersCount: (() => {
+    const fromRendererWorkers = process.env.RENDERER_WORKERS_COUNT;
+    if (fromRendererWorkers != null && fromRendererWorkers !== '') {
+      const parsed = Number(fromRendererWorkers);
+      if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+    }
+
+    const fromLegacyConcurrency = process.env.NODE_RENDERER_CONCURRENCY;
+    if (fromLegacyConcurrency != null && fromLegacyConcurrency !== '') {
+      const parsed = Number(fromLegacyConcurrency);
+      if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+    }
+
+    return 3;
+  })(),
 });
 ```
 
