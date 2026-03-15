@@ -90,10 +90,7 @@ module ReactOnRails
       end
 
       def add_redux_specific_messages
-        # Append Redux-specific post-install instructions
-        GeneratorMessages.add_info(
-          GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world")
-        )
+        # InstallGenerator handles post-install messaging for all install modes.
       end
 
       private

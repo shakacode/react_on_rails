@@ -1673,6 +1673,24 @@ describe InstallGenerator, type: :generator do
       expect(output_text).not_to include("🎉 React on Rails Successfully Installed!")
       expect(output_text).not_to include("📋 QUICK START:")
     end
+
+    specify "shows incomplete-installation guidance for redux installs when shakapacker setup fails" do
+      install_generator = described_class.new([], { redux: true, ignore_warnings: true })
+      allow(install_generator).to receive(:installation_prerequisites_met?).and_return(true)
+      allow(install_generator).to receive(:invoke_generators) do
+        install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
+      end
+      allow(install_generator).to receive(:add_bin_scripts)
+      allow(install_generator).to receive(:print_generator_messages)
+
+      install_generator.run_generators
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("React on Rails installation is incomplete")
+      expect(output_text).to include("Avoid running ./bin/dev")
+      expect(output_text).not_to include("🎉 React on Rails Successfully Installed!")
+      expect(output_text).not_to include("📋 QUICK START:")
+    end
   end
 
   describe "--pretend mode behavior" do
