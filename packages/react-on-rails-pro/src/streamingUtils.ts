@@ -18,7 +18,7 @@ import { PassThrough, Readable } from 'stream';
 import createReactOutput from 'react-on-rails/createReactOutput';
 import { isPromise, isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { consoleReplay } from 'react-on-rails/buildConsoleReplay';
-import { createResultObject, convertToError, validateComponent } from 'react-on-rails/serverRenderUtils';
+import { convertToError, validateComponent } from 'react-on-rails/serverRenderUtils';
 import {
   RenderParams,
   StreamRenderState,
