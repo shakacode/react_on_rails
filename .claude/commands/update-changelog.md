@@ -141,9 +141,10 @@ Entries should be organized under these section headings **in the following orde
 - `#### API Improvements` - API changes and improvements
 - `#### Generator Improvements` - Generator-specific changes
 - `#### Performance` - Performance improvements
-- `#### Pro License Features` - React on Rails Pro features
 
 **Prefer standard headings.** Only use custom headings when the change needs more specific categorization.
+
+**Pro entries**: Pro-specific changes use an inline `**[Pro]**` tag prefix within the standard category sections (e.g., `- **[Pro]** **Feature name**: Description...`). Do NOT create separate `#### Pro` subsections.
 
 **Only include section headings that have entries.**
 
@@ -428,7 +429,7 @@ When consolidating prerelease versions (beta, RC) into a stable release, careful
    - Fixes for new prerelease-only features
    - Generator handling of prerelease version formats
 
-3. **Pro-specific features** (move to Pro section):
+3. **Pro-specific features** (tag with `**[Pro]**` inline):
    - Node renderer fixes/improvements
    - Streaming-related changes
    - Async loading features (Pro-exclusive)
