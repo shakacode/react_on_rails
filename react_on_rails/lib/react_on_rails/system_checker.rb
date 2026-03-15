@@ -184,7 +184,7 @@ module ReactOnRails
     end
 
     def check_react_on_rails_npm_package
-      package_json_path = "package.json"
+      package_json_path = resolved_package_json_path
       return unless File.exist?(package_json_path)
 
       package_json = JSON.parse(File.read(package_json_path))
@@ -205,10 +205,11 @@ module ReactOnRails
     end
 
     def check_package_version_sync
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         package_name, npm_version = react_on_rails_npm_package_details(package_json)
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
@@ -256,7 +257,7 @@ module ReactOnRails
 
     # React dependencies validation
     def check_react_dependencies
-      return unless File.exist?("package.json")
+      return unless File.exist?(resolved_package_json_path)
 
       package_json = parse_package_json
       return unless package_json
@@ -369,10 +370,11 @@ module ReactOnRails
     end
 
     def bundle_analyzer_available?
-      return false unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return false unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
         all_deps["webpack-bundle-analyzer"]
       rescue StandardError
@@ -622,7 +624,7 @@ module ReactOnRails
     # rubocop:enable Metrics/CyclomaticComplexity
 
     def parse_package_json
-      JSON.parse(File.read("package.json"))
+      JSON.parse(File.read(resolved_package_json_path))
     rescue JSON::ParserError
       add_warning("⚠️  Could not parse package.json to check React dependencies")
       nil
@@ -762,10 +764,11 @@ module ReactOnRails
     end
 
     def report_webpack_version
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
         webpack_version = all_deps["webpack"]
@@ -775,6 +778,42 @@ module ReactOnRails
       rescue StandardError
         # Handle other file/access errors
       end
+    end
+
+    def resolved_package_json_path
+      node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
+      return "package.json" if node_modules_location.empty? || node_modules_location == Rails.root.to_s
+
+      File.join(node_modules_location, "package.json")
+    rescue StandardError
+      "package.json"
+    end
+
+    def resolved_webpack_config_path
+      webpack_config_candidates.find { |path| File.exist?(path) }
+    end
+
+    def webpack_config_candidates
+      candidates = ["config/webpack/webpack.config.js"]
+
+      shakapacker_config_dir = shakapacker_webpack_config_directory
+      if shakapacker_config_dir
+        candidates.concat(%w[js ts cjs mjs].map { |ext| File.join(shakapacker_config_dir, "webpack.config.#{ext}") })
+      end
+
+      candidates.concat(Dir.glob("config/**/webpack.config.{js,ts,cjs,mjs}"))
+      candidates.uniq
+    end
+
+    def shakapacker_webpack_config_directory
+      require "shakapacker"
+      path = Shakapacker.config.assets_bundler_config_path.to_s
+      return nil if path.empty?
+
+      rails_root = Rails.root.to_s
+      path.start_with?("#{rails_root}/") ? path.sub("#{rails_root}/", "") : path
+    rescue LoadError, StandardError
+      nil
     end
   end
   # rubocop:enable Metrics/ClassLength

@@ -356,6 +356,27 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.messages.count).to eq(messages_count_before)
       end
     end
+
+    context "when node_modules_location points to a non-root JS workspace" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails-pro" => "^16.0.0" } }.to_json
+      end
+
+      before do
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(File).to receive(:exist?).with("client/package.json").and_return(true)
+        allow(File).to receive(:read).with("client/package.json").and_return(package_json_content)
+      end
+
+      it "reads package metadata from the configured workspace path" do
+        checker.check_react_on_rails_npm_package
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("react-on-rails-pro NPM package")
+        end).to be true
+      end
+    end
   end
 
   describe "#check_package_version_sync" do
