@@ -680,11 +680,6 @@ module ReactOnRails
           export default webpackConfig
         CONFIG
 
-        configs << <<~CONFIG
-          import { webpackConfig } from 'shakapacker'
-          export default webpackConfig
-        CONFIG
-
         # Shakapacker v9.4+ TypeScript rspack configs (ESM syntax)
         configs << <<~CONFIG
           import { generateRspackConfig } from 'shakapacker/rspack'

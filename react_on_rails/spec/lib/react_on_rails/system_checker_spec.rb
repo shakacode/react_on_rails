@@ -735,6 +735,14 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(info_messages).to include("export default")
         expect(info_messages).to include("rspack-stats.json")
       end
+
+      it "uses the detected webpack TypeScript config path in analyzer instructions" do
+        checker.send(:suggest_webpack_inspection, "config/webpack/webpack.config.ts")
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
+
+        expect(info_messages).to include("Add to config/webpack/webpack.config.ts")
+      end
     end
 
     describe "#standard_shakapacker_config?" do
@@ -766,14 +774,6 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.send(:standard_shakapacker_config?, content)).to be true
       end
 
-      it "recognizes TypeScript ESM webpack config that imports webpackConfig directly" do
-        content = <<~TS
-          import { webpackConfig } from 'shakapacker'
-          export default webpackConfig
-        TS
-        expect(checker.send(:standard_shakapacker_config?, content)).to be true
-      end
-
       it "recognizes TypeScript ESM rspack config" do
         content = <<~TS
           import { generateRspackConfig } from 'shakapacker/rspack'
@@ -782,6 +782,14 @@ RSpec.describe ReactOnRails::SystemChecker do
           export default rspackConfig
         TS
         expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "rejects unsupported TypeScript ESM webpackConfig named export variant" do
+        content = <<~TS
+          import { webpackConfig } from 'shakapacker'
+          export default webpackConfig
+        TS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be false
       end
 
       it "rejects fully custom config without standard patterns" do

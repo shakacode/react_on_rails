@@ -353,7 +353,7 @@ module ReactOnRails
         add_info("    This opens the configured bundle analyzer in your browser")
       elsif bundler_name == "webpack"
         add_info("    1. yarn add --dev webpack-bundle-analyzer")
-        add_info("    2. Add to config/webpack/webpack.config.js:")
+        add_info("    2. Add to #{config_path}:")
         add_info("       const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');")
         add_info("       // Add to plugins array when process.env.ANALYZE")
         add_info("    3. ANALYZE=true bin/shakapacker")
@@ -491,7 +491,6 @@ module ReactOnRails
         /generateRspackConfig.*require.*shakapacker/,
         # ESM patterns (TS configs)
         /generateWebpackConfig.*from ['"]shakapacker['"]/,
-        /webpackConfig.*from ['"]shakapacker['"]/,
         %r{generateRspackConfig.*from ['"]shakapacker/rspack['"]}
       ]
       shakapacker_patterns.any? { |pattern| normalized.match?(pattern) }

@@ -2023,14 +2023,6 @@ describe InstallGenerator, type: :generator do
       expect(generator.send(:standard_shakapacker_config?, content)).to be true
     end
 
-    it "recognizes stock TypeScript webpack config using webpackConfig export" do
-      content = <<~TS
-        import { webpackConfig } from 'shakapacker'
-        export default webpackConfig
-      TS
-      expect(generator.send(:standard_shakapacker_config?, content)).to be true
-    end
-
     it "recognizes stock TypeScript configs with double quotes" do
       content = <<~TS
         import { generateWebpackConfig } from "shakapacker"
@@ -2137,6 +2129,52 @@ describe InstallGenerator, type: :generator do
         "config/rspack/rspack.config.ts",
         {}
       )
+    end
+
+    it "replaces existing stock TypeScript webpack config in place" do
+      ts_path = "config/webpack/webpack.config.ts"
+      ts_template = "base/base/config/webpack/webpack.config.ts.tt"
+      stock_ts_config = <<~TS
+        import { generateWebpackConfig } from 'shakapacker'
+        const webpackConfig = generateWebpackConfig()
+        export default webpackConfig
+      TS
+
+      allow(generator).to receive(:bundler_main_config_path).and_return(ts_path)
+      allow(generator).to receive(:bundler_main_config_template_path).with("base/base", ts_path).and_return(ts_template)
+      allow(File).to receive(:exist?).with(ts_path).and_return(true)
+      allow(File).to receive(:read).with(ts_path).and_return(stock_ts_config)
+      allow(generator).to receive(:standard_shakapacker_config?).with(stock_ts_config).and_return(true)
+      allow(generator).to receive(:remove_file)
+      allow(generator).to receive(:template)
+
+      generator.send(:copy_webpack_main_config, "base/base", {})
+
+      expect(generator).to have_received(:remove_file).with(ts_path, verbose: false)
+      expect(generator).to have_received(:template).with(ts_template, ts_path, {})
+    end
+
+    it "routes existing custom TypeScript webpack config through custom replacement flow" do
+      ts_path = "config/webpack/webpack.config.ts"
+      ts_template = "base/base/config/webpack/webpack.config.ts.tt"
+      custom_ts_config = <<~TS
+        import { generateWebpackConfig } from 'shakapacker'
+        const webpackConfig = generateWebpackConfig()
+        webpackConfig.resolve?.extensions?.push('.graphql')
+        export default webpackConfig
+      TS
+
+      allow(generator).to receive(:bundler_main_config_path).and_return(ts_path)
+      allow(generator).to receive(:bundler_main_config_template_path).with("base/base", ts_path).and_return(ts_template)
+      allow(File).to receive(:exist?).with(ts_path).and_return(true)
+      allow(File).to receive(:read).with(ts_path).and_return(custom_ts_config)
+      allow(generator).to receive(:standard_shakapacker_config?).with(custom_ts_config).and_return(false)
+      allow(generator).to receive(:react_on_rails_config?).with(custom_ts_config).and_return(false)
+      allow(generator).to receive(:handle_custom_webpack_config)
+
+      generator.send(:copy_webpack_main_config, "base/base", {})
+
+      expect(generator).to have_received(:handle_custom_webpack_config).with("base/base", {}, ts_path)
     end
   end
 
