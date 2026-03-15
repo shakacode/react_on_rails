@@ -331,6 +331,21 @@ module ReactOnRails
         @shakapacker_setup_incomplete == true
       end
 
+      def recovery_install_command
+        flags = []
+        flags << "--redux" if options.redux?
+        flags << "--typescript" if options.typescript?
+        flags << "--rspack" if options.rspack?
+
+        if use_rsc?
+          flags << "--rsc"
+        elsif options.pro?
+          flags << "--pro"
+        end
+
+        ["rails generate react_on_rails:install", *flags].join(" ")
+      end
+
       def incomplete_installation_message
         package_install_step = "#{GeneratorMessages.detect_package_manager} install"
 
@@ -346,7 +361,7 @@ module ReactOnRails
           1. #{Rainbow('bundle install').cyan}
           2. #{Rainbow('bundle exec rails shakapacker:install').cyan}
           3. #{Rainbow(package_install_step).cyan}
-          4. Re-run #{Rainbow('rails generate react_on_rails:install').cyan}
+          4. Re-run #{Rainbow(recovery_install_command).cyan}
              (add #{Rainbow('--force').cyan} to overwrite files if needed)
 
           Troubleshooting:
@@ -482,7 +497,7 @@ module ReactOnRails
           Please try manually:
               bundle add shakapacker --strict
 
-          Then re-run: rails generate react_on_rails:install
+          Then re-run: #{recovery_install_command}
         MSG
         GeneratorMessages.add_error(error)
         raise Thor::Error, error unless options.ignore_warnings?
@@ -503,7 +518,7 @@ module ReactOnRails
           2. Run: bundle install
           3. Try manually: bundle exec rails shakapacker:install
           4. Check for error output above
-          5. Re-run: rails generate react_on_rails:install
+          5. Re-run: #{recovery_install_command}
 
           Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
         MSG

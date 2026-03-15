@@ -1702,6 +1702,60 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("pnpm install")
     end
+
+    specify "incomplete-installation guidance preserves original install flags" do
+      install_generator = described_class.new([], { redux: true, typescript: true, rspack: true, rsc: true })
+      install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
+
+      install_generator.send(:add_post_install_message)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("rails generate react_on_rails:install --redux --typescript --rspack --rsc")
+      expect(output_text).not_to include("--ignore-warnings")
+    end
+
+    specify "recovery_install_command keeps meaningful flags only" do
+      install_generator = described_class.new(
+        [],
+        { redux: true, typescript: true, rspack: true, rsc: true, pro: true, ignore_warnings: true,
+          force: true, skip: true, pretend: true }
+      )
+
+      command = install_generator.send(:recovery_install_command)
+
+      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --rspack --rsc")
+      expect(command).not_to include("--ignore-warnings")
+      expect(command).not_to include("--force")
+      expect(command).not_to include("--skip")
+      expect(command).not_to include("--pretend")
+      expect(command).not_to include("--pro")
+    end
+
+    specify "recovery_install_command includes --pro when requested without --rsc" do
+      install_generator = described_class.new([], { pro: true })
+
+      command = install_generator.send(:recovery_install_command)
+
+      expect(command).to eq("rails generate react_on_rails:install --pro")
+    end
+
+    specify "shakapacker install error preserves original install flags" do
+      install_generator = described_class.new([], { redux: true, typescript: true, ignore_warnings: true })
+
+      install_generator.send(:handle_shakapacker_install_error)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("Re-run: rails generate react_on_rails:install --redux --typescript")
+    end
+
+    specify "shakapacker gemfile error preserves original install flags" do
+      install_generator = described_class.new([], { rspack: true, pro: true, ignore_warnings: true })
+
+      install_generator.send(:handle_shakapacker_gemfile_error)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("Then re-run: rails generate react_on_rails:install --rspack --pro")
+    end
   end
 
   describe "--pretend mode behavior" do
