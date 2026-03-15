@@ -3,8 +3,10 @@ const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-rendere
 
 const { env } = process;
 const parseWorkersCount = (value) => {
-  if (value == null || value === '') return null;
-  const parsed = Number(value);
+  if (value == null) return null;
+  const normalized = typeof value === 'string' ? value.trim() : String(value);
+  if (normalized === '') return null;
+  const parsed = Number(normalized);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 };
 

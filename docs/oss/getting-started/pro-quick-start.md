@@ -117,27 +117,25 @@ end
 ```js
 const path = require('path');
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+const { env } = process;
+
+const parseWorkersCount = (value) => {
+  if (value == null) return null;
+  const normalized = typeof value === 'string' ? value.trim() : String(value);
+  if (normalized === '') return null;
+  const parsed = Number(normalized);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+};
 
 reactOnRailsProNodeRenderer({
   serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
-  port: Number(process.env.RENDERER_PORT) || 3800,
-  password: process.env.RENDERER_PASSWORD || 'devPassword',
+  port: Number(env.RENDERER_PORT) || 3800,
+  password: env.RENDERER_PASSWORD || 'devPassword',
   supportModules: true,
-  workersCount: (() => {
-    const fromRendererWorkers = process.env.RENDERER_WORKERS_COUNT;
-    if (fromRendererWorkers != null && fromRendererWorkers !== '') {
-      const parsed = Number(fromRendererWorkers);
-      if (Number.isInteger(parsed) && parsed >= 0) return parsed;
-    }
-
-    const fromLegacyConcurrency = process.env.NODE_RENDERER_CONCURRENCY;
-    if (fromLegacyConcurrency != null && fromLegacyConcurrency !== '') {
-      const parsed = Number(fromLegacyConcurrency);
-      if (Number.isInteger(parsed) && parsed >= 0) return parsed;
-    }
-
-    return 3;
-  })(),
+  workersCount:
+    parseWorkersCount(env.RENDERER_WORKERS_COUNT) ??
+    parseWorkersCount(env.NODE_RENDERER_CONCURRENCY) ??
+    3,
 });
 ```
 
