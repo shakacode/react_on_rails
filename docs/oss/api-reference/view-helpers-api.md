@@ -44,6 +44,8 @@ Uncommonly used options:
 
 ### react_component_hash
 
+> **React 19 Alternative:** For metadata use cases (page titles, meta tags, canonical URLs), consider using [React 19 Native Metadata](../building-features/react-19-native-metadata.md) with `react_component` or `stream_react_component` instead. React 19 natively hoists `<title>`, `<meta>`, and `<link>` tags to `<head>`, eliminating the need for a render-function and `react_component_hash`. See the [migration guide](../building-features/react-19-native-metadata.md#migration-guide) for step-by-step instructions.
+
 `react_component_hash` is used to return multiple HTML strings for server rendering, such as for
 adding meta-tags to a page. It is exactly like react_component except for the following:
 

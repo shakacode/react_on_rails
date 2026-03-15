@@ -59,4 +59,12 @@ RSpec.describe "RSC payload endpoint" do
 
     expect_valid_rsc_payload_response
   end
+
+  it "returns bad request for malformed props JSON" do
+    get "/rsc_payload/RscEchoProps", params: { props: '{"message":' }
+
+    expect(response).to have_http_status(:bad_request)
+    expect(response.media_type).to eq("text/plain")
+    expect(response.body).to eq("Invalid props JSON")
+  end
 end

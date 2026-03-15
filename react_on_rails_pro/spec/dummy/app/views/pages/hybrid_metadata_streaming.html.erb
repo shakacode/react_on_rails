@@ -1,0 +1,42 @@
+<%# Rails-side metadata: set from controller data, appears in <head> from the first byte %>
+<%# This dummy layout yields :title directly. Layouts that wrap yield(:title) in <title> should pass only text here. %>
+<% content_for :title do %>
+  <title><%= @page_title %></title>
+<% end %>
+
+<% content_for :head do %>
+  <meta name="description" content="<%= @page_description %>">
+  <meta property="og:title" content="<%= @page_title %>">
+<% end %>
+
+<%= stream_react_component("HybridMetadataApp",
+                           props: @app_props_server_render,
+                           trace: true,
+                           id: "HybridMetadataApp-react-component-0") %>
+
+<hr/>
+
+<h2>About This Example (Recommended for SEO)</h2>
+<p>
+  This page demonstrates the <strong>recommended approach</strong> for SEO-critical streaming pages:
+  metadata is set by the Rails controller, while the component body streams via React Suspense.
+</p>
+<p>
+  <strong>How it works:</strong> The controller sets <code>@page_title</code> and
+  <code>@page_description</code>. The view uses <code>content_for :title</code> and
+  <code>content_for :head</code> to inject them into the layout's <code>&lt;head&gt;</code>.
+  Since the layout renders before streaming begins, the metadata is in the very first byte
+  of the HTTP response.
+</p>
+<p>
+  <strong>Advantage:</strong> SEO crawlers see the correct title and meta description
+  without executing JavaScript. The component body streams progressively for a great
+  user experience.
+</p>
+<p>
+  <strong>Compare with:</strong>
+  <%= link_to "React 19 native metadata (streaming)", stream_native_metadata_path %> |
+  <%= link_to "React 19 native metadata (sync)", native_metadata_path %> |
+  <%= link_to "RSC version", rsc_native_metadata_path %> |
+  <%= link_to "Helmet approach (react_component_hash)", react_helmet_path %>
+</p>

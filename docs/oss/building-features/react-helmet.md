@@ -1,5 +1,7 @@
 # Using React Helmet to build `<head>` content
 
+> **React 19 Alternative:** If you are using React 19, consider using [React 19 Native Metadata](react-19-native-metadata.md) instead of react-helmet. Native metadata tags (`<title>`, `<meta>`, `<link>`) are built into React 19 and work with streaming SSR and React Server Components — no extra dependencies or render-functions needed.
+
 ## Installation and general usage
 
 See [nfl/react-helmet](https://github.com/nfl/react-helmet) for details on how to use this package.

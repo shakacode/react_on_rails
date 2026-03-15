@@ -62,6 +62,8 @@ const MyComponent = (props, _railsContext) => {
 
 ### 3. Objects with `renderedHtml` as a React element
 
+> **React 19 Alternative:** For metadata use cases (titles, meta tags), consider using [React 19 Native Metadata](../building-features/react-19-native-metadata.md) instead of this pattern. React 19 hoists `<title>`, `<meta>`, and `<link>` to `<head>` automatically, eliminating the need for server-side hash render-functions.
+
 ```jsx
 const MyComponent = (props, _railsContext) => {
   return {
