@@ -199,7 +199,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   private
 
   def calc_slow_app_props_server_render
-    msg = <<-MSG.strip_heredoc
+    msg = <<~MSG
       XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
       calling slow calc_slow_app_props_server_render
       XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX

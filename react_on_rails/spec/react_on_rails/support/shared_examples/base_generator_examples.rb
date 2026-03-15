@@ -2,7 +2,7 @@
 
 shared_examples "base_generator_common" do
   it "adds a route for get 'hello_world' to 'hello_world#index'" do
-    match = <<-MATCH.strip_heredoc
+    match = <<~MATCH
       Rails.application.routes.draw do
         get 'hello_world', to: 'hello_world#index'
       end

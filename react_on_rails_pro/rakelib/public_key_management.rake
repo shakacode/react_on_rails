@@ -60,7 +60,7 @@ namespace :react_on_rails_pro do # rubocop:disable Metrics/BlockLength
       # This should be implemented after publishing the API endpoint on the ShakaCode website.
       # Update Ruby public key file
       ruby_file_path = File.join(File.dirname(__FILE__), "..", "lib", "react_on_rails_pro", "license_public_key.rb")
-      ruby_content = <<~RUBY.strip_heredoc
+      ruby_content = <<~RUBY
         # frozen_string_literal: true
 
         module ReactOnRailsPro
@@ -75,7 +75,7 @@ namespace :react_on_rails_pro do # rubocop:disable Metrics/BlockLength
             #   react_on_rails_pro:update_public_key
             # This task fetches the latest key from the API endpoint:
             #   http://shakacode.com/api/public-key
-            KEY = OpenSSL::PKey::RSA.new(<<~PEM.strip.strip_heredoc)
+            KEY = OpenSSL::PKey::RSA.new(<<~PEM.strip)
               #{public_key.strip}
             PEM
           end

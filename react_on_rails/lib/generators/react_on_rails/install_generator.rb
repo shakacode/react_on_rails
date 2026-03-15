@@ -8,6 +8,8 @@ require_relative "generator_messages"
 require_relative "js_dependency_manager"
 require_relative "pro_setup"
 require_relative "rsc_setup"
+# Load-path require: git_utils lives under react_on_rails/lib, not relative to this generator directory.
+require "react_on_rails/git_utils"
 
 module ReactOnRails
   module Generators

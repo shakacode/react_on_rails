@@ -408,10 +408,10 @@ module ReactOnRails
       return if server_render_method.blank? ||
                 server_render_method == "ExecJS"
 
-      msg = <<-MSG.strip_heredoc
-      Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.server_render_method`.
-      If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
-      for details.
+      msg = <<~MSG
+        Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.server_render_method`.
+        If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
+        for details.
       MSG
       raise ReactOnRails::Error, msg
     end
