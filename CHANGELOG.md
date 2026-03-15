@@ -25,13 +25,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [16.4.0.rc.10] - 2026-03-14
+
 #### Fixed
 
 - **Ruby 3.4 compatibility for heredocs**: Replaced legacy `strip_heredoc` usage with native squiggly heredocs (`<<~`) and removed redundant chaining where indentation is already normalized by Ruby. [PR 2599](https://github.com/shakacode/react_on_rails/pull/2599) by [justin808](https://github.com/justin808).
 - **Fix install generator load path for `ReactOnRails::GitUtils`**: Added an explicit `require "react_on_rails/git_utils"` so generator execution does not rely on broader app boot side effects for this constant to be available. [PR 2599](https://github.com/shakacode/react_on_rails/pull/2599) by [justin808](https://github.com/justin808).
 - **`server_render_js` now handles non-Error throws safely**: Defensive error serialization now supports thrown primitives and `null` values without raising secondary `TypeError` exceptions while building SSR error payloads. [PR 2599](https://github.com/shakacode/react_on_rails/pull/2599) by [justin808](https://github.com/justin808).
-
-### [16.4.0.rc.9] - 2026-03-12
+- **Clean stale webpack config on `--rspack` install**: Running `rails g react_on_rails:install --rspack` now removes leftover `config/webpack/` files when switching from webpack to rspack, preventing Shakapacker deprecation warnings. Only known stock/generated webpack configs are removed; custom files are preserved with a warning. [PR 2597](https://github.com/shakacode/react_on_rails/pull/2597) by [justin808](https://github.com/justin808). Fixes [Issue 2549](https://github.com/shakacode/react_on_rails/issues/2549).
 
 #### Improved
 
@@ -69,8 +70,6 @@ Changes since the last non-beta release.
 - **Fixed `private_output_path` not configured on fresh Shakapacker installs**: When running `rails g react_on_rails:install` without pre-existing Shakapacker configuration, `private_output_path: ssr-generated` was left commented out in the generated `config/shakapacker.yml`. The generator now detects whether Shakapacker was just installed and passes a `shakapacker_just_installed` flag to `BaseGenerator`, which uses `force: true` when copying the config template to ensure the RoR version replaces Shakapacker's default. [PR 2411](https://github.com/shakacode/react_on_rails/pull/2411) by [ihabadham](https://github.com/ihabadham).
 - **Install generator `--pretend` now behaves as a safe dry run**: `react_on_rails:install` previously executed real Shakapacker setup commands (`bundle add`, `bundle install`, and `rails shakapacker:install`) and could crash on `File.chmod` because Thor pretend mode does not create files. `--pretend` now skips automatic Shakapacker installation and raw chmod calls so dry-run previews complete without side effects. [PR 2536](https://github.com/shakacode/react_on_rails/pull/2536) by [justin808](https://github.com/justin808).
 - **Generator test defaults now consistently use `build_test_command` + TestHelper, with Minitest support**: Fresh installs now enable `config.build_test_command` and wire React on Rails TestHelper for RSpec and Minitest, while generated `config/shakapacker.yml` sets test `compile: false` to avoid mixed compilation strategies by default. Doctor now validates helper wiring per framework (including mixed RSpec+Minitest apps), detects separate vs shared test/development output-path workflows, and supports `FIX=true` auto-fixes for the recommended setup path. Added `bin/dev test-watch` with `auto|full|client-only` modes so test watching is easier to run consistently. `bin/dev help` and testing docs now explicitly document both the recommended separate-output workflow and the advanced static-only shared-output workflow, including migration from manual watcher commands. [PR 2513](https://github.com/shakacode/react_on_rails/pull/2513) by [justin808](https://github.com/justin808).
-
-#### Pro
 
 ##### Fixed
 
@@ -2076,8 +2075,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.9...master
-[16.4.0.rc.9]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0.rc.9
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.10...master
+[16.4.0.rc.10]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0.rc.10
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0

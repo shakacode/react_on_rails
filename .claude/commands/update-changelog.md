@@ -62,7 +62,7 @@ When stamping a version header (`release`, `rc`, or `beta`), compute the next ve
 
 4. **Verify**: Check that the computed version is newer than ALL existing tags (stable and prerelease). If not, ask the user what to do.
 
-5. **Show the computed version to the user** and ask for confirmation before stamping the header.
+5. **Show the computed version to the user and ask for confirmation** before stamping the header. If the bump type is ambiguous (e.g., changes could reasonably be classified as patch vs minor, or the changelog headings don't clearly signal the bump level), explain your reasoning for the suggested bump and ask the user to confirm or override before proceeding.
 
 ## Critical Requirements
 
@@ -306,9 +306,11 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Which entries were moved from Unreleased
    - Which new entries were added
    - Which PRs were skipped (and why)
-5. If in `release`/`rc`/`beta` mode, remind the user of next steps:
-   - Commit and push CHANGELOG.md
-   - Run `rake release` (no args) to publish and auto-create the GitHub release
+5. If in `release`/`rc`/`beta` mode, **automatically commit, push, and open a PR**:
+   - Create a feature branch (e.g., `jg/changelog-16.4.0.rc.10`)
+   - Commit CHANGELOG.md (and the skill file if it was also modified)
+   - Push and open a PR with the changelog diff as the body
+   - Remind the user to run `rake release` (no args) after merge to publish and auto-create the GitHub release
 
 ### For Prerelease Versions (RC and Beta)
 
