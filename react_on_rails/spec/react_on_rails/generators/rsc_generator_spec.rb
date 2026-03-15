@@ -217,6 +217,41 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when Pro is installed with a symbol HelloWorldController layout declaration" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          layout :marketing_layout
+
+          def index
+          end
+        end
+      RUBY
+      simulate_compatible_auto_registration_layout("marketing_layout")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "does not treat a symbol layout selector as a literal layout file name" do
+      assert_file "app/views/layouts/marketing_layout.html.erb"
+      assert_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
   context "when Pro is installed with an incompatible hello_world layout" do
     before(:all) do
       prepare_destination
