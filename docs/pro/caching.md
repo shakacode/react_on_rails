@@ -132,7 +132,7 @@ i18nLocale = I18n.locale
 
 ### How: API
 
-Here is the doc for helpers `cached_react_component` and `cached_react_component_hash`. Consult the [docs in React on Rails](https://www.shakacode.com/react-on-rails/docs/api/view-helpers-api/) for the non-cached analogies `react_component` and `react_component_hash`. These docs only show the differences.
+Here is the doc for helpers `cached_react_component` and `cached_react_component_hash`. Consult the [docs in React on Rails](https://reactonrails.com/docs/api-reference/view-helpers-api/) for the non-cached analogies `react_component` and `react_component_hash`. These docs only show the differences.
 
 ```ruby
   # Provide caching support for react_component in a manner akin to Rails fragment caching.

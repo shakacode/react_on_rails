@@ -254,7 +254,7 @@ It's super important to exclude certain directories from RubyMine or else it wil
 
 ## Conclusion
 
-- Browse the docs on [our documentation website](https://www.shakacode.com/react-on-rails/docs/)
+- Browse the docs on [our documentation website](https://reactonrails.com/docs/)
 
 Feedback is greatly appreciated! As are stars on github!
 

@@ -1,6 +1,6 @@
 # React on Rails Documentation
 
-> For the best experience, visit our **[documentation website](https://www.shakacode.com/react-on-rails/docs/)**.
+> For the best experience, visit our **[documentation website](https://reactonrails.com/docs/)**.
 
 Browsing on GitHub? This guide will help you navigate the documentation.
 
