@@ -204,6 +204,30 @@ RSpec.describe "update_changelog.rake helper methods" do
       expect(collapsed).to include("- **Bug fix B**")
     end
 
+    it "does not leave a dangling ##### heading when deduplicating duplicate PR entries" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        ### [16.4.0.rc.1] - 2026-03-01
+        #### Pro
+
+        ##### Fixed
+        - **Bug fix A**. [PR 2489](https://github.com/shakacode/react_on_rails/pull/2489) by [user](https://github.com/user).
+
+        ### [16.4.0.rc.0] - 2026-02-28
+        #### Pro
+
+        ##### Fixed
+        - **Bug fix A**. [PR 2489](https://github.com/shakacode/react_on_rails/pull/2489) by [user](https://github.com/user).
+      CHANGELOG
+
+      collapsed = collapse_prerelease_sections(changelog, "16.4.0", "rc")
+
+      expect(collapsed.scan(/^##### Fixed\b/).count).to eq(1)
+      expect(collapsed.scan("PR 2489").count).to eq(1)
+      expect(collapsed).to include("##### Fixed\n- **Bug fix A**")
+    end
+
     it "strips 'Changes since the last non-beta release.' marker text" do
       changelog = <<~CHANGELOG
         ### [Unreleased]

@@ -303,7 +303,7 @@ end
 # Entries are grouped by PR number; only the first occurrence is kept.
 # Multi-line entries (continuation lines not starting with "- ") are
 # kept together with their parent entry.
-# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 def deduplicate_block_entries(block)
   lines = block.lines
   first_line = lines.first&.rstrip || ""
@@ -313,17 +313,36 @@ def deduplicate_block_entries(block)
   heading = first_line
   body_lines = lines.drop(1)
 
-  # Group body lines into logical entries (each starts with "- ")
+  # Group body lines into logical entries.
+  # Keep ##### subheadings attached to the next bullet so deduplication drops
+  # both together when a duplicate PR is removed.
   entries = []
-  body_lines.each do |line|
-    next if line.strip.empty? && entries.empty?
+  pending_subheading = +""
+  current_entry = nil
 
-    if line.match?(/\A\s*- /) || entries.empty?
+  body_lines.each do |line|
+    next if line.strip.empty? && entries.empty? && pending_subheading.empty? && current_entry.nil?
+
+    if line.match?(/\A#####\s+/)
+      entries << current_entry if current_entry
+      current_entry = nil
+      pending_subheading << line
+    elsif line.match?(/\A\s*- /)
+      entries << current_entry if current_entry
+      current_entry = +"#{pending_subheading}#{line}"
+      pending_subheading = +""
+    elsif current_entry
+      current_entry << line
+    elsif pending_subheading.empty?
+      # Keep free-form prose lines as standalone entries.
       entries << line
     else
-      entries[-1] = "#{entries[-1]}#{line}"
+      pending_subheading << line
     end
   end
+
+  entries << current_entry if current_entry
+  entries << pending_subheading unless pending_subheading.empty?
 
   # Deduplicate by PR number (keep first occurrence)
   seen_prs = {}
@@ -344,7 +363,7 @@ def deduplicate_block_entries(block)
 
   "#{heading}\n#{unique_entries.join}"
 end
-# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
 # rubocop:disable Metrics/AbcSize
 def collapse_prerelease_sections(changelog, base_version, channel)
