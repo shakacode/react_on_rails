@@ -20,7 +20,7 @@ cd my-pro-app
 ```ruby
 # Append to Gemfile
 gem "shakapacker", "~> 9.5"
-gem "react_on_rails_pro", "~> 16.4"
+gem "react_on_rails_pro", "16.4.0"
 ```
 
 Since v16.4.0.rc.5, `react_on_rails_pro` automatically requires `react_on_rails` — you only need the Pro gem. On older versions, add both gems explicitly:
