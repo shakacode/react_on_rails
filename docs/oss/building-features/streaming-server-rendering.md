@@ -8,6 +8,7 @@ React on Rails Pro supports streaming server rendering using React 18's latest A
 - React 19
 - React on Rails v16.4.0 or higher
 - React on Rails Pro v16.4.0 or higher
+- Note: Pro version numbering was realigned to the core 16.x scheme; older docs may reference pre-16 aliases.
 
 ## Benefits of Streaming Server Rendering
 
