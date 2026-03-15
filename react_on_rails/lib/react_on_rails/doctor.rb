@@ -1189,11 +1189,11 @@ module ReactOnRails
 
     def resolved_webpack_config_path
       candidates = ["config/webpack/webpack.config.js"]
-      candidates.concat(Dir.glob("config/**/webpack.config.{js,ts,cjs,mjs}"))
       shakapacker_dir = shakapacker_webpack_config_directory
       if shakapacker_dir
         candidates.concat(%w[js ts cjs mjs].map { |ext| File.join(shakapacker_dir, "webpack.config.#{ext}") })
       end
+      candidates.concat(Dir.glob("config/**/webpack.config.{js,ts,cjs,mjs}"))
 
       candidates.uniq.find { |path| File.exist?(path) }
     end

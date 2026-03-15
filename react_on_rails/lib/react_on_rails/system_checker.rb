@@ -625,7 +625,7 @@ module ReactOnRails
 
     def parse_package_json
       JSON.parse(File.read(resolved_package_json_path))
-    rescue JSON::ParserError
+    rescue Errno::ENOENT, JSON::ParserError
       add_warning("⚠️  Could not parse package.json to check React dependencies")
       nil
     end
