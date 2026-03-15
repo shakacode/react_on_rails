@@ -37,17 +37,17 @@ The core React on Rails gem and npm package.
 
 ### Quick Reference
 
-| I want to...                        | Go here                                                                                   |
-| ----------------------------------- | ----------------------------------------------------------------------------------------- |
-| **Add React to existing Rails app** | [Installation Guide](./oss/getting-started/installation-into-an-existing-rails-app.md)    |
-| **Enable server-side rendering**    | [SSR Guide](./oss/core-concepts/react-server-rendering.md)                                |
-| **Set up hot reloading**            | [HMR Setup](./oss/building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
-| **Use Redux with Rails**            | [Redux Integration](./oss/building-features/react-and-redux.md)                           |
-| **Use TanStack Router**             | [TanStack Router Guide](./oss/building-features/tanstack-router.md)                       |
-| **Migrate to React Server Components** | [RSC Migration Guide](./oss/migrating/migrating-to-rsc.md)                            |
-| **Deploy to production**            | [Deployment Guide](./oss/deployment/README.md)                                            |
-| **Manage page metadata (title, meta)** | [React 19 Native Metadata](./oss/building-features/react-19-native-metadata.md)      |
-| **Troubleshoot issues**             | [Troubleshooting](./oss/deployment/troubleshooting.md)                                    |
+| I want to...                           | Go here                                                                                   |
+| -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **Add React to existing Rails app**    | [Installation Guide](./oss/getting-started/installation-into-an-existing-rails-app.md)    |
+| **Enable server-side rendering**       | [SSR Guide](./oss/core-concepts/react-server-rendering.md)                                |
+| **Set up hot reloading**               | [HMR Setup](./oss/building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
+| **Use Redux with Rails**               | [Redux Integration](./oss/building-features/react-and-redux.md)                           |
+| **Use TanStack Router**                | [TanStack Router Guide](./oss/building-features/tanstack-router.md)                       |
+| **Migrate to React Server Components** | [RSC Migration Guide](./oss/migrating/migrating-to-rsc.md)                                |
+| **Deploy to production**               | [Deployment Guide](./oss/deployment/README.md)                                            |
+| **Manage page metadata (title, meta)** | [React 19 Native Metadata](./oss/building-features/react-19-native-metadata.md)           |
+| **Troubleshoot issues**                | [Troubleshooting](./oss/deployment/troubleshooting.md)                                    |
 
 ## Pro
 
