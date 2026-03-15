@@ -8,7 +8,7 @@ This guide is for existing React on Rails Pro customers who are:
 
 - Previously using GitHub Packages authentication (private distribution)
 - On version 16.2.0-beta.x or earlier
-- Upgrading to version 16.2.0 or higher
+- Upgrading to version 16.4.0 or higher
 
 If you're a new customer, see [Installation](./installation.md) instead.
 
@@ -86,7 +86,7 @@ const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails
 - source "https://rubygems.pkg.github.com/shakacode-tools" do
 -   gem "react_on_rails_pro", "16.1.1"
 - end
-+ gem "react_on_rails_pro", "~> 16.2"
++ gem "react_on_rails_pro", "~> 16.4"
 ```
 
 Then run:
@@ -116,9 +116,9 @@ rm .npmrc
 ```diff
 {
   "dependencies": {
-+   "react-on-rails-pro": "^16.2.0",
++   "react-on-rails-pro": "^16.4.0",
 -   "@shakacode-tools/react-on-rails-pro-node-renderer": "16.1.1"
-+   "react-on-rails-pro-node-renderer": "^16.2.0"
++   "react-on-rails-pro-node-renderer": "^16.4.0"
   }
 }
 ```
@@ -214,7 +214,7 @@ If your app overrides `custom_rsc_payload_template`, make sure that override res
 
 ```bash
 bundle list | grep react_on_rails_pro
-# Should show: react_on_rails_pro (16.2.0) or higher
+# Should show: react_on_rails_pro (16.4.0) or higher
 ```
 
 #### 2. Verify NPM Package Installation
@@ -222,11 +222,11 @@ bundle list | grep react_on_rails_pro
 ```bash
 # Verify client package
 npm list react-on-rails-pro
-# Should show: react-on-rails-pro@16.2.0 or higher
+# Should show: react-on-rails-pro@16.4.0 or higher
 
 # Verify node renderer (if using)
 npm list react-on-rails-pro-node-renderer
-# Should show: react-on-rails-pro-node-renderer@16.2.0 or higher
+# Should show: react-on-rails-pro-node-renderer@16.4.0 or higher
 ```
 
 #### 3. Verify License Status
