@@ -706,6 +706,23 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.send(:shakapacker_configured?)).to be true
       end
     end
+
+    describe "#resolved_webpack_config_path" do
+      it "prefers shakapacker-configured paths over glob-discovered paths" do
+        allow(checker).to receive(:shakapacker_webpack_config_directory).and_return("config/custom")
+        allow(Dir).to receive(:glob).with("config/**/webpack.config.{js,ts,cjs,mjs}")
+                                    .and_return(["config/old/webpack.config.js"])
+
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.js").and_return(false)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.cjs").and_return(false)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.mjs").and_return(false)
+        allow(File).to receive(:exist?).with("config/old/webpack.config.js").and_return(true)
+
+        expect(checker.send(:resolved_webpack_config_path)).to eq("config/custom/webpack.config.ts")
+      end
+    end
   end
 
   describe "version reporting" do

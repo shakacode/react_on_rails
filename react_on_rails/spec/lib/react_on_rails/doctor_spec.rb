@@ -191,6 +191,23 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "webpack config path resolution" do
+    it "prefers shakapacker-configured paths over glob-discovered paths" do
+      allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return("config/custom")
+      allow(Dir).to receive(:glob).with("config/**/webpack.config.{js,ts,cjs,mjs}")
+                                  .and_return(["config/old/webpack.config.js"])
+
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/custom/webpack.config.js").and_return(false)
+      allow(File).to receive(:exist?).with("config/custom/webpack.config.ts").and_return(true)
+      allow(File).to receive(:exist?).with("config/custom/webpack.config.cjs").and_return(false)
+      allow(File).to receive(:exist?).with("config/custom/webpack.config.mjs").and_return(false)
+      allow(File).to receive(:exist?).with("config/old/webpack.config.js").and_return(true)
+
+      expect(doctor.send(:resolved_webpack_config_path)).to eq("config/custom/webpack.config.ts")
+    end
+  end
+
   describe "#check_async_usage" do
     let(:checker) { instance_double(ReactOnRails::SystemChecker) }
 
