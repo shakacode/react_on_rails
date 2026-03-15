@@ -71,6 +71,13 @@ describe RscGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
     end
 
+    it "creates react_on_rails_default layout when no compatible existing layout is found" do
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include("<%= stylesheet_pack_tag %>")
+        expect(content).to include("<%= javascript_pack_tag %>")
+      end
+    end
+
     include_examples "rsc_hello_server_files"
 
     it "adds RSC routes" do
@@ -116,6 +123,482 @@ describe RscGenerator, type: :generator do
           expect(content).to include("rscConfig")
         end
       end
+    end
+  end
+
+  context "when Pro is installed with a canonical legacy hello_world layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_canonical_pack_tag_layout("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "hello_world"
+
+    it "reuses the existing hello_world layout without creating react_on_rails_default" do
+      assert_file "app/views/layouts/hello_world.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
+  context "when Pro is installed with a canonical custom HelloWorld layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("marketing")
+      simulate_canonical_pack_tag_layout("marketing")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "marketing"
+
+    it "reuses the HelloWorldController layout when it is compatible" do
+      assert_file "app/views/layouts/marketing.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
+  context "when Pro is installed with a parenthesized HelloWorldController layout declaration" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          layout("marketing")
+
+          def index
+          end
+        end
+      RUBY
+      simulate_canonical_pack_tag_layout("marketing")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "marketing"
+
+    it "reuses the parenthesized-layout declaration target" do
+      assert_file "app/views/layouts/marketing.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
+  context "when Pro is installed with a HelloWorldController layout declaration followed by a comment" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          layout "marketing" # keep the legacy layout for the existing page
+
+          def index
+          end
+        end
+      RUBY
+      simulate_canonical_pack_tag_layout("marketing")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "marketing"
+
+    it "reuses the commented layout declaration target" do
+      assert_file "app/views/layouts/marketing.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
+  context "when Pro is installed with a symbol HelloWorldController layout declaration" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+        class HelloWorldController < ApplicationController
+          layout :marketing_layout
+
+          def index
+          end
+        end
+      RUBY
+      simulate_canonical_pack_tag_layout("marketing_layout")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "does not treat a symbol layout selector as a literal layout file name" do
+      assert_file "app/views/layouts/marketing_layout.html.erb"
+      assert_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
+  context "when Pro is installed with a named-pack hello_world layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_named_pack_tag_layout("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "hello_world"
+
+    it "reuses hello_world when it already has both pack tags" do
+      assert_file "app/views/layouts/hello_world.html.erb" do |content|
+        expect(content).to include('<%= stylesheet_pack_tag "application" %>')
+        expect(content).to include('<%= javascript_pack_tag "application" %>')
+      end
+
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
+  context "when Pro is installed with a mixed-pack react_on_rails_default layout and a canonical hello_world layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_mixed_pack_tag_layout("react_on_rails_default")
+      simulate_canonical_pack_tag_layout("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "hello_world"
+
+    it "prefers the fully canonical hello_world layout over the mixed default layout" do
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include('<%= stylesheet_pack_tag "application" %>')
+        expect(content).to include('<%= javascript_pack_tag "application" %>')
+      end
+
+      assert_file "app/views/layouts/hello_world.html.erb" do |content|
+        expect(content).to include("<%= stylesheet_pack_tag %>")
+        expect(content).to include("<%= javascript_pack_tag %>")
+      end
+    end
+  end
+
+  context "when Pro is installed with canonical pack tags containing percent signs in keyword arguments" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_existing_layout("hello_world", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag(data: { progress: "50%" }) %>
+            <%= javascript_pack_tag(data: { progress: "50%" }) %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "hello_world"
+
+    it "reuses the existing layout instead of misclassifying the pack tags as missing" do
+      assert_file "app/views/layouts/hello_world.html.erb" do |content|
+        expect(content).to include('progress: "50%"')
+      end
+
+      assert_no_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
+  context "when Pro is installed with a user-owned react_on_rails_rsc-prefixed layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_layout("react_on_rails_rsc_auth", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "does not treat user-owned react_on_rails_rsc-prefixed layouts as generator fallbacks" do
+      assert_file "app/views/layouts/react_on_rails_rsc_auth.html.erb"
+      assert_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
+  context "when Pro is installed with similarly named pack tag helpers" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_existing_layout("hello_world", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag_with_integrity "application" %>
+            <%= javascript_pack_tag_with_integrity "application" %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "does not treat similarly named helpers as the required pack tag helpers" do
+      assert_file "app/views/layouts/hello_world.html.erb" do |content|
+        expect(content).to include("javascript_pack_tag_with_integrity")
+        expect(content).to include("stylesheet_pack_tag_with_integrity")
+      end
+
+      assert_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
+  context "when Pro is installed with a named-pack react_on_rails_default layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("react_on_rails_default")
+      simulate_named_pack_tag_layout("react_on_rails_default")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "reuses react_on_rails_default when it already has both pack tags" do
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include('<%= stylesheet_pack_tag "application" %>')
+        expect(content).to include('<%= javascript_pack_tag "application" %>')
+      end
+
+      assert_no_file "app/views/layouts/react_on_rails_rsc.html.erb"
+    end
+  end
+
+  context "when Pro is installed with a hello_world layout missing a required pack tag" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_layout_missing_stylesheet_pack_tag("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "creates react_on_rails_default instead of reusing the incomplete hello_world layout" do
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include("<%= stylesheet_pack_tag %>")
+        expect(content).to include("<%= javascript_pack_tag %>")
+      end
+
+      assert_file "app/views/layouts/hello_world.html.erb" do |content|
+        expect(content).to include('<%= javascript_pack_tag "application" %>')
+        expect(content).not_to include("stylesheet_pack_tag")
+      end
+    end
+  end
+
+  context "when earlier layouts are unusable and a compatible react_on_rails_rsc layout already exists" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_layout_missing_stylesheet_pack_tag("hello_world")
+      simulate_canonical_pack_tag_layout("react_on_rails_rsc")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_rsc"
+
+    it "reuses the existing react_on_rails_rsc layout instead of minting react_on_rails_rsc_2" do
+      assert_file "app/views/layouts/react_on_rails_rsc.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_rsc_2.html.erb"
+    end
+  end
+
+  context "when earlier layouts are unusable and a compatible react_on_rails_rsc_10 layout already exists" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_hello_world_controller("hello_world")
+      simulate_layout_missing_stylesheet_pack_tag("hello_world")
+      simulate_canonical_pack_tag_layout("react_on_rails_rsc_10")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_rsc_10"
+
+    it "reuses the existing react_on_rails_rsc_10 layout instead of minting a new fallback" do
+      assert_file "app/views/layouts/react_on_rails_rsc_10.html.erb"
+      assert_no_file "app/views/layouts/react_on_rails_rsc_11.html.erb"
     end
   end
 
