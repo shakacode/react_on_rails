@@ -88,14 +88,12 @@ module GeneratorMessages
 
     def detect_package_manager
       # Check for lock files to determine package manager
-      if File.exist?("yarn.lock")
-        "yarn"
-      elsif File.exist?("pnpm-lock.yaml")
-        "pnpm"
-      else
-        # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
-        "npm"
-      end
+      return "yarn" if File.exist?("yarn.lock")
+      return "pnpm" if File.exist?("pnpm-lock.yaml")
+      return "bun" if File.exist?("bun.lock") || File.exist?("bun.lockb")
+
+      # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
+      "npm"
     end
 
     private

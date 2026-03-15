@@ -737,7 +737,18 @@ module ReactOnRails
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:bun)
+          end
+
+          it "returns :bun when bun.lock exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lock")).and_return(true)
 
             expect(described_class.detect_package_manager).to eq(:bun)
           end
@@ -747,6 +758,7 @@ module ReactOnRails
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "package-lock.json")).and_return(true)
 
@@ -758,6 +770,7 @@ module ReactOnRails
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "package-lock.json")).and_return(false)
 
