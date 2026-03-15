@@ -2144,7 +2144,8 @@ describe InstallGenerator, type: :generator do
       allow(generator).to receive(:bundler_main_config_template_path).with("base/base", ts_path).and_return(ts_template)
       allow(File).to receive(:exist?).with(ts_path).and_return(true)
       allow(File).to receive(:read).with(ts_path).and_return(stock_ts_config)
-      allow(generator).to receive(:standard_shakapacker_config?).with(stock_ts_config).and_return(true)
+      allow(generator).to receive(:standard_shakapacker_config?).with(stock_ts_config,
+                                                                      strip_comments: true).and_return(true)
       allow(generator).to receive(:remove_file)
       allow(generator).to receive(:template)
 
@@ -2168,7 +2169,8 @@ describe InstallGenerator, type: :generator do
       allow(generator).to receive(:bundler_main_config_template_path).with("base/base", ts_path).and_return(ts_template)
       allow(File).to receive(:exist?).with(ts_path).and_return(true)
       allow(File).to receive(:read).with(ts_path).and_return(custom_ts_config)
-      allow(generator).to receive(:standard_shakapacker_config?).with(custom_ts_config).and_return(false)
+      allow(generator).to receive(:standard_shakapacker_config?).with(custom_ts_config,
+                                                                      strip_comments: true).and_return(false)
       allow(generator).to receive(:react_on_rails_config?).with(custom_ts_config).and_return(false)
       allow(generator).to receive(:handle_custom_webpack_config)
 
