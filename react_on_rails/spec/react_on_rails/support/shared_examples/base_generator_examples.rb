@@ -32,6 +32,14 @@ shared_examples "base_generator_common" do
     assert_file "Procfile.dev-prod-assets", /\$\{PORT:-3001\}/
   end
 
+  it "creates react_on_rails_default layout with a polished title and empty pack tags" do
+    assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+      expect(content).to include("<title>React on Rails</title>")
+      expect(content).to include("<%= stylesheet_pack_tag %>")
+      expect(content).to include("<%= javascript_pack_tag %>")
+    end
+  end
+
   it "creates HelloWorld controller with react_on_rails_default layout" do
     assert_file "app/controllers/hello_world_controller.rb" do |content|
       expect(content).to include('layout "react_on_rails_default"')

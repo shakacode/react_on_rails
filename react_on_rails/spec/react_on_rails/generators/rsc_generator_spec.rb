@@ -396,6 +396,44 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when Pro is installed with a user-owned react_on_rails_rsc-prefixed layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_layout("react_on_rails_rsc_auth", <<~ERB)
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <%= stylesheet_pack_tag %>
+            <%= javascript_pack_tag %>
+          </head>
+          <body>
+            <%= yield %>
+          </body>
+        </html>
+      ERB
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "react_on_rails_default"
+
+    it "does not treat user-owned react_on_rails_rsc-prefixed layouts as generator fallbacks" do
+      assert_file "app/views/layouts/react_on_rails_rsc_auth.html.erb"
+      assert_file "app/views/layouts/react_on_rails_default.html.erb"
+    end
+  end
+
   context "when Pro is installed with similarly named pack tag helpers" do
     before(:all) do
       prepare_destination

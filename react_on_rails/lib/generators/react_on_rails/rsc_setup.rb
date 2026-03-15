@@ -25,6 +25,7 @@ module ReactOnRails
       DEFAULT_LAYOUT_NAME = "react_on_rails_default"
       LEGACY_LAYOUT_NAME = "hello_world"
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
+      RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_[2-9]\d*)?\z/
       MAX_LAYOUT_NAME_ATTEMPTS = 99
 
       # Main entry point for RSC setup.
@@ -564,6 +565,11 @@ module ReactOnRails
       def existing_rsc_layout_names
         Dir.glob(File.join(destination_root, "app/views/layouts/react_on_rails_rsc*.html.erb"))
            .map { |path| File.basename(path, ".html.erb") }
+           .select { |layout_name| generated_rsc_layout_name?(layout_name) }
+      end
+
+      def generated_rsc_layout_name?(layout_name)
+        layout_name.match?(RSC_GENERATED_LAYOUT_NAME_PATTERN)
       end
 
       def classify_hello_server_layout(layout_name)

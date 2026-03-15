@@ -9,6 +9,14 @@ shared_examples "rsc_common_files" do
        app/views/layouts/react_on_rails_default.html.erb].each { |file| assert_file(file) }
   end
 
+  it "creates react_on_rails_default layout with a polished title and empty pack tags" do
+    assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+      expect(content).to include("<title>React on Rails</title>")
+      expect(content).to include("<%= stylesheet_pack_tag %>")
+      expect(content).to include("<%= javascript_pack_tag %>")
+    end
+  end
+
   it "creates Pro initializer with RSC configuration" do
     assert_file "config/initializers/react_on_rails_pro.rb" do |content|
       expect(content).to include("ReactOnRailsPro.configure")
