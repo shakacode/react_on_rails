@@ -86,6 +86,18 @@ module GeneratorMessages
       MSG
     end
 
+    # Uses relative lockfile paths resolved against Dir.pwd, so callers must invoke
+    # this while the current working directory is the target Rails app root.
+    def detect_package_manager
+      # Check for lock files to determine package manager
+      return "yarn" if File.exist?("yarn.lock")
+      return "pnpm" if File.exist?("pnpm-lock.yaml")
+      return "bun" if File.exist?("bun.lock") || File.exist?("bun.lockb")
+
+      # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
+      "npm"
+    end
+
     private
 
     def build_render_example(component_name:, route:, rsc:)
@@ -196,18 +208,6 @@ module GeneratorMessages
     rescue StandardError
       # If version detection fails, don't show a warning to avoid noise
       ""
-    end
-
-    def detect_package_manager
-      # Check for lock files to determine package manager
-      if File.exist?("yarn.lock")
-        "yarn"
-      elsif File.exist?("pnpm-lock.yaml")
-        "pnpm"
-      else
-        # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
-        "npm"
-      end
     end
   end
 end
