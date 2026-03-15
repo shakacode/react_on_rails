@@ -112,14 +112,20 @@ module ReactOnRailsPro
     end
 
     def process_response_chunks(stream_response, error_body)
-      loop_response_lines(stream_response) do |chunk|
+      loop_response_chunks(stream_response) do |chunk|
         if response_has_error_status?(stream_response)
-          error_body << chunk
+          # Error responses yield raw strings (not length-prefixed)
+          error_body << (chunk.is_a?(Hash) ? chunk.to_json : chunk.to_s)
           next
         end
 
-        processed_chunk = chunk.strip
-        yield processed_chunk unless processed_chunk.empty?
+        if chunk.is_a?(Hash)
+          yield chunk
+        else
+          # Legacy NDJSON format (backward compatible with older node renderers)
+          processed_chunk = chunk.strip
+          yield processed_chunk unless processed_chunk.empty?
+        end
       end
     end
 
@@ -154,26 +160,110 @@ module ReactOnRailsPro
 
     private
 
-    # This method is considered as an override of response.each_line
-    # It fixes the problem of not yielding the last chunk on error
-    # You can check the spec of `each_line` in `spec/react_on_rails_pro/stream_spec.rb` for more details
-    def loop_response_lines(response)
-      return enum_for(__method__, response) unless block_given?
+    # Reads streaming response chunks using the length-prefixed protocol with auto-detection.
+    #
+    # Supports two formats:
+    #
+    # 1. Length-prefixed (new): metadata JSON and raw content are separated.
+    #    Wire format per chunk: <metadata JSON>\t<content byte length hex>\n<raw content bytes>
+    #    Yields Hash: { "html" => "<raw content>", "consoleReplayScript" => "...", ... }
+    #
+    # 2. NDJSON (legacy): each line is a complete JSON object.
+    #    Wire format per chunk: <JSON object>\n
+    #    Yields String (the raw JSON line, for downstream JSON.parse).
+    #
+    # Format detection: if a header line (before \n) contains \t, it's length-prefixed.
+    # JSON.stringify never produces literal \t in output (tabs are escaped as \\t),
+    # so NDJSON lines never contain raw \t bytes.
+    #
+    # The length-prefixed format avoids JSON.stringify on the HTML content (the bulk
+    # of the data), eliminating ~30% escaping overhead for typical payloads.
+    def loop_response_chunks(response, &block)
+      return enum_for(__method__, response) unless block
 
-      line = "".b
-
+      parser = LengthPrefixedParser.new
       response.each do |chunk|
         response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-        line << chunk
-
-        while (idx = line.index("\n"))
-          yield line.byteslice(0..idx - 1)
-
-          line = line.byteslice(idx + 1..-1)
-        end
+        parser.feed(chunk, &block)
       end
     ensure
-      yield line unless line.empty?
+      parser&.flush(&block)
+    end
+
+    # State machine parser for the length-prefixed streaming protocol.
+    # Buffers incoming bytes and yields complete chunks (Hash for length-prefixed,
+    # String for legacy NDJSON).
+    class LengthPrefixedParser
+      def initialize
+        @buf = "".b
+        @state = :header
+        @content_len = 0
+        @metadata = nil
+      end
+
+      def feed(chunk)
+        @buf << chunk
+
+        loop do
+          case @state
+          when :header
+            break unless (result = try_parse_header)
+
+            yield result if result.is_a?(String) # Legacy NDJSON line
+          when :content
+            break unless (result = try_read_content)
+
+            yield result
+          end
+        end
+      end
+
+      def flush
+        case @state
+        when :content
+          yield({ "html" => @buf.force_encoding("UTF-8") }.merge!(@metadata)) if @metadata
+        when :header
+          yield @buf.force_encoding("UTF-8") unless @buf.empty?
+        end
+      end
+
+      private
+
+      def try_parse_header
+        idx = @buf.index("\n")
+        return nil unless idx
+
+        header = @buf.byteslice(0, idx)
+        @buf = @buf.byteslice(idx + 1, @buf.bytesize - idx - 1) || "".b
+        tab_idx = header.index("\t")
+
+        if tab_idx
+          parse_length_prefixed_header(header, tab_idx)
+          true # Signal state changed to :content; no value to yield
+        else
+          line = header.force_encoding("UTF-8")
+          line.strip.empty? ? true : line
+        end
+      end
+
+      def parse_length_prefixed_header(header, tab_idx)
+        meta_json = header.byteslice(0, tab_idx)
+        len_hex = header.byteslice(tab_idx + 1, header.bytesize - tab_idx - 1)
+        @metadata = JSON.parse(meta_json.force_encoding("UTF-8"))
+        @content_len = len_hex.to_i(16)
+        @state = :content
+      end
+
+      def try_read_content
+        return nil if @buf.bytesize < @content_len
+
+        content = @buf.byteslice(0, @content_len)
+        @buf = @buf.byteslice(@content_len, @buf.bytesize - @content_len) || "".b
+        result = { "html" => content.force_encoding("UTF-8") }.merge!(@metadata)
+        @metadata = nil
+        @state = :header
+        result
+      end
     end
   end
 end

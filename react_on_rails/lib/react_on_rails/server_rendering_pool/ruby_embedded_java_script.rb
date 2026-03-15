@@ -81,9 +81,13 @@ module ReactOnRails
 
           return parse_result_and_replay_console_messages(result, render_options) unless render_options.streaming?
 
-          # Streamed component is returned as stream of strings.
-          # We need to parse each chunk and replay the console messages.
-          result.transform { |chunk| parse_result_and_replay_console_messages(chunk, render_options) }
+          # Streamed component is returned as stream of chunks.
+          # Chunks are either Strings (legacy NDJSON from ExecJS or old node renderers)
+          # or Hashes (length-prefixed protocol from new node renderers).
+          # We parse JSON strings and replay console messages for both formats.
+          result.transform do |chunk|
+            parse_streaming_chunk(chunk, render_options)
+          end
         end
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
@@ -224,6 +228,14 @@ module ReactOnRails
           raise ReactOnRails::Error, msg
         end
 
+        def parse_streaming_chunk(chunk, render_options)
+          if chunk.is_a?(Hash)
+            replay_console_messages_from_hash(chunk, render_options)
+          else
+            parse_result_and_replay_console_messages(chunk, render_options)
+          end
+        end
+
         def parse_result_and_replay_console_messages(result_string, render_options)
           result = nil
           begin
@@ -232,18 +244,30 @@ module ReactOnRails
             raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
           end
 
-          if render_options.logging_on_server
-            console_script = result["consoleReplayScript"]
-            console_script_lines = console_script.split("\n")
-            # Regular expression to match console.log or console.error calls with SERVER prefix
-            re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
-            console_script_lines&.each do |line|
-              match = re.match(line)
-              # Log matched messages to Rails logger with react_on_rails prefix
-              Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
-            end
-          end
+          replay_console_to_rails_logger(result, render_options)
           result
+        end
+
+        # Handles streaming chunks that are already parsed Hashes (from the length-prefixed protocol).
+        # Skips JSON.parse (already done by the protocol parser) but still replays console messages.
+        def replay_console_messages_from_hash(result, render_options)
+          replay_console_to_rails_logger(result, render_options)
+          result
+        end
+
+        def replay_console_to_rails_logger(result, render_options)
+          return unless render_options.logging_on_server
+
+          console_script = result["consoleReplayScript"]
+          return if console_script.nil? || console_script.empty?
+
+          # Regular expression to match console.log or console.error calls with SERVER prefix
+          re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+          console_script.split("\n").each do |line|
+            match = re.match(line)
+            # Log matched messages to Rails logger with react_on_rails prefix
+            Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
+          end
         end
       end
       # rubocop:enable Metrics/ClassLength

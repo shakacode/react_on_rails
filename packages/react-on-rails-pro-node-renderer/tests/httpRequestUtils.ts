@@ -98,8 +98,6 @@ export const makeRequest = (app: ReturnType<typeof buildApp>, options: Partial<R
     ':path': `/bundles/${usedBundleTimestamp}/render/454a82526211afdb215352755d36032c`,
     'content-type': `multipart/form-data; boundary=${form.getBoundary()}`,
   });
-  request.setEncoding('utf8');
-
   const buffer: string[] = [];
 
   const statusPromise = new Promise<number | undefined>((resolve) => {
@@ -125,8 +123,8 @@ export const makeRequest = (app: ReturnType<typeof buildApp>, options: Partial<R
     }, 1000);
   };
 
-  request.on('data', (data: Buffer) => {
-    buffer.push(data.toString());
+  request.on('data', (data: Buffer | string) => {
+    buffer.push(typeof data === 'string' ? data : data.toString('utf8'));
     if (resolveChunksPromise) {
       scheduleResolveChunkPromise();
     }
