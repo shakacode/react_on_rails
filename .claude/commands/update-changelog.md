@@ -323,6 +323,7 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
    - Commit CHANGELOG.md (and the skill file if it was also modified)
    - Push and open a PR with the changelog diff as the body
+   - If the push or PR creation fails, the CHANGELOG is already stamped locally — fix the issue (e.g., authentication, branch protection), then run `git push -u origin <branch>` and `gh pr create` manually
    - Remind the user to run `rake release` (no args) after merge to publish and auto-create the GitHub release
 
 ### For Prerelease Versions (RC and Beta)
