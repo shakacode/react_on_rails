@@ -70,7 +70,8 @@ describe('streamServerRenderedReactComponent', () => {
     const metadata = JSON.parse(metaJson);
     const contentLenHex = header.slice(tabIdx + 1);
     const contentLen = parseInt(contentLenHex, 16);
-    const content = text.slice(newlineIdx + 1, newlineIdx + 1 + contentLen);
+    const contentBytes = new TextEncoder().encode(text.slice(newlineIdx + 1));
+    const content = new TextDecoder().decode(contentBytes.slice(0, contentLen));
 
     return { html: content, ...metadata };
   };
@@ -84,6 +85,19 @@ describe('streamServerRenderedReactComponent', () => {
     expect(typeof parsed.isShellReady).toBe('boolean');
     return parsed;
   };
+
+  it('parses UTF-8 multibyte HTML chunks using byte length', () => {
+    const html = '<div>Olá 👋</div>';
+    const metadata = {
+      hasErrors: false,
+      isShellReady: true,
+      consoleReplayScript: '',
+    };
+    const contentLenHex = new TextEncoder().encode(html).length.toString(16);
+    const chunk = `${JSON.stringify(metadata)}\t${contentLenHex}\n${html}`;
+
+    expect(parseStreamChunk(chunk)).toEqual({ html, ...metadata });
+  });
 
   const setupStreamTest = ({
     throwSyncError = false,

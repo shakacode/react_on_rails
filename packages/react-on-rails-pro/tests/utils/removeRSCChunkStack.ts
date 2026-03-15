@@ -20,7 +20,8 @@ const parseLengthPrefixedChunk = (chunk: string): RSCPayloadChunk => {
   const metaJson = header.slice(0, tabIdx);
   const contentLenHex = header.slice(tabIdx + 1);
   const contentLen = parseInt(contentLenHex, 16);
-  const content = chunk.slice(newlineIdx + 1, newlineIdx + 1 + contentLen);
+  const contentBytes = new TextEncoder().encode(chunk.slice(newlineIdx + 1));
+  const content = new TextDecoder().decode(contentBytes.slice(0, contentLen));
   const metadata = JSON.parse(metaJson) as Omit<RSCPayloadChunk, 'html'>;
 
   return { html: content, ...metadata } as RSCPayloadChunk;
