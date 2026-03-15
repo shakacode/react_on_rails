@@ -375,10 +375,10 @@ export default function PageErrorBoundary({ children }) {
 ```jsx
 // BAD: Directive after imports
 import { useState } from 'react';
-'use client'; // Too late -- will not work
+('use client'); // Too late -- will not work
 
 // GOOD: Directive before everything (comments allowed above)
-'use client';
+('use client');
 import { useState } from 'react';
 ```
 
@@ -389,7 +389,7 @@ import { useState } from 'react';
 `use client`;
 
 // GOOD
-'use client';
+('use client');
 ```
 
 ### Confusing `'use client'` with `'use server'`
