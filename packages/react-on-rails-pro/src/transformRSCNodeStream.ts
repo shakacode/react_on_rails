@@ -30,24 +30,46 @@ import safePipe from './safePipe.ts';
  * @returns A transformed stream compatible with React's SSR runtime
  */
 export default function transformRSCStream(stream: NodeJS.ReadableStream): NodeJS.ReadableStream {
-  const decoder = new TextDecoder();
-  let lastIncompleteChunk = '';
+  let buf = Buffer.alloc(0);
+  let state: 'header' | 'content' = 'header';
+  let contentLen = 0;
 
   const htmlExtractor = new Transform({
-    transform(oneOrMoreChunks, _, callback) {
+    transform(chunk: Buffer, _, callback) {
       try {
-        const decodedChunk = lastIncompleteChunk + decoder.decode(oneOrMoreChunks as Uint8Array);
-        const separateChunks = decodedChunk.split('\n').filter((chunk) => chunk.trim() !== '');
+        buf = Buffer.concat([buf, chunk]);
 
-        if (!decodedChunk.endsWith('\n')) {
-          lastIncompleteChunk = separateChunks.pop() ?? '';
-        } else {
-          lastIncompleteChunk = '';
-        }
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          if (state === 'header') {
+            const newlineIdx = buf.indexOf(0x0a); // \n
+            if (newlineIdx < 0) break; // incomplete header
 
-        for (const chunk of separateChunks) {
-          const parsedData = JSON.parse(chunk) as { html: string };
-          this.push(parsedData.html);
+            const header = buf.subarray(0, newlineIdx);
+            buf = buf.subarray(newlineIdx + 1);
+
+            const tabIdx = header.indexOf(0x09); // \t
+            if (tabIdx >= 0) {
+              // Length-prefixed format: metadata\tcontent_length\n<raw content>
+              const lenHex = header.subarray(tabIdx + 1).toString('utf8');
+              contentLen = parseInt(lenHex, 16);
+              state = 'content';
+            } else {
+              // Legacy NDJSON format: JSON line
+              const line = header.toString('utf8');
+              if (line.trim() !== '') {
+                const parsedData = JSON.parse(line) as { html: string };
+                this.push(parsedData.html);
+              }
+            }
+          } else {
+            // state === 'content'
+            if (buf.length < contentLen) break; // incomplete content
+
+            this.push(buf.subarray(0, contentLen).toString('utf8'));
+            buf = buf.subarray(contentLen);
+            state = 'header';
+          }
         }
         callback();
       } catch (error) {
