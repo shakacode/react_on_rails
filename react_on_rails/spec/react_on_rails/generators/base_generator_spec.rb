@@ -4,6 +4,20 @@ require "ripper"
 require_relative "../support/generator_spec_helper"
 
 RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
+  describe "managed webpack template map" do
+    it "covers all webpack templates except explicitly handled files" do
+      templates_root = described_class.source_root
+      discovered_templates = Dir.glob(File.join(templates_root, "**/config/webpack/*.tt"))
+                                .map { |path| path.delete_prefix("#{templates_root}/") }
+                                .sort
+
+      explicitly_handled_templates = %w[base/base/config/webpack/webpack.config.js.tt]
+      managed_templates = described_class.const_get(:MANAGED_WEBPACK_FILE_TEMPLATES).values.uniq.sort
+
+      expect(discovered_templates - explicitly_handled_templates).to match_array(managed_templates)
+    end
+  end
+
   describe "#copy_base_files in --pretend mode" do
     let(:base_generator) { described_class.new([], { pretend: true }) }
 
@@ -102,6 +116,39 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
       expect(helper_content.scan("RSpec.configure do |config|").size).to eq(2)
       expect(helper_content).to include('config.example_status_persistence_file_path = "spec/examples.txt"')
       expect(Ripper.sexp(helper_content)).not_to be_nil
+    end
+  end
+
+  describe "#cleanup_stale_webpack_config_dir_for_rspack messaging" do
+    let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
+    let(:generator) { described_class.new([], { rspack: true }, { destination_root: destination }) }
+    let(:webpack_dir) { File.join(destination, "config/webpack") }
+
+    before do
+      FileUtils.rm_rf(destination)
+      FileUtils.mkdir_p(webpack_dir)
+    end
+
+    after do
+      FileUtils.rm_rf(destination)
+    end
+
+    it "logs a skip message when config/webpack exists but is empty" do
+      expect(generator).to receive(:say_status).with(:skip, "config/webpack (empty directory, leaving as-is)", :yellow)
+
+      generator.send(:cleanup_stale_webpack_config_dir_for_rspack)
+
+      expect(File.directory?(webpack_dir)).to be(true)
+    end
+
+    it "logs a clearer warning when only dotfiles are present" do
+      File.write(File.join(webpack_dir, ".gitkeep"), "")
+      expect(generator).to receive(:say_status)
+        .with(:warning, "Keeping config/webpack; only dotfiles found: .gitkeep", :yellow)
+
+      generator.send(:cleanup_stale_webpack_config_dir_for_rspack)
+
+      expect(File.directory?(webpack_dir)).to be(true)
     end
   end
 end
