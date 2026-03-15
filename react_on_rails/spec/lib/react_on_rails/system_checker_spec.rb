@@ -355,6 +355,27 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.messages.count).to eq(messages_count_before)
       end
     end
+
+    context "when node_modules_location points to a non-root JS workspace" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails-pro" => "^16.0.0" } }.to_json
+      end
+
+      before do
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(File).to receive(:exist?).with("client/package.json").and_return(true)
+        allow(File).to receive(:read).with("client/package.json").and_return(package_json_content)
+      end
+
+      it "reads package metadata from the configured workspace path" do
+        checker.check_react_on_rails_npm_package
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("react-on-rails-pro NPM package")
+        end).to be true
+      end
+    end
   end
 
   describe "#check_package_version_sync" do
@@ -671,6 +692,51 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
 
         expect(checker.send(:shakapacker_configured?)).to be false
+      end
+
+      it "returns true when webpack config is discovered at a custom config path" do
+        allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
+        allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.ts").and_return(true)
+        allow(Dir).to receive(:glob).with("config/**/webpack.config.{js,ts,cjs,mjs}")
+                                    .and_return(["config/custom/webpack.config.ts"])
+
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
+
+      it "prefers shakapacker-derived config candidates over the default path" do
+        allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
+        allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.js").and_return(false)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.cjs").and_return(false)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.mjs").and_return(false)
+        allow(Dir).to receive(:glob).with("config/**/webpack.config.{js,ts,cjs,mjs}").and_return([])
+        allow(checker).to receive(:shakapacker_webpack_config_directory).and_return("config/custom")
+
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
+    end
+
+    describe "#shakapacker_webpack_config_directory" do
+      it "extracts the directory from shakapacker's config file path" do
+        allow(checker).to receive(:require).with("shakapacker").and_return(true)
+        shakapacker_config = Struct.new(:assets_bundler_config_path).new(
+          "#{Rails.root}/config/custom/webpack.config.ts"
+        )
+        shakapacker_class = Class.new do
+          class << self
+            attr_accessor :config
+          end
+        end
+        stub_const("Shakapacker", shakapacker_class)
+        Shakapacker.config = shakapacker_config
+
+        expect(checker.send(:shakapacker_webpack_config_directory)).to eq("config/custom")
       end
     end
   end
