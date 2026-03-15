@@ -548,10 +548,12 @@ module ReactOnRails
       end
 
       def hello_world_controller_layout_name
-        controller_path = File.join(destination_root, "app/controllers/hello_world_controller.rb")
-        return nil unless File.exist?(controller_path)
+        return @hello_world_controller_layout_name if defined?(@hello_world_controller_layout_name)
 
-        extract_declared_layout_name(File.read(controller_path))
+        controller_path = File.join(destination_root, "app/controllers/hello_world_controller.rb")
+        @hello_world_controller_layout_name = if File.exist?(controller_path)
+                                                extract_declared_layout_name(File.read(controller_path))
+                                              end
       end
 
       def extract_declared_layout_name(controller_content)
@@ -612,8 +614,9 @@ module ReactOnRails
       end
 
       def pack_tag_without_names?(layout_content, helper_name)
-        pack_tag_arguments(layout_content, helper_name).any? do |arguments|
-          pack_tag_arguments_without_names?(arguments)
+        arguments = pack_tag_arguments(layout_content, helper_name)
+        arguments.any? && arguments.all? do |pack_tag_arguments|
+          pack_tag_arguments_without_names?(pack_tag_arguments)
         end
       end
 
@@ -662,7 +665,6 @@ module ReactOnRails
           ℹ️  Found existing layout file(s) in your app that were not reused for HelloServerController:
           #{skipped_paths}
 
-          Here, "your file" means the layout file already present in the app at the path(s) above.
           Those file(s) do not include both `stylesheet_pack_tag` and `javascript_pack_tag`, so the generator
           will create #{new_layout_path} instead of overwriting them.
           New generated layouts use empty pack tags by default.

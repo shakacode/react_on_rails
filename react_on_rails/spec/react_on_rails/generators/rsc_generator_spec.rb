@@ -319,6 +319,41 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when Pro is installed with a mixed-pack react_on_rails_default layout and a canonical hello_world layout" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_mixed_pack_tag_layout("react_on_rails_default")
+      simulate_canonical_pack_tag_layout("hello_world")
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    include_examples "rsc_hello_server_files", "hello_world"
+
+    it "prefers the fully canonical hello_world layout over the mixed default layout" do
+      assert_file "app/views/layouts/react_on_rails_default.html.erb" do |content|
+        expect(content).to include('<%= stylesheet_pack_tag "application" %>')
+        expect(content).to include('<%= javascript_pack_tag "application" %>')
+      end
+
+      assert_file "app/views/layouts/hello_world.html.erb" do |content|
+        expect(content).to include("<%= stylesheet_pack_tag %>")
+        expect(content).to include("<%= javascript_pack_tag %>")
+      end
+    end
+  end
+
   context "when Pro is installed with canonical pack tags containing percent signs in keyword arguments" do
     before(:all) do
       prepare_destination

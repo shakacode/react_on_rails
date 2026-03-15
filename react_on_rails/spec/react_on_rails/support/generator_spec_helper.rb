@@ -123,6 +123,23 @@ def simulate_named_pack_tag_layout(layout_name = "hello_world")
   )
 end
 
+def simulate_mixed_pack_tag_layout(layout_name = "hello_world")
+  simulate_existing_layout(layout_name, <<~ERB)
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <%= stylesheet_pack_tag %>
+        <%= stylesheet_pack_tag "application" %>
+        <%= javascript_pack_tag %>
+        <%= javascript_pack_tag "application" %>
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+  ERB
+end
+
 def simulate_layout_missing_stylesheet_pack_tag(layout_name = "hello_world")
   simulate_existing_layout(layout_name, <<~ERB)
     <!DOCTYPE html>
