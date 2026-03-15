@@ -306,7 +306,7 @@ def deduplicate_block_entries(block)
   # Group body lines into logical entries (each starts with "- ")
   entries = []
   body_lines.each do |line|
-    if line.match?(/\A\s*- \*\*/) || entries.empty?
+    if line.match?(/\A\s*- /) || entries.empty?
       entries << line
     else
       entries[-1] = "#{entries[-1]}#{line}"

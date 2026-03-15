@@ -286,6 +286,56 @@ RSpec.describe "update_changelog.rake helper methods" do
     end
   end
 
+  describe "#update_changelog_links" do
+    it "updates [unreleased] and adds a new version compare link" do
+      changelog = +"[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master\n" \
+                   "[16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0\n"
+
+      update_changelog_links(changelog, "16.4.0", "[16.4.0]")
+
+      expect(changelog).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0...master")
+      expect(changelog).to include("[16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0")
+    end
+
+    it "returns nil when [unreleased] compare link is absent" do
+      changelog = +"### [Unreleased]\n\nSome content\n"
+
+      result = update_changelog_links(changelog, "16.4.0", "[16.4.0]")
+
+      expect(result).to be_nil
+      expect(changelog).to eq("### [Unreleased]\n\nSome content\n")
+    end
+  end
+
+  describe "#insert_version_header" do
+    it "inserts after ### [Unreleased]" do
+      changelog = +"### [Unreleased]\n\n#### Fixed\n- A fix\n"
+
+      result = insert_version_header(changelog, "[16.4.0]", "2026-03-14")
+
+      expect(result).to be true
+      expect(changelog).to include("### [Unreleased]\n\n### [16.4.0] - 2026-03-14")
+    end
+
+    it "falls back to 'Changes since the last non-beta release.' marker" do
+      changelog = +"Changes since the last non-beta release.\n\n#### Fixed\n- A fix\n"
+
+      result = insert_version_header(changelog, "[16.4.0]", "2026-03-14")
+
+      expect(result).to be true
+      expect(changelog).to include("Changes since the last non-beta release.\n\n### [16.4.0] - 2026-03-14")
+    end
+
+    it "returns false when neither anchor is found" do
+      changelog = +"#### Fixed\n- A fix\n"
+
+      result = insert_version_header(changelog, "[16.4.0]", "2026-03-14")
+
+      expect(result).to be false
+      expect(changelog).to eq("#### Fixed\n- A fix\n")
+    end
+  end
+
   describe "#fetch_git_tags!" do
     it "refreshes local tags from origin when a remote exists" do
       Dir.mktmpdir do |dir|
