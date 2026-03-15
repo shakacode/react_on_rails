@@ -48,6 +48,7 @@ The core React on Rails gem and npm package.
 | **Deploy to production**               | [Deployment Guide](./oss/deployment/README.md)                                            |
 | **Manage page metadata (title, meta)** | [React 19 Native Metadata](./oss/building-features/react-19-native-metadata.md)           |
 | **Troubleshoot issues**                | [Troubleshooting](./oss/deployment/troubleshooting.md)                                    |
+| **Compare OSS vs Pro features**        | [OSS vs Pro](./oss/getting-started/oss-vs-pro.md)                                         |
 
 ## Pro
 
