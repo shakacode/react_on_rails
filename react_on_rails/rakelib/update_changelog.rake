@@ -271,7 +271,9 @@ def consolidate_changelog_blocks(blocks)
         # Append this block's content (lines after heading) to existing block
         idx = heading_indices[heading_key]
         content_after_heading = cleaned.lines.drop(1).join.gsub(/\A\n+/, "").rstrip
-        consolidated[idx] = "#{consolidated[idx].rstrip}\n#{content_after_heading}" unless content_after_heading.empty?
+        unless content_after_heading.empty?
+          consolidated[idx] = "#{consolidated[idx].rstrip}\n\n#{content_after_heading}"
+        end
       else
         heading_indices[heading_key] = consolidated.length
         consolidated << cleaned
@@ -296,7 +298,9 @@ def collapse_prerelease_sections(changelog, base_version, channel)
   matching_sections = sections.select { |section| section[:version].match?(target_regex) }
   return changelog if matching_sections.empty?
 
-  # Collect blocks from Unreleased and all matching prerelease sections
+  # Collect blocks from Unreleased first, then prerelease sections.
+  # Unreleased blocks come first so they are the "first seen" for each heading,
+  # and prerelease content is appended to them (Unreleased is newer).
   all_blocks = changelog_section_blocks(unreleased_section[:body]) +
                matching_sections.flat_map { |section| changelog_section_blocks(section[:body]) }
 

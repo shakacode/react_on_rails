@@ -294,18 +294,13 @@ If the user passed `release`, `rc`, `beta`, or an explicit version string as an 
 
 **For an explicit version string** (e.g., `16.5.0.rc.10`):
 
-1. Determine the mode from the version string:
-   - Contains `.rc.` -> use `rc` mode
-   - Contains `.beta.` -> use `beta` mode
-   - Otherwise -> use `release` mode
-
-2. Run the rake task with the appropriate mode:
+1. Pass the explicit version directly to the rake task:
 
    ```bash
-   bundle exec rake "update_changelog[rc]"   # or release, or beta
+   bundle exec rake "update_changelog[16.5.0.rc.10]"
    ```
 
-3. **Verify** the rake task produced the expected version. If the auto-computed version differs from the user's requested version, manually adjust the header and diff links to match the explicit version the user requested.
+2. **Verify** the stamped header and diff links match the requested version.
 
 If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
 
@@ -325,7 +320,7 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Which new entries were added
    - Which PRs were skipped (and why)
 5. If in `release`/`rc`/`beta` mode, **automatically commit, push, and open a PR**:
-   - Create a feature branch (e.g., `jg/changelog-16.4.0.rc.10`)
+   - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
    - Commit CHANGELOG.md (and the skill file if it was also modified)
    - Push and open a PR with the changelog diff as the body
    - Remind the user to run `rake release` (no args) after merge to publish and auto-create the GitHub release
