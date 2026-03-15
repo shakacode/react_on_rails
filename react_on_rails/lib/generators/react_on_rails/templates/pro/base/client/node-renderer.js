@@ -20,11 +20,10 @@ const config = {
 
   // Number of Node.js worker threads for SSR rendering
   // Set RENDERER_WORKERS_COUNT env var to override (e.g., for production tuning)
+  // Set to 0 for single-process mode (useful for debugging).
   // Legacy fallback: NODE_RENDERER_CONCURRENCY
   workersCount:
-    parseWorkersCount(env.RENDERER_WORKERS_COUNT) ??
-    parseWorkersCount(env.NODE_RENDERER_CONCURRENCY) ??
-    3,
+    parseWorkersCount(env.RENDERER_WORKERS_COUNT) ?? parseWorkersCount(env.NODE_RENDERER_CONCURRENCY) ?? 3,
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
   // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.
