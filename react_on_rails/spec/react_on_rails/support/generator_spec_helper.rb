@@ -88,6 +88,83 @@ def simulate_existing_dir(dirname)
   mkdir_p(path)
 end
 
+def simulate_existing_layout(layout_name, content)
+  simulate_existing_file("app/views/layouts/#{layout_name}.html.erb", content)
+end
+
+def simulate_layout_with_pack_tags(layout_name = "hello_world", stylesheet_tag:, javascript_tag:)
+  simulate_existing_layout(layout_name, <<~ERB)
+    <!DOCTYPE html>
+    <html>
+      <head>
+        #{stylesheet_tag}
+        #{javascript_tag}
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+  ERB
+end
+
+def simulate_canonical_pack_tag_layout(layout_name = "hello_world")
+  simulate_layout_with_pack_tags(
+    layout_name,
+    stylesheet_tag: "<%= stylesheet_pack_tag %>",
+    javascript_tag: "<%= javascript_pack_tag %>"
+  )
+end
+
+def simulate_named_pack_tag_layout(layout_name = "hello_world")
+  simulate_layout_with_pack_tags(
+    layout_name,
+    stylesheet_tag: '<%= stylesheet_pack_tag "application" %>',
+    javascript_tag: '<%= javascript_pack_tag "application" %>'
+  )
+end
+
+def simulate_mixed_pack_tag_layout(layout_name = "hello_world")
+  simulate_existing_layout(layout_name, <<~ERB)
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <%= stylesheet_pack_tag %>
+        <%= stylesheet_pack_tag "application" %>
+        <%= javascript_pack_tag %>
+        <%= javascript_pack_tag "application" %>
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+  ERB
+end
+
+def simulate_layout_missing_stylesheet_pack_tag(layout_name = "hello_world")
+  simulate_existing_layout(layout_name, <<~ERB)
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <%= javascript_pack_tag "application" %>
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+  ERB
+end
+
+def simulate_hello_world_controller(layout_name = "hello_world")
+  simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+    class HelloWorldController < ApplicationController
+      layout "#{layout_name}"
+
+      def index
+      end
+    end
+  RUBY
+end
+
 def assert_directory_with_keep_file(dir)
   assert_directory dir
   assert_file File.join(dir, ".keep")

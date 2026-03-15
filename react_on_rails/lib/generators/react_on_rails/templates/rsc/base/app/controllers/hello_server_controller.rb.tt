@@ -13,7 +13,7 @@
 # https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/
 
 class HelloServerController < ApplicationController
-  layout "hello_world"
+  layout "<%= config[:layout_name] %>"
 
   include ReactOnRailsPro::Stream
 
