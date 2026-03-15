@@ -2003,6 +2003,214 @@ describe InstallGenerator, type: :generator do
       JS
       expect(generator.send(:standard_shakapacker_config?, content)).to be false
     end
+
+    it "recognizes stock TypeScript webpack config with type import (Shakapacker 9.4+)" do
+      content = <<~TS
+        import { generateWebpackConfig } from 'shakapacker'
+        import type { Configuration } from 'webpack'
+        const webpackConfig: Configuration = generateWebpackConfig()
+        export default webpackConfig
+      TS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "recognizes stock TypeScript webpack config without type import" do
+      content = <<~TS
+        import { generateWebpackConfig } from 'shakapacker'
+        const webpackConfig = generateWebpackConfig()
+        export default webpackConfig
+      TS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "recognizes stock TypeScript configs with double quotes" do
+      content = <<~TS
+        import { generateWebpackConfig } from "shakapacker"
+        const webpackConfig = generateWebpackConfig()
+        export default webpackConfig
+      TS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "recognizes stock TypeScript rspack config with type import (Shakapacker 9.4+)" do
+      content = <<~TS
+        import { generateRspackConfig } from 'shakapacker/rspack'
+        import type { RspackOptions } from '@rspack/core'
+        const rspackConfig: RspackOptions = generateRspackConfig()
+        export default rspackConfig
+      TS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "recognizes stock TypeScript rspack config without type import" do
+      content = <<~TS
+        import { generateRspackConfig } from 'shakapacker/rspack'
+        const rspackConfig = generateRspackConfig()
+        export default rspackConfig
+      TS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be true
+    end
+
+    it "rejects customized TypeScript config with user modifications" do
+      content = <<~TS
+        import { generateWebpackConfig } from 'shakapacker'
+        import type { Configuration } from 'webpack'
+        const webpackConfig: Configuration = generateWebpackConfig()
+        webpackConfig.resolve!.extensions!.push('.graphql')
+        export default webpackConfig
+      TS
+      expect(generator.send(:standard_shakapacker_config?, content)).to be false
+    end
+  end
+
+  describe "#bundler_main_config_path" do
+    let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
+
+    context "when using webpack" do
+      let(:generator) { BaseGenerator.new([], {}, { destination_root: destination }) }
+
+      it "returns .ts path when TypeScript config exists" do
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        expect(generator.send(:bundler_main_config_path)).to eq("config/webpack/webpack.config.ts")
+      end
+
+      it "returns .js path when no TypeScript config exists" do
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
+        expect(generator.send(:bundler_main_config_path)).to eq("config/webpack/webpack.config.js")
+      end
+    end
+
+    context "when using rspack" do
+      let(:generator) { BaseGenerator.new([], { rspack: true }, { destination_root: destination }) }
+
+      it "returns .ts path when TypeScript config exists" do
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        expect(generator.send(:bundler_main_config_path)).to eq("config/rspack/rspack.config.ts")
+      end
+
+      it "returns .js path when no TypeScript config exists" do
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
+        expect(generator.send(:bundler_main_config_path)).to eq("config/rspack/rspack.config.js")
+      end
+    end
+  end
+
+  describe "#copy_webpack_main_config" do
+    let(:destination) { File.expand_path("../dummy-for-generators", __dir__) }
+    let(:generator) { BaseGenerator.new([], {}, { destination_root: destination }) }
+
+    it "uses TypeScript template when target config path ends with .ts" do
+      allow(generator).to receive(:bundler_main_config_path).and_return("config/webpack/webpack.config.ts")
+      allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
+      allow(generator).to receive(:template)
+
+      generator.send(:copy_webpack_main_config, "base/base", {})
+
+      expect(generator).to have_received(:template).with(
+        "base/base/config/webpack/webpack.config.ts.tt",
+        "config/webpack/webpack.config.ts",
+        {}
+      )
+    end
+
+    it "uses rspack template when target config path is rspack config" do
+      allow(generator).to receive(:bundler_main_config_path).and_return("config/rspack/rspack.config.ts")
+      allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
+      allow(generator).to receive(:template)
+
+      generator.send(:copy_webpack_main_config, "base/base", {})
+
+      expect(generator).to have_received(:template).with(
+        "base/base/config/webpack/rspack.config.ts.tt",
+        "config/rspack/rspack.config.ts",
+        {}
+      )
+    end
+
+    it "replaces existing stock TypeScript webpack config in place" do
+      ts_path = "config/webpack/webpack.config.ts"
+      ts_template = "base/base/config/webpack/webpack.config.ts.tt"
+      stock_ts_config = <<~TS
+        import { generateWebpackConfig } from 'shakapacker'
+        const webpackConfig = generateWebpackConfig()
+        export default webpackConfig
+      TS
+
+      allow(generator).to receive(:bundler_main_config_path).and_return(ts_path)
+      allow(generator).to receive(:bundler_main_config_template_path).with("base/base", ts_path).and_return(ts_template)
+      allow(File).to receive(:exist?).with(ts_path).and_return(true)
+      allow(File).to receive(:read).with(ts_path).and_return(stock_ts_config)
+      allow(generator).to receive(:standard_shakapacker_config?).with(stock_ts_config,
+                                                                      strip_comments: true).and_return(true)
+      allow(generator).to receive(:remove_file)
+      allow(generator).to receive(:template)
+
+      generator.send(:copy_webpack_main_config, "base/base", {})
+
+      expect(generator).to have_received(:remove_file).with(ts_path, verbose: false)
+      expect(generator).to have_received(:template).with(ts_template, ts_path, {})
+    end
+
+    it "routes existing custom TypeScript webpack config through custom replacement flow" do
+      ts_path = "config/webpack/webpack.config.ts"
+      ts_template = "base/base/config/webpack/webpack.config.ts.tt"
+      custom_ts_config = <<~TS
+        import { generateWebpackConfig } from 'shakapacker'
+        const webpackConfig = generateWebpackConfig()
+        webpackConfig.resolve?.extensions?.push('.graphql')
+        export default webpackConfig
+      TS
+
+      allow(generator).to receive(:bundler_main_config_path).and_return(ts_path)
+      allow(generator).to receive(:bundler_main_config_template_path).with("base/base", ts_path).and_return(ts_template)
+      allow(File).to receive(:exist?).with(ts_path).and_return(true)
+      allow(File).to receive(:read).with(ts_path).and_return(custom_ts_config)
+      allow(generator).to receive(:standard_shakapacker_config?).with(custom_ts_config,
+                                                                      strip_comments: true).and_return(false)
+      allow(generator).to receive(:react_on_rails_config?).with(custom_ts_config).and_return(false)
+      allow(generator).to receive(:handle_custom_webpack_config)
+
+      generator.send(:copy_webpack_main_config, "base/base", {})
+
+      expect(generator).to have_received(:handle_custom_webpack_config).with("base/base", {}, ts_path)
+    end
+  end
+
+  describe "TypeScript bundler main config templates" do
+    let(:webpack_ts_template_path) do
+      File.expand_path(
+        "../../../lib/generators/react_on_rails/templates/base/base/config/webpack/webpack.config.ts.tt",
+        __dir__
+      )
+    end
+    let(:rspack_ts_template_path) do
+      File.expand_path(
+        "../../../lib/generators/react_on_rails/templates/base/base/config/webpack/rspack.config.ts.tt",
+        __dir__
+      )
+    end
+
+    it "keeps the webpack TypeScript template compatible with Shakapacker's require-based loader" do
+      content = File.read(webpack_ts_template_path)
+
+      expect(content).to include("resolve(__dirname, `${env.nodeEnv}.js`)")
+      expect(content).to include("return require(path)")
+      expect(content).not_to include("import.meta.url")
+      expect(content).not_to include("createRequire")
+    end
+
+    it "keeps the rspack TypeScript template compatible with Shakapacker's require-based loader" do
+      content = File.read(rspack_ts_template_path)
+
+      expect(content).to include("resolve(__dirname, `${env.nodeEnv}.js`)")
+      expect(content).to include("return require(path)")
+      expect(content).not_to include("import.meta.url")
+      expect(content).not_to include("createRequire")
+    end
   end
 
   describe "#using_rspack?" do
