@@ -47,6 +47,6 @@ See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANG
 
 ## Need Help?
 
-- **Documentation:** [React on Rails Guides](https://www.shakacode.com/react-on-rails/docs/)
+- **Documentation:** [React on Rails Guides](https://reactonrails.com/docs/)
 - **Support:** [ShakaCode Forum](https://forum.shakacode.com/)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)
