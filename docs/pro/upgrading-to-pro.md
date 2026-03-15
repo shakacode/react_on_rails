@@ -1,55 +1,57 @@
 # Upgrading from React on Rails to React on Rails Pro
 
-Already using React on Rails? Switching to Pro takes three steps and under ten minutes. The change is safe, reversible, and requires no license for evaluation.
+Already using React on Rails? Upgrading to Pro is straightforward: swap the gem and npm package with their Pro equivalents, then run the Pro generator. The upgrade is safe, reversible, and free to evaluate.
 
 ## What You Get
 
 Pro adds performance and rendering features on top of everything in React on Rails OSS:
 
 - **[React Server Components](./react-server-components/tutorial.md)** - RSC with full Rails integration
-- **[Streaming SSR](./streaming-server-rendering.md)** - Progressive server rendering with React 18+
+- **[Streaming SSR](./streaming-server-rendering.md)** - Progressive server rendering with React 19
 - **[Fragment Caching](./caching.md)** - Cache rendered components and skip prop evaluation entirely
 - **Prerender Caching** ([`config.prerender_caching`](./configuration.md#example-of-configuration)) - Cache JavaScript evaluation results across requests
 - **[Node Renderer](./node-renderer/basics.md)** - Dedicated Node.js rendering server for better performance and tooling
 - **[Code Splitting](./code-splitting-loadable-components.md)** - Loadable components with SSR support
 - **[Bundle Caching](./bundle-caching.md)** - Skip redundant webpack builds during deployment
 
-All OSS features continue to work. Pro re-exports everything from the core package.
+Pro includes core React on Rails as a dependency — just swap the packages and everything continues to work.
 
 ## Three Steps to Upgrade
 
-### 1. Add the Pro gem
+### 1. Swap the gem
 
-```bash
-bundle add react_on_rails_pro --version="<gem_version>"
-```
-
-Or add it to your Gemfile directly:
+Replace `react_on_rails` with `react_on_rails_pro` in your Gemfile. Pro depends on the core gem, so you only need the Pro entry:
 
 ```ruby
-gem "react_on_rails_pro", ">= <gem_version>"
+gem "react_on_rails_pro", "~> 16.4"
 ```
 
 Then run `bundle install`.
 
-Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest version.
+Or use `bundle add`, which handles both the Gemfile edit and install:
 
-### 2. Add the Pro npm package
+```bash
+bundle add react_on_rails_pro --version="16.4.0" --strict
+```
 
-Install `react-on-rails-pro` and update your imports:
+Check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest version.
+
+### 2. Swap the npm package
+
+Replace `react-on-rails` with `react-on-rails-pro`:
 
 ```bash
 # npm
-npm install react-on-rails-pro@<npm_version> --save-exact
+npm uninstall react-on-rails && npm install react-on-rails-pro@16.4.0 --save-exact
 
 # yarn
-yarn add react-on-rails-pro@<npm_version> --exact
+yarn remove react-on-rails && yarn add react-on-rails-pro@16.4.0 --exact
 
 # pnpm
-pnpm add react-on-rails-pro@<npm_version> --save-exact
+pnpm remove react-on-rails && pnpm add react-on-rails-pro@16.4.0 --save-exact
 ```
 
-Then update your imports to use `react-on-rails-pro` instead of `react-on-rails`:
+Then update your imports:
 
 ```diff
 - import ReactOnRails from 'react-on-rails';
@@ -80,21 +82,21 @@ That's it. Your app is now running React on Rails Pro.
 If you're setting up a new app (not upgrading an existing one), use the `--pro` flag:
 
 ```bash
-bundle add react_on_rails_pro --version="<gem_version>"
+bundle add react_on_rails_pro --version="16.4.0" --strict
 bundle exec rails generate react_on_rails:install --pro
 ```
 
-## Licensing
+## Try Pro Risk-Free
 
-React on Rails Pro is **free for evaluation and non-production use**. No license token is needed for local development, testing, CI/CD, or staging environments.
+React on Rails Pro is **free to try** — no license token is needed for local development, testing, CI/CD, or staging environments. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
 
-A paid license is required only for production deployments. Set the token as an environment variable:
+A paid license is only required for production deployments. Visit [pro.reactrails.com](https://pro.reactrails.com/) for pricing and to get started. When you're ready, set the token as an environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 ```
 
-Startups or teams without budget: email [justin@shakacode.com](mailto:justin@shakacode.com) and we'll work with you. For larger companies, your license supports continued development of the open-source project.
+If you're a startup or team with limited budget, don't let cost be a barrier — email [justin@shakacode.com](mailto:justin@shakacode.com) and we'll work something out. For larger companies, your license supports continued development of the open-source project.
 
 See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md) for complete license configuration.
 
@@ -102,7 +104,7 @@ See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/r
 
 Switching to Pro is safe to reverse. To go back to OSS:
 
-1. Remove `react_on_rails_pro` from your Gemfile and run `bundle install`
+1. Replace `react_on_rails_pro` with `react_on_rails` in your Gemfile and run `bundle install`
 2. Replace `react-on-rails-pro` with `react-on-rails` in package.json and update imports
 3. Remove the Pro initializer (`config/initializers/react_on_rails_pro.rb`)
 
