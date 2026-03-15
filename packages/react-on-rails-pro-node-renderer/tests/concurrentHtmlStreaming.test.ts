@@ -2,11 +2,10 @@ import { randomUUID } from 'crypto';
 import { createClient } from 'redis';
 import parser from 'node-html-parser';
 
-// eslint-disable-next-line import/no-relative-packages
-import { RSCPayloadChunk } from '../../react-on-rails/lib/types';
 import buildApp from '../src/worker';
 import { createTestConfig } from './testingNodeRendererConfigs';
 import { makeRequest } from './httpRequestUtils';
+import { LengthPrefixedStreamParser } from './parseLengthPrefixedStream';
 
 const { config } = createTestConfig('concurrentHtmlStreaming');
 const app = buildApp(config);
@@ -33,10 +32,9 @@ const sendRedisItemValue = async (redisRequestId: string, itemIndex: number, val
 };
 
 const extractHtmlFromChunks = (chunks: string) => {
-  const html = chunks
-    .split('\n')
-    .map((chunk) => (chunk.trim().length > 0 ? (JSON.parse(chunk) as RSCPayloadChunk).html : chunk))
-    .join('');
+  const streamParser = new LengthPrefixedStreamParser();
+  streamParser.feed(chunks);
+  const html = streamParser.htmlChunks.join('');
   const parsedHtml = parser.parse(html);
   // TODO: investigate why ReactOnRails produces different RSC payload on each request
   parsedHtml.querySelectorAll('script').forEach((x) => x.remove());

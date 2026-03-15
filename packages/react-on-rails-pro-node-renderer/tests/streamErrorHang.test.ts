@@ -8,6 +8,7 @@
  */
 
 import fs from 'fs';
+import { LengthPrefixedStreamParser } from './parseLengthPrefixedStream';
 import path from 'path';
 import http2 from 'http2';
 import FormData from 'form-data';
@@ -69,7 +70,7 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
     });
     request.setEncoding('utf8');
 
-    const chunks: string[] = [];
+    const parser = new LengthPrefixedStreamParser();
     let status: number | undefined;
     let settled = false;
 
@@ -78,11 +79,7 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
     });
 
     request.on('data', (data: string) => {
-      const decoded = data
-        .split('\n')
-        .map((c) => c.trim())
-        .filter((c) => c.length > 0);
-      chunks.push(...decoded);
+      parser.feed(data);
     });
 
     form.pipe(request);
@@ -92,7 +89,7 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
       if (settled) return;
       settled = true;
       client.destroy();
-      resolve({ status, chunks, timedOut });
+      resolve({ status, chunks: parser.htmlChunks, timedOut });
     };
 
     const timeout = setTimeout(() => finish(true), timeoutMs);
