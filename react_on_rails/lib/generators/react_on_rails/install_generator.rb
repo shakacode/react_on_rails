@@ -332,8 +332,7 @@ module ReactOnRails
       end
 
       def incomplete_installation_message
-        package_manager = GeneratorMessages.send(:detect_package_manager)
-        package_install_step = package_manager ? "#{package_manager} install" : "install JavaScript dependencies"
+        package_install_step = "#{GeneratorMessages.detect_package_manager} install"
 
         <<~MSG
 

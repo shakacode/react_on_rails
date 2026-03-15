@@ -209,5 +209,6 @@ module GeneratorMessages
         "npm"
       end
     end
+    public :detect_package_manager
   end
 end

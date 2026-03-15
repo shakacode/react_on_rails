@@ -1686,15 +1686,15 @@ describe InstallGenerator, type: :generator do
       expect(output_text).not_to include("📋 QUICK START:")
     end
 
-    specify "incomplete-installation guidance has a fallback install step when package manager is unknown" do
+    specify "incomplete-installation guidance uses detected package manager install command" do
       install_generator = described_class.new
       install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
-      allow(GeneratorMessages).to receive(:detect_package_manager).and_return(nil)
+      allow(GeneratorMessages).to receive(:detect_package_manager).and_return("pnpm")
 
       install_generator.send(:add_post_install_message)
       output_text = GeneratorMessages.output.join("\n")
 
-      expect(output_text).to include("install JavaScript dependencies")
+      expect(output_text).to include("pnpm install")
     end
   end
 
