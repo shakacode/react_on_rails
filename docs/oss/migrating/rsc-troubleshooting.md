@@ -372,24 +372,32 @@ export default function PageErrorBoundary({ children }) {
 
 ### Must Be at the Very Top
 
-```jsx
-// BAD: Directive after imports
-import { useState } from 'react';
-('use client'); // Too late -- will not work
+**BAD:** Directive after imports
 
-// GOOD: Directive before everything (comments allowed above)
-('use client');
+```text
+import { useState } from 'react';
+'use client'; // Too late -- will not work
+```
+
+**GOOD:** Directive before everything (comments allowed above)
+
+```jsx
+'use client';
 import { useState } from 'react';
 ```
 
 ### Must Use Quotes, Not Backticks
 
-```jsx
-// BAD
-`use client`;
+**BAD:**
 
-// GOOD
-('use client');
+```text
+`use client`;
+```
+
+**GOOD:**
+
+```jsx
+'use client';
 ```
 
 ### Confusing `'use client'` with `'use server'`
