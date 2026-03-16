@@ -207,7 +207,7 @@ def cleanup_collapsed_prerelease_links(changelog, base_version)
   # Find the "from" version in prerelease links that points to a non-prerelease (stable) version
   stable_from = nil
   changelog.scan(/^\[#{prerelease_pattern}\]:\s*#{compare_prefix}(\S+)\.\.\./i) do |from_version,|
-    stable_from = from_version unless from_version.match?(prerelease_pattern)
+    stable_from = from_version unless from_version.delete_prefix("v").match?(prerelease_pattern)
   end
 
   if stable_from
@@ -430,8 +430,8 @@ def update_changelog_links(changelog, version, anchor)
   return unless match_data
 
   prev_version = match_data[:prev_version]
-  new_unreleased_link = "#{compare_link_prefix}/#{version}...master"
-  new_version_link = "#{anchor}: #{compare_link_prefix}/#{prev_version}...#{version}"
+  new_unreleased_link = "#{compare_link_prefix}/v#{version}...master"
+  new_version_link = "#{anchor}: #{compare_link_prefix}/#{prev_version}...v#{version}"
   changelog.sub!(match_data[0], "#{new_unreleased_link}\n#{new_version_link}")
 end
 
