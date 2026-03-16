@@ -10,7 +10,7 @@ Choose **React on Rails** when you want Rails and React tightly integrated, you 
 
 Choose **Hotwire/Turbo** when Rails-rendered HTML is still your preferred model and you only need modest JavaScript sprinkles or progressive enhancement.
 
-Choose **Inertia Rails** when you want a page-oriented SPA workflow with Rails controllers and Vite, and you are comfortable making the frontend shell the main rendering model.
+Choose **Inertia Rails** when you want a page-oriented SPA workflow with Rails controllers, and you are comfortable making the frontend shell the main rendering model.
 
 Choose **react-rails** when you want a smaller helper-based integration for embedding React components in Rails views and do not need the broader React on Rails feature set.
 
@@ -58,7 +58,7 @@ react-rails is a good baseline comparison because it also helps you render React
 
 react-rails is lighter-weight and helper-oriented. It can be a reasonable choice if you mostly need to mount React components in Rails views and want to keep the surrounding integration simple.
 
-React on Rails goes further on the Rails + React integration story: generator workflows, Shakapacker-first tooling, server rendering support, richer integration patterns, and a clearer path to advanced features through React on Rails Pro.
+React on Rails goes further on the Rails + React integration story: generator workflows, flexible bundler support (Shakapacker/webpack, Rspack, or Vite), server rendering support, richer integration patterns, and a clearer path to advanced features through React on Rails Pro.
 
 Choose react-rails if your requirement is "mount React in Rails with minimal ceremony."
 
@@ -66,7 +66,7 @@ Choose React on Rails if your requirement is "treat React as a first-class front
 
 Official docs:
 
-- [react-rails README](https://github.com/reactjs/react-rails)
+- [react-rails README](https://github.com/shakacode/react-rails)
 
 ## Common Decision Patterns
 
