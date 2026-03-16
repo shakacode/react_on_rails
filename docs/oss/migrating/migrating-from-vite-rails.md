@@ -19,7 +19,7 @@ Before you start, make sure the current app still installs cleanly on the Ruby a
 
 - If `bundle install` fails on older native gems such as `pg`, `nio4r`, `mysql2`, or `msgpack`, refresh those gems or use the Ruby version already pinned by the app before introducing React on Rails.
 - If the app has an older Bundler-era lockfile, refresh that lockfile first.
-- If the repo uses Yarn and has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example: `"packageManager": "yarn@1.22.22"`.
+- If the repo uses Yarn and has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example for Yarn Classic: `npm pkg set packageManager="yarn@1.22.22"` (or add the field manually). Use the version that matches your project's Yarn installation.
 - The React on Rails install generator boots the full app. Make sure `config/database.yml` exists and any required env vars for initializers are set before you run it.
 - Commit or stash your current work so the generator diff is easier to review.
 
@@ -45,18 +45,27 @@ For anything beyond a tiny app, prefer a route-by-route cutover instead of a big
 ```bash
 bundle add shakapacker --strict
 bundle add react_on_rails --strict
-bundle exec rails generate react_on_rails:install
 ```
 
-If you use Yarn and `package.json` does not already declare it, set the package manager before running the generator:
+## 2. Declare the package manager if needed
+
+If you use Yarn and `package.json` does not already declare it, set the package manager before running the generator. This only updates `package.json`; it does not install or switch Yarn for you.
 
 ```bash
 npm pkg set packageManager="yarn@1.22.22"
 ```
 
+If you prefer, add the same field manually in `package.json`. The example above is for Yarn Classic; use the version that matches your project.
+
+## 3. Run the generator
+
+```bash
+bundle exec rails generate react_on_rails:install
+```
+
 The generator adds the React on Rails initializer, `bin/dev`, Shakapacker config, example routes, and the server bundle entrypoint.
 
-## 2. Replace Vite layout tags
+## 4. Replace Vite layout tags
 
 A typical Vite layout looks like this:
 
@@ -76,7 +85,7 @@ React on Rails + Shakapacker layouts use pack tags instead:
 
 These empty pack tags are the default for React on Rails auto-bundling — React on Rails injects component-specific bundles per page. If you use a manual entrypoint instead (non-auto-bundling), pass the pack name explicitly, e.g. `javascript_pack_tag "application"`.
 
-## 3. Move frontend code into the React on Rails structure
+## 5. Move frontend code into the React on Rails structure
 
 A common Vite layout is:
 
@@ -101,7 +110,7 @@ For auto-bundling, move page-level components into a `ror_components` directory,
 app/javascript/src/Hero/ror_components/Hero.client.jsx
 ```
 
-## 4. Replace client bootstraps with Rails view rendering
+## 6. Replace client bootstraps with Rails view rendering
 
 Vite apps often mount React manually from an entrypoint:
 
@@ -117,7 +126,7 @@ With React on Rails, render the component from the Rails view instead:
 
 This is the key mental model shift: Rails decides where the component mounts, and React on Rails handles registration and hydration.
 
-## 5. Replace Vite-specific asset and env usage
+## 7. Replace Vite-specific asset and env usage
 
 ### `vite_asset_path`
 
@@ -135,7 +144,7 @@ Vite-specific `import.meta.env` usage needs to be replaced. In a React on Rails 
 - `railsContext` for request-aware values
 - `process.env` in server-rendered bundles (available natively in Node); for client bundles, values must be injected via webpack's `DefinePlugin` or `EnvironmentPlugin`
 
-## 6. Replace the development workflow
+## 8. Replace the development workflow
 
 Vite apps usually have a dev command like:
 
@@ -153,7 +162,7 @@ bin/rails db:prepare
 bin/dev
 ```
 
-## 7. Remove Vite once parity is confirmed
+## 9. Remove Vite once parity is confirmed
 
 After the new React on Rails entrypoints are working, remove:
 

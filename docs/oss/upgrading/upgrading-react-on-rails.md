@@ -34,7 +34,7 @@ Before changing versions, check these first:
 4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.
 5. **Native gem age**: older `pg`, `nio4r`, `mysql2`, or `msgpack` versions can fail on current Ruby or macOS before the React on Rails upgrade even begins.
 6. **App boot readiness**: the install generator boots the full Rails app. Make sure `config/database.yml` exists and required env vars for initializers are set.
-7. **Package manager metadata**: if the repo has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example: `"packageManager": "yarn@1.22.22"`.
+7. **Package manager metadata**: if the repo has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example for Yarn Classic: `npm pkg set packageManager="yarn@1.22.22"` (or add the field manually). Use the version that matches your project's Yarn installation.
 8. **Version pinning**: use exact gem and npm package versions for React on Rails-related packages. Avoid `^`, `~`, or `*`.
 
 If your app is both Ruby/Bundler-old and Webpacker-old, do those upgrades first. Trying to jump directly from a Rails 5 / Webpacker 3 / Bundler 1 stack to current React on Rails is usually more than one migration.

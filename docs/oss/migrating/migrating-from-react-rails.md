@@ -12,7 +12,7 @@ Before swapping gems, check these first:
 2. **Bundler age**: some older `react-rails` apps still carry Bundler 1.x lockfiles. Those can fail on modern Ruby before you even reach the migration work.
 3. **Native gem age**: older lockfiles often pin `nio4r`, `pg`, or `mysql2` versions that fail to compile on current macOS and Ruby before the migration even starts.
 4. **App boot readiness**: the React on Rails install generator boots the full Rails app. Make sure `config/database.yml` exists and required env vars for initializers are set.
-5. **Package manager metadata**: if the repo has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example: `"packageManager": "yarn@1.22.22"`.
+5. **Package manager metadata**: if the repo has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example for Yarn Classic: `npm pkg set packageManager="yarn@1.22.22"` (or add the field manually). Use the version that matches your project's Yarn installation.
 6. **Rails age**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 / Webpacker 3 apps are usually a staged migration, not a one-command migration.
 
 If you are already on `shakapacker` 7+ and React 18+, the migration is mostly about helper syntax, component registration, and generated defaults.
@@ -29,7 +29,7 @@ If the first failure is a native gem compile error, solve that before swapping t
 1. Update Deps
    1. Replace `react-rails` in `Gemfile` with `react_on_rails` and make sure `shakapacker` is present.
    2. Remove `react_ujs` from `package.json`.
-   3. If the repo uses Yarn and `package.json` does not already declare it, add `"packageManager": "yarn@1.22.22"` before booting the app with Shakapacker 9.
+   3. If the repo uses Yarn and `package.json` does not already declare it, add the package manager field before booting the app with Shakapacker 9: `npm pkg set packageManager="yarn@1.22.22"` (or add it manually to `package.json`). The example is for Yarn Classic; use the version that matches your project.
    4. Run `bundle install` and your package manager's install command.
    5. Commit changes.
 
