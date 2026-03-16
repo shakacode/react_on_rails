@@ -79,6 +79,10 @@ module ReactOnRails
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
+      STOCK_RAILS_BIN_DEV = <<~RUBY
+        #!/usr/bin/env ruby
+        exec "./bin/rails", "server", *ARGV
+      RUBY
 
       # Main generator entry point
       #
@@ -190,8 +194,9 @@ module ReactOnRails
       def installation_prerequisites_met?
         # Check uncommitted_changes? before missing_pro_gem? so that
         # auto-install does not mutate the Gemfile on a dirty working tree.
-        !(missing_node? || missing_package_manager? ||
-          ReactOnRails::GitUtils.uncommitted_changes?(GeneratorMessages) || missing_pro_gem?)
+        ReactOnRails::GitUtils.warn_if_uncommitted_changes(GeneratorMessages)
+
+        !(missing_node? || missing_package_manager? || missing_pro_gem?)
       end
 
       def missing_node?
@@ -277,6 +282,8 @@ module ReactOnRails
       end
 
       def add_bin_scripts
+        replace_stock_rails_bin_dev!
+
         # Copy bin scripts from templates
         template_bin_path = "#{__dir__}/templates/base/base/bin"
         directory template_bin_path, "bin"
@@ -301,6 +308,19 @@ module ReactOnRails
         files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename}" }
 
         File.chmod(0o755, *files_to_become_executable)
+      end
+
+      def replace_stock_rails_bin_dev!
+        return unless stock_rails_bin_dev?
+
+        say_status :replace, "Detected stock Rails bin/dev; installing React on Rails bin/dev", :yellow
+        remove_file "bin/dev", verbose: false
+      end
+
+      def stock_rails_bin_dev?
+        return false unless File.exist?("bin/dev")
+
+        File.read("bin/dev").strip == STOCK_RAILS_BIN_DEV.strip
       end
 
       def add_post_install_message
