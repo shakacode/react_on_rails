@@ -160,7 +160,7 @@ bundle exec rake "update_changelog[beta]"      # stamp next beta version
 
 The rake task handles:
 
-- Auto-computing the next version from changelog headings and git tags
+- Auto-computing the next version from git tags (prerelease index is determined solely from tags, not changelog headers)
 - Inserting the version header right after `### [Unreleased]`
 - Updating version diff links at the bottom of the file
 - For `rc`/`beta` modes: collapsing prior prerelease sections of the same base version into a single section
