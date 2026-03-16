@@ -63,6 +63,8 @@ exclude = [
   '^https://redux\.js\.org/?$',            # Intermittent connection resets from CI
   '^https://angularjs\.org/?$',            # Connection failed from CI
   '^https://frigade\.com/blog/bundle-size-reduction-with-rsc-and-frigade/?$', # Connection failed from CI
+  '^https://tanstack\.com/router',           # Connection failed from CI
+  '^https://lodash\.com',                    # Connection reset from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE

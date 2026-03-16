@@ -7,12 +7,12 @@ Already using React on Rails? Upgrading to Pro is straightforward: swap the gem 
 Pro adds performance and rendering features on top of everything in React on Rails OSS:
 
 - **[React Server Components](./react-server-components/tutorial.md)** - RSC with full Rails integration
-- **[Streaming SSR](./streaming-server-rendering.md)** - Progressive server rendering with React 19
-- **[Fragment Caching](./caching.md)** - Cache rendered components and skip prop evaluation entirely
-- **Prerender Caching** ([`config.prerender_caching`](./configuration.md#example-of-configuration)) - Cache JavaScript evaluation results across requests
-- **[Node Renderer](./node-renderer/basics.md)** - Dedicated Node.js rendering server for better performance and tooling
-- **[Code Splitting](./code-splitting-loadable-components.md)** - Loadable components with SSR support
-- **[Bundle Caching](./bundle-caching.md)** - Skip redundant webpack builds during deployment
+- **[Streaming SSR](../oss/building-features/streaming-server-rendering.md)** - Progressive server rendering with React 19
+- **[Fragment Caching](../oss/building-features/caching.md)** - Cache rendered components and skip prop evaluation entirely
+- **Prerender Caching** ([`config.prerender_caching`](../oss/configuration/configuration-pro.md#example-of-configuration)) - Cache JavaScript evaluation results across requests
+- **[Node Renderer](../oss/building-features/node-renderer/basics.md)** - Dedicated Node.js rendering server for better performance and tooling
+- **[Code Splitting](../oss/building-features/code-splitting.md)** - Loadable components with SSR support
+- **[Bundle Caching](../oss/building-features/bundle-caching.md)** - Skip redundant webpack builds during deployment
 
 Pro includes core React on Rails as a dependency — just swap the packages and everything continues to work.
 
@@ -118,6 +118,6 @@ Pro-only features (fragment caching, Node renderer, RSC) will stop working, but 
 ## Next Steps
 
 - [Installation reference](./installation.md) - Detailed manual installation steps
-- [Configuration](./configuration.md) - All Pro configuration options
+- [Configuration](../oss/configuration/configuration-pro.md) - All Pro configuration options
 - [Upgrading Pro versions](./updating.md) - Upgrading between Pro versions
 - [React Server Components](./react-server-components/tutorial.md) - Get started with RSC

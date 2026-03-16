@@ -15,7 +15,7 @@ See [Installation](../../../pro/installation.md).
 
 **node-renderer** is a standalone Node application to serve React SSR requests from a **Rails** client. You don't need any **Ruby** code to setup and launch it. You can configure with the command line or with a launch file.
 
-> **Generator shortcut:** Running `rails generate react_on_rails:install --pro` (or `rails generate react_on_rails:pro` for existing apps) automatically creates `client/node-renderer.js`, adds the Node Renderer process to `Procfile.dev`, and installs the required npm packages. See [Installation](../installation.md) for details. The manual setup below is for apps that need custom configuration.
+> **Generator shortcut:** Running `rails generate react_on_rails:install --pro` (or `rails generate react_on_rails:pro` for existing apps) automatically creates `client/node-renderer.js`, adds the Node Renderer process to `Procfile.dev`, and installs the required npm packages. See [Installation](../../../pro/installation.md) for details. The manual setup below is for apps that need custom configuration.
 
 ## Simple Command Line for node-renderer
 
