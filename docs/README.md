@@ -19,6 +19,7 @@ The core React on Rails gem and npm package.
 **Experienced developers:**
 
 - [Installation Guide](./oss/getting-started/installation-into-an-existing-rails-app.md) - Add to existing Rails app
+- [Compare React on Rails to alternatives](./oss/getting-started/comparing-react-on-rails-to-alternatives.md) - Evaluate Hotwire, Inertia Rails, and react-rails
 - [API Reference](./oss/api-reference/view-helpers-api.md) - View helpers and JavaScript API
 - [Configuration](./oss/configuration/README.md) - All configuration options
 - [Core Concepts](./oss/core-concepts/how-react-on-rails-works.md) - Architecture and SSR
@@ -41,6 +42,7 @@ The core React on Rails gem and npm package.
 | I want to...                           | Go here                                                                                   |
 | -------------------------------------- | ----------------------------------------------------------------------------------------- |
 | **Add React to existing Rails app**    | [Installation Guide](./oss/getting-started/installation-into-an-existing-rails-app.md)    |
+| **Compare Rails + frontend options**   | [Comparison Guide](./oss/getting-started/comparing-react-on-rails-to-alternatives.md)     |
 | **Enable server-side rendering**       | [SSR Guide](./oss/core-concepts/react-server-rendering.md)                                |
 | **Set up hot reloading**               | [HMR Setup](./oss/building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
 | **Use Redux with Rails**               | [Redux Integration](./oss/building-features/react-and-redux.md)                           |
