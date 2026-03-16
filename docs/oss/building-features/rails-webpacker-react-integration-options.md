@@ -1,5 +1,7 @@
 # Shakapacker (Rails/Webpacker) React Integration Options
 
+> **Looking for a comparison of React on Rails with alternatives like Inertia.js, Hotwire, and react-rails?** See [Comparison with Alternatives](../getting-started/comparison-with-alternatives.md).
+
 You only _need_ props hydration if you need SSR. However, there's no good reason to
 have your app make a second round trip to the Rails server to get initialization props.
 
