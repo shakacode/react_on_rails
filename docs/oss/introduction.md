@@ -42,6 +42,8 @@ Unlike a separate SPA approach, React on Rails lets you leverage Rails conventio
 
 - ❌ You're building a standalone SPA with a separate API backend
 
+For a detailed comparison with Inertia.js, Hotwire, and react-rails, see [Comparison with Alternatives](./getting-started/comparison-with-alternatives.md).
+
 ## Getting Started
 
 Choose your path based on your situation:
