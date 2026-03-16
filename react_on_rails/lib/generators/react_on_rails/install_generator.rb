@@ -322,6 +322,7 @@ module ReactOnRails
         GeneratorMessages.add_info(GeneratorMessages.helpful_message_after_installation(
                                      component_name: component_name,
                                      route: route,
+                                     pro: use_pro?,
                                      rsc: use_rsc?,
                                      shakapacker_just_installed: shakapacker_just_installed?
                                    ))

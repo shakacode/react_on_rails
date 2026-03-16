@@ -3,6 +3,9 @@
 require "rainbow"
 
 module GeneratorMessages
+  PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
+                     "\n       docs/pro/upgrading-to-pro.md"
+
   class << self
     def output
       @output ||= []
@@ -40,14 +43,15 @@ module GeneratorMessages
       @output = []
     end
 
-    def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", rsc: false,
-                                           shakapacker_just_installed: false)
+    def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", pro: false,
+                                           rsc: false, shakapacker_just_installed: false)
       process_manager_section = build_process_manager_section
       testing_section = build_testing_section
       package_manager = detect_package_manager
       shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed)
       render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
       render_label = build_render_label(route: route, rsc: rsc)
+      pro_hint = pro || rsc ? "" : PRO_UPGRADE_HINT
 
       <<~MSG
 
@@ -82,7 +86,7 @@ module GeneratorMessages
         • Documentation: #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
         • Webpack customization: #{Rainbow('https://github.com/shakacode/shakapacker#webpack-configuration').cyan.underline}
 
-        💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}
+        💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}#{pro_hint}
       MSG
     end
 
@@ -133,10 +137,7 @@ module GeneratorMessages
     end
 
     def build_testing_section
-      # Check if we have any spec files to determine if testing setup is needed
-      has_spec_files = File.exist?("spec/rails_helper.rb") || File.exist?("spec/spec_helper.rb")
-
-      return "" if has_spec_files
+      return "" if File.exist?("spec/rails_helper.rb") || File.exist?("spec/spec_helper.rb")
 
       <<~TESTING
 
@@ -160,7 +161,6 @@ module GeneratorMessages
 
     def build_shakapacker_status_section(shakapacker_just_installed: false)
       version_warning = check_shakapacker_version_warning
-
       if shakapacker_just_installed
         base = <<~SHAKAPACKER
 
@@ -179,18 +179,13 @@ module GeneratorMessages
     end
 
     def check_shakapacker_version_warning
-      # Try to detect Shakapacker version from Gemfile.lock
       return "" unless File.exist?("Gemfile.lock")
 
-      gemfile_lock_content = File.read("Gemfile.lock")
-      shakapacker_match = gemfile_lock_content.match(/shakapacker \((\d+\.\d+\.\d+)\)/)
-
+      shakapacker_match = File.read("Gemfile.lock").match(/shakapacker \((\d+\.\d+\.\d+)\)/)
       return "" unless shakapacker_match
 
       version = shakapacker_match[1]
-      major_version = version.split(".").first.to_i
-
-      if major_version < 8
+      if version.split(".").first.to_i < 8
         <<~WARNING
 
           ⚠️  #{Rainbow('IMPORTANT: Upgrade Recommended').yellow.bold}
