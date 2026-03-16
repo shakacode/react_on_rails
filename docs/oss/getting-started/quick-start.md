@@ -26,14 +26,17 @@ Add the React on Rails gem and run its installer:
 # Add the gem
 bundle add react_on_rails --strict
 
-# Commit your changes (required for generator)
-git add . && git commit -m "Add react_on_rails gem"
+# Optional but recommended: commit or stash first for easier diff review
+# git add . && git commit -m "Prepare for React on Rails install"
 
-# Run the installer
-bin/rails generate react_on_rails:install
+# Run the installer for TypeScript
+bundle exec rails generate react_on_rails:install --typescript
 
-# Optional: Use Rspack for ~20x faster builds
-# bin/rails generate react_on_rails:install --rspack
+# Optional: Use Rspack for faster builds
+# bundle exec rails generate react_on_rails:install --typescript --rspack
+
+# For JavaScript instead of TypeScript, omit --typescript
+# bundle exec rails generate react_on_rails:install
 ```
 
 Take a look at the files created by the generator.
@@ -175,6 +178,7 @@ Now that you have React on Rails working, here's what to explore next:
 1. **[Using React on Rails](./using-react-on-rails.md)** - Core concepts explained
 2. **[View Helpers API](../api-reference/view-helpers-api.md)** - Learn all the options for `react_component`
 3. **[Hot Module Replacement](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Optimize your dev workflow
+4. **[Compare React on Rails to alternatives](./comparing-react-on-rails-to-alternatives.md)** - Evaluate Hotwire, Inertia Rails, and react-rails
 
 ### Dive Deeper
 
