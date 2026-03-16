@@ -1298,7 +1298,6 @@ RSpec.describe ReactOnRails::Doctor do
       it "prefers shakapacker-derived webpack config candidates over the default path" do
         allow(File).to receive(:exist?).and_return(false)
         allow(File).to receive(:exist?).with("config/custom/webpack.config.ts").and_return(true)
-        allow(Dir).to receive(:glob).with("config/**/webpack.config.{js,ts,cjs,mjs}").and_return([])
         allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return("config/custom")
 
         expect(doctor.send(:resolved_webpack_config_path)).to eq("config/custom/webpack.config.ts")

@@ -24,7 +24,6 @@ module ReactOnRails
       end
 
       candidates << "config/webpack/webpack.config.js"
-      candidates.concat(Dir.glob("config/**/webpack.config.{js,ts,cjs,mjs}"))
       candidates.uniq
     end
 
