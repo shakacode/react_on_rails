@@ -22,7 +22,7 @@ Consult the [Rails Guide on Caching](http://guides.rubyonrails.org/caching_with_
 - [Determination of Cache Keys](http://guides.rubyonrails.org/caching_with_rails.html#cache-keys)
 - [Caching in Development](http://guides.rubyonrails.org/caching_with_rails.html#caching-in-development): **To toggle caching in development**, run `rails dev:cache`.
 
-### Tracing
+## Tracing
 
 If tracing is turned on in your config/initializers/react_on_rails_pro.rb, you'll see timing log messages that begin with `[ReactOnRailsPro:1234]: exec_server_render_js` where 1234 is the process id and `exec_server_render_js` could be a different method being traced.
 
@@ -31,7 +31,7 @@ If tracing is turned on in your config/initializers/react_on_rails_pro.rb, you'l
 
 Here's a sample. Note the second request:
 
-```
+```text
 Started GET "/server_side_redux_app_cached" for ::1 at 2018-05-24 22:40:13 -1000
 [ReactOnRailsPro:63422] exec_server_render_js: ReduxApp, 230.7ms
 [ReactOnRailsPro:63422] cached_react_component: ReduxApp, 2483.8ms
@@ -185,10 +185,10 @@ And a fragment caching version for the `react_component_hash`:
    end %>
 
 <% content_for :title do %>
-  <%= react_helmet_app['title'] %>
+  <%= result['title'] %>
 <% end %>
 
-<%= react_helmet_app["componentHtml"] %>
+<%= result["componentHtml"] %>
 
 <% printable_cache_key = ReactOnRailsPro::Utils.printable_cache_key(result[:RORP_CACHE_KEY]) %>
 <!-- <%= "CACHE_HIT: #{result[:RORP_CACHE_HIT]}, RORP_CACHE_KEY: #{printable_cache_key}" %> -->
@@ -266,7 +266,7 @@ At Popmenu (a ShakaCode client running React on Rails Pro), cache warming across
 - Server CPU during peak hours dropped 45%
 - Database connections dropped 35% (fewer concurrent renders)
 
-For more details on the full cache warming architecture including stampede prevention, event-driven warming, and monitoring, see the [ShakaCode article on building a cache warmer](https://github.com/shakacode/sc-articles/blob/main/performance/popmenu/drafts/v9-justin-voice-from-v8-hybrid/cache-warmer-sidekiq-prerendering/index.md).
+For more details on the full cache warming architecture including stampede prevention, event-driven warming, and monitoring, contact [ShakaCode](https://www.shakacode.com/react-on-rails-pro/) for consulting on production cache warming strategies.
 
 ---
 
@@ -281,7 +281,7 @@ You will see a message like:
 
 > Development mode is now being cached.
 
-You might need to check your `config/development.rb`contains the following:
+You might need to check your `config/development.rb` contains the following:
 
 ```ruby
   # Enable/disable caching. By default caching is disabled.
@@ -294,7 +294,7 @@ You might need to check your `config/development.rb`contains the following:
     }
 
     # For Rails >= 5.1 determines whether to log fragment cache reads and writes in verbose format as follows:
-    config.action_controller.enable_fragment_cache_logging
+    config.action_controller.enable_fragment_cache_logging = true
   else
     config.action_controller.perform_caching = false
 
@@ -310,6 +310,6 @@ You might need to check your `config/development.rb`contains the following:
 
 To avoid seeing the cache calls to the prerender_caching, you can temporarily set:
 
-```
+```ruby
 config.prerender_caching = false
 ```

@@ -33,7 +33,7 @@ The bundles are cached in `Rails.root.join('tmp', 'bundle_cache')`
 
 So, if you have sibling directories for the same project, you can make a sym link so both directories use the same bundle cache directory.
 
-```
+```bash
 cd my_project2/tmp
 ln -s ../../my_project/tmp/bundle_cache
 ```
@@ -75,7 +75,7 @@ end
 Next, we need to configure the `config/initializers/react_on_rails_pro.rb` with some module,
 say called S3BundleCacheAdapter.
 
-```
+```ruby
 config.remote_bundle_cache_adapter = S3BundleCacheAdapter
 ```
 

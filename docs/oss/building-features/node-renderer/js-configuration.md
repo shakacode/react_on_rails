@@ -7,7 +7,7 @@ You can configure the node-renderer with only ENV values using the provided bin 
 
 You can also create a custom configuration file to setup and launch the node-renderer.
 
-The values in this file must be kept in sync with with the `config/initializers/react_on_rails_pro.rb` file, as documented in [Configuration](../../configuration/configuration-pro.md).
+The values in this file must be kept in sync with the `config/initializers/react_on_rails_pro.rb` file, as documented in [Configuration](../../configuration/configuration-pro.md).
 
 Here are the options available for the JavaScript renderer configuration object, as well as the available default ENV values if using the command line program node-renderer.
 
