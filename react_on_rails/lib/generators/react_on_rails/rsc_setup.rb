@@ -167,7 +167,7 @@ module ReactOnRails
             ⚠️  Procfile.dev not found. Skipping RSC bundle watcher addition.
 
             You'll need to add the RSC bundle watcher to your process manager manually:
-              rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+              rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker-watch --watch
           MSG
           return
         end
@@ -182,7 +182,7 @@ module ReactOnRails
         rsc_watcher_line = <<~PROCFILE
 
           # React on Rails Pro - RSC bundle watcher
-          rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+          rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker-watch --watch
         PROCFILE
 
         append_to_file("Procfile.dev", rsc_watcher_line)
