@@ -1,7 +1,18 @@
 import path from 'path';
 import fs from 'fs';
 import { CliOptions } from './types.js';
-import { execLiveArgs, logStep, logStepDone, logError, logSuccess, logInfo } from './utils.js';
+import {
+  execLiveArgs,
+  execLiveArgsWithEnv,
+  getCommandVersion,
+  logStep,
+  logStepDone,
+  logError,
+  logSuccess,
+  logInfo,
+} from './utils.js';
+
+const DOCS_URL = 'https://reactonrails.com/docs/';
 
 function cleanupAppDirectory(
   appPath: string,
@@ -64,9 +75,72 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
     args.push('--rsc');
   }
 
+  args.push('--force');
   args.push('--ignore-warnings');
 
   return args;
+}
+
+function packageManagerFieldValue(packageManager: CliOptions['packageManager']): string {
+  const version = getCommandVersion(packageManager)?.replace(/^v/, '');
+  return version ? `${packageManager}@${version}` : packageManager;
+}
+
+function updateJsonFile(
+  filePath: string,
+  updater: (data: Record<string, unknown>) => Record<string, unknown>,
+): void {
+  if (!fs.existsSync(filePath)) {
+    return;
+  }
+
+  const json = JSON.parse(fs.readFileSync(filePath, 'utf8')) as Record<string, unknown>;
+  const updatedJson = updater(json);
+  fs.writeFileSync(filePath, `${JSON.stringify(updatedJson, null, 2)}\n`, 'utf8');
+}
+
+function rewriteFileIfPresent(filePath: string, transform: (contents: string) => string): void {
+  if (!fs.existsSync(filePath)) {
+    return;
+  }
+
+  const original = fs.readFileSync(filePath, 'utf8');
+  const updated = transform(original);
+  if (updated !== original) {
+    fs.writeFileSync(filePath, updated, 'utf8');
+  }
+}
+
+function normalizeGeneratedPackageManager(
+  appPath: string,
+  packageManager: CliOptions['packageManager'],
+): void {
+  if (packageManager !== 'pnpm') {
+    return;
+  }
+
+  logInfo('Normalizing generated app for pnpm...');
+
+  const packageJsonPath = path.join(appPath, 'package.json');
+  const packageLockPath = path.join(appPath, 'package-lock.json');
+  const setupPath = path.join(appPath, 'bin', 'setup');
+
+  updateJsonFile(packageJsonPath, (json) => ({
+    ...json,
+    packageManager: packageManagerFieldValue(packageManager),
+  }));
+
+  if (fs.existsSync(packageLockPath)) {
+    execLiveArgs('pnpm', ['import'], appPath);
+    fs.rmSync(packageLockPath, { force: true });
+  }
+
+  rewriteFileIfPresent(setupPath, (contents) =>
+    contents.replace('system!("npm install")', 'system!("pnpm install")'),
+  );
+
+  execLiveArgs('pnpm', ['install'], appPath);
+  logStepDone('pnpm configuration applied');
 }
 
 function printSuccessMessage(appName: string, route: string): void {
@@ -75,11 +149,14 @@ function printSuccessMessage(appName: string, route: string): void {
   console.log('');
   logInfo('Next steps:');
   console.log(`  cd ${appName}`);
+  console.log('  bin/rails db:prepare');
   console.log('  bin/dev');
+  console.log('');
+  logInfo('If PostgreSQL is not running locally, start it before running bin/rails db:prepare.');
   console.log('');
   logInfo(`Then visit http://localhost:3000/${route}`);
   console.log('');
-  logInfo('Documentation: https://www.shakacode.com/react-on-rails/docs/');
+  logInfo(`Documentation: ${DOCS_URL}`);
   console.log('');
 }
 
@@ -196,10 +273,14 @@ export function createApp(appName: string, options: CliOptions): void {
   currentStep += 1;
   logStep(currentStep, totalSteps, 'Running React on Rails generator...');
   try {
-    execLiveArgs(
+    execLiveArgsWithEnv(
       'bundle',
       ['exec', 'rails', 'generate', 'react_on_rails:install', ...generatorArgs],
       appPath,
+      {
+        ...process.env,
+        REACT_ON_RAILS_PACKAGE_MANAGER: options.packageManager,
+      },
     );
     logStepDone('React on Rails setup complete');
   } catch (error) {
@@ -214,6 +295,24 @@ export function createApp(appName: string, options: CliOptions): void {
       `Delete the created "${appName}" directory and rerun once the generator issue is resolved.`,
     );
     process.exit(1);
+  }
+
+  try {
+    normalizeGeneratedPackageManager(appPath, options.packageManager);
+  } catch (error) {
+    logError(
+      `Failed to finish ${options.packageManager} setup. The app was created, but package manager normalization did not complete.`,
+    );
+    if (error instanceof Error && error.message) {
+      console.error(`Debug info: ${error.message}`);
+    }
+    logInfo('To finish manually:');
+    if (options.packageManager === 'pnpm') {
+      console.log(`  cd ${appName}`);
+      console.log('  pnpm import');
+      console.log('  rm -f package-lock.json');
+      console.log('  pnpm install');
+    }
   }
 
   // Final success

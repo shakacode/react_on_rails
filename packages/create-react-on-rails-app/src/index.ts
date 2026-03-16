@@ -48,7 +48,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
     logInfo(
       'If installation fails, verify your Bundler/RubyGems setup for react_on_rails_pro, then rerun with --rsc.',
     );
-    logInfo('Pro setup docs: https://www.shakacode.com/react-on-rails-pro/docs/installation/');
+    logInfo('Pro setup docs: https://reactonrails.com/docs/pro/installation/');
     console.log('');
   }
 
@@ -118,7 +118,7 @@ After setup, run bin/dev and visit:
 
 --rsc supports both JavaScript and TypeScript templates.
 
-Documentation: https://www.shakacode.com/react-on-rails/docs/`,
+Documentation: https://reactonrails.com/docs/`,
   )
   .action((appName: string, opts: Record<string, unknown>) => {
     try {
