@@ -40,7 +40,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
     - [Moving from the Rails default `/app/javascript` to the recommended `/client` structure](#moving-from-the-rails-default-appjavascript-to-the-recommended-client-structure)
     - [Custom IP & PORT setup (Cloud9 example)](#custom-ip--port-setup-cloud9-example)
     - [RubyMine performance tip](#rubymine-performance-tip)
-- [Conclusion](#conclusion)
+- [What's Next](#whats-next)
 
 ## Installation
 
@@ -257,6 +257,7 @@ It's super important to exclude certain directories from RubyMine or else it wil
 Now that you have React on Rails running, here are ways to level up:
 
 - **Add server-side rendering** — [SSR guide](../core-concepts/react-server-rendering.md)
+- **Compare React on Rails to alternatives** — [Comparison guide](./comparing-react-on-rails-to-alternatives.md)
 - **See the feature comparison** — [OSS vs Pro](./oss-vs-pro.md)
 - **Upgrade to Pro** for React Server Components, streaming SSR, and 10-100x faster SSR — [3-step upgrade guide](../../pro/upgrading-to-pro.md)
 - **Explore the full docs** — [Documentation index](../../README.md)
