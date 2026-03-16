@@ -45,7 +45,7 @@ by repo [shakacode/react_on_rails_tutorial_with_ssr_and_hmr_fast_refresh](https:
 
 ## Loadable Components
 
-See more details in [docs/code-splitting-loadable-components](../../../docs/pro/code-splitting-loadable-components.md).
+See more details in [docs/code-splitting](../../../docs/oss/building-features/code-splitting.md).
 
 Note that the webpack configuration substitutes files with the extension `imports-loadable.js` with `imports-hmr.js`. See the use of `NormalModuleReplacementPlugin` in [`config/webpack/commonWebpackConfig.js`](./config/webpack/commonWebpackConfig.js).
 

@@ -56,13 +56,13 @@ Performance enhancements, React Server Components, and advanced features. Requir
 
 - [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
 - [Installation](./pro/installation.md) - Set up React on Rails Pro
-- [Configuration](./pro/configuration.md) - Pro-specific settings
+- [Configuration](./oss/configuration/configuration-pro.md) - Pro-specific settings
 - [React Server Components](./pro/react-server-components/tutorial.md) - RSC with Rails
-- [Streaming SSR](./pro/streaming-server-rendering.md) - Progressive server rendering
-- [Fragment Caching](./pro/caching.md) - Cache rendered components
-- [Node Renderer](./pro/node-renderer/basics.md) - Dedicated Node.js rendering server
-- [Code Splitting](./pro/code-splitting-loadable-components.md) - Loadable components
-- [Bundle Caching](./pro/bundle-caching.md) - Avoid redundant builds
+- [Streaming SSR](./oss/building-features/streaming-server-rendering.md) - Progressive server rendering
+- [Fragment Caching](./oss/building-features/fragment-caching.md) - Cache rendered components
+- [Node Renderer](./oss/building-features/node-renderer/basics.md) - Dedicated Node.js rendering server
+- [Code Splitting](./oss/building-features/code-splitting.md) - Loadable components
+- [Ruby API (Pro)](./oss/api-reference/ruby-api-pro.md) - Pro view helpers and utilities
 - [Upgrading Pro](./pro/updating.md) - Version upgrade guide
 - [Troubleshooting](./pro/troubleshooting.md) - Common Pro issues
 

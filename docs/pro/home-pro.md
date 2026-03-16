@@ -1,6 +1,6 @@
 # React on Rails Pro
 
-Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails). Now supports React 18 with updates to React on Rails! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details and the updates to the [loadable-components instructions](./code-splitting-loadable-components.md).
+Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails). Now supports React 18 with updates to React on Rails! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for details and the updates to the [loadable-components instructions](../oss/building-features/code-splitting.md).
 
 ## Getting Started
 
@@ -24,7 +24,7 @@ See the README.md in those sample apps for more details.
 
 React on Rails Pro supports React 18's Streaming Server-Side Rendering, allowing you to progressively render and stream HTML content to the client. This enables faster page loads and better user experience.
 
-See [Streaming Server Rendering](./streaming-server-rendering.md) for more details.
+See [Streaming Server Rendering](../oss/building-features/streaming-server-rendering.md) for more details.
 
 ### Caching
 
@@ -33,7 +33,7 @@ Caching of SSR is critical for achieving optimum performance.
 - **Fragment Caching**: for `react_component` and `react_component_hash`, including lazy evaluation of props.
 - **Prerender Caching**: Server rendering JavaScript evaluation is cached if `prerender_caching` is turned on in your Rails config. This applies to all JavaScript evaluation methods.
 
-See [Fragment Caching](./caching.md) for more details.
+See [Fragment Caching](../oss/building-features/fragment-caching.md) for more details.
 
 ### Clearing of Global State
 
@@ -44,23 +44,23 @@ For more details, see [Rails Configuration (OSS)](../oss/configuration/README.md
 ### React On Rails Pro Node Renderer
 
 The "React on Rails Pro Node Renderer" provides more efficient server rendering on a standalone Node JS server.
-See the [Node Renderer Docs](./node-renderer/basics.md).
+See the [Node Renderer Docs](../oss/building-features/node-renderer/basics.md).
 
 ### Bundle Caching
 
-Don't wait for the same webpack bundles to be built over and over. See the [bundle-caching docs](./bundle-caching.md).
+Don't wait for the same webpack bundles to be built over and over. See the [bundle-caching docs](../oss/building-features/fragment-caching.md#bundle-caching).
 
 ## Other Utility Methods
 
-See the [Ruby API](./ruby-api.md).
+See the [Ruby API](../oss/api-reference/ruby-api-pro.md).
 
 ## References
 
 - [Installation](./installation.md)
-- [Streaming Server Rendering](./streaming-server-rendering.md)
-- [Caching](./caching.md)
-- [Rails Configuration](./configuration.md)
-- [Node Renderer Docs](./node-renderer/basics.md)
+- [Streaming Server Rendering](../oss/building-features/streaming-server-rendering.md)
+- [Caching](../oss/building-features/fragment-caching.md)
+- [Rails Configuration](../oss/configuration/configuration-pro.md)
+- [Node Renderer Docs](../oss/building-features/node-renderer/basics.md)
 
 # Features
 
@@ -97,7 +97,7 @@ Such fragment caching saves CPU work for your web server and greatly reduces the
 4. Creating the HTML string containing the props and the server-rendered JavaScript code.
 
 Note, even without server rendering (without step 3 above), fragment caching is still effective.
-See [Caching](./caching.md) for more additional details.
+See [Caching](../oss/building-features/fragment-caching.md) for more additional details.
 
 ## React On Rails Pro Node React Render
 
@@ -121,11 +121,11 @@ Due to poor performance and crashes due to memory leaks, the rolling restart of 
 
 ### Docs
 
-See the [Node React Render Docs](./node-renderer/basics.md).
+See the [Node React Render Docs](../oss/building-features/node-renderer/basics.md).
 
 ## Other Utility Methods
 
-See the [Ruby API](./ruby-api.md).
+See the [Ruby API](../oss/api-reference/ruby-api-pro.md).
 
 # Testimonials
 
@@ -160,5 +160,5 @@ For more info, email [justin@shakacode.com](mailto:justin@shakacode.com).
 
 # References
 
-- [Caching](./caching.md)
-- [Rails Configuration](./configuration.md)
+- [Caching](../oss/building-features/fragment-caching.md)
+- [Rails Configuration](../oss/configuration/configuration-pro.md)

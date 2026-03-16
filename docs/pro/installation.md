@@ -136,7 +136,7 @@ For complete license setup instructions, see [LICENSE_SETUP.md](https://github.c
 
 ## Rails Configuration
 
-You don't need to create an initializer if you are satisfied with the defaults as described in [Configuration](./configuration.md).
+You don't need to create an initializer if you are satisfied with the defaults as described in [Configuration](../oss/configuration/configuration-pro.md).
 
 For basic setup:
 
@@ -144,7 +144,7 @@ For basic setup:
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   # Your configuration here
-  # See docs/configuration.md for all options
+  # See docs/oss/configuration/configuration-pro.md for all options
 end
 ```
 
@@ -307,7 +307,7 @@ end
 
 ### Configuration Options
 
-See [Rails Configuration Options](./configuration.md) for all available settings.
+See [Rails Configuration Options](../oss/configuration/configuration-pro.md) for all available settings.
 
 Pay attention to:
 
@@ -322,7 +322,7 @@ Set your server bundle webpack configuration to use a target of `node` per the [
 
 ## Additional Documentation
 
-- [Node Renderer Basics](./node-renderer/basics.md)
-- [Node Renderer JavaScript Configuration](./node-renderer/js-configuration.md)
-- [Rails Configuration Options](./configuration.md)
-- [Error Reporting and Tracing](./node-renderer/error-reporting-and-tracing.md)
+- [Node Renderer Basics](../oss/building-features/node-renderer/basics.md)
+- [Node Renderer JavaScript Configuration](../oss/building-features/node-renderer/js-configuration.md)
+- [Rails Configuration Options](../oss/configuration/configuration-pro.md)
+- [Error Reporting and Tracing](../oss/building-features/node-renderer/error-reporting-and-tracing.md)

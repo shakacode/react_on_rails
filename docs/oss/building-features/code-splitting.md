@@ -1,8 +1,7 @@
-# Server-side rendering with code-splitting using Loadable/Components
+# Code Splitting with Loadable Components
 
-by ShakaCode
-
-_Last updated September 19, 2022_
+> **Pro Feature** — Available with [React on Rails Pro](../../pro/upgrading-to-pro.md).
+> Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
 
 ## Introduction
 

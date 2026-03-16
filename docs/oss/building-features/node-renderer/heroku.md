@@ -1,4 +1,7 @@
-# Heroku Deployment
+# Node Renderer: Heroku Deployment
+
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/upgrading-to-pro.md).
+> Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
 
 Most React on Rails Pro installations of the Node SSR Renderer will deploy the Rails and Renderer
 instances on the same server. This technique results in better performance since it avoids network
@@ -44,7 +47,7 @@ Any task in client/package.json that starts the node-renderer
 
 ### Modifying Precompile Task
 
-_Not necessary if you are using [bundle caching](../bundle-caching.md) as doing so will result in the below being done automatically._
+_Not necessary if you are using [bundle caching](../fragment-caching.md#bundle-caching) as doing so will result in the below being done automatically._
 
 To avoid the initial round trip to get a bundle on the renderer, you can do something like this to copy the file during precompile.
 

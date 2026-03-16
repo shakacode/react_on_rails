@@ -95,7 +95,7 @@ A "renderer function" is a Render-Function that accepts three arguments (rather 
 
 Why would you want to call `ReactDOM.hydrate` yourself? One possible use case is code splitting. In a nutshell, you don't want to load the React component on the DOM node yet. So you want to install some handler that will call `ReactDOM.hydrate` at a later time. In the case of code splitting with server rendering, the server-rendered code has any async code loaded and used to server render. Thus, the client code must also fully load any async code before server rendering. Otherwise, the client code would first render partially, not matching the server rendering, and then a second later, the full code would render, resulting in an unpleasant flashing on the screen.
 
-For modern code splitting with server-side rendering, see the [React on Rails Pro loadable-components guide](../../pro/code-splitting-loadable-components.md).
+For modern code splitting with server-side rendering, see the [React on Rails Pro loadable-components guide](../building-features/code-splitting.md).
 
 Renderer functions are not meant to be used on the server since there's no DOM on the server. Instead, use a Render-Function. Attempting to server render with a renderer function will throw an error.
 
@@ -107,7 +107,7 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 
 1. [React on Rails docs for React Router](../building-features/react-router.md)
 2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/RouterApp.server.jsx](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
-3. [React on Rails Pro loadable-components guide](../../pro/code-splitting-loadable-components.md) for modern code splitting with server-side rendering.
+3. [React on Rails Pro loadable-components guide](../building-features/code-splitting.md) for modern code splitting with server-side rendering.
 
 ### TanStack Router
 
@@ -163,7 +163,7 @@ Renders React Server Component (RSC) payloads in NDJSON format for client-side c
 - Server-side data fetching
 - Selective client-side hydration
 
-See the [React on Rails Pro Configuration](../../pro/configuration.md) for RSC setup.
+See the [React on Rails Pro Configuration](../configuration/configuration-pro.md) for RSC setup.
 
 ---
 

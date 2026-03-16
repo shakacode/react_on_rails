@@ -1,3 +1,8 @@
+# Node Renderer Debugging
+
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/upgrading-to-pro.md).
+> Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
+
 Because the renderer communicates over a port to the server, you can start a renderer instance in this repo and hack on it.
 
 # Yalc vs Yarn Link
