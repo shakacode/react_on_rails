@@ -1633,14 +1633,15 @@ describe InstallGenerator, type: :generator do
     before do
       # Clear any previous messages to ensure clean test state
       GeneratorMessages.clear
-      # Mock Shakapacker installation to succeed so we get the success message
-      allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
-      allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
     end
 
     specify "base generator contains a helpful message" do
-      run_generator_test_with_args(%w[], package_json: true)
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/shakapacker.yml", "default: {}\n")
+        simulate_existing_file("config/webpack/webpack.config.js", "// mock webpack config\n")
+      end
       # Check that the success message is present (flexible matching)
       output_text = GeneratorMessages.output.join("\n")
       expect(output_text).to include("🎉 React on Rails Successfully Installed!")
@@ -1651,7 +1652,12 @@ describe InstallGenerator, type: :generator do
     end
 
     specify "react with redux generator contains a helpful message" do
-      run_generator_test_with_args(%w[--redux], package_json: true)
+      run_generator_test_with_args(%w[--redux], package_json: true) do
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/shakapacker.yml", "default: {}\n")
+        simulate_existing_file("config/webpack/webpack.config.js", "// mock webpack config\n")
+      end
       # Check that the success message is present (flexible matching)
       output_text = GeneratorMessages.output.join("\n")
       expect(output_text).to include("🎉 React on Rails Successfully Installed!")
@@ -1659,6 +1665,105 @@ describe InstallGenerator, type: :generator do
       expect(output_text).to include("✨ KEY FEATURES:")
       expect(output_text).to match(/bundle && (npm|yarn|pnpm) install/)
       expect(output_text).to include("💡 TIP: Run 'bin/dev help'")
+    end
+
+    specify "run_generators adds post-install messaging for redux installs" do
+      install_generator = described_class.new([], { redux: true })
+      allow(install_generator).to receive(:installation_prerequisites_met?).and_return(true)
+      allow(install_generator).to receive(:invoke_generators)
+      allow(install_generator).to receive(:add_bin_scripts)
+      allow(install_generator).to receive(:print_generator_messages)
+
+      expect(install_generator).to receive(:add_post_install_message)
+      install_generator.run_generators
+    end
+
+    specify "shows incomplete-installation guidance when shakapacker setup fails" do
+      install_generator = described_class.new
+      install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
+
+      install_generator.send(:add_post_install_message)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("React on Rails installation is incomplete")
+      expect(output_text).to include("Avoid running ./bin/dev")
+      expect(output_text).to include("Some generator files may have been partially created during this run")
+      expect(output_text).to include("clean up your working tree before rerunning")
+      expect(output_text).to include("commit, stash, or discard the partial changes")
+      expect(output_text).to include("--ignore-warnings")
+      expect(output_text).not_to include("🎉 React on Rails Successfully Installed!")
+      expect(output_text).not_to include("📋 QUICK START:")
+    end
+
+    specify "incomplete-installation guidance uses detected package manager install command" do
+      install_generator = described_class.new
+      install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
+      allow(GeneratorMessages).to receive(:detect_package_manager).and_return("pnpm")
+
+      install_generator.send(:add_post_install_message)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("pnpm install")
+    end
+
+    specify "incomplete-installation guidance preserves original install flags" do
+      install_generator = described_class.new([], { redux: true, typescript: true, rspack: true, rsc: true })
+      install_generator.instance_variable_set(:@shakapacker_setup_incomplete, true)
+
+      install_generator.send(:add_post_install_message)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("rails generate react_on_rails:install --redux --typescript --rspack --rsc")
+      expect(output_text).not_to include(
+        "rails generate react_on_rails:install --redux --typescript --rspack --rsc --ignore-warnings"
+      )
+    end
+
+    specify "recovery_install_command keeps meaningful flags only" do
+      install_generator = described_class.new(
+        [],
+        { redux: true, typescript: true, rspack: true, rsc: true, pro: true, ignore_warnings: true,
+          force: true, skip: true, pretend: true }
+      )
+
+      command = install_generator.send(:recovery_install_command)
+
+      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --rspack --rsc")
+      expect(command).not_to include("--ignore-warnings")
+      expect(command).not_to include("--force")
+      expect(command).not_to include("--skip")
+      expect(command).not_to include("--pretend")
+      expect(command).not_to include("--pro")
+    end
+
+    specify "recovery_install_command includes --pro when requested without --rsc" do
+      install_generator = described_class.new([], { pro: true })
+
+      command = install_generator.send(:recovery_install_command)
+
+      expect(command).to eq("rails generate react_on_rails:install --pro")
+    end
+
+    specify "shakapacker install error preserves original install flags" do
+      install_generator = described_class.new([], { redux: true, typescript: true, ignore_warnings: true })
+
+      install_generator.send(:handle_shakapacker_install_error)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("clean up your working tree before rerunning")
+      expect(output_text).to include("Re-run: rails generate react_on_rails:install --redux --typescript")
+    end
+
+    specify "shakapacker gemfile error preserves original install flags" do
+      # ignore_warnings: true is required so handle_shakapacker_gemfile_error logs
+      # the error instead of raising Thor::Error, which lets this example inspect output.
+      install_generator = described_class.new([], { rspack: true, pro: true, ignore_warnings: true })
+
+      install_generator.send(:handle_shakapacker_gemfile_error)
+      output_text = GeneratorMessages.output.join("\n")
+
+      expect(output_text).to include("clean up your working tree before rerunning")
+      expect(output_text).to include("Then re-run: rails generate react_on_rails:install --rspack --pro")
     end
   end
 
@@ -1872,6 +1977,20 @@ describe InstallGenerator, type: :generator do
 
         Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
         expect(install_generator.instance_variable_get(:@shakapacker_just_installed)).to be_nil
+        expect(install_generator.instance_variable_get(:@shakapacker_setup_incomplete)).to be true
+      end
+    end
+
+    it "keeps setup incomplete when adding shakapacker to Gemfile fails, even if install succeeds" do
+      Dir.mktmpdir do |dir|
+        allow(install_generator).to receive_messages(ensure_shakapacker_in_gemfile: false, install_shakapacker: true)
+        allow(install_generator).to receive(:finalize_shakapacker_setup)
+
+        Dir.chdir(dir) { install_generator.send(:ensure_shakapacker_installed) }
+
+        expect(install_generator.instance_variable_get(:@shakapacker_setup_incomplete)).to be true
+        expect(install_generator).to have_received(:install_shakapacker)
+        expect(install_generator).to have_received(:finalize_shakapacker_setup)
       end
     end
   end

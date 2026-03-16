@@ -128,6 +128,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         # Mock file existence checks for lock files so detect_used_package_manager returns nil
         allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
         allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+        allow(File).to receive(:exist?).with("bun.lock").and_return(false)
         allow(File).to receive(:exist?).with("bun.lockb").and_return(false)
         allow(File).to receive(:exist?).with("package-lock.json").and_return(false)
       end
@@ -671,6 +672,25 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
 
         expect(checker.send(:shakapacker_configured?)).to be false
+      end
+    end
+
+    describe "#detect_used_package_manager" do
+      it "returns bun when bun.lock exists" do
+        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
+        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+        allow(File).to receive(:exist?).with("bun.lock").and_return(true)
+
+        expect(checker.send(:detect_used_package_manager)).to eq("bun")
+      end
+
+      it "returns bun when bun.lockb exists" do
+        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
+        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+        allow(File).to receive(:exist?).with("bun.lock").and_return(false)
+        allow(File).to receive(:exist?).with("bun.lockb").and_return(true)
+
+        expect(checker.send(:detect_used_package_manager)).to eq("bun")
       end
     end
   end

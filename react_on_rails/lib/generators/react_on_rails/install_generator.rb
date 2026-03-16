@@ -102,9 +102,7 @@ module ReactOnRails
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
           add_bin_scripts
-          # Only add the post install message if not using Redux
-          # Redux generator handles its own messages
-          add_post_install_message unless options.redux?
+          add_post_install_message
         else
           error = <<~MSG.strip
             🚫 React on Rails generator prerequisites not met!
@@ -150,6 +148,7 @@ module ReactOnRails
         # - Without --rsc: Normal behavior (HelloWorld or HelloWorldApp based on --redux)
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
+                                                          invoked_by_install: true,
                                                           force: options[:force], skip: options[:skip],
                                                           pretend: options[:pretend] }
         elsif !use_rsc?
@@ -244,6 +243,7 @@ module ReactOnRails
       end
 
       def ensure_shakapacker_installed
+        @shakapacker_setup_incomplete = false
         return if shakapacker_configured?
 
         if options[:pretend]
@@ -252,14 +252,19 @@ module ReactOnRails
         end
 
         print_shakapacker_setup_banner
-        ensure_shakapacker_in_gemfile
+        gemfile_ok = ensure_shakapacker_in_gemfile
+        @shakapacker_setup_incomplete = true unless gemfile_ok
 
         # NOTE: File.exist?/File.read use Dir.pwd (not destination_root) because
         # Rails generators always run from the destination root. This is consistent
         # with other relative-path file checks in this generator (e.g. shakapacker_configured?).
         yml_content_before = File.exist?(SHAKAPACKER_YML_PATH) ? File.read(SHAKAPACKER_YML_PATH) : nil
 
-        finalize_shakapacker_setup(yml_content_before) if install_shakapacker
+        if install_shakapacker
+          finalize_shakapacker_setup(yml_content_before)
+        else
+          @shakapacker_setup_incomplete = true
+        end
       end
 
       # Checks whether "shakapacker" is explicitly declared in this project's Gemfile.
@@ -299,6 +304,11 @@ module ReactOnRails
       end
 
       def add_post_install_message
+        if shakapacker_setup_incomplete?
+          GeneratorMessages.add_warning(incomplete_installation_message)
+          return
+        end
+
         # Determine what route and component will be created by the generator
         if use_rsc? && !options.redux?
           # RSC without Redux: HelloServer replaces HelloWorld
@@ -315,6 +325,67 @@ module ReactOnRails
                                      rsc: use_rsc?,
                                      shakapacker_just_installed: shakapacker_just_installed?
                                    ))
+      end
+
+      def shakapacker_setup_incomplete?
+        # Strict comparison keeps nil (unset) distinct from true.
+        @shakapacker_setup_incomplete == true
+      end
+
+      def recovery_install_command
+        flags = []
+        flags << "--redux" if options.redux?
+        flags << "--typescript" if options.typescript?
+        flags << "--rspack" if options.rspack?
+
+        if use_rsc?
+          flags << "--rsc"
+        elsif options.pro?
+          flags << "--pro"
+        end
+
+        ["rails generate react_on_rails:install", *flags].join(" ")
+      end
+
+      def recovery_working_tree_lines
+        [
+          "If this run created or changed files, clean up your working tree before rerunning",
+          "(commit, stash, or discard the partial changes), or re-run with --ignore-warnings",
+          "if you intentionally want to continue on a dirty tree."
+        ]
+      end
+
+      def recovery_working_tree_note
+        "#{recovery_working_tree_lines.join("\n")}\n"
+      end
+
+      def recovery_working_tree_step(step_number)
+        first_line, *remaining_lines = recovery_working_tree_lines
+        (["#{step_number}. #{first_line}"] + remaining_lines.map { |line| "   #{line}" }).join("\n")
+      end
+
+      def incomplete_installation_message
+        package_install_step = "#{GeneratorMessages.detect_package_manager} install"
+
+        <<~MSG
+
+          ⚠️  React on Rails installation is incomplete.
+          ─────────────────────────────────────────────────────────────────────────
+          Shakapacker setup failed, so this app is not ready to run yet.
+          Avoid running ./bin/dev until Shakapacker is installed successfully.
+          Note: Some generator files may have been partially created during this run.
+
+          Next steps:
+          1. #{Rainbow('bundle install').cyan}
+          2. #{Rainbow('bundle exec rails shakapacker:install').cyan}
+          3. #{Rainbow(package_install_step).cyan}
+          #{recovery_working_tree_step(4)}
+          5. Re-run #{Rainbow(recovery_install_command).cyan}
+             (add #{Rainbow('--force').cyan} to overwrite files if needed)
+
+          Troubleshooting:
+          • https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
+        MSG
       end
 
       def shakapacker_loaded_in_process?(gem_name)
@@ -368,15 +439,16 @@ module ReactOnRails
       end
 
       def ensure_shakapacker_in_gemfile
-        return if shakapacker_in_gemfile?
+        return true if shakapacker_in_gemfile?
 
         say "📝 Adding Shakapacker to Gemfile...", :yellow
         # Use with_unbundled_env to prevent inheriting BUNDLE_GEMFILE from parent process
         # See: https://github.com/shakacode/react_on_rails/issues/2287
         success = Bundler.with_unbundled_env { system("bundle add shakapacker --strict") }
-        return if success
+        return true if success
 
         handle_shakapacker_gemfile_error
+        false
       end
 
       def install_shakapacker
@@ -445,7 +517,8 @@ module ReactOnRails
           Please try manually:
               bundle add shakapacker --strict
 
-          Then re-run: rails generate react_on_rails:install
+          #{recovery_working_tree_note}
+          Then re-run: #{recovery_install_command}
         MSG
         GeneratorMessages.add_error(error)
         raise Thor::Error, error unless options.ignore_warnings?
@@ -466,7 +539,8 @@ module ReactOnRails
           2. Run: bundle install
           3. Try manually: bundle exec rails shakapacker:install
           4. Check for error output above
-          5. Re-run: rails generate react_on_rails:install
+          #{recovery_working_tree_step(5)}
+          6. Re-run: #{recovery_install_command}
 
           Need help? Visit: https://github.com/shakacode/shakapacker/blob/main/docs/installation.md
         MSG

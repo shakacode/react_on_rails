@@ -105,20 +105,28 @@ The doctor command checks your environment, dependencies, and configuration file
 
 For detailed upgrade instructions, see [upgrade guide documentation](docs/oss/upgrading/upgrading-react-on-rails.md).
 
-## React on Rails Pro
+## React on Rails vs React on Rails Pro
 
-Some features of React on Rails regarding performance require a React on Rails Pro subscription.
+React on Rails Pro adds performance and advanced rendering features on top of the open-source gem. The subscription is **free for evaluation and non-production use**.
 
-Note: the subscription price is free for evaluation and non-production use.
+| Feature                              |    OSS     |        Pro        |
+| ------------------------------------ | :--------: | :---------------: |
+| React in Rails views                 |     ✓      |         ✓         |
+| Hot Module Replacement               |     ✓      |         ✓         |
+| Server-side rendering                | ✓ (ExecJS) | ✓ (Node renderer) |
+| Auto-bundling                        |     ✓      |         ✓         |
+| Rspack support (~20x faster builds)  |     ✓      |         ✓         |
+| Redux integration                    |     ✓      |         ✓         |
+| I18n                                 |     ✓      |         ✓         |
+| React Server Components              |            |         ✓         |
+| Streaming SSR                        |            |         ✓         |
+| Fragment caching                     |            |         ✓         |
+| Code splitting / Loadable Components |            |         ✓         |
+| Node renderer (10-100x faster SSR)   |            |         ✓         |
+| TanStack Router SSR                  |            |         ✓         |
+| Bundle caching                       |            |         ✓         |
 
-Notable new features include:
-
-- React Server Components
-- Streaming SSR
-- Loadable Components
-- Code Splitting with React Router
-
-React on Rails Pro is the best way to optimize your Webpack setup for React on Rails, including code splitting with [React Router](https://reactrouter.com/) and [loadable-components](https://loadable-components.com/) with server-side rendering for SEO and hot-reloading for developers.
+For a detailed comparison with feature descriptions, see the [OSS vs Pro comparison](docs/oss/getting-started/oss-vs-pro.md).
 
 We did this for Popmenu, [lowering Heroku costs 20-25% while getting a 73% decrease in average response times](https://www.shakacode.com/recent-work/popmenu/). Several years later, Popmenu serves tens of millions of SSR requests daily with React on Rails Pro.
 
