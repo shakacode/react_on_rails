@@ -387,7 +387,7 @@ module ReactOnRails
       root = Rails.root
       return :yarn if File.exist?(File.join(root, "yarn.lock"))
       return :pnpm if File.exist?(File.join(root, "pnpm-lock.yaml"))
-      return :bun if File.exist?(File.join(root, "bun.lockb"))
+      return :bun if File.exist?(File.join(root, "bun.lock")) || File.exist?(File.join(root, "bun.lockb"))
       return :npm if File.exist?(File.join(root, "package-lock.json"))
 
       nil

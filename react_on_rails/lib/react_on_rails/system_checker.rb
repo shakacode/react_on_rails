@@ -399,7 +399,7 @@ module ReactOnRails
         "yarn"
       elsif File.exist?("pnpm-lock.yaml")
         "pnpm"
-      elsif File.exist?("bun.lockb")
+      elsif File.exist?("bun.lock") || File.exist?("bun.lockb")
         "bun"
       elsif File.exist?("package-lock.json")
         "npm"
