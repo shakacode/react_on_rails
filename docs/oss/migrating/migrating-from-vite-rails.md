@@ -17,8 +17,10 @@ If your app is already happy with a Vite-only client-rendered setup, this migrat
 
 Before you start, make sure the current app still installs cleanly on the Ruby and Node versions you plan to use for the migration.
 
-- If `bundle install` fails on older native gems such as `pg`, `nio4r`, or `msgpack`, refresh those gems or use the Ruby version already pinned by the app before introducing React on Rails.
+- If `bundle install` fails on older native gems such as `pg`, `nio4r`, `mysql2`, or `msgpack`, refresh those gems or use the Ruby version already pinned by the app before introducing React on Rails.
 - If the app has an older Bundler-era lockfile, refresh that lockfile first.
+- If the repo uses Yarn and has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example: `"packageManager": "yarn@1.22.22"`.
+- The React on Rails install generator boots the full app. Make sure `config/database.yml` exists and any required env vars for initializers are set before you run it.
 - Commit or stash your current work so the generator diff is easier to review.
 
 Then inventory the Vite-specific pieces in your app:
@@ -44,6 +46,12 @@ For anything beyond a tiny app, prefer a route-by-route cutover instead of a big
 bundle add shakapacker --strict
 bundle add react_on_rails --strict
 bundle exec rails generate react_on_rails:install
+```
+
+If you use Yarn and `package.json` does not already declare it, set the package manager before running the generator:
+
+```bash
+npm pkg set packageManager="yarn@1.22.22"
 ```
 
 The generator adds the React on Rails initializer, `bin/dev`, Shakapacker config, example routes, and the server bundle entrypoint.
@@ -180,3 +188,5 @@ one reasonable React on Rails target is:
 - Turbo usage, if your app already uses it
 
 The migration is mostly about asset/build integration, mounting strategy, and optional SSR capability.
+
+One practical detail from real app migrations: if the generator fails while booting your app, treat that as an application preflight problem first, not a React on Rails problem. Missing `APP_URL`-style env vars or an absent `config/database.yml` can stop the migration before any React on Rails files are generated.
