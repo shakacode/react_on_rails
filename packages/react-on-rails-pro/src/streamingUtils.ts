@@ -18,7 +18,7 @@ import { PassThrough, Readable } from 'stream';
 import createReactOutput from 'react-on-rails/createReactOutput';
 import { isPromise, isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { consoleReplay } from 'react-on-rails/buildConsoleReplay';
-import { convertToError, validateComponent } from 'react-on-rails/serverRenderUtils';
+import { buildRenderMetadata, convertToError, validateComponent } from 'react-on-rails/serverRenderUtils';
 import {
   RenderParams,
   StreamRenderState,
@@ -123,17 +123,8 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
 
       const contentBuf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, 'utf-8');
-      const metadata = JSON.stringify({
-        consoleReplayScript,
-        clientProps: renderState.clientProps,
-        hasErrors: renderState.hasErrors,
-        renderingError: renderState.error && {
-          message: renderState.error.message,
-          stack: renderState.error.stack,
-        },
-        isShellReady: 'isShellReady' in renderState ? renderState.isShellReady : undefined,
-      });
-      const header = `${metadata}\t${contentBuf.length.toString(16).padStart(8, '0')}\n`;
+      const metadataJson = JSON.stringify(buildRenderMetadata(consoleReplayScript, renderState));
+      const header = `${metadataJson}\t${contentBuf.length.toString(16).padStart(8, '0')}\n`;
       this.push(Buffer.concat([Buffer.from(header), contentBuf]));
 
       // Reset the render state to ensure that the error is not carried over to the next chunk
