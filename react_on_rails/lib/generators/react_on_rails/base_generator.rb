@@ -267,6 +267,7 @@ module ReactOnRails
 
       def copy_webpack_main_config(base_path, config)
         webpack_config_path = bundler_main_config_path
+        template_path = bundler_main_config_template_path(base_path, webpack_config_path)
 
         if File.exist?(webpack_config_path)
           existing_content = File.read(webpack_config_path)
@@ -279,7 +280,7 @@ module ReactOnRails
             say_status :replace,
                        "#{webpack_config_path} (auto-upgrading from standard Shakapacker to React on Rails config)",
                        :green
-            template("#{base_path}/config/webpack/webpack.config.js.tt", webpack_config_path, config)
+            template(template_path, webpack_config_path, config)
           elsif react_on_rails_config?(existing_content)
             say_status :identical, "#{webpack_config_path} (already React on Rails compatible)", :blue
             # Skip - don't need to do anything
@@ -288,7 +289,7 @@ module ReactOnRails
           end
         else
           # File doesn't exist, create it
-          template("#{base_path}/config/webpack/webpack.config.js.tt", webpack_config_path, config)
+          template(template_path, webpack_config_path, config)
         end
       end
 
@@ -309,7 +310,7 @@ module ReactOnRails
             say_status :create, "#{backup_path} (backup of your custom config)", :green
           end
 
-          template("#{base_path}/config/webpack/webpack.config.js.tt", webpack_config_path, config)
+          template(bundler_main_config_template_path(base_path, webpack_config_path), webpack_config_path, config)
         else
           say_status :skip, webpack_config_path, :yellow
           say_status :warning,
@@ -320,7 +321,13 @@ module ReactOnRails
 
       def bundler_main_config_path
         if using_rspack?
-          "config/rspack/rspack.config.js"
+          if File.exist?("config/rspack/rspack.config.ts")
+            "config/rspack/rspack.config.ts"
+          else
+            "config/rspack/rspack.config.js"
+          end
+        elsif File.exist?("config/webpack/webpack.config.ts")
+          "config/webpack/webpack.config.ts"
         else
           "config/webpack/webpack.config.js"
         end
@@ -584,10 +591,26 @@ module ReactOnRails
 
         # Normalize whitespace while preserving comments by default so added comments
         # count as potential customizations and keep cleanup conservative.
-        normalized_content.gsub(/\s+/, " ").strip
+        normalized_content.gsub(/\s+/, " ")
+                          .tr('"', "'") # Normalize quote style for import/require statements
+                          .strip
+      end
+
+      def bundler_main_config_template_path(base_path, config_path)
+        template_ext = config_path.end_with?(".ts") ? "ts.tt" : "js.tt"
+        template_base = if config_path.include?("/rspack/") || File.basename(config_path).start_with?("rspack.config")
+                          "rspack.config"
+                        else
+                          "webpack.config"
+                        end
+        "#{base_path}/config/webpack/#{template_base}.#{template_ext}"
       end
 
       def shakapacker_default_configs
+        shakapacker_cjs_default_configs + shakapacker_esm_default_configs
+      end
+
+      def shakapacker_cjs_default_configs
         configs = []
 
         # Shakapacker v7+ (generateWebpackConfig function)
@@ -635,6 +658,40 @@ module ReactOnRails
           const { generateRspackConfig } = require('shakapacker/rspack')
           const rspackConfig = generateRspackConfig()
           module.exports = rspackConfig
+        CONFIG
+
+        configs
+      end
+
+      def shakapacker_esm_default_configs
+        configs = []
+
+        # Shakapacker v9.4+ TypeScript webpack configs (ESM syntax)
+        configs << <<~CONFIG
+          import { generateWebpackConfig } from 'shakapacker'
+          import type { Configuration } from 'webpack'
+          const webpackConfig: Configuration = generateWebpackConfig()
+          export default webpackConfig
+        CONFIG
+
+        configs << <<~CONFIG
+          import { generateWebpackConfig } from 'shakapacker'
+          const webpackConfig = generateWebpackConfig()
+          export default webpackConfig
+        CONFIG
+
+        # Shakapacker v9.4+ TypeScript rspack configs (ESM syntax)
+        configs << <<~CONFIG
+          import { generateRspackConfig } from 'shakapacker/rspack'
+          import type { RspackOptions } from '@rspack/core'
+          const rspackConfig: RspackOptions = generateRspackConfig()
+          export default rspackConfig
+        CONFIG
+
+        configs << <<~CONFIG
+          import { generateRspackConfig } from 'shakapacker/rspack'
+          const rspackConfig = generateRspackConfig()
+          export default rspackConfig
         CONFIG
 
         configs

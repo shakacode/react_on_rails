@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **Install generator now handles TypeScript and rspack bundler configs correctly**: Projects using Shakapacker 9.4+ with TypeScript configs (`.ts`) were incorrectly prompted to confirm config replacement during `rails generate react_on_rails:install`, because the installer didn't recognize the ESM-style stock configs. The installer and `react_on_rails:doctor` now detect all config variants (webpack/rspack, JS/TS), use the correct replacement template for each, and show accurate bundler-specific diagnostic messages. [PR 2567](https://github.com/shakacode/react_on_rails/pull/2567) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+
 ### [16.4.0.rc.10] - 2026-03-15
 
 #### Fixed
