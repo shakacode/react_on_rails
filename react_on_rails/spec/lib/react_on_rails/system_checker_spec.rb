@@ -363,11 +363,14 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       before do
+        rails_root = Pathname.new("/tmp/myapp")
+        package_json_path = rails_root.join("client", "package.json").to_s
+        allow(Rails).to receive(:root).and_return(rails_root)
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: "client")
         )
-        allow(File).to receive(:exist?).with("client/package.json").and_return(true)
-        allow(File).to receive(:read).with("client/package.json").and_return(package_json_content)
+        allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+        allow(File).to receive(:read).with(package_json_path).and_return(package_json_content)
       end
 
       it "reads package metadata from the configured workspace path" do

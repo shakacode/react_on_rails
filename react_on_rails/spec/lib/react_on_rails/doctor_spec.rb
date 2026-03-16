@@ -1273,11 +1273,14 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when package.json is located in a configured JS workspace" do
       before do
+        rails_root = Pathname.new("/tmp/myapp")
+        package_json_path = rails_root.join("client", "package.json").to_s
+        allow(Rails).to receive(:root).and_return(rails_root)
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: "client")
         )
-        allow(File).to receive(:exist?).with("client/package.json").and_return(true)
-        allow(File).to receive(:read).with("client/package.json").and_return(
+        allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails-pro" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)

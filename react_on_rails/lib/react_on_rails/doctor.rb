@@ -4,6 +4,7 @@ require "json"
 require "erb"
 require "yaml"
 require_relative "utils"
+require_relative "config_path_resolver"
 require_relative "version_syntax_converter"
 require_relative "system_checker"
 
@@ -39,6 +40,8 @@ end
 module ReactOnRails
   # rubocop:disable Metrics/ClassLength, Metrics/AbcSize
   class Doctor
+    include ConfigPathResolver
+
     MESSAGE_COLORS = {
       error: :red,
       warning: :yellow,
@@ -1176,37 +1179,6 @@ module ReactOnRails
       # Handle missing Shakapacker gem or other configuration errors
       bundle_filename = server_bundle_filename
       "app/javascript/packs/#{bundle_filename}"
-    end
-
-    def resolved_package_json_path
-      node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
-      return "package.json" if node_modules_location.empty? || node_modules_location == Rails.root.to_s
-
-      File.join(node_modules_location, "package.json")
-    end
-
-    def resolved_webpack_config_path
-      candidates = []
-      shakapacker_dir = shakapacker_webpack_config_directory
-      if shakapacker_dir
-        candidates.concat(%w[js ts cjs mjs].map { |ext| File.join(shakapacker_dir, "webpack.config.#{ext}") })
-      end
-      candidates << "config/webpack/webpack.config.js"
-      candidates.concat(Dir.glob("config/**/webpack.config.{js,ts,cjs,mjs}"))
-
-      candidates.uniq.find { |path| File.exist?(path) }
-    end
-
-    def shakapacker_webpack_config_directory
-      require "shakapacker"
-      path = Shakapacker.config.assets_bundler_config_path.to_s
-      return nil if path.empty?
-
-      directory = File.dirname(path)
-      rails_root = Rails.root.to_s
-      directory.start_with?("#{rails_root}/") ? directory.sub("#{rails_root}/", "") : directory
-    rescue LoadError, StandardError
-      nil
     end
 
     def server_bundle_filename
