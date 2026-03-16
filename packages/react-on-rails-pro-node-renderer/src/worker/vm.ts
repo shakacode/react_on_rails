@@ -415,8 +415,10 @@ export async function buildExecutionContext(
         return newStreamAfterHandlingError;
       }
       if (typeof result !== 'string') {
-        const objectResult = await result;
-        result = JSON.stringify(objectResult);
+        const resolvedResult = await result;
+        // If the resolved value is already a string (e.g., length-prefixed format from
+        // buildLengthPrefixedResult), use it directly. Only JSON.stringify objects.
+        result = typeof resolvedResult === 'string' ? resolvedResult : JSON.stringify(resolvedResult);
       }
       if (log.level === 'debug' && result) {
         log.debug(`result from JS:

@@ -57,7 +57,17 @@ export function buildLengthPrefixedResult(
   consoleReplayScript: string,
   renderState: RenderState | StreamRenderState,
 ): string {
-  const htmlStr = typeof html === 'string' ? html : '';
+  // html can be a string (common), null, or a ServerRenderHashRenderedHtml object
+  // (when render functions return multiple named HTML fragments like { componentHtml, title }).
+  // For object values, JSON-serialize them so the content is a valid string on the wire.
+  let htmlStr: string;
+  if (html == null) {
+    htmlStr = '';
+  } else if (typeof html === 'string') {
+    htmlStr = html;
+  } else {
+    htmlStr = JSON.stringify(html);
+  }
   const metadata = JSON.stringify(buildRenderMetadata(consoleReplayScript, renderState));
   const byteLength = Buffer.byteLength(htmlStr, 'utf-8');
   return `${metadata}\t${byteLength.toString(16).padStart(8, '0')}\n${htmlStr}`;
