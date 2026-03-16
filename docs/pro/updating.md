@@ -172,15 +172,13 @@ yarn install
 
 #### Step 5: Configure License Token (Production Only)
 
-React on Rails Pro uses a license-optional model to simplify evaluation and development.
+React on Rails Pro uses a license-optional model — no license is needed to get started. Pro is also free for startups, small companies, and organizations without funds for a license.
 
 A license token is **optional** for non-production environments:
 
-- Evaluation and local development
+- Local development
 - Test environments and CI/CD pipelines
 - Staging/non-production deployments
-
-**A paid license is required only for production deployments.**
 
 Configure your React on Rails Pro license token as an environment variable:
 

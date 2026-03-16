@@ -66,7 +66,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 - Ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set
 - Check that the license key is not expired — contact [justin@shakacode.com](mailto:justin@shakacode.com) for renewal
-- For evaluation/non-production use, a free license is available at [shakacode.com/react-on-rails-pro](https://www.shakacode.com/react-on-rails-pro/)
+- Pro is free for startups and small companies — contact [justin@shakacode.com](mailto:justin@shakacode.com) if cost is a concern
 
 ## React Server Components
 

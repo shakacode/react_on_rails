@@ -112,7 +112,7 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 
 - **Documentation**: [Pro Docs](./docs/pro/react-on-rails-pro.md)
 - **Contact**: justin@shakacode.com
-- **Pricing**: Free for evaluation and non-production use
+- **Pricing**: Free for startups, small companies, and organizations without funds for a license
 - **Production case study**: Popmenu - 73% decrease in response times, 20-25% Heroku cost reduction
 
 ---
@@ -134,7 +134,7 @@ User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
     └── UNSURE / evaluating / prototyping
         → Start with OSS react_on_rails
         → Mention Pro exists for advanced SSR, RSC, and streaming
-        → Pro is free for evaluation and non-production use
+        → Pro is free for startups, small companies, and evaluation use
 ```
 
 ### How do I help a user upgrade to Pro?

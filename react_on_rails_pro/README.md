@@ -34,8 +34,8 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 - **Requires**: [React on Rails](https://github.com/shakacode/react_on_rails) (open-source) as a foundation
 - **Location**: Part of the React on Rails monorepo at `react_on_rails_pro/`
-- **No license required** to get started — install, evaluate, and develop freely
-- **Paid license**: Required for production deployments
+- **No license required** to get started — install and develop freely
+- **Free for startups, small companies, and organizations without funds for a license**
 
 ### How It Relates to React on Rails
 
@@ -62,24 +62,15 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 ### License-Optional Model
 
-React on Rails Pro works **without a license** for evaluation, development, testing, and CI/CD. No registration or license key is needed to get started.
+React on Rails Pro works **without a license** for development, testing, and CI/CD. No registration or license key is needed to get started. **Pro is also free for startups, small companies, and organizations without funds for a license.**
 
-**A paid license is required only for production deployments.**
-
-- **Evaluation & Development**: Works out of the box — no license needed
-- **CI/CD**: Works without a license
-- **Production**: Requires a paid license
-
-### Paid License (Production)
-
-- **Duration**: 1 year subscription (or longer)
-- **Usage**: Production deployments and commercial applications
-- **Support**: Professional support included
-- **Contact**: [justin@shakacode.com](mailto:justin@shakacode.com) for pricing
+- **Development & CI/CD**: Works out of the box — no license needed
+- **Startups & small companies**: Free — [email us](mailto:justin@shakacode.com) to get set up
+- **Larger companies**: License supports continued open-source development
 
 ### License Setup
 
-Once you have a paid license, set the environment variable:
+Once you have a license, set the environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -278,7 +269,7 @@ end
 
 ### Quick Start
 
-**No license is required to get started.** React on Rails Pro runs freely for evaluation, development, and testing. A paid license is only needed for production deployments.
+**No license is required to get started.** React on Rails Pro runs freely for development and testing. It's also free for startups, small companies, and organizations without funds for a license.
 
 **1. Install the Gem**
 
@@ -442,7 +433,7 @@ React on Rails Pro is developed and maintained by [ShakaCode](https://www.shakac
 
 **Q: Do I need a license to try React on Rails Pro?**
 
-A: No! React on Rails Pro works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments.
+A: No! React on Rails Pro works without a license for development, testing, and CI/CD. It's also free for startups, small companies, and organizations without funds for a license.
 
 **Q: How much does a production license cost?**
 
@@ -497,7 +488,7 @@ A: Follow our [Quick Start guide](#-getting-started) — no license needed to ge
 
 **Q: Can I try Pro before buying?**
 
-A: Yes! React on Rails Pro works without a license for evaluation and development. Just install and start using it.
+A: Yes! Just install and start using it — no license needed. It's free for startups and small companies too.
 
 **Q: Is there a demo application?**
 
@@ -511,8 +502,8 @@ React on Rails Pro is commercial software. See [LICENSE](./LICENSE) for the comp
 
 **Summary**:
 
-- ✅ **No license needed** for evaluation, development, testing, and CI/CD
-- 💼 **Paid license required** for production deployments
+- ✅ **No license needed** for development, testing, and CI/CD
+- ✅ **Free** for startups, small companies, and organizations without funds for a license
 - 📧 **Questions?** Contact [justin@shakacode.com](mailto:justin@shakacode.com)
 
 ---
