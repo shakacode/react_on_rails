@@ -13,7 +13,7 @@ Choosing a React integration strategy for Rails? This guide compares React on Ra
 | Auto-bundling            |        —         |        —         |   Import maps    |        —        |          ✓           |          ✓          |
 | Rspack / Webpack support |        —         | ✓ (Vite default) |        —         | ✓ (Vite/Rollup) |          ✓           |          ✓          |
 | Hot module replacement   |        —         |        ✓         |  Turbo morphing  |        ✓        |          ✓           |          ✓          |
-| Type-safe routing        |        —         |    ✓ (Ziggy)     |        —         |        —        |          —           | ✓ (TanStack Router) |
+| Type-safe routing        |        —         |    ✓ (Ziggy)     |        —         |     ✓ (BYO)     |          —           | ✓ (TanStack Router) |
 | Props from controller    |        —         |        ✓         |       N/A        |        —        |          ✓           |          ✓          |
 | SSR caching              |        —         |        —         | Fragment caching |        —        |          —           |          ✓          |
 | React component helper   |        ✓         |        —         |       N/A        |        —        |          ✓           |          ✓          |
@@ -133,14 +133,14 @@ Rspack uses **2–3x less memory** than Vite in development.
 
 Build speed is only part of the picture. Here's how the two approaches compare as Rails integration tools:
 
-| Aspect                      | Vite (via vite_rails)                    | Rspack (via Shakapacker)                      |
-| --------------------------- | ---------------------------------------- | --------------------------------------------- |
-| **SSR support**             | Vite SSR mode (manual Rails integration) | Integrated with React on Rails SSR pipeline   |
-| **Webpack compatibility**   | None — different plugin/loader format    | Near-complete Webpack API compatibility       |
-| **Migration from Webpack**  | Full rewrite of build config             | Minimal changes — same config format          |
-| **Rails integration**       | Asset tag helpers only                   | Full Shakapacker integration + React on Rails |
-| **React component helpers** | None — manual DOM mounting               | `react_component`, `react_component_hash`     |
-| **Plugin ecosystem**        | Vite/Rollup plugins                      | Webpack/Rspack plugins                        |
+| Aspect                     | Vite (via vite_rails)                           | Rspack (via Shakapacker)                             |
+| -------------------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| **SSR support**            | Vite SSR mode (manual Rails integration)        | Integrated with React on Rails SSR pipeline          |
+| **Webpack compatibility**  | None — different plugin/loader format           | Near-complete Webpack API compatibility              |
+| **Migration from Webpack** | Full rewrite of build config                    | Minimal changes — same config format                 |
+| **Rails view integration** | Asset tag helpers; manual component mounting    | `react_component` helper with props from controllers |
+| **Client-side routing**    | Any React router (React Router, TanStack, etc.) | Any React router; TanStack Router SSR in Pro         |
+| **Plugin ecosystem**       | Vite/Rollup plugins                             | Webpack/Rspack plugins                               |
 
 **Key takeaway:** As pure bundlers, Vite and Rspack are both excellent — Rspack starts dev faster and uses less memory, while Vite 8 produces production builds faster. HMR is a tie. But Vite is _only_ a bundler. Choosing Vite means giving up React on Rails' `react_component` helper, automatic props passing from controllers, built-in SSR, and auto-bundling. With Rspack, you get competitive build speeds while retaining the full React on Rails integration layer. If you need SSR, the gap widens further: React on Rails provides SSR out of the box, while Vite requires building a custom Node.js rendering pipeline and wiring it into Rails yourself.
 
