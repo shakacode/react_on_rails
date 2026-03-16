@@ -222,7 +222,7 @@ module ReactOnRails
       def installation_prerequisites_met?
         # Check uncommitted_changes? before missing_pro_gem? so that
         # auto-install does not mutate the Gemfile on a dirty working tree.
-        ReactOnRails::GitUtils.warn_if_uncommitted_changes(GeneratorMessages)
+        ReactOnRails::GitUtils.warn_if_uncommitted_changes(GeneratorMessages, git_installed: cli_exists?("git"))
 
         !(missing_node? || missing_package_manager? || missing_pro_gem?)
       end
@@ -348,7 +348,7 @@ module ReactOnRails
       def stock_rails_bin_dev?
         return false unless File.exist?("bin/dev")
 
-        File.read("bin/dev").strip == STOCK_RAILS_BIN_DEV.strip
+        File.read("bin/dev").gsub("\r\n", "\n").strip == STOCK_RAILS_BIN_DEV.gsub("\r\n", "\n").strip
       end
 
       def add_post_install_message

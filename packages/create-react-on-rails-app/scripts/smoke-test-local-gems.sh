@@ -108,6 +108,7 @@ grep -q 'system!("pnpm install")' "$APP_JS_DIR/bin/setup"
 
 grep -q "gem \"react_on_rails\"" "$APP_RSPACK_DIR/Gemfile"
 grep -q "path: \"$RUBY_GEM_DIR\"" "$APP_RSPACK_DIR/Gemfile"
+grep -q "hello_world" "$APP_RSPACK_DIR/config/routes.rb"
 grep -q '"@rspack/core"' "$APP_RSPACK_DIR/package.json"
 test -f "$APP_RSPACK_DIR/pnpm-lock.yaml"
 ! test -f "$APP_RSPACK_DIR/package-lock.json"

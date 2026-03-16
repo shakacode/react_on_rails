@@ -27,7 +27,9 @@ gem "react_on_rails", "16.4.0.rc.10"
 ```
 
 ```bash
-pnpm add react-on-rails@16.4.0-rc.10 --save-exact
+npm install react-on-rails@16.4.0-rc.10 --save-exact
+# or: yarn add react-on-rails@16.4.0-rc.10 --exact
+# or: pnpm add react-on-rails@16.4.0-rc.10 --save-exact
 ```
 
 ## 2. Run the generator
