@@ -18,6 +18,8 @@ Pro includes core React on Rails as a dependency — just swap the packages and 
 
 ## Three Steps to Upgrade
 
+> **Version note:** The examples below use `16.4.0` for illustration. Before you begin, check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) to find the latest version and substitute it in the commands below. Always use an exact version pin (`=`) for the gem and `--save-exact`/`--exact` for the npm package.
+
 ### 1. Swap the gem
 
 Replace `react_on_rails` with `react_on_rails_pro` in your Gemfile. Pro depends on the core gem, so you only need the Pro entry:
@@ -36,8 +38,6 @@ bundle add react_on_rails_pro --version="= 16.4.0"
 ```
 
 > **Important:** `bundle add` does not remove existing gems. You must run `bundle remove` first, otherwise both gems will appear in your Gemfile, which can cause Bundler warnings or version conflicts.
-
-Check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest version.
 
 ### 2. Swap the npm package
 
