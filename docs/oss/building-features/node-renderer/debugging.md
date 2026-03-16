@@ -1,18 +1,18 @@
 # Node Renderer Debugging
 
-> **Pro Feature** — Available with [React on Rails Pro](../../../pro/upgrading-to-pro.md).
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
 > Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
 
 Because the renderer communicates over a port to the server, you can start a renderer instance in this repo and hack on it.
 
-# Yalc vs Yarn Link
+## Yalc vs Yarn Link
 
 The project is setup to use [yalc](https://github.com/whitecolor/yalc). This means that at the top level
 directory, `yalc publish` will send the node package files to the global yalc store. Running `yarn` in the
 `/spec/dummy/client` directory will copy the files from the global yalc store over to the local `node_modules`
 directory.
 
-# Debugging the Node Renderer
+## Debugging the Node Renderer
 
 1. cd to the top level of the project.
 1. `yarn` to install any libraries.
@@ -32,7 +32,7 @@ directory.
 1. See [the Jest documentation](https://jestjs.io/docs/troubleshooting) for overall guidance.
 2. For RubyMine, see [the RubyMine documentation](https://www.jetbrains.com/help/ruby/running-unit-tests-on-jest.html) for the current information. The original [Testing With Jest in WebStorm](https://blog.jetbrains.com/webstorm/2018/10/testing-with-jest-in-webstorm/) post can be useful as well.
 
-# Debugging the Ruby gem
+## Debugging the Ruby gem
 
 Open the gemfile in the problematic app.
 

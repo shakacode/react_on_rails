@@ -1,6 +1,6 @@
 # Ruby API (Pro)
 
-> **Pro Feature** — Available with [React on Rails Pro](../../pro/upgrading-to-pro.md).
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
 > Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
 
 ## View Helpers

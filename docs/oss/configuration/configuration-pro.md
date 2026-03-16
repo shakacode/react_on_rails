@@ -1,6 +1,6 @@
 # React on Rails Pro Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](../../pro/upgrading-to-pro.md).
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
 > Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
 
 For general React on Rails configuration options, see [Configuration](README.md).
@@ -78,7 +78,7 @@ ReactOnRailsPro.configure do |config|
   config.renderer_url = ENV["RENDERER_URL"]
 
   # If you don't want to worry about special characters in your password within the url, use this config value
-  # Default for `renderer_password` is ""
+  # Default for `renderer_password` is nil
   # config.renderer_password = ENV["RENDERER_PASSWORD"]
 
   # Set the `ssr_timeout` configuration so the Rails server will not wait more than this many seconds
@@ -89,7 +89,7 @@ ReactOnRailsPro.configure do |config|
   # Can be useful to set to false in development or testing to make sure that the remote renderer
   # works and any non-availability of the remote renderer does not just do ExecJS.
   # Suggest setting this to false if the SSR JS code cannot run in ExecJS
-  # Default for `renderer_use_fallback_exec_js` is false.
+  # Default for `renderer_use_fallback_exec_js` is true.
   config.renderer_use_fallback_exec_js = false
 
   # The maximum size of the http connection pool,

@@ -1,6 +1,6 @@
 # Node Renderer: Heroku Deployment
 
-> **Pro Feature** — Available with [React on Rails Pro](../../../pro/upgrading-to-pro.md).
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
 > Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
 
 Most React on Rails Pro installations of the Node SSR Renderer will deploy the Rails and Renderer
