@@ -48,7 +48,7 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
     logInfo(
       'If installation fails, verify your Bundler/RubyGems setup for react_on_rails_pro, then rerun with --rsc.',
     );
-    logInfo('Pro setup docs: https://reactonrails.com/docs/pro/installation');
+    logInfo('Pro setup docs: https://reactonrails.com/docs/pro/installation/');
     console.log('');
   }
 

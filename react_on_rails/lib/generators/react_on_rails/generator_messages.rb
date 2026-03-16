@@ -94,6 +94,9 @@ module GeneratorMessages
     # Uses relative lockfile paths resolved against Dir.pwd, so callers must invoke
     # this while the current working directory is the target Rails app root.
     def detect_package_manager
+      env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
+      return env_package_manager if %w[npm pnpm yarn bun].include?(env_package_manager)
+
       # Check for lock files to determine package manager
       return "yarn" if File.exist?("yarn.lock")
       return "pnpm" if File.exist?("pnpm-lock.yaml")

@@ -29,10 +29,11 @@
 ```bash
 npx create-react-on-rails-app my-app
 cd my-app
+bin/rails db:prepare
 bin/dev
 ```
 
-Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) - done! TypeScript? Add `--template typescript`. [Full CLI docs →](./docs/oss/getting-started/create-react-on-rails-app.md)
+Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) - done! JavaScript? Add `--template javascript`. [Full CLI docs →](./docs/oss/getting-started/create-react-on-rails-app.md)
 
 **Or add to an existing Rails app:**
 

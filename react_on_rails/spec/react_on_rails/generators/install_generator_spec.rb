@@ -2714,4 +2714,32 @@ describe InstallGenerator, type: :generator do
       expect(GeneratorMessages.messages.join("\n")).not_to include("RSC")
     end
   end
+
+  describe "#add_bin_scripts" do
+    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+
+    before do
+      prepare_destination
+      simulate_existing_file("bin/dev", described_class::STOCK_RAILS_BIN_DEV)
+    end
+
+    it "replaces the stock Rails bin/dev without prompting" do
+      Dir.chdir(destination_root) do
+        install_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "hello_world"')
+        expect(content).to include("ReactOnRails::Dev::ServerManager")
+      end
+    end
+
+    it "detects custom bin/dev files" do
+      simulate_existing_file("bin/dev", "#!/usr/bin/env ruby\nputs 'custom'\n")
+
+      Dir.chdir(destination_root) do
+        expect(install_generator.send(:stock_rails_bin_dev?)).to be(false)
+      end
+    end
+  end
 end

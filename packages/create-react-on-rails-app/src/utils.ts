@@ -12,6 +12,26 @@ export function execLiveArgs(command: string, args: string[], cwd?: string): voi
   const result = spawnSync(command, args, {
     stdio: 'inherit',
     cwd,
+    env: undefined,
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(`Command "${command}" exited with code ${result.status}`);
+  }
+}
+
+export function execLiveArgsWithEnv(
+  command: string,
+  args: string[],
+  cwd?: string,
+  env?: NodeJS.ProcessEnv,
+): void {
+  const result = spawnSync(command, args, {
+    stdio: 'inherit',
+    cwd,
+    env,
   });
   if (result.error) {
     throw result.error;
