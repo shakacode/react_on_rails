@@ -32,7 +32,10 @@ Before changing versions, check these first:
 2. **Bundler age**: legacy apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
 3. **Rails version**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 apps need a Rails upgrade before they can bundle v16.
 4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.
-5. **Version pinning**: use exact gem and npm package versions for React on Rails-related packages. Avoid `^`, `~`, or `*`.
+5. **Native gem age**: older `pg`, `nio4r`, `mysql2`, or `msgpack` versions can fail on current Ruby or macOS before the React on Rails upgrade even begins.
+6. **App boot readiness**: the install generator boots the full Rails app. Make sure `config/database.yml` exists and required env vars for initializers are set.
+7. **Package manager metadata**: if the repo has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example: `"packageManager": "yarn@1.22.22"`.
+8. **Version pinning**: use exact gem and npm package versions for React on Rails-related packages. Avoid `^`, `~`, or `*`.
 
 If your app is both Ruby/Bundler-old and Webpacker-old, do those upgrades first. Trying to jump directly from a Rails 5 / Webpacker 3 / Bundler 1 stack to current React on Rails is usually more than one migration.
 
@@ -43,6 +46,8 @@ gem install bundler   # if Bundler 2.x is not already available
 bundle lock --update
 bundle install
 ```
+
+If `bundle install` is failing even earlier on native gems, fix that baseline before upgrading React on Rails. Common examples from real upgrades are `pg` compile errors in older Postgres apps, `nio4r` failures in older Rails/Webpacker stacks, or `mysql2` linker issues on Homebrew/macOS setups.
 
 ## Upgrading Precompile Hooks for SSR + HMR
 

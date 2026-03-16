@@ -6,6 +6,9 @@ Use this path when you already have a Rails application and want React on Rails 
 
 - Rails 7+ is recommended. Rails 5.2+ can work, but Webpacker-era apps usually need an incremental upgrade first.
 - If your app still uses `webpacker`, expect this to be a two-step migration: move to `shakapacker`, then install React on Rails.
+- If `bundle install` is already failing on older native gems such as `pg`, `nio4r`, `mysql2`, or `msgpack`, fix that baseline first. React on Rails installation cannot get past a broken app bundle.
+- If your repo has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example: `"packageManager": "yarn@1.22.22"`.
+- The install generator boots your app. Make sure `config/database.yml` exists and any required env vars for initializers are set before running `rails generate`.
 - If your app is Rails 5 API-only, first [convert it to a standard Rails app](../migrating/convert-rails-5-api-only-app.md).
 - Commit or stash your current work if you want the generated diff to be easier to review. The generator updates files like `bin/dev`, `config/shakapacker.yml`, routes, initializers, and sample views/controllers.
 
