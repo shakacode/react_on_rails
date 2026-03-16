@@ -54,6 +54,7 @@ The core React on Rails gem and npm package.
 
 Performance enhancements, React Server Components, and advanced features. Requires a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) subscription (free for evaluation and non-production use).
 
+- [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
 - [Installation](./pro/installation.md) - Set up React on Rails Pro
 - [Configuration](./pro/configuration.md) - Pro-specific settings
 - [React Server Components](./pro/react-server-components/tutorial.md) - RSC with Rails
