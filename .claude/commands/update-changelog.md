@@ -239,10 +239,10 @@ When a new version is released:
 
 1. Get the latest git tag: `git tag --sort=-v:refname | head -5`
 2. Get the most recent version header in CHANGELOG.md (the first `### [VERSION] - DATE` after `### [Unreleased]`)
-3. **Compare them.** If the latest git tag (minus the `v` prefix) does NOT match the latest changelog version header, there are tagged releases missing from the changelog. For example:
-   - Latest tag: `v16.4.0.rc.4`
-   - Latest changelog version: `### [16.4.0.rc.3]`
+3. **Compare them.** If the latest git tag (minus the `v` prefix) does NOT appear anywhere in the changelog version headers, there are tagged releases missing from the changelog. **Important**: Don't just compare against the _top_ changelog header — a version header may exist _above_ the latest tag if it was stamped as a draft before tagging. Check whether the tag's version appears in _any_ `### [X.Y.Z]` header. For example:
+   - Latest tag: `v16.4.0.rc.4`, and no `### [16.4.0.rc.4]` header exists anywhere in CHANGELOG.md
    - **Result: `16.4.0.rc.4` is missing and needs its own section**
+   - But if `### [16.5.0.rc.0]` is the top header (a draft, not yet tagged) and `### [16.4.0.rc.4]` exists below it, then nothing is missing — the top header is simply a pre-release draft
 
 4. For EACH missing tagged version (there may be multiple):
    a. Find commits in that tag vs the previous tag: `git log --oneline PREV_TAG..MISSING_TAG`
@@ -264,10 +264,11 @@ When a new version is released:
 
 #### Step 3: Add new entries for post-tag commits
 
-1. Run `git log --oneline LATEST_TAG..origin/master` to find commits after the latest tag
+1. Run `git log --oneline LATEST_TAG..origin/master` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
 2. Extract PR numbers: `git log --oneline LATEST_TAG..origin/master | grep -oE "#[0-9]+" | sort -u`
-3. For each PR number, check if it's already in CHANGELOG.md: `grep "PR XXX" CHANGELOG.md`
-4. For PRs not yet in the changelog:
+3. If Step 2 found no missing tagged versions, verify no tag is ahead of master: `git log --oneline origin/master..LATEST_TAG` should be empty. If not, entries in "Unreleased" may belong to that tagged version — Step 2 should have caught this, so re-check.
+4. For each PR number, check if it's already in CHANGELOG.md: `grep "PR XXX" CHANGELOG.md`
+5. For PRs not yet in the changelog:
    - Get PR details: `gh pr view NUMBER --json title,body,author --repo shakacode/react_on_rails`
    - **Never ask the user for PR details** - get them from git history or the GitHub API
    - Validate that the change is user-visible (per the criteria above). Skip CI, lint, refactoring, test-only changes.
@@ -313,16 +314,19 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Proper author link
    - Consistent with existing entries
    - File ends with a newline character
+   - **No duplicate section headings** (e.g., don't create two `#### Fixed` sections — merge entries into the existing heading)
 2. **Verify version sections are in order** (Unreleased -> newest tag -> older tags)
-3. **Verify version diff links** at the bottom of the file are correct
+3. **Verify version diff links** at the bottom of the file are correct (compare links MUST use the `v` prefix to match git tags)
 4. **Show the user** a summary of what was done:
    - Which version sections were created
    - Which entries were moved from Unreleased
    - Which new entries were added
    - Which PRs were skipped (and why)
 5. If in `release`/`rc`/`beta` mode or explicit-version mode, **automatically commit, push, and open a PR**:
+   - Verify the working tree only has `CHANGELOG.md` changes; if there are other uncommitted changes, warn the user and stop
+   - Verify the current branch is `master` (`git branch --show-current`); if not, warn the user and stop
    - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
-   - Commit CHANGELOG.md (and the skill file if it was also modified)
+   - Stage only `CHANGELOG.md` (`git add CHANGELOG.md`) and commit with message `Update CHANGELOG.md for VERSION` (using the stamped version)
    - Push and open a PR with the changelog diff as the body
    - If the push or PR creation fails, the CHANGELOG is already stamped locally — fix the issue (e.g., authentication, branch protection), then run `git push -u origin <branch>` and `gh pr create` manually
    - Remind the user to run `rake release` (no args) after merge to publish and auto-create the GitHub release
@@ -342,11 +346,13 @@ When the user passes `rc` or `beta` as an argument:
 3. **Always collapse prior prereleases into the current prerelease** (this is the default behavior):
    - Combine all prior prerelease changelog entries into the new prerelease version section
    - Remove previous prerelease version sections (e.g., remove `### [16.5.0.rc.0]` when creating `### [16.5.0.rc.1]`)
+   - When collapsing, **consolidate duplicate category headings** — if both the Unreleased section and a prior prerelease section have `#### Fixed`, merge all entries under a single `#### Fixed` heading
+   - **Remove orphaned version diff links** at the bottom of the file for collapsed prerelease sections
    - Add any new user-visible changes from commits since the last prerelease
    - Update version diff links to point from the last stable version to the new prerelease
    - This keeps the changelog clean with a single prerelease section that accumulates all changes since the last stable release
 
-**CRITICAL**: The new version header must be inserted **immediately after `### [Unreleased]`**, NOT after "Changes since the last non-beta release." or any other text. This ensures correct ordering of version headers.
+**Note**: The new version header must be inserted **immediately after `### [Unreleased]`** (see Step 4). This ensures correct ordering of version headers.
 
 ### For Prerelease to Stable Version Release
 
