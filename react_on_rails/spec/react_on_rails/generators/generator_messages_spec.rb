@@ -57,7 +57,7 @@ describe GeneratorMessages do
     )
 
     expect(message).to include("React on Rails Pro")
-    expect(message).to include("https://www.shakacode.com/react-on-rails/docs/pro/upgrading-to-pro/")
+    expect(message).to include("https://reactonrails.com/docs/pro/upgrading-to-pro/")
   end
 
   it "does not show Pro upgrade hint when --pro is used" do

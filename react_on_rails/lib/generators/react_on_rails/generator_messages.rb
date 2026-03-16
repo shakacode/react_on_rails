@@ -4,7 +4,7 @@ require "rainbow"
 
 module GeneratorMessages
   PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
-                     "\n       https://www.shakacode.com/react-on-rails/docs/pro/upgrading-to-pro/"
+                     "\n       https://reactonrails.com/docs/pro/upgrading-to-pro/"
 
   class << self
     def output
