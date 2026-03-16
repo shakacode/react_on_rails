@@ -19,6 +19,8 @@ Pro includes core React on Rails as a dependency — just swap the packages and 
 ## Three Steps to Upgrade
 
 > **Version note:** The examples below use `16.4.0` for illustration. Before you begin, check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) to find the latest version and substitute it in the commands below. Always use an exact version pin (`=`) for the gem and `--save-exact`/`--exact` for the npm package.
+>
+> **RC versions:** RubyGems and npm use different pre-release separators. For example, release candidate 9 of version 16.4.0 is `16.4.0.rc.9` on RubyGems (dots) but `16.4.0-rc.9` on npm (hyphen). Make sure to use the correct format for each package manager.
 
 ### 1. Swap the gem
 
