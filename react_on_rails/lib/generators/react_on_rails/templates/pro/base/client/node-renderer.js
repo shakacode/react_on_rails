@@ -7,7 +7,9 @@ const parseWorkersCount = (value) => {
   const normalized = value.trim();
   if (normalized === '') return null;
   const parsed = Number(normalized);
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+  console.warn(`[react-on-rails] Ignoring invalid worker count "${value}". Expected a non-negative integer.`);
+  return null;
 };
 const configuredWorkersCount =
   parseWorkersCount(env.RENDERER_WORKERS_COUNT) ?? parseWorkersCount(env.NODE_RENDERER_CONCURRENCY);

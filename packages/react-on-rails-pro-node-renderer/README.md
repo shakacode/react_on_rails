@@ -24,6 +24,16 @@ Create `node-renderer.js` in your project root:
 const path = require('path');
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
+const parseWorkersCount = (value) => {
+  if (value == null) return null;
+  const normalized = value.trim();
+  if (normalized === '') return null;
+  const parsed = Number(normalized);
+  if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+  console.warn(`[react-on-rails] Ignoring invalid worker count "${value}". Expected a non-negative integer.`);
+  return null;
+};
+
 reactOnRailsProNodeRenderer({
   // Directory where the renderer caches uploaded server bundles
   serverBundleCachePath: path.resolve(__dirname, '.node-renderer-bundles'),
@@ -42,7 +52,7 @@ reactOnRailsProNodeRenderer({
 
   // Number of worker processes (defaults to CPU count - 1)
   // Set to 0 for single-process mode (useful for debugging)
-  workersCount: Number(process.env.RENDERER_WORKERS_COUNT) ?? 3,
+  workersCount: parseWorkersCount(process.env.RENDERER_WORKERS_COUNT) ?? 3,
 });
 ```
 
