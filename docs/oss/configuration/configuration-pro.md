@@ -35,7 +35,7 @@ ReactOnRailsPro.configure do |config|
   config.excluded_dependency_globs = [ File.join(Rails.root, "app", "views", "**", "dont_hash_this.jbuilder") ]
 
   # Remote bundle caching saves deployment time by caching bundles.
-  # See /docs/oss/building-features/fragment-caching.md#bundle-caching for usage and examples.
+  # See /docs/oss/building-features/bundle-caching.md for usage and examples.
   config.remote_bundle_cache_adapter = nil
 
   # ALL OPTIONS BELOW ONLY APPLY IF SERVER RENDERING

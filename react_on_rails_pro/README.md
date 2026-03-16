@@ -156,7 +156,7 @@ end %>
 - Automatic cache invalidation based on props
 - Works with Rails fragment caching infrastructure
 
-**📖 Learn more**: [docs/oss/building-features/fragment-caching.md](../docs/oss/building-features/fragment-caching.md)
+**📖 Learn more**: [docs/oss/building-features/caching.md](../docs/oss/building-features/caching.md)
 
 ### 2. Prerender Caching
 
@@ -175,7 +175,7 @@ end
 - Caches across multiple requests
 - Complements fragment caching for maximum performance
 
-**📖 Learn more**: [docs/oss/building-features/fragment-caching.md](../docs/oss/building-features/fragment-caching.md)
+**📖 Learn more**: [docs/oss/building-features/caching.md](../docs/oss/building-features/caching.md)
 
 ### 3. React on Rails Pro Node Renderer
 
@@ -236,7 +236,7 @@ Speed up webpack rebuilds by caching unchanged bundles.
 - **Faster development**: Hot reload only what changed
 - **Lower costs**: Reduce build server time
 
-**📖 Learn more**: [docs/oss/building-features/fragment-caching.md#bundle-caching](../docs/oss/building-features/fragment-caching.md#bundle-caching)
+**📖 Learn more**: [docs/oss/building-features/bundle-caching.md](../docs/oss/building-features/bundle-caching.md)
 
 ### 6. Global State Management
 
@@ -326,7 +326,7 @@ rails console
 
 ### Next Steps
 
-- **Enable caching**: See [docs/oss/building-features/fragment-caching.md](../docs/oss/building-features/fragment-caching.md)
+- **Enable caching**: See [docs/oss/building-features/caching.md](../docs/oss/building-features/caching.md)
 - **Set up Node Renderer**: See [docs/oss/building-features/node-renderer/basics.md](../docs/oss/building-features/node-renderer/basics.md)
 - **Optimize performance**: See [docs/oss/configuration/configuration-pro.md](../docs/oss/configuration/configuration-pro.md)
 - **Set up for your team**: See [LICENSE_SETUP.md](./LICENSE_SETUP.md#team-setup)
@@ -343,7 +343,8 @@ rails console
 
 ### Features
 
-- **[Caching Guide](../docs/oss/building-features/fragment-caching.md)** - Fragment and prerender caching
+- **[Caching Guide](../docs/oss/building-features/caching.md)** - Prerender and fragment caching
+- **[Bundle Caching](../docs/oss/building-features/bundle-caching.md)** - Speed up webpack builds
 - **[Node Renderer Basics](../docs/oss/building-features/node-renderer/basics.md)** - Standalone Node.js server
 - **[Node Renderer Configuration](../docs/oss/building-features/node-renderer/js-configuration.md)** - JavaScript config
 - **[Code Splitting](../docs/oss/building-features/code-splitting.md)** - Loadable components with SSR

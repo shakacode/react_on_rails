@@ -156,7 +156,7 @@ See the [RSC tutorial](../../pro/react-server-components/tutorial.md) for detail
 
 - [Configuration Reference](../configuration/configuration-pro.md) — All Pro config options
 - [Node Renderer Configuration](../building-features/node-renderer/js-configuration.md) — All Node Renderer options
-- [Caching Guide](../building-features/fragment-caching.md) — Fragment and prerender caching
+- [Caching Guide](../building-features/caching.md) — Fragment and prerender caching
 - [Streaming SSR](../building-features/streaming-server-rendering.md) — Progressive rendering
 - [Code Splitting](../building-features/code-splitting.md) — Loadable components with SSR
 

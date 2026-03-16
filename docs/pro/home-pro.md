@@ -33,7 +33,7 @@ Caching of SSR is critical for achieving optimum performance.
 - **Fragment Caching**: for `react_component` and `react_component_hash`, including lazy evaluation of props.
 - **Prerender Caching**: Server rendering JavaScript evaluation is cached if `prerender_caching` is turned on in your Rails config. This applies to all JavaScript evaluation methods.
 
-See [Fragment Caching](../oss/building-features/fragment-caching.md) for more details.
+See [Fragment Caching](../oss/building-features/caching.md) for more details.
 
 ### Clearing of Global State
 
@@ -48,7 +48,7 @@ See the [Node Renderer Docs](../oss/building-features/node-renderer/basics.md).
 
 ### Bundle Caching
 
-Don't wait for the same webpack bundles to be built over and over. See the [bundle-caching docs](../oss/building-features/fragment-caching.md#bundle-caching).
+Don't wait for the same webpack bundles to be built over and over. See the [bundle-caching docs](../oss/building-features/bundle-caching.md).
 
 ## Other Utility Methods
 
@@ -58,7 +58,7 @@ See the [Ruby API](../oss/api-reference/ruby-api-pro.md).
 
 - [Installation](./installation.md)
 - [Streaming Server Rendering](../oss/building-features/streaming-server-rendering.md)
-- [Caching](../oss/building-features/fragment-caching.md)
+- [Caching](../oss/building-features/caching.md)
 - [Rails Configuration](../oss/configuration/configuration-pro.md)
 - [Node Renderer Docs](../oss/building-features/node-renderer/basics.md)
 
@@ -97,7 +97,7 @@ Such fragment caching saves CPU work for your web server and greatly reduces the
 4. Creating the HTML string containing the props and the server-rendered JavaScript code.
 
 Note, even without server rendering (without step 3 above), fragment caching is still effective.
-See [Caching](../oss/building-features/fragment-caching.md) for more additional details.
+See [Caching](../oss/building-features/caching.md) for more additional details.
 
 ## React On Rails Pro Node React Render
 
@@ -160,5 +160,5 @@ For more info, email [justin@shakacode.com](mailto:justin@shakacode.com).
 
 # References
 
-- [Caching](../oss/building-features/fragment-caching.md)
+- [Caching](../oss/building-features/caching.md)
 - [Rails Configuration](../oss/configuration/configuration-pro.md)

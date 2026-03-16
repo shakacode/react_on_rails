@@ -48,7 +48,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 - Verify Rails cache store is configured (not `:null_store`)
 - Check `cache_key` values — if they change every request, the cache will never hit
-- If your component depends on URL or locale, include those in the `cache_key` (see [Caching docs](../oss/building-features/fragment-caching.md))
+- If your component depends on URL or locale, include those in the `cache_key` (see [Caching docs](../oss/building-features/caching.md))
 
 ### Stale cached content after deploy
 

@@ -59,7 +59,8 @@ Performance enhancements, React Server Components, and advanced features. Requir
 - [Configuration](./oss/configuration/configuration-pro.md) - Pro-specific settings
 - [React Server Components](./pro/react-server-components/tutorial.md) - RSC with Rails
 - [Streaming SSR](./oss/building-features/streaming-server-rendering.md) - Progressive server rendering
-- [Fragment Caching](./oss/building-features/fragment-caching.md) - Cache rendered components
+- [SSR Caching](./oss/building-features/caching.md) - Prerender and fragment caching
+- [Bundle Caching](./oss/building-features/bundle-caching.md) - Avoid redundant webpack builds
 - [Node Renderer](./oss/building-features/node-renderer/basics.md) - Dedicated Node.js rendering server
 - [Code Splitting](./oss/building-features/code-splitting.md) - Loadable components
 - [Ruby API (Pro)](./oss/api-reference/ruby-api-pro.md) - Pro view helpers and utilities
