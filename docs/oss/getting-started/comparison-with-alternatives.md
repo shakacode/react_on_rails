@@ -24,6 +24,8 @@ Choosing a React integration strategy for Rails? This guide compares React on Ra
 
 [react-rails](https://github.com/reactjs/react-rails) was one of the first gems to integrate React with Rails. It provides a `react_component` view helper and basic ExecJS-based server rendering. However, the project has seen minimal maintenance in recent years and lacks support for modern React features like streaming SSR, code splitting, or React Server Components.
 
+Both react-rails and React on Rails are maintained by [ShakaCode](https://www.shakacode.com/), and switching from react-rails to React on Rails is straightforward since both use a `react_component` view helper with the same API. See the [migration guide](../migrating/migrating-from-react-rails.md) for details.
+
 **Best for:** Legacy projects already using react-rails that don't need advanced rendering features.
 
 ### Inertia.js
@@ -110,7 +112,6 @@ Pro is free for evaluation and non-production use. See the [OSS vs Pro feature m
 Yes. React on Rails is designed for progressive adoption:
 
 - Use Hotwire for simple pages and React on Rails for interactive components on the same app
-- Migrate from react-rails to React on Rails incrementally — both use a `react_component` helper with similar APIs
 - Start with React on Rails OSS and upgrade to Pro when you need advanced features
 
 ## Further Reading
