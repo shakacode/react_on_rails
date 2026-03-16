@@ -4,19 +4,20 @@ Choosing a React integration strategy for Rails? This guide compares React on Ra
 
 ## Feature Comparison
 
-| Feature                  |   react-rails    |    Inertia.js    | Hotwire / Turbo  | React on Rails (OSS) | React on Rails Pro  |
-| ------------------------ | :--------------: | :--------------: | :--------------: | :------------------: | :-----------------: |
-| Server-side rendering    | Limited (ExecJS) |        —         |       N/A        |      ✓ (ExecJS)      |  ✓ (Node renderer)  |
-| React Server Components  |        —         |        —         |       N/A        |          —           |          ✓          |
-| Streaming SSR            |        —         |        —         |  Turbo Streams   |          —           |          ✓          |
-| Code splitting with SSR  |        —         |        —         |       N/A        |          —           |          ✓          |
-| Auto-bundling            |        —         |        —         |   Import maps    |          ✓           |          ✓          |
-| Rspack / Webpack support |        —         | ✓ (Vite default) |        —         |          ✓           |          ✓          |
-| Hot module replacement   |        —         |        ✓         |  Turbo morphing  |          ✓           |          ✓          |
-| Type-safe routing        |        —         |    ✓ (Ziggy)     |        —         |          —           | ✓ (TanStack Router) |
-| Props from controller    |        —         |        ✓         |       N/A        |          ✓           |          ✓          |
-| SSR caching              |        —         |        —         | Fragment caching |          —           |          ✓          |
-| Active maintenance       |     Minimal      |        ✓         |        ✓         |          ✓           |          ✓          |
+| Feature                  |   react-rails    |    Inertia.js    | Hotwire / Turbo  |    Vite Ruby    | React on Rails (OSS) | React on Rails Pro  |
+| ------------------------ | :--------------: | :--------------: | :--------------: | :-------------: | :------------------: | :-----------------: |
+| Server-side rendering    | Limited (ExecJS) |        —         |       N/A        |        —        |      ✓ (ExecJS)      |  ✓ (Node renderer)  |
+| React Server Components  |        —         |        —         |       N/A        |        —        |          —           |          ✓          |
+| Streaming SSR            |        —         |        —         |  Turbo Streams   |        —        |          —           |          ✓          |
+| Code splitting with SSR  |        —         |        —         |       N/A        |        —        |          —           |          ✓          |
+| Auto-bundling            |        —         |        —         |   Import maps    |        —        |          ✓           |          ✓          |
+| Rspack / Webpack support |        —         | ✓ (Vite default) |        —         | ✓ (Vite/Rollup) |          ✓           |          ✓          |
+| Hot module replacement   |        —         |        ✓         |  Turbo morphing  |        ✓        |          ✓           |          ✓          |
+| Type-safe routing        |        —         |    ✓ (Ziggy)     |        —         |        —        |          —           | ✓ (TanStack Router) |
+| Props from controller    |        —         |        ✓         |       N/A        |        —        |          ✓           |          ✓          |
+| SSR caching              |        —         |        —         | Fragment caching |        —        |          —           |          ✓          |
+| React component helper   |        ✓         |        —         |       N/A        |        —        |          ✓           |          ✓          |
+| Active maintenance       |     Minimal      |        ✓         |        ✓         |        ✓        |          ✓           |          ✓          |
 
 ## Overview of Each Option
 
@@ -64,6 +65,42 @@ Both react-rails and React on Rails are maintained by [ShakaCode](https://www.sh
 
 **Best for:** Apps where most pages are CRUD-oriented and you want to minimize JavaScript complexity.
 
+### Vite Ruby
+
+[Vite Ruby](https://vite-ruby.netlify.app/) integrates the [Vite](https://vite.dev/) build tool with Rails. Vite uses esbuild for fast development builds and Rollup for optimized production bundles. The `vite_rails` gem provides asset tag helpers and a dev server proxy, but it is a **build tool only** — it does not provide React-specific helpers, server-side rendering, or a component rendering layer.
+
+**Strengths:**
+
+- Very fast dev server startup and HMR via Vite's native ESM approach
+- Large plugin ecosystem (Vite plugins, Rollup plugins)
+- Simple configuration compared to Webpack
+
+**Trade-offs:**
+
+- No `react_component` view helper — you must manually mount React components via DOM selectors or data attributes
+- No server-side rendering — SSR requires building your own Node.js rendering pipeline
+- No props-from-controller pattern — data must be passed through `data-*` attributes, JSON script tags, or a separate API
+- No auto-bundling — each component entry point must be manually registered
+
+**Best for:** Rails apps that only need client-side React rendering and want the simplest possible build tooling without SSR or Rails view integration.
+
+### Vite vs Rspack: Build Tooling Compared
+
+If build performance is your primary concern, both Vite and Rspack offer dramatic improvements over Webpack. Here's how they compare:
+
+| Aspect                      | Vite (via vite_rails)                    | Rspack (via Shakapacker)                      |
+| --------------------------- | ---------------------------------------- | --------------------------------------------- |
+| **Dev server startup**      | Near-instant (native ESM, no bundling)   | Fast (~53–270ms incremental builds)           |
+| **Production builds**       | Rollup (tree-shaking, code splitting)    | Rust-based bundling with SWC transpilation    |
+| **SSR support**             | Vite SSR mode (manual Rails integration) | Integrated with React on Rails SSR pipeline   |
+| **Webpack compatibility**   | None — different plugin/loader format    | Near-complete Webpack API compatibility       |
+| **Migration from Webpack**  | Full rewrite of build config             | Minimal changes — same config format          |
+| **Rails integration**       | Asset tag helpers only                   | Full Shakapacker integration + React on Rails |
+| **React component helpers** | None — manual DOM mounting               | `react_component`, `react_component_hash`     |
+| **Plugin ecosystem**        | Vite/Rollup plugins                      | Webpack/Rspack plugins                        |
+
+**Key takeaway:** Vite is a fast, modern bundler — but it is only a bundler. Choosing Vite means giving up React on Rails' `react_component` helper, automatic props passing from controllers, built-in SSR, and auto-bundling. With Rspack, you get comparable build speeds while retaining the full React on Rails integration layer. If you need SSR, the gap widens further: React on Rails provides SSR out of the box, while Vite requires building a custom Node.js rendering pipeline and wiring it into Rails yourself.
+
 ### React on Rails (OSS)
 
 [React on Rails](https://github.com/shakacode/react_on_rails) provides full React integration with Rails views. Components render directly in ERB/Haml templates via the `react_component` helper, with props passed from Rails. Server-side rendering uses ExecJS (via mini_racer).
@@ -98,14 +135,16 @@ Pro is free for evaluation and non-production use. See the [OSS vs Pro feature m
 
 ## Choosing the Right Approach
 
-| Your situation                      | Recommended approach                                                                      |
-| ----------------------------------- | ----------------------------------------------------------------------------------------- |
-| CRUD-heavy app, minimal JS needed   | Hotwire / Turbo                                                                           |
-| SPA-like experience, no SSR needed  | Inertia.js                                                                                |
-| React components within Rails views | React on Rails (OSS)                                                                      |
-| React + SSR + SEO requirements      | React on Rails (OSS or Pro)                                                               |
-| High-traffic SSR, RSC, streaming    | React on Rails Pro                                                                        |
-| Legacy react-rails app              | Migrate to React on Rails ([migration guide](../migrating/migrating-from-react-rails.md)) |
+| Your situation                        | Recommended approach                                                                      |
+| ------------------------------------- | ----------------------------------------------------------------------------------------- |
+| CRUD-heavy app, minimal JS needed     | Hotwire / Turbo                                                                           |
+| SPA-like experience, no SSR needed    | Inertia.js                                                                                |
+| Client-side React only, no SSR needed | Vite Ruby (simple) or React on Rails (with Rails view integration)                        |
+| React components within Rails views   | React on Rails (OSS)                                                                      |
+| React + SSR + SEO requirements        | React on Rails (OSS or Pro)                                                               |
+| High-traffic SSR, RSC, streaming      | React on Rails Pro                                                                        |
+| Fast builds + full Rails integration  | React on Rails with Rspack                                                                |
+| Legacy react-rails app                | Migrate to React on Rails ([migration guide](../migrating/migrating-from-react-rails.md)) |
 
 ## Can I Combine Approaches?
 
