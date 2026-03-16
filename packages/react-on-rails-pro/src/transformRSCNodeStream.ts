@@ -30,24 +30,36 @@ import safePipe from './safePipe.ts';
  * @returns A transformed stream compatible with React's SSR runtime
  */
 export default function transformRSCStream(stream: NodeJS.ReadableStream): NodeJS.ReadableStream {
-  const decoder = new TextDecoder();
-  let lastIncompleteChunk = '';
+  let buf = Buffer.alloc(0);
+  let state: 'header' | 'content' = 'header';
+  let contentLen = 0;
 
   const htmlExtractor = new Transform({
-    transform(oneOrMoreChunks, _, callback) {
+    transform(chunk: Buffer, _, callback) {
       try {
-        const decodedChunk = lastIncompleteChunk + decoder.decode(oneOrMoreChunks as Uint8Array);
-        const separateChunks = decodedChunk.split('\n').filter((chunk) => chunk.trim() !== '');
+        buf = Buffer.concat([buf, chunk]);
 
-        if (!decodedChunk.endsWith('\n')) {
-          lastIncompleteChunk = separateChunks.pop() ?? '';
-        } else {
-          lastIncompleteChunk = '';
-        }
+        let progressed = true;
+        while (progressed) {
+          progressed = false;
+          if (state === 'header') {
+            const idx = buf.indexOf(0x0a); // \n
+            if (idx >= 0) {
+              const header = buf.subarray(0, idx);
+              buf = buf.subarray(idx + 1);
 
-        for (const chunk of separateChunks) {
-          const parsedData = JSON.parse(chunk) as { html: string };
-          this.push(parsedData.html);
+              const tabIdx = header.indexOf(0x09); // \t
+              const lenHex = header.subarray(tabIdx + 1).toString('utf8');
+              contentLen = parseInt(lenHex, 16);
+              state = 'content';
+              progressed = true;
+            }
+          } else if (buf.length >= contentLen) {
+            this.push(buf.subarray(0, contentLen));
+            buf = buf.subarray(contentLen);
+            state = 'header';
+            progressed = true;
+          }
         }
         callback();
       } catch (error) {
