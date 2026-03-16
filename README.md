@@ -131,8 +131,8 @@ For detailed feature descriptions, see the [full OSS vs Pro comparison](docs/oss
 ### Upgrade in 3 Steps
 
 ```bash
-bundle add react_on_rails_pro --strict
-rails generate react_on_rails:install --pro
+bundle add react_on_rails_pro --version="<gem_version>" --strict
+rails generate react_on_rails:pro
 bin/dev
 ```
 
