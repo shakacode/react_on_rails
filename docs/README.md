@@ -32,6 +32,7 @@ The core React on Rails gem and npm package.
 - [API Reference](./oss/api-reference/) - View helpers and JavaScript API
 - [Deployment](./oss/deployment/README.md) - Production deployment and troubleshooting
 - [Upgrading](./oss/upgrading/) - Version upgrade guides
+- [Changelog](./oss/upgrading/changelog.md) - All notable changes by version
 - [Migrating](./oss/migrating/) - From other frameworks
 - [Misc](./oss/misc/) - Articles, tips, credits, and other resources
 
