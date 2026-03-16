@@ -10,7 +10,12 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
                                 .map { |path| path.delete_prefix("#{templates_root}/") }
                                 .sort
 
-      explicitly_handled_templates = %w[base/base/config/webpack/webpack.config.js.tt]
+      explicitly_handled_templates = %w[
+        base/base/config/webpack/webpack.config.js.tt
+        base/base/config/webpack/webpack.config.ts.tt
+        base/base/config/webpack/rspack.config.js.tt
+        base/base/config/webpack/rspack.config.ts.tt
+      ]
       managed_templates = described_class.const_get(:MANAGED_WEBPACK_FILE_TEMPLATES).values.uniq.sort
 
       expect(discovered_templates - explicitly_handled_templates).to match_array(managed_templates)
