@@ -128,11 +128,12 @@ React on Rails Pro adds advanced rendering and performance features on top of th
 
 For detailed feature descriptions, see the [full OSS vs Pro comparison](docs/oss/getting-started/oss-vs-pro.md).
 
-### Upgrade in 3 Steps
+### Get Started in 3 Steps
 
 ```bash
+# See docs/pro/installation.md or CHANGELOG for the latest version number
 bundle add react_on_rails_pro --version="<gem_version>" --strict
-rails generate react_on_rails:pro
+bundle exec rails generate react_on_rails:pro
 bin/dev
 ```
 
