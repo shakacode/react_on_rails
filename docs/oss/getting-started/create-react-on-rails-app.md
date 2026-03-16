@@ -7,6 +7,7 @@ The fastest way to start a new React on Rails project. One command creates a ful
 ```bash
 npx create-react-on-rails-app my-app
 cd my-app
+bin/rails db:prepare
 bin/dev
 ```
 
@@ -84,6 +85,7 @@ The CLI checks for these before starting:
 - **Node.js 18+**
 - **Ruby 3.0+**
 - **Rails 7.0+** (`gem install rails`)
+- **PostgreSQL** running locally
 - **npm or pnpm**
 
 If any are missing, you'll get a clear error message with installation instructions.
