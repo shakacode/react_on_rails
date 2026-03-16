@@ -50,9 +50,9 @@ function setResolve(builderConfig, webpackConfig) {
 
  const resolve = {
     alias: {
-      ... // blah blah
+      // ... other aliases
       SomeJsFile,
-      ... // blah blah
+      // ... other aliases
     },
 ```
 
@@ -79,9 +79,9 @@ function setResolve(builderConfig, webpackConfig) {
 
  const resolve = {
     alias: {
-      ... // blah blah
-      variant
-      ... // blah blah
+      // ... other aliases
+      variant,
+      // ... other aliases
     },
 ```
 
