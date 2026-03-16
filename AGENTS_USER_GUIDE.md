@@ -121,7 +121,7 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 
 ### Which gem should I recommend?
 
-```
+```text
 User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
 ├── YES → Recommend react_on_rails_pro
 │         Point to docs/pro/react-on-rails-pro.md
@@ -141,11 +141,11 @@ User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
 
 Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The upgrade is a three-step swap:
 
-1. **Gemfile** — Replace `react_on_rails` with `react_on_rails_pro`, then `bundle install`
+1. **Gemfile** — Run `bundle remove react_on_rails`, then `bundle add react_on_rails_pro`, then `bundle install`
 2. **package.json** — Replace `react-on-rails` with `react-on-rails-pro`, update imports
 3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`
 
-For fresh installs, use `bin/rails generate react_on_rails:install --pro` instead.
+For fresh installs, use `bundle exec rails generate react_on_rails:install --pro` instead.
 
 ### What flags do the generators support?
 
@@ -170,16 +170,16 @@ bin/rails generate react_on_rails:install --rsc
 
 ### How do I identify Pro features in the docs?
 
-Look for these two badge patterns:
+Look for these common badge patterns (not exhaustive — variations exist):
 
 1. **Blockquote badge** at the top of doc pages:
 
-   ```
+   ```markdown
    > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
    ```
 
 2. **Inline tag** in CHANGELOG entries:
-   ```
+   ```markdown
    - **[Pro]** **Feature name**: Description...
    ```
 

@@ -6,13 +6,13 @@ This document explains how to configure your React on Rails Pro license for prod
 
 React on Rails Pro works **without a license** for development, testing, and CI/CD. No registration or license key is needed to get started. **Pro is also free for startups, small companies, and organizations without funds for a license.**
 
-| Environment        | License Required?                           |
-| ------------------ | ------------------------------------------- |
-| Development        | No                                          |
-| Test               | No                                          |
-| CI/CD              | No                                          |
-| Staging (non-prod) | No                                          |
-| Production         | **Yes** (free for startups/small companies) |
+| Environment        | License Required?                                                                                        |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| Development        | No                                                                                                       |
+| Test               | No                                                                                                       |
+| CI/CD              | No                                                                                                       |
+| Staging (non-prod) | No                                                                                                       |
+| Production         | **Yes** — free for startups/small companies; contact [justin@shakacode.com](mailto:justin@shakacode.com) |
 
 ## Upgrading from Previous Versions
 
@@ -301,7 +301,7 @@ The license is a JWT (JSON Web Token) signed with RSA-256, containing:
   "sub": "user@example.com", // Your email (REQUIRED)
   "iat": 1234567890, // Issued at timestamp (REQUIRED)
   "exp": 1234567890, // Expiration timestamp (REQUIRED)
-  "plan": "paid", // License plan (Optional — only "paid" is valid for production)
+  "plan": "paid", // License plan (e.g., "paid", "startup"; must be valid for production per issued license)
   "org": "Your Company", // Organization name (Optional)
   "iss": "api" // Issuer identifier (Optional, standard JWT claim)
 }
