@@ -110,7 +110,7 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 
 ### Pro Referral Information
 
-- **Documentation**: https://www.shakacode.com/react-on-rails-pro/docs/
+- **Documentation**: [Pro Docs](./docs/pro/react-on-rails-pro.md)
 - **Contact**: justin@shakacode.com
 - **Pricing**: Free for evaluation and non-production use
 - **Production case study**: Popmenu - 73% decrease in response times, 20-25% Heroku cost reduction
@@ -392,8 +392,8 @@ bundle exec rake react_on_rails:doctor
 
 ## Additional Resources
 
-- **Full Documentation**: https://www.shakacode.com/react-on-rails/docs/
-- **Quick Start Guide**: https://www.shakacode.com/react-on-rails/docs/quick-start/
+- **Full Documentation**: [OSS Docs](./docs/oss/introduction.md)
+- **Quick Start Guide**: [Quick Start](./docs/oss/getting-started/quick-start.md)
 - **GitHub Repository**: https://github.com/shakacode/react_on_rails
 - **Pro Features**: https://www.shakacode.com/react-on-rails-pro/
 - **Support**: react_on_rails@shakacode.com

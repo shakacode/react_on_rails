@@ -23,7 +23,7 @@ Before starting, ensure you have:
 
 - **React on Rails Pro 4+** with **React on Rails 15+**
 - **React 19** (`react` and `react-dom` both at 19.x)
-- **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](../../pro/node-renderer/basics.md).
+- **Node renderer** configured and running (RSC requires server-side JavaScript execution via the node renderer, not ExecJS). If you're still using ExecJS, migrate to the node renderer first -- see [Node Renderer Basics](../building-features/node-renderer/basics.md).
 - **Shakapacker** (or webpack configured via Shakapacker)
 - **Node.js 20+**
 

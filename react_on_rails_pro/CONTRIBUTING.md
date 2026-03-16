@@ -46,7 +46,7 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 
 ## Doc Changes
 
-When making doc changes, we want the change to work on both [the ShakaCode docs site](https://www.shakacode.com/react-on-rails-pro/docs/) and when browsing the GitHub repo.
+When making doc changes, we want the change to work on both [the React on Rails docs site](https://reactonrails.com/docs/pro/react-on-rails-pro/) and when browsing the GitHub repo.
 The issue is that the ShakaCode site is generated only from files in [`../docs/pro`](../docs/pro), so any references from them to non-doc files must use the full GitHub URL.
 
 ### Links to other docs:

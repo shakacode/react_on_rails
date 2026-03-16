@@ -8,7 +8,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 **Cause**: A compression middleware (`Rack::Deflater`, `Rack::Brotli`) is configured with an `:if` condition that calls `body.each` to check the response size. This destructively consumes streaming chunks from the `SizedQueue`, causing a deadlock.
 
-**Fix**: See the "Compression Middleware Compatibility" section in the [Streaming Server Rendering guide](./streaming-server-rendering.md).
+**Fix**: See the "Compression Middleware Compatibility" section in the [Streaming Server Rendering guide](../oss/building-features/streaming-server-rendering.md).
 
 ## Node Renderer
 
@@ -20,7 +20,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 - Verify the renderer is running: `curl http://localhost:3800/`
 - Check that `config.renderer_url` in `config/initializers/react_on_rails_pro.rb` matches the renderer's actual port
-- On Heroku, ensure the renderer is started via `Procfile.web` (see [Heroku deployment](./node-renderer/heroku.md))
+- On Heroku, ensure the renderer is started via `Procfile.web` (see [Heroku deployment](../oss/building-features/node-renderer/heroku.md))
 
 ### Workers crashing with memory leaks
 
@@ -48,7 +48,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 - Verify Rails cache store is configured (not `:null_store`)
 - Check `cache_key` values — if they change every request, the cache will never hit
-- If your component depends on URL or locale, include those in the `cache_key` (see [Caching docs](./caching.md))
+- If your component depends on URL or locale, include those in the `cache_key` (see [Caching docs](../oss/building-features/caching.md))
 
 ### Stale cached content after deploy
 

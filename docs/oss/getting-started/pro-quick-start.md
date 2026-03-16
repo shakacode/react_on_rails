@@ -154,11 +154,11 @@ See the [RSC tutorial](../../pro/react-server-components/tutorial.md) for detail
 
 ## Next Steps
 
-- [Configuration Reference](../../pro/configuration.md) — All Pro config options
-- [Node Renderer Configuration](../../pro/node-renderer/js-configuration.md) — All Node Renderer options
-- [Caching Guide](../../pro/caching.md) — Fragment and prerender caching
-- [Streaming SSR](../../pro/streaming-server-rendering.md) — Progressive rendering
-- [Code Splitting](../../pro/code-splitting-loadable-components.md) — Loadable components with SSR
+- [Configuration Reference](../configuration/configuration-pro.md) — All Pro config options
+- [Node Renderer Configuration](../building-features/node-renderer/js-configuration.md) — All Node Renderer options
+- [Caching Guide](../building-features/caching.md) — Fragment and prerender caching
+- [Streaming SSR](../building-features/streaming-server-rendering.md) — Progressive rendering
+- [Code Splitting](../building-features/code-splitting.md) — Loadable components with SSR
 
 ## Troubleshooting
 

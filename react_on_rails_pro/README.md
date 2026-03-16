@@ -156,7 +156,7 @@ end %>
 - Automatic cache invalidation based on props
 - Works with Rails fragment caching infrastructure
 
-**📖 Learn more**: [docs/pro/caching.md](../docs/pro/caching.md)
+**📖 Learn more**: [docs/oss/building-features/caching.md](../docs/oss/building-features/caching.md)
 
 ### 2. Prerender Caching
 
@@ -175,7 +175,7 @@ end
 - Caches across multiple requests
 - Complements fragment caching for maximum performance
 
-**📖 Learn more**: [docs/pro/caching.md](../docs/pro/caching.md)
+**📖 Learn more**: [docs/oss/building-features/caching.md](../docs/oss/building-features/caching.md)
 
 ### 3. React on Rails Pro Node Renderer
 
@@ -203,7 +203,7 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-**📖 Learn more**: [docs/pro/node-renderer/basics.md](../docs/pro/node-renderer/basics.md)
+**📖 Learn more**: [docs/oss/building-features/node-renderer/basics.md](../docs/oss/building-features/node-renderer/basics.md)
 
 ### 4. React Server Components (RSC)
 
@@ -236,7 +236,7 @@ Speed up webpack rebuilds by caching unchanged bundles.
 - **Faster development**: Hot reload only what changed
 - **Lower costs**: Reduce build server time
 
-**📖 Learn more**: [docs/pro/bundle-caching.md](../docs/pro/bundle-caching.md)
+**📖 Learn more**: [docs/oss/building-features/bundle-caching.md](../docs/oss/building-features/bundle-caching.md)
 
 ### 6. Global State Management
 
@@ -249,7 +249,7 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-**📖 Learn more**: [docs/pro/configuration.md](../docs/pro/configuration.md)
+**📖 Learn more**: [docs/oss/configuration/configuration-pro.md](../docs/oss/configuration/configuration-pro.md)
 
 ---
 
@@ -326,9 +326,9 @@ rails console
 
 ### Next Steps
 
-- **Enable caching**: See [docs/pro/caching.md](../docs/pro/caching.md)
-- **Set up Node Renderer**: See [docs/pro/node-renderer/basics.md](../docs/pro/node-renderer/basics.md)
-- **Optimize performance**: See [docs/pro/configuration.md](../docs/pro/configuration.md)
+- **Enable caching**: See [docs/oss/building-features/caching.md](../docs/oss/building-features/caching.md)
+- **Set up Node Renderer**: See [docs/oss/building-features/node-renderer/basics.md](../docs/oss/building-features/node-renderer/basics.md)
+- **Optimize performance**: See [docs/oss/configuration/configuration-pro.md](../docs/oss/configuration/configuration-pro.md)
 - **Set up for your team**: See [LICENSE_SETUP.md](./LICENSE_SETUP.md#team-setup)
 
 ---
@@ -339,18 +339,19 @@ rails console
 
 - **[Installation Guide](../docs/pro/installation.md)** - Detailed installation instructions
 - **[License Setup](./LICENSE_SETUP.md)** - Complete license configuration guide
-- **[Configuration Reference](../docs/pro/configuration.md)** - All configuration options
+- **[Configuration Reference](../docs/oss/configuration/configuration-pro.md)** - All configuration options
 
 ### Features
 
-- **[Caching Guide](../docs/pro/caching.md)** - Fragment and prerender caching
-- **[Bundle Caching](../docs/pro/bundle-caching.md)** - Speed up webpack builds
-- **[Node Renderer Basics](../docs/pro/node-renderer/basics.md)** - Standalone Node.js server
-- **[Node Renderer Configuration](../docs/pro/node-renderer/js-configuration.md)** - JavaScript config
+- **[Caching Guide](../docs/oss/building-features/caching.md)** - Prerender and fragment caching
+- **[Bundle Caching](../docs/oss/building-features/bundle-caching.md)** - Speed up webpack builds
+- **[Node Renderer Basics](../docs/oss/building-features/node-renderer/basics.md)** - Standalone Node.js server
+- **[Node Renderer Configuration](../docs/oss/building-features/node-renderer/js-configuration.md)** - JavaScript config
+- **[Code Splitting](../docs/oss/building-features/code-splitting.md)** - Loadable components with SSR
 
 ### API Reference
 
-- **[Ruby API](../docs/pro/ruby-api.md)** - Helper methods and utilities
+- **[Ruby API](../docs/oss/api-reference/ruby-api-pro.md)** - Helper methods and utilities
 - **[CHANGELOG](./CHANGELOG.md)** - Version history and upgrade notes
 
 ### Upgrading
