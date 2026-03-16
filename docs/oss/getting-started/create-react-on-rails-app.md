@@ -88,3 +88,12 @@ rails generate react_on_rails:install               # JavaScript
 ```
 
 See [Installation into an Existing Rails App](./installation-into-an-existing-rails-app.md) for details.
+
+## What's Next?
+
+Now that you have React on Rails running, here are ways to level up:
+
+- **Add server-side rendering** — [SSR guide](../core-concepts/react-server-rendering.md)
+- **See the feature comparison** — [OSS vs Pro](./oss-vs-pro.md)
+- **Upgrade to Pro** for React Server Components, streaming SSR, and 10-100x faster SSR — [3-step upgrade guide](../../pro/upgrading-to-pro.md)
+- **Explore the full docs** — [Documentation index](../../README.md)

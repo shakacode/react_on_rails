@@ -187,6 +187,11 @@ Now that you have React on Rails working, here's what to explore next:
 1. **[Redux Integration](../building-features/react-and-redux.md)** - Manage application state
 2. **[React Router](../building-features/react-router.md)** - Client-side routing
 
+### Go Pro
+
+- **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
+- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - React Server Components, streaming SSR, and 10-100x faster SSR
+
 ## 🆘 Need Help?
 
 - **[Troubleshooting Guide](../deployment/troubleshooting.md)** - Common issues and solutions
