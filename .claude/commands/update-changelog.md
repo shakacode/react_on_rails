@@ -197,7 +197,7 @@ To determine the most recent version:
 
 4. **The first match after `### [Unreleased]`** is the most recent version in the changelog.
 
-**IMPORTANT**: Git tags use `v` prefix (e.g., `v16.2.0.beta.20`) but the changelog and compare links use versions WITHOUT the `v` prefix (e.g., `16.2.0.beta.20`). Strip the `v` when adding to the changelog.
+**IMPORTANT**: Git tags use `v` prefix (e.g., `v16.2.0.beta.20`). Changelog **headers** use versions WITHOUT the `v` prefix (e.g., `### [16.2.0.beta.20]`), but compare **links** at the bottom of the file MUST use the `v` prefix to match the git tag (e.g., `.../compare/v16.1.1...v16.2.0.beta.20`). Strip the `v` only for changelog headers, not for compare link URLs.
 
 ### Version Links
 
@@ -206,8 +206,8 @@ After adding an entry to the `### [Unreleased]` section, ensure the version diff
 The format at the bottom should be:
 
 ```markdown
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...master
-[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.19...master
+[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/v16.1.1...v16.2.0.beta.19
 ```
 
 When a new version is released:

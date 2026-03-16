@@ -344,6 +344,24 @@ RSpec.describe "update_changelog.rake helper methods" do
       expect(result).to include("[16.3.0]:")
     end
 
+    it "handles v-prefixed prerelease versions in compare links" do
+      changelog = <<~CHANGELOG
+        ### [Unreleased]
+
+        [unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.1...master
+        [16.4.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.0...v16.4.0.rc.1
+        [16.4.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.0
+        [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
+      CHANGELOG
+
+      result = cleanup_collapsed_prerelease_links(changelog, "16.4.0")
+
+      expect(result).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master")
+      expect(result).not_to include("[16.4.0.rc.1]:")
+      expect(result).not_to include("[16.4.0.rc.0]:")
+      expect(result).to include("[16.3.0]:")
+    end
+
     it "returns changelog unchanged when no prerelease links exist" do
       changelog = <<~CHANGELOG
         ### [Unreleased]
@@ -365,8 +383,8 @@ RSpec.describe "update_changelog.rake helper methods" do
 
       update_changelog_links(changelog, "16.4.0", "[16.4.0]")
 
-      expect(changelog).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0...master")
-      expect(changelog).to include("[16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0")
+      expect(changelog).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...master")
+      expect(changelog).to include("[16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0")
     end
 
     it "returns nil when [unreleased] compare link is absent" do
