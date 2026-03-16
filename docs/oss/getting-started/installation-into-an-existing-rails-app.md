@@ -84,3 +84,12 @@ npm install react-on-rails --save-exact
 
 That will install the latest version and update your package.json.
 **NOTE:** the `--save-exact` (or `--exact` for yarn) flag will ensure that you do not have a "~" or "^" for your react-on-rails version in your package.json.
+
+## What's Next?
+
+Now that you have React on Rails running, here are ways to level up:
+
+- **Add server-side rendering** — [SSR guide](../core-concepts/react-server-rendering.md)
+- **See the feature comparison** — [OSS vs Pro](./oss-vs-pro.md)
+- **Upgrade to Pro** for React Server Components, streaming SSR, and 10-100x faster SSR — [3-step upgrade guide](../../pro/upgrading-to-pro.md)
+- **Explore the full docs** — [Documentation index](../../README.md)

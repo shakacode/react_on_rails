@@ -252,10 +252,13 @@ It's super important to exclude certain directories from RubyMine or else it wil
 - Generated files, per the settings in your `config/shakapacker.yml`, which default to `public/packs` and `public/packs-test` (kept separate so test and development manifests do not overwrite each other)
 - `node_modules`
 
-## Conclusion
+## What's Next?
 
-- Browse the docs on [our documentation website](https://reactonrails.com/docs/)
+Now that you have React on Rails running, here are ways to level up:
 
-Feedback is greatly appreciated! As are stars on github!
+- **Add server-side rendering** — [SSR guide](../core-concepts/react-server-rendering.md)
+- **See the feature comparison** — [OSS vs Pro](./oss-vs-pro.md)
+- **Upgrade to Pro** for React Server Components, streaming SSR, and 10-100x faster SSR — [3-step upgrade guide](../../pro/upgrading-to-pro.md)
+- **Explore the full docs** — [Documentation index](../../README.md)
 
-If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com). We offer [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) and consulting so you can focus on your app and not on how to make Webpack plus Rails work optimally.
+Feedback is greatly appreciated! As are stars on GitHub. If you want personalized help, don't hesitate to get in touch with us at [contact@shakacode.com](mailto:contact@shakacode.com).
