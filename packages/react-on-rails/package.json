@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "16.4.0-rc.9",
+  "version": "16.4.0-rc.10",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
