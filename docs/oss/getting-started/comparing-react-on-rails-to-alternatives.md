@@ -10,7 +10,7 @@ Choose **React on Rails** when you want Rails and React tightly integrated, you 
 
 Choose **Hotwire/Turbo** when Rails-rendered HTML is still your preferred model and you only need modest JavaScript sprinkles or progressive enhancement.
 
-Choose **Inertia Rails** when you want a page-oriented SPA workflow with Rails controllers, and you are comfortable making the frontend shell the main rendering model.
+Choose **Inertia Rails** when you want a page-oriented SPA workflow with Rails controllers and Vite, and you are comfortable making the frontend shell the main rendering model.
 
 Choose **react-rails** when you want a smaller helper-based integration for embedding React components in Rails views and do not need the broader React on Rails feature set.
 
@@ -66,7 +66,7 @@ Choose React on Rails if your requirement is "treat React as a first-class front
 
 Official docs:
 
-- [react-rails README](https://github.com/shakacode/react-rails)
+- [react-rails README](https://github.com/reactjs/react-rails)
 
 ## Common Decision Patterns
 

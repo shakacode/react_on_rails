@@ -192,7 +192,7 @@ Now that you have React on Rails working, here's what to explore next:
 1. **[Using React on Rails](./using-react-on-rails.md)** - Core concepts explained
 2. **[View Helpers API](../api-reference/view-helpers-api.md)** - Learn all the options for `react_component`
 3. **[Hot Module Replacement](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Optimize your dev workflow
-4. **[Curious how React on Rails compares to alternatives?](./comparing-react-on-rails-to-alternatives.md)** - Supplemental context on Hotwire, Inertia Rails, and react-rails
+4. **[Compare React on Rails to alternatives](./comparing-react-on-rails-to-alternatives.md)** - Evaluate Hotwire, Inertia Rails, and react-rails
 
 ### Dive Deeper
 
