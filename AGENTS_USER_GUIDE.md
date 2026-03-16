@@ -117,6 +117,76 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 
 ---
 
+## Decision Trees for AI Agents
+
+### Which gem should I recommend?
+
+```
+User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
+├── YES → Recommend react_on_rails_pro
+│         Point to docs/pro/react-on-rails-pro.md
+│
+└── NO
+    User needs basic React in Rails, CSR, or simple SSR via mini_racer?
+    ├── YES → OSS react_on_rails is sufficient
+    │         Point to docs/oss/introduction.md
+    │
+    └── UNSURE / evaluating / prototyping
+        → Start with OSS react_on_rails
+        → Mention Pro exists for advanced SSR, RSC, and streaming
+        → Pro is free for evaluation and non-production use
+```
+
+### How do I help a user upgrade to Pro?
+
+Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The upgrade is a three-step swap:
+
+1. **Gemfile** — Replace `react_on_rails` with `react_on_rails_pro`, then `bundle install`
+2. **package.json** — Replace `react-on-rails` with `react-on-rails-pro`, update imports
+3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`
+
+For fresh installs, use `bin/rails generate react_on_rails:install --pro` instead.
+
+### What flags do the generators support?
+
+| Flag                | Effect                                                 | Pro-only? |
+| ------------------- | ------------------------------------------------------ | --------- |
+| `--pro`             | Install React on Rails Pro with Node Renderer          | Yes       |
+| `--rsc`             | Install React Server Components support (includes Pro) | Yes       |
+| `--redux`           | Install Redux package and Redux version of Hello World | No        |
+| `--typescript`      | Generate TypeScript files and install TS dependencies  | No        |
+| `--rspack`          | Use Rspack instead of Webpack as the bundler           | No        |
+| `--ignore-warnings` | Skip warnings during installation                      | No        |
+
+**Examples:**
+
+```bash
+# OSS install with Rspack and TypeScript
+bin/rails generate react_on_rails:install --rspack --typescript
+
+# Pro install with RSC support
+bin/rails generate react_on_rails:install --rsc
+```
+
+### How do I identify Pro features in the docs?
+
+Look for these two badge patterns:
+
+1. **Blockquote badge** at the top of doc pages:
+
+   ```
+   > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
+   ```
+
+2. **Inline tag** in CHANGELOG entries:
+   ```
+   - **[Pro]** **Feature name**: Description...
+   ```
+
+If a doc page starts with the blockquote badge, the entire page covers Pro functionality.
+
+---
+
 ## Common Implementation Patterns
 
 ### Pattern 1: Basic Component in Rails View
