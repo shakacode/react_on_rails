@@ -133,7 +133,7 @@ This is a minor release - update your gem and npm package versions, then run `bu
    ```bash
    bundle update react_on_rails shakapacker
    # then run your package manager's install command
-   pnpm install
+   npm install   # or: yarn install / pnpm install
    ```
 
 3. **Run Generator**
