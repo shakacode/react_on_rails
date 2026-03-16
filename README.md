@@ -40,7 +40,7 @@ Then use React in any Rails view:
 <%= react_component("HelloWorld", props: { name: "World" }) %>
 ```
 
-**That's it!** Your React component renders in Rails with zero API setup. [Full quick start guide →](https://www.shakacode.com/react-on-rails/docs/quick-start/)
+**That's it!** Your React component renders in Rails with zero API setup. [Full quick start guide →](https://reactonrails.com/docs/getting-started/quick-start/)
 
 ---
 
@@ -48,7 +48,7 @@ Then use React in any Rails view:
 
 **🚀 React on Rails v16.0 Released!** Major modernization with ESM support, enhanced React Server Components, and streamlined configuration.
 
-- **⚡ Rspack Support**: New `--rspack` generator flag for ~20x faster builds! Use Rspack instead of Webpack for dramatically improved build performance. See [Rspack documentation](https://www.shakacode.com/react-on-rails/docs/api-reference/generator-details#rspack-support) for details.
+- **⚡ Rspack Support**: New `--rspack` generator flag for ~20x faster builds! Use Rspack instead of Webpack for dramatically improved build performance. See [Rspack documentation](https://reactonrails.com/docs/api-reference/generator-details#rspack-support) for details.
 - **ESM-only package**: Modern module system with better tree-shaking and performance
 - **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
 - **Performance improvements**: New async loading strategies and optimized bundle generation
@@ -149,8 +149,8 @@ Ready to try Pro? Visit [pro.reactrails.com](https://pro.reactrails.com) or emai
 
 **New to React on Rails?** Get up and running in minutes:
 
-🚀 **[15-Minute Quick Start](https://www.shakacode.com/react-on-rails/docs/quick-start/)** - Your first React component
-📖 **[Complete Documentation](https://www.shakacode.com/react-on-rails/docs/)** - Comprehensive guides and API reference
+🚀 **[15-Minute Quick Start](https://reactonrails.com/docs/getting-started/quick-start/)** - Your first React component
+📖 **[Complete Documentation](https://reactonrails.com/docs/)** - Comprehensive guides and API reference
 🎮 **[Live Demo](https://reactrails.com)** - See it in action with [source code](https://github.com/shakacode/react-webpack-rails-tutorial)
 
 ## Project Objective
@@ -175,7 +175,7 @@ To provide a high-performance framework for integrating Ruby on Rails with React
 
 > **Trusted by thousands** - See [real production sites](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/) using React on Rails
 
-See [Rails/Shakapacker React Integration Options](https://www.shakacode.com/react-on-rails/docs/building-features/rails-webpacker-react-integration-options) for comparisons to other gems.
+See [Rails/Shakapacker React Integration Options](https://reactonrails.com/docs/building-features/rails-webpacker-react-integration-options) for comparisons to other gems.
 
 ## Online demo
 
