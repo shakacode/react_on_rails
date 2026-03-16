@@ -300,10 +300,13 @@ end
 # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # Remove duplicate changelog entries within a single block.
-# Entries are grouped by PR number; only the first occurrence is kept.
+# Entries are deduplicated by normalized text content — two entries are
+# considered duplicates only when their text is identical (ignoring
+# leading/trailing whitespace).  This preserves distinct entries that
+# share the same PR number (e.g. multiple fixes in one PR).
 # Multi-line entries (continuation lines not starting with "- ") are
 # kept together with their parent entry.
-# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 def deduplicate_block_entries(block)
   lines = block.lines
   first_line = lines.first&.rstrip || ""
@@ -344,26 +347,24 @@ def deduplicate_block_entries(block)
   entries << current_entry if current_entry
   entries << pending_subheading unless pending_subheading.empty?
 
-  # Deduplicate by PR number (keep first occurrence)
-  seen_prs = {}
+  # Deduplicate by full entry text (keep first occurrence).
+  # This preserves distinct entries that share the same PR number.
+  seen_texts = {}
   unique_entries = entries.select do |entry|
-    pr_numbers = entry.scan(/\[PR (\d+)\]/).flatten
-    if pr_numbers.empty?
-      true # Keep entries without PR numbers (blank lines, etc.)
+    key = entry.strip
+    if key.empty?
+      true
+    elsif seen_texts.key?(key)
+      false
     else
-      key = pr_numbers.sort.join(",")
-      if seen_prs.key?(key)
-        false
-      else
-        seen_prs[key] = true
-        true
-      end
+      seen_texts[key] = true
+      true
     end
   end
 
   "#{heading}\n#{unique_entries.join}"
 end
-# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
 # rubocop:disable Metrics/AbcSize
 def collapse_prerelease_sections(changelog, base_version, channel)
@@ -393,15 +394,17 @@ def collapse_prerelease_sections(changelog, base_version, channel)
 end
 # rubocop:enable Metrics/AbcSize
 
-def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: changelog)
+def compute_auto_version(changelog_for_bump, mode, monorepo_root)
   bump_type = inferred_bump_type_from_unreleased(changelog_for_bump)
   latest_stable = latest_stable_tag_version(monorepo_root)
   base_version = bump_stable_version(latest_stable, bump_type)
 
   return base_version if mode == "release"
 
-  indices = prerelease_indices_from_tags(monorepo_root, base_version, mode) +
-            prerelease_indices_from_changelog(changelog, base_version, mode)
+  # Only use git tags to determine the next prerelease index.
+  # Changelog headers are drafts that may not have been released yet —
+  # git tags are the authoritative source of shipped versions.
+  indices = prerelease_indices_from_tags(monorepo_root, base_version, mode)
   next_index = indices.empty? ? 0 : indices.max + 1
   "#{base_version}.#{mode}.#{next_index}"
 end
@@ -466,12 +469,7 @@ task :update_changelog, %i[mode_or_tag] do |_, args|
   if auto_mode
     fetch_git_tags!(monorepo_root)
     prepared_changelog = prepare_changelog_for_auto_version(changelog, monorepo_root)
-    changelog_version = compute_auto_version(
-      changelog,
-      auto_mode,
-      monorepo_root,
-      changelog_for_bump: prepared_changelog
-    )
+    changelog_version = compute_auto_version(prepared_changelog, auto_mode, monorepo_root)
     changelog = prepared_changelog
     tag_date = Date.today.strftime("%Y-%m-%d")
     puts "Auto-computed #{auto_mode} version: #{changelog_version}"

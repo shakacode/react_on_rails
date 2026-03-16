@@ -58,7 +58,7 @@ When stamping a version header (`release`, `rc`, or `beta`), compute the next ve
 
 3. **Compute the version**:
    - For `release`: Apply the bump to the latest stable tag (e.g., `16.4.0` + minor -> `16.5.0`)
-   - For `rc`: Apply the bump, then find the next RC index (e.g., if `v16.5.0.rc.0` tag exists -> `16.5.0.rc.1`)
+   - For `rc`: Apply the bump, then find the next RC index based **only on git tags** (e.g., if `v16.5.0.rc.0` tag exists -> `16.5.0.rc.1`). **Do NOT use changelog headers** to determine the next index — a version header in the changelog is a draft that may not have been released yet. Only git tags represent shipped versions.
    - For `beta`: Same as RC but with beta suffix
 
 4. **Verify**: Check that the computed version is newer than ALL existing tags (stable and prerelease). If not, ask the user what to do.
