@@ -28,11 +28,14 @@ gem "react_on_rails_pro", "= 16.4.0"
 
 Then run `bundle install`.
 
-Or use `bundle add`, which handles both the Gemfile edit and install:
+Or use the command line, which handles both the Gemfile edits and install:
 
 ```bash
+bundle remove react_on_rails
 bundle add react_on_rails_pro --version="= 16.4.0"
 ```
+
+> **Important:** `bundle add` does not remove existing gems. You must run `bundle remove` first, otherwise both gems will appear in your Gemfile, which can cause Bundler warnings or version conflicts.
 
 Check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest version.
 
