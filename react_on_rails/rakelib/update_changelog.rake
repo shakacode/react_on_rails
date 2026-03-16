@@ -317,6 +317,8 @@ def deduplicate_block_entries(block)
   body_lines = lines.drop(1)
 
   # Group body lines into logical entries.
+  # Only top-level "- " lines start new entries; nested bullets belong to the
+  # current entry body.
   # Keep ##### subheadings attached to the next bullet so deduplication drops
   # both together when a duplicate PR is removed.
   entries = []
@@ -330,7 +332,7 @@ def deduplicate_block_entries(block)
       entries << current_entry if current_entry
       current_entry = nil
       pending_subheading << line
-    elsif line.match?(/\A\s*- /)
+    elsif line.start_with?("- ")
       entries << current_entry if current_entry
       current_entry = +"#{pending_subheading}#{line}"
       pending_subheading = +""
@@ -394,7 +396,10 @@ def collapse_prerelease_sections(changelog, base_version, channel)
 end
 # rubocop:enable Metrics/AbcSize
 
-def compute_auto_version(changelog_for_bump, mode, monorepo_root)
+def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: nil)
+  # Keep backward compatibility with older callers that pass changelog_for_bump
+  # as a keyword while allowing the new 3-argument call shape.
+  changelog_for_bump ||= changelog
   bump_type = inferred_bump_type_from_unreleased(changelog_for_bump)
   latest_stable = latest_stable_tag_version(monorepo_root)
   base_version = bump_stable_version(latest_stable, bump_type)

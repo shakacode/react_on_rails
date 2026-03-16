@@ -286,6 +286,20 @@ RSpec.describe "update_changelog.rake helper methods" do
         - **Bug fix A**. [PR 2489](https://github.com/shakacode/react_on_rails/pull/2489) by [user](https://github.com/user).
       EXPECTED
     end
+
+    it "keeps nested bullets attached when parent lines are duplicated" do
+      block = <<~BLOCK
+        #### Fixed
+        - **Bug fix A**.
+          - Handles edge case alpha.
+        - **Bug fix A**.
+          - Handles edge case beta.
+      BLOCK
+
+      deduped = deduplicate_block_entries(block)
+
+      expect(deduped).to eq(block)
+    end
   end
 
   describe "#cleanup_collapsed_prerelease_links" do
@@ -456,7 +470,7 @@ RSpec.describe "update_changelog.rake helper methods" do
       end
     end
 
-    it "continues the active rc series even when Unreleased is sparse" do
+    it "starts at rc.0 when only changelog draft prereleases exist" do
       Dir.mktmpdir do |repo_dir|
         init_git_repo!(repo_dir)
         run_git!("tag", "v16.3.0", chdir: repo_dir)
@@ -472,7 +486,7 @@ RSpec.describe "update_changelog.rake helper methods" do
         prepared_changelog = prepare_changelog_for_auto_version(changelog, repo_dir)
         version = compute_auto_version(changelog, "rc", repo_dir, changelog_for_bump: prepared_changelog)
 
-        expect(version).to eq("16.4.0.rc.1")
+        expect(version).to eq("16.4.0.rc.0")
       end
     end
   end
