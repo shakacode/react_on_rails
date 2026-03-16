@@ -220,4 +220,4 @@ A `.client.jsx` file can be a React Server Component (if it lacks `'use client'`
 Update `/CHANGELOG.md` for **user-visible changes only** (features, bug fixes, breaking changes, deprecations, performance improvements). Do **not** add entries for linting, formatting, refactoring, tests, or doc fixes.
 
 - **Format**: `[PR 1818](https://github.com/shakacode/react_on_rails/pull/1818) by [username](https://github.com/username)` (no hash before PR number)
-- **Pro-only changes** go in the `#### Pro` section of `/CHANGELOG.md`; shared changes go in the main section only (do not duplicate into Pro)
+- **Pro-only changes** use an inline `**[Pro]**` tag prefix within the standard category sections (e.g., `- **[Pro]** **Feature name**: Description...`); do NOT create separate `#### Pro` subsections

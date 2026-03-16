@@ -10,6 +10,7 @@ This command accepts an optional argument: `$ARGUMENTS`
 - **`release`** (`/update-changelog release`): Add entries and stamp a version header. Auto-compute the next version based on changes (breaking -> major, added features -> minor, fixes -> patch). Then `rake release` (with no args) will pick up this version automatically.
 - **`rc`** (`/update-changelog rc`): Same as `release`, but stamps an RC prerelease version (e.g., `16.5.0.rc.0`). Auto-increments the RC index if prior RCs exist for the same base version.
 - **`beta`** (`/update-changelog beta`): Same as `rc`, but stamps a beta prerelease version (e.g., `16.5.0.beta.0`).
+- **Explicit version** (`/update-changelog 16.5.0.rc.10`): Add entries and stamp the exact version provided. Skips auto-computation — use this when you already know the target version. The version string must look like a semver version (with optional `.rc.N` or `.beta.N` suffix).
 
 ## When to Use This
 
@@ -57,12 +58,12 @@ When stamping a version header (`release`, `rc`, or `beta`), compute the next ve
 
 3. **Compute the version**:
    - For `release`: Apply the bump to the latest stable tag (e.g., `16.4.0` + minor -> `16.5.0`)
-   - For `rc`: Apply the bump, then find the next RC index (e.g., if `v16.5.0.rc.0` tag exists -> `16.5.0.rc.1`)
+   - For `rc`: Apply the bump, then find the next RC index based **only on git tags** (e.g., if `v16.5.0.rc.0` tag exists -> `16.5.0.rc.1`). **Do NOT use changelog headers** to determine the next index — a version header in the changelog is a draft that may not have been released yet. Only git tags represent shipped versions.
    - For `beta`: Same as RC but with beta suffix
 
 4. **Verify**: Check that the computed version is newer than ALL existing tags (stable and prerelease). If not, ask the user what to do.
 
-5. **Show the computed version to the user** and ask for confirmation before stamping the header.
+5. **Show the computed version to the user and ask for confirmation** before stamping the header. If the bump type is ambiguous (e.g., changes could reasonably be classified as patch vs minor, or the changelog headings don't clearly signal the bump level), explain your reasoning for the suggested bump and ask the user to confirm or override before proceeding.
 
 ## Critical Requirements
 
@@ -140,9 +141,10 @@ Entries should be organized under these section headings **in the following orde
 - `#### API Improvements` - API changes and improvements
 - `#### Generator Improvements` - Generator-specific changes
 - `#### Performance` - Performance improvements
-- `#### Pro License Features` - React on Rails Pro features
 
 **Prefer standard headings.** Only use custom headings when the change needs more specific categorization.
+
+**Pro entries**: Pro-specific changes use an inline `**[Pro]**` tag prefix within the standard category sections (e.g., `- **[Pro]** **Feature name**: Description...`). Do NOT create separate `#### Pro` subsections.
 
 **Only include section headings that have entries.**
 
@@ -271,9 +273,11 @@ When a new version is released:
    - Validate that the change is user-visible (per the criteria above). Skip CI, lint, refactoring, test-only changes.
    - Add the entry to `### [Unreleased]` under the appropriate category heading
 
-#### Step 4: Stamp version header (only for `release`, `rc`, or `beta` modes)
+#### Step 4: Stamp version header (only when a version mode or explicit version is given)
 
-If the user passed `release`, `rc`, or `beta` as an argument:
+If the user passed `release`, `rc`, `beta`, or an explicit version string as an argument:
+
+**For `release`, `rc`, or `beta` keywords:**
 
 1. Run the rake task to stamp the version header:
 
@@ -288,6 +292,16 @@ If the user passed `release`, `rc`, or `beta` as an argument:
    - For `rc`/`beta`: collapse prior prerelease sections
 
 3. **Verify** the computed version looks correct. If not, the user can manually adjust.
+
+**For an explicit version string** (e.g., `16.5.0.rc.10`):
+
+1. Pass the explicit version directly to the rake task:
+
+   ```bash
+   bundle exec rake "update_changelog[16.5.0.rc.10]"
+   ```
+
+2. **Verify** the stamped header and diff links match the requested version.
 
 If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
 
@@ -306,9 +320,12 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Which entries were moved from Unreleased
    - Which new entries were added
    - Which PRs were skipped (and why)
-5. If in `release`/`rc`/`beta` mode, remind the user of next steps:
-   - Commit and push CHANGELOG.md
-   - Run `rake release` (no args) to publish and auto-create the GitHub release
+5. If in `release`/`rc`/`beta` mode or explicit-version mode, **automatically commit, push, and open a PR**:
+   - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
+   - Commit CHANGELOG.md (and the skill file if it was also modified)
+   - Push and open a PR with the changelog diff as the body
+   - If the push or PR creation fails, the CHANGELOG is already stamped locally — fix the issue (e.g., authentication, branch protection), then run `git push -u origin <branch>` and `gh pr create` manually
+   - Remind the user to run `rake release` (no args) after merge to publish and auto-create the GitHub release
 
 ### For Prerelease Versions (RC and Beta)
 
@@ -412,7 +429,7 @@ When consolidating prerelease versions (beta, RC) into a stable release, careful
    - Fixes for new prerelease-only features
    - Generator handling of prerelease version formats
 
-3. **Pro-specific features** (move to Pro section):
+3. **Pro-specific features** (tag with `**[Pro]**` inline):
    - Node renderer fixes/improvements
    - Streaming-related changes
    - Async loading features (Pro-exclusive)

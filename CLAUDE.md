@@ -17,6 +17,13 @@ If this file conflicts with `AGENTS.md`, follow `AGENTS.md`.
 
 - When confident in your changes, **commit and push without asking for permission**. Always monitor CI after pushing.
 
+## Git Safety
+
+- **NEVER force-push** (`--force`, `--force-with-lease`) unless the user explicitly requests it. Force-pushing destroys commit history that may represent significant prior work.
+- **NEVER `git reset --hard`** on a branch that has existing commits (yours or others'). This destroys work.
+- When you need to start fresh or test something without affecting an existing branch, **use a git worktree** (`git worktree add`) or **create a new branch** instead of resetting the current one.
+- If a rebase has conflicts, abort and ask the user how to proceed rather than force-pushing a rewritten history.
+
 ## Claude-Specific Workflow
 
 Use these docs for Claude-oriented operational guidance:

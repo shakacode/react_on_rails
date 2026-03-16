@@ -5,10 +5,10 @@
 ## Where to add entries
 
 - Open-source features/fixes → Add to the regular category sections (`#### Added`, `#### Fixed`, etc.)
-- Pro-only features/fixes → Add to the `#### Pro` section under the appropriate subcategory (`##### Added`, `##### Fixed`, etc.)
-- Changes affecting both → Add to the regular sections; Pro-specific details go in the Pro section
+- Pro-only features/fixes → Add to the regular category sections with an inline `**[Pro]**` tag prefix (e.g., `- **[Pro]** **Feature name**: Description...`)
+- Changes affecting both → Add to the regular sections; prefix with `**[Pro]**` if the change is primarily Pro-specific
 
-Each release version has an optional `#### Pro` section at the end that contains Pro-specific entries organized by the same categories.
+All entries live in a single chronological flow within each release. Pro entries are identified by their `**[Pro]**` inline tag, not by separate subsections.
 
 ## Rules
 

@@ -247,7 +247,128 @@ def normalize_changelog_block(lines)
   normalized_lines.join("\n")
 end
 
-# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
+def normalize_heading_key(line)
+  normalized = line.to_s.strip
+  heading_level = normalized[/\A(#+)/, 1] || ""
+  heading_text = normalized.sub(/\A#+\s+/, "")
+                           .gsub(/\A(?:⚠️|⚠)\s*/, "")
+                           .downcase
+                           .gsub(/\s+/, " ")
+  "#{heading_level} #{heading_text}".strip
+end
+
+# Merge an array of changelog blocks so that blocks with the same heading
+# (e.g. two "#### Fixed" blocks) are combined into one.  Header-only blocks
+# like "#### Pro" are kept at their first-seen position, ensuring they remain
+# as parent headings for any ##### sub-sections that follow.
+# Also strips the "Changes since the last non-beta release." marker text
+# and deduplicates entries that share the same PR number.
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+def consolidate_changelog_blocks(blocks)
+  consolidated = []
+  heading_indices = {}
+
+  blocks.each do |block|
+    cleaned = block.gsub(/\n*Changes since the last non-beta release\.\s*/, "\n").strip
+    next if cleaned.empty?
+
+    first_line = cleaned.lines.first&.rstrip || ""
+    heading_match = first_line.match(/\A(####+\s+.+)/)
+
+    if heading_match
+      heading_key = normalize_heading_key(heading_match[1])
+
+      if heading_indices.key?(heading_key)
+        # Append this block's content (lines after heading) to existing block
+        idx = heading_indices[heading_key]
+        content_after_heading = cleaned.lines.drop(1).join.gsub(/\A\n+/, "").rstrip
+        consolidated[idx] = "#{consolidated[idx].rstrip}\n#{content_after_heading}" unless content_after_heading.empty?
+      else
+        heading_indices[heading_key] = consolidated.length
+        consolidated << cleaned
+      end
+    else
+      # Keep non-heading prose blocks (for example explanatory text). Marker-only
+      # blocks are already stripped by the cleanup + empty guard above.
+      consolidated << cleaned
+    end
+  end
+
+  # Deduplicate entries within each block by PR number
+  consolidated.map { |block| deduplicate_block_entries(block) }
+end
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+# Remove duplicate changelog entries within a single block.
+# Entries are deduplicated by normalized text content — two entries are
+# considered duplicates only when their text is identical (ignoring
+# leading/trailing whitespace).  This preserves distinct entries that
+# share the same PR number (e.g. multiple fixes in one PR).
+# Multi-line entries (continuation lines not starting with "- ") are
+# kept together with their parent entry.
+# rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+def deduplicate_block_entries(block)
+  lines = block.lines
+  first_line = lines.first&.rstrip || ""
+  return block unless first_line.match?(/\A####+\s+/)
+
+  # Split into heading + entries
+  heading = first_line
+  body_lines = lines.drop(1)
+
+  # Group body lines into logical entries.
+  # Only top-level "- " lines start new entries; nested bullets belong to the
+  # current entry body.
+  # Keep ##### subheadings attached to the next bullet so deduplication drops
+  # both together when a duplicate PR is removed.
+  entries = []
+  pending_subheading = +""
+  current_entry = nil
+
+  body_lines.each do |line|
+    next if line.strip.empty? && entries.empty? && pending_subheading.empty? && current_entry.nil?
+
+    if line.match?(/\A#####\s+/)
+      entries << current_entry if current_entry
+      current_entry = nil
+      pending_subheading << line
+    elsif line.start_with?("- ")
+      entries << current_entry if current_entry
+      current_entry = +"#{pending_subheading}#{line}"
+      pending_subheading = +""
+    elsif current_entry
+      current_entry << line
+    elsif pending_subheading.empty?
+      # Keep free-form prose lines as standalone entries.
+      entries << line
+    else
+      pending_subheading << line
+    end
+  end
+
+  entries << current_entry if current_entry
+  entries << pending_subheading unless pending_subheading.empty?
+
+  # Deduplicate by full entry text (keep first occurrence).
+  # This preserves distinct entries that share the same PR number.
+  seen_texts = {}
+  unique_entries = entries.select do |entry|
+    key = entry.strip
+    if key.empty?
+      true
+    elsif seen_texts.key?(key)
+      false
+    else
+      seen_texts[key] = true
+      true
+    end
+  end
+
+  "#{heading}\n#{unique_entries.join}"
+end
+# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+# rubocop:disable Metrics/AbcSize
 def collapse_prerelease_sections(changelog, base_version, channel)
   parsed = parse_changelog_sections(changelog)
   sections = parsed[:sections]
@@ -258,35 +379,37 @@ def collapse_prerelease_sections(changelog, base_version, channel)
   matching_sections = sections.select { |section| section[:version].match?(target_regex) }
   return changelog if matching_sections.empty?
 
-  merged_body = matching_sections
-                .flat_map { |section| changelog_section_blocks(section[:body]) }
-                .uniq
-                .join("\n\n")
-                .strip
-  sections.reject! { |section| section[:version].match?(target_regex) }
+  # Collect blocks from Unreleased first, then prerelease sections.
+  # Unreleased blocks come first so they are the "first seen" for each heading,
+  # and prerelease content is appended to them (Unreleased is newer).
+  all_blocks = changelog_section_blocks(unreleased_section[:body]) +
+               matching_sections.flat_map { |section| changelog_section_blocks(section[:body]) }
 
-  unless merged_body.empty?
-    unreleased_body = unreleased_section[:body].rstrip
-    unreleased_section[:body] = if unreleased_body.empty?
-                                  "#{merged_body}\n"
-                                else
-                                  "#{unreleased_body}\n\n#{merged_body}\n"
-                                end
-  end
+  # Merge blocks with the same heading instead of simple .uniq
+  consolidated = consolidate_changelog_blocks(all_blocks)
+  merged_body = consolidated.join("\n\n").strip
+
+  sections.reject! { |section| section[:version].match?(target_regex) }
+  unreleased_section[:body] = merged_body.empty? ? "\n" : "\n\n#{merged_body}\n"
 
   render_changelog_sections(parsed[:prefix], sections)
 end
-# rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+# rubocop:enable Metrics/AbcSize
 
-def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: changelog)
+def compute_auto_version(changelog, mode, monorepo_root, changelog_for_bump: nil)
+  # Keep backward compatibility with older callers that pass changelog_for_bump
+  # as a keyword while allowing the new 3-argument call shape.
+  changelog_for_bump ||= changelog
   bump_type = inferred_bump_type_from_unreleased(changelog_for_bump)
   latest_stable = latest_stable_tag_version(monorepo_root)
   base_version = bump_stable_version(latest_stable, bump_type)
 
   return base_version if mode == "release"
 
-  indices = prerelease_indices_from_tags(monorepo_root, base_version, mode) +
-            prerelease_indices_from_changelog(changelog, base_version, mode)
+  # Only use git tags to determine the next prerelease index.
+  # Changelog headers are drafts that may not have been released yet —
+  # git tags are the authoritative source of shipped versions.
+  indices = prerelease_indices_from_tags(monorepo_root, base_version, mode)
   next_index = indices.empty? ? 0 : indices.max + 1
   "#{base_version}.#{mode}.#{next_index}"
 end
@@ -351,12 +474,7 @@ task :update_changelog, %i[mode_or_tag] do |_, args|
   if auto_mode
     fetch_git_tags!(monorepo_root)
     prepared_changelog = prepare_changelog_for_auto_version(changelog, monorepo_root)
-    changelog_version = compute_auto_version(
-      changelog,
-      auto_mode,
-      monorepo_root,
-      changelog_for_bump: prepared_changelog
-    )
+    changelog_version = compute_auto_version(prepared_changelog, auto_mode, monorepo_root)
     changelog = prepared_changelog
     tag_date = Date.today.strftime("%Y-%m-%d")
     puts "Auto-computed #{auto_mode} version: #{changelog_version}"
