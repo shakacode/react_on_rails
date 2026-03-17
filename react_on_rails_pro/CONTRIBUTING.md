@@ -46,7 +46,7 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 
 ## Doc Changes
 
-When making doc changes, we want the change to work on both [the React on Rails docs site](https://reactonrails.com/docs/pro/react-on-rails-pro/) and when browsing the GitHub repo.
+When making doc changes, we want the change to work on both [the React on Rails docs site](https://reactonrails.com/docs/pro) and when browsing the GitHub repo.
 For links from docs pages to non-doc files, use full GitHub URLs so links resolve correctly in both contexts.
 
 ### Links to other docs:

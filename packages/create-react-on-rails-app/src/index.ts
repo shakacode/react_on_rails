@@ -127,7 +127,7 @@ After setup, run bin/dev and visit:
 
 --rsc supports both JavaScript and TypeScript templates.
 
-Documentation: https://www.shakacode.com/react-on-rails/docs/`,
+Documentation: https://reactonrails.com/docs/`,
   )
   .action(async (appName: string, opts: Record<string, unknown>) => {
     try {

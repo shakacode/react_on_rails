@@ -138,7 +138,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
         config/shakapacker.yml to enable nested entries. for more information read
-        https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
+        https://reactonrails.com/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
       MSG
 
       raise ReactOnRails::Error, msg

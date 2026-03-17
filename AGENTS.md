@@ -84,22 +84,22 @@ cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb
 
 ## Project Structure
 
-| Directory                                        | Purpose                                                                                                  |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `react_on_rails/lib/react_on_rails/`             | Ruby gem source — helpers, configuration, SSR pool, engine                                               |
-| `react_on_rails/lib/generators/`                 | Rails generators for `react_on_rails:install`                                                            |
-| `react_on_rails/spec/`                           | RSpec tests (unit + integration via dummy app)                                                           |
-| `react_on_rails/spec/dummy/`                     | Full Rails app for integration testing and E2E                                                           |
-| `packages/react-on-rails/src/`                   | TypeScript source — client-side React integration                                                        |
-| `packages/react-on-rails/tests/`                 | Jest tests for the npm package                                                                           |
-| `react_on_rails_pro/`                            | Pro package (separate gem + npm, own lint config)                                                        |
-| `rakelib/`                                       | Rake task definitions                                                                                    |
-| `docs/oss/`                                      | OSS documentation — published to the [ShakaCode website](https://www.shakacode.com/react-on-rails/docs/) |
-| `docs/pro/`                                      | Pro documentation — installation, configuration, RSC, node renderer, caching                             |
-| `internal/contributor-info/`                     | Internal contributor docs (not published to the website)                                                 |
-| `internal/planning/`                             | Internal planning docs, drafts, and historical analysis                                                  |
-| `internal/react_on_rails_pro/contributors-info/` | Internal Pro contributor docs (not published to the website)                                             |
-| `analysis/`                                      | Investigation and analysis documents (kebab-case `.md` files)                                            |
+| Directory                                        | Purpose                                                                                  |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `react_on_rails/lib/react_on_rails/`             | Ruby gem source — helpers, configuration, SSR pool, engine                               |
+| `react_on_rails/lib/generators/`                 | Rails generators for `react_on_rails:install`                                            |
+| `react_on_rails/spec/`                           | RSpec tests (unit + integration via dummy app)                                           |
+| `react_on_rails/spec/dummy/`                     | Full Rails app for integration testing and E2E                                           |
+| `packages/react-on-rails/src/`                   | TypeScript source — client-side React integration                                        |
+| `packages/react-on-rails/tests/`                 | Jest tests for the npm package                                                           |
+| `react_on_rails_pro/`                            | Pro package (separate gem + npm, own lint config)                                        |
+| `rakelib/`                                       | Rake task definitions                                                                    |
+| `docs/oss/`                                      | OSS documentation — published to the [ShakaCode website](https://reactonrails.com/docs/) |
+| `docs/pro/`                                      | Pro documentation — installation, configuration, RSC, node renderer, caching             |
+| `internal/contributor-info/`                     | Internal contributor docs (not published to the website)                                 |
+| `internal/planning/`                             | Internal planning docs, drafts, and historical analysis                                  |
+| `internal/react_on_rails_pro/contributors-info/` | Internal Pro contributor docs (not published to the website)                             |
+| `analysis/`                                      | Investigation and analysis documents (kebab-case `.md` files)                            |
 
 ## Code Style
 

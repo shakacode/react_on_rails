@@ -584,7 +584,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the \
         common definition. Please delete the common definition and have separate server and client files. For more \
-        information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+        information, please see https://reactonrails.com/docs/guides/file-system-based-automated-bundle-generation.md
       MSG
 
       raise ReactOnRails::Error, msg
@@ -594,7 +594,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: server specific definition for Component '#{component_name}' overrides the \
         common definition. Please delete the common definition and have separate server and client files. For more \
-        information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+        information, please see https://reactonrails.com/docs/guides/file-system-based-automated-bundle-generation.md
       MSG
 
       raise ReactOnRails::Error, msg
@@ -603,7 +603,7 @@ module ReactOnRails
     def raise_missing_client_component(component_name)
       msg = <<~MSG
         **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more \
-        information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+        information, please see https://reactonrails.com/docs/guides/file-system-based-automated-bundle-generation.md
       MSG
 
       raise ReactOnRails::Error, msg

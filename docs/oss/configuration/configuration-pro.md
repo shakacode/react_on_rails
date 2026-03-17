@@ -1,6 +1,6 @@
 # React on Rails Pro Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
 > Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
 
 For general React on Rails configuration options, see [Configuration](README.md).

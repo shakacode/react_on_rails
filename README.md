@@ -150,7 +150,7 @@ That's it — Pro layers on top of your existing setup. See the [Pro installatio
 
 Popmenu achieved a [73% decrease in average response times and 20-25% lower Heroku costs](https://www.shakacode.com/recent-work/popmenu/) with React on Rails Pro, now serving tens of millions of SSR requests daily.
 
-Ready to try Pro? Visit [pro.reactrails.com](https://pro.reactrails.com) or email [justin@shakacode.com](mailto:justin@shakacode.com).
+Ready to try Pro? Visit [pro.reactonrails.com](https://pro.reactonrails.com) or email [justin@shakacode.com](mailto:justin@shakacode.com).
 
 # 📚 Quick Start
 
