@@ -1,0 +1,1 @@
+{"version":3,"file":"serverRenderReactComponent.d.ts","sourceRoot":"","sources":["../src/serverRenderReactComponent.ts"],"names":[],"mappings":"AASA,OAAO,KAAK,EAGV,YAAY,EACZ,YAAY,EAMb,MAAM,kBAAkB,CAAC;AAqH1B,iBAAS,kCAAkC,CAAC,OAAO,EAAE,YAAY,GAAG,IAAI,GAAG,MAAM,GAAG,OAAO,CAAC,YAAY,CAAC,CAsDxG;AAED,QAAA,MAAM,0BAA0B,EAAE,OAAO,kCAUxC,CAAC;AAEF,eAAe,0BAA0B,CAAC"}

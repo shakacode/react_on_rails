@@ -1,0 +1,1 @@
+{"version":3,"file":"RSCRoute.d.ts","sourceRoot":"","sources":["../src/RSCRoute.tsx"],"names":[],"mappings":"AAmBA,OAAO,EAAkB,KAAK,SAAS,EAAE,MAAM,OAAO,CAAC;AAgCvD;;;;;;;;;;;;;;;;;;;;;GAqBG;AACH,MAAM,MAAM,aAAa,GAAG;IAC1B,aAAa,EAAE,MAAM,CAAC;IACtB,cAAc,EAAE,OAAO,CAAC;CACzB,CAAC;AAeF,QAAA,MAAM,QAAQ,GAAI,mCAAmC,aAAa,KAAG,SAQpE,CAAC;AAEF,eAAe,QAAQ,CAAC"}

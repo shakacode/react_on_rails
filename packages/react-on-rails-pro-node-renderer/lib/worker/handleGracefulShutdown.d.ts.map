@@ -1,0 +1,1 @@
+{"version":3,"file":"handleGracefulShutdown.d.ts","sourceRoot":"","sources":["../../src/worker/handleGracefulShutdown.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,eAAe,EAAE,MAAM,YAAY,CAAC;AAI7C,QAAA,MAAM,sBAAsB,GAAI,KAAK,eAAe,SA4DnD,CAAC;AAEF,eAAe,sBAAsB,CAAC"}

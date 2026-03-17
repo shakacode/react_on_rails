@@ -88,8 +88,8 @@ ssr-generated
 # Claude Code local settings
 .claude/settings.local.json
 
-# Workspace package build outputs (but track source code)
-packages/*/lib/
+# Workspace package build outputs (tracked on git-deps-support branch)
+# packages/*/lib/
 packages/**/node_modules/
 
 # Jest test reports

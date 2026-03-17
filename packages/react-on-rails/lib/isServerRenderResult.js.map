@@ -1,0 +1,1 @@
+{"version":3,"file":"isServerRenderResult.js","sourceRoot":"","sources":["../src/isServerRenderResult.ts"],"names":[],"mappings":"AAOA,MAAM,UAAU,kBAAkB,CAChC,SAAyD;IAEzD,OAAO,CAAC,CAAC,CACN,SAAgC,CAAC,YAAY;QAC7C,SAAgC,CAAC,gBAAgB;QACjD,SAAgC,CAAC,UAAU;QAC3C,SAAgC,CAAC,KAAK,CACxC,CAAC;AACJ,CAAC;AAED,MAAM,UAAU,SAAS,CACvB,SAAwG;IAExG,OAAO,CAAC,CAAE,SAA+B,EAAE,IAAI,CAAC;AAClD,CAAC"}

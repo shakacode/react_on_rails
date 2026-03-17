@@ -1,0 +1,2 @@
+export declare const PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzcS/fpHz5CbnTQxb4Zot\nkhjzXu7xNS+Y9VKfapMaHOMzNoCMfy1++hxHJatRedr+YQfZRCjfiN168Cpe+dhe\nyfNtOoLU9/+/5jTsxH+WQJWNRswyKms5HNajlIMN1GEYdZmZbvOPaZvh6ENsT+EV\nHnhjJtsHl7qltBoL0ul7rONxaNHCzJcKk4lf3B2/1j1wpA91MKz4bbQVh4/6Th0E\n/39f0PWvvBXzQS+yt1qaa1DIX5YL6Aug5uEpb1+6QWcN3hCzqSPBv1HahrG50rsD\ngf8KORV3X2N9t6j6iqPmRqfRcTBKtmPhM9bORtKiSwBK8LsIUzp2/UUmkdHnkyzu\nNQIDAQAB\n-----END PUBLIC KEY-----";
+//# sourceMappingURL=licensePublicKey.d.ts.map

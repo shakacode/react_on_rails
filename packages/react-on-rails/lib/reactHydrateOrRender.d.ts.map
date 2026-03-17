@@ -1,0 +1,1 @@
+{"version":3,"file":"reactHydrateOrRender.d.ts","sourceRoot":"","sources":["../src/reactHydrateOrRender.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,OAAO,CAAC;AAC1C,OAAO,KAAK,EAAE,gBAAgB,EAAE,MAAM,kBAAkB,CAAC;AAGzD,MAAM,CAAC,OAAO,UAAU,oBAAoB,CAC1C,OAAO,EAAE,OAAO,EAChB,YAAY,EAAE,YAAY,EAC1B,OAAO,EAAE,OAAO,GACf,gBAAgB,CAElB"}

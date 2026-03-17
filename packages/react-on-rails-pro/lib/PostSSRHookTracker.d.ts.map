@@ -1,0 +1,1 @@
+{"version":3,"file":"PostSSRHookTracker.d.ts","sourceRoot":"","sources":["../src/PostSSRHookTracker.ts"],"names":[],"mappings":"AAcA,KAAK,WAAW,GAAG,MAAM,IAAI,CAAC;AAE9B;;;;;;;;;;GAUG;AACH,cAAM,kBAAkB;IACtB,OAAO,CAAC,KAAK,CAAqB;IAElC,OAAO,CAAC,WAAW,CAAS;IAE5B;;;;;OAKG;IACH,cAAc,CAAC,IAAI,EAAE,WAAW,GAAG,IAAI;IAYvC;;;;;OAKG;IACH,YAAY,IAAI,IAAI;CAoBrB;AAED,eAAe,kBAAkB,CAAC"}

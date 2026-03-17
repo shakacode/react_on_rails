@@ -1,0 +1,1 @@
+{"version":3,"file":"checkProtocolVersionHandler.d.ts","sourceRoot":"","sources":["../../src/worker/checkProtocolVersionHandler.ts"],"names":[],"mappings":"AAoCA,MAAM,WAAW,WAAW;IAC1B,eAAe,CAAC,EAAE,MAAM,CAAC;IACzB,UAAU,CAAC,EAAE,MAAM,CAAC;IACpB,QAAQ,CAAC,EAAE,MAAM,CAAC;CACnB;AAED,wBAAgB,oBAAoB,CAAC,IAAI,EAAE,WAAW;;;;;;cAmErD"}

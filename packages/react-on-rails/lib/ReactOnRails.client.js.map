@@ -1,0 +1,1 @@
+{"version":3,"file":"ReactOnRails.client.js","sourceRoot":"","sources":["../src/ReactOnRails.client.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,sBAAsB,EAAE,MAAM,kBAAkB,CAAC;AAC1D,OAAO,kBAAkB,MAAM,yBAAyB,CAAC;AAEzD,MAAM,aAAa,GAAG,UAAU,CAAC,YAAY,IAAI,IAAI,CAAC;AACtD,MAAM,YAAY,GAAG,kBAAkB,CAAC,sBAAsB,EAAE,aAAa,CAAC,CAAC;AAE/E,cAAc,kBAAkB,CAAC;AACjC,eAAe,YAAY,CAAC"}

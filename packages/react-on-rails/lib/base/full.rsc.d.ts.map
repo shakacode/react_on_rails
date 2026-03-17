@@ -1,0 +1,1 @@
+{"version":3,"file":"full.rsc.d.ts","sourceRoot":"","sources":["../../src/base/full.rsc.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,sBAAsB,EAAE,KAAK,oBAAoB,EAAE,MAAM,aAAa,CAAC;AAChF,OAAO,KAAK,EAAE,kBAAkB,EAAqC,MAAM,WAAW,CAAC;AAEvF,mBAAmB,WAAW,CAAC;AAE/B,wBAAgB,oBAAoB,CAClC,UAAU,EAAE,UAAU,CAAC,OAAO,sBAAsB,CAAC,CAAC,CAAC,CAAC,EACxD,aAAa,GAAE,oBAAoB,GAAG,IAAW,GAChD,kBAAkB,CA6BpB"}

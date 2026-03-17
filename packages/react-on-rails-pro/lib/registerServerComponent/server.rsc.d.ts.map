@@ -1,0 +1,1 @@
+{"version":3,"file":"server.rsc.d.ts","sourceRoot":"","sources":["../../src/registerServerComponent/server.rsc.ts"],"names":[],"mappings":"AAcA,OAAO,EAAE,cAAc,EAAE,cAAc,EAAE,MAAM,sBAAsB,CAAC;AAGtE;;;;;;;;;;;;;;;;;GAiBG;AACH,QAAA,MAAM,uBAAuB,GAAI,YAAY;IAAE,CAAC,EAAE,EAAE,MAAM,GAAG,cAAc,GAAG,cAAc,CAAA;CAAE,SAE7F,CAAC;AAEF,eAAe,uBAAuB,CAAC"}

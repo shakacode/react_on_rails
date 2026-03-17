@@ -1,0 +1,1 @@
+{"version":3,"file":"server.d.ts","sourceRoot":"","sources":["../../src/wrapServerComponentRenderer/server.tsx"],"names":[],"mappings":"AAeA,OAAO,KAAK,EAAE,cAAc,EAAE,8BAA8B,EAAE,MAAM,sBAAsB,CAAC;AAM3F;;;;;;;;;;;;;;;;;;GAkBG;AACH,QAAA,MAAM,2BAA2B,GAC/B,2BAA2B,8BAA8B,EACzD,gBAAe,MAAkB,mBAiDlC,CAAC;AAEF,eAAe,2BAA2B,CAAC"}
