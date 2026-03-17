@@ -8,19 +8,25 @@ RSpec.describe "RSC payload endpoint" do
   end
 
   def parsed_chunks
-    response.body.each_line.filter_map do |line|
-      stripped_line = line.strip
-      next if stripped_line.empty?
+    chunks = []
+    buf = response.body.b
+    while buf.bytesize.positive?
+      tab_idx = buf.index("\t")
+      break unless tab_idx
 
-      begin
-        JSON.parse(stripped_line)
-      rescue JSON::ParserError => e
-        raise "Rails view annotation leaked into RSC payload response: #{stripped_line.inspect}" \
-          if stripped_line.include?("<!--")
+      newline_idx = buf.index("\n", tab_idx)
+      break unless newline_idx
 
-        raise "Non-JSON line in RSC payload response: #{stripped_line.inspect} (#{e.message})"
-      end
+      meta_json = buf.byteslice(0, tab_idx).force_encoding("UTF-8")
+      len_hex = buf.byteslice(tab_idx + 1, newline_idx - tab_idx - 1)
+      content_len = len_hex.to_i(16)
+      html = buf.byteslice(newline_idx + 1, content_len)&.force_encoding("UTF-8")
+      buf = buf.byteslice(newline_idx + 1 + content_len, buf.bytesize) || "".b
+
+      metadata = JSON.parse(meta_json)
+      chunks << metadata.merge("html" => html)
     end
+    chunks
   end
 
   def expect_valid_rsc_payload_response
