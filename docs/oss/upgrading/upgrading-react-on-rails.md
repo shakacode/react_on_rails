@@ -29,7 +29,7 @@ rails generate react_on_rails:install
 Before changing versions, check these first:
 
 1. **Ruby and Node requirements**: React on Rails v16 requires Ruby 3.2+ and Node 20+.
-2. **Bundler age**: very old apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
+2. **Bundler age**: legacy apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
 3. **Rails version**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 apps need a Rails upgrade before they can bundle v16.
 4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.
 5. **Version pinning**: use exact gem and npm package versions for React on Rails-related packages. Avoid `^`, `~`, or `*`.
@@ -115,21 +115,21 @@ This is a minor release - update your gem and npm package versions, then run `bu
 
 1. **Update Dependencies**
 
+   > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest stable release and substitute accordingly.
+
    ```ruby
-   # Gemfile
+   # Gemfile — pre-release gems use dots (e.g., 16.4.0.rc.10)
    gem "react_on_rails", "16.4.0.rc.10"
    ```
 
    ```json
-   // package.json
+   // package.json — pre-release npm uses hyphens (e.g., 16.4.0-rc.10)
    {
      "dependencies": {
        "react-on-rails": "16.4.0-rc.10"
      }
    }
    ```
-
-   Replace those example versions with the current exact release if newer.
 
 2. **Install Updates**
 
