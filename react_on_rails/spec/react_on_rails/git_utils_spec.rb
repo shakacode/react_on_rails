@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "open3"
 require_relative "spec_helper"
 
 module ReactOnRails
@@ -17,7 +18,8 @@ module ReactOnRails
         end
 
         it "returns true" do
-          allow(described_class).to receive(:`).with("git status --porcelain").and_return("M file/path")
+          status = instance_double(Process::Status, success?: true)
+          allow(Open3).to receive(:capture2e).with("git", "status", "--porcelain").and_return(["M file/path", status])
           expect(message_handler).to receive(:add_error)
             .with(<<~MSG.strip)
               You have uncommitted changes. Please commit or stash them before continuing.
@@ -43,7 +45,7 @@ module ReactOnRails
 
         it "returns false without checking git status" do
           # Should not call git status at all
-          expect(described_class).not_to receive(:`)
+          expect(Open3).not_to receive(:capture2e)
           expect(message_handler).not_to receive(:add_error)
 
           expect(described_class.uncommitted_changes?(message_handler, git_installed: true)).to be(false)
@@ -62,7 +64,8 @@ module ReactOnRails
         end
 
         it "returns false" do
-          allow(described_class).to receive(:`).with("git status --porcelain").and_return("")
+          status = instance_double(Process::Status, success?: true)
+          allow(Open3).to receive(:capture2e).with("git", "status", "--porcelain").and_return(["", status])
           expect(message_handler).not_to receive(:add_error)
 
           expect(described_class.uncommitted_changes?(message_handler, git_installed: true)).to be(false)
@@ -81,7 +84,7 @@ module ReactOnRails
         end
 
         it "returns true without calling git" do
-          expect(described_class).not_to receive(:`)
+          expect(Open3).not_to receive(:capture2e)
           expect(message_handler).to receive(:add_error)
             .with(<<~MSG.strip)
               Git is not installed. Please install Git and commit your changes before continuing.
@@ -107,7 +110,8 @@ module ReactOnRails
         end
 
         it "adds a warning and returns true" do
-          allow(described_class).to receive(:`).with("git status --porcelain").and_return("M file/path")
+          status = instance_double(Process::Status, success?: true)
+          allow(Open3).to receive(:capture2e).with("git", "status", "--porcelain").and_return(["M file/path", status])
           expect(message_handler).to receive(:add_warning).with(described_class::DIRTY_WORKTREE_WARNING)
 
           expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: true)).to be(true)
@@ -126,7 +130,7 @@ module ReactOnRails
         end
 
         it "returns false without checking git status" do
-          expect(described_class).not_to receive(:`)
+          expect(Open3).not_to receive(:capture2e)
           expect(message_handler).not_to receive(:add_warning)
 
           expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: true)).to be(false)
@@ -144,7 +148,8 @@ module ReactOnRails
         end
 
         it "returns false" do
-          allow(described_class).to receive(:`).with("git status --porcelain").and_return("")
+          status = instance_double(Process::Status, success?: true)
+          allow(Open3).to receive(:capture2e).with("git", "status", "--porcelain").and_return(["", status])
           expect(message_handler).not_to receive(:add_warning)
 
           expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: true)).to be(false)
@@ -162,7 +167,7 @@ module ReactOnRails
         end
 
         it "adds a warning and returns true without calling git" do
-          expect(described_class).not_to receive(:`)
+          expect(Open3).not_to receive(:capture2e)
           expect(message_handler).to receive(:add_warning).with(described_class::MISSING_GIT_WARNING)
 
           expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: false)).to be(true)

@@ -76,6 +76,10 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
   }
 
   args.push('--force');
+  // The newly created app directory is not a git repo yet, so the generator's
+  // uncommitted-changes check would always warn. --ignore-warnings bypasses all
+  // generator validation warnings (git, Node version, package manager) which is
+  // acceptable for a fresh app where prerequisites were already checked above.
   args.push('--ignore-warnings');
 
   return args;
@@ -135,9 +139,13 @@ function normalizeGeneratedPackageManager(
     fs.rmSync(packageLockPath, { force: true });
   }
 
-  rewriteFileIfPresent(setupPath, (contents) =>
-    contents.replace(/system!\("npm install"\)/g, 'system!("pnpm install")'),
-  );
+  rewriteFileIfPresent(setupPath, (contents) => {
+    const updated = contents.replace(/system!\("npm install"\)/g, 'system!("pnpm install")');
+    if (updated === contents) {
+      logInfo('Note: Could not auto-update bin/setup for pnpm. Update it manually if needed.');
+    }
+    return updated;
+  });
 
   execLiveArgs('pnpm', ['install'], appPath);
   logStepDone('pnpm configuration applied');
