@@ -51,6 +51,7 @@ module GeneratorMessages
       shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed)
       render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
       render_label = build_render_label(route: route, rsc: rsc)
+      # rsc guard is defensive; callers via install_generator already pass pro: true when rsc is set
       pro_hint = pro || rsc ? "" : PRO_UPGRADE_HINT
 
       <<~MSG
