@@ -463,7 +463,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: auto_load_bundle is set to true, yet components_subdirectory is not configured.\
         Please set components_subdirectory to the desired directory.  For more information, please see \
-        https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+        https://reactonrails.com/docs/guides/file-system-based-automated-bundle-generation.md
       MSG
 
       raise ReactOnRails::Error, msg

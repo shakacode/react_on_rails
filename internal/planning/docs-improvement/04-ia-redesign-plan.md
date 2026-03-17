@@ -1141,7 +1141,7 @@ find docs -name "*.md" -exec markdown-link-check {} \;
 
 ```bash
 # Visit actual site
-open https://www.shakacode.com/react-on-rails/docs/
+open https://reactonrails.com/docs/
 
 # Check Google Search Console (after a few days)
 # - Are old URLs redirecting?

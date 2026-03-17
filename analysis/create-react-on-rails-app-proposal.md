@@ -347,7 +347,7 @@ Next steps:
 
 Visit http://localhost:3000/hello_world
 
-Documentation: https://www.shakacode.com/react-on-rails/docs/
+Documentation: https://reactonrails.com/docs/
 ```
 
 ## React on Rails Pro Support (Future Enhancement)

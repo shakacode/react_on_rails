@@ -79,7 +79,7 @@ function printSuccessMessage(appName: string, route: string): void {
   console.log('');
   logInfo(`Then visit http://localhost:3000/${route}`);
   console.log('');
-  logInfo('Documentation: https://www.shakacode.com/react-on-rails/docs/');
+  logInfo('Documentation: https://reactonrails.com/docs/');
   console.log('');
 }
 

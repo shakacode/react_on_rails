@@ -35,7 +35,7 @@
 # 2. Remove precompile_hook from config/shakapacker.yml if present
 # 3. Uncomment the run_precompile_tasks call near the bottom of this file
 #
-# See documentation: https://www.shakacode.com/react-on-rails/docs/building-features/extensible-precompile-pattern
+# See documentation: https://reactonrails.com/docs/building-features/extensible-precompile-pattern
 #
 # def run_precompile_tasks
 #   require_relative "../config/environment"

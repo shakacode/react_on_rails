@@ -101,7 +101,7 @@ import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerCompon
 
 ## Documentation Links
 
-- Docs: https://www.shakacode.com/react-on-rails/docs/
+- Docs: https://reactonrails.com/docs/
 - Pro Docs: https://www.shakacode.com/react-on-rails-pro/docs/
 - Pro Installation: https://www.shakacode.com/react-on-rails-pro/docs/installation/
 - Pro Configuration: https://www.shakacode.com/react-on-rails-pro/docs/configuration/

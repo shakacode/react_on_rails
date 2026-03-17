@@ -25,7 +25,7 @@ module ReactOnRails
             The `prerender` option to allow Server Side Rendering is marked as true but the ReactOnRails configuration
             for `server_bundle_js_file` is nil or not present in `config/initializers/react_on_rails.rb`.
             Set `config.server_bundle_js_file` to your javascript bundle to allow server side rendering.
-            Read more at https://www.shakacode.com/react-on-rails/docs/guides/react-server-rendering/
+            Read more at https://reactonrails.com/docs/guides/react-server-rendering/
           MSG
           raise ReactOnRails::Error, msg
         end

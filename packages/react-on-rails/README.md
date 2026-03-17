@@ -96,10 +96,10 @@ rails generate react_on_rails:install
 
 ## Documentation
 
-- [Getting Started](https://www.shakacode.com/react-on-rails/docs/getting-started/quick-start/)
-- [Installation Guide](https://www.shakacode.com/react-on-rails/docs/getting-started/installation-into-an-existing-rails-app/)
-- [API Reference](https://www.shakacode.com/react-on-rails/docs/api-reference/)
-- [Configuration](https://www.shakacode.com/react-on-rails/docs/configuration/)
+- [Getting Started](https://reactonrails.com/docs/getting-started/quick-start/)
+- [Installation Guide](https://reactonrails.com/docs/getting-started/installation-into-an-existing-rails-app/)
+- [API Reference](https://reactonrails.com/docs/api-reference/)
+- [Configuration](https://reactonrails.com/docs/configuration/)
 
 ## License
 

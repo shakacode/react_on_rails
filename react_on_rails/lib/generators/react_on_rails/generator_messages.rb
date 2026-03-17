@@ -79,7 +79,7 @@ module GeneratorMessages
 
         📚 LEARN MORE:
         ─────────────────────────────────────────────────────────────────────────
-        • Documentation: #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
+        • Documentation: #{Rainbow('https://reactonrails.com/docs/').cyan.underline}
         • Webpack customization: #{Rainbow('https://github.com/shakacode/shakapacker#webpack-configuration').cyan.underline}
 
         💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}
