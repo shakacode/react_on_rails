@@ -9,7 +9,7 @@ GIT
 PATH
   remote: ..
   specs:
-    react_on_rails (16.4.0.rc.10)
+    react_on_rails (16.4.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -20,7 +20,7 @@ PATH
 PATH
   remote: .
   specs:
-    react_on_rails_pro (16.4.0.rc.10)
+    react_on_rails_pro (16.4.0)
       addressable
       async (>= 2.6)
       connection_pool
@@ -29,7 +29,7 @@ PATH
       httpx (~> 1.5)
       jwt (~> 2.7)
       rainbow
-      react_on_rails (= 16.4.0.rc.10)
+      react_on_rails (= 16.4.0)
 
 GEM
   remote: https://rubygems.org/
@@ -231,7 +231,6 @@ GEM
     method_source (1.1.0)
     metrics (0.15.0)
     mini_mime (1.1.5)
-    mini_portile2 (2.8.9)
     minitest (6.0.2)
       drb (~> 2.0)
       prism (~> 1.5)
@@ -441,8 +440,9 @@ GEM
       actionpack (>= 6.1)
       activesupport (>= 6.1)
       sprockets (>= 3.0.0)
-    sqlite3 (1.7.3)
-      mini_portile2 (~> 2.8.0)
+    sqlite3 (1.7.3-arm64-darwin)
+    sqlite3 (1.7.3-x86_64-darwin)
+    sqlite3 (1.7.3-x86_64-linux)
     stringio (3.2.0)
     sync (0.5.0)
     term-ansicolor (1.10.2)
