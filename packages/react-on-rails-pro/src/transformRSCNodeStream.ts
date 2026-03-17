@@ -14,6 +14,7 @@
 
 import { Readable, Transform } from 'stream';
 import safePipe from './safePipe.ts';
+import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
 
 /**
  * Transforms an RSC Node.js stream for server-side processing.
@@ -30,37 +31,14 @@ import safePipe from './safePipe.ts';
  * @returns A transformed stream compatible with React's SSR runtime
  */
 export default function transformRSCStream(stream: NodeJS.ReadableStream): NodeJS.ReadableStream {
-  let buf = Buffer.alloc(0);
-  let state: 'header' | 'content' = 'header';
-  let contentLen = 0;
+  const parser = new LengthPrefixedStreamParser();
 
   const htmlExtractor = new Transform({
     transform(chunk: Buffer, _, callback) {
       try {
-        buf = Buffer.concat([buf, chunk]);
-
-        let progressed = true;
-        while (progressed) {
-          progressed = false;
-          if (state === 'header') {
-            const idx = buf.indexOf(0x0a); // \n
-            if (idx >= 0) {
-              const header = buf.subarray(0, idx);
-              buf = buf.subarray(idx + 1);
-
-              const tabIdx = header.indexOf(0x09); // \t
-              const lenHex = header.subarray(tabIdx + 1).toString('utf8');
-              contentLen = parseInt(lenHex, 16);
-              state = 'content';
-              progressed = true;
-            }
-          } else if (buf.length >= contentLen) {
-            this.push(buf.subarray(0, contentLen));
-            buf = buf.subarray(contentLen);
-            state = 'header';
-            progressed = true;
-          }
-        }
+        parser.feed(chunk, (content) => {
+          this.push(content);
+        });
         callback();
       } catch (error) {
         callback(error as Error);
