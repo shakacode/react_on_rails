@@ -64,9 +64,10 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 **Fixes**:
 
-- Ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set
+- In production, ensure `REACT_ON_RAILS_PRO_LICENSE` environment variable is set
+- Run `bundle exec rake react_on_rails_pro:verify_license` to check license status (use `FORMAT=json` for CI/CD)
 - Check that the license key is not expired — contact [justin@shakacode.com](mailto:justin@shakacode.com) for renewal
-- For evaluation/non-production use, a free license is available at [shakacode.com/react-on-rails-pro](https://www.shakacode.com/react-on-rails-pro/)
+- For evaluation/non-production use, no license token is required — the app runs in unlicensed mode
 
 ## React Server Components
 

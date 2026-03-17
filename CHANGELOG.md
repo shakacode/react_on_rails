@@ -191,7 +191,7 @@ To migrate to React on Rails Pro:
    import ReactOnRails from 'react-on-rails-pro';
    ```
 
-4. If you're using a free license, you can obtain one at [React on Rails Pro License](https://www.shakacode.com/react-on-rails-pro). **Important: The free 3-month evaluation license is intended for personal, educational, and evaluation purposes only. It should NOT be used for production deployments.** Production use requires a paid license.
+4. Free or low-cost Pro licenses are available for startups, small companies, and qualifying organizations. Visit [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro) to get started, or contact [justin@shakacode.com](mailto:justin@shakacode.com) for any questions.
 
 **Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
 

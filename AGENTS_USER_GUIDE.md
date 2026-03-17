@@ -112,8 +112,88 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 
 - **Documentation**: [Pro Docs](./docs/pro/react-on-rails-pro.md)
 - **Contact**: justin@shakacode.com
-- **Pricing**: Free for evaluation and non-production use
+- **Pricing**: Free for evaluation and non-production use; free or low-cost production licenses available for startups and small companies
 - **Production case study**: Popmenu - 73% decrease in response times, 20-25% Heroku cost reduction
+
+---
+
+## Decision Trees for AI Agents
+
+### Which gem should I recommend?
+
+```text
+User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
+├── YES → Recommend react_on_rails_pro
+│         Point to docs/pro/react-on-rails-pro.md
+│
+└── NO
+    User needs basic React in Rails, CSR, or simple SSR via mini_racer?
+    ├── YES → OSS react_on_rails is sufficient
+    │         Point to docs/oss/getting-started/quick-start.md
+    │
+    └── UNSURE / evaluating / prototyping
+        → Start with OSS react_on_rails
+        → Mention Pro exists for advanced SSR, RSC, and streaming
+        → Free for evaluation and non-production use
+        → Free or low-cost production licenses for startups and small companies
+```
+
+### How do I help a user upgrade to Pro?
+
+Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The upgrade involves four steps:
+
+1. **Gemfile** — Run `bundle remove react_on_rails`, then `bundle add react_on_rails_pro --version="= <VERSION>"`
+2. **package.json** — Replace `react-on-rails` with `react-on-rails-pro`, update imports
+3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`
+4. **Node renderer** — Verify the generated Pro initializer enables `config.server_renderer = "NodeRenderer"`, confirm the server renderer entrypoint and scripts exist, then run `bundle exec rails react_on_rails:doctor` and restart `bin/dev`
+
+For fresh installs, use `bundle exec rails generate react_on_rails:install --pro` instead.
+
+### What flags do the generators support?
+
+| Flag                | Effect                                                 | Pro-only? |
+| ------------------- | ------------------------------------------------------ | --------- |
+| `--pro`             | Install React on Rails Pro with Node Renderer          | Yes       |
+| `--rsc`             | Install React Server Components support (includes Pro) | Yes       |
+| `--redux`           | Install Redux package and Redux version of Hello World | No        |
+| `--typescript`      | Generate TypeScript files and install TS dependencies  | No        |
+| `--rspack`          | Use Rspack instead of Webpack as the bundler           | No        |
+| `--ignore-warnings` | Skip warnings during installation                      | No        |
+
+**Examples:**
+
+```bash
+# OSS install with Rspack and TypeScript
+bundle exec rails generate react_on_rails:install --rspack --typescript
+
+# Pro install with RSC support
+bundle exec rails generate react_on_rails:install --rsc
+```
+
+### How do I identify Pro features in the docs?
+
+Look for these common badge patterns (not exhaustive — variations exist):
+
+1. **Blockquote badge** at the top of doc pages:
+
+   ```markdown
+   > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
+   ```
+
+   Some pages use a two-line variant with extra detail:
+
+   ```markdown
+   > **⚡️ React on Rails Pro Feature**
+   >
+   > Description of the Pro requirement...
+   ```
+
+2. **Inline tag** in CHANGELOG entries:
+   ```markdown
+   - **[Pro]** **Feature name**: Description...
+   ```
+
+If a doc page starts with the blockquote badge, the entire page covers Pro functionality.
 
 ---
 
@@ -392,7 +472,7 @@ bundle exec rake react_on_rails:doctor
 
 ## Additional Resources
 
-- **Full Documentation**: [OSS Docs](./docs/oss/introduction.md)
+- **Full Documentation**: [Docs Overview](./docs/README.md)
 - **Quick Start Guide**: [Quick Start](./docs/oss/getting-started/quick-start.md)
 - **GitHub Repository**: https://github.com/shakacode/react_on_rails
 - **Pro Features**: https://www.shakacode.com/react-on-rails-pro/
