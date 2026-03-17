@@ -2,20 +2,12 @@ import path from 'path';
 import fs from 'fs';
 import { validateAppName, buildGeneratorArgs, createApp } from '../src/create-app';
 import { CliOptions } from '../src/types';
-import {
-  execLiveArgs,
-  execLiveArgsWithEnv,
-  getCommandVersion,
-  logError,
-  logInfo,
-  logStepDone,
-} from '../src/utils';
+import { execLiveArgs, getCommandVersion, logError, logInfo, logStepDone } from '../src/utils';
 
 jest.mock('fs');
 jest.mock('../src/utils', () => ({
   ...jest.requireActual('../src/utils'),
   execLiveArgs: jest.fn(),
-  execLiveArgsWithEnv: jest.fn(),
   getCommandVersion: jest.fn(),
   logStep: jest.fn(),
   logStepDone: jest.fn(),
@@ -26,7 +18,6 @@ jest.mock('../src/utils', () => ({
 
 const mockedFs = jest.mocked(fs);
 const mockedExecLiveArgs = jest.mocked(execLiveArgs);
-const mockedExecLiveArgsWithEnv = jest.mocked(execLiveArgsWithEnv);
 const mockedGetCommandVersion = jest.mocked(getCommandVersion);
 const mockedLogError = jest.mocked(logError);
 const mockedLogInfo = jest.mocked(logInfo);
@@ -195,7 +186,6 @@ describe('createApp', () => {
     mockedFs.writeFileSync.mockReset();
     process.env = { ...originalEnv };
     mockedExecLiveArgs.mockReset();
-    mockedExecLiveArgsWithEnv.mockReset();
     mockedGetCommandVersion.mockReset();
     mockedGetCommandVersion.mockImplementation((command) => (command === 'pnpm' ? '10.22.0' : null));
     mockedLogError.mockReset();
@@ -235,14 +225,14 @@ describe('createApp', () => {
       appPath,
     );
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(3, 'bundle', ['add', 'react_on_rails_pro'], appPath);
-    expect(mockedExecLiveArgsWithEnv).toHaveBeenNthCalledWith(
-      1,
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      4,
       'bundle',
       ['exec', 'rails', 'generate', 'react_on_rails:install', '--rsc', '--force', '--ignore-warnings'],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
-    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(3);
+    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(4);
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_server');
@@ -266,14 +256,14 @@ describe('createApp', () => {
       ['add', 'react_on_rails', '--strict'],
       appPath,
     );
-    expect(mockedExecLiveArgsWithEnv).toHaveBeenNthCalledWith(
-      1,
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      3,
       'bundle',
       ['exec', 'rails', 'generate', 'react_on_rails:install', '--force', '--ignore-warnings'],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
-    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(2);
+    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(3);
     expect(mockedExecLiveArgs).not.toHaveBeenCalledWith(
       'bundle',
       ['add', 'react_on_rails_pro'],
@@ -303,15 +293,15 @@ describe('createApp', () => {
 
     createApp('my-app', { ...baseOptions, packageManager: 'pnpm' });
 
-    expect(mockedExecLiveArgsWithEnv).toHaveBeenNthCalledWith(
-      1,
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      3,
       'bundle',
       ['exec', 'rails', 'generate', 'react_on_rails:install', '--force', '--ignore-warnings'],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'pnpm' }),
     );
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(3, 'pnpm', ['import'], appPath);
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(4, 'pnpm', ['install'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(4, 'pnpm', ['import'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(5, 'pnpm', ['install'], appPath);
     expect(mockedFs.rmSync).toHaveBeenCalledWith(packageLockPath, { force: true });
     expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
       packageJsonPath,
@@ -323,6 +313,31 @@ describe('createApp', () => {
       expect.stringContaining('system!("pnpm install")'),
       'utf8',
     );
+  });
+
+  it('skips pnpm import and install when no package-lock.json exists', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+    const packageJsonPath = path.join(appPath, 'package.json');
+    const setupPath = path.join(appPath, 'bin', 'setup');
+    const packageLockPath = path.join(appPath, 'package-lock.json');
+
+    mockedFs.existsSync.mockImplementation((targetPath) => targetPath !== packageLockPath);
+    mockedFs.readFileSync.mockImplementation((targetPath) => {
+      if (targetPath === packageJsonPath) {
+        return JSON.stringify({ packageManager: 'pnpm@10.22.0', name: 'app' });
+      }
+      if (targetPath === setupPath) {
+        return '#!/usr/bin/env ruby\nsystem!("pnpm install")\n';
+      }
+
+      return '';
+    });
+
+    createApp('my-app', { ...baseOptions, packageManager: 'pnpm' });
+
+    expect(mockedExecLiveArgs).not.toHaveBeenCalledWith('pnpm', ['import'], appPath);
+    expect(mockedExecLiveArgs).not.toHaveBeenCalledWith('pnpm', ['install'], appPath);
+    expect(mockedFs.rmSync).not.toHaveBeenCalledWith(packageLockPath, { force: true });
   });
 
   it('cleans up app directory when react_on_rails add fails', () => {
@@ -403,10 +418,12 @@ describe('createApp', () => {
 
   it('cleans up app directory when generator fails', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
-    mockedExecLiveArgs.mockImplementationOnce(() => {}).mockImplementationOnce(() => {});
-    mockedExecLiveArgsWithEnv.mockImplementationOnce(() => {
-      throw new Error('generator failed');
-    });
+    mockedExecLiveArgs
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('generator failed');
+      });
 
     expect(() => createApp('my-app', baseOptions)).toThrow('process.exit');
     expect(mockedLogError).toHaveBeenCalledWith(

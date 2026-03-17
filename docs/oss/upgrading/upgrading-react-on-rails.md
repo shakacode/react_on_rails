@@ -33,11 +33,12 @@ Before changing versions, check these first:
 
 If your app is both Ruby/Bundler-old and Webpacker-old, do those upgrades first. Trying to jump directly from a Rails 5 / Webpacker 3 / Bundler 1 stack to current React on Rails is usually more than one migration.
 
-If the first failure is a Bundler 1.x lockfile, refresh that lockfile before changing React on Rails:
+If the first failure is a Bundler 1.x lockfile, refresh that lockfile with Bundler 2.x before changing React on Rails:
 
 ```bash
-bundle _2.3.26_ lock --update
-bundle _2.3.26_ install
+gem install bundler   # if Bundler 2.x is not already available
+bundle lock --update
+bundle install
 ```
 
 ## Upgrading Precompile Hooks for SSR + HMR
