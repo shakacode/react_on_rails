@@ -89,7 +89,6 @@ export default function injectRSCPayload(
   safePipe(pipeableHtmlStream, htmlStream, (err) => {
     resultStream.emit('error', err);
   });
-  const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
 
   // ========================================

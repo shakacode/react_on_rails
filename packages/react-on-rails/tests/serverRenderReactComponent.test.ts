@@ -50,7 +50,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     assertIsString(html);
     const result = html && html.indexOf('>HELLO</div>') > 0;
@@ -75,7 +75,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     assertIsString(html);
     const result = html && html.indexOf('XYZ') > 0 && html.indexOf('Exception in rendering!') > 0;
@@ -102,7 +102,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     expect(html).toEqual(expectedHtml);
     expect(hasErrors).toBeFalsy();
@@ -127,7 +127,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: false,
     });
     assertIsString(renderResult);
-    const { html, hasErrors, clientProps }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors, clientProps } = parseLengthPrefixed(renderResult);
 
     expect(html).toEqual('<div>Hello with client props</div>');
     expect(clientProps).toEqual({
@@ -151,7 +151,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: false,
     });
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     expect(html).toContain('Exception in rendering!');
     expect(html).toContain('Element type is invalid');
@@ -184,7 +184,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     // Instead of expecting exact strings, check that it contains key parts of the error
     expect(html).toContain('Exception in rendering!');
@@ -328,7 +328,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     assertIsString(html);
     const result = html && html.indexOf('renderer') > 0 && html.indexOf('Exception in rendering!') > 0;

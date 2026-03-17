@@ -57,7 +57,7 @@ const replayConsole = (consoleReplayScript: string, nonce?: string) => {
  */
 const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: string) => {
   const response = await fetchPromise;
-  const body = response.body;
+  const { body } = response;
   if (!body) {
     throw new Error('No stream found in response');
   }
