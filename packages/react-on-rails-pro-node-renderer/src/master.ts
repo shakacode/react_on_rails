@@ -93,6 +93,13 @@ export default function masterRun(runningConfig?: Partial<Config>) {
       log.info('Worker #%d exited on schedule', worker.id);
       return;
     }
+    if (worker.isRollingRestartReplacement) {
+      // A replacement forked by the rolling restart loop crashed during
+      // bootstrap. The restart loop handles retries itself, so we must
+      // not auto-fork here to avoid growing the pool.
+      log.info('Rolling restart replacement worker #%d exited during bootstrap', worker.id);
+      return;
+    }
     // TODO: Track last rendering request per worker.id
     // TODO: Consider blocking a given rendering request if it kills a worker more than X times
     const msg = `Worker ${worker.id} died UNEXPECTEDLY :(, restarting`;

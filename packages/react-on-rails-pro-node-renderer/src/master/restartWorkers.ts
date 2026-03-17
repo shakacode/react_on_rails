@@ -23,6 +23,13 @@ const MAX_REPLACEMENT_RETRIES = 2;
 declare module 'cluster' {
   interface Worker {
     isScheduledRestart?: boolean;
+    /**
+     * Set on replacement workers forked by the rolling restart loop.
+     * Prevents the exit handler in master.ts from auto-forking when a
+     * replacement crashes during bootstrap — the restart loop handles
+     * retries itself.
+     */
+    isRollingRestartReplacement?: boolean;
   }
 }
 
@@ -33,18 +40,24 @@ declare module 'cluster' {
  */
 async function forkAndWaitForListening(timeoutMs: number): Promise<Worker | null> {
   const replacement = cluster.fork();
+  replacement.isRollingRestartReplacement = true;
   const replacementId = replacement.id;
   log.debug('Forked replacement worker #%d, waiting for it to start listening', replacementId);
+
+  let timeoutHandle: NodeJS.Timeout | undefined;
 
   const result = await Promise.race([
     once(replacement, 'listening').then(() => 'ready' as const),
     once(replacement, 'exit').then(() => 'crashed' as const),
     new Promise<'timeout'>((resolve) => {
-      setTimeout(() => resolve('timeout'), timeoutMs);
+      timeoutHandle = setTimeout(() => resolve('timeout'), timeoutMs);
     }),
   ]);
 
+  clearTimeout(timeoutHandle);
+
   if (result === 'ready') {
+    replacement.isRollingRestartReplacement = false;
     log.info('Replacement worker #%d is listening', replacementId);
     return replacement;
   }
@@ -71,9 +84,9 @@ function waitForWorkerExit(worker: Worker, gracefulTimeout: number | undefined):
       clearTimeout(timeout);
       resolve();
     };
-    worker.on('exit', onExit);
+    worker.once('exit', onExit);
 
-    if (gracefulTimeout) {
+    if (gracefulTimeout != null && gracefulTimeout > 0) {
       timeout = setTimeout(() => {
         log.debug('Worker #%d timed out during graceful shutdown, force-killing', worker.id);
         worker.destroy();
@@ -104,6 +117,13 @@ export default async function restartWorkers(
   );
 
   for (const worker of workersToRestart) {
+    // Skip workers that exited unexpectedly before their turn in the loop.
+    if (!cluster.workers?.[worker.id]) {
+      log.warn('Worker #%d already exited before its scheduled restart turn, skipping', worker.id);
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+
     log.debug('Restarting worker #%d', worker.id);
 
     // Fork replacement first, retrying up to MAX_REPLACEMENT_RETRIES times.
