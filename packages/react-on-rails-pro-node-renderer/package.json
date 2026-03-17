@@ -60,7 +60,8 @@
     "redis": "^5.0.1",
     "sentry-testkit": "^5.0.6",
     "touch": "^3.1.0",
-    "typescript": "^5.4.3"
+    "@tsconfig/node14": "^14.1.2",
+    "typescript": "^5.8.3"
   },
   "peerDependencies": {
     "@honeybadger-io/js": ">=4.0.0",

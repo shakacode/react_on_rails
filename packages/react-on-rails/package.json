@@ -55,6 +55,10 @@
       "default": "./lib/base/full.js"
     }
   },
+  "devDependencies": {
+    "@tsconfig/node14": "^14.1.2",
+    "typescript": "^5.8.3"
+  },
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16"

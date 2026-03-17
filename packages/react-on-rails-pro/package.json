@@ -76,10 +76,12 @@
   },
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
   "devDependencies": {
+    "@tsconfig/node14": "^14.1.2",
     "@types/mock-fs": "^4.13.4",
     "mock-fs": "^5.5.0",
     "react": "^19.0.3",
     "react-dom": "^19.0.3",
-    "react-on-rails-rsc": "^19.0.4"
+    "react-on-rails-rsc": "^19.0.4",
+    "typescript": "^5.8.3"
   }
 }

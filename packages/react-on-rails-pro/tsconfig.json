@@ -1,6 +1,19 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "@tsconfig/node14",
   "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": false,
+    "declaration": true,
+    "declarationMap": true,
+    "jsx": "react-jsx",
+    "lib": ["dom", "es2020"],
+    "noImplicitAny": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "strict": true,
+    "sourceMap": true,
+    "incremental": true,
+    "target": "es2020",
     "outDir": "./lib"
   },
   "include": ["src/**/*"]

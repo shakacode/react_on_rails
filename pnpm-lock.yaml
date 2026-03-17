@@ -212,6 +212,13 @@ importers:
       react-dom:
         specifier: ^19.0.3
         version: 19.2.3(react@19.2.3)
+    devDependencies:
+      '@tsconfig/node14':
+        specifier: ^14.1.2
+        version: 14.1.8
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
   packages/react-on-rails-pro:
     dependencies:
@@ -219,6 +226,9 @@ importers:
         specifier: workspace:*
         version: link:../react-on-rails
     devDependencies:
+      '@tsconfig/node14':
+        specifier: ^14.1.2
+        version: 14.1.8
       '@types/mock-fs':
         specifier: ^4.13.4
         version: 4.13.4
@@ -234,6 +244,9 @@ importers:
       react-on-rails-rsc:
         specifier: ^19.0.4
         version: 19.0.4(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(webpack@5.103.0(@swc/core@1.15.3))
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
   packages/react-on-rails-pro-node-renderer:
     dependencies:
@@ -283,6 +296,9 @@ importers:
       '@sentry/node':
         specifier: ^7.120.0
         version: 7.120.4
+      '@tsconfig/node14':
+        specifier: ^14.1.2
+        version: 14.1.8
       '@types/fs-extra':
         specifier: ^11.0.4
         version: 11.0.4
@@ -335,7 +351,7 @@ importers:
         specifier: ^3.1.0
         version: 3.1.1
       typescript:
-        specifier: ^5.4.3
+        specifier: ^5.8.3
         version: 5.9.3
 
   react_on_rails/spec/dummy:
