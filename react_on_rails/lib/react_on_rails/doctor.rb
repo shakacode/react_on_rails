@@ -4,6 +4,7 @@ require "json"
 require "erb"
 require "yaml"
 require_relative "utils"
+require_relative "config_path_resolver"
 require_relative "version_syntax_converter"
 require_relative "system_checker"
 
@@ -39,6 +40,8 @@ end
 module ReactOnRails
   # rubocop:disable Metrics/ClassLength, Metrics/AbcSize
   class Doctor
+    include ConfigPathResolver
+
     MESSAGE_COLORS = {
       error: :red,
       warning: :yellow,
@@ -473,10 +476,11 @@ module ReactOnRails
     end
 
     def check_npm_package_version
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
 
         npm_version = all_deps["react-on-rails"]
@@ -520,10 +524,11 @@ module ReactOnRails
     end
 
     def check_npm_wildcards
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
 
         npm_version = all_deps["react-on-rails"]
@@ -542,9 +547,10 @@ module ReactOnRails
     end
 
     def check_pro_package_consistency
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
-      package_json = JSON.parse(File.read("package.json"))
+      package_json = JSON.parse(File.read(package_json_path))
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
       has_base = all_deps.key?("react-on-rails")
       has_pro = all_deps.key?("react-on-rails-pro")
@@ -606,8 +612,7 @@ module ReactOnRails
         "config/initializers/react_on_rails.rb" => "React on Rails initializer",
         "bin/dev" => "Development server launcher",
         "bin/shakapacker" => "Shakapacker binary",
-        "bin/shakapacker-dev-server" => "Shakapacker dev server binary",
-        "config/webpack/webpack.config.js" => "Webpack configuration"
+        "bin/shakapacker-dev-server" => "Shakapacker dev server binary"
       }
 
       files_to_check.each do |file_path, description|
@@ -616,6 +621,16 @@ module ReactOnRails
         else
           checker.add_warning("⚠️  Missing #{description}: #{file_path}")
         end
+      end
+
+      webpack_config_path = resolved_webpack_config_path
+      if webpack_config_path
+        checker.add_success("✅ Webpack configuration: #{webpack_config_path}")
+      else
+        checker.add_warning("⚠️  Missing Webpack configuration: config/webpack/webpack.config.js")
+        checker.add_info(
+          "ℹ️  If your app uses a custom webpack config location, this warning may be informational."
+        )
       end
 
       check_layout_files
@@ -1117,10 +1132,11 @@ module ReactOnRails
     end
 
     def npm_test_script?
-      return false unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return false unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         test_script = package_json.dig("scripts", "test")
         test_script && !test_script.empty?
       rescue StandardError

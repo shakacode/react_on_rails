@@ -1270,5 +1270,72 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_pro_package_consistency)
       end
     end
+
+    context "when package.json is located in a configured JS workspace" do
+      before do
+        rails_root = Pathname.new("/tmp/myapp")
+        package_json_path = rails_root.join("client", "package.json").to_s
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+        allow(File).to receive(:read).with(package_json_path).and_return(
+          JSON.generate({ "dependencies" => { "react-on-rails-pro" => "16.4.0" } })
+        )
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "uses the configured workspace package.json path" do
+        expect(checker).to receive(:add_error).with(/npm package is installed but the Pro gem is not/)
+        doctor.send(:check_pro_package_consistency)
+      end
+    end
+  end
+
+  describe "private path resolution helpers" do
+    describe "#resolved_webpack_config_path" do
+      it "prefers shakapacker-derived webpack config candidates over the default path" do
+        allow(File).to receive(:exist?).and_return(false)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.ts").and_return(true)
+        allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return("config/custom")
+
+        expect(doctor.send(:resolved_webpack_config_path)).to eq("config/custom/webpack.config.ts")
+      end
+
+      it "resolves rspack config candidates from the shakapacker-derived directory" do
+        allow(File).to receive(:exist?).and_return(false)
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return("config/rspack")
+
+        expect(doctor.send(:resolved_webpack_config_path)).to eq("config/rspack/rspack.config.ts")
+      end
+
+      it "falls back to default rspack config paths when shakapacker directory is unavailable" do
+        allow(File).to receive(:exist?).and_return(false)
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(true)
+        allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return(nil)
+
+        expect(doctor.send(:resolved_webpack_config_path)).to eq("config/rspack/rspack.config.js")
+      end
+    end
+
+    describe "#shakapacker_webpack_config_directory" do
+      it "extracts a directory from shakapacker's config file path" do
+        allow(doctor).to receive(:require).with("shakapacker").and_return(true)
+        shakapacker_config = Struct.new(:assets_bundler_config_path).new(
+          "#{Rails.root}/config/custom/webpack.config.ts"
+        )
+        shakapacker_class = Class.new do
+          class << self
+            attr_accessor :config
+          end
+        end
+        stub_const("Shakapacker", shakapacker_class)
+        Shakapacker.config = shakapacker_config
+
+        expect(doctor.send(:shakapacker_webpack_config_directory)).to eq("config/custom")
+      end
+    end
   end
 end
