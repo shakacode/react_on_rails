@@ -92,14 +92,15 @@ const fetchRSC = ({
 };
 
 const createRSCStreamFromArray = (payloads: string[]) => {
-  let streamController: ReadableStreamController<string> | undefined;
-  const stream = new ReadableStream<string>({
+  const encoder = new TextEncoder();
+  let streamController: ReadableStreamController<Uint8Array> | undefined;
+  const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       if (typeof window === 'undefined') {
         return;
       }
       const handleChunk = (chunk: string) => {
-        controller.enqueue(chunk);
+        controller.enqueue(encoder.encode(chunk));
       };
 
       payloads.forEach(handleChunk);
@@ -127,20 +128,21 @@ const createRSCStreamFromArray = (payloads: string[]) => {
  * Creates React elements from preloaded RSC payloads in the page.
  *
  * This function:
- * 1. Creates a ReadableStream from the array of payload chunks
- * 2. Transforms the stream to handle console logs and other processing
- * 3. Uses React's createFromReadableStream to process the payload
+ * 1. Creates a ReadableStream from the array of raw Flight data strings
+ * 2. Feeds the stream directly to React's createFromReadableStream
+ *
+ * Console replay is handled separately via standalone <script> tags
+ * emitted by injectRSCPayload, not through the payload array.
  *
  * This is used during hydration to avoid making HTTP requests when
  * the payload is already embedded in the page.
  *
- * @param payloads - Array of RSC payload chunks from the global array
+ * @param payloads - Array of raw Flight data strings from the global array
  * @returns A Promise resolving to the rendered React element
  */
-const createFromPreloadedPayloads = (payloads: string[], cspNonce?: string) => {
+const createFromPreloadedPayloads = (payloads: string[]) => {
   const stream = createRSCStreamFromArray(payloads);
-  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream, cspNonce);
-  const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
+  const renderPromise = createFromReadableStream<React.ReactNode>(stream);
   return wrapInNewPromise(renderPromise);
 };
 
@@ -183,7 +185,7 @@ const getReactServerComponent =
       const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
       const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey];
       if (payloads) {
-        return createFromPreloadedPayloads(payloads, railsContext.cspNonce);
+        return createFromPreloadedPayloads(payloads);
       }
     }
     return fetchRSC({ componentName, componentProps, railsContext });
