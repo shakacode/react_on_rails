@@ -45,6 +45,7 @@ describe GeneratorMessages do
       rsc: false
     )
 
+    expect(message).to include("bin/rails db:prepare")
     expect(message).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
   end
 

@@ -340,6 +340,29 @@ describe('createApp', () => {
     expect(mockedFs.rmSync).not.toHaveBeenCalledWith(packageLockPath, { force: true });
   });
 
+  it('exits without printing success when pnpm normalization fails', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    mockedExecLiveArgs
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('pnpm import failed');
+      });
+
+    expect(() => createApp('my-app', { ...baseOptions, packageManager: 'pnpm' })).toThrow('process.exit');
+
+    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(mockedLogError).toHaveBeenCalledWith(
+      'Failed to finish pnpm setup. The app was created, but package manager normalization did not complete.',
+    );
+    expect(mockedLogStepDone).not.toHaveBeenCalledWith('Done!');
+    expect(mockedLogInfo).not.toHaveBeenCalledWith('Then visit http://localhost:3000/hello_world');
+    expect(consoleLogSpy).not.toHaveBeenCalledWith('  bin/dev');
+    expect(mockedFs.rmSync).not.toHaveBeenCalledWith(appPath, { recursive: true, force: true });
+  });
+
   it('cleans up app directory when react_on_rails add fails', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
     mockedExecLiveArgs

@@ -186,7 +186,7 @@ module ReactOnRails
         end
       end
 
-      context "when git status fails" do
+      context "when git status reports a non-git directory" do
         let(:message_handler) { instance_double("MessageHandler") } # rubocop:disable RSpec/VerifiedDoubleReference
 
         around do |example|
@@ -196,14 +196,14 @@ module ReactOnRails
           ENV["CI"] = original_ci if original_ci
         end
 
-        it "treats the worktree as dirty" do
+        it "uses a not-a-repository warning" do
           allow(Open3).to receive(:capture2e)
             .with("git", "status", "--porcelain")
             .and_return([
                           "fatal: not a git repository",
                           instance_double(Process::Status, success?: false)
                         ])
-          expect(message_handler).to receive(:add_warning).with(described_class::DIRTY_WORKTREE_WARNING)
+          expect(message_handler).to receive(:add_warning).with(described_class::NOT_A_GIT_REPOSITORY_WARNING)
 
           expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: true)).to be(true)
         end

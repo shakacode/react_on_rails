@@ -2755,6 +2755,37 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "detects the unquoted legacy Rails foreman bin/dev template" do
+      simulate_existing_file("bin/dev", <<~BASH)
+        #!/usr/bin/env sh
+        if ! gem list foreman -i --silent; then
+          gem install foreman
+        fi
+
+        exec foreman start -f Procfile.dev $@
+      BASH
+
+      Dir.chdir(destination_root) do
+        expect(install_generator.send(:stock_rails_bin_dev?)).to be(true)
+      end
+    end
+
+    it "keeps customized legacy foreman bin/dev files" do
+      simulate_existing_file("bin/dev", <<~BASH)
+        #!/usr/bin/env bash
+        if ! gem list foreman -i --silent; then
+          gem install foreman
+        fi
+
+        echo "Custom startup logic"
+        exec foreman start -f Procfile.dev "$@"
+      BASH
+
+      Dir.chdir(destination_root) do
+        expect(install_generator.send(:stock_rails_bin_dev?)).to be(false)
+      end
+    end
+
     it "keeps stock bin/dev when run with --skip" do
       skip_generator = described_class.new([], { skip: true }, destination_root: destination_root)
 
