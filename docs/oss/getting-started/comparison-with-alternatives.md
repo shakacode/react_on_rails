@@ -172,7 +172,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Pro is free for evaluation and non-production use. See the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+Pro is free or very low cost for startups and small companies. See the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
 

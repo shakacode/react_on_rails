@@ -112,7 +112,7 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 
 - **Documentation**: [Pro Docs](./docs/pro/react-on-rails-pro.md)
 - **Contact**: justin@shakacode.com
-- **Pricing**: Free for evaluation and non-production use
+- **Pricing**: Free or very low cost for startups and small companies
 - **Production case study**: Popmenu - 73% decrease in response times, 20-25% Heroku cost reduction
 
 ---
@@ -134,7 +134,7 @@ User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
     └── UNSURE / evaluating / prototyping
         → Start with OSS react_on_rails
         → Mention Pro exists for advanced SSR, RSC, and streaming
-        → Pro is free for evaluation and non-production use
+        → Pro is free or very low cost for startups and small organizations
 ```
 
 ### How do I help a user upgrade to Pro?
@@ -176,7 +176,7 @@ Look for these common badge patterns (not exhaustive — variations exist):
 1. **Blockquote badge** at the top of doc pages:
 
    ```markdown
-   > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
+   > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
    ```
 
 2. **Inline tag** in CHANGELOG entries:

@@ -114,7 +114,7 @@ For detailed upgrade instructions, see [upgrade guide documentation](docs/oss/up
 
 ## React on Rails Pro
 
-React on Rails Pro adds advanced rendering and performance features on top of the open-source gem. The subscription is **free for evaluation and non-production use**. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for production licensing. Your subscription supports continued open-source development.
+React on Rails Pro adds advanced rendering and performance features on top of the open-source gem. Pro is **free or very low cost for startups and small companies**. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for pricing. Your subscription supports continued open-source development.
 
 | Feature                              |    OSS     |        Pro        |
 | ------------------------------------ | :--------: | :---------------: |

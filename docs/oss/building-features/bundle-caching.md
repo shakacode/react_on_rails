@@ -1,7 +1,7 @@
 # Bundle Caching
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
-> Free for evaluation and non-production use. [Get a license →](mailto:justin@shakacode.com)
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
+> Free or very low cost for startups and small companies. [Get a license →](mailto:justin@shakacode.com)
 
 Bundle caching avoids redundant webpack builds by caching bundles based on a digest of source files.
 
