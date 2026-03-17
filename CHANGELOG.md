@@ -111,7 +111,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Changed
 
 - **Simplified Shakapacker version handling**: Removed obsolete minimum version checks (6.5.1) and example generation pinning (8.2.0). The gemspec dependency `shakapacker >= 6.0` is now the only minimum version requirement, with autobundling requiring >= 7.0.0. [PR 2247](https://github.com/shakacode/react_on_rails/pull/2247) by [justin808](https://github.com/justin808).
-- **[Pro]** **License-Optional Attribution Model**: React on Rails Pro now works without a license for development, testing, and CI/CD. Pro is also free for startups, small companies, and organizations without funds for a license. Added `plan` field validation to both Ruby and Node.js license validators — only `"paid"` plan (or no plan field for backwards compatibility) is accepted. Old free licenses are now treated as invalid. Documentation overhauled across README and LICENSE_SETUP guides; removed CI_SETUP.md (CI needs no license configuration). [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **License-Optional Attribution Model**: React on Rails Pro now works without a license for development, testing, and CI/CD. Free or low-cost licenses are available for startups, small companies, and qualifying organizations. Added `plan` field validation to both Ruby and Node.js license validators — only `"paid"` plan (or no plan field for backwards compatibility) is accepted. Old free licenses are now treated as invalid. Documentation overhauled across README and LICENSE_SETUP guides; removed CI_SETUP.md (CI needs no license configuration). [PR 2324](https://github.com/shakacode/react_on_rails/pull/2324) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Fixed
 
@@ -191,7 +191,7 @@ To migrate to React on Rails Pro:
    import ReactOnRails from 'react-on-rails-pro';
    ```
 
-4. Pro is free for startups, small companies, and organizations without funds for a license. Visit [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro) to get started, or contact [justin@shakacode.com](mailto:justin@shakacode.com) for any questions.
+4. Free or low-cost Pro licenses are available for startups, small companies, and qualifying organizations. Visit [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro) to get started, or contact [justin@shakacode.com](mailto:justin@shakacode.com) for any questions.
 
 **Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
 
