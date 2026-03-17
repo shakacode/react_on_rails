@@ -20,10 +20,18 @@ module ReactOnRails
 
       shakapacker_config_dir = shakapacker_webpack_config_directory
       if shakapacker_config_dir
-        candidates.concat(%w[js ts cjs mjs].map { |ext| File.join(shakapacker_config_dir, "webpack.config.#{ext}") })
+        candidates.concat(%w[js ts cjs mjs].flat_map do |ext|
+          [
+            File.join(shakapacker_config_dir, "webpack.config.#{ext}"),
+            File.join(shakapacker_config_dir, "rspack.config.#{ext}")
+          ]
+        end)
       end
 
       candidates << "config/webpack/webpack.config.js"
+      candidates << "config/webpack/webpack.config.ts"
+      candidates << "config/rspack/rspack.config.js"
+      candidates << "config/rspack/rspack.config.ts"
       candidates.uniq
     end
 
