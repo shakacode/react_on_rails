@@ -154,6 +154,8 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(result).to be false
         expect(checker.errors?).to be true
         expect(checker.messages.last[:content]).to include("Shakapacker is not properly configured")
+        expect(checker.messages.last[:content]).to include("config/webpack/webpack.config.{js,ts}")
+        expect(checker.messages.last[:content]).to include("config/rspack/rspack.config.{js,ts}")
       end
     end
 
@@ -740,13 +742,46 @@ RSpec.describe ReactOnRails::SystemChecker do
         end).to be true
       end
 
-      it "warns and defaults to rspack when both bundlers exist and config is ambiguous" do
+      it "warns and defaults to webpack when both bundlers exist and config is ambiguous" do
         allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
         allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
         allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(false)
 
-        expect(checker.send(:detect_bundler_config_path)).to eq("config/rspack/rspack.config.ts")
-        expect(checker.messages.any? { |msg| msg[:content].include?("defaulting to rspack") }).to be true
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
+        expect(checker.messages.any? { |msg| msg[:content].include?("defaulting to webpack") }).to be true
+      end
+    end
+
+    describe "#configured_assets_bundler" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+      end
+
+      it "parses ERB-backed assets_bundler values from shakapacker.yml" do
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+          default: &default
+            assets_bundler: <%= "webpack" %> # inline comment
+          development:
+            <<: *default
+        YAML
+
+        expect(checker.send(:configured_assets_bundler)).to eq("webpack")
+      end
+
+      it "prefers the current Rails environment over the default config" do
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+          default:
+            assets_bundler: webpack
+          test:
+            assets_bundler: rspack
+        YAML
+
+        original_rails_env = ENV.fetch("RAILS_ENV", nil)
+        ENV["RAILS_ENV"] = "test"
+
+        expect(checker.send(:configured_assets_bundler)).to eq("rspack")
+      ensure
+        ENV["RAILS_ENV"] = original_rails_env
       end
     end
 
