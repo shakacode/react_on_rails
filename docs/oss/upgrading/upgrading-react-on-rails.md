@@ -118,15 +118,15 @@ This is a minor release - update your gem and npm package versions, then run `bu
    > **Note**: The versions below are examples. Check the [changelog](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) for the latest stable release and substitute accordingly.
 
    ```ruby
-   # Gemfile — pre-release gems use dots (e.g., 16.4.0.rc.10)
-   gem "react_on_rails", "16.4.0.rc.10"
+   # Gemfile
+   gem "react_on_rails", "16.4.0"
    ```
 
    ```json
-   // package.json — pre-release npm uses hyphens (e.g., 16.4.0-rc.10)
+   // package.json
    {
      "dependencies": {
-       "react-on-rails": "16.4.0-rc.10"
+       "react-on-rails": "16.4.0"
      }
    }
    ```

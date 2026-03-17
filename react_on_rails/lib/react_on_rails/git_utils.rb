@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "English"
+require "open3"
 
 module ReactOnRails
   module GitUtils
@@ -55,12 +56,13 @@ module ReactOnRails
     end
 
     def self.ci_environment?
-      ENV["CI"] == "true" || ENV["COVERAGE"] == "true"
+      ENV["CI"] == "true"
     end
     private_class_method :ci_environment?
 
     def self.clean_worktree?
-      `git status --porcelain`.to_s.empty?
+      output, status = Open3.capture2e("git", "status", "--porcelain")
+      status.success? && output.strip.empty?
     end
     private_class_method :clean_worktree?
   end
