@@ -4,15 +4,6 @@
   "description": "react-on-rails monorepo workspace manager",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/react-on-rails",
-    "packages/react-on-rails-pro",
-    "packages/react-on-rails-pro-node-renderer",
-    "packages/create-react-on-rails-app",
-    "react_on_rails/spec/dummy",
-    "react_on_rails_pro/spec/dummy",
-    "react_on_rails_pro/spec/execjs-compatible-dummy"
-  ],
   "directories": {
     "doc": "docs"
   },
