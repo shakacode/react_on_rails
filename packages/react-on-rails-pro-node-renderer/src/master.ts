@@ -88,13 +88,15 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   // Listen for dying workers:
   cluster.on('exit', (worker) => {
     if (worker.isScheduledRestart) {
-      log.info('Restarting worker #%d on schedule', worker.id);
-    } else {
-      // TODO: Track last rendering request per worker.id
-      // TODO: Consider blocking a given rendering request if it kills a worker more than X times
-      const msg = `Worker ${worker.id} died UNEXPECTEDLY :(, restarting`;
-      errorReporter.message(msg);
+      // The rolling restart loop forks the replacement before shutting down
+      // the old worker, so we must not fork again here.
+      log.info('Worker #%d exited on schedule', worker.id);
+      return;
     }
+    // TODO: Track last rendering request per worker.id
+    // TODO: Consider blocking a given rendering request if it kills a worker more than X times
+    const msg = `Worker ${worker.id} died UNEXPECTEDLY :(, restarting`;
+    errorReporter.message(msg);
     // Replace the dead worker:
     cluster.fork();
   });
