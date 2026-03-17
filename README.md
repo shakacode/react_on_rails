@@ -16,6 +16,8 @@
 [![JS Tests](https://github.com/shakacode/react_on_rails/actions/workflows/package-js-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/package-js-tests.yml)
 [![Linting](https://github.com/shakacode/react_on_rails/actions/workflows/lint-js-and-ruby.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/lint-js-and-ruby.yml)
 
+**[Documentation](https://reactonrails.com/docs/)** · [Quick Start](https://reactonrails.com/docs/getting-started/quick-start/) · [API Reference](https://reactonrails.com/docs/api-reference/) · [Pro](https://reactonrails.com/docs/pro)
+
 ## ⚡ 30-Second Overview
 
 **Create a new React on Rails app with one command:**
