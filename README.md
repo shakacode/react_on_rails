@@ -16,14 +16,12 @@
 [![JS Tests](https://github.com/shakacode/react_on_rails/actions/workflows/package-js-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/package-js-tests.yml)
 [![Linting](https://github.com/shakacode/react_on_rails/actions/workflows/lint-js-and-ruby.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/lint-js-and-ruby.yml)
 
-<br>
 <p align="center">
   <a href="https://reactonrails.com/docs/">Documentation</a> ·
   <a href="https://reactonrails.com/docs/getting-started/quick-start/">Quick Start</a> ·
   <a href="https://reactonrails.com/docs/api-reference/">API Reference</a> ·
   <a href="https://reactonrails.com/docs/pro">Pro</a>
 </p>
-<br>
 
 ## ⚡ 30-Second Overview
 
