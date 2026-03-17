@@ -61,13 +61,16 @@ module GeneratorMessages
         1. Install dependencies:
            #{Rainbow("bundle && #{package_manager} install").cyan}
 
-        2. Start the app:
+        2. Prepare database:
+           #{Rainbow('bin/rails db:prepare').cyan}
+
+        3. Start the app:
            ./bin/dev              # HMR (Hot Module Replacement) mode
            ./bin/dev static       # Static bundles (no HMR, faster initial load)
            ./bin/dev prod         # Production-like mode for testing
            ./bin/dev help         # See all available options
 
-        3. Visit: #{Rainbow(route ? "http://localhost:3000/#{route}" : 'http://localhost:3000').cyan.underline}
+        4. Visit: #{Rainbow(route ? "http://localhost:3000/#{route}" : 'http://localhost:3000').cyan.underline}
         ✨ KEY FEATURES:
         ─────────────────────────────────────────────────────────────────────────
         • Auto-registration enabled - Your layout only needs:
