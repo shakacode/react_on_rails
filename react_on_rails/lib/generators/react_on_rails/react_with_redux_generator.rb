@@ -99,7 +99,8 @@ module ReactOnRails
 
         # Append Redux-specific post-install instructions
         GeneratorMessages.add_info(
-          GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world")
+          GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world",
+                                                               pro: Gem.loaded_specs.key?("react_on_rails_pro"))
         )
       end
 
