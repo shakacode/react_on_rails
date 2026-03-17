@@ -332,6 +332,15 @@ describe ReactOnRailsProHelper do
       HTML
     end
 
+    # Converts a chunk Hash to length-prefixed format for mock streaming responses.
+    # Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
+    def to_length_prefixed(chunk)
+      html = chunk[:html] || chunk["html"] || ""
+      metadata = chunk.except(:html, "html")
+      content_bytes = html.bytesize.to_s(16).rjust(8, "0")
+      "#{metadata.to_json}\t#{content_bytes}\n#{html}"
+    end
+
     # mock_chunks can be an Async::Queue or an Array
     def mock_request_and_response(mock_chunks = chunks, count: 1)
       # Reset connection instance variables to ensure clean state for tests
@@ -351,12 +360,12 @@ describe ReactOnRailsProHelper do
             break if chunk.nil?
 
             chunks_read << chunk
-            yielder.call("#{chunk.to_json}\n")
+            yielder.call(to_length_prefixed(chunk))
           end
         else
           mock_chunks.each do |chunk|
             chunks_read << chunk
-            yielder.call("#{chunk.to_json}\n")
+            yielder.call(to_length_prefixed(chunk))
           end
         end
       end
