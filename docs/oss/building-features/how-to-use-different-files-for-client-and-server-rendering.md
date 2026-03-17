@@ -68,9 +68,9 @@ function setResolve(builderConfig, webpackConfig) {
   // Use a different resolution for Client and Server file
   let variant;
   if (builderConfig.serverRendering) {
-    variant = path.resolve(__dirname, "../bundles/variant/ClientOnly");
+    variant = path.resolve(__dirname, "../bundles/variant/ServerOnly");
   } else {
-    variant = path.resolve(__dirname, "../bundles/variant/serverOnly");
+    variant = path.resolve(__dirname, "../bundles/variant/ClientOnly");
   }
 
  const resolve = {
