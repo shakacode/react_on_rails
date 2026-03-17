@@ -19,8 +19,8 @@
 <p align="center">
   <a href="https://reactonrails.com/docs/">Documentation</a> ·
   <a href="https://reactonrails.com/docs/getting-started/quick-start/">Quick Start</a> ·
-  <a href="https://reactonrails.com/docs/api-reference/">API Reference</a> ·
-  <a href="https://reactonrails.com/docs/pro">Pro</a>
+  <a href="https://reactonrails.com/examples/">Examples</a> ·
+  <a href="https://reactonrails.com/docs/pro/">Pro</a>
 </p>
 
 ## ⚡ 30-Second Overview
