@@ -2161,7 +2161,24 @@ module ReactOnRails
     def check_pro_setup
       return unless ReactOnRails::Utils.react_on_rails_pro?
 
+      check_pro_initializer_existence
       check_pro_renderer_mode
+      check_base_package_imports
+    end
+
+    def check_pro_initializer_existence
+      initializer_path = "config/initializers/react_on_rails_pro.rb"
+      if File.exist?(initializer_path)
+        checker.add_success("✅ Pro initializer exists (#{initializer_path})")
+      else
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  Pro initializer not found at #{initializer_path}.
+
+          Without this file, React on Rails Pro runs with all default settings.
+          Run the Pro generator to create it:
+            rails g react_on_rails:pro
+        MSG
+      end
     end
 
     def check_pro_renderer_mode
@@ -2174,6 +2191,45 @@ module ReactOnRails
       end
     rescue StandardError => e
       checker.add_warning("⚠️  Could not detect Pro renderer mode: #{e.message}")
+    end
+
+    # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
+    # so `import ... from 'react-on-rails'` resolves silently — loading the base package instead
+    # of Pro. Components registered through the base package won't have Pro features (streaming,
+    # caching, RSC), and may cause "component not registered" errors at runtime.
+    BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+
+    def check_base_package_imports
+      js_patterns = %w[app/javascript/**/*.js app/javascript/**/*.jsx app/javascript/**/*.ts app/javascript/**/*.tsx]
+      files_with_base_import = []
+
+      js_patterns.each do |pattern|
+        Dir.glob(pattern).each do |file|
+          content = File.read(file)
+          next unless content.match?(BASE_PACKAGE_IMPORT_PATTERN) || content.match?(BASE_PACKAGE_REQUIRE_PATTERN)
+
+          files_with_base_import << file
+        end
+      end
+
+      if files_with_base_import.empty?
+        checker.add_success("✅ No base 'react-on-rails' imports found (Pro package used correctly)")
+      else
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  Found imports from 'react-on-rails' instead of 'react-on-rails-pro':
+          #{files_with_base_import.map { |f| "  • #{f}" }.join("\n")}
+
+          The base package is a transitive dependency of Pro, so these imports resolve
+          silently but load the base version without Pro features.
+
+          Fix: Update imports to use 'react-on-rails-pro':
+            import ReactOnRails from 'react-on-rails-pro';        // server
+            import ReactOnRails from 'react-on-rails-pro/client';  // client
+        MSG
+      end
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not scan for base package imports: #{e.message}")
     end
 
     # ── React Server Components ────────────────────────────────────
