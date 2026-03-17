@@ -88,9 +88,9 @@ module ReactOnRails
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
-      # Matches the stock bin/dev written by `rails new` in Rails 7.1–8.x.
-      # Source: railties/lib/rails/generators/rails/app/templates/bin/dev.tt
-      # Last verified: Rails 8.0.0. Update when Rails changes this template.
+      # Matches the stock `bin/dev` written by Rails 8.x. Rails 7.1 commonly
+      # generated a foreman-based shell script instead, which stock_rails_bin_dev?
+      # also recognizes so the React on Rails template can replace either variant.
       STOCK_RAILS_BIN_DEV = <<~RUBY
         #!/usr/bin/env ruby
         exec "./bin/rails", "server", *ARGV
@@ -223,8 +223,8 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
-        # Warn about uncommitted changes before missing_pro_gem? so users see
-        # the notice before any potential Gemfile mutation from auto-install.
+        # Warn about the working tree before missing_pro_gem? so users see the state
+        # of their repo before any optional Gemfile mutation from auto-install.
         ReactOnRails::GitUtils.warn_if_uncommitted_changes(GeneratorMessages, git_installed: cli_exists?("git"))
 
         !(missing_node? || missing_package_manager? || missing_pro_gem?)
@@ -342,12 +342,17 @@ module ReactOnRails
       end
 
       def replace_stock_rails_bin_dev!
-        if File.exist?("bin/dev") && !stock_rails_bin_dev?
-          say_status :skip, "bin/dev exists but differs from stock Rails template; keeping existing file", :yellow
+        unless stock_rails_bin_dev?
+          if File.exist?("bin/dev")
+            say_status :skip, "bin/dev exists but does not match a stock Rails template; keeping existing file", :yellow
+          end
           return
         end
 
-        return unless stock_rails_bin_dev?
+        if options[:pretend] || options[:skip]
+          say_status :skip, "Detected stock Rails bin/dev; leaving existing file in place for --pretend/--skip", :yellow
+          return
+        end
 
         say_status :replace, "Detected stock Rails bin/dev; installing React on Rails bin/dev", :yellow
         remove_file "bin/dev", verbose: false
@@ -356,7 +361,8 @@ module ReactOnRails
       def stock_rails_bin_dev?
         return false unless File.exist?("bin/dev")
 
-        File.read("bin/dev").gsub("\r\n", "\n").strip == STOCK_RAILS_BIN_DEV.gsub("\r\n", "\n").strip
+        content = normalize_bin_dev_content(File.read("bin/dev"))
+        content == normalize_bin_dev_content(STOCK_RAILS_BIN_DEV) || legacy_foreman_bin_dev?(content)
       end
 
       def add_post_install_message
@@ -468,7 +474,17 @@ module ReactOnRails
       end
 
       def cli_exists?(command)
-        system("which", command, out: File::NULL, err: File::NULL)
+        which_command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
+        system(which_command, command, out: File::NULL, err: File::NULL)
+      end
+
+      def normalize_bin_dev_content(content)
+        content.gsub("\r\n", "\n").strip
+      end
+
+      def legacy_foreman_bin_dev?(content)
+        content.include?("gem list foreman -i --silent") &&
+          content.match?(/(?:^|\n)(?:exec\s+)?foreman start -f Procfile\.dev "\$@"$/)
       end
 
       def shakapacker_binaries_exist?

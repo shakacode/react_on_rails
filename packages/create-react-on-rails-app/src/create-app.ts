@@ -3,7 +3,6 @@ import fs from 'fs';
 import { CliOptions } from './types.js';
 import {
   execLiveArgs,
-  execLiveArgsWithEnv,
   getCommandVersion,
   logStep,
   logStepDone,
@@ -75,6 +74,8 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
     args.push('--rsc');
   }
 
+  // Fresh-app scaffolding should keep going past non-fatal generator warnings and
+  // surface them in command output instead of aborting the entire setup.
   args.push('--force');
   // The newly created app directory is not a git repo yet, so the generator's
   // uncommitted-changes check would always warn. --ignore-warnings bypasses all
@@ -98,7 +99,13 @@ function updateJsonFile(
     return;
   }
 
-  const json = JSON.parse(fs.readFileSync(filePath, 'utf8')) as Record<string, unknown>;
+  let json: Record<string, unknown>;
+  try {
+    json = JSON.parse(fs.readFileSync(filePath, 'utf8')) as Record<string, unknown>;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'invalid JSON';
+    throw new Error(`Could not parse ${filePath}: ${message}`);
+  }
   const updatedJson = updater(json);
   fs.writeFileSync(filePath, `${JSON.stringify(updatedJson, null, 2)}\n`, 'utf8');
 }
@@ -137,17 +144,19 @@ function normalizeGeneratedPackageManager(
   if (fs.existsSync(packageLockPath)) {
     execLiveArgs('pnpm', ['import'], appPath);
     fs.rmSync(packageLockPath, { force: true });
+    execLiveArgs('pnpm', ['install'], appPath);
   }
 
   rewriteFileIfPresent(setupPath, (contents) => {
-    const updated = contents.replace(/system!\("npm install"\)/g, 'system!("pnpm install")');
-    if (updated === contents) {
-      logInfo('Note: Could not auto-update bin/setup for pnpm. Update it manually if needed.');
+    const updated = contents.replace(/system!\((["'])npm install\1\)/g, 'system!("pnpm install")');
+    if (updated === contents && contents.includes('npm install')) {
+      logInfo(
+        'Could not auto-update bin/setup for pnpm. Replace "npm install" with "pnpm install" manually.',
+      );
     }
     return updated;
   });
 
-  execLiveArgs('pnpm', ['install'], appPath);
   logStepDone('pnpm configuration applied');
 }
 
@@ -281,7 +290,7 @@ export function createApp(appName: string, options: CliOptions): void {
   currentStep += 1;
   logStep(currentStep, totalSteps, 'Running React on Rails generator...');
   try {
-    execLiveArgsWithEnv(
+    execLiveArgs(
       'bundle',
       ['exec', 'rails', 'generate', 'react_on_rails:install', ...generatorArgs],
       appPath,

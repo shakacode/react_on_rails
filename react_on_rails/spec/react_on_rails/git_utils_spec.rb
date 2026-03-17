@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "open3"
 require_relative "spec_helper"
+require "open3"
 
 module ReactOnRails
   RSpec.describe GitUtils do
@@ -10,7 +10,6 @@ module ReactOnRails
         let(:message_handler) { instance_double("MessageHandler") } # rubocop:disable RSpec/VerifiedDoubleReference
 
         around do |example|
-          # Temporarily unset CI env var to test actual uncommitted changes behavior
           original_ci = ENV.fetch("CI", nil)
           ENV.delete("CI")
           example.run
@@ -18,8 +17,12 @@ module ReactOnRails
         end
 
         it "returns true" do
-          status = instance_double(Process::Status, success?: true)
-          allow(Open3).to receive(:capture2e).with("git", "status", "--porcelain").and_return(["M file/path", status])
+          allow(Open3).to receive(:capture2e)
+            .with("git", "status", "--porcelain")
+            .and_return([
+                          "M file/path",
+                          instance_double(Process::Status, success?: true)
+                        ])
           expect(message_handler).to receive(:add_error)
             .with(<<~MSG.strip)
               You have uncommitted changes. Please commit or stash them before continuing.
@@ -37,14 +40,13 @@ module ReactOnRails
 
         around do |example|
           original_ci = ENV.fetch("CI", nil)
-          ENV["CI"] = "true"
+          ENV["CI"] = "1"
           example.run
           ENV["CI"] = original_ci
           ENV.delete("CI") unless original_ci
         end
 
         it "returns false without checking git status" do
-          # Should not call git status at all
           expect(Open3).not_to receive(:capture2e)
           expect(message_handler).not_to receive(:add_error)
 
@@ -56,7 +58,6 @@ module ReactOnRails
         let(:message_handler) { instance_double("MessageHandler") } # rubocop:disable RSpec/VerifiedDoubleReference
 
         around do |example|
-          # Temporarily unset CI env var to test actual clean git behavior
           original_ci = ENV.fetch("CI", nil)
           ENV.delete("CI")
           example.run
@@ -64,8 +65,12 @@ module ReactOnRails
         end
 
         it "returns false" do
-          status = instance_double(Process::Status, success?: true)
-          allow(Open3).to receive(:capture2e).with("git", "status", "--porcelain").and_return(["", status])
+          allow(Open3).to receive(:capture2e)
+            .with("git", "status", "--porcelain")
+            .and_return([
+                          "",
+                          instance_double(Process::Status, success?: true)
+                        ])
           expect(message_handler).not_to receive(:add_error)
 
           expect(described_class.uncommitted_changes?(message_handler, git_installed: true)).to be(false)
@@ -76,7 +81,6 @@ module ReactOnRails
         let(:message_handler) { instance_double("MessageHandler") } # rubocop:disable RSpec/VerifiedDoubleReference
 
         around do |example|
-          # Temporarily unset CI env var to test actual git not installed behavior
           original_ci = ENV.fetch("CI", nil)
           ENV.delete("CI")
           example.run
@@ -110,8 +114,12 @@ module ReactOnRails
         end
 
         it "adds a warning and returns true" do
-          status = instance_double(Process::Status, success?: true)
-          allow(Open3).to receive(:capture2e).with("git", "status", "--porcelain").and_return(["M file/path", status])
+          allow(Open3).to receive(:capture2e)
+            .with("git", "status", "--porcelain")
+            .and_return([
+                          "M file/path",
+                          instance_double(Process::Status, success?: true)
+                        ])
           expect(message_handler).to receive(:add_warning).with(described_class::DIRTY_WORKTREE_WARNING)
 
           expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: true)).to be(true)
@@ -123,7 +131,7 @@ module ReactOnRails
 
         around do |example|
           original_ci = ENV.fetch("CI", nil)
-          ENV["CI"] = "true"
+          ENV["CI"] = "yes"
           example.run
           ENV["CI"] = original_ci
           ENV.delete("CI") unless original_ci
@@ -148,8 +156,12 @@ module ReactOnRails
         end
 
         it "returns false" do
-          status = instance_double(Process::Status, success?: true)
-          allow(Open3).to receive(:capture2e).with("git", "status", "--porcelain").and_return(["", status])
+          allow(Open3).to receive(:capture2e)
+            .with("git", "status", "--porcelain")
+            .and_return([
+                          "",
+                          instance_double(Process::Status, success?: true)
+                        ])
           expect(message_handler).not_to receive(:add_warning)
 
           expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: true)).to be(false)
@@ -171,6 +183,29 @@ module ReactOnRails
           expect(message_handler).to receive(:add_warning).with(described_class::MISSING_GIT_WARNING)
 
           expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: false)).to be(true)
+        end
+      end
+
+      context "when git status fails" do
+        let(:message_handler) { instance_double("MessageHandler") } # rubocop:disable RSpec/VerifiedDoubleReference
+
+        around do |example|
+          original_ci = ENV.fetch("CI", nil)
+          ENV.delete("CI")
+          example.run
+          ENV["CI"] = original_ci if original_ci
+        end
+
+        it "treats the worktree as dirty" do
+          allow(Open3).to receive(:capture2e)
+            .with("git", "status", "--porcelain")
+            .and_return([
+                          "fatal: not a git repository",
+                          instance_double(Process::Status, success?: false)
+                        ])
+          expect(message_handler).to receive(:add_warning).with(described_class::DIRTY_WORKTREE_WARNING)
+
+          expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: true)).to be(true)
         end
       end
     end
