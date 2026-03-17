@@ -98,9 +98,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import ProductDetails from './components/ProductDetails';
 
-export default async function ProductPage({ user, productId }) {
-  const product = await getProduct(productId);
-
+export default function ProductPage({ user, product }) {
   return (
     <div>
       <Header /> {/* Server Component -- outside providers */}
@@ -227,9 +225,7 @@ import ReduxProvider from './ReduxProvider';
 import ProductSpecs from './ProductSpecs';
 import AddToCartButton from './AddToCartButton';
 
-export default async function ProductPage({ productId }) {
-  const product = await getProduct(productId);
-
+export default function ProductPage({ product }) {
   return (
     <ReduxProvider>
       <h1>{product.name}</h1> {/* Server-rendered */}

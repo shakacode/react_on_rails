@@ -217,12 +217,8 @@ function ProductList() {
 ```
 
 ```jsx
-// After: Server Component
-import { getProducts } from '../lib/data';
-
-async function ProductList() {
-  const products = await getProducts();
-
+// After: Server Component -- receives data from Rails controller props
+function ProductList({ products }) {
   return (
     <ul>
       {products.map((p) => (
@@ -233,47 +229,38 @@ async function ProductList() {
 }
 ```
 
-> **React on Rails Pro note:** If your data lives in Rails (ActiveRecord, etc.), use [async props](#data-fetching-in-react-on-rails-pro) instead of calling a data layer directly from the component. Async props stream Rails-fetched data to the component via Suspense, without bypassing Rails' authorization and caching layers.
+> **React on Rails note:** In React on Rails, the controller prepares the data and passes it as props -- no `async/await` in the component, no direct data layer calls. For data that's slow to compute, use [async props](#data-fetching-in-react-on-rails-pro) to stream it in progressively with Suspense. The generic `async function` + `await` pattern shown in other RSC frameworks bypasses Rails' authorization and caching layers and is not recommended.
 
-### Pattern 2: Prefetch + Hydrate (Keep React Query for Client Features)
+### Pattern 2: Rails Props as Initial Data (Keep React Query for Client Features)
 
-When you need React Query's client features (background refetching, mutations, optimistic updates), prefetch on the server and hydrate on the client:
+When you need React Query's client features (background refetching, mutations, optimistic updates), pass Rails controller props as `initialData` so the component renders instantly with server data, then React Query takes over for client-side updates:
 
 ```jsx
-// ReactQueryProvider.jsx -- Client Component (provides QueryClient + hydration)
+// ReactQueryProvider.jsx -- Client Component (provides QueryClient)
 'use client';
 
-import { QueryClient, QueryClientProvider, HydrationBoundary } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 
-export default function ReactQueryProvider({ children, dehydratedState }) {
+export default function ReactQueryProvider({ children }) {
   const [queryClient] = useState(() => new QueryClient());
   return (
     <QueryClientProvider client={queryClient}>
-      <HydrationBoundary state={dehydratedState}>{children}</HydrationBoundary>
+      {children}
     </QueryClientProvider>
   );
 }
 ```
 
 ```jsx
-// ProductsPage.jsx -- Server Component
-import { dehydrate, QueryClient } from '@tanstack/react-query';
-import { getProducts } from '../lib/data';
+// ProductsPage.jsx -- Server Component (receives data from Rails controller props)
 import ReactQueryProvider from './ReactQueryProvider';
 import ProductList from './ProductList';
 
-export default async function ProductsPage() {
-  const queryClient = new QueryClient();
-
-  await queryClient.prefetchQuery({
-    queryKey: ['products'],
-    queryFn: getProducts,
-  });
-
+export default function ProductsPage({ products }) {
   return (
-    <ReactQueryProvider dehydratedState={dehydrate(queryClient)}>
-      <ProductList />
+    <ReactQueryProvider>
+      <ProductList initialProducts={products} />
     </ReactQueryProvider>
   );
 }
@@ -285,10 +272,11 @@ export default async function ProductsPage() {
 
 import { useQuery } from '@tanstack/react-query';
 
-export default function ProductList() {
+export default function ProductList({ initialProducts }) {
   const { data: products } = useQuery({
     queryKey: ['products'],
     queryFn: () => fetch('/api/products').then((res) => res.json()),
+    initialData: initialProducts, // Rails data renders instantly, React Query refetches in background
   });
 
   return (
@@ -305,24 +293,22 @@ export default function ProductList() {
 
 **How it works:**
 
-1. Server Component creates a `QueryClient` and prefetches data
-2. `dehydrate()` serializes the cache state
-3. `ReactQueryProvider` wraps children with both `QueryClientProvider` (required for `useQuery`) and `HydrationBoundary` (seeds the cache)
-4. Client-side `useQuery` picks up the prefetched data -- no loading state on first render
-5. Subsequent refetches happen client-side as usual
+1. Rails controller prepares the data and passes `products` as props
+2. Server Component passes the data to `ProductList` as `initialData`
+3. `useQuery` renders immediately with the Rails data -- no loading state on first render
+4. React Query handles background refetching, stale-while-revalidate, and cache management
+
+> **Alternative:** For complex cases with many queries, you can use TanStack Query's `dehydrate`/`HydrationBoundary` pattern to prefetch and seed the entire QueryClient cache on the server. See the [TanStack Query SSR docs](https://tanstack.com/query/latest/docs/framework/react/guides/ssr) for details.
 
 ## Migrating from SWR
 
-SWR follows a similar pattern -- use the `fallback` prop to pass server-fetched data:
+SWR follows a similar pattern -- pass Rails controller props as `fallbackData` so the component renders instantly with server data:
 
 ```jsx
-// DashboardPage.jsx -- Server Component
-import { getDashboardStats } from '../lib/data';
+// DashboardPage.jsx -- Server Component (receives data from Rails controller props)
 import DashboardStats from './DashboardStats';
 
-export default async function DashboardPage() {
-  const stats = await getDashboardStats();
-
+export default function DashboardPage({ stats }) {
   return <DashboardStats fallbackData={stats} />;
 }
 ```
@@ -350,6 +336,8 @@ export default function DashboardStats({ fallbackData }) {
 ```
 
 ## Avoiding Server-Side Waterfalls
+
+> **React on Rails note:** In React on Rails, the primary way to handle parallel data loading is [async props](#data-fetching-in-react-on-rails-pro) -- Rails emits each prop independently, and Suspense boundaries stream them to the browser as they resolve. The patterns below apply when you have async Server Components that fetch data directly (outside the async props flow).
 
 The most critical performance pitfall with Server Components is sequential data fetching. When one `await` blocks the next, you create a waterfall on the server:
 
@@ -501,6 +489,8 @@ async function RelatedSection({ promise }) {
 ```
 
 ## Streaming with the `use()` Hook
+
+> **React on Rails note:** If you're using [async props](#data-fetching-in-react-on-rails-pro), `getReactOnRailsAsyncProp` already provides this promise-based pattern -- you can pass the promise to a Client Component and resolve it with `use()`. The patterns below show the general RSC mechanism.
 
 The `use()` hook lets Client Components resolve promises that were started on the server. This enables the "server-to-client promise handoff" pattern:
 
@@ -662,6 +652,8 @@ function Comments({ postId }) {
 
 ## Request Deduplication with `React.cache()`
 
+> **React on Rails note:** When using [async props](#data-fetching-in-react-on-rails-pro), `getReactOnRailsAsyncProp(key)` already returns the same cached Promise on repeated calls -- no `React.cache()` needed. The pattern below is useful when async Server Components fetch data directly outside the async props flow.
+
 When multiple Server Components need the same data, `React.cache()` ensures the fetch happens only once per request:
 
 ```jsx
@@ -800,7 +792,7 @@ export default function CommentForm({ postId }) {
 
 ## When to Keep Client-Side Fetching
 
-Not everything should move to the server. Keep client-side data fetching for:
+Not everything should move to the server. In React on Rails, most read-only data is already server-side -- Rails controller props deliver it to your components without any client-side fetching. The table below covers the cases where you should keep client-side fetching instead of relying on Rails controller props or [async props](#data-fetching-in-react-on-rails-pro):
 
 | Use Case                        | Why Client-Side                            | Recommended Tool                    |
 | ------------------------------- | ------------------------------------------ | ----------------------------------- |
@@ -939,9 +931,8 @@ For each component that fetches data:
 1. Remove the `'use client'` directive
 2. Remove `useState` for data, loading, and error
 3. Remove the `useEffect` data fetch
-4. Make the component `async`
-5. Add direct data fetching with `await`
-6. Remove the API route if it was only used by this component
+4. Accept data as props from Rails (or use [async props](#data-fetching-in-react-on-rails-pro) for slow data)
+5. Remove the API route if it was only used by this component
 
 ### Step 3: Add Suspense Boundaries
 

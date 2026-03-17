@@ -132,6 +132,8 @@ Components that mix data fetching with interactivity need to be split into two p
 
 The most common restructuring pattern. When a parent component has state that only a small part of the tree needs, extract the stateful part into a dedicated Client Component.
 
+**React on Rails context:** Your data is already on the server -- Rails controllers prepare it and pass it as props. The goal of this restructuring is not to "move data fetching to the server" (Rails already does that), but to **reduce client bundle size** by keeping display-only components as Server Components, **eliminate unnecessary JavaScript** for components that don't need interactivity, and **enable streaming** with async props for slow data sources.
+
 ### Before: State at the top blocks everything
 
 ```jsx
@@ -164,15 +166,13 @@ export default function ProductPage({ productId }) {
 }
 ```
 
-### After: State pushed to a leaf, data fetched on server
+### After: State pushed to a leaf, JavaScript eliminated
 
 ```jsx
 // ProductPage.jsx -- Server Component (no directive)
-// Generic RSC example: in React on Rails, this data would typically come from
-// Rails props or async props. See Part 4 for the recommended fetching patterns.
-export default async function ProductPage({ productId }) {
-  const product = await getProduct(productId);
-
+// In React on Rails, the controller passes product data as props --
+// no async/await needed, no direct data layer calls.
+export default function ProductPage({ product }) {
   return (
     <div>
       <h1>{product.name}</h1>
