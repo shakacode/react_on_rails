@@ -1666,7 +1666,7 @@ Here is the addition to the generated config file:
 ##### Added
 
 - Support for React 15.0 to react_on_rails. See [#379](https://github.com/shakacode/react_on_rails/pull/379) by [brucek](https://github.com/brucek).
-- Support for Node.js server side rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat](https://github.com/alleycat-at-git) and [doc](https://www.shakacode.com/react-on-rails/docs/pro/react-on-rails-pro#pro-integration-with-nodejs-for-server-rendering)
+- Support for Node.js server side rendering. See [#380](https://github.com/shakacode/react_on_rails/pull/380) by [alleycat](https://github.com/alleycat-at-git) and [doc](https://reactonrails.com/docs/pro#pro-integration-with-nodejs-for-server-rendering)
 
 ##### Removed
 

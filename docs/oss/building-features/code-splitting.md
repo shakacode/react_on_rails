@@ -1,6 +1,6 @@
 # Code Splitting with Loadable Components
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
 > Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
 
 ## Introduction

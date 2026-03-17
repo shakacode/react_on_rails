@@ -1,6 +1,6 @@
 # Error Reporting and Tracing
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
 > Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
 
 For versions before 4.0.0, error reporting was configured via `honeybadgerApiKey` and `sentryDsn` options. These options were removed in 4.0.0 and will cause an error if used. See the current integration approach below.
