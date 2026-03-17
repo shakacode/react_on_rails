@@ -94,6 +94,16 @@ pushd react_on_rails_pro/spec/dummy > /dev/null
 run_cmd bundle install
 popd > /dev/null
 
+# Restore lockfiles that bundle install may have modified due to platform
+# differences (e.g., sqlite3 binary gems vs source gem on Darwin 25).
+# These lockfiles are committed for CI platforms and should not be dirtied
+# by workspace setup.
+echo "🔒 Restoring committed Gemfile.lock files..."
+git checkout -- \
+  react_on_rails_pro/Gemfile.lock \
+  react_on_rails_pro/spec/dummy/Gemfile.lock \
+  2>/dev/null || true
+
 # Enable corepack for pnpm (this project uses pnpm, not yarn)
 echo "📦 Enabling corepack for pnpm..."
 run_cmd corepack enable
