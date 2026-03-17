@@ -440,9 +440,9 @@ GEM
       actionpack (>= 6.1)
       activesupport (>= 6.1)
       sprockets (>= 3.0.0)
-    sqlite3 (1.7.3-arm64-darwin)
-    sqlite3 (1.7.3-x86_64-darwin)
-    sqlite3 (1.7.3-x86_64-linux)
+    sqlite3 (2.9.2-arm64-darwin)
+    sqlite3 (2.9.2-x86_64-darwin)
+    sqlite3 (2.9.2-x86_64-linux-gnu)
     stringio (3.2.0)
     sync (0.5.0)
     term-ansicolor (1.10.2)
@@ -538,7 +538,7 @@ DEPENDENCIES
   spring
   spring-watcher-listen
   sprockets
-  sqlite3 (~> 1.4)
+  sqlite3 (~> 2.0)
   turbolinks
   web-console
   webdrivers (= 5.3.0)
