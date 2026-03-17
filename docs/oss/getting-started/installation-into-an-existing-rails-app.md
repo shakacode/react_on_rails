@@ -20,7 +20,7 @@ React on Rails installs the matching `react-on-rails` JavaScript package during 
 
 ### Optional: pin exact gem and npm versions yourself
 
-If you manage versions manually, keep the Ruby gem and npm package on the same exact release. Pre-release gems use dots while npm uses hyphens.
+If you manage versions manually, keep the Ruby gem and npm package on the same release. Pre-release gems use dots while npm uses hyphens.
 
 ```ruby
 gem "react_on_rails", "16.4.0.rc.10"

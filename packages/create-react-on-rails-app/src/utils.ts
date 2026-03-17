@@ -12,7 +12,6 @@ export function execLiveArgs(command: string, args: string[], cwd?: string): voi
   const result = spawnSync(command, args, {
     stdio: 'inherit',
     cwd,
-    env: undefined,
   });
   if (result.error) {
     throw result.error;
