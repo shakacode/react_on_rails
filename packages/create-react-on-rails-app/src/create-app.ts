@@ -330,6 +330,7 @@ export function createApp(appName: string, options: CliOptions): void {
       console.log('  rm -f package-lock.json');
       console.log('  pnpm install');
     }
+    process.exit(1);
   }
 
   // Final success

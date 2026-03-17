@@ -17,6 +17,12 @@ module ReactOnRails
       much easier to review the generated changes and back out partial installs.
     MSG
 
+    NOT_A_GIT_REPOSITORY_WARNING = <<~MSG.strip
+      Git is installed, but this directory is not a Git repository yet. The generator
+      will continue, but initializing Git makes it much easier to review the generated
+      changes and back out partial installs.
+    MSG
+
     def self.uncommitted_changes?(message_handler, git_installed: true)
       return false if skip_worktree_check?
 
@@ -25,7 +31,13 @@ module ReactOnRails
         return true
       end
 
-      return false if clean_worktree?
+      case worktree_status
+      when :clean
+        return false
+      when :not_a_git_repository
+        message_handler.add_error(not_a_git_repository_error_message)
+        return true
+      end
 
       message_handler.add_error(dirty_worktree_error_message)
       true
@@ -39,7 +51,13 @@ module ReactOnRails
         return true
       end
 
-      return false if clean_worktree?
+      case worktree_status
+      when :clean
+        return false
+      when :not_a_git_repository
+        message_handler.add_warning(NOT_A_GIT_REPOSITORY_WARNING)
+        return true
+      end
 
       message_handler.add_warning(DIRTY_WORKTREE_WARNING)
       true
@@ -53,11 +71,14 @@ module ReactOnRails
       CI_TRUTHY_VALUES.include?(value.to_s.strip.downcase)
     end
 
-    def self.clean_worktree?
+    def self.worktree_status
       output, status = Open3.capture2e("git", "status", "--porcelain")
-      status.success? && output.strip.empty?
+      return :clean if status.success? && output.strip.empty?
+      return :not_a_git_repository if output.to_s.downcase.include?("not a git repository")
+
+      :dirty
     rescue Errno::ENOENT
-      false
+      :not_a_git_repository
     end
 
     def self.dirty_worktree_error_message
@@ -72,6 +93,16 @@ module ReactOnRails
     def self.missing_git_error_message
       <<~MSG.strip
         Git is not installed. Please install Git and commit your changes before continuing.
+
+        The React on Rails generator creates many new files and version control helps
+        track what was generated versus your existing code.
+      MSG
+    end
+
+    def self.not_a_git_repository_error_message
+      <<~MSG.strip
+        Git is installed, but this directory is not a Git repository yet. Initialize Git
+        and commit or stash your changes before continuing.
 
         The React on Rails generator creates many new files and version control helps
         track what was generated versus your existing code.

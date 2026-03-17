@@ -86,6 +86,42 @@ module ReactOnRails
         #!/usr/bin/env ruby
         exec "./bin/rails", "server", *ARGV
       RUBY
+      # Recognize only known legacy Rails foreman templates. Any other variant is
+      # treated as customized so install does not overwrite app-specific logic.
+      LEGACY_FOREMAN_BIN_DEV_TEMPLATES = [
+        <<~BASH,
+          #!/usr/bin/env bash
+          if ! gem list foreman -i --silent; then
+            gem install foreman
+          fi
+
+          exec foreman start -f Procfile.dev "$@"
+        BASH
+        <<~SH,
+          #!/usr/bin/env sh
+          if ! gem list foreman -i --silent; then
+            gem install foreman
+          fi
+
+          exec foreman start -f Procfile.dev "$@"
+        SH
+        <<~BASH,
+          #!/usr/bin/env bash
+          if ! gem list foreman -i --silent; then
+            gem install foreman
+          fi
+
+          exec foreman start -f Procfile.dev $@
+        BASH
+        <<~SH
+          #!/usr/bin/env sh
+          if ! gem list foreman -i --silent; then
+            gem install foreman
+          fi
+
+          exec foreman start -f Procfile.dev $@
+        SH
+      ].map { |template| template.gsub("\r\n", "\n").strip }.freeze
 
       # Main generator entry point
       #
@@ -455,8 +491,7 @@ module ReactOnRails
       end
 
       def legacy_foreman_bin_dev?(content)
-        content.include?("gem list foreman -i --silent") &&
-          content.match?(/(?:^|\n)(?:exec\s+)?foreman start -f Procfile\.dev "\$@"$/)
+        LEGACY_FOREMAN_BIN_DEV_TEMPLATES.include?(content)
       end
 
       def shakapacker_binaries_exist?
