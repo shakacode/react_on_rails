@@ -10,5 +10,5 @@ This repository uses a dual-licensing model:
 ## Summary
 
 - Core (MIT) → free and open-source for any use
-- Pro → free for startups, small companies, and organizations without funds for a license
-- No license needed for development, testing, and CI/CD
+- Pro → free for non-commercial, educational, and demo use
+- **Production Use** (including by non-profits) requires a paid subscription

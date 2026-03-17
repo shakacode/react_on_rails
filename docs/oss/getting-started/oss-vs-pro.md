@@ -1,6 +1,6 @@
 # React on Rails: OSS vs Pro Feature Comparison
 
-React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. **Free for startups, small companies, and organizations without funds for a license.** No license is needed for development or testing — just install and try it. A license is required for production use; contact [justin@shakacode.com](mailto:justin@shakacode.com) to get set up (free for qualifying organizations).
+React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. The Pro subscription is **free for evaluation and non-production use**.
 
 ## Feature Matrix
 

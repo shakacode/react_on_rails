@@ -1,6 +1,6 @@
 # Installation
 
-React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. **Free for startups, small companies, and organizations without funds for a license.** No license token is needed to get started — just install and try it. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for any questions.
+React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org. A **paid license is required for production deployments only**. No license token is needed for evaluation, local development, testing, or CI/CD. Contact [justin@shakacode.com](mailto:justin@shakacode.com) to purchase a license.
 
 **Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
@@ -122,7 +122,7 @@ gem install react_on_rails_pro --version "<version>"
 
 ## License Configuration (Production Only)
 
-React on Rails Pro uses a license-optional model — no license is needed to get started. A license token is optional for local development, test environments, CI/CD pipelines, and staging/non-production deployments. Pro is also free for startups, small companies, and organizations without funds for a license.
+React on Rails Pro uses a license-optional model to simplify evaluation and development. A license token is optional for evaluation, local development, test environments, CI/CD pipelines, and staging/non-production deployments.
 
 **For production deployments**, set your license token as an environment variable:
 

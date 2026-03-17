@@ -68,7 +68,7 @@ For Pro-licensed code (as defined in the "License Scope" section above), see:
 **Key Points:**
 
 - Pro features require a valid React on Rails Pro subscription for production use
-- Free for startups, small companies, and organizations without funds for a license
+- Free use is permitted for educational, personal, and non-production purposes
 - Modifying MIT-licensed interface files is permitted under MIT terms
 - However, using those modifications to access Pro features without a valid license violates the Pro License
 

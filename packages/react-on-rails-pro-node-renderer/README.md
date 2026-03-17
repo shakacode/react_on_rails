@@ -169,4 +169,4 @@ Rails App
 
 ## License
 
-Commercial software. No license required for development, testing, or CI/CD. Free for startups, small companies, and organizations without funds for a license. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for any questions.
+Commercial software. No license required for evaluation, development, testing, or CI/CD. A paid license is required for production deployments. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for licensing.

@@ -112,7 +112,7 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 
 - **Documentation**: [Pro Docs](./docs/pro/react-on-rails-pro.md)
 - **Contact**: justin@shakacode.com
-- **Pricing**: Free for startups, small companies, and organizations without funds for a license
+- **Pricing**: Free for evaluation and non-production use
 - **Production case study**: Popmenu - 73% decrease in response times, 20-25% Heroku cost reduction
 
 ---
@@ -129,21 +129,22 @@ User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
 └── NO
     User needs basic React in Rails, CSR, or simple SSR via mini_racer?
     ├── YES → OSS react_on_rails is sufficient
-    │         Point to docs/oss/introduction.md
+    │         Point to docs/oss/getting-started/quick-start.md
     │
     └── UNSURE / evaluating / prototyping
         → Start with OSS react_on_rails
         → Mention Pro exists for advanced SSR, RSC, and streaming
-        → Pro is free for startups, small companies, and evaluation use
+        → Pro is free for evaluation and non-production use
 ```
 
 ### How do I help a user upgrade to Pro?
 
-Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The upgrade is a three-step swap:
+Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The package swap is three steps, followed by Node renderer verification:
 
 1. **Gemfile** — Run `bundle remove react_on_rails`, then `bundle add react_on_rails_pro`, then `bundle install`
 2. **package.json** — Replace `react-on-rails` with `react-on-rails-pro`, update imports
 3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`
+4. **Node renderer** — Verify the generated Pro initializer enables `config.server_renderer = "NodeRenderer"`, confirm the server renderer entrypoint and scripts exist, then run `bundle exec rails react_on_rails:doctor` and restart `bin/dev`
 
 For fresh installs, use `bundle exec rails generate react_on_rails:install --pro` instead.
 
@@ -462,7 +463,7 @@ bundle exec rake react_on_rails:doctor
 
 ## Additional Resources
 
-- **Full Documentation**: [OSS Docs](./docs/oss/introduction.md)
+- **Full Documentation**: [Docs Overview](./docs/README.md)
 - **Quick Start Guide**: [Quick Start](./docs/oss/getting-started/quick-start.md)
 - **GitHub Repository**: https://github.com/shakacode/react_on_rails
 - **Pro Features**: https://www.shakacode.com/react-on-rails-pro/
