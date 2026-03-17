@@ -123,18 +123,11 @@ module ReactOnRailsPro
     def process_response_chunks(stream_response, error_body)
       loop_response_chunks(stream_response) do |chunk|
         if response_has_error_status?(stream_response)
-          # Error responses yield raw strings (not length-prefixed)
-          error_body << (chunk.is_a?(Hash) ? chunk.to_json : chunk.to_s)
+          error_body << chunk.to_s
           next
         end
 
-        if chunk.is_a?(Hash)
-          yield chunk
-        else
-          # Legacy NDJSON format (backward compatible with older node renderers)
-          processed_chunk = chunk.strip
-          yield processed_chunk unless processed_chunk.empty?
-        end
+        yield chunk
       end
     end
 
@@ -169,21 +162,12 @@ module ReactOnRailsPro
 
     private
 
-    # Reads streaming response chunks using the length-prefixed protocol with auto-detection.
+    # Reads streaming response chunks using the length-prefixed protocol.
     #
-    # Supports two formats:
+    # Wire format per chunk: <metadata JSON>\t<content byte length hex>\n<raw content bytes>
+    # Yields Hash: { "html" => "<raw content>", "consoleReplayScript" => "...", ... }
     #
-    # 1. Length-prefixed (new): metadata JSON and raw content are separated.
-    #    Wire format per chunk: <metadata JSON>\t<content byte length hex>\n<raw content bytes>
-    #    Yields Hash: { "html" => "<raw content>", "consoleReplayScript" => "...", ... }
-    #
-    # 2. NDJSON (legacy): each line is a complete JSON object.
-    #    Wire format per chunk: <JSON object>\n
-    #    Yields String (the raw JSON line, for downstream JSON.parse).
-    #
-    # Format detection: if a header line (before \n) contains \t, it's length-prefixed.
-    # JSON.stringify never produces literal \t in output (tabs are escaped as \\t),
-    # so NDJSON lines never contain raw \t bytes.
+    # For error responses (plain text without \t), yields raw strings.
     #
     # The length-prefixed format avoids JSON.stringify on the HTML content (the bulk
     # of the data), eliminating ~30% escaping overhead for typical payloads.
@@ -201,7 +185,7 @@ module ReactOnRailsPro
 
     # State machine parser for the length-prefixed streaming protocol.
     # Buffers incoming bytes and yields complete chunks (Hash for length-prefixed,
-    # String for legacy NDJSON).
+    # String for plain text error responses).
     class LengthPrefixedParser
       def initialize
         @buf = "".b
@@ -218,7 +202,7 @@ module ReactOnRailsPro
           when :header
             break unless (result = try_parse_header)
 
-            yield result if result.is_a?(String) # Legacy NDJSON line
+            yield result if result.is_a?(String) # Plain text line (error response)
           when :content
             break unless (result = try_read_content)
 
@@ -266,9 +250,13 @@ module ReactOnRailsPro
       def try_read_content
         return nil if @buf.bytesize < @content_len
 
-        content = @buf.byteslice(0, @content_len)
-        @buf = @buf.byteslice(@content_len, @buf.bytesize - @content_len) || "".b
-        result = { "html" => content.force_encoding("UTF-8") }.merge!(@metadata)
+        # When content length is 0, set html to nil (preserves null semantics from JS)
+        html = if @content_len > 0
+                 content = @buf.byteslice(0, @content_len)
+                 @buf = @buf.byteslice(@content_len, @buf.bytesize - @content_len) || "".b
+                 content.force_encoding("UTF-8")
+               end
+        result = { "html" => html }.merge!(@metadata)
         @metadata = nil
         @state = :header
         result

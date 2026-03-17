@@ -79,14 +79,13 @@ module ReactOnRails
             raise ReactOnRails::Error, msg, err.backtrace
           end
 
-          return parse_result_and_replay_console_messages(result, render_options) unless render_options.streaming?
+          return parse_length_prefixed_result(result, render_options) unless render_options.streaming?
 
-          # Streamed component is returned as stream of chunks.
-          # Chunks are either Strings (legacy NDJSON from ExecJS or old node renderers)
-          # or Hashes (length-prefixed protocol from new node renderers).
-          # We parse JSON strings and replay console messages for both formats.
+          # Streamed chunks are Hashes (from LengthPrefixedParser in stream_request.rb).
+          # Just replay console messages and pass through.
           result.transform do |chunk|
-            parse_streaming_chunk(chunk, render_options)
+            replay_console_to_rails_logger(chunk, render_options)
+            chunk
           end
         end
 
@@ -228,31 +227,21 @@ module ReactOnRails
           raise ReactOnRails::Error, msg
         end
 
-        def parse_streaming_chunk(chunk, render_options)
-          if chunk.is_a?(Hash)
-            replay_console_messages_from_hash(chunk, render_options)
-          else
-            parse_result_and_replay_console_messages(chunk, render_options)
-          end
-        end
-
-        def parse_result_and_replay_console_messages(result_string, render_options)
-          result = nil
-          begin
-            result = JSON.parse(result_string)
-          rescue JSON::ParserError => e
-            raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
-          end
-
+        # Parses a length-prefixed result string into a Hash.
+        # Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
+        # When content length is 0, html is set to nil (preserving null semantics from JS).
+        def parse_length_prefixed_result(result_string, render_options)
+          tab_idx = result_string.index("\t")
+          newline_idx = result_string.index("\n", tab_idx)
+          meta_json = result_string.byteslice(0, tab_idx)
+          len_hex = result_string.byteslice(tab_idx + 1, newline_idx - tab_idx - 1)
+          content_len = len_hex.to_i(16)
+          html = content_len > 0 ? result_string.byteslice(newline_idx + 1, content_len) : nil
+          result = JSON.parse(meta_json).merge!("html" => html)
           replay_console_to_rails_logger(result, render_options)
           result
-        end
-
-        # Handles streaming chunks that are already parsed Hashes (from the length-prefixed protocol).
-        # Skips JSON.parse (already done by the protocol parser) but still replays console messages.
-        def replay_console_messages_from_hash(result, render_options)
-          replay_console_to_rails_logger(result, render_options)
-          result
+        rescue StandardError => e
+          raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
         end
 
         def replay_console_to_rails_logger(result, render_options)

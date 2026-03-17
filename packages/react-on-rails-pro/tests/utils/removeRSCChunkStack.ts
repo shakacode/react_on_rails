@@ -1,8 +1,18 @@
-import { RSCPayloadChunk } from 'react-on-rails';
+import LengthPrefixedStreamParser from '../../src/parseLengthPrefixedStream.ts';
 
-const removeRSCChunkStack = (chunk: string) => {
-  const parsedJson = JSON.parse(chunk) as RSCPayloadChunk;
-  const { html } = parsedJson;
+const parseChunk = (chunk: string | Uint8Array) => {
+  const parser = new LengthPrefixedStreamParser();
+  const results: Array<{ html: string; [key: string]: unknown }> = [];
+  const bytes = typeof chunk === 'string' ? new TextEncoder().encode(chunk) : chunk;
+  parser.feed(bytes, (content, metadata) => {
+    results.push({ html: new TextDecoder().decode(content), ...metadata });
+  });
+  return results[0]!;
+};
+
+const removeRSCChunkStack = (chunk: string | Uint8Array) => {
+  const parsed = parseChunk(chunk);
+  const { html } = parsed;
   const santizedHtml = html.split('\n').map((chunkLine) => {
     if (!chunkLine.includes('"stack":')) {
       return chunkLine;
@@ -20,7 +30,7 @@ const removeRSCChunkStack = (chunk: string) => {
   });
 
   return JSON.stringify({
-    ...parsedJson,
+    ...parsed,
     html: santizedHtml,
   });
 };

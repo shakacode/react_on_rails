@@ -3,12 +3,39 @@ import { RailsContextWithServerStreamingCapabilities } from 'react-on-rails/type
 import injectRSCPayload from '../src/injectRSCPayload.ts';
 import RSCRequestTracker from '../src/RSCRequestTracker.ts';
 
-// Shared utilities
-const createMockStream = (chunks: (string | Buffer)[] | { [key: number]: string | string[] }) => {
+// Wraps raw content in the length-prefixed format that transformRenderStreamChunksToResultObject produces.
+const toLengthPrefixed = (content: string): string => {
+  const metadata = JSON.stringify({ consoleReplayScript: '', hasErrors: false, isShellReady: true });
+  const contentBuf = Buffer.from(content, 'utf8');
+  return `${metadata}\t${contentBuf.length.toString(16).padStart(8, '0')}\n${content}`;
+};
+
+// Shared utilities — createMockRSCStream wraps content in length-prefixed format,
+// createMockHTMLStream passes HTML through as-is.
+const createMockRSCStream = (chunks: string[] | { [key: number]: string | string[] }) => {
   if (Array.isArray(chunks)) {
-    return Readable.from(
-      chunks.map((chunk) => (typeof chunk === 'string' ? new TextEncoder().encode(chunk) : chunk)),
-    );
+    return Readable.from(chunks.map((chunk) => new TextEncoder().encode(toLengthPrefixed(chunk))));
+  }
+  const passThrough = new PassThrough();
+  const entries = Object.entries(chunks);
+  const keysLength = entries.length;
+  entries.forEach(([delay, value], index) => {
+    setTimeout(() => {
+      const chunksArray = Array.isArray(value) ? value : [value];
+      chunksArray.forEach((chunk) => {
+        passThrough.push(new TextEncoder().encode(toLengthPrefixed(chunk)));
+      });
+      if (index === keysLength - 1) {
+        passThrough.push(null);
+      }
+    }, +delay);
+  });
+  return passThrough;
+};
+
+const createMockHTMLStream = (chunks: string[] | { [key: number]: string | string[] }) => {
+  if (Array.isArray(chunks)) {
+    return Readable.from(chunks.map((chunk) => new TextEncoder().encode(chunk)));
   }
   const passThrough = new PassThrough();
   const entries = Object.entries(chunks);
@@ -48,8 +75,8 @@ const setupTest = (mockRSC: Readable) => {
 
 describe('injectRSCPayload', () => {
   it('should inject RSC payload as script tags', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}']);
-    const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
@@ -61,8 +88,8 @@ describe('injectRSCPayload', () => {
   });
 
   it('should handle multiple RSC payloads', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}', '{"test": "data2"}']);
-    const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const mockRSC = createMockRSCStream(['{"test": "data"}', '{"test": "data2"}']);
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
@@ -77,8 +104,8 @@ describe('injectRSCPayload', () => {
   });
 
   it('should add all ready html chunks before adding RSC payloads', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}', '{"test": "data2"}']);
-    const mockHTML = createMockStream([
+    const mockRSC = createMockRSCStream(['{"test": "data"}', '{"test": "data2"}']);
+    const mockHTML = createMockHTMLStream([
       '<html><body><div>Hello, world!</div></body></html>',
       '<div>Next chunk</div>',
     ]);
@@ -97,8 +124,8 @@ describe('injectRSCPayload', () => {
   });
 
   it('adds delayed html chunks after RSC payloads', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}', '{"test": "data2"}']);
-    const mockHTML = createMockStream({
+    const mockRSC = createMockRSCStream(['{"test": "data"}', '{"test": "data2"}']);
+    const mockHTML = createMockHTMLStream({
       0: '<html><body><div>Hello, world!</div></body></html>',
       100: '<div>Next chunk</div>',
     });
@@ -117,11 +144,11 @@ describe('injectRSCPayload', () => {
   });
 
   it('handles the case when html is delayed', async () => {
-    const mockRSC = createMockStream({
+    const mockRSC = createMockRSCStream({
       0: '{"test": "data"}',
       150: '{"test": "data2"}',
     });
-    const mockHTML = createMockStream({
+    const mockHTML = createMockHTMLStream({
       100: ['<html><body><div>Hello, world!</div></body></html>', '<div>Next chunk</div>'],
       200: '<div>Third chunk</div>',
     });
@@ -141,10 +168,10 @@ describe('injectRSCPayload', () => {
   });
 
   it('should include RSC payload that arrives after HTML stream finishes', async () => {
-    const mockRSC = createMockStream({
+    const mockRSC = createMockRSCStream({
       300: '{"late": "rsc_data"}',
     });
-    const mockHTML = createMockStream({
+    const mockHTML = createMockHTMLStream({
       0: '<html><body>Hello</body></html>',
     });
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -159,11 +186,11 @@ describe('injectRSCPayload', () => {
   });
 
   it('should include all RSC payloads arriving at different times after HTML stream finishes', async () => {
-    const mockRSC = createMockStream({
+    const mockRSC = createMockRSCStream({
       200: '{"first": "chunk"}',
       400: '{"second": "chunk"}',
     });
-    const mockHTML = createMockStream({
+    const mockHTML = createMockHTMLStream({
       0: '<div>content</div>',
     });
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
@@ -181,8 +208,8 @@ describe('injectRSCPayload', () => {
   });
 
   it('adds sanitized nonce attribute to injected RSC script tags', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}']);
-    const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, 'abc123" onload=alert(1)');
@@ -193,8 +220,8 @@ describe('injectRSCPayload', () => {
   });
 
   it('adds valid nonce attribute to injected RSC script tags', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}']);
-    const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const mockRSC = createMockRSCStream(['{"test": "data"}']);
+    const mockHTML = createMockHTMLStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, 'abc123');

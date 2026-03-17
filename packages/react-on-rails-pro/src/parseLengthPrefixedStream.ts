@@ -20,9 +20,21 @@
  *
  * Handles buffer boundaries: a single feed() call may contain partial
  * headers, partial content, or multiple complete chunks merged together.
+ *
+ * Environment-agnostic: works with both Node.js Buffer and browser Uint8Array.
  */
+
+const decoder = new TextDecoder();
+
+function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
+  const result = new Uint8Array(a.length + b.length);
+  result.set(a);
+  result.set(b, a.length);
+  return result;
+}
+
 export default class LengthPrefixedStreamParser {
-  private buf = Buffer.alloc(0);
+  private buf: Uint8Array = new Uint8Array(0);
 
   private state: 'header' | 'content' = 'header';
 
@@ -30,11 +42,8 @@ export default class LengthPrefixedStreamParser {
 
   private metadata: Record<string, unknown> = {};
 
-  feed(
-    chunk: Buffer | Uint8Array,
-    onChunk: (content: Buffer, metadata: Record<string, unknown>) => void,
-  ): void {
-    this.buf = Buffer.concat([this.buf, chunk instanceof Buffer ? chunk : Buffer.from(chunk)]);
+  feed(chunk: Uint8Array, onChunk: (content: Uint8Array, metadata: Record<string, unknown>) => void): void {
+    this.buf = concatBytes(this.buf, chunk);
 
     let progressed = true;
     while (progressed) {
@@ -45,8 +54,8 @@ export default class LengthPrefixedStreamParser {
           const header = this.buf.subarray(0, idx);
           this.buf = this.buf.subarray(idx + 1);
           const tabIdx = header.indexOf(0x09); // \t
-          this.metadata = JSON.parse(header.subarray(0, tabIdx).toString('utf8'));
-          this.contentLen = parseInt(header.subarray(tabIdx + 1).toString('utf8'), 16);
+          this.metadata = JSON.parse(decoder.decode(header.subarray(0, tabIdx)));
+          this.contentLen = parseInt(decoder.decode(header.subarray(tabIdx + 1)), 16);
           this.state = 'content';
           progressed = true;
         }

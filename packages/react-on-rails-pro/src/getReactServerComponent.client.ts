@@ -15,8 +15,8 @@
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
 import { RailsContext } from 'react-on-rails/types';
-import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
-import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
+import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage, sanitizeNonce } from './utils.ts';
+import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
 
 declare global {
   interface Window {
@@ -30,13 +30,67 @@ export type ClientGetReactServerComponentProps = {
   enforceRefetch?: boolean;
 };
 
+/**
+ * Replays a consoleReplayScript by injecting it as a <script> element.
+ */
+const replayConsole = (consoleReplayScript: string, nonce?: string) => {
+  const code = consoleReplayScript
+    .trim()
+    .replace(/^<script[^>]*>/i, '')
+    .replace(/<\/script>$/i, '');
+  if (code.trim() !== '') {
+    const el = document.createElement('script');
+    if (nonce) {
+      el.nonce = nonce;
+    }
+    el.textContent = code;
+    document.body.appendChild(el);
+  }
+};
+
+/**
+ * Parses a length-prefixed RSC fetch response stream.
+ *
+ * Wire format per chunk: <metadata JSON>\t<hex content length>\n<raw Flight data>
+ *
+ * Extracts raw Flight data for React, replays console from metadata.
+ */
 const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: string) => {
   const response = await fetchPromise;
-  const stream = response.body;
-  if (!stream) {
+  const body = response.body;
+  if (!body) {
     throw new Error('No stream found in response');
   }
-  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream, cspNonce);
+
+  const nonce = sanitizeNonce(cspNonce);
+  const parser = new LengthPrefixedStreamParser();
+
+  const transformedStream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = body.getReader();
+      try {
+        let done = false;
+        while (!done) {
+          // eslint-disable-next-line no-await-in-loop
+          const readResult = await reader.read();
+          done = readResult.done;
+          if (readResult.value) {
+            parser.feed(readResult.value, (content, metadata) => {
+              controller.enqueue(content);
+              const consoleScript = (metadata.consoleReplayScript as string) ?? '';
+              if (consoleScript) {
+                replayConsole(consoleScript, nonce);
+              }
+            });
+          }
+        }
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    },
+  });
+
   const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
   return wrapInNewPromise(renderPromise);
 };

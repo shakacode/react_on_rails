@@ -455,7 +455,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   /**
    * Used by server rendering by Rails
    */
-  serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
+  serverRenderReactComponent(options: RenderParams): null | string | Promise<string>;
   /**
    * Used by server rendering by Rails
    */

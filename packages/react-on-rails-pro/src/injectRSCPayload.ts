@@ -259,10 +259,11 @@ export default function injectRSCPayload(
         rscPromises.push(
           (async () => {
             const parser = new LengthPrefixedStreamParser();
+            const textDecoder = new TextDecoder();
             for await (const chunk of stream ?? []) {
-              const chunkBuf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+              const chunkBuf = chunk instanceof Uint8Array ? chunk : new TextEncoder().encode(chunk);
               parser.feed(chunkBuf, (content, metadata) => {
-                const flightData = content.toString('utf8');
+                const flightData = textDecoder.decode(content);
                 const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
                 rscPayloadBuffers.push(Buffer.from(payloadScript));
 
