@@ -127,7 +127,14 @@ module ReactOnRailsPro
           next
         end
 
-        yield chunk
+        # Hashes (length-prefixed) are yielded as-is.
+        # Strings (plain text from error or edge cases) are stripped and skipped if empty.
+        if chunk.is_a?(String)
+          stripped = chunk.strip
+          yield stripped unless stripped.empty?
+        else
+          yield chunk
+        end
       end
     end
 
@@ -251,7 +258,7 @@ module ReactOnRailsPro
         return nil if @buf.bytesize < @content_len
 
         # When content length is 0, set html to nil (preserves null semantics from JS)
-        html = if @content_len > 0
+        html = if @content_len.positive?
                  content = @buf.byteslice(0, @content_len)
                  @buf = @buf.byteslice(@content_len, @buf.bytesize - @content_len) || "".b
                  content.force_encoding("UTF-8")

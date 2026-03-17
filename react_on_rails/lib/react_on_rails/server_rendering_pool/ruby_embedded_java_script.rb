@@ -236,7 +236,7 @@ module ReactOnRails
           meta_json = result_string.byteslice(0, tab_idx)
           len_hex = result_string.byteslice(tab_idx + 1, newline_idx - tab_idx - 1)
           content_len = len_hex.to_i(16)
-          html = content_len > 0 ? result_string.byteslice(newline_idx + 1, content_len) : nil
+          html = content_len.positive? ? result_string.byteslice(newline_idx + 1, content_len) : nil
           result = JSON.parse(meta_json).merge!("html" => html)
           replay_console_to_rails_logger(result, render_options)
           result

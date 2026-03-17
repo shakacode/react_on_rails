@@ -1,13 +1,18 @@
 import * as React from 'react';
 import serverRenderReactComponent from '../src/serverRenderReactComponent.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
-import type {
-  RenderParams,
-  RenderResult,
-  RailsContext,
-  RenderFunction,
-  RenderFunctionResult,
-} from '../src/types/index.ts';
+import type { RenderParams, RailsContext, RenderFunction, RenderFunctionResult } from '../src/types/index.ts';
+
+// Parses a length-prefixed result string: metadata\tcontent_len\ncontent
+const parseLengthPrefixed = (str: string) => {
+  const newlineIdx = str.indexOf('\n');
+  const header = str.slice(0, newlineIdx);
+  const tabIdx = header.indexOf('\t');
+  const metadata = JSON.parse(header.slice(0, tabIdx));
+  const contentLen = parseInt(header.slice(tabIdx + 1), 16);
+  const html = contentLen > 0 ? str.slice(newlineIdx + 1, newlineIdx + 1 + contentLen) : null;
+  return { html, ...metadata };
+};
 
 const assertIsString: (value: unknown) => asserts value is string = (value: unknown) => {
   if (typeof value !== 'string') {
@@ -205,10 +210,10 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const html = await renderResult.then((r) => r.html);
+    const parsed = parseLengthPrefixed(await renderResult);
 
-    expect(html).toEqual(expectedHtml);
-    await expect(renderResult.then((r) => r.hasErrors)).resolves.toBeFalsy();
+    expect(parsed.html).toEqual(expectedHtml);
+    expect(parsed.hasErrors).toBeFalsy();
   });
 
   it('serverRenderReactComponent processes async serverRenderHash renderedHtml', async () => {
@@ -228,7 +233,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const result = await renderResult;
+    const result = parseLengthPrefixed(await renderResult);
     expect(result.html).toEqual('<div>Hello</div>');
     expect(result.hasErrors).toBeFalsy();
   });
@@ -251,7 +256,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: true,
     });
     assertIsPromise(renderResult);
-    const result = await renderResult;
+    const result = parseLengthPrefixed(await renderResult);
     expect(result.html).toEqual('<div>Hello with async hash client props</div>');
     expect(result.clientProps).toEqual({
       __tanstackRouterDehydratedState: { url: '/products?category=tools' },
@@ -278,8 +283,9 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const result = await renderResult;
-    expect(result.html).toMatchObject(reactComponentHashResult);
+    const result = parseLengthPrefixed(await renderResult);
+    // html is a JSON-serialized ServerRenderHashRenderedHtml object
+    expect(JSON.parse(result.html as string)).toMatchObject(reactComponentHashResult);
   });
 
   it('serverRenderReactComponent renders async render function that returns react component', async () => {
@@ -296,7 +302,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: true,
     });
     assertIsPromise(renderResult);
-    const result = await renderResult;
+    const result = parseLengthPrefixed(await renderResult);
     expect(result.html).toBe('<div>Hello</div>');
   });
 
