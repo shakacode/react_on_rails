@@ -234,7 +234,7 @@ module ReactOnRails
         # - Length-prefixed: <metadata JSON>\t<content byte length hex>\n<raw html>
         # - JSON (legacy, from server_render_js helper): {"html":"...","consoleReplayScript":"..."}
         def parse_render_result(result_string, render_options)
-          str = result_string.b # Ensure binary encoding for byte-accurate slicing
+          str = result_string.to_s.b # Ensure plain String with binary encoding for byte-accurate slicing
           tab_idx = str.index("\t")
           newline_idx = tab_idx ? str.index("\n", tab_idx) : nil
 
