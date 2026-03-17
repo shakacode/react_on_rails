@@ -24,14 +24,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [16.4.0] - 2026-03-16
+
 #### Fixed
 
 - **Install generator now handles TypeScript and rspack bundler configs correctly**: Projects using Shakapacker 9.4+ with TypeScript configs (`.ts`) were incorrectly prompted to confirm config replacement during `rails generate react_on_rails:install`, because the installer didn't recognize the ESM-style stock configs. The installer and `react_on_rails:doctor` now detect all config variants (webpack/rspack, JS/TS), use the correct replacement template for each, and show accurate bundler-specific diagnostic messages. [PR 2567](https://github.com/shakacode/react_on_rails/pull/2567) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
-
-### [16.4.0.rc.10] - 2026-03-15
-
-#### Fixed
-
 - **Show incomplete install message after Shakapacker failure**: The `react_on_rails:install` generator now tracks when automatic Shakapacker setup fails and emits an explicit "installation incomplete" warning with manual recovery steps, instead of the misleading "Successfully Installed" banner. [PR 2613](https://github.com/shakacode/react_on_rails/pull/2613) by [justin808](https://github.com/justin808). Fixes [Issue 2600](https://github.com/shakacode/react_on_rails/issues/2600).
 - **Ruby 3.4 compatibility for heredocs**: Replaced legacy `strip_heredoc` usage with native squiggly heredocs (`<<~`) and removed redundant chaining where indentation is already normalized by Ruby. [PR 2599](https://github.com/shakacode/react_on_rails/pull/2599) by [justin808](https://github.com/justin808).
 - **Fix install generator load path for `ReactOnRails::GitUtils`**: Added an explicit `require "react_on_rails/git_utils"` so generator execution does not rely on broader app boot side effects for this constant to be available. [PR 2599](https://github.com/shakacode/react_on_rails/pull/2599) by [justin808](https://github.com/justin808).
@@ -2017,8 +2014,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.10...master
-[16.4.0.rc.10]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.10
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...master
+[16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1
 [16.2.0]: https://github.com/shakacode/react_on_rails/compare/16.1.1...v16.2.0
