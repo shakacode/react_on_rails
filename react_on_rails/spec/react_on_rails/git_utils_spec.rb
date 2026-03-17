@@ -80,8 +80,8 @@ module ReactOnRails
           ENV["CI"] = original_ci if original_ci
         end
 
-        it "returns true" do
-          allow(described_class).to receive(:`).with("git status --porcelain").and_return(nil)
+        it "returns true without calling git" do
+          expect(described_class).not_to receive(:`)
           expect(message_handler).to receive(:add_error)
             .with(<<~MSG.strip)
               Git is not installed. Please install Git and commit your changes before continuing.
@@ -161,8 +161,8 @@ module ReactOnRails
           ENV["CI"] = original_ci if original_ci
         end
 
-        it "adds a warning and returns true" do
-          allow(described_class).to receive(:`).with("git status --porcelain").and_return(nil)
+        it "adds a warning and returns true without calling git" do
+          expect(described_class).not_to receive(:`)
           expect(message_handler).to receive(:add_warning).with(described_class::MISSING_GIT_WARNING)
 
           expect(described_class.warn_if_uncommitted_changes(message_handler, git_installed: false)).to be(true)

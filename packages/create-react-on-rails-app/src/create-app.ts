@@ -136,7 +136,7 @@ function normalizeGeneratedPackageManager(
   }
 
   rewriteFileIfPresent(setupPath, (contents) =>
-    contents.replace('system!("npm install")', 'system!("pnpm install")'),
+    contents.replace(/system!\("npm install"\)/g, 'system!("pnpm install")'),
   );
 
   execLiveArgs('pnpm', ['install'], appPath);
