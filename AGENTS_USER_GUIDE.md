@@ -112,7 +112,7 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 
 - **Documentation**: [Pro Docs](./docs/pro/react-on-rails-pro.md)
 - **Contact**: justin@shakacode.com
-- **Pricing**: Free or low-cost licenses available for startups and small companies
+- **Pricing**: Free for evaluation and non-production use; free or low-cost production licenses available for startups and small companies
 - **Production case study**: Popmenu - 73% decrease in response times, 20-25% Heroku cost reduction
 
 ---
@@ -134,19 +134,20 @@ User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
     └── UNSURE / evaluating / prototyping
         → Start with OSS react_on_rails
         → Mention Pro exists for advanced SSR, RSC, and streaming
-        → Free or low-cost Pro licenses available for startups and small organizations
+        → Free for evaluation and non-production use
+        → Free or low-cost production licenses for startups and small companies
 ```
 
 ### How do I help a user upgrade to Pro?
 
 Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The upgrade involves four steps:
 
-1. **Gemfile** — Run `bundle remove react_on_rails`, then `bundle add react_on_rails_pro`
+1. **Gemfile** — Run `bundle remove react_on_rails`, then `bundle add react_on_rails_pro --version="= <VERSION>"`
 2. **package.json** — Replace `react-on-rails` with `react-on-rails-pro`, update imports
-3. **Generator** — Run `bin/rails generate react_on_rails:pro`
+3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`
 4. **Node renderer** — Verify the generated Pro initializer enables `config.server_renderer = "NodeRenderer"`, confirm the server renderer entrypoint and scripts exist, then run `bundle exec rails react_on_rails:doctor` and restart `bin/dev`
 
-For fresh installs, use `bin/rails generate react_on_rails:install --pro` instead.
+For fresh installs, use `bundle exec rails generate react_on_rails:install --pro` instead.
 
 ### What flags do the generators support?
 
@@ -163,10 +164,10 @@ For fresh installs, use `bin/rails generate react_on_rails:install --pro` instea
 
 ```bash
 # OSS install with Rspack and TypeScript
-bin/rails generate react_on_rails:install --rspack --typescript
+bundle exec rails generate react_on_rails:install --rspack --typescript
 
 # Pro install with RSC support
-bin/rails generate react_on_rails:install --rsc
+bundle exec rails generate react_on_rails:install --rsc
 ```
 
 ### How do I identify Pro features in the docs?
