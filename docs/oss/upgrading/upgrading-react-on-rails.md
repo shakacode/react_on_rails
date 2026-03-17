@@ -121,7 +121,7 @@ This is a minor release - update your gem and npm package versions, then run `bu
    ```
 
    ```json
-   // package.json
+   // package.json — use the npm equivalent of the same release
    {
      "dependencies": {
        "react-on-rails": "16.4.0"
