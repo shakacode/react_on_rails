@@ -295,7 +295,7 @@ module ReactOnRails
 
     # Webpack configuration validation
     def check_webpack_configuration
-      config_path = detect_bundler_config_path
+      config_path = resolved_webpack_config_path
       if config_path
         add_success("✅ Bundler configuration exists (#{config_path})")
         check_webpack_config_content(config_path)

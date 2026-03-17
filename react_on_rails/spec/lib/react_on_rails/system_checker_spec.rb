@@ -559,6 +559,38 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
   end
 
+  describe "#check_webpack_configuration" do
+    context "when webpack config is resolved from a custom shakapacker location" do
+      before do
+        allow(checker).to receive(:resolved_webpack_config_path).and_return("config/custom/webpack.config.ts")
+        allow(checker).to receive(:check_webpack_config_content)
+        allow(checker).to receive(:suggest_webpack_inspection)
+      end
+
+      it "reports success instead of an error" do
+        checker.check_webpack_configuration
+
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("config/custom/webpack.config.ts")
+        end).to be true
+        expect(checker.errors?).to be false
+      end
+    end
+
+    context "when no webpack config can be resolved" do
+      before do
+        allow(checker).to receive(:resolved_webpack_config_path).and_return(nil)
+      end
+
+      it "reports an error" do
+        checker.check_webpack_configuration
+
+        expect(checker.errors?).to be true
+        expect(checker.messages.last[:content]).to include("Bundler configuration not found")
+      end
+    end
+  end
+
   describe "#check_react_dependencies" do
     let(:base_package_json) do
       {
