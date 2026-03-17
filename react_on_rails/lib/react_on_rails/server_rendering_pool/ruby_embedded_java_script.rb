@@ -254,7 +254,11 @@ module ReactOnRails
           meta_json = str.byteslice(0, tab_idx).force_encoding("UTF-8")
           len_hex = str.byteslice(tab_idx + 1, newline_idx - tab_idx - 1)
           content_len = len_hex.to_i(16)
-          html = content_len.positive? ? str.byteslice(newline_idx + 1, content_len).force_encoding("UTF-8") : nil
+          html_raw = content_len.positive? ? str.byteslice(newline_idx + 1, content_len).force_encoding("UTF-8") : nil
+          # When html is a ServerRenderHashRenderedHtml (object), it was JSON-serialized
+          # by buildLengthPrefixedResult. Parse it back to a Hash so downstream consumers
+          # (react_component_hash) see the expected type.
+          html = html_raw&.start_with?("{") ? JSON.parse(html_raw) : html_raw
           JSON.parse(meta_json).merge!("html" => html)
         end
 
