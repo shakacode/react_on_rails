@@ -139,14 +139,14 @@ User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
 
 ### How do I help a user upgrade to Pro?
 
-Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The package swap is three steps, followed by Node renderer verification:
+Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The upgrade involves four steps:
 
-1. **Gemfile** — Run `bundle remove react_on_rails`, then `bundle add react_on_rails_pro`, then `bundle install`
+1. **Gemfile** — Run `bundle remove react_on_rails`, then `bundle add react_on_rails_pro`
 2. **package.json** — Replace `react-on-rails` with `react-on-rails-pro`, update imports
-3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`
+3. **Generator** — Run `bin/rails generate react_on_rails:pro`
 4. **Node renderer** — Verify the generated Pro initializer enables `config.server_renderer = "NodeRenderer"`, confirm the server renderer entrypoint and scripts exist, then run `bundle exec rails react_on_rails:doctor` and restart `bin/dev`
 
-For fresh installs, use `bundle exec rails generate react_on_rails:install --pro` instead.
+For fresh installs, use `bin/rails generate react_on_rails:install --pro` instead.
 
 ### What flags do the generators support?
 
@@ -177,6 +177,14 @@ Look for these common badge patterns (not exhaustive — variations exist):
 
    ```markdown
    > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
+   ```
+
+   Some pages use a two-line variant with extra detail:
+
+   ```markdown
+   > **⚡️ React on Rails Pro Feature**
+   >
+   > Description of the Pro requirement...
    ```
 
 2. **Inline tag** in CHANGELOG entries:
