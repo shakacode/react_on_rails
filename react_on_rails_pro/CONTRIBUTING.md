@@ -24,7 +24,7 @@ For non-doc fixes:
 
 - Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/CHANGELOG.md#unreleased).
 - Ensure CI passes and that you added a test that passes with the fix and fails without the fix.
-- Squash all commits down to one with a nice commit message _ONLY_ once final review is given. Make sure this single commit is rebased on top of master.
+- Squash all commits down to one with a nice commit message _ONLY_ once final review is given. Make sure this single commit is rebased on top of main.
 - Please address all code review comments.
 - Ensure that docs are updated accordingly if a feature is added.
 
