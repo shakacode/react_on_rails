@@ -102,7 +102,7 @@ Present the triage to the user - **DO NOT automatically start addressing items**
 - Wait for the user to tell you which items to address
 - Always offer an explicit optional follow-up to post rationale replies on selected `SKIPPED` or declined `DISCUSS` items
 - Never post those rationale replies unless the user explicitly selects which items to reply to
-- Ask two things when relevant:
+- Ask two things when there are `SKIPPED` or declined `DISCUSS` items:
   - Which items to address in code/tests/docs
   - Which skipped/declined items (if any) should receive a rationale reply
 
@@ -184,6 +184,8 @@ SKIPPED (3):
 Which items would you like me to address? (e.g., "1", "1,2", or "all must-fix")
 Optional: I can also post rationale replies for skipped/declined items (e.g., "reply 3,5" or "reply all skipped").
 ```
+
+Note: Only show the "Optional: rationale replies" line when there are `SKIPPED` or declined `DISCUSS` items. Omit it when every item is `MUST-FIX`.
 
 # Important Notes
 
