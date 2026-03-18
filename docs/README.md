@@ -64,6 +64,7 @@ Performance enhancements, React Server Components, and advanced features. Requir
 - [SSR Caching](./oss/building-features/caching.md) - Prerender and fragment caching
 - [Bundle Caching](./oss/building-features/bundle-caching.md) - Avoid redundant webpack builds
 - [Node Renderer](./oss/building-features/node-renderer/basics.md) - Dedicated Node.js rendering server
+- [Node Renderer: Container Deployment](./oss/building-features/node-renderer/container-deployment.md) - Sidecar vs. separate workloads, memory tuning, troubleshooting
 - [Code Splitting](./oss/building-features/code-splitting.md) - Loadable components
 - [Ruby API (Pro)](./oss/api-reference/ruby-api-pro.md) - Pro view helpers and utilities
 - [Upgrading Pro](./pro/updating.md) - Version upgrade guide
