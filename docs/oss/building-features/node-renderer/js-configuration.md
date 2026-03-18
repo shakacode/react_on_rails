@@ -1,17 +1,15 @@
 # Node Renderer JavaScript Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
 
-You can configure the node-renderer entirely with ENV values from your own launch file or
-`package.json` script. The package does not ship a standalone `node-renderer` CLI.
+You can configure the node-renderer with only ENV values using the provided bin file `node-renderer`.
 
-For most apps, create a small configuration file to set up and launch the node-renderer.
+You can also create a custom configuration file to setup and launch the node-renderer.
 
 The values in this file must be kept in sync with the `config/initializers/react_on_rails_pro.rb` file, as documented in [Configuration](../../configuration/configuration-pro.md).
 
-Here are the options available for the JavaScript renderer configuration object, as well as the
-available default ENV values if you wire them into your own launch script.
+Here are the options available for the JavaScript renderer configuration object, as well as the available default ENV values if using the command line program node-renderer.
 
 [//]: # 'If you change text here, you may want to update comments in packages/node-renderer/src/shared/configBuilder.ts as well.'
 
@@ -27,10 +25,9 @@ available default ENV values if you wire them into your own launch script.
 1. **serverBundleCachePath** (default: `process.env.RENDERER_SERVER_BUNDLE_CACHE_PATH || process.env.RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-node-renderer-bundles'` ) - Path to a cache directory where uploaded server bundle files will be stored. This is distinct from Shakapacker's public asset directory. For example you can set it to `path.resolve(__dirname, './.node-renderer-bundles')` if you configured renderer from the `/` directory of your app.
 1. **workersCount** (default: `process.env.RENDERER_WORKERS_COUNT || defaultWorkersCount()` where default is your CPUs count - 1) - Number of workers that will be forked to serve rendering requests. If you set this manually make sure that value is a **Number** and is `>= 0`. Setting this to `0` will run the renderer in a single process mode without forking any workers, which is useful for debugging purposes. For production use, the value should be `>= 1`.
 1. **password** (default: `env.RENDERER_PASSWORD`) - The password expected to receive from the **Rails client** to authenticate rendering requests.
-   In `development` and `test` environments (checked via both `NODE_ENV` and `RAILS_ENV`), the password is optional — if unset, no authentication is required.
-   In all other environments (`staging`, `production`, etc.), the renderer will refuse to start without an explicit password. Set `RENDERER_PASSWORD` in your environment or pass `password` in the config object.
-1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set. **Recommended for production** — rolling restarts are the primary safety net against memory leaks from application code. See the [Memory Leaks guide](../../../pro/js-memory-leaks.md).
-1. **delayBetweenIndividualWorkerRestarts** (default: `env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`) - Interval in minutes between individual worker restarts (when cluster restart is triggered). By default restarts are not enabled. If restarts are enabled, `allWorkersRestartInterval` should also be set. Set this high enough so that not all workers are down simultaneously (e.g., if you have 4 workers and set this to 5 minutes, the full restart cycle takes 20 minutes).
+   If no password is set, no authentication will be required.
+1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set.
+1. **delayBetweenIndividualWorkerRestarts** (default: `env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`) - Interval in minutes between individual worker restarts (when cluster restart is triggered). By default restarts are not enabled. If restarts are enabled, `allWorkersRestartInterval` should also be set.
 1. **gracefulWorkerRestartTimeout**: (default: `env.GRACEFUL_WORKER_RESTART_TIMEOUT`) - Time in seconds that the master waits for a worker to gracefully restart (after serving all active requests) before killing it. Use this when you want to avoid situations where a worker gets stuck in an infinite loop and never restarts. This config is only usable if worker restart is enabled. The timeout starts when the worker should restart; if it elapses without a restart, the worker is killed.
 1. **maxDebugSnippetLength** (default: 1000) - If the rendering request is longer than this, it will be truncated in exception and logging messages.
 1. **supportModules** - (default: `env.RENDERER_SUPPORT_MODULES || null`) - If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS global objects and functions that get added to the VM context:
@@ -58,20 +55,19 @@ Deprecated options:
 
 ### Testing example:
 
-[spec/dummy/client/node-renderer.js](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/client/node-renderer.js)
+[spec/dummy/client/node-renderer.js](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/node-renderer.js)
 
 ### Simple example:
 
-Create a file `client/node-renderer.js`. The generator uses this filename and CommonJS syntax so
-the file runs directly with `node client/node-renderer.js` without extra ESM configuration.
+Create a file './node-renderer.js'
 
 ```js
-const path = require('path');
-const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+import path from 'path';
+import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
 
 const config = {
-  // Save bundles to relative "./.node-renderer-bundles" dir of our app root
-  serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
+  // Save bundles to relative "./.node-renderer-bundles" dir of our app
+  serverBundleCachePath: path.resolve(__dirname, './.node-renderer-bundles'),
 
   // All other values are the defaults, as described above
 };
@@ -90,15 +86,15 @@ else if (process.env.CI) {
 reactOnRailsProNodeRenderer(config);
 ```
 
-And add a root-level script to the `scripts` section of your `package.json`
+And add this line to your `scripts` section of `package.json`
 
 ```json
   "scripts": {
-    "node-renderer": "node client/node-renderer.js"
+    "start": "echo 'Starting React on Rails Pro Node Renderer.' && node ./node-renderer.js"
   },
 ```
 
-Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` command for your app).
+`yarn start` will run the renderer.
 
 ## Custom Fastify Configuration
 
@@ -111,10 +107,6 @@ For advanced use cases, you can customize the Fastify server instance by importi
 ### Adding a Health Check Endpoint
 
 When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
-
-The advanced examples below use ES modules for readability. If you want this file to keep running
-as `node client/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
-example above or switch the file to `.mjs` or `"type": "module"`.
 
 ```js
 import masterRun from 'react-on-rails-pro-node-renderer/master';

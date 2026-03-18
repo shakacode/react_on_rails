@@ -1,7 +1,7 @@
 # Error Reporting and Tracing
 
-> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
 
 For versions before 4.0.0, error reporting was configured via `honeybadgerApiKey` and `sentryDsn` options. These options were removed in 4.0.0 and will cause an error if used. See the current integration approach below.
 
@@ -52,7 +52,7 @@ To enable Sentry Tracing:
 ## Other services
 
 You can create your own integrations in the same way as the provided ones.
-You can use [the built-in implementations](https://github.com/shakacode/react_on_rails/tree/main/packages/react-on-rails-pro-node-renderer/src/integrations) as examples.
+You can use [the built-in implementations](https://github.com/shakacode/react_on_rails/tree/master/packages/react-on-rails-pro-node-renderer/src/integrations) as examples.
 Import these functions from `react-on-rails-pro-node-renderer/integrations/api`:
 
 ### Error reporting services

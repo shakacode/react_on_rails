@@ -70,13 +70,13 @@ export interface Config {
   gracefulWorkerRestartTimeout: number | undefined;
   // If the rendering request is longer than this, it will be truncated in exception and logging messages
   maxDebugSnippetLength: number;
-  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  // @deprecated See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.
   honeybadgerApiKey?: string | null;
-  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  // @deprecated See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.
   sentryDsn?: string | null;
-  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  // @deprecated See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.
   sentryTracing?: boolean;
-  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  // @deprecated See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.
   sentryTracesSampleRate?: string | number;
   // If true, `{set/clear}{Timeout/Interval/Immediate}` and `queueMicrotask` are stubbed out to do nothing.
   stubTimers: boolean;
@@ -305,7 +305,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   ) {
     log.error(
       'honeybadgerApiKey, sentryDsn, sentryTracing, and sentryTracesSampleRate are not used since RoRP 4.0. ' +
-        'See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.',
+        'See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.',
     );
     process.exit(1);
   }

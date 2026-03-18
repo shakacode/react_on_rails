@@ -70,9 +70,8 @@ exclude = [
   # PLANNED DEPLOYMENTS NOT YET LIVE
   # ============================================================================
   '^https://ror-spec-dummy\.reactrails\.com',  # spec/dummy demo - deployment pending
-  '^https://reactonrails\.com/docs/getting-started/existing-rails-app',  # #2929 slug cleanup - live after docs deploy
-  '^https://reactonrails\.com/docs/core-concepts/auto-bundling/?',  # #2929 slug cleanup - live after docs deploy
-  '^https://reactonrails\.com/docs/api-reference/?$',  # Generated-index URL - not a standalone page
+  '^https://pro\.reactonrails\.com/docs/',     # Pro docs site - pages being deployed incrementally
+  '^https://reactonrails\.com/pro',            # Pro page - deployment pending
 
   # ============================================================================
   # SITES FROM PROJECTS.MD THAT BLOCK BOTS OR ARE UNRELIABLE
@@ -92,6 +91,7 @@ exclude = [
   '^https?://(www\.)?undeveloped\.com',  # Timeout in CI
   '^https://devchat\.tv',  # Ruby Rogues podcast - times out in CI
   '^https?://chlg\.co',  # URL shortener - times out in CI
+  '^https?://contributor-covenant\.org',  # Timeout in CI
 
   # ============================================================================
   # CHANGELOG COMPARE LINKS

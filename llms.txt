@@ -105,10 +105,10 @@ import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerCompon
 ## Documentation Links
 
 - Docs: https://reactonrails.com/docs/
-- Pro Docs: https://www.shakacode.com/react-on-rails-pro/docs/
-- Pro Installation: https://www.shakacode.com/react-on-rails-pro/docs/installation/
-- Pro Configuration: https://www.shakacode.com/react-on-rails-pro/docs/configuration/
-- Node Renderer Basics: https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/basics/
-- Node Renderer JS Config: https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/
-- RSC Tutorial: https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/
+- Pro Docs: https://reactonrails.com/docs/pro/
+- Pro Installation: https://reactonrails.com/docs/pro/installation
+- Pro Configuration: https://reactonrails.com/docs/configuration/configuration-pro
+- Node Renderer Basics: https://reactonrails.com/docs/building-features/node-renderer/basics
+- Node Renderer JS Config: https://reactonrails.com/docs/building-features/node-renderer/js-configuration
+- RSC Tutorial: https://reactonrails.com/docs/pro/react-server-components/tutorial
 - GitHub: https://github.com/shakacode/react_on_rails

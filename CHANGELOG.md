@@ -191,7 +191,7 @@ To migrate to React on Rails Pro:
    import ReactOnRails from 'react-on-rails-pro';
    ```
 
-4. Free or low-cost Pro licenses are available for startups, small companies, and qualifying organizations. Visit [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro) to get started, or contact [justin@shakacode.com](mailto:justin@shakacode.com) for any questions.
+4. Free or low-cost Pro licenses are available for startups, small companies, and qualifying organizations. Visit [React on Rails Pro](https://pro.reactonrails.com) to get started, or contact [justin@shakacode.com](mailto:justin@shakacode.com) for any questions.
 
 **Note:** If you're not using any of the Pro-only methods listed above, no changes are required.
 
@@ -249,7 +249,7 @@ To migrate to React on Rails Pro:
 - **Smart Error Messages with Actionable Solutions**: Added intelligent Ruby-side error handling with context-aware, actionable solutions for common issues. Features include fuzzy matching for component name typos, environment-specific debugging suggestions, color-coded error formatting, and detailed troubleshooting guides for component registration, auto-bundling, hydration mismatches, server rendering errors, and Redux store issues. [PR 1934](https://github.com/shakacode/react_on_rails/pull/1934) by [justin808](https://github.com/justin808).
 
 - **Doctor Checks for :async Loading Strategy**: Added proactive diagnostic checks to the React on Rails doctor tool to detect usage of the `:async` loading strategy in projects without React on Rails Pro. The feature scans view files and initializer configuration, providing clear guidance to either upgrade to Pro or use alternative loading strategies like `:defer` or `:sync` to avoid component registration race conditions. [PR 2010](https://github.com/shakacode/react_on_rails/pull/2010) by [justin808](https://github.com/justin808).
-- **[Pro]** **React Server Components Support**: Full RSC integration for Rails apps — reduce client bundle sizes and enable powerful data fetching patterns. [See the tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial). [PR 422](https://github.com/shakacode/react_on_rails_pro/pull/422) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **React Server Components Support**: Full RSC integration for Rails apps — reduce client bundle sizes and enable powerful data fetching patterns. [See the tutorial](https://reactonrails.com/docs/pro/react-server-components/tutorial). [PR 422](https://github.com/shakacode/react_on_rails_pro/pull/422) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **Streaming Server Rendering**: `stream_view_containing_react_components` and `stream_react_component` helpers for progressive page loading. Includes console log replay, error handling during streaming (initial render and suspense boundaries), and `raise_non_shell_server_rendering_errors` configuration. [PR 407](https://github.com/shakacode/react_on_rails_pro/pull/407), [PR #429](https://github.com/shakacode/react_on_rails_pro/pull/429), [PR #432](https://github.com/shakacode/react_on_rails_pro/pull/432) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **Async React Component Rendering**: `async_react_component` and `cached_async_react_component` helpers for concurrent component rendering. Multiple components execute HTTP requests to the Node renderer in parallel. Requires `ReactOnRailsPro::AsyncRendering` concern in controller. [PR 2139](https://github.com/shakacode/react_on_rails/pull/2139) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 - **[Pro]** **Concurrent Streaming Performance**: Concurrent draining of streamed React components using the async gem with producer-consumer pattern and bounded buffering. [PR 2015](https://github.com/shakacode/react_on_rails/pull/2015) by [ihabadham](https://github.com/ihabadham).
@@ -841,7 +841,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
   can be loaded "async" and a handler function can determine when to hydrate.
   For an example of this, see the [docs for loadable-components SSR](https://loadable-components.com/docs/server-side-rendering/#4-add-loadableready-client-side).
   [PR 1327](https://github.com/shakacode/react_on_rails/pull/1327) by [justin808](https://github.com/justin808).
-  Loadable-Components is supported by [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro).
+  Loadable-Components is supported by [React on Rails Pro](https://pro.reactonrails.com).
 
 ### [12.0.2] - 2020-07-09
 

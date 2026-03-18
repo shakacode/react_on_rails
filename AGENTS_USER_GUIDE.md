@@ -134,18 +134,19 @@ User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
     └── UNSURE / evaluating / prototyping
         → Start with OSS react_on_rails
         → Mention Pro exists for advanced SSR, RSC, and streaming
-        → Free for evaluation and non-production use
-        → Free or low-cost production licenses for startups and small companies
+        → Available for free or with startup-friendly pricing
+        → See https://reactonrails.com/pro for details
 ```
 
 ### How do I help a user upgrade to Pro?
 
-Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The upgrade involves four steps:
+Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md). The upgrade involves three steps:
 
 1. **Gemfile** — Run `bundle remove react_on_rails`, then `bundle add react_on_rails_pro --version="= <VERSION>"`
 2. **package.json** — Replace `react-on-rails` with `react-on-rails-pro`, update imports
-3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`
-4. **Node renderer** — Verify the generated Pro initializer enables `config.server_renderer = "NodeRenderer"`, confirm the server renderer entrypoint and scripts exist, then run `bundle exec rails react_on_rails:doctor` and restart `bin/dev`
+3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`, then:
+   - Verify `config/initializers/react_on_rails_pro.rb` has `config.server_renderer = "NodeRenderer"` and the server entrypoint exists
+   - Run `bundle exec rails react_on_rails:doctor` and restart `bin/dev`
 
 For fresh installs, use `bundle exec rails generate react_on_rails:install --pro` instead.
 
@@ -475,5 +476,5 @@ bundle exec rake react_on_rails:doctor
 - **Full Documentation**: [Docs Overview](./docs/README.md)
 - **Quick Start Guide**: [Quick Start](./docs/oss/getting-started/quick-start.md)
 - **GitHub Repository**: https://github.com/shakacode/react_on_rails
-- **Pro Features**: https://www.shakacode.com/react-on-rails-pro/
+- **Pro Features**: https://reactonrails.com/pro
 - **Support**: react_on_rails@shakacode.com

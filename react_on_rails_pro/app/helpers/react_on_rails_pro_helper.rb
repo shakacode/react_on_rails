@@ -183,7 +183,7 @@ module ReactOnRailsProHelper
   # `rsc_payload_route` helper function. The returned data from this function is used internally by
   # components registered using the `registerServerComponent` function. Don't use it unless you need
   # more control over the RSC payload generation. To know more about RSC payload, see the following link:
-  # @see https://www.shakacode.com/react-on-rails-pro/docs/how-react-server-components-works.md
+  # @see https://reactonrails.com/docs/pro/react-server-components/how-react-server-components-work
   #   for technical details about the RSC payload format
   def rsc_payload_react_component(component_name, options = {})
     # rsc_payload_react_component doesn't have the prerender option

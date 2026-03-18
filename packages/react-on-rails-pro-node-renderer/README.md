@@ -12,7 +12,7 @@ yarn add react-on-rails-pro-node-renderer
 pnpm add react-on-rails-pro-node-renderer
 ```
 
-**Prerequisites:** This package is used with the `react_on_rails_pro` Ruby gem and the `react-on-rails-pro` npm package. See the [full installation guide](https://www.shakacode.com/react-on-rails-pro/docs/installation/).
+**Prerequisites:** This package is used with the `react_on_rails_pro` Ruby gem and the `react-on-rails-pro` npm package. See the [full installation guide](https://reactonrails.com/docs/pro/installation).
 
 ## Quick Start
 
@@ -146,15 +146,15 @@ addNotifier((error) => {
 });
 ```
 
-See [Error Reporting and Tracing docs](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing/).
+See [Error Reporting and Tracing docs](https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing).
 
 ## Documentation
 
-- [Node Renderer Basics](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/basics/)
-- [JavaScript Configuration](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/js-configuration/)
-- [Rails Configuration](https://www.shakacode.com/react-on-rails-pro/docs/configuration/)
-- [Debugging](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/debugging/)
-- [Troubleshooting](https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/troubleshooting/)
+- [Node Renderer Basics](https://reactonrails.com/docs/building-features/node-renderer/basics)
+- [JavaScript Configuration](https://reactonrails.com/docs/building-features/node-renderer/js-configuration)
+- [Rails Configuration](https://reactonrails.com/docs/configuration/configuration-pro)
+- [Debugging](https://reactonrails.com/docs/building-features/node-renderer/debugging)
+- [Troubleshooting](https://reactonrails.com/docs/building-features/node-renderer/troubleshooting)
 
 ## Package Relationships
 

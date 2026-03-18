@@ -1,7 +1,7 @@
 # Node Renderer Basics
 
-> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
 
 ## Requirements
 
@@ -10,18 +10,6 @@
 ## Install the Gem and the Node Module
 
 See [Installation](../../../pro/installation.md).
-
-## Memory Management
-
-The Node Renderer reuses V8 VM contexts across requests for performance. This means **module-level state in your server bundle persists across all SSR requests**. Any unbounded caches, `_.memoize` calls, or growing data structures at module scope will leak memory until the worker restarts.
-
-**Essential for production:**
-
-- Set `NODE_OPTIONS=--max-old-space-size=<MB>` to prevent V8 from deferring garbage collection
-- Enable worker rolling restarts via `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts`
-- Audit your server bundle for module-level mutable state
-
-See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak patterns and how to fix them.
 
 ## Setup Node Renderer Server
 
@@ -42,7 +30,7 @@ See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak pa
    - `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`
    - `RENDERER_SUPPORT_MODULES`
 2. Configure ENV values and run the command. Note, you can set port with args `-p <PORT>`. For example, assuming node-renderer is in your path:
-   ```bash
+   ```
    RENDERER_BUNDLE_PATH=/app/.node-renderer-bundles node-renderer
    ```
 3. You can use a command line argument of `-p SOME_PORT` to override any ENV value for the PORT.
@@ -56,14 +44,11 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    mkdir renderer-app
    cd renderer-app
    ```
-2. Make sure you have **Node.js 18+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**.
-3. Initialize a Node application and install the `react-on-rails-pro-node-renderer` package.
+2. Make sure you have **Node.js** version **14** or higher and **Yarn** installed.
+3. Init node application and install the `react-on-rails-pro-node-renderer` package.
    ```sh
-   npm init -y
-   npm install react-on-rails-pro-node-renderer
-   # or: pnpm add react-on-rails-pro-node-renderer
-   # or: yarn add react-on-rails-pro-node-renderer
-   # or: bun add react-on-rails-pro-node-renderer
+   yarn init
+   yarn add react-on-rails-pro-node-renderer
    ```
 4. Configure a JavaScript file that will launch the rendering server per the docs in [Node Renderer JavaScript Configuration](./js-configuration.md). For example, create a file `node-renderer.js`. Here is a simple example that uses all the defaults except for serverBundleCachePath:
 
@@ -86,7 +71,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
 Create `config/initializers/react_on_rails_pro.rb` and configure the **renderer server**. See configuration values in [Configuration](../../configuration/configuration-pro.md). Pay attention to:
 
 1. Set `config.server_renderer = "NodeRenderer"`
-2. Decide whether to enable `config.prerender_caching = true`. The default is `false`; turn it on only if you want Rails cache-backed SSR result caching and your cache is configured for the additional load.
+2. Leave the default of `config.prerender_caching = true` and ensure your Rails cache is properly configured to handle the additional cache load.
 3. Configure values beginning with `renderer_`
 4. Use ENV values for values like `renderer_url` so that your deployed server is properly configured. If the ENV value is unset, the default for the renderer_url is `localhost:3800`.
 5. Here's a tiny example using mostly defaults:
@@ -123,7 +108,7 @@ See [JS Configuration](./js-configuration.md) for the `host` and `password` opti
 
 ## Troubleshooting
 
-- See [Memory Leaks guide](../../../pro/js-memory-leaks.md).
+- See [JS Memory Leaks](../../../pro/js-memory-leaks.md).
 
 ## Upgrading
 
@@ -134,4 +119,3 @@ The NodeRenderer has a protocol version on both the Rails and Node sides. If the
 - [Installation](../../../pro/installation.md)
 - [Rails Options for node-renderer](../../configuration/configuration-pro.md)
 - [JS Options for node-renderer](./js-configuration.md)
-- [Container Deployment](./container-deployment.md) — Sidecar vs. separate workloads, memory tuning, autoscaling, and troubleshooting

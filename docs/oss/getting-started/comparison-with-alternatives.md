@@ -1,29 +1,23 @@
----
-sidebar_label: 'Feature Matrix & Benchmarks'
-description: Side-by-side feature matrix and performance-oriented comparison of Rails + React integration options.
----
-
 # Comparison with Alternatives
 
 Choosing a React integration strategy for Rails? This guide compares React on Rails (OSS and Pro) with the main alternatives so you can make an informed decision.
 
 ## Feature Comparison
 
-| Option                    | Keep Rails as the main app? | Incremental React inside Rails views? | Full-page React app model? | Built-in SSR path                 | RSC / streaming path    | Operational model                                    | Best when                                                                  |
-| ------------------------- | --------------------------- | ------------------------------------- | -------------------------- | --------------------------------- | ----------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------- |
-| **React on Rails**        | Yes                         | Excellent                             | Good                       | Yes, via ExecJS                   | Pro upgrade path        | One Rails app                                        | You want the strongest React + Rails integration with a clear upgrade path |
-| **React on Rails Pro**    | Yes                         | Excellent                             | Good                       | Yes, via a dedicated Node process | Yes                     | Same Rails app plus a Node SSR process               | You want higher-performance SSR, streaming, RSC, or advanced SSR features  |
-| **Inertia Rails + React** | Yes                         | Limited                               | Excellent                  | Optional                          | No first-class RSC path | One Rails app with SPA-style pages                   | You want React pages with Rails controllers and no separate API            |
-| **Vite Ruby + React**     | Yes                         | DIY                                   | DIY                        | Experimental / DIY                | No first-class RSC path | One Rails app with custom integration decisions      | You want maximum flexibility and minimal framework conventions             |
-| **react-rails**           | Yes                         | Good                                  | Limited                    | Yes, via ExecJS                   | No                      | One Rails app                                        | You want a simpler, older integration and do not need newer React features |
-| **Next.js + Rails API**   | Usually no                  | Poor                                  | Excellent                  | Yes                               | Excellent               | Separate frontend/backend boundary in most real apps | You want a React-first architecture and are willing to split concerns      |
-| **Hotwire / Turbo**       | Yes                         | N/A                                   | N/A                        | HTML-over-the-wire                | N/A                     | One Rails app                                        | You want minimal JavaScript and the most Rails-native path                 |
-
-## Recommended Default
-
-If you want React inside a Rails app, start with React on Rails. It is the best default when you want to keep Rails as the main application while still getting React components, Rails view helpers, props hydration, and an upgrade path to more advanced rendering later.
-
-Upgrade to React on Rails Pro when you want Node-based SSR, streaming SSR, React Server Components, higher-performance rendering, or advanced SSR tooling. See [OSS vs Pro](./oss-vs-pro.md) for the detailed feature matrix.
+| Feature                 |   react-rails    |     Inertia.js      | Hotwire / Turbo  |    Vite Ruby    | React on Rails (OSS) | React on Rails Pro  |
+| ----------------------- | :--------------: | :-----------------: | :--------------: | :-------------: | :------------------: | :-----------------: |
+| Server-side rendering   | Limited (ExecJS) | ✓ (opt-in, Node.js) |       N/A        |        —        |      ✓ (ExecJS)      |  ✓ (Node renderer)  |
+| React Server Components |        —         |          —          |       N/A        |        —        |          —           |          ✓          |
+| Streaming SSR           |        —         |          —          |        —         |        —        |          —           |          ✓          |
+| Code splitting with SSR |        —         |          —          |       N/A        |        —        |          —           |          ✓          |
+| Auto-bundling           |        —         |          —          |        —         |        —        |          ✓           |          ✓          |
+| Bundler support         |   Import maps    |  ✓ (Vite default)   |   Import maps    | ✓ (Vite/Rollup) |      ✓ (Rspack)      |     ✓ (Rspack)      |
+| Hot module replacement  |        —         |          ✓          |  Turbo morphing  |        ✓        |          ✓           |          ✓          |
+| Type-safe routing       |        —         |          —          |        —         |     ✓ (BYO)     |          —           | ✓ (TanStack Router) |
+| Props from controller   |        —         |          ✓          |       N/A        |        —        |          ✓           |          ✓          |
+| SSR caching             |        —         |          —          | Fragment caching |        —        |          —           |          ✓          |
+| React component helper  |        ✓         |          —          |       N/A        |        —        |          ✓           |          ✓          |
+| Active maintenance      |     Minimal      |          ✓          |        ✓         |        ✓        |          ✓           |          ✓          |
 
 ## Overview of Each Option
 
@@ -39,8 +33,6 @@ Switching from react-rails to React on Rails is straightforward since both use a
 
 [Inertia.js](https://inertiajs.com/) replaces Rails views entirely with a single-page app architecture while keeping server-side routing. Controllers return Inertia responses instead of HTML, and the client-side adapter renders React (or Vue/Svelte) components as full pages.
 
-The [Evil Martians Inertia Rails React Starter Kit](https://evilmartians.com/opensource/inertia-rails-react-starter-kit) is a polished example of this approach, not a separate category.
-
 **Strengths:**
 
 - Simple mental model — controllers drive page navigation, no client-side router needed
@@ -49,11 +41,9 @@ The [Evil Martians Inertia Rails React Starter Kit](https://evilmartians.com/ope
 
 **Trade-offs:**
 
-- **Every page navigation is a server round-trip.** Even client-side transitions hit a Rails controller to serialize page props as JSON. Inertia v2 adds [partial reloads](https://inertia-rails.dev/guide/partial-reloads) to narrow which props are refreshed, but a controller round-trip is still required for every transition and perceived performance depends on Rails response time.
-- **All-or-nothing per route.** A route is either fully Inertia or fully traditional Rails — you cannot embed a React component into part of an existing ERB template. This makes incremental adoption in existing Rails apps significantly harder compared to React on Rails' `react_component` helper.
-- **SSR is opt-in and limited.** SSR requires a separate Node.js server process. Route-level code splitting via dynamic imports works with SSR, but there is no component-level code splitting with SSR or streaming SSR, which are available in React on Rails Pro.
-- **Controller coupling.** Controllers become tied to the Inertia response protocol. Switching to a different frontend approach later requires rewriting controller actions.
-- **No path to React Server Components or fragment caching.**
+- SSR is opt-in and requires a separate Node.js server process — not as integrated as React on Rails' built-in SSR
+- Replaces Rails views at the per-route level — an action responds as either Inertia or traditional, though incremental adoption is supported
+- Requires adopting Inertia's conventions for data passing and page transitions
 
 **Best for:** New apps where you want a SPA-like experience with server-side routing, using a controller-driven architecture across React, Vue, or Svelte.
 
@@ -88,7 +78,7 @@ The [Evil Martians Inertia Rails React Starter Kit](https://evilmartians.com/ope
 **Trade-offs:**
 
 - No `react_component` view helper — you must manually mount React components via DOM selectors or data attributes
-- SSR is possible, but the Rails integration is much more DIY and currently less turnkey than React on Rails
+- No server-side rendering — SSR requires building your own Node.js rendering pipeline
 - No props-from-controller pattern — data must be passed through `data-*` attributes, JSON script tags, or a separate API
 - No auto-bundling — each component entry point must be manually registered
 
@@ -171,38 +161,20 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 ### React on Rails Pro
 
-[React on Rails Pro](../../pro/react-on-rails-pro.md) extends the OSS gem with production-grade rendering performance and modern React features.
+[React on Rails Pro](https://pro.reactonrails.com/) extends the OSS gem with production-grade rendering performance and modern React features.
 
 **Key additions over OSS:**
 
 - **React Server Components** — full RSC support with Rails integration
 - **Streaming SSR** — progressive rendering with React 18's `renderToPipeableStream`
-- **Node renderer** — dedicated Node.js server for 3-10x faster SSR (replaces ExecJS)
+- **Node renderer** — dedicated Node.js server for 10–100x faster SSR (replaces ExecJS)
 - **Fragment caching** — cache rendered components with `cached_react_component`
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Available for free or with startup-friendly pricing — see the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+Available for free or with startup-friendly pricing — see [reactonrails.com/pro](https://reactonrails.com/pro) for details and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
-
-### Next.js + Rails API
-
-[Next.js](https://nextjs.org/docs/app) is the React-first benchmark for App Router, React Server Components, and streaming. It is a strong choice when your team wants the frontend framework to drive the architecture and is comfortable treating Rails as an API or backend service rather than the main rendering app.
-
-**Strengths:**
-
-- Excellent App Router, streaming, and RSC support
-- Large React ecosystem mindshare and deployment ecosystem
-- Strong choice when the team is already oriented around Node-first frontend architecture
-
-**Trade-offs:**
-
-- Usually means separating frontend and backend concerns instead of keeping one Rails app
-- Duplicates routing, auth/session, and deployment concerns across two layers unless designed very carefully
-- Less natural if your goal is to add React to an existing Rails app without re-architecting it
-
-**Best for:** React-first teams that want a frontend-led architecture and are willing to split responsibilities between Next.js and Rails.
 
 ## Choosing the Right Approach
 
@@ -213,7 +185,6 @@ Available for free or with startup-friendly pricing — see the [React on Rails 
 | Client-side React only, no SSR needed | Vite Ruby (simple) or React on Rails (with Rails view integration)                        |
 | React components within Rails views   | React on Rails (OSS)                                                                      |
 | React + SSR + SEO requirements        | React on Rails (OSS or Pro)                                                               |
-| React-first app with a separate API   | Next.js + Rails API                                                                       |
 | High-traffic SSR, RSC, streaming      | React on Rails Pro                                                                        |
 | Fast builds + full Rails integration  | React on Rails with Rspack                                                                |
 | Legacy react-rails app                | Migrate to React on Rails ([migration guide](../migrating/migrating-from-react-rails.md)) |
