@@ -83,13 +83,13 @@ Or use the generator for automated setup:
 rails generate react_on_rails:install --pro
 ```
 
-See the [full installation guide](https://pro.reactonrails.com/docs/installation/).
+See the [full installation guide](https://reactonrails.com/docs/pro/installation).
 
 ## Documentation
 
-- [Installation Guide](https://pro.reactonrails.com/docs/installation/)
-- [Configuration Reference](https://pro.reactonrails.com/docs/configuration/)
-- [React Server Components Tutorial](https://pro.reactonrails.com/docs/react-server-components/tutorial/)
+- [Installation Guide](https://reactonrails.com/docs/pro/installation)
+- [Configuration Reference](https://reactonrails.com/docs/configuration/configuration-pro)
+- [React Server Components Tutorial](https://reactonrails.com/docs/pro/react-server-components/tutorial)
 - [React on Rails Pro Overview](https://pro.reactonrails.com/)
 
 ## License

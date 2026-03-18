@@ -50,4 +50,4 @@ Note, even without server rendering (without step 3 above), fragment caching is 
 
 ### Pro: Integration with Node.js for Server Rendering
 
-Default server rendering is done by ExecJS. If you want to use a Node.js server for better performing server rendering, [email justin@shakacode.com](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server that is part of [React on Rails Pro](https://pro.reactonrails.com).
+Default server rendering is done by ExecJS. If you want to use a Node.js server for better-performing server-side rendering, [email justin@shakacode.com](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server that is part of [React on Rails Pro](https://pro.reactonrails.com).

@@ -78,8 +78,9 @@ module ReactOnRails
 
           Then run: bundle install
 
-          Try Pro free! Email justin@shakacode.com for an evaluation license.
-          For evaluation licenses or more info, see: https://pro.reactonrails.com/
+          No license needed for evaluation or non-production use.
+          Free or low-cost production licenses available for startups and small companies.
+          Get started: https://pro.reactonrails.com/
         MSG
         true
       end

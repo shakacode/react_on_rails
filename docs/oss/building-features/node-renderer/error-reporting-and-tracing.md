@@ -1,7 +1,7 @@
 # Error Reporting and Tracing
 
 > **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Paid license required for production use. Startup-friendly pricing available — [contact us](mailto:justin@shakacode.com).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
 
 For versions before 4.0.0, error reporting was configured via `honeybadgerApiKey` and `sentryDsn` options. These options were removed in 4.0.0 and will cause an error if used. See the current integration approach below.
 
