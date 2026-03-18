@@ -325,10 +325,12 @@ module ReactOnRails
 
         # Copy bin scripts from templates
         template_bin_path = "#{__dir__}/templates/base/base/bin"
-        directory template_bin_path, "bin"
+        directory_options = {}
+        directory_options[:exclude_pattern] = %r{/dev(?:\.tt)?\z} if preserve_existing_bin_dev?
+        directory template_bin_path, "bin", directory_options
 
         # For --rsc without --redux, hello_world doesn't exist — update DEFAULT_ROUTE
-        if use_rsc? && !options.redux?
+        if use_rsc? && !options.redux? && !preserve_existing_bin_dev?
           gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
         end
 
@@ -350,20 +352,28 @@ module ReactOnRails
       end
 
       def replace_stock_rails_bin_dev!
+        @preserve_existing_bin_dev = false
+
         unless stock_rails_bin_dev?
           if File.exist?("bin/dev")
             say_status :skip, "bin/dev exists but does not match a stock Rails template; keeping existing file", :yellow
+            @preserve_existing_bin_dev = true
           end
           return
         end
 
         if options[:pretend] || options[:skip]
           say_status :skip, "Detected stock Rails bin/dev; leaving existing file in place for --pretend/--skip", :yellow
+          @preserve_existing_bin_dev = true
           return
         end
 
         say_status :replace, "Detected stock Rails bin/dev; installing React on Rails bin/dev", :yellow
         remove_file "bin/dev", verbose: false
+      end
+
+      def preserve_existing_bin_dev?
+        @preserve_existing_bin_dev
       end
 
       def stock_rails_bin_dev?
