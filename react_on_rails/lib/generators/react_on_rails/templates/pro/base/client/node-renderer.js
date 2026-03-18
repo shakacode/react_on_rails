@@ -1,16 +1,7 @@
 const path = require('path');
-const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+const { reactOnRailsProNodeRenderer, parseWorkersCount } = require('react-on-rails-pro-node-renderer');
 
 const { env } = process;
-const parseWorkersCount = (value) => {
-  if (value == null) return null;
-  const normalized = value.trim();
-  if (normalized === '') return null;
-  const parsed = Number(normalized);
-  if (Number.isInteger(parsed) && parsed >= 0) return parsed;
-  console.warn(`[react-on-rails] Ignoring invalid worker count "${value}". Expected a non-negative integer.`);
-  return null;
-};
 const configuredWorkersCount =
   parseWorkersCount(env.RENDERER_WORKERS_COUNT) ?? parseWorkersCount(env.NODE_RENDERER_CONCURRENCY);
 
