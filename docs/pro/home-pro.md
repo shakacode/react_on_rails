@@ -78,7 +78,7 @@ Server rendering of JavaScript evaluation is cached if `prerender_caching` is tu
 
 ### Pro: Fragment Caching
 
-Fragment caching is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
+Fragment caching is a [React on Rails Pro](https://pro.reactonrails.com/) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
 
 1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
 1. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken. Suppose you put your props calculation into some method called `some_slow_method_that_returns_props`:

@@ -482,7 +482,7 @@ console.log(ReactOnRails.getComponents());
 ### Professional support
 
 - **[ShakaCode](https://www.shakacode.com)** offers consulting and support services
-- **[React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)** includes priority support
+- **[React on Rails Pro](https://pro.reactonrails.com/)** includes priority support
 
 ---
 

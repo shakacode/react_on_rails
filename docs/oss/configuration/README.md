@@ -989,7 +989,7 @@ Access methods:
 ## Need Help?
 
 - **Documentation:** [React on Rails Guides](https://reactonrails.com/docs/)
-- **Pro Features:** [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)
+- **Pro Features:** [React on Rails Pro](https://pro.reactonrails.com/)
 - **Support:** [ShakaCode Forum](https://forum.shakacode.com/)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)
 

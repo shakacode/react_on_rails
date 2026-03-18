@@ -129,7 +129,7 @@ Use `content_for` to render your body content first, capturing auto-appends befo
 
 > **⚡️ React on Rails Pro Feature**
 >
-> Turbo Streams require the `immediate_hydration: true` option, which is a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) licensed feature.
+> Turbo Streams require the `immediate_hydration: true` option, which is a [React on Rails Pro](https://pro.reactonrails.com/) licensed feature.
 
 **Why Turbo Streams Need Special Handling:**
 

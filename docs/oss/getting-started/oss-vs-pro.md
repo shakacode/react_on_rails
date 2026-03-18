@@ -1,6 +1,6 @@
 # React on Rails: OSS vs Pro Feature Comparison
 
-React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. Pro is **free or very low cost for startups and small companies**.
+React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. A **paid license is required for production use**. Startup-friendly pricing is available — contact [justin@shakacode.com](mailto:justin@shakacode.com).
 
 ## Feature Matrix
 
@@ -43,6 +43,6 @@ Popmenu achieved a [73% decrease in average response times and 20-25% lower Hero
 
 ## Getting Started with Pro
 
-- [React on Rails Pro overview](https://www.shakacode.com/react-on-rails-pro/)
+- [React on Rails Pro overview](https://pro.reactonrails.com/)
 - [Pro installation guide](../../pro/installation.md)
 - [Book a consultation](https://meetings.hubspot.com/justingordon/30-minute-consultation)

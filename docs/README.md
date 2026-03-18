@@ -54,7 +54,7 @@ The core React on Rails gem and npm package.
 
 ## Pro
 
-Performance enhancements, React Server Components, and advanced features. Requires a [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) subscription (free or very low cost for startups and small companies).
+Performance enhancements, React Server Components, and advanced features. Requires a [React on Rails Pro](https://pro.reactonrails.com/) subscription for production use. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for startup-friendly pricing.
 
 - [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
 - [Installation](./pro/installation.md) - Set up React on Rails Pro
@@ -73,4 +73,4 @@ Performance enhancements, React Server Components, and advanced features. Requir
 
 - [Troubleshooting Guide](./oss/deployment/troubleshooting.md) - Common issues and solutions
 - [GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions) - Ask questions
-- [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) - Advanced features and professional support
+- [React on Rails Pro](https://pro.reactonrails.com/) - Advanced features and professional support

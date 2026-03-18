@@ -217,7 +217,7 @@ jobs:
               `**Status:** ${status}`,
               `**Days remaining:** ${days}`,
               '',
-              'Renew at https://www.shakacode.com/react-on-rails-pro/',
+              'Renew at https://pro.reactonrails.com/',
               'or contact support@shakacode.com',
             ].join('\n');
 

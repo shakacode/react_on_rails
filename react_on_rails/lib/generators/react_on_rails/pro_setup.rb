@@ -79,7 +79,7 @@ module ReactOnRails
           Then run: bundle install
 
           Try Pro free! Email justin@shakacode.com for an evaluation license.
-          For evaluation licenses or more info, see: https://www.shakacode.com/react-on-rails-pro/
+          For evaluation licenses or more info, see: https://pro.reactonrails.com/
         MSG
         true
       end

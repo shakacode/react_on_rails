@@ -17,7 +17,7 @@ module ReactOnRails
     def self.immediate_hydration_pro_install_warning(name, type = "Component")
       "[REACT ON RAILS] Warning: immediate_hydration: true requires the React on Rails Pro gem to be installed.\n" \
         "#{type} '#{name}' will fall back to standard hydration behavior.\n" \
-        "Visit https://www.shakacode.com/react-on-rails-pro/ for installation details."
+        "Visit https://pro.reactonrails.com/ for installation details."
     end
 
     # Normalizes the immediate_hydration option value, enforcing Pro gem-availability requirements.

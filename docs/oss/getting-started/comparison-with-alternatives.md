@@ -161,7 +161,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 ### React on Rails Pro
 
-[React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) extends the OSS gem with production-grade rendering performance and modern React features.
+[React on Rails Pro](https://pro.reactonrails.com/) extends the OSS gem with production-grade rendering performance and modern React features.
 
 **Key additions over OSS:**
 
@@ -172,7 +172,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Pro is free or very low cost for startups and small companies. See the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+A paid license is required for production use. Startup-friendly pricing is available — contact [justin@shakacode.com](mailto:justin@shakacode.com). See the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
 
