@@ -266,7 +266,7 @@ At Popmenu (a ShakaCode client running React on Rails Pro), cache warming across
 - Server CPU during peak hours dropped 45%
 - Database connections dropped 35% (fewer concurrent renders)
 
-For more details on the full cache warming architecture including stampede prevention, event-driven warming, and monitoring, contact [ShakaCode](https://pro.reactonrails.com/) for consulting on production cache warming strategies.
+For more details on the full cache warming architecture including stampede prevention, event-driven warming, and monitoring, contact [justin@shakacode.com](mailto:justin@shakacode.com) for consulting on production cache warming strategies.
 
 ---
 
