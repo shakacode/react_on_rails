@@ -40,7 +40,7 @@ By the time you read this, the latest may have changed. Be sure to check the ver
     - [Moving from the Rails default `/app/javascript` to the recommended `/client` structure](#moving-from-the-rails-default-appjavascript-to-the-recommended-client-structure)
     - [Custom IP & PORT setup (Cloud9 example)](#custom-ip--port-setup-cloud9-example)
     - [RubyMine performance tip](#rubymine-performance-tip)
-- [Conclusion](#conclusion)
+- [What's Next?](#whats-next)
 
 ## Installation
 

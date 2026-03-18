@@ -1,76 +1,43 @@
-# React on Rails Documentation
+# Documentation Guide
 
-> For the best experience, visit our **[documentation website](https://reactonrails.com/docs/)**.
+React on Rails is one product with two tiers: open source for Rails + React integration, and Pro when you need higher SSR throughput, deeper RSC support, or maintainer-backed help.
 
-Browsing on GitHub? This guide will help you navigate the documentation.
+## Choose the path that matches your app
 
-## Open Source (OSS)
+### Starting a new Rails + React app
 
-The core React on Rails gem and npm package.
+- [Create a new app](./oss/getting-started/create-react-on-rails-app.md)
+- [Quick Start](./oss/getting-started/quick-start.md)
 
-### Learning Paths
+### Adding React to an existing Rails app
 
-**New to React on Rails?**
+- [Install into an existing Rails app](./oss/getting-started/installation-into-an-existing-rails-app.md)
+- [Render your first component](./oss/getting-started/using-react-on-rails.md)
 
-1. [Introduction](./oss/introduction.md) - What is React on Rails and why use it?
-2. [Quick Start](./oss/getting-started/quick-start.md) - Get your first component running in 15 minutes
-3. [Tutorial](./oss/getting-started/tutorial.md) - Build a complete app with Redux and routing
+### Already using React on Rails OSS?
 
-**Experienced developers:**
+- [Compare OSS and Pro](./oss/getting-started/oss-vs-pro.md)
+- [Upgrade to Pro](./pro/upgrading-to-pro.md)
 
-- [Installation Guide](./oss/getting-started/installation-into-an-existing-rails-app.md) - Add to existing Rails app
-- [API Reference](./oss/api-reference/view-helpers-api.md) - View helpers and JavaScript API
-- [Configuration](./oss/configuration/README.md) - All configuration options
-- [Core Concepts](./oss/core-concepts/how-react-on-rails-works.md) - Architecture and SSR
+### Evaluating Rails + React options
 
-### Categories
+- [Examples and migration references](https://reactonrails.com/examples)
+- [Compare with alternatives](./oss/getting-started/comparison-with-alternatives.md)
+- [Migrate from react-rails](./oss/migrating/migrating-from-react-rails.md)
 
-- [Getting Started](./oss/getting-started/quick-start.md) - Installation, quick start, tutorial
-- [Core Concepts](./oss/core-concepts/) - How React on Rails works, SSR, auto-bundling
-- [Building Features](./oss/building-features/) - Redux, routing, i18n, testing
-- [Configuration](./oss/configuration/README.md) - All configuration options
-- [API Reference](./oss/api-reference/) - View helpers and JavaScript API
-- [Deployment](./oss/deployment/README.md) - Production deployment and troubleshooting
-- [Upgrading](./oss/upgrading/) - Version upgrade guides
-- [Changelog](./oss/upgrading/changelog.md) - All notable changes by version
-- [Migrating](./oss/migrating/) - From other frameworks
-- [Misc](./oss/misc/) - Articles, tips, credits, and other resources
+## Dive deeper when you need it
 
-### Quick Reference
+- [Introduction](./oss/introduction.md)
+- [Core Concepts](./oss/core-concepts/how-react-on-rails-works.md)
+- [API Reference](./oss/api-reference/view-helpers-api.md)
+- [Deployment and troubleshooting](./oss/deployment/README.md)
 
-| I want to...                           | Go here                                                                                   |
-| -------------------------------------- | ----------------------------------------------------------------------------------------- |
-| **Add React to existing Rails app**    | [Installation Guide](./oss/getting-started/installation-into-an-existing-rails-app.md)    |
-| **Enable server-side rendering**       | [SSR Guide](./oss/core-concepts/react-server-rendering.md)                                |
-| **Set up hot reloading**               | [HMR Setup](./oss/building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
-| **Use Redux with Rails**               | [Redux Integration](./oss/building-features/react-and-redux.md)                           |
-| **Use TanStack Router**                | [TanStack Router Guide](./oss/building-features/tanstack-router.md)                       |
-| **Migrate to React Server Components** | [RSC Migration Guide](./oss/migrating/migrating-to-rsc.md)                                |
-| **Deploy to production**               | [Deployment Guide](./oss/deployment/README.md)                                            |
-| **Manage page metadata (title, meta)** | [React 19 Native Metadata](./oss/building-features/react-19-native-metadata.md)           |
-| **Troubleshoot issues**                | [Troubleshooting](./oss/deployment/troubleshooting.md)                                    |
-| **Compare OSS vs Pro features**        | [OSS vs Pro](./oss/getting-started/oss-vs-pro.md)                                         |
-| **Compare with alternatives**          | [Comparison with Alternatives](./oss/getting-started/comparison-with-alternatives.md)     |
+## Friendly evaluation policy
 
-## Pro
+- You can try React on Rails Pro without a license while evaluating.
+- If your organization is budget-constrained, contact us about free licenses.
 
-Performance enhancements, React Server Components, and advanced features. Requires a [React on Rails Pro](https://pro.reactonrails.com/) subscription for production use. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for startup-friendly pricing.
+## Need more help?
 
-- [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
-- [Installation](./pro/installation.md) - Set up React on Rails Pro
-- [Configuration](./oss/configuration/configuration-pro.md) - Pro-specific settings
-- [React Server Components](./pro/react-server-components/tutorial.md) - RSC with Rails
-- [Streaming SSR](./oss/building-features/streaming-server-rendering.md) - Progressive server rendering
-- [SSR Caching](./oss/building-features/caching.md) - Prerender and fragment caching
-- [Bundle Caching](./oss/building-features/bundle-caching.md) - Avoid redundant webpack builds
-- [Node Renderer](./oss/building-features/node-renderer/basics.md) - Dedicated Node.js rendering server
-- [Code Splitting](./oss/building-features/code-splitting.md) - Loadable components
-- [Ruby API (Pro)](./oss/api-reference/ruby-api-pro.md) - Pro view helpers and utilities
-- [Upgrading Pro](./pro/updating.md) - Version upgrade guide
-- [Troubleshooting](./pro/troubleshooting.md) - Common Pro issues
-
-## Need Help?
-
-- [Troubleshooting Guide](./oss/deployment/troubleshooting.md) - Common issues and solutions
-- [GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions) - Ask questions
-- [React on Rails Pro](https://pro.reactonrails.com/) - Advanced features and professional support
+- [GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)
+- [Documentation website](https://reactonrails.com/docs/)
