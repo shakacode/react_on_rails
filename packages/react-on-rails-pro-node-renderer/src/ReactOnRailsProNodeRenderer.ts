@@ -6,6 +6,16 @@ const { version: fastifyVersion } = fastifyPackageJson;
 import log from './shared/log.js';
 import { majorVersion } from './shared/utils.js';
 
+export function parseWorkersCount(value: string | null | undefined): number | null {
+  if (value == null) return null;
+  const normalized = value.trim();
+  if (normalized === '') return null;
+  const parsed = Number(normalized);
+  if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+  console.warn(`[react-on-rails] Ignoring invalid worker count "${value}". Expected a non-negative integer.`);
+  return null;
+}
+
 export async function reactOnRailsProNodeRenderer(config: Partial<Config> = {}) {
   const fastify5Supported = majorVersion(process.versions.node) >= 20;
   const fastify5OrNewer = majorVersion(fastifyVersion) >= 5;
