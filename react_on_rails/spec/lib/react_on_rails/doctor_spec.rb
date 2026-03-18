@@ -1801,15 +1801,16 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
-    def write_package_json_with_react(version)
-      File.write("package.json", "{\"dependencies\":{\"react\":\"#{version}\"}}")
+    def install_react(version)
+      FileUtils.mkdir_p("node_modules/react")
+      File.write("node_modules/react/package.json", "{\"version\":\"#{version}\"}")
     end
 
     context "when React 19.0.4+" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
-            write_package_json_with_react("19.0.4")
+            install_react("19.0.4")
             example.run
           end
         end
@@ -1826,7 +1827,7 @@ RSpec.describe ReactOnRails::Doctor do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
-            write_package_json_with_react("19.0.2")
+            install_react("19.0.2")
             example.run
           end
         end
@@ -1843,7 +1844,7 @@ RSpec.describe ReactOnRails::Doctor do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
-            write_package_json_with_react("18.2.0")
+            install_react("18.2.0")
             example.run
           end
         end
@@ -1860,7 +1861,7 @@ RSpec.describe ReactOnRails::Doctor do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
-            write_package_json_with_react("19.1.0")
+            install_react("19.1.0")
             example.run
           end
         end
@@ -1873,24 +1874,44 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
-    context "when React version has semver prefix" do
+    context "when React 20.x (future major)" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
-            write_package_json_with_react("~19.0.4")
+            install_react("20.0.0")
             example.run
           end
         end
       end
 
-      it "strips prefix and reports success" do
+      it "reports warning, not error" do
         doctor.send(:check_rsc_react_version)
-        success_msgs = checker.messages.select { |m| m[:type] == :success }
-        expect(success_msgs.any? { |m| m[:content].include?("compatible with RSC") }).to be true
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(warning_msgs.any? { |m| m[:content].include?("not been verified") }).to be true
+        expect(error_msgs).to be_empty
       end
     end
 
-    context "when React is not in package.json" do
+    context "when installed version differs from declared range" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write("package.json", '{"dependencies":{"react":"^19.0.0"}}')
+            install_react("19.0.4")
+            example.run
+          end
+        end
+      end
+
+      it "uses the installed version, not the declared range" do
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+    end
+
+    context "when React is not installed" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do

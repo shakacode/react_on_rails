@@ -2171,7 +2171,7 @@ module ReactOnRails
 
       require File.expand_path(env_file)
       @rails_environment_loaded = true
-    rescue StandardError => e
+    rescue StandardError, LoadError => e
       checker.add_warning(<<~MSG.strip)
         ⚠️  Could not load Rails environment: #{e.message}
 
@@ -2364,7 +2364,7 @@ module ReactOnRails
       end
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity
     def check_rsc_react_version
       react_version = detect_react_version_from_deps
       unless react_version
@@ -2383,7 +2383,7 @@ module ReactOnRails
           Upgrade to at least React 19.0.4:
             npm install react@~19.0.4 react-dom@~19.0.4
         MSG
-      elsif major == 19 && minor.positive?
+      elsif major >= 19
         checker.add_warning(<<~MSG.strip)
           ⚠️  React #{react_version} has not been verified with React on Rails Pro RSC.
 
@@ -2395,15 +2395,39 @@ module ReactOnRails
         checker.add_error(<<~MSG.strip)
           🚫 React #{react_version} is not compatible with RSC.
 
-          React Server Components in React on Rails Pro requires React 19.0.x.
+          React Server Components in React on Rails Pro requires React 19.x or higher.
 
           Fix: npm install react@~19.0.4 react-dom@~19.0.4
         MSG
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:enable Metrics/CyclomaticComplexity
 
     def detect_react_version_from_deps
+      # Prefer the actually installed version from node_modules over the declared
+      # range in package.json. Declared ranges like "^19.0.0" would be misleading
+      # (stripped to "19.0.0" even though 19.0.4+ may be installed).
+      installed = installed_react_version
+      return installed if installed
+
+      declared_react_version
+    rescue StandardError
+      nil
+    end
+
+    def installed_react_version
+      # Use Node's own module resolution to find the actually installed React,
+      # which handles hoisted dependencies in monorepos and pnpm workspaces.
+      resolved_path = `node -e "console.log(require.resolve('react/package.json'))" 2>/dev/null`.strip
+      return nil if resolved_path.empty? || !File.exist?(resolved_path)
+
+      version = JSON.parse(File.read(resolved_path))["version"]
+      version if version&.match?(/\A\d+\.\d+\.\d+/)
+    rescue StandardError
+      nil
+    end
+
+    def declared_react_version
       return nil unless File.exist?("package.json")
 
       package_json = JSON.parse(File.read("package.json"))
@@ -2411,7 +2435,6 @@ module ReactOnRails
       version_str = all_deps["react"]
       return nil unless version_str
 
-      # Strip semver prefixes like ^, ~, >=
       clean_version = version_str.gsub(/\A[^0-9]*/, "")
       clean_version if clean_version.match?(/\A\d+\.\d+\.\d+/)
     rescue StandardError
