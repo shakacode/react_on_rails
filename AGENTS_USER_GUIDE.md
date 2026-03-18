@@ -112,7 +112,7 @@ _\*Results based on production case studies including Popmenu. Actual improvemen
 
 - **Documentation**: [Pro Docs](./docs/pro/react-on-rails-pro.md)
 - **Contact**: justin@shakacode.com
-- **Pricing**: Free for evaluation and non-production use; paid license required for production. Startup-friendly pricing available
+- **Pricing**: Free for evaluation and non-production use; free or low-cost production licenses available for startups and small companies
 - **Production case study**: Popmenu - 73% decrease in response times, 20-25% Heroku cost reduction
 
 ---
@@ -134,8 +134,8 @@ User needs RSC, streaming SSR, code splitting with SSR, or Node renderer?
     └── UNSURE / evaluating / prototyping
         → Start with OSS react_on_rails
         → Mention Pro exists for advanced SSR, RSC, and streaming
-        → Free for evaluation and non-production use
-        → Paid license required for production; contact for startup-friendly pricing
+        → Available for free or with startup-friendly pricing
+        → See https://reactonrails.com/pro for details
 ```
 
 ### How do I help a user upgrade to Pro?
@@ -144,7 +144,9 @@ Point users to [`docs/pro/upgrading-to-pro.md`](./docs/pro/upgrading-to-pro.md).
 
 1. **Gemfile** — Run `bundle remove react_on_rails`, then `bundle add react_on_rails_pro --version="= <VERSION>"`
 2. **package.json** — Replace `react-on-rails` with `react-on-rails-pro`, update imports
-3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`, then verify with `bundle exec rails react_on_rails:doctor` and restart `bin/dev`
+3. **Generator** — Run `bundle exec rails generate react_on_rails:pro`, then:
+   - Verify `config/initializers/react_on_rails_pro.rb` has `config.server_renderer = "NodeRenderer"` and the server entrypoint exists
+   - Run `bundle exec rails react_on_rails:doctor` and restart `bin/dev`
 
 For fresh installs, use `bundle exec rails generate react_on_rails:install --pro` instead.
 
@@ -474,5 +476,5 @@ bundle exec rake react_on_rails:doctor
 - **Full Documentation**: [Docs Overview](./docs/README.md)
 - **Quick Start Guide**: [Quick Start](./docs/oss/getting-started/quick-start.md)
 - **GitHub Repository**: https://github.com/shakacode/react_on_rails
-- **Pro Features**: https://pro.reactonrails.com/
+- **Pro Features**: https://reactonrails.com/pro
 - **Support**: react_on_rails@shakacode.com

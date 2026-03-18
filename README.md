@@ -3,8 +3,9 @@
 <p align="center">
  <a href="https://shakacode.com/"><img src="https://user-images.githubusercontent.com/10421828/79436256-517d0500-7fd9-11ea-9300-dfbc7c293f26.png"></a>
  <a href="https://forum.shakacode.com/"><img src="https://user-images.githubusercontent.com/10421828/79436266-53df5f00-7fd9-11ea-94b3-b985e1b05bdc.png"></a>
- <a href="https://pro.reactonrails.com"><img src="https://user-images.githubusercontent.com/10421828/79436265-53df5f00-7fd9-11ea-8220-fc474f6a856c.png"></a>
- <a href="https://github.com/sponsors/shakacode"><img src="https://user-images.githubusercontent.com/10421828/79466109-cdd90d80-8004-11ea-88e5-25f9a9ddcf44.png"></a>
+
+<a href="https://github.com/sponsors/shakacode"><img src="https://user-images.githubusercontent.com/10421828/79466109-cdd90d80-8004-11ea-88e5-25f9a9ddcf44.png"></a>
+
 </p>
 
 ---
@@ -60,7 +61,7 @@ Then use React in any Rails view:
 - **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
 - **Performance improvements**: New async loading strategies and optimized bundle generation
 - **Webpacker removal**: Streamlined for Shakapacker-only support (>= 6.0)
-- [React on Rails Pro](https://pro.reactonrails.com/) supports the latest features of React 19, including [React Server Components](https://react.dev/reference/rsc/server-components) and [streaming](https://react.dev/reference/react-dom/server/renderToPipeableStream). Contact [Justin Gordon](mailto:justin@shakacode.com) for more information.
+- **[Pro features](https://reactonrails.com/pro)** are available for advanced use cases including [React Server Components](https://react.dev/reference/rsc/server-components), [streaming SSR](https://react.dev/reference/react-dom/server/renderToPipeableStream), and a dedicated Node renderer for 10–100x faster SSR.
 - ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
 
 ---
