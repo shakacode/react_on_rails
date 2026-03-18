@@ -7,6 +7,10 @@
  * fails to start after all retry attempts, the restart cycle aborts to
  * preserve the remaining healthy workers.
  *
+ * Note: the pool is transiently one worker above its configured size while
+ * the old worker is draining its active requests. This is by design — the
+ * brief memory overhead is preferable to dropping below capacity.
+ *
  * @module master/restartWorkers
  */
 
@@ -17,6 +21,7 @@ import log from '../shared/log.js';
 import { SHUTDOWN_WORKER_MESSAGE } from '../shared/utils.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
+const MILLISECONDS_IN_SECOND = 1000;
 const DEFAULT_REPLACEMENT_LISTEN_TIMEOUT_MS = 30000;
 const MAX_REPLACEMENT_RETRIES = 2;
 
@@ -36,7 +41,7 @@ declare module 'cluster' {
 /**
  * Fork a replacement worker and wait for it to start listening.
  * Returns the replacement Worker on success, or null if it failed to start
- * (crashed or timed out).
+ * (crashed, errored, or timed out).
  */
 async function forkAndWaitForListening(timeoutMs: number): Promise<Worker | null> {
   const replacement = cluster.fork();
@@ -46,13 +51,20 @@ async function forkAndWaitForListening(timeoutMs: number): Promise<Worker | null
 
   let timeoutHandle: NodeJS.Timeout | undefined;
 
-  const result = await Promise.race([
-    once(replacement, 'listening').then(() => 'ready' as const),
-    once(replacement, 'exit').then(() => 'crashed' as const),
-    new Promise<'timeout'>((resolve) => {
-      timeoutHandle = setTimeout(() => resolve('timeout'), timeoutMs);
-    }),
-  ]);
+  let result: 'ready' | 'crashed' | 'timeout';
+  try {
+    result = await Promise.race([
+      once(replacement, 'listening').then(() => 'ready' as const),
+      once(replacement, 'exit').then(() => 'crashed' as const),
+      new Promise<'timeout'>((resolve) => {
+        timeoutHandle = setTimeout(() => resolve('timeout'), timeoutMs);
+      }),
+    ]);
+  } catch {
+    // events.once() rejects if the emitter fires an 'error' event before the
+    // awaited event. Treat this the same as a crash.
+    result = 'crashed';
+  }
 
   clearTimeout(timeoutHandle);
 
@@ -75,8 +87,13 @@ async function forkAndWaitForListening(timeoutMs: number): Promise<Worker | null
 /**
  * Wait for a worker to exit after sending it a shutdown message.
  * If the worker does not exit within the timeout, force-kill it.
+ *
+ * When gracefulTimeoutSeconds is undefined or 0, there is no force-kill
+ * backstop — the promise resolves only when the worker exits on its own.
+ * Callers should verify the worker is still alive before calling this to
+ * avoid waiting on a worker that already exited.
  */
-function waitForWorkerExit(worker: Worker, gracefulTimeout: number | undefined): Promise<void> {
+function waitForWorkerExit(worker: Worker, gracefulTimeoutSeconds: number | undefined): Promise<void> {
   return new Promise<void>((resolve) => {
     let timeout: NodeJS.Timeout;
 
@@ -86,13 +103,13 @@ function waitForWorkerExit(worker: Worker, gracefulTimeout: number | undefined):
     };
     worker.once('exit', onExit);
 
-    if (gracefulTimeout != null && gracefulTimeout > 0) {
+    if (gracefulTimeoutSeconds != null && gracefulTimeoutSeconds > 0) {
       timeout = setTimeout(() => {
         log.debug('Worker #%d timed out during graceful shutdown, force-killing', worker.id);
         worker.destroy();
         worker.off('exit', onExit);
         resolve();
-      }, gracefulTimeout);
+      }, gracefulTimeoutSeconds * MILLISECONDS_IN_SECOND);
     }
   });
 }
@@ -115,7 +132,7 @@ export default async function restartWorkers(
   // Convert seconds to milliseconds, falling back to the default if not configured.
   const replacementListenTimeoutMs =
     replacementWorkerListenTimeout != null && replacementWorkerListenTimeout > 0
-      ? replacementWorkerListenTimeout * 1000
+      ? replacementWorkerListenTimeout * MILLISECONDS_IN_SECOND
       : DEFAULT_REPLACEMENT_LISTEN_TIMEOUT_MS;
 
   for (const worker of workersToRestart) {
@@ -154,6 +171,15 @@ export default async function restartWorkers(
         worker.id,
       );
       break;
+    }
+
+    // Re-check liveness: the old worker may have died while we were waiting
+    // for the replacement. If so, skip the shutdown — it's already gone,
+    // and the replacement we just forked covers the slot.
+    if (!cluster.workers?.[worker.id]) {
+      log.warn('Worker #%d exited while forking its replacement, skipping shutdown', worker.id);
+      // eslint-disable-next-line no-continue
+      continue;
     }
 
     // Replacement is confirmed listening — now safe to shut down the old worker.

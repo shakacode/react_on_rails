@@ -228,7 +228,8 @@ describe('restartWorkers', () => {
 
       forkAlwaysSucceeds();
 
-      const restartPromise = restartWorkers(0, 5000, undefined);
+      // gracefulWorkerRestartTimeout is in seconds (converted to ms internally)
+      const restartPromise = restartWorkers(0, 5, undefined);
 
       // Let fork + listening happen
       await new Promise((resolve) => process.nextTick(resolve));
