@@ -1341,6 +1341,63 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "ensure_rails_environment_loaded" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when config/environment.rb exists and loads successfully" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/environment.rb", "# noop")
+            example.run
+          end
+        end
+      end
+
+      it "returns true" do
+        expect(doctor.send(:ensure_rails_environment_loaded)).to be true
+      end
+
+      it "only loads once" do
+        doctor.send(:ensure_rails_environment_loaded)
+        # Second call should return true without re-requiring
+        expect(doctor.send(:ensure_rails_environment_loaded)).to be true
+      end
+    end
+
+    context "when config/environment.rb does not exist" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "returns false" do
+        expect(doctor.send(:ensure_rails_environment_loaded)).to be false
+      end
+    end
+
+    context "when loading raises an error" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/environment.rb", "raise 'boot failed'")
+            example.run
+          end
+        end
+      end
+
+      it "returns false and adds a warning" do
+        expect(doctor.send(:ensure_rails_environment_loaded)).to be false
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("Could not load Rails environment") }).to be true
+      end
+    end
+  end
+
   describe "check_pro_initializer_existence" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
@@ -1470,6 +1527,32 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_base_package_imports)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when Shakapacker source_path is custom (e.g. client/app)" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/shakapacker.yml", "default:\n  source_path: client/app\n")
+            FileUtils.mkdir_p("client/app/packs")
+            File.write("client/app/packs/app.js",
+                       "import ReactOnRails from 'react-on-rails';\n")
+            example.run
+          end
+        end
+      end
+
+      before do
+        allow(doctor).to receive(:require).with("shakapacker").and_raise(LoadError)
+      end
+
+      it "scans the custom source_path and reports warning" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("client/app/packs/app.js") }).to be true
       end
     end
   end

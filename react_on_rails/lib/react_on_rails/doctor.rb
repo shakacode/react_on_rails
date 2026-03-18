@@ -56,6 +56,7 @@ module ReactOnRails
       @fix = fix
       @checker = SystemChecker.new
       @test_output_path_strategy = :unknown
+      @rails_environment_loaded = false
     end
 
     def run_diagnosis
@@ -2156,12 +2157,56 @@ module ReactOnRails
         - Serve as single source of truth for server bundle location
       MSG
     end
+    # ── Helpers for Pro/RSC checks ────────────────────────────────────
+
+    # Lazily load the Rails environment so that initializers (which configure
+    # ReactOnRailsPro) have run before we read Pro/RSC config values.
+    # Safe to call multiple times — only loads once.
+    # Returns true if environment was loaded successfully, false otherwise.
+    def ensure_rails_environment_loaded
+      return true if @rails_environment_loaded
+
+      env_file = "config/environment.rb"
+      return false unless File.exist?(env_file)
+
+      require File.expand_path(env_file)
+      @rails_environment_loaded = true
+    rescue StandardError => e
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Could not load Rails environment: #{e.message}
+
+        Pro/RSC diagnostics may reflect default values instead of your app's configuration.
+      MSG
+      false
+    end
+
+    # Resolve the JavaScript source path from Shakapacker config.
+    # Falls back to "app/javascript" if Shakapacker is not available.
+    def resolve_js_source_path
+      require "shakapacker"
+      Shakapacker.config.source_path.to_s
+    rescue LoadError, StandardError
+      shakapacker_yml_source_path || "app/javascript"
+    end
+
+    def shakapacker_yml_source_path
+      config_path = "config/shakapacker.yml"
+      return nil unless File.exist?(config_path)
+
+      config = YAML.safe_load(ERB.new(File.read(config_path)).result, permitted_classes: [Symbol])
+      default_config = config["default"] || {}
+      default_config["source_path"]
+    rescue StandardError
+      nil
+    end
+
     # ── React on Rails Pro Setup ──────────────────────────────────────
 
     def check_pro_setup
       return unless ReactOnRails::Utils.react_on_rails_pro?
 
       check_pro_initializer_existence
+      ensure_rails_environment_loaded
       check_pro_renderer_mode
       check_base_package_imports
     end
@@ -2200,8 +2245,10 @@ module ReactOnRails
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
 
-    def check_base_package_imports
-      js_patterns = %w[app/javascript/**/*.js app/javascript/**/*.jsx app/javascript/**/*.ts app/javascript/**/*.tsx]
+    def check_base_package_imports # rubocop:disable Metrics/CyclomaticComplexity
+      source_path = resolve_js_source_path
+      js_extensions = %w[js jsx ts tsx]
+      js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
       files_with_base_import = []
 
       js_patterns.each do |pattern|
