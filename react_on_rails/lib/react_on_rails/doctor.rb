@@ -2253,7 +2253,6 @@ module ReactOnRails
       check_rsc_renderer_mode(pro_config)
       check_rsc_payload_route
       check_rsc_bundler_config
-      check_rsc_npm_package
       check_rsc_react_version
       check_rsc_procfile_watcher
     rescue StandardError => e
@@ -2313,32 +2312,6 @@ module ReactOnRails
             rails g react_on_rails:rsc
         MSG
       end
-    end
-
-    def check_rsc_npm_package
-      unless File.exist?("package.json")
-        checker.add_warning("⚠️  package.json not found — cannot verify RSC npm package")
-        return
-      end
-
-      package_json = JSON.parse(File.read("package.json"))
-      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
-
-      if all_deps.key?("react-on-rails-rsc")
-        checker.add_success("✅ react-on-rails-rsc npm package installed")
-      else
-        checker.add_error(<<~MSG.strip)
-          🚫 react-on-rails-rsc npm package not found.
-
-          This package provides the RSC webpack plugin and loader required for
-          React Server Components.
-
-          Fix: Install with your package manager, e.g.:
-            npm install react-on-rails-rsc
-        MSG
-      end
-    rescue JSON::ParserError => e
-      checker.add_warning("⚠️  Could not parse package.json: #{e.message}")
     end
 
     # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity

@@ -1714,59 +1714,6 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
-  describe "check_rsc_npm_package" do
-    let(:doctor) { described_class.new(verbose: false, fix: false) }
-    let(:checker) { doctor.instance_variable_get(:@checker) }
-
-    context "when react-on-rails-rsc is in dependencies" do
-      around do |example|
-        Dir.mktmpdir do |tmpdir|
-          Dir.chdir(tmpdir) do
-            File.write("package.json", '{"dependencies":{"react-on-rails-rsc":"1.0.0"}}')
-            example.run
-          end
-        end
-      end
-
-      it "reports success" do
-        doctor.send(:check_rsc_npm_package)
-        success_msgs = checker.messages.select { |m| m[:type] == :success }
-        expect(success_msgs.any? { |m| m[:content].include?("react-on-rails-rsc") }).to be true
-      end
-    end
-
-    context "when react-on-rails-rsc is missing" do
-      around do |example|
-        Dir.mktmpdir do |tmpdir|
-          Dir.chdir(tmpdir) do
-            File.write("package.json", '{"dependencies":{"react":"19.0.4"}}')
-            example.run
-          end
-        end
-      end
-
-      it "reports error" do
-        doctor.send(:check_rsc_npm_package)
-        error_msgs = checker.messages.select { |m| m[:type] == :error }
-        expect(error_msgs.any? { |m| m[:content].include?("react-on-rails-rsc") }).to be true
-      end
-    end
-
-    context "when package.json does not exist" do
-      around do |example|
-        Dir.mktmpdir do |tmpdir|
-          Dir.chdir(tmpdir) { example.run }
-        end
-      end
-
-      it "reports warning" do
-        doctor.send(:check_rsc_npm_package)
-        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
-        expect(warning_msgs.any? { |m| m[:content].include?("package.json not found") }).to be true
-      end
-    end
-  end
-
   describe "check_rsc_react_version" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
