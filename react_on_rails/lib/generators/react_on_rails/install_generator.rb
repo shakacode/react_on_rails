@@ -234,9 +234,14 @@ module ReactOnRails
         # Non-blocking: warn about dirty worktree but don't prevent installation.
         # A clean tree makes the generator diff easier to review, but blocking would
         # be too strict for a generator that creates many new files.
-        ReactOnRails::GitUtils.warn_if_uncommitted_changes(GeneratorMessages, git_installed: cli_exists?("git"))
+        has_worktree_issues = ReactOnRails::GitUtils.warn_if_uncommitted_changes(
+          GeneratorMessages, git_installed: cli_exists?("git")
+        )
 
-        !(missing_node? || missing_package_manager? || missing_pro_gem?)
+        # Check missing_pro_gem? only on a clean worktree because it may auto-install
+        # the gem (mutating Gemfile). On a dirty tree, skip the check to avoid mixing
+        # generated changes with the user's uncommitted work.
+        !(missing_node? || missing_package_manager? || (!has_worktree_issues && missing_pro_gem?))
       end
 
       def missing_node?
@@ -349,12 +354,7 @@ module ReactOnRails
         end
 
         # Make these and only these files executable
-        files_to_copy = []
-        Dir.chdir(template_bin_path) do
-          files_to_copy.concat(Dir.glob("*"))
-        end
-        files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename}" }
-
+        files_to_become_executable = bin_scripts_to_chmod(template_bin_path)
         File.chmod(0o755, *files_to_become_executable)
       end
 
@@ -383,6 +383,12 @@ module ReactOnRails
         # Set by replace_stock_rails_bin_dev! which always runs first via add_bin_scripts.
         # Explicitly coerce to boolean so nil (before initialization) is treated as false.
         !!@preserve_existing_bin_dev
+      end
+
+      def bin_scripts_to_chmod(template_bin_path)
+        files = Dir.children(template_bin_path)
+        files.reject! { |f| f == "dev" } if preserve_existing_bin_dev?
+        files.map { |filename| "bin/#{filename}" }
       end
 
       def stock_rails_bin_dev?
