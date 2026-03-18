@@ -125,11 +125,16 @@ Present the triage to the user - **DO NOT automatically start addressing items**
 - `DISCUSS ({count})`: list items needing user choice, with a short reason
 - `SKIPPED ({count})`: list skipped comments with a short reason, including duplicates and factually incorrect suggestions
 - Wait for the user to tell you which items to address
-- If useful, suggest replying with a brief rationale on declined items, but do not do so unless the user asks
+- Always offer an explicit optional follow-up to post rationale replies on selected `SKIPPED` or declined `DISCUSS` items
+- Never post those rationale replies unless the user explicitly selects which items to reply to
+- Ask two things when there are `SKIPPED` or declined `DISCUSS` items:
+  - Which items to address in code/tests/docs
+  - Which skipped/declined items (if any) should receive a rationale reply
 
 ## Step 7: Address Items, Reply, and Resolve
 
 When addressing items, after completing each selected todo item, reply to the original review comment explaining how it was addressed.
+If the user selects skipped/declined items for rationale replies, post those replies too.
 
 **For issue comments (general PR comments):**
 
@@ -204,7 +209,10 @@ SKIPPED (3):
 5. spec/helper_spec.rb:20 - "Consolidate assertions" (@claude[bot]) - test style preference
 
 Which items would you like me to address? (e.g., "1", "1,2", or "all must-fix")
+Optional: I can also post rationale replies for skipped/declined items (e.g., "reply 3,5" or "reply all skipped").
 ```
+
+Note: Only show the "Optional: rationale replies" line when there are `SKIPPED` or declined `DISCUSS` items. Omit it when every item is `MUST-FIX`.
 
 # Important Notes
 
@@ -216,6 +224,7 @@ Which items would you like me to address? (e.g., "1", "1,2", or "all must-fix")
 - **NEVER automatically address all review comments** - always wait for user direction
 - When given a specific review URL, no need to ask for more information
 - **ALWAYS reply to comments after addressing them** to close the feedback loop
+- After triage, always offer to post rationale replies for selected `SKIPPED`/declined items, but only post them with explicit user approval
 - Resolve the review thread after replying when the concern is actually addressed and a thread ID is available
 - Default to real issues only. Do not spend a review cycle on optional polish unless the user explicitly asks for it
 - Triage comments before creating todos. Only `MUST-FIX` items should become todos by default
