@@ -119,13 +119,17 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
     const allWorkersRestartIntervalMS = allWorkersRestartInterval * MILLISECONDS_IN_MINUTE;
     const scheduleWorkersRestart = () => {
-      void restartWorkers(
+      restartWorkers(
         delayBetweenIndividualWorkerRestarts,
         gracefulWorkerRestartTimeout,
         replacementWorkerListenTimeout,
-      ).finally(() => {
-        setTimeout(scheduleWorkersRestart, allWorkersRestartIntervalMS);
-      });
+      )
+        .catch((err: unknown) => {
+          log.error({ msg: 'Rolling restart failed unexpectedly', err });
+        })
+        .finally(() => {
+          setTimeout(scheduleWorkersRestart, allWorkersRestartIntervalMS);
+        });
     };
 
     setTimeout(scheduleWorkersRestart, allWorkersRestartIntervalMS);
