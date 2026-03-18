@@ -70,6 +70,7 @@ exclude = [
   # PLANNED DEPLOYMENTS NOT YET LIVE
   # ============================================================================
   '^https://ror-spec-dummy\.reactrails\.com',  # spec/dummy demo - deployment pending
+  '^https://pro\.reactonrails\.com/docs/',     # Pro docs site - pages being deployed incrementally
 
   # ============================================================================
   # SITES FROM PROJECTS.MD THAT BLOCK BOTS OR ARE UNRELIABLE
