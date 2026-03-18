@@ -5,13 +5,45 @@
 
 This guide covers deploying the Node Renderer in containerized environments (Docker, Kubernetes, ControlPlane, etc.), including architecture options, performance tuning, memory management, error tracking, and troubleshooting.
 
-## Architecture: Sidecar vs. Separate Workload
+## Architecture Options
 
-When running Rails and the Node Renderer in containers, you have two options:
+When running Rails and the Node Renderer in containers, you have three options, listed from simplest to most complex:
 
-### Option 1: Sidecar Containers (Recommended)
+### Option 1: Single Container (Default)
 
-Rails and the Node Renderer run as separate containers within the **same pod/workload**, sharing the same lifecycle.
+Rails and the Node Renderer run together in a **single container**. This is the simplest setup and the recommended starting point.
+
+```
+┌──────────────────────────┐
+│        Container         │
+│  ┌────────┐ ┌──────────┐│
+│  │ Rails  │ │  Node    ││
+│  │ process│ │ Renderer ││
+│  └────────┘ └──────────┘│
+│       shared memory      │
+└──────────────────────────┘
+```
+
+**Advantages:**
+- **Simplest setup** — One container, one image, one deploy.
+- **No networking config** — Rails connects to the renderer via `localhost` out of the box.
+- **Guaranteed version alignment** — Both processes always run from the same image.
+- **Lower overhead** — Shared OS layer saves ~200–300 MB vs. separate containers.
+
+**When to move on:** If you're experiencing OOM restarts and need to determine whether Rails or the Node Renderer is the culprit, move to sidecar containers for visibility.
+
+**Configuration:**
+```ruby
+# config/initializers/react_on_rails_pro.rb
+ReactOnRailsPro.configure do |config|
+  config.server_renderer = "NodeRenderer"
+  config.renderer_url = "http://localhost:3800"
+end
+```
+
+### Option 2: Sidecar Containers
+
+Rails and the Node Renderer run as separate containers within the **same pod/workload**, sharing the same lifecycle. Use this when you need to isolate and diagnose memory/CPU usage per process.
 
 ```
 ┌─────────────────────────────────┐
@@ -28,9 +60,14 @@ Rails and the Node Renderer run as separate containers within the **same pod/wor
 ```
 
 **Advantages:**
-- **Guaranteed version alignment** — Both containers use the same image, so the React on Rails gem and Node Renderer package are always in sync during rolling deploys.
-- **Simpler networking** — Rails connects to the renderer via `localhost`.
-- **Atomic deploys** — No risk of old Rails talking to new Node Renderer or vice versa.
+- **Per-process visibility** — See exactly which process is consuming memory and causing OOM kills.
+- **Independent resource limits** — Set separate CPU/memory limits for Rails and the Node Renderer.
+- **Guaranteed version alignment** — Both containers use the same image on deploy.
+- **Simpler networking** — Rails still connects via `localhost`.
+
+**Tradeoffs:**
+- Slightly more complex deployment config than a single container.
+- Autoscaling logic may need adjustment (see [Autoscaling Considerations](#autoscaling-considerations)).
 
 **Configuration:**
 ```ruby
@@ -41,18 +78,18 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-### Option 2: Separate Workloads
+### Option 3: Separate Workloads
 
-Rails and the Node Renderer run as independent workloads with their own scaling.
+Rails and the Node Renderer run as independent workloads with their own scaling. This is the most complex option and is rarely needed.
 
 **Advantages:**
 - **Independent scaling** — Scale the renderer independently of Rails.
-- **Isolated resource limits** — OOM in the renderer doesn't affect Rails and vice versa.
 
 **Disadvantages:**
 - **Version drift risk** — During rolling deploys, Rails and the Node Renderer may briefly run different versions. While protocol changes are rare, this is a risk to monitor.
+- **Race conditions** — Pods restart independently, which can cause transient connection errors.
 - **Network dependency** — Renderer must be reachable via internal service DNS.
-- **Independent restarts** — Containers restart on their own schedule, which may cause transient connection errors.
+- **Overkill for most setups** — If you're running 2–4 replicas, independent scaling adds complexity without real benefit.
 
 **Configuration:**
 ```ruby
@@ -63,7 +100,7 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-> **Recommendation:** Start with sidecar containers. Only move to separate workloads if you have a specific need for independent scaling. For most apps running 2–4 replicas, sidecars are simpler and more reliable.
+> **Recommendation:** Start with a single container. Move to sidecar containers if you need per-process memory/CPU visibility (e.g., to diagnose OOM restarts). Separate workloads are rarely justified unless you have a specific need for independent scaling at high replica counts.
 
 ## Host Binding for Container Environments
 
