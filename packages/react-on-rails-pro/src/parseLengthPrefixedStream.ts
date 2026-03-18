@@ -55,7 +55,11 @@ export default class LengthPrefixedStreamParser {
           this.buf = this.buf.subarray(idx + 1);
           const tabIdx = header.indexOf(0x09); // \t
           this.metadata = JSON.parse(decoder.decode(header.subarray(0, tabIdx)));
-          this.contentLen = parseInt(decoder.decode(header.subarray(tabIdx + 1)), 16);
+          const lenHex = decoder.decode(header.subarray(tabIdx + 1));
+          this.contentLen = parseInt(lenHex, 16);
+          if (Number.isNaN(this.contentLen)) {
+            throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
+          }
           this.state = 'content';
           progressed = true;
         }

@@ -252,6 +252,8 @@ module ReactOnRailsPro
       def parse_length_prefixed_header(header, tab_idx)
         meta_json = header.byteslice(0, tab_idx)
         len_hex = header.byteslice(tab_idx + 1, header.bytesize - tab_idx - 1)
+        raise "Invalid content length hex: #{len_hex.inspect}" unless len_hex.match?(/\A[0-9a-fA-F]+\z/)
+
         @metadata = JSON.parse(meta_json.force_encoding("UTF-8"))
         @content_len = len_hex.to_i(16)
         @state = :content

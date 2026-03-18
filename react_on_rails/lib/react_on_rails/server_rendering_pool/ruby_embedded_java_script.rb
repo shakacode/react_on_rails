@@ -253,6 +253,8 @@ module ReactOnRails
         def parse_length_prefixed(str, tab_idx, newline_idx)
           meta_json = str.byteslice(0, tab_idx).force_encoding("UTF-8")
           len_hex = str.byteslice(tab_idx + 1, newline_idx - tab_idx - 1)
+          raise "Invalid content length hex: #{len_hex.inspect}" unless len_hex.match?(/\A[0-9a-fA-F]+\z/)
+
           content_len = len_hex.to_i(16)
           html_raw = content_len.positive? ? str.byteslice(newline_idx + 1, content_len).force_encoding("UTF-8") : nil
           # When html is a ServerRenderHashRenderedHtml (object), it was JSON-serialized
