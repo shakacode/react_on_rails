@@ -2,7 +2,7 @@ name: Check Markdown Links
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - '**.md'
       - '.github/workflows/check-markdown-links.yml'

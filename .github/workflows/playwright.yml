@@ -2,8 +2,8 @@ name: Playwright E2E Tests
 
 on:
   push:
-    branches: [master]
-    # Always trigger on master; docs-only detection handles skipping heavy jobs
+    branches: [main]
+    # Always trigger on main; docs-only detection handles skipping heavy jobs
   workflow_dispatch:
 
 jobs:
@@ -22,12 +22,12 @@ jobs:
       - name: Detect relevant changes
         id: detect
         run: |
-          BASE_REF="${{ github.event.before || 'origin/master' }}"
+          BASE_REF="${{ github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
-      - name: Guard docs-only master pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: ./.github/actions/ensure-master-docs-safety
+      - name: Guard docs-only main pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/ensure-main-docs-safety
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
@@ -38,7 +38,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' || !(
         github.event_name == 'push' &&
-        github.ref == 'refs/heads/master' &&
+        github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.docs_only == 'true'
       )
     steps:

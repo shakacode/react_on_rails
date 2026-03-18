@@ -4,7 +4,7 @@ We're releasing this as a unified release with 6 packages total. We keep the ver
 
 ## Testing the Gem before Release from a Rails App
 
-See [Contributing](https://github.com/shakacode/react_on_rails/tree/master/CONTRIBUTING.md)
+See [Contributing](https://github.com/shakacode/react_on_rails/tree/main/CONTRIBUTING.md)
 
 ## Release Process
 

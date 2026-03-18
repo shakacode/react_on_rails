@@ -221,7 +221,7 @@ rails generate react_on_rails:install --pro
 
 **After installation:**
 
-Configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md) for all options.
+Configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md) for all options.
 
 **Combining with other options:**
 

@@ -52,7 +52,7 @@ To enable Sentry Tracing:
 ## Other services
 
 You can create your own integrations in the same way as the provided ones.
-You can use [the built-in implementations](https://github.com/shakacode/react_on_rails/tree/master/packages/react-on-rails-pro-node-renderer/src/integrations) as examples.
+You can use [the built-in implementations](https://github.com/shakacode/react_on_rails/tree/main/packages/react-on-rails-pro-node-renderer/src/integrations) as examples.
 Import these functions from `react-on-rails-pro-node-renderer/integrations/api`:
 
 ### Error reporting services

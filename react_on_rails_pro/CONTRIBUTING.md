@@ -22,7 +22,7 @@ See the example apps under `/spec`
 
 For non-doc fixes:
 
-- Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/CHANGELOG.md#unreleased).
+- Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/CHANGELOG.md#unreleased).
 - Ensure CI passes and that you added a test that passes with the fix and fails without the fix.
 - Squash all commits down to one with a nice commit message _ONLY_ once final review is given. Make sure this single commit is rebased on top of master.
 - Please address all code review comments.
@@ -55,7 +55,7 @@ For links from docs pages to non-doc files, use full GitHub URLs so links resolv
   `[Installation Guide](../docs/pro/installation.md)`
 
 - When making references to source code files, use a full url path like:
-  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails.rb)`
+  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails.rb)`
 
 ## To run tests:
 

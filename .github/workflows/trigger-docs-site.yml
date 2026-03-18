@@ -2,7 +2,7 @@ name: Trigger docs site rebuild
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths: ['docs/**']
 
 jobs:

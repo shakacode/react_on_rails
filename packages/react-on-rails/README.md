@@ -103,4 +103,4 @@ rails generate react_on_rails:install
 
 ## License
 
-See [LICENSE.md](https://github.com/shakacode/react_on_rails/blob/master/LICENSE.md).
+See [LICENSE.md](https://github.com/shakacode/react_on_rails/blob/main/LICENSE.md).

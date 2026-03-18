@@ -13,7 +13,7 @@ For general React on Rails configuration options, see [Configuration](README.md)
 
 ## Example of Configuration
 
-Also see [spec/dummy/config/initializers/react_on_rails_pro.rb](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails_pro.rb) for how the testing app is setup.
+Also see [spec/dummy/config/initializers/react_on_rails_pro.rb](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails_pro.rb) for how the testing app is setup.
 
 The below example is a typical production setup, using the separate `NodeRenderer`, where development takes the defaults when the ENV values are not specified.
 

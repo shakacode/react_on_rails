@@ -649,7 +649,7 @@ The sections above cover generic RSC pitfalls. The following issues are specific
 **Fix:** Upgrade to a release that includes this patch (`react-on-rails-pro`
 16.4.0.rc.3+ was the first patched line). If a newer stable release is
 available, prefer that and check the
-[CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md)
+[CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
 for the current recommendation. See also
 [PR #2444](https://github.com/shakacode/react_on_rails/pull/2444).
 

@@ -345,7 +345,7 @@ react_on_rails/                          # Root
 4. Create feature branch for Phase 6
 5. Execute Phase 6 checklist
 6. Final testing and documentation
-7. Merge to master
+7. Merge to main
 8. Release new versions
 
 ---

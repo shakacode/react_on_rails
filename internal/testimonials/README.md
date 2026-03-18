@@ -26,4 +26,4 @@ From Kyle Maune of Cooper Aerial, May 4, 2018
 
 ![image](https://user-images.githubusercontent.com/1118459/40891236-9b0b406e-671d-11e8-80ee-c026dbd1d5a2.png)
 
-For more testimonials, see [Live Projects](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) and [Kudos](https://github.com/shakacode/react_on_rails/tree/master/KUDOS.md).
+For more testimonials, see [Live Projects](https://github.com/shakacode/react_on_rails/tree/main/PROJECTS.md) and [Kudos](https://github.com/shakacode/react_on_rails/tree/main/KUDOS.md).

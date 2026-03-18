@@ -196,7 +196,7 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 **Where to get your license token:** Contact [justin@shakacode.com](mailto:justin@shakacode.com) if you don't have your license token.
 
-For complete licensing details, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
+For complete licensing details, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
 ### Additional Upgrade Notes
 
