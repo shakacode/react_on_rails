@@ -2498,7 +2498,7 @@ describe InstallGenerator, type: :generator do
       expect(error_text).to include("--pro")
       expect(error_text).to include("react_on_rails_pro")
       expect(error_text).to include("~> #{expected_pro_version}")
-      expect(error_text).to include("justin@shakacode.com")
+      expect(error_text).to include("https://pro.reactonrails.com/")
     end
   end
 
