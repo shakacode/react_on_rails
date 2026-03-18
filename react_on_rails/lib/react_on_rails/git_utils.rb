@@ -24,43 +24,11 @@ module ReactOnRails
     MSG
 
     def self.uncommitted_changes?(message_handler, git_installed: true)
-      return false if skip_worktree_check?
-
-      unless git_installed
-        message_handler.add_error(missing_git_error_message)
-        return true
-      end
-
-      case worktree_status
-      when :clean
-        return false
-      when :not_a_git_repository
-        message_handler.add_error(not_a_git_repository_error_message)
-        return true
-      end
-
-      message_handler.add_error(dirty_worktree_error_message)
-      true
+      report_worktree_issues(message_handler, git_installed: git_installed, as_error: true)
     end
 
     def self.warn_if_uncommitted_changes(message_handler, git_installed: true)
-      return false if skip_worktree_check?
-
-      unless git_installed
-        message_handler.add_warning(MISSING_GIT_WARNING)
-        return true
-      end
-
-      case worktree_status
-      when :clean
-        return false
-      when :not_a_git_repository
-        message_handler.add_warning(NOT_A_GIT_REPOSITORY_WARNING)
-        return true
-      end
-
-      message_handler.add_warning(DIRTY_WORKTREE_WARNING)
-      true
+      report_worktree_issues(message_handler, git_installed: git_installed, as_error: false)
     end
 
     def self.skip_worktree_check?
@@ -74,12 +42,38 @@ module ReactOnRails
     def self.worktree_status
       output, status = Open3.capture2e("git", "status", "--porcelain")
       return :clean if status.success? && output.strip.empty?
-      return :not_a_git_repository if output.to_s.downcase.include?("not a git repository")
+      # Exit code 128 is git's standard fatal error (e.g., not a git repository)
+      return :not_a_git_repository if status.exitstatus == 128
 
       :dirty
     rescue Errno::ENOENT
-      :not_a_git_repository
+      # git binary not found despite passing the cli_exists? check
+      :git_not_installed
     end
+
+    def self.report_worktree_issues(message_handler, git_installed:, as_error:)
+      return false if skip_worktree_check?
+
+      status = git_installed ? worktree_status : :git_not_installed
+      return false if status == :clean
+
+      msg = worktree_message(status, as_error: as_error)
+      as_error ? message_handler.add_error(msg) : message_handler.add_warning(msg)
+      true
+    end
+    private_class_method :report_worktree_issues
+
+    def self.worktree_message(status, as_error:)
+      case status
+      when :not_a_git_repository
+        as_error ? not_a_git_repository_error_message : NOT_A_GIT_REPOSITORY_WARNING
+      when :git_not_installed
+        as_error ? missing_git_error_message : MISSING_GIT_WARNING
+      else
+        as_error ? dirty_worktree_error_message : DIRTY_WORKTREE_WARNING
+      end
+    end
+    private_class_method :worktree_message
 
     def self.dirty_worktree_error_message
       <<~MSG.strip

@@ -345,9 +345,7 @@ describe('createApp', () => {
     const packageJsonPath = path.join(appPath, 'package.json');
     const packageLockPath = path.join(appPath, 'package-lock.json');
 
-    mockedFs.existsSync.mockImplementation(
-      (targetPath) => targetPath === packageLockPath || targetPath !== packageJsonPath,
-    );
+    mockedFs.existsSync.mockReturnValue(true);
     mockedFs.readFileSync.mockImplementation((targetPath) => {
       if (targetPath === packageJsonPath) {
         return JSON.stringify({ packageManager: 'npm@11.6.2', name: 'app' });

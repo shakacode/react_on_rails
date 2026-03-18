@@ -21,7 +21,7 @@ module ReactOnRails
             .with("git", "status", "--porcelain")
             .and_return([
                           "M file/path",
-                          instance_double(Process::Status, success?: true)
+                          instance_double(Process::Status, success?: true, exitstatus: 0)
                         ])
           expect(message_handler).to receive(:add_error)
             .with(<<~MSG.strip)
@@ -69,7 +69,7 @@ module ReactOnRails
             .with("git", "status", "--porcelain")
             .and_return([
                           "",
-                          instance_double(Process::Status, success?: true)
+                          instance_double(Process::Status, success?: true, exitstatus: 0)
                         ])
           expect(message_handler).not_to receive(:add_error)
 
@@ -118,7 +118,7 @@ module ReactOnRails
             .with("git", "status", "--porcelain")
             .and_return([
                           "M file/path",
-                          instance_double(Process::Status, success?: true)
+                          instance_double(Process::Status, success?: true, exitstatus: 0)
                         ])
           expect(message_handler).to receive(:add_warning).with(described_class::DIRTY_WORKTREE_WARNING)
 
@@ -160,7 +160,7 @@ module ReactOnRails
             .with("git", "status", "--porcelain")
             .and_return([
                           "",
-                          instance_double(Process::Status, success?: true)
+                          instance_double(Process::Status, success?: true, exitstatus: 0)
                         ])
           expect(message_handler).not_to receive(:add_warning)
 
@@ -201,7 +201,7 @@ module ReactOnRails
             .with("git", "status", "--porcelain")
             .and_return([
                           "fatal: not a git repository",
-                          instance_double(Process::Status, success?: false)
+                          instance_double(Process::Status, success?: false, exitstatus: 128)
                         ])
           expect(message_handler).to receive(:add_warning).with(described_class::NOT_A_GIT_REPOSITORY_WARNING)
 

@@ -231,8 +231,9 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
-        # Warn about the working tree before missing_pro_gem? so users see the state
-        # of their repo before any optional Gemfile mutation from auto-install.
+        # Non-blocking: warn about dirty worktree but don't prevent installation.
+        # A clean tree makes the generator diff easier to review, but blocking would
+        # be too strict for a generator that creates many new files.
         ReactOnRails::GitUtils.warn_if_uncommitted_changes(GeneratorMessages, git_installed: cli_exists?("git"))
 
         !(missing_node? || missing_package_manager? || missing_pro_gem?)
@@ -379,7 +380,9 @@ module ReactOnRails
       end
 
       def preserve_existing_bin_dev?
-        @preserve_existing_bin_dev
+        # Set by replace_stock_rails_bin_dev! which always runs first via add_bin_scripts.
+        # Explicitly coerce to boolean so nil (before initialization) is treated as false.
+        !!@preserve_existing_bin_dev
       end
 
       def stock_rails_bin_dev?
