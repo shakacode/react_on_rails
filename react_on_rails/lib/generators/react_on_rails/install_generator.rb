@@ -330,8 +330,14 @@ module ReactOnRails
         directory template_bin_path, "bin", directory_options
 
         # For --rsc without --redux, hello_world doesn't exist — update DEFAULT_ROUTE
-        if use_rsc? && !options.redux? && !preserve_existing_bin_dev?
-          gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
+        if use_rsc? && !options.redux?
+          if preserve_existing_bin_dev?
+            say_status :warn,
+                       'Custom bin/dev detected: update DEFAULT_ROUTE to "hello_server" manually for --rsc',
+                       :yellow
+          else
+            gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
+          end
         end
 
         # `directory` and `gsub_file` above are Thor actions that already honor

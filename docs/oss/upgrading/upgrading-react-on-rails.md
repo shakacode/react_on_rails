@@ -25,7 +25,7 @@ rails generate react_on_rails:install
 
 Before changing versions, check these first:
 
-1. **Ruby and Node requirements**: React on Rails v16 requires Ruby 3.2+ and Node 20+.
+1. **Ruby and Node requirements**: React on Rails v16 requires Ruby 3.0+ and Node 18+.
 2. **Bundler age**: legacy apps may have lockfiles created by Bundler 1.x. Those lockfiles can fail on modern Ruby before the React on Rails upgrade even starts.
 3. **Rails version**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 apps need a Rails upgrade before they can bundle v16.
 4. **Asset stack**: if the app still uses `webpacker`, upgrade to `shakapacker` first.

@@ -64,7 +64,7 @@ module ReactOnRails
     end
 
     def self.skip_worktree_check?
-      truthy_env?(ENV.fetch("CI", nil))
+      truthy_env?(ENV.fetch("CI", nil)) || truthy_env?(ENV.fetch("COVERAGE", nil))
     end
 
     def self.truthy_env?(value)

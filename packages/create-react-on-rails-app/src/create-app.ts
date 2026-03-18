@@ -143,13 +143,15 @@ function normalizeGeneratedPackageManager(
 
   if (fs.existsSync(packageLockPath)) {
     execLiveArgs('pnpm', ['import'], appPath);
+    execLiveArgs('pnpm', ['install'], appPath);
     fs.rmSync(packageLockPath, { force: true });
+  } else {
     execLiveArgs('pnpm', ['install'], appPath);
   }
 
   rewriteFileIfPresent(setupPath, (contents) => {
     const updated = contents.replace(/system!\((["'])npm install\1\)/g, 'system!("pnpm install")');
-    if (updated === contents && contents.includes('npm install')) {
+    if (updated === contents && /(?<![p])npm install/.test(contents)) {
       logInfo(
         'Could not auto-update bin/setup for pnpm. Replace "npm install" with "pnpm install" manually.',
       );

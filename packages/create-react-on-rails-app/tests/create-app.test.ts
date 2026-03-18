@@ -315,7 +315,7 @@ describe('createApp', () => {
     );
   });
 
-  it('skips pnpm import and install when no package-lock.json exists', () => {
+  it('skips pnpm import when no package-lock.json exists but still runs pnpm install', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
     const packageJsonPath = path.join(appPath, 'package.json');
     const setupPath = path.join(appPath, 'bin', 'setup');
@@ -336,12 +336,24 @@ describe('createApp', () => {
     createApp('my-app', { ...baseOptions, packageManager: 'pnpm' });
 
     expect(mockedExecLiveArgs).not.toHaveBeenCalledWith('pnpm', ['import'], appPath);
-    expect(mockedExecLiveArgs).not.toHaveBeenCalledWith('pnpm', ['install'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('pnpm', ['install'], appPath);
     expect(mockedFs.rmSync).not.toHaveBeenCalledWith(packageLockPath, { force: true });
   });
 
   it('exits without printing success when pnpm normalization fails', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
+    const packageJsonPath = path.join(appPath, 'package.json');
+    const packageLockPath = path.join(appPath, 'package-lock.json');
+
+    mockedFs.existsSync.mockImplementation(
+      (targetPath) => targetPath === packageLockPath || targetPath !== packageJsonPath,
+    );
+    mockedFs.readFileSync.mockImplementation((targetPath) => {
+      if (targetPath === packageJsonPath) {
+        return JSON.stringify({ packageManager: 'npm@11.6.2', name: 'app' });
+      }
+      return '';
+    });
 
     mockedExecLiveArgs
       .mockImplementationOnce(() => {})

@@ -62,8 +62,8 @@ A typical Vite layout looks like this:
 React on Rails + Shakapacker layouts use pack tags instead:
 
 ```erb
-<%= stylesheet_pack_tag %>
-<%= javascript_pack_tag %>
+<%= stylesheet_pack_tag "application" %>
+<%= javascript_pack_tag "application" %>
 ```
 
 If you use React on Rails auto-bundling, keep those empty pack-tag placeholders in the layout and let React on Rails load component-specific bundles per page.
