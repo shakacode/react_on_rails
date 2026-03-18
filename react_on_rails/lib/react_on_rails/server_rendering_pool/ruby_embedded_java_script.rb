@@ -269,7 +269,7 @@ module ReactOnRails
           return if console_script.nil? || console_script.empty?
 
           # Regular expression to match console.log or console.error calls with SERVER prefix
-          re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+          re = /console\.(?:log|error|info|warn)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
           console_script.split("\n").each do |line|
             match = re.match(line)
             # Log matched messages to Rails logger with react_on_rails prefix

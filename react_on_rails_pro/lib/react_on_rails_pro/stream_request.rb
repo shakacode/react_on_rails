@@ -120,6 +120,8 @@ module ReactOnRailsPro
       end
     end
 
+    private
+
     def process_response_chunks(stream_response, error_body)
       loop_response_chunks(stream_response) do |chunk|
         if response_has_error_status?(stream_response)
@@ -166,8 +168,6 @@ module ReactOnRailsPro
     def self.create(&request_block)
       StreamDecorator.new(new(&request_block))
     end
-
-    private
 
     # Reads streaming response chunks using the length-prefixed protocol.
     #
@@ -221,7 +221,10 @@ module ReactOnRailsPro
       def flush
         case @state
         when :content
-          yield({ "html" => @buf.force_encoding("UTF-8") }.merge!(@metadata)) if @metadata
+          # Stream ended mid-content — don't yield truncated HTML.
+          # The missing bytes indicate a connection drop or renderer crash.
+          # The error will surface via HTTPX error handling in each_chunk.
+          nil
         when :header
           yield @buf.force_encoding("UTF-8") unless @buf.empty?
         end
