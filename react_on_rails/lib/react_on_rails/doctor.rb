@@ -2193,9 +2193,11 @@ module ReactOnRails
       config_path = "config/shakapacker.yml"
       return nil unless File.exist?(config_path)
 
-      config = YAML.safe_load(ERB.new(File.read(config_path)).result, permitted_classes: [Symbol])
+      config = parse_shakapacker_config(File.read(config_path))
+      return nil unless config.is_a?(Hash)
+
       default_config = config["default"] || {}
-      default_config["source_path"]
+      normalize_yaml_scalar(default_config["source_path"]) if default_config.key?("source_path")
     rescue StandardError
       nil
     end
@@ -2290,6 +2292,7 @@ module ReactOnRails
     def check_rsc_setup
       return unless ReactOnRails::Utils.react_on_rails_pro?
 
+      ensure_rails_environment_loaded
       pro_config = ReactOnRailsPro.configuration
       return unless pro_config.enable_rsc_support
 
