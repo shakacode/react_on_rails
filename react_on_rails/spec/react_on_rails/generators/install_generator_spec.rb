@@ -2795,5 +2795,20 @@ describe InstallGenerator, type: :generator do
 
       assert_file "bin/dev", described_class::STOCK_RAILS_BIN_DEV
     end
+
+    it "keeps custom bin/dev when run with --force" do
+      custom_bin_dev = "#!/usr/bin/env ruby\nputs 'custom'\n"
+      force_generator = described_class.new([], { force: true }, destination_root: destination_root)
+
+      simulate_existing_file("bin/dev", custom_bin_dev)
+
+      Dir.chdir(destination_root) do
+        force_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/dev", custom_bin_dev
+      assert_file "bin/switch-bundler"
+      assert_file "bin/shakapacker-precompile-hook"
+    end
   end
 end
