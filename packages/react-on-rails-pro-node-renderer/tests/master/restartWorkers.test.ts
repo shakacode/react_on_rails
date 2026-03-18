@@ -90,7 +90,7 @@ describe('restartWorkers', () => {
 
     forkAlwaysSucceeds();
 
-    await restartWorkers(0, undefined);
+    await restartWorkers(0, undefined, undefined);
 
     // Both workers were shut down
     expect(worker1.send).toHaveBeenCalledWith(SHUTDOWN_WORKER_MESSAGE);
@@ -125,7 +125,7 @@ describe('restartWorkers', () => {
       }
     });
 
-    await restartWorkers(0, undefined);
+    await restartWorkers(0, undefined, undefined);
 
     // Fork must happen before shutdown
     expect(shutdownOrder).toEqual(['fork', 'shutdown']);
@@ -150,7 +150,7 @@ describe('restartWorkers', () => {
       return replacement;
     });
 
-    await restartWorkers(0, undefined);
+    await restartWorkers(0, undefined, undefined);
 
     // Two fork attempts (1 failed + 1 succeeded)
     expect(mockedCluster.fork).toHaveBeenCalledTimes(2);
@@ -167,7 +167,7 @@ describe('restartWorkers', () => {
 
     forkAlwaysCrashes();
 
-    await restartWorkers(0, undefined);
+    await restartWorkers(0, undefined, undefined);
 
     // 3 fork attempts for worker #1 (1 initial + 2 retries), then abort
     expect(mockedCluster.fork).toHaveBeenCalledTimes(3);
@@ -188,7 +188,7 @@ describe('restartWorkers', () => {
       // Fork returns workers that never emit listening or exit (simulates hang)
       mockedCluster.fork.mockImplementation(() => new MockWorker(nextWorkerId++));
 
-      const restartPromise = restartWorkers(0, undefined);
+      const restartPromise = restartWorkers(0, undefined, undefined);
 
       // Advance through all 3 timeout periods (30s each)
       for (let i = 0; i < 3; i += 1) {
@@ -228,7 +228,7 @@ describe('restartWorkers', () => {
 
       forkAlwaysSucceeds();
 
-      const restartPromise = restartWorkers(0, 5000);
+      const restartPromise = restartWorkers(0, 5000, undefined);
 
       // Let fork + listening happen
       await new Promise((resolve) => process.nextTick(resolve));
@@ -277,7 +277,7 @@ describe('restartWorkers', () => {
       return replacement;
     });
 
-    await restartWorkers(0, undefined);
+    await restartWorkers(0, undefined, undefined);
 
     // Worker #1 was restarted successfully
     expect(worker1.send).toHaveBeenCalledWith(SHUTDOWN_WORKER_MESSAGE);

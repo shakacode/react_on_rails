@@ -105,6 +105,8 @@ All options can be set via the config object or environment variables. Config ob
 | `stubTimers`                           | `RENDERER_STUB_TIMERS`                              | `true`                      | Stub timer functions during SSR                                                                |
 | `allWorkersRestartInterval`            | `RENDERER_ALL_WORKERS_RESTART_INTERVAL`             | (disabled)                  | Minutes between restarting all workers                                                         |
 | `delayBetweenIndividualWorkerRestarts` | `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS` | (disabled)                  | Minutes between each worker restart                                                            |
+| `gracefulWorkerRestartTimeout`         | `GRACEFUL_WORKER_RESTART_TIMEOUT`                   | (wait indefinitely)         | Seconds to wait for a worker to exit before force-killing it                                   |
+| `replacementWorkerListenTimeout`       | `REPLACEMENT_WORKER_LISTEN_TIMEOUT`                 | `30`                        | Seconds to wait for a replacement worker to start accepting requests                           |
 | `fastifyServerOptions`                 | —                                                   | `{}`                        | Additional [Fastify server options](https://fastify.dev/docs/latest/Reference/Server/#factory) |
 
 ## Advanced: Custom Fastify Configuration

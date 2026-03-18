@@ -65,9 +65,17 @@ export interface Config {
   allWorkersRestartInterval: number | undefined;
   // Time in minutes between each worker restarting when restarting all workers
   delayBetweenIndividualWorkerRestarts: number | undefined;
-  // Time in seconds to wait for worker to restart before killing it
-  // Set it to 0 or undefined to never kill the worker
+  // Time in seconds to wait for a worker to finish serving its active requests
+  // and exit after receiving a shutdown signal during a rolling restart.
+  // If the worker does not exit within this time, it is force-killed.
+  // Set to 0 or undefined to wait indefinitely (the worker is never force-killed).
   gracefulWorkerRestartTimeout: number | undefined;
+  // Time in seconds to wait for a newly forked replacement worker to start
+  // accepting requests during a rolling restart. If the replacement does not
+  // start within this time, the attempt is considered failed and may be retried.
+  // Increase this if your node-renderer.js entry file performs slow initialization
+  // (e.g., connecting to databases, loading large models) before starting the server.
+  replacementWorkerListenTimeout: number | undefined;
   // If the rendering request is longer than this, it will be truncated in exception and logging messages
   maxDebugSnippetLength: number;
   // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
@@ -182,6 +190,10 @@ const defaultConfig: Config = {
     ? parseInt(env.GRACEFUL_WORKER_RESTART_TIMEOUT, 10)
     : undefined,
 
+  replacementWorkerListenTimeout: env.REPLACEMENT_WORKER_LISTEN_TIMEOUT
+    ? parseInt(env.REPLACEMENT_WORKER_LISTEN_TIMEOUT, 10)
+    : undefined,
+
   maxDebugSnippetLength: MAX_DEBUG_SNIPPET_LENGTH,
 
   // default to true if empty, otherwise it is set to false
@@ -218,6 +230,8 @@ function envValuesUsed() {
       env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS,
     GRACEFUL_WORKER_RESTART_TIMEOUT:
       !userConfig.gracefulWorkerRestartTimeout && env.GRACEFUL_WORKER_RESTART_TIMEOUT,
+    REPLACEMENT_WORKER_LISTEN_TIMEOUT:
+      !userConfig.replacementWorkerListenTimeout && env.REPLACEMENT_WORKER_LISTEN_TIMEOUT,
     INCLUDE_TIMER_POLYFILLS: !('includeTimerPolyfills' in userConfig) && env.INCLUDE_TIMER_POLYFILLS,
     REPLAY_SERVER_ASYNC_OPERATION_LOGS:
       !userConfig.replayServerAsyncOperationLogs && env.REPLAY_SERVER_ASYNC_OPERATION_LOGS,
@@ -233,6 +247,7 @@ function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: 
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
         gracefulWorkerRestartTimeout: aConfig.gracefulWorkerRestartTimeout || defaultValue,
+        replacementWorkerListenTimeout: aConfig.replacementWorkerListenTimeout || defaultValue,
       }
     : {};
 }

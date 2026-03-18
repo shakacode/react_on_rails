@@ -100,6 +100,7 @@ function waitForWorkerExit(worker: Worker, gracefulTimeout: number | undefined):
 export default async function restartWorkers(
   delayBetweenIndividualWorkerRestarts: number,
   gracefulWorkerRestartTimeout: number | undefined,
+  replacementWorkerListenTimeout: number | undefined,
 ) {
   log.info('Started scheduled restart of workers');
 
@@ -111,10 +112,11 @@ export default async function restartWorkers(
   // are not included in the iteration.
   const workersToRestart = Object.values(cluster.workers).filter((w): w is Worker => !!w);
 
-  const replacementListenTimeoutMs = Math.max(
-    DEFAULT_REPLACEMENT_LISTEN_TIMEOUT_MS,
-    gracefulWorkerRestartTimeout ?? 0,
-  );
+  // Convert seconds to milliseconds, falling back to the default if not configured.
+  const replacementListenTimeoutMs =
+    replacementWorkerListenTimeout != null && replacementWorkerListenTimeout > 0
+      ? replacementWorkerListenTimeout * 1000
+      : DEFAULT_REPLACEMENT_LISTEN_TIMEOUT_MS;
 
   for (const worker of workersToRestart) {
     // Skip workers that exited unexpectedly before their turn in the loop.

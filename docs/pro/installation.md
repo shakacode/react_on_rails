@@ -258,7 +258,8 @@ const config = {
   // Optional: Automatic worker restarting (for memory leak mitigation)
   // allWorkersRestartInterval: 15, // minutes between restarting all workers
   // delayBetweenIndividualWorkerRestarts: 2, // minutes between each worker restart
-  // gracefulWorkerRestartTimeout: undefined, // timeout for graceful worker restart; forces restart if worker stuck
+  // gracefulWorkerRestartTimeout: undefined, // seconds to wait for a worker to exit before force-killing it
+  // replacementWorkerListenTimeout: undefined, // seconds to wait for a replacement worker to start (default: 30)
 };
 
 // Renderer detects a total number of CPUs on virtual hostings like Heroku
