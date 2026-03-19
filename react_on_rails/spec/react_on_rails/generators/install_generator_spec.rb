@@ -2611,6 +2611,62 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when --pro flag used on a dirty worktree without pro gem" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
+      allow(install_generator).to receive(:cli_exists?).with("git").and_return(true)
+      allow(install_generator).to receive_messages(missing_node?: false, missing_package_manager?: false)
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+    end
+
+    specify "installation_prerequisites_met? returns false with clear error" do
+      expect(install_generator.send(:installation_prerequisites_met?)).to be false
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("react_on_rails_pro")
+      expect(error_text).to include("uncommitted changes")
+      expect(error_text).to include("--pro")
+    end
+  end
+
+  context "when --rsc flag used on a dirty worktree without pro gem" do
+    let(:install_generator) { described_class.new([], { rsc: true }) }
+
+    before do
+      allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
+      allow(install_generator).to receive(:cli_exists?).with("git").and_return(true)
+      allow(install_generator).to receive_messages(missing_node?: false, missing_package_manager?: false)
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+    end
+
+    specify "installation_prerequisites_met? returns false with clear error" do
+      expect(install_generator.send(:installation_prerequisites_met?)).to be false
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("react_on_rails_pro")
+      expect(error_text).to include("uncommitted changes")
+      expect(error_text).to include("--rsc")
+    end
+  end
+
+  context "when --pro flag used on a dirty worktree with pro gem installed" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
+      allow(install_generator).to receive(:cli_exists?).with("git").and_return(true)
+      allow(install_generator).to receive_messages(missing_node?: false, missing_package_manager?: false)
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+    end
+
+    specify "installation_prerequisites_met? returns true (no error)" do
+      expect(install_generator.send(:installation_prerequisites_met?)).to be true
+      expect(GeneratorMessages.messages.join("\n")).not_to include("react_on_rails_pro")
+    end
+  end
+
   # React version detection tests
 
   context "when package.json has standard React version" do

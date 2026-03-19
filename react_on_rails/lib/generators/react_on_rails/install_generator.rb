@@ -238,9 +238,20 @@ module ReactOnRails
           GeneratorMessages, git_installed: cli_exists?("git")
         )
 
-        # Check missing_pro_gem? only on a clean worktree because it may auto-install
-        # the gem (mutating Gemfile). On a dirty tree, skip the check to avoid mixing
-        # generated changes with the user's uncommitted work.
+        # missing_pro_gem? may auto-install the gem (mutating Gemfile), so only run
+        # it on a clean worktree. On a dirty tree, use the read-only pro_gem_installed?
+        # check to catch a missing gem without triggering auto-install.
+        if has_worktree_issues && use_pro? && !pro_gem_installed?
+          GeneratorMessages.add_error(<<~MSG.strip)
+            🚫 react_on_rails_pro gem is required for #{options[:rsc] ? '--rsc' : '--pro'} but is not installed.
+            Auto-install was skipped because the worktree has uncommitted changes.
+            Please add it manually:
+              gem 'react_on_rails_pro', '~> #{recommended_pro_gem_version}'
+            Then run: bundle install
+          MSG
+          return false
+        end
+
         !(missing_node? || missing_package_manager? || (!has_worktree_issues && missing_pro_gem?))
       end
 

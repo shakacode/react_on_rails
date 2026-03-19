@@ -157,7 +157,7 @@ function normalizeGeneratedPackageManager(
   rewriteFileIfPresent(setupPath, (contents) => {
     // Match both system!("npm install") and system("npm install") in bin/setup,
     // preserving the bang (!) if present.
-    const updated = contents.replace(/system(!?)\((["'])npm install\2\)/g, 'system$1("pnpm install")');
+    const updated = contents.replace(/system(!?)\((["'])npm install\2\)/g, 'system$1($2pnpm install$2)');
     if (updated === contents && /(?<![p])npm install/.test(contents)) {
       logInfo(
         'Could not auto-update bin/setup for pnpm. Replace "npm install" with "pnpm install" manually.',
