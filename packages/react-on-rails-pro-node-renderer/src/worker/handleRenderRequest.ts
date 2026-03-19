@@ -107,10 +107,6 @@ async function handleNewBundleProvided(
         `Moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
       await moveUploadedAsset(providedNewBundle.bundle, bundleFilePathPerTimestamp);
-      if (assetsToCopy) {
-        await copyUploadedAssets(assetsToCopy, bundleDirectory);
-      }
-
       log.info(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
@@ -130,6 +126,13 @@ to ${bundleFilePathPerTimestamp})`,
         'File exists when trying to overwrite bundle %s. Assuming bundle written by other thread',
         bundleFilePathPerTimestamp,
       );
+    }
+
+    // Always copy assets to the bundle directory — even if the bundle was
+    // already present (e.g., from a prior upload or another worker).
+    // copyUploadedAssets uses overwrite:true, so this is idempotent.
+    if (assetsToCopy) {
+      await copyUploadedAssets(assetsToCopy, bundleDirectory);
     }
 
     return undefined;
