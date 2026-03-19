@@ -84,7 +84,7 @@ jobs:
         node-version:
           # Always run: Latest Node version (fast feedback on PRs)
           - '22'
-          # Master and full-ci label: Minimum supported Node version (full coverage)
+          # Main and full-ci label: Minimum supported Node version (full coverage)
           - '20'
         exclude:
           # Skip minimum dependency matrix on regular PRs (run only on main or with full-ci label)

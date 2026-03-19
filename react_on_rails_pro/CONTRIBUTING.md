@@ -70,7 +70,7 @@ React on Rails Pro shares the optimized CI pipeline with the main gem. The CI sy
 ### CI Behavior
 
 - **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback
-- **On Master**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
+- **On Main**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
 - **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
 
 ### Local CI Tools
@@ -88,7 +88,7 @@ cd ..
 # Auto-detect what to test (includes Pro tests if Pro files changed)
 bin/ci-local
 
-# Run all CI checks (same as master branch)
+# Run all CI checks (same as main branch)
 bin/ci-local --all
 
 # Quick check - only fast tests
@@ -103,7 +103,7 @@ Analyzes changes to both main gem and Pro:
 
 ```bash
 # From repository root
-script/ci-changes-detector origin/master
+script/ci-changes-detector origin/main
 ```
 
 ### CI Best Practices for Pro

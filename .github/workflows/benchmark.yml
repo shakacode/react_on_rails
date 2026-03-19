@@ -60,7 +60,7 @@ on:
       - '**.md'
       - 'docs/**'
 # Cancel stale PR benchmark runs when new commits are pushed.
-# Master runs are never cancelled so every merge is measured.
+# Main runs are never cancelled so every merge is measured.
 concurrency:
   group: ${{ github.event.pull_request.number && format('benchmark-pr-{0}', github.event.pull_request.number) || format('benchmark-{0}', github.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -665,7 +665,7 @@ jobs:
           fi
 
       # ============================================
-      # STEP 7b: ALERT ON MASTER REGRESSION
+      # STEP 7b: ALERT ON MAIN REGRESSION
       # ============================================
       - name: Create GitHub Issue for main regression
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0'
@@ -754,7 +754,7 @@ jobs:
           fi
 
       # ============================================
-      # STEP 7c: FAIL WORKFLOW ON MASTER REGRESSION
+      # STEP 7c: FAIL WORKFLOW ON MAIN REGRESSION
       # ============================================
       # Only fail on main — PR benchmarks are informational (triggered by 'benchmark' label).
       # Regressions on PRs are surfaced via Bencher report comments, not workflow failures.
