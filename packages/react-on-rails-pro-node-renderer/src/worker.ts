@@ -116,7 +116,7 @@ function extractBundlesAndAssets(
       providedNewBundles.push({ timestamp: primaryBundleTimestamp, bundle: value });
     } else if (key.startsWith('bundle_')) {
       assertAsset(value, key);
-      providedNewBundles.push({ timestamp: key.replace('bundle_', ''), bundle: value });
+      providedNewBundles.push({ timestamp: key.slice('bundle_'.length), bundle: value });
     } else if (isAsset(value)) {
       assetsToCopy.push(value);
     }
@@ -334,7 +334,7 @@ export default function run(config: Partial<Config>) {
   // Bundle files use the form key convention "bundle_<hash>" and are placed in
   // their own directory; remaining assets are copied to every bundle directory.
   app.post<{
-    Body: Record<string, Asset>;
+    Body: Record<string, unknown>;
   }>('/upload-assets', async (req, res) => {
     if (!(await requestPrechecks(req, res))) {
       return;

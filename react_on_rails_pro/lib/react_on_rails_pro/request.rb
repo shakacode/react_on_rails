@@ -44,7 +44,8 @@ module ReactOnRailsPro
       def upload_assets
         Rails.logger.info { "[ReactOnRailsPro] Uploading assets" }
 
-        # Check if server bundle exists before trying to upload assets
+        # Early checks with descriptive messages. add_bundle_to_form(check_bundle: true) also
+        # validates existence, but these provide clearer context for the rake task user.
         server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
         unless File.exist?(server_bundle_path)
           raise ReactOnRailsPro::Error, "Server bundle not found at #{server_bundle_path}. " \
