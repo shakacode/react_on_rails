@@ -6,7 +6,7 @@
 import path from 'path';
 import cluster from 'cluster';
 import { randomUUID } from 'crypto';
-import { mkdir, rm } from 'fs/promises';
+import { rm } from 'fs/promises';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
@@ -17,21 +17,20 @@ import fileExistsAsync from './shared/fileExistsAsync.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/types.js';
 import checkProtocolVersion from './worker/checkProtocolVersionHandler.js';
 import authenticate from './worker/authHandler.js';
-import { handleRenderRequest, type ProvidedNewBundle } from './worker/handleRenderRequest.js';
+import {
+  handleRenderRequest,
+  handleNewBundlesProvided,
+  type ProvidedNewBundle,
+} from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import {
   errorResponseResult,
   formatExceptionMessage,
-  copyUploadedAssets,
   ResponseResult,
-  workerIdLabel,
   saveMultipartFile,
   Asset,
   getAssetPath,
-  getBundleDirectory,
-  getRequestBundleFilePath,
 } from './shared/utils.js';
-import { lock, unlock } from './shared/locks.js';
 import { startSsrRequestOptions, trace } from './shared/tracing.js';
 
 // Uncomment the below for testing timeouts:
@@ -94,6 +93,35 @@ function assertAsset(value: unknown, key: string): asserts value is Asset {
   if (!isAsset(value)) {
     throw new Error(`React On Rails Error: Expected an asset for key: ${key}`);
   }
+}
+
+/**
+ * Parses the multipart form body to separate bundle files from shared assets.
+ * Used by both the render and /upload-assets endpoints to avoid duplicating
+ * bundle-vs-asset classification logic.
+ *
+ * @param body  The parsed multipart request body.
+ * @param primaryBundleTimestamp  If provided, a field with key `"bundle"` is
+ *   treated as a bundle for this timestamp (render endpoint convention).
+ */
+function extractBundlesAndAssets(
+  body: Record<string, unknown>,
+  primaryBundleTimestamp?: string | number,
+): { providedNewBundles: ProvidedNewBundle[]; assetsToCopy: Asset[] } {
+  const providedNewBundles: ProvidedNewBundle[] = [];
+  const assetsToCopy: Asset[] = [];
+  Object.entries(body).forEach(([key, value]) => {
+    if (key === 'bundle' && primaryBundleTimestamp != null) {
+      assertAsset(value, key);
+      providedNewBundles.push({ timestamp: primaryBundleTimestamp, bundle: value });
+    } else if (key.startsWith('bundle_')) {
+      assertAsset(value, key);
+      providedNewBundles.push({ timestamp: key.replace('bundle_', ''), bundle: value });
+    } else if (isAsset(value)) {
+      assetsToCopy.push(value);
+    }
+  });
+  return { providedNewBundles, assetsToCopy };
 }
 
 // Remove after this issue is resolved: https://github.com/fastify/light-my-request/issues/315
@@ -271,19 +299,7 @@ export default function run(config: Partial<Config>) {
 
     const { renderingRequest } = req.body;
     const { bundleTimestamp } = req.params;
-    const providedNewBundles: ProvidedNewBundle[] = [];
-    const assetsToCopy: Asset[] = [];
-    Object.entries(req.body).forEach(([key, value]) => {
-      if (key === 'bundle') {
-        assertAsset(value, key);
-        providedNewBundles.push({ timestamp: bundleTimestamp, bundle: value });
-      } else if (key.startsWith('bundle_')) {
-        assertAsset(value, key);
-        providedNewBundles.push({ timestamp: key.replace('bundle_', ''), bundle: value });
-      } else if (isAsset(value)) {
-        assetsToCopy.push(value);
-      }
-    });
+    const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(req.body, bundleTimestamp);
 
     try {
       const dependencyBundleTimestamps = extractBodyArrayField(req.body, 'dependencyBundleTimestamps');
@@ -315,88 +331,47 @@ export default function run(config: Partial<Config>) {
 
   // There can be additional files that might be required at the runtime.
   // Since the remote renderer doesn't contain any assets, they must be uploaded manually.
+  // Bundle files use the form key convention "bundle_<hash>" and are placed in
+  // their own directory; remaining assets are copied to every bundle directory.
   app.post<{
-    Body: WithBodyArrayField<Record<string, Asset>, 'targetBundles'>;
+    Body: Record<string, Asset>;
   }>('/upload-assets', async (req, res) => {
     if (!(await requestPrechecks(req, res))) {
       return;
     }
-    const assets: Asset[] = Object.values(req.body).filter(isAsset);
 
-    // Handle targetBundles as either a string or an array
-    const targetBundles = extractBodyArrayField(req.body, 'targetBundles');
-    if (!targetBundles || targetBundles.length === 0) {
-      const errorMsg = 'No targetBundles provided. As of protocol version 2.0.0, targetBundles is required.';
+    const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(req.body);
+
+    if (providedNewBundles.length === 0) {
+      const errorMsg =
+        'No bundle_<hash> fields provided. ' +
+        'The /upload-assets endpoint requires at least one bundle file with a "bundle_<hash>" form key.';
       log.error(errorMsg);
       await setResponse(errorResponseResult(errorMsg), res);
       return;
     }
 
-    const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
-    const taskDescription = `Uploading files ${assetsDescription} to bundle directories: ${targetBundles.join(', ')}`;
-
+    const bundleNames = providedNewBundles.map((b) => b.bundle.filename);
+    const assetNames = assetsToCopy.map((a) => a.filename);
+    const taskDescription = `Uploading bundles [${bundleNames.join(', ')}] with assets [${assetNames.join(', ')}]`;
     log.info(taskDescription);
+
     try {
-      // Use per-bundle locks (same lock key as handleRenderRequest) so that
-      // asset copies and render-request bundle writes to the same directory
-      // are mutually exclusive. See https://github.com/shakacode/react_on_rails/issues/2463
-      //
-      // Use allSettled (not Promise.all) to ensure every in-flight copy
-      // finishes before the handler returns. Otherwise the onResponse hook
-      // can delete req.uploadDir while background copies still read from it.
-      const copyPromises = targetBundles.map(async (bundleTimestamp) => {
-        const bundleDirectory = getBundleDirectory(bundleTimestamp);
-        await mkdir(bundleDirectory, { recursive: true });
-
-        const bundleFilePath = getRequestBundleFilePath(bundleTimestamp);
-        const { lockfileName, wasLockAcquired, errorMessage } = await lock(bundleFilePath);
-
-        if (!wasLockAcquired) {
-          const msg = formatExceptionMessage(
-            taskDescription,
-            errorMessage,
-            `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
-          );
-          throw new Error(msg);
-        }
-
-        try {
-          await copyUploadedAssets(assets, bundleDirectory);
-          log.info(`Copied assets to bundle directory: ${bundleDirectory}`);
-        } finally {
-          try {
-            await unlock(lockfileName);
-          } catch (error) {
-            log.warn({
-              msg: `Error unlocking ${lockfileName} from worker ${workerIdLabel()}`,
-              err: error,
-              task: taskDescription,
-            });
-          }
-        }
-      });
-
-      const results = await Promise.allSettled(copyPromises);
-      const firstFailure = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-      if (firstFailure) {
-        throw firstFailure.reason;
+      // Reuses the same per-bundle lock + move/copy logic as the render
+      // endpoint so that concurrent /upload-assets and render requests
+      // targeting the same bundle directory are mutually exclusive.
+      // See https://github.com/shakacode/react_on_rails/issues/2463
+      const result = await handleNewBundlesProvided(taskDescription, providedNewBundles, assetsToCopy);
+      if (result) {
+        await setResponse(result, res);
+        return;
       }
 
-      await setResponse(
-        {
-          status: 200,
-          headers: {},
-        },
-        res,
-      );
+      await setResponse({ status: 200, headers: {} }, res);
     } catch (err) {
-      const msg = 'ERROR when trying to copy assets';
+      const msg = 'ERROR when trying to upload bundles and assets';
       const message = `${msg}. ${err}. Task: ${taskDescription}`;
-      log.error({
-        msg,
-        err,
-        task: taskDescription,
-      });
+      log.error({ msg, err, task: taskDescription });
       await setResponse(errorResponseResult(message), res);
     }
   });

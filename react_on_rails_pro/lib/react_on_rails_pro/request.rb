@@ -51,24 +51,17 @@ module ReactOnRailsPro
                                         "Please build your bundles before uploading assets."
         end
 
-        # Create a list of bundle timestamps to send to the node renderer
-        pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-        target_bundles = [pool.server_bundle_hash]
-
-        # Add RSC bundle if enabled
         if ReactOnRailsPro.configuration.enable_rsc_support
           rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
           unless File.exist?(rsc_bundle_path)
             raise ReactOnRailsPro::Error, "RSC bundle not found at #{rsc_bundle_path}. " \
                                           "Please build your bundles before uploading assets."
           end
-          target_bundles << pool.rsc_bundle_hash
         end
 
-        form = form_with_assets_and_bundle
-        form["targetBundles"] = target_bundles
-
-        perform_request("/upload-assets", form: form)
+        # The node renderer derives target directories from the bundle_<hash>
+        # form keys, so no separate targetBundles field is needed.
+        perform_request("/upload-assets", form: form_with_assets_and_bundle)
       end
 
       def asset_exists_on_vm_renderer?(filename)

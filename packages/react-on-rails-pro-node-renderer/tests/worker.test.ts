@@ -332,7 +332,7 @@ describe('worker', () => {
       protocolVersion,
       railsEnv,
       password: 'my_password',
-      targetBundles: [bundleHash],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
       asset1: createReadStream(getFixtureAsset()),
       asset2: createReadStream(getOtherFixtureAsset()),
     });
@@ -356,7 +356,8 @@ describe('worker', () => {
       protocolVersion,
       railsEnv,
       password: 'my_password',
-      targetBundles: [bundleHash, bundleHashOther],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
+      [`bundle_${bundleHashOther}`]: createReadStream(getFixtureSecondaryBundle()),
       asset1: createReadStream(getFixtureAsset()),
       asset2: createReadStream(getOtherFixtureAsset()),
     });
