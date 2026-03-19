@@ -2436,7 +2436,7 @@ module ReactOnRails
       return nil unless version_str
 
       clean_version = version_str.gsub(/\A[^0-9]*/, "")
-      clean_version if clean_version.match?(/\A\d+\.\d+\.\d+/)
+      clean_version if clean_version.match?(/\A\d+\.\d+\.\d+\z/)
     rescue StandardError
       nil
     end
