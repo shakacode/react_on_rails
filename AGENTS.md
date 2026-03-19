@@ -4,6 +4,12 @@ Instructions for AI coding agents working on the React on Rails codebase.
 
 React on Rails is a Ruby gem + npm package that integrates React with Ruby on Rails, providing server-side rendering (SSR) via Node.js or ExecJS. This is a monorepo: the open-source gem lives at `react_on_rails/`, the npm package at `packages/react-on-rails/`, and the Pro package at `react_on_rails_pro/`.
 
+## Reusable Workflows
+
+- `.claude/commands/`: Claude Code slash commands
+- `prompts/`: shared prompt templates for Codex, GPT, and other non-Claude tools
+- When the user asks to address PR review comments outside Claude slash commands, follow `prompts/address-review.md`
+
 ## Canonical Agent Policy
 
 `AGENTS.md` is the canonical source for repository-wide agent rules:
