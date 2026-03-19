@@ -2165,6 +2165,9 @@ module ReactOnRails
     # Returns true if environment was loaded successfully, false otherwise.
     def ensure_rails_environment_loaded
       return true if @rails_environment_loaded
+      return false if @rails_environment_attempted
+
+      @rails_environment_attempted = true
 
       env_file = "config/environment.rb"
       return false unless File.exist?(env_file)
@@ -2393,8 +2396,7 @@ module ReactOnRails
           ⚠️  React #{react_version} has not been verified with React on Rails Pro RSC.
 
           RSC support currently targets React 19.0.x. React #{major}.#{minor}.x may work
-          but has not been tested. Consider using React 19.0.4+ for guaranteed compatibility:
-            npm install react@~19.0.4 react-dom@~19.0.4
+          but has not been tested. Verified compatibility: React 19.0.4+.
         MSG
       else
         checker.add_error(<<~MSG.strip)
