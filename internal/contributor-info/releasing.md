@@ -12,7 +12,7 @@ See [Contributing](https://github.com/shakacode/react_on_rails/tree/main/CONTRIB
 
 **Always update CHANGELOG.md before running the release task.** The release task reads the version from CHANGELOG.md and automatically creates a GitHub release from the changelog section.
 
-1. Ensure all desired changes are merged to `master` branch
+1. Ensure all desired changes are merged to `main` branch
 2. Run `/update-changelog release` (or `rc` or `beta` for prereleases) to:
    - Find merged PRs missing from the changelog
    - Add changelog entries under the appropriate category headings
