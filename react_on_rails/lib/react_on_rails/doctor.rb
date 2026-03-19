@@ -2418,7 +2418,11 @@ module ReactOnRails
     def installed_react_version
       # Use Node's own module resolution to find the actually installed React,
       # which handles hoisted dependencies in monorepos and pnpm workspaces.
-      resolved_path = `node -e "console.log(require.resolve('react/package.json'))" 2>/dev/null`.strip
+      stdout, _stderr, status = Open3.capture3("node", "-e",
+                                               "console.log(require.resolve('react/package.json'))")
+      return nil unless status.success?
+
+      resolved_path = stdout.strip
       return nil if resolved_path.empty? || !File.exist?(resolved_path)
 
       version = JSON.parse(File.read(resolved_path))["version"]
