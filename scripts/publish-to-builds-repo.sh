@@ -220,32 +220,32 @@ echo ""
 cd "$DIST_DIR/repo"
 git add -A
 
+SOURCE_SHA=$(cd "$MONOREPO_ROOT" && git rev-parse --short HEAD)
+SOURCE_BRANCH=$(cd "$MONOREPO_ROOT" && git rev-parse --abbrev-ref HEAD)
+
 if git diff --cached --quiet; then
-  echo "==> No changes to commit."
+  echo "==> No file changes to commit."
 else
-  SOURCE_SHA=$(cd "$MONOREPO_ROOT" && git rev-parse --short HEAD)
-  SOURCE_BRANCH=$(cd "$MONOREPO_ROOT" && git rev-parse --abbrev-ref HEAD)
-
   git commit -m "Build packages $VERSION from $SOURCE_BRANCH ($SOURCE_SHA)"
+fi
 
-  if [[ "$DRY_RUN" == "true" ]]; then
-    echo "==> [DRY RUN] Would push to $DIST_REPO branch $DIST_BRANCH"
-    echo "==> [DRY RUN] Would create tag $DIST_TAG"
-    echo ""
-    echo "==> Contents of dist repo:"
-    find . -not -path './.git/*' -not -path './.git' | sort
+if [[ "$DRY_RUN" == "true" ]]; then
+  echo "==> [DRY RUN] Would push to $DIST_REPO branch $DIST_BRANCH"
+  echo "==> [DRY RUN] Would create tag $DIST_TAG"
+  echo ""
+  echo "==> Contents of dist repo:"
+  find . -not -path './.git/*' -not -path './.git' | sort
+else
+  echo "==> Pushing to $DIST_REPO branch $DIST_BRANCH..."
+  git push -u origin "$DIST_BRANCH"
+
+  # Create and push tag
+  if git rev-parse "$DIST_TAG" &>/dev/null; then
+    echo "==> Tag $DIST_TAG already exists, skipping tag creation."
   else
-    echo "==> Pushing to $DIST_REPO branch $DIST_BRANCH..."
-    git push -u origin "$DIST_BRANCH"
-
-    # Create and push tag
-    if git rev-parse "$DIST_TAG" &>/dev/null; then
-      echo "==> Tag $DIST_TAG already exists, skipping tag creation."
-    else
-      git tag "$DIST_TAG"
-      git push origin "$DIST_TAG"
-      echo "==> Tag $DIST_TAG pushed."
-    fi
+    git tag "$DIST_TAG"
+    git push origin "$DIST_TAG"
+    echo "==> Tag $DIST_TAG pushed."
   fi
 fi
 
