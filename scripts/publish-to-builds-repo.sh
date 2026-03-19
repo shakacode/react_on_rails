@@ -7,7 +7,7 @@
 #
 # Options:
 #   --dist-repo   Git URL of the builds repo (default: git@github.com:shakacode/react-on-rails-builds.git)
-#   --branch      Branch to push to in the builds repo (default: main)
+#   --branch      Branch to push to in the builds repo (default: current git branch name)
 #   --tag         Tag to create (default: v<version> from react-on-rails package.json)
 #   --dry-run     Build and prepare but don't push
 #
@@ -28,7 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MONOREPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 DIST_REPO="git@github.com:shakacode/react-on-rails-builds.git"
-DIST_BRANCH="main"
+DIST_BRANCH=""
 DIST_TAG=""
 DRY_RUN=false
 
@@ -53,6 +53,11 @@ VERSION=$(node -e "console.log(require('./packages/react-on-rails/package.json')
 if [[ -z "$VERSION" ]]; then
   echo "Error: Could not read version from packages/react-on-rails/package.json" >&2
   exit 1
+fi
+
+# Default branch to the current git branch name
+if [[ -z "$DIST_BRANCH" ]]; then
+  DIST_BRANCH=$(cd "$MONOREPO_ROOT" && git rev-parse --abbrev-ref HEAD)
 fi
 
 if [[ -z "$DIST_TAG" ]]; then
