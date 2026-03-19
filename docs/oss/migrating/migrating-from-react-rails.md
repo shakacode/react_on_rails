@@ -2,18 +2,13 @@
 
 This migration is easiest when the app is already on a modern Rails + Shakapacker baseline.
 
-If your `react-rails` app uses Vite or another non-Shakapacker asset setup, use this page for the helper and registration changes, but follow [Migrate from `vite_rails`](./migrating-from-vite-rails.md) for the asset-pipeline and entrypoint steps.
-
 ## Preflight
 
 Before swapping gems, check these first:
 
 1. **Webpacker vs Shakapacker**: if the app still uses `webpacker`, migrate to `shakapacker` first.
 2. **Bundler age**: some older `react-rails` apps still carry Bundler 1.x lockfiles. Those can fail on modern Ruby before you even reach the migration work.
-3. **Native gem age**: older lockfiles often pin `nio4r`, `pg`, or `mysql2` versions that fail to compile on current macOS and Ruby before the migration even starts.
-4. **App boot readiness**: the React on Rails install generator boots the full Rails app. Make sure `config/database.yml` exists and required env vars for initializers are set.
-5. **Package manager metadata**: if the repo has a `yarn.lock` but no `"packageManager"` field in `package.json`, add one before introducing Shakapacker 9. Example for Yarn Classic: `npm pkg set packageManager="yarn@1.22.22"` (or add the field manually). Use the version that matches your project's Yarn installation.
-6. **Rails age**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 / Webpacker 3 apps are usually a staged migration, not a one-command migration.
+3. **Rails age**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 / Webpacker 3 apps are usually a staged migration, not a one-command migration.
 
 If you are already on `shakapacker` 7+ and React 18+, the migration is mostly about helper syntax, component registration, and generated defaults.
 
@@ -24,14 +19,11 @@ bundle _2.3.26_ lock --update
 bundle _2.3.26_ install
 ```
 
-If the first failure is a native gem compile error, solve that before swapping to React on Rails. Typical examples are `nio4r` in older Rails/Webpacker apps and `pg` or `mysql2` in apps with older database adapters pinned in the lockfile.
-
 1. Update Deps
    1. Replace `react-rails` in `Gemfile` with `react_on_rails` and make sure `shakapacker` is present.
    2. Remove `react_ujs` from `package.json`.
-   3. If the repo uses Yarn and `package.json` does not already declare it, add the package manager field before booting the app with Shakapacker 9: `npm pkg set packageManager="yarn@1.22.22"` (or add it manually to `package.json`). The example is for Yarn Classic; use the version that matches your project.
-   4. Run `bundle install` and your package manager's install command.
-   5. Commit changes.
+   3. Run `bundle install` and your package manager's install command.
+   4. Commit changes.
 
 2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` attempts to install node dependencies, creates a sample React component, Rails view/controller, and updates `config/routes.rb`. If dependency installation fails, the generator prints manual install commands. If required package-manager tooling (Node.js and npm/yarn/pnpm/bun) is unavailable, the generator stops with setup guidance. Run the suggested commands or install missing tools before continuing.
 
@@ -135,7 +127,6 @@ then treat the migration as:
 1. Move from `webpacker` to `shakapacker`.
 2. If the app is still on Rails 5.1, upgrade Rails to 5.2+ before adding current `react_on_rails`.
 3. Remove `react_ujs`.
-4. Ensure the app can boot for generator execution (`config/database.yml`, initializer env vars, package manager metadata).
-5. Run the React on Rails install generator.
-6. Replace helper syntax and component registration.
-7. Review `bin/dev`, `config/shakapacker.yml`, and webpack config diffs before committing.
+4. Run the React on Rails install generator.
+5. Replace helper syntax and component registration.
+6. Review `bin/dev`, `config/shakapacker.yml`, and webpack config diffs before committing.

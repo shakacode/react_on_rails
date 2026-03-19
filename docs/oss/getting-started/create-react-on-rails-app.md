@@ -87,8 +87,9 @@ The CLI checks for these before starting:
 - **Rails 7.0+** (`gem install rails`)
 - **PostgreSQL** running locally
 - **npm or pnpm**
+- **PostgreSQL** running locally (needed at `bin/rails db:prepare`, not validated by the CLI)
 
-If any are missing, you'll get a clear error message with installation instructions.
+If any of the first four are missing, you'll get a clear error message with installation instructions.
 
 ## Adding to an Existing Rails App
 

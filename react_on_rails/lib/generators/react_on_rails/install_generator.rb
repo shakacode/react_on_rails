@@ -95,6 +95,42 @@ module ReactOnRails
         #!/usr/bin/env ruby
         exec "./bin/rails", "server", *ARGV
       RUBY
+      # Recognize only known legacy Rails foreman templates. Any other variant is
+      # treated as customized so install does not overwrite app-specific logic.
+      LEGACY_FOREMAN_BIN_DEV_TEMPLATES = [
+        <<~BASH,
+          #!/usr/bin/env bash
+          if ! gem list foreman -i --silent; then
+            gem install foreman
+          fi
+
+          exec foreman start -f Procfile.dev "$@"
+        BASH
+        <<~SH,
+          #!/usr/bin/env sh
+          if ! gem list foreman -i --silent; then
+            gem install foreman
+          fi
+
+          exec foreman start -f Procfile.dev "$@"
+        SH
+        <<~BASH,
+          #!/usr/bin/env bash
+          if ! gem list foreman -i --silent; then
+            gem install foreman
+          fi
+
+          exec foreman start -f Procfile.dev $@
+        BASH
+        <<~SH
+          #!/usr/bin/env sh
+          if ! gem list foreman -i --silent; then
+            gem install foreman
+          fi
+
+          exec foreman start -f Procfile.dev $@
+        SH
+      ].map { |template| template.gsub("\r\n", "\n").strip }.freeze
 
       # Main generator entry point
       #
@@ -223,11 +259,28 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
-        # Warn about the working tree before missing_pro_gem? so users see the state
-        # of their repo before any optional Gemfile mutation from auto-install.
-        ReactOnRails::GitUtils.warn_if_uncommitted_changes(GeneratorMessages, git_installed: cli_exists?("git"))
+        # Non-blocking: warn about dirty worktree but don't prevent installation.
+        # A clean tree makes the generator diff easier to review, but blocking would
+        # be too strict for a generator that creates many new files.
+        has_worktree_issues = ReactOnRails::GitUtils.warn_if_uncommitted_changes(
+          GeneratorMessages, git_installed: cli_exists?("git")
+        )
 
-        !(missing_node? || missing_package_manager? || missing_pro_gem?)
+        # missing_pro_gem? may auto-install the gem (mutating Gemfile), so only run
+        # it on a clean worktree. On a dirty tree, use the read-only pro_gem_installed?
+        # check to catch a missing gem without triggering auto-install.
+        if has_worktree_issues && use_pro? && !pro_gem_installed?
+          GeneratorMessages.add_error(<<~MSG.strip)
+            🚫 react_on_rails_pro gem is required for #{options[:rsc] ? '--rsc' : '--pro'} but is not installed.
+            Auto-install was skipped because the worktree has uncommitted changes.
+            Please add it manually:
+              gem 'react_on_rails_pro', '~> #{recommended_pro_gem_version}'
+            Then run: bundle install
+          MSG
+          return false
+        end
+
+        !(missing_node? || missing_package_manager? || (!has_worktree_issues && missing_pro_gem?))
       end
 
       def missing_node?
@@ -317,11 +370,19 @@ module ReactOnRails
 
         # Copy bin scripts from templates
         template_bin_path = "#{__dir__}/templates/base/base/bin"
-        directory template_bin_path, "bin"
+        directory_options = {}
+        directory_options[:exclude_pattern] = %r{/dev(?:\.tt)?\z} if preserve_existing_bin_dev?
+        directory template_bin_path, "bin", directory_options
 
         # For --rsc without --redux, hello_world doesn't exist — update DEFAULT_ROUTE
         if use_rsc? && !options.redux?
-          gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
+          if preserve_existing_bin_dev?
+            say_status :warn,
+                       'Custom bin/dev detected: update DEFAULT_ROUTE to "hello_server" manually for --rsc',
+                       :yellow
+          else
+            gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
+          end
         end
 
         # `directory` and `gsub_file` above are Thor actions that already honor
@@ -332,30 +393,41 @@ module ReactOnRails
         end
 
         # Make these and only these files executable
-        files_to_copy = []
-        Dir.chdir(template_bin_path) do
-          files_to_copy.concat(Dir.glob("*"))
-        end
-        files_to_become_executable = files_to_copy.map { |filename| "bin/#{filename}" }
-
+        files_to_become_executable = bin_scripts_to_chmod(template_bin_path)
         File.chmod(0o755, *files_to_become_executable)
       end
 
       def replace_stock_rails_bin_dev!
+        @preserve_existing_bin_dev = false
+
         unless stock_rails_bin_dev?
           if File.exist?("bin/dev")
             say_status :skip, "bin/dev exists but does not match a stock Rails template; keeping existing file", :yellow
+            @preserve_existing_bin_dev = true
           end
           return
         end
 
         if options[:pretend] || options[:skip]
           say_status :skip, "Detected stock Rails bin/dev; leaving existing file in place for --pretend/--skip", :yellow
+          @preserve_existing_bin_dev = true
           return
         end
 
         say_status :replace, "Detected stock Rails bin/dev; installing React on Rails bin/dev", :yellow
         remove_file "bin/dev", verbose: false
+      end
+
+      def preserve_existing_bin_dev?
+        # Set by replace_stock_rails_bin_dev! which always runs first via add_bin_scripts.
+        # Explicitly coerce to boolean so nil (before initialization) is treated as false.
+        !!@preserve_existing_bin_dev
+      end
+
+      def bin_scripts_to_chmod(template_bin_path)
+        files = Dir.children(template_bin_path)
+        files.reject! { |f| f == "dev" } if preserve_existing_bin_dev?
+        files.map { |filename| "bin/#{filename}" }
       end
 
       def stock_rails_bin_dev?
@@ -484,8 +556,7 @@ module ReactOnRails
       end
 
       def legacy_foreman_bin_dev?(content)
-        content.include?("gem list foreman -i --silent") &&
-          content.match?(/(?:^|\n)(?:exec\s+)?foreman start -f Procfile\.dev "\$@"$/)
+        LEGACY_FOREMAN_BIN_DEV_TEMPLATES.include?(content)
       end
 
       def shakapacker_binaries_exist?

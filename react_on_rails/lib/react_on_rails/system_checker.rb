@@ -331,6 +331,9 @@ module ReactOnRails
         return paths_by_bundler[configured_bundler].first
       end
 
+      # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
+      # Webpack is the longer-established default; rspack users typically set
+      # assets_bundler explicitly in shakapacker.yml.
       add_warning(
         "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
       )

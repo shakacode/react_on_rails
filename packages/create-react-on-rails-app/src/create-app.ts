@@ -74,8 +74,8 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
     args.push('--rsc');
   }
 
-  // Fresh-app scaffolding should keep going past non-fatal generator warnings and
-  // surface them in command output instead of aborting the entire setup.
+  // --force makes the generator overwrite conflicting files without prompting,
+  // which is safe for a freshly scaffolded app with no custom content yet.
   args.push('--force');
   // The newly created app directory is not a git repo yet, so the generator's
   // uncommitted-changes check would always warn. --ignore-warnings bypasses all
@@ -88,6 +88,11 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
 
 function packageManagerFieldValue(packageManager: CliOptions['packageManager']): string {
   const version = getCommandVersion(packageManager)?.replace(/^v/, '');
+  if (!version) {
+    logInfo(
+      `Could not detect ${packageManager} version; package.json "packageManager" field will omit the version.`,
+    );
+  }
   return version ? `${packageManager}@${version}` : packageManager;
 }
 
@@ -143,13 +148,17 @@ function normalizeGeneratedPackageManager(
 
   if (fs.existsSync(packageLockPath)) {
     execLiveArgs('pnpm', ['import'], appPath);
+    execLiveArgs('pnpm', ['install'], appPath);
     fs.rmSync(packageLockPath, { force: true });
+  } else {
     execLiveArgs('pnpm', ['install'], appPath);
   }
 
   rewriteFileIfPresent(setupPath, (contents) => {
-    const updated = contents.replace(/system!\((["'])npm install\1\)/g, 'system!("pnpm install")');
-    if (updated === contents && contents.includes('npm install')) {
+    // Match both system!("npm install") and system("npm install") in bin/setup,
+    // preserving the bang (!) if present.
+    const updated = contents.replace(/system(!?)\((["'])npm install\2\)/g, 'system$1($2pnpm install$2)');
+    if (updated === contents && /(?<![p])npm install/.test(contents)) {
       logInfo(
         'Could not auto-update bin/setup for pnpm. Replace "npm install" with "pnpm install" manually.',
       );
@@ -169,7 +178,9 @@ function printSuccessMessage(appName: string, route: string): void {
   console.log('  bin/rails db:prepare');
   console.log('  bin/dev');
   console.log('');
-  logInfo('If PostgreSQL is not running locally, start it before running bin/rails db:prepare.');
+  logInfo(
+    'Note: The generated app uses PostgreSQL by default. Start PostgreSQL before running bin/rails db:prepare.',
+  );
   console.log('');
   logInfo(`Then visit http://localhost:3000/${route}`);
   console.log('');
@@ -330,6 +341,7 @@ export function createApp(appName: string, options: CliOptions): void {
       console.log('  rm -f package-lock.json');
       console.log('  pnpm install');
     }
+    process.exit(1);
   }
 
   // Final success

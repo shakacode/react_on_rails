@@ -11,7 +11,7 @@ Choosing a React integration strategy for Rails? This guide compares React on Ra
 | Streaming SSR           |        —         |          —          |        —         |        —        |          —           |          ✓          |
 | Code splitting with SSR |        —         |          —          |       N/A        |        —        |          —           |          ✓          |
 | Auto-bundling           |        —         |          —          |        —         |        —        |          ✓           |          ✓          |
-| Bundler support         |   Import maps    |  ✓ (Vite default)   |   Import maps    | ✓ (Vite/Rollup) |      ✓ (Rspack)      |     ✓ (Rspack)      |
+| Bundler support         |   Import maps    |  ✓ (Vite default)   |   Import maps    | ✓ (Vite/Rollup) |  ✓ (Webpack/Rspack)  | ✓ (Webpack/Rspack)  |
 | Hot module replacement  |        —         |          ✓          |  Turbo morphing  |        ✓        |          ✓           |          ✓          |
 | Type-safe routing       |        —         |          —          |        —         |     ✓ (BYO)     |          —           | ✓ (TanStack Router) |
 | Props from controller   |        —         |          ✓          |       N/A        |        —        |          ✓           |          ✓          |
