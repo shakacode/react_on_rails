@@ -2331,7 +2331,12 @@ module ReactOnRails
       end
 
       routes_content = File.read(routes_file)
-      if routes_content.include?("rsc_payload_route")
+      uncommented_route = routes_content.each_line.any? do |line|
+        next if line.match?(/^\s*#/)
+
+        line.include?("rsc_payload_route")
+      end
+      if uncommented_route
         checker.add_success("✅ RSC payload route configured")
       else
         checker.add_error(<<~MSG.strip)
@@ -2454,7 +2459,12 @@ module ReactOnRails
         return
       end
 
-      if File.read(procfile_path).include?("RSC_BUNDLE_ONLY")
+      uncommented_watcher = File.readlines(procfile_path).any? do |line|
+        next if line.match?(/^\s*#/)
+
+        line.include?("RSC_BUNDLE_ONLY")
+      end
+      if uncommented_watcher
         checker.add_success("✅ RSC bundle watcher configured in Procfile.dev")
       else
         checker.add_warning(<<~MSG.strip)

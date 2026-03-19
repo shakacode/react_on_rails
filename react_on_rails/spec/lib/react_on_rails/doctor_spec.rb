@@ -1709,6 +1709,25 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when rsc_payload_route is commented out" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/routes.rb",
+                       "Rails.application.routes.draw do\n  # rsc_payload_route\nend")
+            example.run
+          end
+        end
+      end
+
+      it "reports error (does not count commented-out route)" do
+        doctor.send(:check_rsc_payload_route)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("rsc_payload_route") }).to be true
+      end
+    end
+
     context "when routes.rb exists but lacks rsc_payload_route" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -1947,6 +1966,24 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_rsc_procfile_watcher)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("RSC bundle watcher") }).to be true
+      end
+    end
+
+    context "when RSC_BUNDLE_ONLY is commented out in Procfile.dev" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write("Procfile.dev",
+                       "web: bin/rails server\n# rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning (does not count commented-out entry)" do
+        doctor.send(:check_rsc_procfile_watcher)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("RSC bundle watcher not found") }).to be true
       end
     end
 
