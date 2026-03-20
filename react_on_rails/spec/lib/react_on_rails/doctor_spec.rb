@@ -1181,6 +1181,45 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#check_server_rendering_engine" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:execjs_runtime) { Struct.new(:name).new("Node.js (V8)") }
+    let(:execjs_module) { Struct.new(:runtime).new(execjs_runtime) }
+
+    context "when Pro gem is installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      end
+
+      it "labels ExecJS as fallback" do
+        stub_const("ExecJS", execjs_module)
+
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
+        expect(info_messages).to include(a_string_including("ExecJS available as fallback"))
+        expect(info_messages).not_to include(a_string_matching(/^\s+ExecJS Runtime:/))
+      end
+    end
+
+    context "when Pro gem is not installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "reports ExecJS as primary engine" do
+        stub_const("ExecJS", execjs_module)
+
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("ExecJS Runtime:"))
+      end
+    end
+  end
+
   describe "server bundle path Shakapacker integration" do
     let(:doctor) { described_class.new }
     let(:checker) { doctor.instance_variable_get(:@checker) }

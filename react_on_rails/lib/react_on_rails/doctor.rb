@@ -664,20 +664,25 @@ module ReactOnRails
       end
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def check_server_rendering_engine
       return unless defined?(ReactOnRails)
 
       checker.add_info("\n🖥️  Server Rendering Engine:")
 
       begin
-        # Check if ExecJS is available and what runtime is being used
-        if defined?(ExecJS)
+        is_pro = ReactOnRails::Utils.react_on_rails_pro?
+
+        if is_pro
+          checker.add_info("  Pro uses NodeRenderer for server rendering")
+          if defined?(ExecJS) && ExecJS.runtime
+            checker.add_info("  ExecJS available as fallback: #{ExecJS.runtime.name}")
+          end
+        elsif defined?(ExecJS)
           runtime_name = ExecJS.runtime.name if ExecJS.runtime
           if runtime_name
             checker.add_info("  ExecJS Runtime: #{runtime_name}")
 
-            # Provide more specific information about the runtime
             case runtime_name
             when /MiniRacer/
               checker.add_info("    ℹ️  Using V8 via mini_racer gem (fast, isolated)")
@@ -698,7 +703,7 @@ module ReactOnRails
         checker.add_warning("  ⚠️  Could not determine server rendering engine: #{e.message}")
       end
     end
-    # rubocop:enable Metrics/CyclomaticComplexity
+    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def check_shakapacker_configuration_details
       return unless File.exist?("config/shakapacker.yml")
