@@ -82,6 +82,26 @@ Use a script-based hook with an explicit self-guard. This pattern is reliable ac
 
 In CI, run precompile preparation explicitly once before webpack compilation or test startup, rather than relying on hook timing in watch-like flows.
 
+## Upgrading to v16.4.0 (from v16.3.x)
+
+This release includes major generator improvements, development workflow enhancements, and Pro stability fixes. See the [v16.4.0 Release Notes](release-notes/16.4.0.md) for full details.
+
+**Key actions required:**
+
+1. **Update gem and npm package versions** to 16.4.0
+2. **Pro users: remove legacy license key file** — `config/react_on_rails_pro_license.key` is no longer read. Move the token to the `REACT_ON_RAILS_PRO_LICENSE` environment variable
+3. **Pro RSC users: check `custom_rsc_payload_template` overrides** — the template is now rendered with `formats: [:text]`. If your override is `.html.erb`, rename it to `.text.erb`
+4. **Pro users upgrading from 3.x:** See the [Pro Upgrade Guide](../../pro/updating.md) for package rename steps, changed defaults, and version alignment notes
+
+## Upgrading to v16.3.0 (from v16.2.x)
+
+This is a minor release. Update your gem and npm package versions, then run `bundle install` and your package manager's install command. See the [v16.3.0 Release Notes](release-notes/16.3.0.md) for details.
+
+**Key changes:**
+
+1. **Simplified Shakapacker version handling** — obsolete minimum version checks removed
+2. **Pro license model changed** — Pro now works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments
+
 ## Upgrading to v16.2.x (from v16.1.x)
 
 This release focuses on clear separation between open-source and Pro features. See the [v16.2.x Release Notes](release-notes/16.2.0.md) for full details.

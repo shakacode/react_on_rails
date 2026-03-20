@@ -267,8 +267,10 @@ end
 
 | React on Rails Pro | React on Rails | Rails  | Ruby   | React   |
 | ------------------ | -------------- | ------ | ------ | ------- |
-| 4.x                | >= 16.0        | >= 7.0 | >= 3.2 | >= 18   |
+| 16.x               | >= 16.0        | >= 7.0 | >= 3.2 | >= 18   |
 | 3.x                | >= 13.0        | >= 6.0 | >= 3.0 | >= 16.8 |
+
+> **Note:** Pro version numbers were aligned with the core gem starting at 16.2.0. Pro 16.x is the direct successor to Pro 3.x/4.x.
 
 **📖 Check compatibility**: See [CHANGELOG.md](./CHANGELOG.md) for version-specific requirements
 
@@ -286,15 +288,7 @@ Since React on Rails Pro is part of the public monorepo, you can install it dire
 
 ```ruby
 # Gemfile
-gem 'react_on_rails_pro', '~> 4.0'
-```
-
-Or use a specific version/tag:
-
-```ruby
-gem 'react_on_rails_pro', git: 'https://github.com/shakacode/react_on_rails.git',
-                          glob: 'react_on_rails_pro/*.gemspec',
-                          tag: 'v4.0.0'
+gem 'react_on_rails_pro', '~> 16.0'
 ```
 
 Then run:
