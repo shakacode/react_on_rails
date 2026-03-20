@@ -1088,6 +1088,99 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#check_server_bundle_prerender_consistency" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    def write_project_file(path, content)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
+
+    context "when views use stream_react_component (RSC/streaming apps)" do
+      it "reports consistent configuration" do
+        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = "server-bundle.js"
+          end
+        RUBY
+        write_project_file("app/views/hello_server/index.html.erb", <<~ERB)
+          <h1>Hello Server</h1>
+          <%= stream_react_component('HelloServer', props: @hello_server_props) %>
+        ERB
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+        expect(success_messages).to include(a_string_including("Server rendering configuration is consistent"))
+        expect(info_messages).not_to include(a_string_including("remove server_bundle_js_file"))
+      end
+    end
+
+    context "when views use cached_stream_react_component" do
+      it "reports consistent configuration" do
+        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = "server-bundle.js"
+          end
+        RUBY
+        write_project_file("app/views/posts/show.html.erb", <<~ERB)
+          <%= cached_stream_react_component('PostDetail', props: @post_props) %>
+        ERB
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+        expect(success_messages).to include(a_string_including("Server rendering configuration is consistent"))
+      end
+    end
+
+    context "when views use rsc_payload_react_component" do
+      it "reports consistent configuration" do
+        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = "server-bundle.js"
+          end
+        RUBY
+        write_project_file("app/views/posts/show.html.erb", <<~ERB)
+          <%= rsc_payload_react_component('PostDetail', props: @post_props) %>
+        ERB
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+        expect(success_messages).to include(a_string_including("Server rendering configuration is consistent"))
+      end
+    end
+
+    context "when views have no prerender or streaming helpers" do
+      it "suggests removing server_bundle_js_file" do
+        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = "server-bundle.js"
+          end
+        RUBY
+        write_project_file("app/views/hello_world/index.html.erb", <<~ERB)
+          <h1>Hello World</h1>
+          <%= react_component("HelloWorld", props: @hello_world_props) %>
+        ERB
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("remove server_bundle_js_file"))
+      end
+    end
+  end
+
   describe "server bundle path Shakapacker integration" do
     let(:doctor) { described_class.new }
     let(:checker) { doctor.instance_variable_get(:@checker) }

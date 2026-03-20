@@ -1246,12 +1246,14 @@ module ReactOnRails
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def uses_prerender_in_views?
-      # Check view files for prerender: true
       view_files = Dir.glob("app/views/**/*.{erb,haml,slim}")
       view_files.any? do |file|
         next unless File.exist?(file)
 
-        File.read(file).match?(/prerender:\s*true/)
+        content = File.read(file)
+        # Match explicit prerender: true OR Pro streaming helpers that implicitly prerender
+        content.match?(/prerender:\s*true/) ||
+          content.match?(/stream_react_component|cached_stream_react_component|rsc_payload_react_component/)
       end
     rescue StandardError
       false
