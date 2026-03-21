@@ -192,7 +192,7 @@ describe ReactOnRailsPro::Cache, :caching do
                             "123456", "Foobar", "cache-key"])
     end
 
-    it "includes bundle hash when global prerender is enabled and option is omitted" do
+    it "omits bundle hash when global prerender is enabled and option is omitted" do
       ReactOnRails.configuration.prerender = true
       ReactOnRails.configuration.prerender_override = nil
       allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
@@ -200,7 +200,7 @@ describe ReactOnRailsPro::Cache, :caching do
       result = described_class.react_component_cache_key("Foobar", cache_key: "cache-key")
 
       expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION,
-                            "123456", "Foobar", "cache-key"])
+                            "Foobar", "cache-key"])
     end
 
     it "omits bundle hash when prerender_override disables prerender" do

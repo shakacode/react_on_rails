@@ -77,7 +77,7 @@ module ReactOnRailsPro
 
         override = ReactOnRails.configuration.prerender_override
         effective_prerender = if override.nil?
-                                options.fetch(:prerender, ReactOnRails.configuration.prerender)
+                                options[:prerender]
                               else
                                 override
                               end
