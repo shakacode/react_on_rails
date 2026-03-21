@@ -14,7 +14,7 @@ If you're a new customer, see [Installation](./installation.md) instead.
 
 ### What's Changing
 
-React on Rails Pro packages are now **publicly distributed** via npmjs.org and RubyGems.org:
+React on Rails Pro packages are now **publicly distributed** via npmjs.com and RubyGems.org:
 
 - ✅ No more GitHub Personal Access Tokens (PATs)
 - ✅ No more `.npmrc` configuration
@@ -29,6 +29,19 @@ Package names have changed:
 | Node Renderer | `@shakacode-tools/react-on-rails-pro-node-renderer` | `react-on-rails-pro-node-renderer` |
 
 **Important:** Pro users should now import from `react-on-rails-pro` instead of `react-on-rails`. The Pro package includes all core features plus Pro-exclusive functionality.
+
+## Version Alignment: Pro 3.x/4.x → 16.x
+
+React on Rails Pro version numbers were aligned with the core React on Rails gem during the 16.x series. **Pro 16.x is the direct successor to Pro 3.x/4.x** — it is the same gem, with the same features, under a new version number.
+
+| Version        | Distribution              | Notes                                       |
+| -------------- | ------------------------- | ------------------------------------------- |
+| Pro 3.3.x      | GitHub Packages (private) | Last 3.x release                            |
+| Pro 4.0.0-rc.x | GitHub Packages (private) | Release candidates (pre-monorepo)           |
+| Pro 16.1.x     | GitHub Packages (private) | Version-aligned with core gem               |
+| Pro 16.2.0+    | RubyGems.org / npmjs.com  | First publicly distributed, version-aligned |
+
+If you are upgrading from Pro 3.x, 4.0.0-rc.x, or any GitHub Packages version (including 16.1.x), follow the full [Migration Steps](#migration-steps) below.
 
 ## Breaking Changes and Deprecation Policy
 
@@ -200,15 +213,66 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 For complete licensing details, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
 
+### Understanding the Pro npm packages
+
+React on Rails Pro has two npm packages with different purposes:
+
+| Package                            | Purpose                                                                     | When to install                                        |
+| ---------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `react-on-rails-pro`               | Client-side Pro features (immediate hydration, RSC, component registration) | **Always** — all Pro users need this                   |
+| `react-on-rails-pro-node-renderer` | Server-side Node.js rendering pool                                          | **Only** if using the standalone Node Renderer for SSR |
+
+If you only use ExecJS for SSR (the default), you do not need `react-on-rails-pro-node-renderer`.
+
 ### Additional Upgrade Notes
 
 #### Upgrading to 16.4.0 or later
+
+##### JWT gem requirement
+
+`react_on_rails_pro` 16.4.0 tightened the `jwt` gem requirement to `~> 2.7`. If your Gemfile pins `jwt` to an older version (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+
+```bash
+bundle update jwt
+```
+
+##### Node renderer config: `bundlePath` → `serverBundleCachePath`
+
+The node renderer configuration key `bundlePath` has been renamed to `serverBundleCachePath`. Update your node renderer configuration file:
+
+```diff
+  const config = {
+-   bundlePath: path.resolve(__dirname, '../.node-renderer-bundles'),
++   serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
+  };
+```
+
+##### Changed defaults (from Pro 3.x)
+
+If you are upgrading from Pro 3.x and relied on default values without explicitly setting them, be aware of these changes:
+
+| Setting                         | Old Default (3.x) | New Default (16.x) |
+| ------------------------------- | ----------------- | ------------------ |
+| `ssr_timeout`                   | 20 seconds        | 5 seconds          |
+| `renderer_request_retry_limit`  | 1                 | 5                  |
+| `renderer_use_fallback_exec_js` | `false`           | `true`             |
+
+If your app depends on the previous defaults, set them explicitly in `config/initializers/react_on_rails_pro.rb`.
 
 ##### RSC payload template overrides
 
 React on Rails Pro now renders the built-in RSC payload template with `formats: [:text]` so Rails view annotations cannot inject HTML comments into NDJSON responses.
 
 If your app overrides `custom_rsc_payload_template`, make sure that override resolves to a text or format-neutral template path, such as `app/views/.../rsc_payload.text.erb`. Overrides that only exist as `.html.erb` templates will raise `ActionView::MissingTemplate` when the RSC payload endpoint renders.
+
+##### Gemfile: `react_on_rails` is redundant with `react_on_rails_pro`
+
+`react_on_rails_pro` declares `react_on_rails` as a dependency, so you do not need a separate `gem "react_on_rails"` line in your Gemfile when using Pro. Remove it to avoid confusion about which line controls the version:
+
+```diff
+- gem "react_on_rails", "16.4.0"
+  gem "react_on_rails_pro", "16.4.0"
+```
 
 ### Verify Migration
 
