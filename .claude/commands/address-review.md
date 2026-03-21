@@ -8,6 +8,9 @@ Fetch review comments from a GitHub PR in this repository, triage them, and crea
 
 ## Step 1: Determine the Repository
 
+If the user input is a full GitHub URL, extract `org/repo` from the URL and use that as `REPO`.
+Otherwise, detect the repository from the current checkout:
+
 ```bash
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 ```
@@ -56,12 +59,17 @@ Include the review body as a general comment when it contains actionable feedbac
 **If only PR number is provided (fetch all PR comments):**
 
 ```bash
+# Review summary bodies (can contain actionable feedback even without inline comments)
+gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews | jq -s '[.[].[] | select((.body // "") != "") | {id: .id, type: "review_summary", body: .body, state: .state, user: .user.login, html_url: .html_url}]'
+
 # Inline code review comments
 gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "review", path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id}]'
 
 # General PR discussion comments (not tied to specific lines)
 gh api --paginate repos/${REPO}/issues/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "issue", body: .body, user: .user.login, html_url: .html_url}]'
 ```
+
+Include actionable review summary bodies from `/pulls/{PR_NUMBER}/reviews` as additional general comments. Like specific review bodies, they cannot be replied to via the `/replies` endpoint and must be answered as general PR comments (see Step 7).
 
 **For all paths that fetch review comments (both specific review and full PR), fetch review thread metadata and attach `thread_id` by matching each review comment's `node_id`:**
 

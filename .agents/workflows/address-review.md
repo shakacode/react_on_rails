@@ -33,18 +33,19 @@ Behavior rules:
 
 Execution flow when terminal access is available:
 
-1. Determine repository:
-   - Run: `REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)`
-   - If the input is a full GitHub URL, use the URL's `org/repo`.
-   - If `gh` is unavailable or unauthenticated, stop and tell me to fix that first.
-
-2. Parse the input:
+1. Parse the input:
    - Support:
      - PR number only
      - PR URL
      - Specific review URL with `#pullrequestreview-...`
      - Specific issue comment URL with `#issuecomment-...`
+   - If the input is a full GitHub URL, extract the URL's `org/repo` before running `gh repo view`.
    - Extract the PR number and optional review/comment ID.
+
+2. Determine repository:
+   - If step 1 extracted `org/repo` from a full GitHub URL, use that as `REPO`.
+   - Otherwise run: `REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)`
+   - If `gh` is unavailable or unauthenticated, stop and tell me to fix that first.
 
 3. Fetch review data:
    - Specific issue comment:
@@ -54,8 +55,10 @@ Execution flow when terminal access is available:
      `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id}]'`
    - If the review body contains actionable feedback, include it as an additional general comment. Review summary bodies cannot use the `/replies` endpoint; post those responses as general PR comments (see step 7).
    - Full PR:
+     `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews | jq -s '[.[].[] | select((.body // "") != "") | {id: .id, type: "review_summary", body: .body, state: .state, user: .user.login, html_url: .html_url}]'`
      `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "review", path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id}]'`
      `gh api --paginate repos/${REPO}/issues/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "issue", body: .body, user: .user.login, html_url: .html_url}]'`
+   - Include actionable review summary bodies from `/pulls/{PR_NUMBER}/reviews` as additional general comments. Like specific review bodies, they cannot use the `/replies` endpoint and must be answered as general PR comments (see step 7).
    - For all review-comment paths, fetch thread metadata and match `thread_id` by `node_id`:
      `OWNER=${REPO%/*}`
      `NAME=${REPO#*/}`
