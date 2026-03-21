@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../react_on_rails"
+require_relative "../react_on_rails/version_synchronizer"
 
 namespace :react_on_rails do
   desc "Sync React on Rails npm package versions with gem versions (dry-run by default)"
