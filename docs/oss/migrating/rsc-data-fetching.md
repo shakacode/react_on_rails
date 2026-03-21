@@ -379,9 +379,21 @@ When data sources are independent, use Ruby threads to fetch in parallel:
       props: { title: "My Dashboard" }) do |emit|
   user_id = params[:user_id]
   threads = []
-  threads << Thread.new { emit.call("user", User.find(user_id).as_json) }
-  threads << Thread.new { emit.call("stats", DashboardStats.compute.as_json) }
-  threads << Thread.new { emit.call("posts", Post.recent.as_json) }
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      emit.call("user", User.find(user_id).as_json)
+    end
+  end
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      emit.call("stats", DashboardStats.compute.as_json)
+    end
+  end
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      emit.call("posts", Post.recent.as_json)
+    end
+  end
   threads.each(&:join)
   # Total: 300ms (limited by slowest)
 end %>
@@ -389,10 +401,10 @@ end %>
 
 ### Solution 2: Progressive Streaming with Async Props
 
-The recommended approach -- each async prop streams independently as it becomes ready, and Suspense boundaries let the UI fill in progressively:
+For the best user experience -- each async prop streams independently as it becomes ready, and Suspense boundaries let the UI fill in progressively. Total server time is the same as sequential, but _perceived_ performance improves because the user sees content as each prop resolves:
 
 ```erb
-<%# BEST: Each prop streams to the browser as it resolves %>
+<%# PROGRESSIVE: Each prop streams to the browser as it resolves %>
 <%= stream_react_component_with_async_props("Dashboard",
       props: { title: "My Dashboard" }) do |emit|
   emit.call("user", User.find(params[:user_id]).as_json)        # Streams at ~200ms

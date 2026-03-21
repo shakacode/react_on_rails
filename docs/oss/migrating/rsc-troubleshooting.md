@@ -10,14 +10,14 @@ Everything passed from a Server Component to a Client Component must be serializ
 
 ### What Can Cross the Server-to-Client Boundary
 
-| Allowed                                         | Not Allowed                       |
-| ----------------------------------------------- | --------------------------------- |
-| Strings, numbers, booleans, `null`, `undefined` | Functions (except Server Actions) |
-| Plain objects and arrays                        | Class instances                   |
-| `Date` objects                                  | `WeakMap`, `WeakSet`              |
-| `Map`, `Set`, typed arrays (React 19+)          | Symbols                           |
-| `Promise` (resolved by `use()`)                 | DOM nodes                         |
-| React elements (`<Component />`)                | Closures                          |
+| Allowed                                         | Not Allowed          |
+| ----------------------------------------------- | -------------------- |
+| Strings, numbers, booleans, `null`, `undefined` | Functions            |
+| Plain objects and arrays                        | Class instances      |
+| `Date` objects                                  | `WeakMap`, `WeakSet` |
+| `Map`, `Set`, typed arrays (React 19+)          | Symbols              |
+| `Promise` (resolved by `use()`)                 | DOM nodes            |
+| React elements (`<Component />`)                | Closures             |
 
 ### Common Error: Passing Functions
 

@@ -192,7 +192,7 @@ export default function ProductPage({ product }) {
 'use client';
 
 import { useState } from 'react';
-import { addToCart } from '../actions'; // Server Action or API call for mutation
+import { addToCart } from '../actions'; // Calls a Rails controller endpoint
 
 export default function AddToCartButton({ productId }) {
   const [quantity, setQuantity] = useState(1);
@@ -370,7 +370,7 @@ export default function Dashboard({ title, getReactOnRailsAsyncProp }) {
 }
 
 // Stats.jsx -- Async Server Component (awaits the streamed prop)
-async function Stats({ statsPromise }) {
+export default async function Stats({ statsPromise }) {
   const stats = await statsPromise;
   return (
     <div>
