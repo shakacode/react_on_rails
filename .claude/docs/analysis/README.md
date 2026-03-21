@@ -26,7 +26,7 @@ These documents serve as:
 The analysis in these files led to the creation of:
 
 - `.claude/docs/testing-build-scripts.md`
-- `.claude/docs/master-health-monitoring.md`
+- `.claude/docs/main-health-monitoring.md`
 - `.claude/docs/managing-file-paths.md`
 
 See also PR #2062 and PR #2065 for the full context.
