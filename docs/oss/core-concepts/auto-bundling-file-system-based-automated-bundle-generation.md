@@ -97,7 +97,7 @@ default: &default
 
 the directory structure will look like this
 
-```
+```text
 app/javascript:
   └── packs:               # sets up webpack entries
   │   └── application.js   # references FooComponentOne.jsx, BarComponentOne.jsx and BarComponentTwo.jsx in `../src`
@@ -634,7 +634,7 @@ ReactOnRails.registerStore({ commentsStore });
 
 Component and store names must be unique across both registries. If a component and a store share the same name, pack generation will raise an error:
 
-```
+```text
 **ERROR** ReactOnRails: The following names are used for both components and stores: myName.
 This would cause pack file conflicts in the generated directory.
 Please rename your components or stores to have unique names.

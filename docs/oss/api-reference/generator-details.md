@@ -4,7 +4,7 @@ The `react_on_rails:install` generator combined with the example pull requests o
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
-```
+```text
 Usage:
   rails generate react_on_rails:install [options]
 
@@ -78,7 +78,7 @@ The React on Rails generator creates different directory structures depending on
 
 The basic generator creates a simple, flat structure optimized for auto-bundling:
 
-```
+```text
 app/javascript/
 └── src/
     └── HelloWorld/
@@ -98,7 +98,7 @@ For components that need different client vs. server implementations, use `.clie
 
 The Redux generator creates a more structured organization with familiar Redux patterns:
 
-```
+```text
 app/javascript/
 └── src/
     └── HelloWorldApp/

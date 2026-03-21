@@ -122,7 +122,7 @@ If you prefer to use React Hooks instead of Redux, run the basic installer witho
 
 Add the following variable to your environment:
 
-```
+```text
 EXECJS_RUNTIME=Node
 ```
 

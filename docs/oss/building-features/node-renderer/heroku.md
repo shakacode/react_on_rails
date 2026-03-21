@@ -17,7 +17,7 @@ Scroll down if you want to have different servers.
 
 `/Procfile`
 
-```
+```text
 web: bin/runsvdir-dyno
 ```
 
@@ -25,14 +25,14 @@ web: bin/runsvdir-dyno
 
 `/Procfile.web`
 
-```
+```text
 puma: bundle exec puma -C config/puma.rb
 renderer: bin/node-renderer
 ```
 
 ### bin/node-renderer
 
-```
+```bash
 #!/bin/bash
 cd client
 yarn run node-renderer
@@ -75,7 +75,7 @@ end
 If you get this sort of error, then you're forgetting to configure the PORT on the node-renderer and
 setting the config.renderer_url on the Rails App.
 
-```
+```text
 bundler: failed to load command: puma (/app/vendor/bundle/ruby/2.6.0/bin/puma)
 Errno::EADDRINUSE: Address already in use - bind(2) for "0.0.0.0" port 21752
   /app/vendor/bundle/ruby/2.6.0/gems/puma-4.3.3/lib/puma/binder.rb:229:in `initialize'

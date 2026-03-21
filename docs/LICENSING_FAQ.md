@@ -37,7 +37,7 @@ See the [Installation Guide](./pro/installation.md) for details.
 
 **A:** The monorepo will have clear directory-based license boundaries:
 
-```
+```text
 react_on_rails/ (monorepo root)
 ├── lib/
 │   ├── react_on_rails/           # MIT Licensed

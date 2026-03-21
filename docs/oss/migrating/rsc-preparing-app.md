@@ -332,7 +332,7 @@ module.exports = webpackConfig;
 
 Add the RSC bundle watcher to your `Procfile.dev`:
 
-```
+```text
 # Procfile.dev
 rails: rails s -p 3000
 webpack-dev-server: HMR=true bin/shakapacker-dev-server
@@ -390,7 +390,7 @@ Do the same for any component files imported in your `server-bundle.js`.
 
 If you use `auto_load_bundle` with a `components_subdirectory`, each component has a file in that directory:
 
-```
+```text
 app/javascript/src/
   └── ProductPage/
       └── ror_components/          # your components_subdirectory
@@ -412,7 +412,7 @@ export default ProductPage;
 
 If you use separate files for client and server rendering:
 
-```
+```text
 app/javascript/src/
   └── ReduxApp/
       └── ror_components/

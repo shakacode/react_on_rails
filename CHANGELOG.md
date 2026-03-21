@@ -726,7 +726,7 @@ _Major bump because dropping support for Ruby 2.7 and deprecated `webpackConfigL
 
   In exchange, you may see a warning like this when building using any version of React below 18:
 
-  ```
+  ```text
   WARNING in ./node_modules/react-on-rails/node_package/lib/reactHydrateOrRender.js19:25-52
   Module not found: Error: Can't resolve 'react-dom/client' in '/home/runner/work/react_on_rails/react_on_rails/spec/dummy/node_modules/react-on-rails/node_package/lib'
    @ ./node_modules/react-on-rails/node_package/lib/ReactOnRails.js 34:45-78
@@ -1270,7 +1270,7 @@ _Note: 8.0.4 skipped._
 
 - Generators and full support for [webpacker_lite](https://github.com/shakacode/webpacker_lite)
 - No breaking changes to move to 8.0.0 other than the default for this setting changed to nil. If you depended on the default of this setting and are using the asset pipeline (and not webpacker_lite), then add this to your `config/initializers/react_on_rails.rb`:
-  ```
+  ```ruby
   symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
   ```
 - For an example of migration, see: [react-webpack-rails-tutorial PR #395](https://github.com/shakacode/react-webpack-rails-tutorial/pull/395)
@@ -1302,7 +1302,7 @@ old value to nil. This is a breaking change if you didn't have this value set in
 config/initializers/react_on_rails.rb file and you need this because you're using webpack's CSS
 features and you have not switched to webpacker lite.
 
-```
+```ruby
 symlink_non_digested_assets_regex: /\.(png|jpg|jpeg|gif|tiff|woff|ttf|eot|svg|map)/,
 ```
 
@@ -1422,13 +1422,13 @@ No changes other than a test fix.
 
 - If you installed 6.6.0, you will need to comment out the line matching i18n_dir unless you are using this feature. 6.7.1 will give you an error like:
 
-```
+```text
 Errno::ENOENT: No such file or directory @ rb_sysopen - /tmp/build_1444a5bb9dd16ddb2561c7aff40f0fc7/my-app-816d31e9896edd90cecf1402acd002c724269333/client/app/libs/i18n/translations.js
 ```
 
 Commenting out this line addresses the issue:
 
-```
+```ruby
 config.i18n_dir = Rails.root.join("client", "app", "libs", "i18n")
 ```
 
@@ -1913,26 +1913,24 @@ RSpec.configure do |config|
 - No global namespace pollution. ReactOnRails is the only global added.
 - New API. Instead of placing React components on the global namespace, you instead call ReactOnRails.register, passing an object where keys are the names of your components:
 
-```
+```javascript
 import ReactOnRails from 'react-on-rails';
-ReactOnRails.register({name: component});
+ReactOnRails.register({ name: component });
 ```
 
 Best done with Object destructing:
 
-```
-  import ReactOnRails from 'react-on-rails';
-  ReactOnRails.register(
-    {
-      Component1,
-      Component2
-    }
-  );
+```javascript
+import ReactOnRails from 'react-on-rails';
+ReactOnRails.register({
+  Component1,
+  Component2,
+});
 ```
 
 Previously, you used
 
-```
+```javascript
 window.Component1 = Component1;
 window.Component2 = Component2;
 ```
@@ -1941,14 +1939,14 @@ This would pollute the global namespace. See details in the README.md for more i
 
 - Your jade template for the WebpackDevServer setup should use the new API:
 
-```
-  ReactOnRails.render(componentName, props, domNodeId);
+```javascript
+ReactOnRails.render(componentName, props, domNodeId);
 ```
 
 such as:
 
-```
-  ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');
+```javascript
+ReactOnRails.render('HelloWorldApp', { name: 'Stranger' }, 'app');
 ```
 
 - All npm dependency libraries updated. Most notable is going to Babel 6.

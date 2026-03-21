@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 You may see a warning like this when building a Webpack bundle using any version of React below 18:
 
-```
+```text
 Module not found: Error: Can't resolve 'react-dom/client' in ....
 ```
 

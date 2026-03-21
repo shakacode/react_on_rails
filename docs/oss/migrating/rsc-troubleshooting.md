@@ -104,7 +104,7 @@ The `'use client'` directive operates at the **module level**. Once a file is ma
 
 ### The Problem
 
-```
+```text
 ClientComponent.jsx ('use client')
 ├── imports utils.js          → becomes client code
 │   └── imports heavy-lib.js  → becomes client code (100KB wasted)
@@ -463,7 +463,7 @@ Async Server Components introduce new testing challenges. Vitest and Jest can te
 
 ### Recommended Testing Approach
 
-```
+```text
 Unit Tests (Vitest/Jest)
 ├── Client Components -- full support with hooks mocking
 ├── Synchronous Server Components -- basic rendering tests
@@ -753,7 +753,7 @@ React on Rails requires the gem and npm package versions to match exactly. The v
 
 **Symptom 1 -- Version mismatch:**
 
-```
+```text
 **ERROR** ReactOnRails: The 'react-on-rails' package version does not match the gem version.
 
 Package: 16.3.0
@@ -778,7 +778,7 @@ npm install react-on-rails@16.4.0 --save-exact
 
 **Symptom 2 -- Non-exact version:**
 
-```
+```text
 **ERROR** ReactOnRails: The 'react-on-rails' package version is not an exact version.
 
 Detected: ^16.4.0
@@ -799,7 +799,7 @@ React on Rails does not allow semver ranges (`^`, `~`, `>`, `<`, `*`) or special
 
 **Symptom 3 -- Pro gem with base package:**
 
-```
+```text
 **ERROR** ReactOnRails: You have the Pro gem installed but are using the base 'react-on-rails' package.
 ```
 
@@ -813,7 +813,7 @@ yarn remove react-on-rails && yarn add react-on-rails-pro@16.4.0 --exact
 
 **Symptom 4 -- Pro package without Pro gem:**
 
-```
+```text
 **ERROR** ReactOnRails: You have the 'react-on-rails-pro' package installed but the Pro gem is not installed.
 ```
 

@@ -5,10 +5,10 @@ If yarn is not installed, asset compilation will fail on the Elastic Beanstalk i
 
 You can install `yarn` by adding a `0x_install_yarn.config` file to your `.ebextensions` folder which contains these commands.
 
-```
+```yaml
 files:
-  "/opt/elasticbeanstalk/hooks/appdeploy/pre/09_yarn.sh" :
-    mode: "000755"
+  '/opt/elasticbeanstalk/hooks/appdeploy/pre/09_yarn.sh':
+    mode: '000755'
     owner: root
     group: root
     content: |
@@ -48,7 +48,7 @@ Your app can be deployed to Elastic Beanstalk successfully. However, the React a
 
 In your `proxy.conf` setting, please add the following code.
 
-```
+```nginx
 ...
 server{
   ...
