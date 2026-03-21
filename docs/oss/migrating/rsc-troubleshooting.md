@@ -18,7 +18,6 @@ Everything passed from a Server Component to a Client Component must be serializ
 | `Map`, `Set`, typed arrays (React 19+)          | Symbols                           |
 | `Promise` (resolved by `use()`)                 | DOM nodes                         |
 | React elements (`<Component />`)                | Closures                          |
-| Server Action references (`'use server'`)       |                                   |
 
 ### Common Error: Passing Functions
 
@@ -46,37 +45,39 @@ export default function ClientButton() {
 }
 ```
 
-**Fix 2:** Use a Server Action for server-side logic:
+**Fix 2:** Move the logic to a Client Component that calls a Rails endpoint:
 
 ```jsx
-// Page.jsx -- Server Component
-async function Page() {
-  async function handleSubmit(formData) {
-    'use server';
-    // In React on Rails, Server Actions run in Node.js and cannot access
-    // Rails models directly. Call your Rails API endpoint instead:
-    // Server-side fetch needs an absolute URL. Point RAILS_BASE_URL at your
-    // internal Rails URL (for example http://127.0.0.1:3000 in development),
-    // not the public-facing domain.
-    // This server-side fetch will not include the browser's CSRF token, so
-    // use an API-only route or another non-session auth boundary. If you use
-    // `protect_from_forgery with: :null_session`, add another trust check
-    // (for example signed tokens, API keys, or same-origin validation)
-    // because `null_session` avoids the CSRF failure but does not
-    // authenticate the request.
-    const railsBaseUrl = process.env.RAILS_BASE_URL;
-    if (!railsBaseUrl) {
-      throw new Error('RAILS_BASE_URL environment variable is required for Server Actions');
-    }
-    await fetch(new URL('/api/items', railsBaseUrl), {
+// ClientForm.jsx -- Client Component
+'use client';
+
+import { useState } from 'react';
+
+export default function ClientForm({ csrfToken }) {
+  const [name, setName] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    await fetch('/api/items', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: formData.get('name') }),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({ name }),
     });
   }
-  return <ClientForm action={handleSubmit} />;
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      <button type="submit">Submit</button>
+    </form>
+  );
 }
 ```
+
+> **Note:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controller endpoints for all mutations.
 
 ### Common Error: Passing Class Instances
 
@@ -406,6 +407,8 @@ import { useState } from 'react';
 - `'use server'` marks **Server Actions** (functions callable from the client) -- NOT Server Components
 - Server Components are the **default** and need no directive
 
+> **React on Rails note:** Server Actions (`'use server'`) are **not supported** in React on Rails. The Node renderer has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controller endpoints for all mutations.
+
 ## Performance Pitfalls
 
 ### Server Waterfalls
@@ -467,7 +470,6 @@ Async Server Components introduce new testing challenges. Vitest and Jest can te
 Unit Tests (Vitest/Jest)
 ├── Client Components -- full support with hooks mocking
 ├── Synchronous Server Components -- basic rendering tests
-├── Server Actions -- test as regular async functions
 └── Utility/helper functions -- standard unit tests
 
 Integration Tests
@@ -481,28 +483,28 @@ E2E Tests (Playwright)
 └── Full page flows -- navigation, forms, etc.
 ```
 
-### Testing Server Actions
+### Testing Mutations
 
-Server Actions can be tested as regular async functions:
+In React on Rails, mutations go through Rails controller endpoints rather than Server Actions. Test mutation logic in your Rails controller specs (RSpec request specs) and test the Client Component's form submission behavior with component tests:
 
 ```jsx
-// actions.test.js
-import { createUser } from './actions';
+// UserForm.test.jsx
+import { render, screen, fireEvent } from '@testing-library/react';
+import UserForm from './UserForm';
 
-it('rejects invalid input', async () => {
-  const formData = new FormData();
-  formData.set('name', 'Alice');
-  // email is missing -- expect validation error
-  const result = await createUser(formData);
-  expect(result.error).toBeDefined();
-});
+it('submits to the Rails endpoint', async () => {
+  global.fetch = jest.fn(() => Promise.resolve({ ok: true }));
 
-it('accepts valid input', async () => {
-  const formData = new FormData();
-  formData.set('name', 'Alice');
-  formData.set('email', 'alice@example.com');
-  const result = await createUser(formData);
-  expect(result).toBeUndefined(); // createUser returns no value on success
+  render(<UserForm csrfToken="test-token" />);
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Alice' } });
+  fireEvent.click(screen.getByText('Submit'));
+
+  expect(global.fetch).toHaveBeenCalledWith(
+    '/api/users',
+    expect.objectContaining({
+      method: 'POST',
+    }),
+  );
 });
 ```
 
@@ -530,31 +532,28 @@ async function Page() {
 }
 ```
 
-### Runtime Validation for Server Actions
+### Runtime Validation for API Endpoints
 
-TypeScript only provides compile-time checking. Server Actions are public endpoints that can receive arbitrary data. Use runtime validation:
+TypeScript only provides compile-time checking. Rails API endpoints that receive data from React forms should validate input on the server side. Use Rails' built-in model validations and strong parameters in your controllers:
 
-```tsx
-'use server';
-import { z } from 'zod';
+```ruby
+# app/controllers/api/users_controller.rb
+class Api::UsersController < ApplicationController
+  def create
+    user = User.new(user_params)
+    if user.save
+      render json: user, status: :created
+    else
+      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
 
-const CreateUserSchema = z.object({
-  name: z.string().min(1).max(100),
-  email: z.string().email(),
-});
+  private
 
-export async function createUser(formData: FormData) {
-  const parsed = CreateUserSchema.safeParse({
-    name: formData.get('name'),
-    email: formData.get('email'),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.flatten() };
-  }
-
-  await db.users.create({ data: parsed.data });
-}
+  def user_params
+    params.require(:user).permit(:name, :email)
+  end
+end
 ```
 
 ## Bundle Analysis Tools
@@ -579,7 +578,7 @@ export async function createUser(formData: FormData) {
 
 | Error Message                                                                                                                | Cause                                                                                                                                                                                                    | Solution                                                                                                                                                                                                                                    |
 | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"Functions cannot be passed directly to Client Components unless you explicitly expose it by marking it with 'use server'"` | Passing a function prop from Server to Client Component                                                                                                                                                  | Use Server Actions, or define the function in the Client Component                                                                                                                                                                          |
+| `"Functions cannot be passed directly to Client Components unless you explicitly expose it by marking it with 'use server'"` | Passing a function prop from Server to Client Component                                                                                                                                                  | Define the function in the Client Component, or submit to a Rails controller endpoint. Note: React on Rails does not support Server Actions (`'use server'`).                                                                               |
 | `"You're importing a component that needs useState/useEffect..."`                                                            | Using hooks in a Server Component                                                                                                                                                                        | Add `'use client'` to the component file                                                                                                                                                                                                    |
 | `"Only plain objects, and a few built-ins, can be passed to Client Components..."`                                           | Passing class instances or non-serializable values                                                                                                                                                       | Convert to plain objects with `.toJSON()` or manual serialization                                                                                                                                                                           |
 | `"async/await is not yet supported in Client Components"`                                                                    | Making a Client Component async. This is an intentional design constraint, not a temporary limitation -- Client Components re-render on state changes, which is incompatible with async rendering.       | Move async logic to a Server Component, or use `useEffect`/`use()`                                                                                                                                                                          |
