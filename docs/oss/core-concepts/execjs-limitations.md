@@ -16,7 +16,7 @@ ExecJS does not support `setTimeout`, `setInterval`, or `clearInterval`. These f
 
 **Common error messages:**
 
-```
+```text
 ReferenceError: setTimeout is not defined
 TypeError: Cannot read property 'setTimeout' of undefined
 ```
@@ -73,7 +73,7 @@ ExecJS does not provide a `window`, `document`, or any DOM API. Server rendering
 
 **Common error messages:**
 
-```
+```text
 ReferenceError: window is not defined
 ReferenceError: document is not defined
 ```
@@ -98,7 +98,7 @@ See [Client vs. Server Rendering](./client-vs-server-rendering.md) for more on h
 
 When using `mini_racer`, you may encounter:
 
-```
+```text
 ReferenceError: TextEncoder is not defined
 ```
 

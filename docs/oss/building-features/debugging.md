@@ -75,7 +75,7 @@ When `config.trace` is enabled, React on Rails logs additional details about the
 
 Hydration mismatches occur when the server-rendered HTML differs from what React generates on the client. React will warn in the browser console:
 
-```
+```text
 Warning: Text content did not match. Server: "March 21" Client: "March 22"
 ```
 
@@ -152,10 +152,11 @@ Build errors and warnings appear in:
 - **Terminal:** where webpack-dev-server or `bin/dev` runs
 - **Browser console:** webpack overlay may show compilation errors
 
-To see the full webpack configuration for debugging build issues:
+To see the full bundler configuration for debugging build issues:
 
 ```bash
-bin/webpack --config-dump
+# Install the binstub (one-time): rake shakapacker:binstubs
+bin/shakapacker-config --doctor
 ```
 
 ### Browser Console
@@ -176,7 +177,7 @@ To verify that your components are registered correctly:
 console.log(ReactOnRails.registeredComponents());
 ```
 
-This returns a list of all components that have been registered with `ReactOnRails.register()`. If your component is missing, check that the registration file is included in your webpack entry point.
+This returns a map of all components that have been registered with `ReactOnRails.register()`. If your component is missing, check that the registration file is included in your webpack entry point.
 
 ## Debugging Webpack Configuration
 

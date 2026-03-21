@@ -4,20 +4,20 @@ This page covers the performance characteristics of React on Rails across differ
 
 ## SSR Performance: ExecJS vs Node Renderer
 
-The default ExecJS renderer evaluates JavaScript synchronously inside a single-threaded pool. The [Node Renderer](../building-features/node-renderer/basics.md) (React on Rails Pro) runs a dedicated Node.js process with worker threads, providing dramatically better throughput.
+The default ExecJS renderer evaluates JavaScript synchronously inside a single-threaded pool. The [Node Renderer](../building-features/node-renderer/basics.md) (React on Rails Pro) runs a dedicated Node.js master process with worker processes (via `cluster.fork()`), providing dramatically better throughput.
 
 ### Key Differences
 
 | Metric            | ExecJS (mini_racer)           | ExecJS (Node.js runtime)      | Node Renderer (Pro)        |
 | ----------------- | ----------------------------- | ----------------------------- | -------------------------- |
-| Architecture      | V8 isolate in Ruby process    | Spawns Node.js per eval       | Persistent Node.js workers |
+| Architecture      | V8 isolate in Ruby process    | Persistent subprocess via IPC | Persistent Node.js workers |
 | Concurrency (MRI) | Single-threaded (pool size 1) | Single-threaded (pool size 1) | Multi-worker               |
 | Async support     | None                          | None                          | Full (Promises, timers)    |
 | Streaming SSR     | Not supported                 | Not supported                 | Supported                  |
 | RSC support       | Not supported                 | Not supported                 | Supported                  |
 | Typical speedup   | Baseline                      | ~1-2x over mini_racer         | 10-100x over ExecJS        |
 
-The Node Renderer's persistent process avoids the overhead of re-evaluating the server bundle on each request (ExecJS re-creates the context), which is the primary source of the performance difference. For complex components with large bundles, this gap widens significantly.
+The Node Renderer's persistent process supports full async rendering and multi-worker concurrency, which are the primary sources of the performance difference. ExecJS is limited to synchronous rendering within a single-threaded pool. For complex components with many async dependencies, this gap widens significantly.
 
 ## Bundle Splitting Impact
 
