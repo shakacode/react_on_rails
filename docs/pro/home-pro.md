@@ -20,35 +20,37 @@ See the README.md in those sample apps for more details.
 
 ## Features
 
-### 🚀 Next-Gen Server Rendering: Streaming with React 18's Latest APIs
+### Node Renderer
 
-React on Rails Pro supports React 18's Streaming Server-Side Rendering, allowing you to progressively render and stream HTML content to the client. This enables faster page loads and better user experience.
+The Pro Node Renderer replaces ExecJS with a dedicated Node.js server for 10-100x faster SSR, proper Node.js tooling, and memory isolation from the Ruby process. See the [Node Renderer overview](./node-renderer.md).
 
-See [Streaming Server Rendering](../oss/building-features/streaming-server-rendering.md) for more details.
+### Streaming SSR
 
-### Caching
+Stream HTML to the browser progressively using React 19's `renderToPipeableStream`, so users see content as it becomes ready instead of waiting for the slowest component. See the [Streaming SSR overview](./streaming-ssr.md).
 
-Caching of SSR is critical for achieving optimum performance.
+### Fragment Caching
 
-- **Fragment Caching**: for `react_component` and `react_component_hash`, including lazy evaluation of props.
-- **Prerender Caching**: Server rendering JavaScript evaluation is cached if `prerender_caching` is turned on in your Rails config. This applies to all JavaScript evaluation methods.
+Cache the complete rendered output of a component — including props assembly, serialization, and JavaScript evaluation — so that on a cache hit, none of that work happens. See the [Fragment Caching overview](./fragment-caching.md).
 
-See [Fragment Caching](../oss/building-features/caching.md) for more details.
+### React Server Components
 
-### Clearing of Global State
+Full RSC support with Rails integration. Server Components run on the server and stream their output to the client, reducing bundle size and enabling server-only data access. See the [RSC tutorial](./react-server-components/tutorial.md).
 
-Suppose you detect that some library used in server-rendering is leaking state between calls to server render. In that case, you can set the `config.ssr_pre_hook_js` in your `config/initializers/react_on_rails_pro.rb` to run some JavaScript to clear the globally leaked state at the beginning of each call to server render.
+### Prerender Caching
 
-For more details, see [Rails Configuration (OSS)](../oss/configuration/README.md).
+Cache JavaScript evaluation results with a single config line (`config.prerender_caching = true`). See the [Caching guide](../oss/building-features/caching.md#level-1-prerender-caching).
 
-### React On Rails Pro Node Renderer
+### Code Splitting
 
-The "React on Rails Pro Node Renderer" provides more efficient server rendering on a standalone Node JS server.
-See the [Node Renderer Docs](../oss/building-features/node-renderer/basics.md).
+Route-based code splitting with Loadable Components and SSR support. See [Code Splitting](../oss/building-features/code-splitting.md).
 
 ### Bundle Caching
 
-Don't wait for the same webpack bundles to be built over and over. See the [bundle-caching docs](../oss/building-features/bundle-caching.md).
+Skip redundant webpack builds across deployments. See the [Bundle Caching docs](../oss/building-features/bundle-caching.md).
+
+### Clearing of Global State
+
+Set `config.ssr_pre_hook_js` to run JavaScript that clears globally leaked state at the beginning of each server render call. See [Rails Configuration](../oss/configuration/README.md).
 
 ## Other Utility Methods
 
@@ -57,10 +59,14 @@ See the [Ruby API](../oss/api-reference/ruby-api-pro.md).
 ## References
 
 - [Installation](./installation.md)
-- [Streaming Server Rendering](../oss/building-features/streaming-server-rendering.md)
-- [Caching](../oss/building-features/caching.md)
+- [Upgrading from OSS to Pro](./upgrading-to-pro.md)
+- [Node Renderer](./node-renderer.md)
+- [Streaming SSR](./streaming-ssr.md)
+- [Fragment Caching](./fragment-caching.md)
+- [React Server Components](./react-server-components/tutorial.md)
+- [Caching guide](../oss/building-features/caching.md)
 - [Rails Configuration](../oss/configuration/configuration-pro.md)
-- [Node Renderer Docs](../oss/building-features/node-renderer/basics.md)
+- [Node Renderer technical docs](../oss/building-features/node-renderer/basics.md)
 
 # Features
 

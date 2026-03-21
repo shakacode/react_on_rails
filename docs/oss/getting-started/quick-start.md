@@ -189,6 +189,10 @@ Now that you have React on Rails working, here's what to explore next:
 
 ### Go Pro
 
+:::tip Pro Upgrade
+React on Rails Pro adds [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and a [Node renderer](../../pro/node-renderer.md) for 10-100x faster SSR. Free to evaluate — no license needed for development. [Upgrade guide →](../../pro/upgrading-to-pro.md)
+:::
+
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
 - **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - React Server Components, streaming SSR, and 10-100x faster SSR
 
