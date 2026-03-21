@@ -42,7 +42,9 @@ runs:
           // For commits outside this window, we skip the check and allow the docs-only skip.
           const createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString();
 
-          // Optimize pagination: use lower per_page and collect only what we need
+          // Optimize pagination: use lower per_page and collect only what we need.
+          // Do not filter by branch here: during master->main cutover, workflow runs
+          // for previousSha may still be recorded under master.
           const workflowRuns = [];
           let foundAllRelevant = false;
 
@@ -51,7 +53,6 @@ runs:
             {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              branch: 'main',
               event: 'push',
               per_page: 30,
               created: `>${createdAfter}`,
