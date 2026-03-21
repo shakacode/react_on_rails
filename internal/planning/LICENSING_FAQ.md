@@ -86,7 +86,7 @@ react_on_rails/ (monorepo root)
 
 ### Q: When will this happen?
 
-**A:** The merger is planned as a 7-phase process. Each phase maintains full functionality and CI compliance. See [MONOREPO_MERGER_PLAN_REF.md](../internal/planning/MONOREPO_MERGER_PLAN_REF.md) for details.
+**A:** The merger is planned as a 7-phase process. Each phase maintains full functionality and CI compliance. See [MONOREPO_MERGER_PLAN_REF.md](./MONOREPO_MERGER_PLAN_REF.md) for details.
 
 ### Q: What if something goes wrong during the merger?
 
