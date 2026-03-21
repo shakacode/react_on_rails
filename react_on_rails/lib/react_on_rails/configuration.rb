@@ -76,7 +76,8 @@ module ReactOnRails
   end
 
   class Configuration
-    attr_accessor :node_modules_location, :server_bundle_js_file, :prerender, :replay_console,
+    attr_accessor :node_modules_location, :server_bundle_js_file, :prerender, :prerender_override,
+                  :replay_console,
                   :trace, :development_mode, :logging_on_server, :server_renderer_pool_size,
                   :server_renderer_timeout, :skip_display_none, :raise_on_prerender_error,
                   :generated_assets_dirs, :generated_assets_dir, :components_subdirectory,

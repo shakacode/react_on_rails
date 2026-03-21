@@ -3,6 +3,7 @@ module ReactOnRails
     attr_accessor node_modules_location: String?
     attr_accessor server_bundle_js_file: String
     attr_accessor prerender: bool
+    attr_accessor prerender_override: bool?
     attr_accessor replay_console: bool
     attr_accessor trace: bool
     attr_accessor development_mode: bool

@@ -164,6 +164,75 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     end
   end
 
+  describe "#prerender with prerender_override" do
+    after do
+      ReactOnRails.configuration.prerender_override = nil
+    end
+
+    context "when prerender_override is false" do
+      it "returns false even when component sets prerender: true" do
+        ReactOnRails.configuration.prerender_override = false
+        attrs = the_attrs(options: { prerender: true })
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.prerender).to be false
+      end
+
+      it "returns false even when config.prerender is true" do
+        ReactOnRails.configuration.prerender = true
+        ReactOnRails.configuration.prerender_override = false
+        attrs = the_attrs
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.prerender).to be false
+      end
+    end
+
+    context "when prerender_override is true" do
+      it "returns true even when component sets prerender: false" do
+        ReactOnRails.configuration.prerender_override = true
+        attrs = the_attrs(options: { prerender: false })
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.prerender).to be true
+      end
+
+      it "returns true even when config.prerender is false" do
+        ReactOnRails.configuration.prerender = false
+        ReactOnRails.configuration.prerender_override = true
+        attrs = the_attrs
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.prerender).to be true
+      end
+    end
+
+    context "when prerender_override is nil (default)" do
+      it "falls back to component-level option" do
+        ReactOnRails.configuration.prerender_override = nil
+        attrs = the_attrs(options: { prerender: true })
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.prerender).to be true
+      end
+
+      it "falls back to config default when no component option" do
+        ReactOnRails.configuration.prerender_override = nil
+        ReactOnRails.configuration.prerender = false
+        attrs = the_attrs
+
+        opts = described_class.new(**attrs)
+
+        expect(opts.prerender).to be false
+      end
+    end
+  end
+
   describe "#immediate_hydration" do
     context "with Pro license" do
       before do

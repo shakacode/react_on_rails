@@ -68,6 +68,9 @@ module ReactOnRails
       end
 
       def prerender
+        override = ReactOnRails.configuration.prerender_override
+        return override unless override.nil?
+
         retrieve_configuration_value_for(:prerender)
       end
 
