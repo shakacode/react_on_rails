@@ -1,6 +1,6 @@
-# create-react-on-rails-app
+# Quick Start: `npx create-react-on-rails-app`
 
-The fastest way to start a new React on Rails project. One command creates a fully configured Rails + React application with TypeScript, server-side rendering, and hot module replacement.
+The fastest way to start a new React on Rails project. One command creates a fully configured Rails + React application with TypeScript, server-side rendering, hot module replacement, and, optionally, React Server Components (RSC).
 
 ## Quick Start
 
