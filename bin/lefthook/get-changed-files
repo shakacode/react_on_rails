@@ -14,9 +14,12 @@ case "$CONTEXT" in
     (git diff --cached --name-only --diff-filter=ACMR; git diff --name-only --diff-filter=ACMR; git ls-files --others --exclude-standard) | sort -u | grep -E "$PATTERN" || true
     ;;
   branch)
-    # Find base branch (prefer main over master)
+    # Compare against main for this repo's default-branch workflow.
     base="origin/main"
-    git rev-parse --verify --quiet "$base" >/dev/null || base="origin/master"
+    if ! git rev-parse --verify --quiet "$base" >/dev/null; then
+      echo "Error: ${base} not found. Run: git fetch origin main" >&2
+      exit 1
+    fi
     git diff --name-only --diff-filter=ACMR "$base"...HEAD | grep -E "$PATTERN" || true
     ;;
   *)
