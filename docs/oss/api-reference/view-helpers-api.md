@@ -17,7 +17,7 @@ react_component(component_name,
 
 Uncommonly used options:
 
-```
+```ruby
   trace: nil,
   replay_console: nil,
   raise_on_prerender_error: nil,

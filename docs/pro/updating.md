@@ -66,7 +66,7 @@ end
 
 **2. `.npmrc` file with GitHub authentication:**
 
-```
+```ini
 always-auth=true
 //npm.pkg.github.com/:_authToken=YOUR_TOKEN
 @shakacode-tools:registry=https://npm.pkg.github.com

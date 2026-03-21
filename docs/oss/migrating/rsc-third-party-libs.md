@@ -304,7 +304,7 @@ For third-party packages, check if the library provides direct import paths (mos
 
 Avoid creating barrel files that mix server and client components. If you must use a barrel file, keep separate barrels for server and client exports:
 
-```
+```text
 components/
 ├── server/index.js    # Only server components
 ├── client/index.js    # Only 'use client' components

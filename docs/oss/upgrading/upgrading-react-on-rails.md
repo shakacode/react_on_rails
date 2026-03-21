@@ -260,7 +260,7 @@ Registered Objects are of the following type:
 
 2. **Function that takes only zero or one params and returns an Object (_not a React Element_)**. If the function takes zero or one params, **you need to add one or two unused params so you have exactly 2 params** and then that function will be treated as a render function and it can return an Object rather than a React element. If you don't do this, you'll see this obscure error message:
 
-```
+```text
   [SERVER] message: Objects are not valid as a React child (found: object with keys {renderedHtml}). If you meant to render a collection of children, use an array instead.
   in YourComponentRenderFunction
 ```
@@ -382,7 +382,7 @@ Reason for doing this: This enables your Webpack bundles to bypass the Rails ass
 
 - You'll need the following code to read data from the webpacker config:
 
-```
+```javascript
 const path = require('path');
 const ManifestPlugin = require('webpack-manifest-plugin'); // we'll use this later
 
@@ -393,7 +393,7 @@ const { output } = webpackConfigLoader(configPath);
 
 - That output variable will be used for Webpack's `output` rules:
 
-```
+```javascript
   output: {
     filename: '[name]-[chunkhash].js', // [chunkhash] because we've got to do our own cache-busting now
     path: output.path,
@@ -403,7 +403,7 @@ const { output } = webpackConfigLoader(configPath);
 
 - ...as well as for the output of plugins like `webpack-manifest-plugin`:
 
-```
+```javascript
 
       new ManifestPlugin({
         publicPath: output.publicPath,
@@ -463,7 +463,7 @@ gem "webpacker"
 - Edit your Webpack.config files:
   - Change your Webpack output to be like this. **Be sure to have the hash or chunkhash in the filename,** unless the bundle is server side.:
 
-    ```
+    ```javascript
     const webpackConfigLoader = require('react-on-rails/webpackConfigLoader');
     const configPath = resolve('..', 'config');
     const { output, settings } = webpackConfigLoader(configPath);
@@ -481,7 +481,7 @@ gem "webpacker"
 
   - Change your ManifestPlugin definition to something like the following
 
-    ```
+    ```javascript
     new ManifestPlugin({
         publicPath: output.publicPath,
         writeToFileEmit: true
@@ -494,15 +494,15 @@ gem "webpacker"
   - If you are not using the webpacker Webpack setup, be sure to put in `compile: false` in the `default` section.
   - Alternately, if you are updating from webpacker_lite, you can manually change these:
   - Add a default setting
-    ```
+    ```yaml
     cache_manifest: false
     ```
   - For production, set:
-    ```
+    ```yaml
     cache_manifest: true
     ```
   - Add a section like this under your development env:
-    ```
+    ```yaml
     dev_server:
       host: localhost
       port: 3035

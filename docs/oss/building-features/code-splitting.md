@@ -14,7 +14,7 @@ team no longer recommends that library. The new way is far preferable.
 
 ## Installation
 
-```
+```bash
 yarn add  @loadable/babel-plugin @loadable/component @loadable/server @loadable/webpack-plugin
 ```
 

@@ -10,7 +10,7 @@ Rails will start creating the app and will skip the files you have already creat
 
 2. Resolve conflicts
 
-```
+```text
 1. Press "d" to see the difference
 2. If it is only adding lines then press "y" to continue
 3. If it is removeing some of your code then press "n" and add all additions manually

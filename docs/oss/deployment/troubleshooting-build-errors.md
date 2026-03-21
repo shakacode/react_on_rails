@@ -17,7 +17,7 @@ This guide covers common webpack build errors encountered when using react_on_ra
 
 ### Error Message
 
-```
+```text
 Cannot read properties of undefined (reading 'module')
 TypeError: Cannot read properties of undefined (reading 'module')
     at ProvidedDependencyTemplate.apply
@@ -137,7 +137,7 @@ Some operations require a working Rails environment:
 
 1. **Database Connection Errors:**
 
-   ```
+   ```text
    MONGODB | Error checking localhost:27017: Connection refused
    ```
 
@@ -150,7 +150,7 @@ Some operations require a working Rails environment:
 
 2. **Missing Dependencies:**
 
-   ```
+   ```text
    sidekiq-pro is not installed
    ```
 

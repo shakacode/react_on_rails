@@ -149,7 +149,7 @@ const webpackConfig = (envSpecific) => {
 
 Finally, update `Procfile.dev` to generate the RSC bundle when running the development server:
 
-```
+```text
 # Procfile.dev
 # existing code...
 
@@ -398,7 +398,7 @@ bin/dev
 
 Navigate to the React Server Component Page:
 
-```
+```text
 http://localhost:3000/react_server_component_without_ssr
 ```
 
@@ -414,7 +414,7 @@ Looking at the network tab in your browser's developer tools, you'll notice that
 
 Also, by looking at the console, we can see the log
 
-```
+```text
 [SERVER] Hello from ReactServerComponent
 ```
 

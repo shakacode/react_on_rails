@@ -435,7 +435,7 @@ bundle exec rspec
 
 If all checks pass, React on Rails temporarily overrides Shakapacker's test config to point at the development output. You'll see:
 
-```
+```text
 ====> React on Rails: Reusing development assets from packs
       (detected fresh static-mode webpack output, skipping test compilation)
 ```

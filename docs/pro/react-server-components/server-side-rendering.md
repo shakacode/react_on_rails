@@ -22,7 +22,7 @@ Update the `react_server_component_without_ssr.html.erb` view to pass `prerender
 
 Now, when you visit the page, you should see part of the React Server Component page rendered in the browser. Then, we get the error:
 
-```
+```text
 The server did not finish this Suspense boundary: The server used "renderToString" which does not support Suspense. If you intended for this Suspense boundary to render the fallback content on the server consider throwing an Error somewhere within the Suspense boundary. If you intended to have the server wait for the suspended component please switch to "renderToPipeableStream" which supports Suspense on the server
 ```
 
