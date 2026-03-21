@@ -620,10 +620,13 @@ Client Components only have access to environment variables that are explicitly 
 
 ```js
 // config/webpack/environment.js (Shakapacker)
-const { environment } = require('@rails/webpacker');
+const { generateWebpackConfig } = require('shakapacker');
+const webpack = require('webpack');
+
+const webpackConfig = generateWebpackConfig();
 
 // Only these variables are available in Client Components
-environment.plugins.prepend('Environment', new webpack.EnvironmentPlugin(['RAILS_ENV', 'PUBLIC_API_URL']));
+webpackConfig.plugins.push(new webpack.EnvironmentPlugin(['RAILS_ENV', 'PUBLIC_API_URL']));
 ```
 
 ```jsx

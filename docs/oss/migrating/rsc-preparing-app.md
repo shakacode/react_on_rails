@@ -44,12 +44,12 @@ yarn why react
 # Should show 19.x
 
 yarn why react-on-rails-rsc
-# Major.minor should match react (e.g., both 19.1.x)
+# Check the package's README or changelog for React version compatibility
 ```
 
 If you're on React 18 or earlier, upgrade first -- RSC requires React 19.
 
-> **Version requirements:** Use `react-on-rails-rsc` **19.0.4 or later** -- earlier versions (19.0.0 through 19.0.3) vendored older builds of `react-server-dom-webpack` that were updated in 19.0.4 with upstream security patches. The major and minor versions of `react-on-rails-rsc` must match your `react` version (e.g., `react` 19.1.x requires `react-on-rails-rsc` 19.1.x).
+> **Version requirements:** Use `react-on-rails-rsc` **19.0.4 or later** -- earlier versions (19.0.0 through 19.0.3) vendored older builds of `react-server-dom-webpack` that were updated in 19.0.4. Check the `react-on-rails-rsc` README or changelog for the supported React version range.
 
 ## Step 2: Configure Rails for RSC
 

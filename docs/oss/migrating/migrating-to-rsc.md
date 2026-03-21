@@ -8,8 +8,8 @@ This guide covers the React-side challenges of migrating an existing React on Ra
 
 React Server Components offer significant performance benefits when used correctly:
 
-- **62% reduction** in client-side bundle size ([Frigade case study](https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade))
-- Significant improvements in Google Speed Index and Total Blocking Time reported across RSC adoption case studies
+- Significant reductions in client-side bundle size reported across RSC adoption case studies
+- Improvements in Google Speed Index and Total Blocking Time
 - Server-only dependencies (date-fns, marked, sanitize-html) never ship to the client
 
 However, these benefits require intentional architecture changes. Simply adding `'use client'` everywhere preserves the status quo -- `'use client'` is a [boundary marker, not a component annotation](rsc-component-patterns.md#use-client-marks-a-boundary-not-a-component-type). The guides below walk you through the restructuring needed to capture real gains.
