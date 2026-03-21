@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../react_on_rails"
-require_relative "../react_on_rails/version_synchronizer"
 
 namespace :react_on_rails do
   desc "Sync React on Rails npm package versions with gem versions (dry-run by default)"
@@ -11,9 +10,6 @@ namespace :react_on_rails do
 
     raise ReactOnRails::Error, "WRITE and DRY_RUN cannot both be true" if write && dry_run
 
-    result = ReactOnRails::VersionSynchronizer.new.sync(write: write)
-    next if result.changes.empty? || write
-
-    puts "No files changed. Run with WRITE=true to apply updates."
+    ReactOnRails::VersionSynchronizer.new.sync(write: write)
   end
 end
