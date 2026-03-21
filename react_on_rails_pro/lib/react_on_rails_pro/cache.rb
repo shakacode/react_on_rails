@@ -75,9 +75,16 @@ module ReactOnRailsPro
                             cache_key_option
                           end
 
+        override = ReactOnRails.configuration.prerender_override
+        effective_prerender = if override.nil?
+                                options.fetch(:prerender, ReactOnRails.configuration.prerender)
+                              else
+                                override
+                              end
+
         # NOTE: Rails seems to do this automatically: ActiveSupport::Cache.expand_cache_key(keys)
         [
-          *base_cache_key("ror_component", prerender: options[:prerender]),
+          *base_cache_key("ror_component", prerender: effective_prerender),
           dependencies_cache_key,
           component_name,
           cache_key_value

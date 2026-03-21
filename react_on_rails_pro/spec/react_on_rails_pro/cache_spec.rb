@@ -147,6 +147,15 @@ describe ReactOnRailsPro::Cache, :caching do
   end
 
   describe ".react_component_cache_key" do
+    around do |example|
+      original_prerender = ReactOnRails.configuration.prerender
+      original_prerender_override = ReactOnRails.configuration.prerender_override
+      example.run
+    ensure
+      ReactOnRails.configuration.prerender = original_prerender
+      ReactOnRails.configuration.prerender_override = original_prerender_override
+    end
+
     it "properly expands cache keys without the dependencies" do
       cacheable = instance_double(TestingCache)
       allow(cacheable).to receive(:cache_key)
@@ -170,6 +179,39 @@ describe ReactOnRailsPro::Cache, :caching do
 
       expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION,
                             "123456", "abc", "Foobar", cacheable])
+    end
+
+    it "includes bundle hash when prerender_override forces prerender on" do
+      ReactOnRails.configuration.prerender = false
+      ReactOnRails.configuration.prerender_override = true
+      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+
+      result = described_class.react_component_cache_key("Foobar", cache_key: "cache-key", prerender: false)
+
+      expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION,
+                            "123456", "Foobar", "cache-key"])
+    end
+
+    it "includes bundle hash when global prerender is enabled and option is omitted" do
+      ReactOnRails.configuration.prerender = true
+      ReactOnRails.configuration.prerender_override = nil
+      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+
+      result = described_class.react_component_cache_key("Foobar", cache_key: "cache-key")
+
+      expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION,
+                            "123456", "Foobar", "cache-key"])
+    end
+
+    it "omits bundle hash when prerender_override disables prerender" do
+      ReactOnRails.configuration.prerender = true
+      ReactOnRails.configuration.prerender_override = false
+      allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+
+      result = described_class.react_component_cache_key("Foobar", cache_key: "cache-key", prerender: true)
+
+      expect(result).to eq(["ror_component", ReactOnRails::VERSION, ReactOnRailsPro::VERSION,
+                            "Foobar", "cache-key"])
     end
   end
 

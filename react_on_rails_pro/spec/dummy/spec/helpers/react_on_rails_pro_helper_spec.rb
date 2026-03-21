@@ -129,6 +129,33 @@ describe ReactOnRailsProHelper do
           end
         end
 
+        context "when prerender_override forces prerender on" do
+          around do |example|
+            original_prerender = ReactOnRails.configuration.prerender
+            original_prerender_override = ReactOnRails.configuration.prerender_override
+            ReactOnRails.configuration.prerender = false
+            ReactOnRails.configuration.prerender_override = true
+            example.run
+          ensure
+            ReactOnRails.configuration.prerender = original_prerender
+            ReactOnRails.configuration.prerender_override = original_prerender_override
+          end
+
+          it "includes bundle hash in cache key even when prerender is false" do
+            cache_key = "cache-key-#{SecureRandom.hex(4)}"
+            allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+            allow(self).to receive(:react_component).and_return("<div>stubbed component</div>")
+
+            cached_react_component("App", cache_key: cache_key, prerender: false) do
+              { a: 1, b: 2 }
+            end
+
+            cache_entry_key = cache_data.keys.find { |key| key.match?(%r{/App/#{cache_key}}) }
+            expect(cache_entry_key).not_to be_nil
+            expect(cache_entry_key).to include("123456")
+          end
+        end
+
         context "when 'props' aren't passed in a block" do
           it "throws an error" do
             props = { a: 1, b: 2 }
@@ -1092,6 +1119,31 @@ describe ReactOnRailsProHelper do
         second_html = second_value.value
 
         expect(second_html).not_to eq(first_html)
+      end
+
+      context "when prerender_override forces prerender on" do
+        around do |example|
+          original_prerender = ReactOnRails.configuration.prerender
+          original_prerender_override = ReactOnRails.configuration.prerender_override
+          ReactOnRails.configuration.prerender = false
+          ReactOnRails.configuration.prerender_override = true
+          example.run
+        ensure
+          ReactOnRails.configuration.prerender = original_prerender
+          ReactOnRails.configuration.prerender_override = original_prerender_override
+        end
+
+        it "includes bundle hash in cache key even when prerender is false" do
+          cache_key = "async-prerender-override-#{SecureRandom.hex(4)}"
+          allow(ReactOnRailsPro::Utils).to receive(:bundle_hash).and_return("123456")
+          allow(self).to receive(:react_component).and_return("<div>stubbed component</div>")
+          first_value = cached_async_react_component("App", cache_key: cache_key, prerender: false) { { a: 1 } }
+          first_value.value
+
+          cache_entry_key = cache_data.keys.find { |key| key.match?(%r{/App/#{cache_key}}) }
+          expect(cache_entry_key).not_to be_nil
+          expect(cache_entry_key).to include("123456")
+        end
       end
 
       it "raises error when props are passed directly instead of as block" do
