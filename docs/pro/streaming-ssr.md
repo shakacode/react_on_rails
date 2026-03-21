@@ -77,7 +77,7 @@ end
 ### Rails View
 
 ```erb
-<%= stream_react_component('ProductPage', props: { id: @product.id }, prerender: true) %>
+<%= stream_react_component('ProductPage', props: { id: @product.id }) %>
 ```
 
 ## Prerequisites

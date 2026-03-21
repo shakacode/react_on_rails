@@ -34,5 +34,5 @@ Server rendering is used for either SEO or performance reasons.
 3. Promises and file system access don't work when server rendering with ExecJS. Instead, you can use the Node renderer or [React on Rails Pro](https://pro.reactonrails.com/).
 
 :::tip Pro Upgrade
-React on Rails Pro includes a [dedicated Node.js renderer](../../pro/node-renderer.md) that eliminates ExecJS limitations and improves SSR performance by 10-100x. It also supports [streaming SSR](../../pro/streaming-ssr.md) with React 19's `renderToPipeableStream` for faster Time to First Byte. [Learn more →](../../pro/upgrading-to-pro.md)
+React on Rails Pro includes a [dedicated Node.js renderer](../../pro/node-renderer.md) that eliminates ExecJS limitations and improves SSR performance by 10-100x. It also supports [streaming SSR](../../pro/streaming-ssr.md) with React 18/19's `renderToPipeableStream` for faster Time to First Byte. [Learn more →](../../pro/upgrading-to-pro.md)
 :::

@@ -1,7 +1,7 @@
 # Streaming Server Rendering with React 18
 
 :::tip Pro Feature
-SSR works in the OSS version via mini_racer. Pro adds streaming SSR with `renderToPipeableStream` and Suspense for progressive rendering. See the [Streaming SSR overview](../../pro/streaming-ssr.md) or [upgrade to Pro →](../../pro/upgrading-to-pro.md)
+SSR works in the OSS version via ExecJS. Pro adds streaming SSR with `renderToPipeableStream` and Suspense for progressive rendering. See the [Streaming SSR overview](../../pro/streaming-ssr.md) or [upgrade to Pro →](../../pro/upgrading-to-pro.md)
 :::
 
 React on Rails Pro supports streaming server rendering using React 18's latest APIs, including `renderToPipeableStream` and Suspense. This guide explains how to implement and optimize streaming server rendering in your React on Rails application.
