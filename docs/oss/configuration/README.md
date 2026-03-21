@@ -609,6 +609,39 @@ You can override the global setting per-component:
 react_component("MyComponent", prerender: false)  # Skip SSR for this component
 ```
 
+#### prerender_override
+
+**Type:** Boolean or nil
+**Default:** `nil`
+
+Global override that takes precedence over **all** prerender settings, including both `config.prerender` and component-level `prerender:` options. This is a tri-state value:
+
+- `nil` (default) - No override; existing behavior is preserved
+- `false` - Force-disable prerendering for all components globally
+- `true` - Force-enable prerendering for all components globally
+
+The primary use case is disabling all SSR in CI or test environments without modifying every component call-site:
+
+```ruby
+# config/initializers/react_on_rails.rb
+ReactOnRails.configure do |config|
+  config.prerender_override = false if ENV["DISABLE_SSR"]
+end
+```
+
+Or in a test helper:
+
+```ruby
+# spec/support/disable_ssr.rb
+RSpec.configure do |config|
+  config.before(:suite) do
+    ReactOnRails.configuration.prerender_override = false
+  end
+end
+```
+
+**Caveat:** When set to `true`, the override force-enables SSR even for components that explicitly set `prerender: false`. If a component is not SSR-compatible (e.g., it relies on browser-only APIs), forcing SSR on it will cause server-rendering errors. Use `prerender_override: true` with caution and only when you are confident all components support SSR.
+
 ### Development and Debugging
 
 #### trace

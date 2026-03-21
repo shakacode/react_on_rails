@@ -71,7 +71,8 @@ module ReactOnRails
       # Whether to check database connectivity before starting bin/dev.
       # Set to false to disable (saves ~1-2 seconds startup time).
       # Can also be disabled via SKIP_DATABASE_CHECK=true or bin/dev --skip-database-check
-      check_database_on_dev_start: true
+      check_database_on_dev_start: true,
+      prerender_override: nil
     )
   end
 
@@ -153,7 +154,8 @@ module ReactOnRails
                    random_dom_id: nil, server_render_method: nil, rendering_props_extension: nil,
                    components_subdirectory: nil, stores_subdirectory: nil, auto_load_bundle: nil,
                    component_registry_timeout: nil, server_bundle_output_path: nil, enforce_private_server_bundles: nil,
-                   check_database_on_dev_start: nil)
+                   check_database_on_dev_start: nil,
+                   prerender_override: nil)
       self.node_modules_location = node_modules_location.present? ? node_modules_location : Rails.root
       self.generated_assets_dirs = generated_assets_dirs
       self.generated_assets_dir = generated_assets_dir
@@ -198,6 +200,7 @@ module ReactOnRails
       self.server_bundle_output_path = server_bundle_output_path
       self.enforce_private_server_bundles = enforce_private_server_bundles
       self.check_database_on_dev_start = check_database_on_dev_start.nil? ? true : check_database_on_dev_start
+      self.prerender_override = prerender_override
     end
     # rubocop:enable Metrics/AbcSize
 

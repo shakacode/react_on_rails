@@ -167,6 +167,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
   describe "#prerender with prerender_override" do
     after do
       ReactOnRails.configuration.prerender_override = nil
+      ReactOnRails.configuration.prerender = false
     end
 
     context "when prerender_override is false" do

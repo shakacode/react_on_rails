@@ -67,6 +67,9 @@ module ReactOnRails
         options[:html_options].to_h
       end
 
+      # When prerender_override is non-nil, it takes precedence over ALL other prerender settings,
+      # including component-level prerender: options. Use with caution when set to true, as it will
+      # force SSR on components that may have explicitly opted out.
       def prerender
         override = ReactOnRails.configuration.prerender_override
         return override unless override.nil?

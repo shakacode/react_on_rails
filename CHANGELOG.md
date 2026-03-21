@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **`config.prerender_override`**: New tri-state configuration option (`nil`, `true`, `false`) to globally force prerendering on or off, overriding both component-level `prerender:` options and `config.prerender`. Useful for disabling all SSR in CI/test environments without modifying every component call-site. [PR 2779](https://github.com/shakacode/react_on_rails/pull/2779) by [justin808](https://github.com/justin808).
+
 ### [16.4.0] - 2026-03-16
 
 #### Fixed
