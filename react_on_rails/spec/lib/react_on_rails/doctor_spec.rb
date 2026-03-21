@@ -1338,4 +1338,752 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
   end
+
+  # ── Pro Setup Checks ──────────────────────────────────────────────
+  # ReactOnRailsPro class may not be loaded in the test environment (Pro is optional),
+  # so we must use unverified doubles for stub_const.
+  # rubocop:disable RSpec/VerifiedDoubles
+
+  describe "Pro setup checks" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    before do
+      allow(doctor).to receive(:puts)
+      allow(doctor).to receive(:exit)
+    end
+
+    context "when Pro gem is not installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "does not add any Pro setup messages" do
+        initial_count = checker.messages.length
+        doctor.send(:check_pro_setup)
+        expect(checker.messages.length).to eq(initial_count)
+      end
+    end
+
+    context "when Pro gem is installed with NodeRenderer" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        pro_config = double("ProConfig", server_renderer: "NodeRenderer")
+        stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+      end
+
+      it "reports success for NodeRenderer" do
+        doctor.send(:check_pro_setup)
+        success_messages = checker.messages.select { |m| m[:type] == :success }
+        expect(success_messages.any? { |m| m[:content].include?("NodeRenderer") }).to be true
+      end
+    end
+
+    context "when Pro gem is installed with ExecJS" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        pro_config = double("ProConfig", server_renderer: "ExecJS")
+        stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+      end
+
+      it "reports ExecJS mode as info" do
+        doctor.send(:check_pro_setup)
+        info_messages = checker.messages.select { |m| m[:type] == :info }
+        expect(info_messages.any? { |m| m[:content].include?("ExecJS") }).to be true
+      end
+    end
+
+    context "when Pro configuration raises an error" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        stub_const("ReactOnRailsPro", double("ReactOnRailsPro"))
+        allow(ReactOnRailsPro).to receive(:configuration).and_raise(StandardError, "config load failed")
+      end
+
+      it "catches the error and adds a warning" do
+        doctor.send(:check_pro_setup)
+        warning_messages = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_messages.any? { |m| m[:content].include?("config load failed") }).to be true
+      end
+    end
+  end
+
+  describe "ensure_rails_environment_loaded" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when config/environment.rb exists and loads successfully" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/environment.rb", "# noop")
+            example.run
+          end
+        end
+      end
+
+      it "returns true" do
+        expect(doctor.send(:ensure_rails_environment_loaded)).to be true
+      end
+
+      it "only loads once" do
+        doctor.send(:ensure_rails_environment_loaded)
+        # Second call should return true without re-requiring
+        expect(doctor.send(:ensure_rails_environment_loaded)).to be true
+      end
+    end
+
+    context "when config/environment.rb does not exist" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "returns false" do
+        expect(doctor.send(:ensure_rails_environment_loaded)).to be false
+      end
+    end
+
+    context "when loading raises an error" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/environment.rb", "raise 'boot failed'")
+            example.run
+          end
+        end
+      end
+
+      it "returns false and adds a warning" do
+        expect(doctor.send(:ensure_rails_environment_loaded)).to be false
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("Could not load Rails environment") }).to be true
+      end
+    end
+  end
+
+  describe "check_pro_initializer_existence" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when Pro initializer exists" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config/initializers")
+            File.write("config/initializers/react_on_rails_pro.rb", "ReactOnRailsPro.configure {}")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_pro_initializer_existence)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("Pro initializer exists") }).to be true
+      end
+    end
+
+    context "when Pro initializer is missing" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_pro_initializer_existence)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("Pro initializer not found") }).to be true
+      end
+    end
+  end
+
+  describe "check_base_package_imports" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when JS files import from 'react-on-rails' (base package)" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/custom-bundle.js",
+                       "import ReactOnRails from 'react-on-rails';\nReactOnRails.register({});\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning with file paths" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("custom-bundle.js") }).to be true
+      end
+    end
+
+    context "when JS files import from 'react-on-rails/client' (base subpath)" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.js",
+                       "import ReactOnRails from 'react-on-rails/client';\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
+      end
+    end
+
+    context "when JS files use require('react-on-rails')" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/legacy.js",
+                       "const ReactOnRails = require('react-on-rails');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
+      end
+    end
+
+    context "when JS files correctly import from 'react-on-rails-pro'" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.js",
+                       "import ReactOnRails from 'react-on-rails-pro';\nReactOnRails.register({});\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_base_package_imports)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when no JS files exist" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "reports success (no files to scan)" do
+        doctor.send(:check_base_package_imports)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when Shakapacker source_path is custom (e.g. client/app)" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/shakapacker.yml", "default:\n  source_path: client/app\n")
+            FileUtils.mkdir_p("client/app/packs")
+            File.write("client/app/packs/app.js",
+                       "import ReactOnRails from 'react-on-rails';\n")
+            example.run
+          end
+        end
+      end
+
+      before do
+        allow(doctor).to receive(:require).with("shakapacker").and_raise(LoadError)
+      end
+
+      it "scans the custom source_path and reports warning" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("client/app/packs/app.js") }).to be true
+      end
+    end
+  end
+
+  # ── RSC Setup Checks ─────────────────────────────────────────────
+
+  describe "RSC setup checks" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    before do
+      allow(doctor).to receive(:puts)
+      allow(doctor).to receive(:exit)
+    end
+
+    context "when Pro gem is not installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "does not add any RSC messages" do
+        initial_count = checker.messages.length
+        doctor.send(:check_rsc_setup)
+        expect(checker.messages.length).to eq(initial_count)
+      end
+    end
+
+    context "when Pro is installed but RSC is disabled" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        pro_config = double("ProConfig", enable_rsc_support: false)
+        stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+      end
+
+      it "does not add any RSC messages" do
+        initial_count = checker.messages.length
+        doctor.send(:check_rsc_setup)
+        expect(checker.messages.length).to eq(initial_count)
+      end
+    end
+
+    context "when RSC is enabled with valid setup" do
+      let(:pro_config) do
+        double("ProConfig",
+               enable_rsc_support: true,
+               server_renderer: "NodeRenderer",
+               rsc_bundle_js_file: "rsc-bundle.js",
+               rsc_payload_generation_url_path: "rsc_payload/")
+      end
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config/webpack")
+            File.write("config/routes.rb", "Rails.application.routes.draw do\n  rsc_payload_route\nend")
+            File.write("config/webpack/rscWebpackConfig.js", "module.exports = {}")
+            File.write("package.json", '{"dependencies":{"react":"~19.0.4","react-on-rails-rsc":"1.0.0"}}')
+            File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch")
+            example.run
+          end
+        end
+      end
+
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+      end
+
+      it "reports RSC detected with config values" do
+        doctor.send(:check_rsc_setup)
+        info_messages = checker.messages.select { |m| m[:type] == :info }
+        expect(info_messages.any? { |m| m[:content].include?("React Server Components: enabled") }).to be true
+        expect(info_messages.any? { |m| m[:content].include?("rsc-bundle.js") }).to be true
+      end
+
+      it "reports no errors for a complete setup" do
+        doctor.send(:check_rsc_setup)
+        error_messages = checker.messages.select { |m| m[:type] == :error }
+        expect(error_messages).to be_empty
+      end
+    end
+
+    context "when RSC is enabled but renderer is ExecJS" do
+      let(:pro_config) do
+        double("ProConfig",
+               enable_rsc_support: true,
+               server_renderer: "ExecJS",
+               rsc_bundle_js_file: "rsc-bundle.js",
+               rsc_payload_generation_url_path: "rsc_payload/")
+      end
+
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config/webpack")
+            File.write("config/routes.rb", "rsc_payload_route")
+            File.write("config/webpack/rscWebpackConfig.js", "{}")
+            File.write("package.json", '{"dependencies":{"react":"~19.0.4","react-on-rails-rsc":"1.0.0"}}')
+            File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch")
+            example.run
+          end
+        end
+      end
+
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
+      end
+
+      it "reports error about renderer mode" do
+        doctor.send(:check_rsc_setup)
+        error_messages = checker.messages.select { |m| m[:type] == :error }
+        expect(error_messages.any? { |m| m[:content].include?("NodeRenderer") }).to be true
+      end
+    end
+
+    context "when check_rsc_setup raises an unexpected error" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        stub_const("ReactOnRailsPro", double("ReactOnRailsPro"))
+        allow(ReactOnRailsPro).to receive(:configuration).and_raise(StandardError, "unexpected failure")
+      end
+
+      it "catches the error and adds a warning" do
+        doctor.send(:check_rsc_setup)
+        warning_messages = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_messages.any? { |m| m[:content].include?("unexpected failure") }).to be true
+      end
+    end
+  end
+
+  # ── RSC Individual Check Methods ─────────────────────────────────
+
+  describe "check_rsc_payload_route" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when routes.rb contains rsc_payload_route" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/routes.rb",
+                       "Rails.application.routes.draw do\n  rsc_payload_route\nend")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_rsc_payload_route)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("RSC payload route") }).to be true
+      end
+    end
+
+    context "when rsc_payload_route is commented out" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/routes.rb",
+                       "Rails.application.routes.draw do\n  # rsc_payload_route\nend")
+            example.run
+          end
+        end
+      end
+
+      it "reports error (does not count commented-out route)" do
+        doctor.send(:check_rsc_payload_route)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("rsc_payload_route") }).to be true
+      end
+    end
+
+    context "when routes.rb exists but lacks rsc_payload_route" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config")
+            File.write("config/routes.rb", "Rails.application.routes.draw do\nend")
+            example.run
+          end
+        end
+      end
+
+      it "reports error with fix instructions" do
+        doctor.send(:check_rsc_payload_route)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("rsc_payload_route") }).to be true
+      end
+    end
+
+    context "when routes.rb does not exist" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_rsc_payload_route)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("routes.rb not found") }).to be true
+      end
+    end
+  end
+
+  describe "check_rsc_bundler_config" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when config/webpack/rscWebpackConfig.js exists" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config/webpack")
+            File.write("config/webpack/rscWebpackConfig.js", "{}")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_rsc_bundler_config)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("RSC bundler config") }).to be true
+      end
+    end
+
+    context "when config/rspack/rscWebpackConfig.js exists" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("config/rspack")
+            File.write("config/rspack/rscWebpackConfig.js", "{}")
+            example.run
+          end
+        end
+      end
+
+      it "reports success for rspack variant" do
+        doctor.send(:check_rsc_bundler_config)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("RSC bundler config") }).to be true
+      end
+    end
+
+    context "when neither config exists" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "reports error with fix instructions" do
+        doctor.send(:check_rsc_bundler_config)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("RSC bundler config not found") }).to be true
+      end
+    end
+  end
+
+  describe "check_rsc_react_version" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    def install_react(version)
+      FileUtils.mkdir_p("node_modules/react")
+      File.write("node_modules/react/package.json", "{\"version\":\"#{version}\"}")
+    end
+
+    context "when React 19.0.4+" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            install_react("19.0.4")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("compatible with RSC") }).to be true
+      end
+    end
+
+    context "when React 19.0.0-19.0.3" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            install_react("19.0.2")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning about security vulnerabilities" do
+        doctor.send(:check_rsc_react_version)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("security vulnerabilities") }).to be true
+      end
+    end
+
+    context "when React 18.x" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            install_react("18.2.0")
+            example.run
+          end
+        end
+      end
+
+      it "reports error" do
+        doctor.send(:check_rsc_react_version)
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(error_msgs.any? { |m| m[:content].include?("not compatible with RSC") }).to be true
+      end
+    end
+
+    context "when React 19.1.x" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            install_react("19.1.0")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning about unverified version" do
+        doctor.send(:check_rsc_react_version)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("not been verified") }).to be true
+      end
+    end
+
+    context "when React 20.x (future major)" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            install_react("20.0.0")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning, not error" do
+        doctor.send(:check_rsc_react_version)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        error_msgs = checker.messages.select { |m| m[:type] == :error }
+        expect(warning_msgs.any? { |m| m[:content].include?("not been verified") }).to be true
+        expect(error_msgs).to be_empty
+      end
+    end
+
+    context "when installed version differs from declared range" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write("package.json", '{"dependencies":{"react":"^19.0.0"}}')
+            install_react("19.0.4")
+            example.run
+          end
+        end
+      end
+
+      it "uses the installed version, not the declared range" do
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+    end
+
+    context "when React is not installed" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write("package.json", '{"dependencies":{}}')
+            example.run
+          end
+        end
+      end
+
+      it "reports info and skips" do
+        doctor.send(:check_rsc_react_version)
+        info_msgs = checker.messages.select { |m| m[:type] == :info }
+        expect(info_msgs.any? { |m| m[:content].include?("Could not detect React version") }).to be true
+      end
+    end
+  end
+
+  describe "check_rsc_procfile_watcher" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when Procfile.dev contains RSC_BUNDLE_ONLY" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_rsc_procfile_watcher)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("RSC bundle watcher") }).to be true
+      end
+    end
+
+    context "when RSC_BUNDLE_ONLY is commented out in Procfile.dev" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write("Procfile.dev",
+                       "web: bin/rails server\n# rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning (does not count commented-out entry)" do
+        doctor.send(:check_rsc_procfile_watcher)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("RSC bundle watcher not found") }).to be true
+      end
+    end
+
+    context "when Procfile.dev exists but lacks RSC entry" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write("Procfile.dev", "web: bin/rails server\nwebpack: bin/shakapacker-dev-server")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_rsc_procfile_watcher)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("RSC bundle watcher not found") }).to be true
+      end
+    end
+
+    context "when Procfile.dev does not exist" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) { example.run }
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_rsc_procfile_watcher)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("Procfile.dev not found") }).to be true
+      end
+    end
+  end
+  # rubocop:enable RSpec/VerifiedDoubles
 end

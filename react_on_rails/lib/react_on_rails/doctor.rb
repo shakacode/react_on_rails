@@ -59,6 +59,7 @@ module ReactOnRails
       @fix = fix
       @checker = SystemChecker.new
       @test_output_path_strategy = :unknown
+      @rails_environment_loaded = false
     end
 
     def run_diagnosis
@@ -104,7 +105,9 @@ module ReactOnRails
         ["Rails Integration", :check_rails],
         ["Webpack Configuration", :check_webpack],
         ["Testing Setup", :check_testing_setup],
-        ["Development Environment", :check_development]
+        ["Development Environment", :check_development],
+        ["React on Rails Pro Setup", :check_pro_setup],
+        ["React Server Components", :check_rsc_setup]
       ]
 
       checks.each do |section_name, check_method|
@@ -2169,6 +2172,331 @@ module ReactOnRails
         - Enable auto-detection by React on Rails
         - Serve as single source of truth for server bundle location
       MSG
+    end
+    # ── Helpers for Pro/RSC checks ────────────────────────────────────
+
+    # Lazily load the Rails environment so that initializers (which configure
+    # ReactOnRailsPro) have run before we read Pro/RSC config values.
+    # Safe to call multiple times — only loads once.
+    # Returns true if environment was loaded successfully, false otherwise.
+    def ensure_rails_environment_loaded
+      return true if @rails_environment_loaded
+      return false if @rails_environment_attempted
+
+      @rails_environment_attempted = true
+
+      env_file = "config/environment.rb"
+      return false unless File.exist?(env_file)
+
+      require File.expand_path(env_file)
+      @rails_environment_loaded = true
+    rescue StandardError, LoadError => e
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Could not load Rails environment: #{e.message}
+
+        Pro/RSC diagnostics may reflect default values instead of your app's configuration.
+      MSG
+      false
+    end
+
+    # Resolve the JavaScript source path from Shakapacker config.
+    # Falls back to "app/javascript" if Shakapacker is not available.
+    def resolve_js_source_path
+      require "shakapacker"
+      Shakapacker.config.source_path.to_s
+    rescue LoadError, StandardError
+      shakapacker_yml_source_path || "app/javascript"
+    end
+
+    def shakapacker_yml_source_path
+      config_path = "config/shakapacker.yml"
+      return nil unless File.exist?(config_path)
+
+      config = parse_shakapacker_config(File.read(config_path))
+      return nil unless config.is_a?(Hash)
+
+      default_config = config["default"] || {}
+      normalize_yaml_scalar(default_config["source_path"]) if default_config.key?("source_path")
+    rescue StandardError
+      nil
+    end
+
+    # ── React on Rails Pro Setup ──────────────────────────────────────
+
+    def check_pro_setup
+      return unless ReactOnRails::Utils.react_on_rails_pro?
+
+      check_pro_initializer_existence
+      ensure_rails_environment_loaded
+      check_pro_renderer_mode
+      check_base_package_imports
+    end
+
+    def check_pro_initializer_existence
+      initializer_path = "config/initializers/react_on_rails_pro.rb"
+      if File.exist?(initializer_path)
+        checker.add_success("✅ Pro initializer exists (#{initializer_path})")
+      else
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  Pro initializer not found at #{initializer_path}.
+
+          Without this file, React on Rails Pro runs with all default settings.
+          Run the Pro generator to create it:
+            rails g react_on_rails:pro
+        MSG
+      end
+    end
+
+    def check_pro_renderer_mode
+      renderer = ReactOnRailsPro.configuration.server_renderer
+      if renderer == "NodeRenderer"
+        checker.add_success("✅ Pro renderer: NodeRenderer (dedicated Node.js process)")
+      else
+        checker.add_info("ℹ️  Pro renderer: #{renderer}")
+        checker.add_info("  💡 NodeRenderer provides better performance and is required for RSC")
+      end
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not detect Pro renderer mode: #{e.message}")
+    end
+
+    # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
+    # so `import ... from 'react-on-rails'` resolves silently — loading the base package instead
+    # of Pro. Components registered through the base package won't have Pro features (streaming,
+    # caching, RSC), and may cause "component not registered" errors at runtime.
+    BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+
+    def check_base_package_imports # rubocop:disable Metrics/CyclomaticComplexity
+      source_path = resolve_js_source_path
+      js_extensions = %w[js jsx ts tsx]
+      js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
+      files_with_base_import = []
+
+      js_patterns.each do |pattern|
+        Dir.glob(pattern).each do |file|
+          content = File.read(file)
+          next unless content.match?(BASE_PACKAGE_IMPORT_PATTERN) || content.match?(BASE_PACKAGE_REQUIRE_PATTERN)
+
+          files_with_base_import << file
+        end
+      end
+
+      if files_with_base_import.empty?
+        checker.add_success("✅ No base 'react-on-rails' imports found (Pro package used correctly)")
+      else
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  Found imports from 'react-on-rails' instead of 'react-on-rails-pro':
+          #{files_with_base_import.map { |f| "  • #{f}" }.join("\n")}
+
+          The base package is a transitive dependency of Pro, so these imports resolve
+          silently but load the base version without Pro features.
+
+          Fix: Update imports to use 'react-on-rails-pro':
+            import ReactOnRails from 'react-on-rails-pro';        // server
+            import ReactOnRails from 'react-on-rails-pro/client';  // client
+        MSG
+      end
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not scan for base package imports: #{e.message}")
+    end
+
+    # ── React Server Components ────────────────────────────────────
+
+    # Candidate paths for RSC bundler configuration (webpack and rspack variants)
+    RSC_BUNDLER_CONFIG_PATHS = %w[
+      config/webpack/rscWebpackConfig.js
+      config/rspack/rscWebpackConfig.js
+    ].freeze
+
+    def check_rsc_setup
+      return unless ReactOnRails::Utils.react_on_rails_pro?
+
+      ensure_rails_environment_loaded
+      pro_config = ReactOnRailsPro.configuration
+      return unless pro_config.enable_rsc_support
+
+      checker.add_info("🔬 React Server Components: enabled")
+      checker.add_info("  rsc_bundle_js_file: #{pro_config.rsc_bundle_js_file}")
+      checker.add_info("  rsc_payload_generation_url_path: #{pro_config.rsc_payload_generation_url_path}")
+
+      check_rsc_renderer_mode(pro_config)
+      check_rsc_payload_route
+      check_rsc_bundler_config
+      check_rsc_react_version
+      check_rsc_procfile_watcher
+    rescue StandardError => e
+      checker.add_warning("⚠️  RSC setup check encountered an error: #{e.message}")
+    end
+
+    def check_rsc_renderer_mode(pro_config)
+      return if pro_config.server_renderer == "NodeRenderer"
+
+      checker.add_error(<<~MSG.strip)
+        🚫 RSC requires NodeRenderer but current renderer is '#{pro_config.server_renderer}'.
+
+        React Server Components need a dedicated Node.js process for server rendering.
+
+        Fix: Set server_renderer to "NodeRenderer" in config/initializers/react_on_rails_pro.rb:
+          config.server_renderer = "NodeRenderer"
+      MSG
+    end
+
+    def check_rsc_payload_route
+      routes_file = "config/routes.rb"
+
+      unless File.exist?(routes_file)
+        checker.add_warning("⚠️  config/routes.rb not found — cannot verify RSC payload route")
+        return
+      end
+
+      routes_content = File.read(routes_file)
+      uncommented_route = routes_content.each_line.any? do |line|
+        next if line.match?(/^\s*#/)
+
+        line.include?("rsc_payload_route")
+      end
+      if uncommented_route
+        checker.add_success("✅ RSC payload route configured")
+      else
+        checker.add_error(<<~MSG.strip)
+          🚫 RSC payload route not found in config/routes.rb.
+
+          Without this route, React Server Component payload requests will 404.
+
+          Fix: Add to config/routes.rb inside the Rails.application.routes.draw block:
+            rsc_payload_route
+        MSG
+      end
+    end
+
+    def check_rsc_bundler_config
+      found_path = RSC_BUNDLER_CONFIG_PATHS.find { |path| File.exist?(path) }
+
+      if found_path
+        checker.add_success("✅ RSC bundler config exists (#{found_path})")
+      else
+        checker.add_error(<<~MSG.strip)
+          🚫 RSC bundler config not found.
+
+          Expected one of: #{RSC_BUNDLER_CONFIG_PATHS.join(' or ')}
+
+          This file defines the webpack/rspack configuration for the RSC bundle.
+
+          Fix: Run the RSC generator to create it:
+            rails g react_on_rails:rsc
+        MSG
+      end
+    end
+
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def check_rsc_react_version
+      react_version = detect_react_version_from_deps
+      unless react_version
+        checker.add_info("ℹ️  Could not detect React version — skipping RSC version check")
+        return
+      end
+
+      major, minor, patch = react_version.split(".").map(&:to_i)
+
+      if major == 19 && minor.zero? && patch >= 4
+        checker.add_success("✅ React #{react_version} is compatible with RSC")
+      elsif major == 19 && minor.zero?
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  React #{react_version} has known security vulnerabilities fixed in 19.0.4+.
+
+          Upgrade to at least React 19.0.4:
+            npm install react@~19.0.4 react-dom@~19.0.4
+        MSG
+      elsif major >= 19
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  React #{react_version} has not been verified with React on Rails Pro RSC.
+
+          RSC support currently targets React 19.0.x. React #{major}.#{minor}.x may work
+          but has not been tested. Verified compatibility: React 19.0.4+.
+        MSG
+      else
+        checker.add_error(<<~MSG.strip)
+          🚫 React #{react_version} is not compatible with RSC.
+
+          React Server Components in React on Rails Pro requires React 19.x or higher.
+
+          Fix: npm install react@~19.0.4 react-dom@~19.0.4
+        MSG
+      end
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity
+
+    def detect_react_version_from_deps
+      # Prefer the actually installed version from node_modules over the declared
+      # range in package.json. Declared ranges like "^19.0.0" would be misleading
+      # (stripped to "19.0.0" even though 19.0.4+ may be installed).
+      installed = installed_react_version
+      return installed if installed
+
+      declared_react_version
+    rescue StandardError
+      nil
+    end
+
+    def installed_react_version
+      # Use Node's own module resolution to find the actually installed React,
+      # which handles hoisted dependencies in monorepos and pnpm workspaces.
+      stdout, _stderr, status = Open3.capture3("node", "-e",
+                                               "console.log(require.resolve('react/package.json'))")
+      return nil unless status.success?
+
+      resolved_path = stdout.strip
+      return nil if resolved_path.empty? || !File.exist?(resolved_path)
+
+      version = JSON.parse(File.read(resolved_path))["version"]
+      version if version&.match?(/\A\d+\.\d+\.\d+/)
+    rescue StandardError
+      nil
+    end
+
+    def declared_react_version
+      return nil unless File.exist?("package.json")
+
+      package_json = JSON.parse(File.read("package.json"))
+      all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
+      version_str = all_deps["react"]
+      return nil unless version_str
+
+      clean_version = version_str.gsub(/\A[^0-9]*/, "")
+      clean_version if clean_version.match?(/\A\d+\.\d+\.\d+\z/)
+    rescue StandardError
+      nil
+    end
+
+    def check_rsc_procfile_watcher
+      procfile_path = "Procfile.dev"
+
+      unless File.exist?(procfile_path)
+        checker.add_warning("⚠️  Procfile.dev not found — cannot verify RSC bundle watcher")
+        checker.add_info("  💡 If using a custom process manager, ensure RSC bundle is built separately")
+        return
+      end
+
+      uncommented_watcher = File.readlines(procfile_path).any? do |line|
+        next if line.match?(/^\s*#/)
+
+        line.include?("RSC_BUNDLE_ONLY")
+      end
+      if uncommented_watcher
+        checker.add_success("✅ RSC bundle watcher configured in Procfile.dev")
+      else
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  RSC bundle watcher not found in Procfile.dev.
+
+          The RSC bundle needs to be built separately from client/server bundles.
+
+          If using Procfile.dev, add:
+            rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+
+          If using a custom process manager, ensure the RSC bundle is built with
+          the RSC_BUNDLE_ONLY=yes environment variable.
+        MSG
+      end
     end
   end
   # rubocop:enable Metrics/ClassLength
