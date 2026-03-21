@@ -31,7 +31,7 @@
 import ReactOnRails from 'react-on-rails-pro';
 ```
 
-See the [Installation Guide](./pro/installation.md) for details.
+See the [Installation Guide](../../docs/pro/installation.md) for details.
 
 ### Q: How will the monorepo structure maintain license separation?
 
@@ -142,4 +142,4 @@ Production use requires a valid subscription.
 
 ---
 
-_For more information about the monorepo merger, see [MONOREPO_MERGER_PLAN_REF.md](../internal/planning/MONOREPO_MERGER_PLAN_REF.md)_
+_For more information about the monorepo merger, see [MONOREPO_MERGER_PLAN_REF.md](./MONOREPO_MERGER_PLAN_REF.md)_
