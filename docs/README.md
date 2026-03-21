@@ -31,6 +31,14 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 - [Core Concepts](./oss/core-concepts/how-react-on-rails-works.md)
 - [API Reference](./oss/api-reference/view-helpers-api.md)
 - [Deployment and troubleshooting](./oss/deployment/README.md)
+- [Changelog](./oss/upgrading/changelog.md)
+
+## Pro features
+
+- [React Server Components](./pro/react-server-components/tutorial.md) - RSC with Rails
+- [Streaming SSR](./oss/building-features/streaming-server-rendering.md) - Progressive server rendering
+- [Node Renderer](./oss/building-features/node-renderer/basics.md) - Dedicated Node.js rendering server
+- [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
 
 ## Friendly evaluation policy
 
