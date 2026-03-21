@@ -1913,19 +1913,23 @@ RSpec.configure do |config|
 - No global namespace pollution. ReactOnRails is the only global added.
 - New API. Instead of placing React components on the global namespace, you instead call ReactOnRails.register, passing an object where keys are the names of your components:
 
+<!-- prettier-ignore-start -->
+
 ```javascript
 import ReactOnRails from 'react-on-rails';
-ReactOnRails.register({ name: component });
+ReactOnRails.register({name: component});
 ```
 
 Best done with Object destructing:
 
 ```javascript
-import ReactOnRails from 'react-on-rails';
-ReactOnRails.register({
-  Component1,
-  Component2,
-});
+  import ReactOnRails from 'react-on-rails';
+  ReactOnRails.register(
+    {
+      Component1,
+      Component2
+    }
+  );
 ```
 
 Previously, you used
@@ -1940,14 +1944,16 @@ This would pollute the global namespace. See details in the README.md for more i
 - Your jade template for the WebpackDevServer setup should use the new API:
 
 ```javascript
-ReactOnRails.render(componentName, props, domNodeId);
+  ReactOnRails.render(componentName, props, domNodeId);
 ```
 
 such as:
 
 ```javascript
-ReactOnRails.render('HelloWorldApp', { name: 'Stranger' }, 'app');
+  ReactOnRails.render("HelloWorldApp", {name: "Stranger"}, 'app');
 ```
+
+<!-- prettier-ignore-end -->
 
 - All npm dependency libraries updated. Most notable is going to Babel 6.
 - Dropped support for React 0.13.
