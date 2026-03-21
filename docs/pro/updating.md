@@ -14,7 +14,7 @@ If you're a new customer, see [Installation](./installation.md) instead.
 
 ### What's Changing
 
-React on Rails Pro packages are now **publicly distributed** via npmjs.org and RubyGems.org:
+React on Rails Pro packages are now **publicly distributed** via npmjs.com and RubyGems.org:
 
 - ✅ No more GitHub Personal Access Tokens (PATs)
 - ✅ No more `.npmrc` configuration
@@ -39,7 +39,7 @@ React on Rails Pro version numbers were aligned with the core React on Rails gem
 | Pro 3.3.x      | GitHub Packages (private) | Last 3.x release                            |
 | Pro 4.0.0-rc.x | GitHub Packages (private) | Release candidates (pre-monorepo)           |
 | Pro 16.1.x     | GitHub Packages (private) | Version-aligned with core gem               |
-| Pro 16.2.0+    | RubyGems.org / npmjs.org  | First publicly distributed, version-aligned |
+| Pro 16.2.0+    | RubyGems.org / npmjs.com  | First publicly distributed, version-aligned |
 
 If you are upgrading from Pro 3.x, 4.0.0-rc.x, or any GitHub Packages version (including 16.1.x), follow the full [Migration Steps](#migration-steps) below.
 
@@ -228,7 +228,7 @@ If you only use ExecJS for SSR (the default), you do not need `react-on-rails-pr
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` 16.4.0 and later requires `jwt ~> 2.7`. If your Gemfile pins `jwt` to an older version (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` 16.4.0 tightened the `jwt` gem requirement to `~> 2.7`. If your Gemfile pins `jwt` to an older version (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt
