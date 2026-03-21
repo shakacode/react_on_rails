@@ -438,6 +438,8 @@ console.log('Client render time:', new Date());
 
 ## 🛠️ Advanced Debugging
 
+For a comprehensive debugging guide covering SSR issues, hydration mismatches, and log analysis, see the [Debugging Guide](../building-features/debugging.md).
+
 ### Enable verbose logging
 
 ```ruby

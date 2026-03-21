@@ -4,7 +4,7 @@ _Also, see [our React server-rendering documentation](../core-concepts/react-ser
 
 In most cases, you should use the `prerender: false` (default behavior) with the provided helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
 
-Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. By default, ExecJS uses the Node.js runtime. You can use alternative runtimes as outlined in [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md).
+Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. By default, ExecJS uses the Node.js runtime. You can use alternative runtimes as outlined in [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md). For details on ExecJS constraints with timers, async, and browser APIs, see [ExecJS Limitations](./execjs-limitations.md).
 
 Note: if you use the [mini_racer](https://github.com/rubyjs/mini_racer) runtime and run into a `ReferenceError: TextEncoder is not defined` error, see [this comment](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717) for a solution.
 
