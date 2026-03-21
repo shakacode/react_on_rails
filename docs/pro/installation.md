@@ -4,7 +4,7 @@ React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org
 
 **Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
-Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) to see what version you want.
+Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) to see what version you want.
 
 ## Version Format
 
@@ -132,7 +132,7 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 ⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
-For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
+For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
 ## Rails Configuration
 

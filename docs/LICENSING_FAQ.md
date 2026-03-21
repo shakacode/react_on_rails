@@ -119,7 +119,7 @@ react_on_rails/ (monorepo root)
 - Node.js rendering process management
 - Premium support and consultation
 
-See [REACT-ON-RAILS-PRO-LICENSE.md](https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
+See [REACT-ON-RAILS-PRO-LICENSE.md](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
 
 ### Q: Can I modify the MIT-licensed interface files?
 

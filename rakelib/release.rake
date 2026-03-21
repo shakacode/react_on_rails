@@ -619,7 +619,7 @@ Version argument can be:
   - Pre-release version: '16.2.0.beta.1' (rubygem format with dots, converted to 16.2.0-beta.1 for NPM)
 
 Note: Pre-release versions (containing .test., .beta., .alpha., .rc., or .pre.) automatically
-skip git branch checks, allowing releases from non-master branches.
+skip git branch checks, allowing releases from non-main branches.
 
 This will update and release:
   PUBLIC (npmjs.org + rubygems.org):
@@ -697,14 +697,14 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
     )
     is_prerelease = release_prerelease_version?(resolved_target_gem_version)
 
-    unless is_prerelease || current_branch == "master"
+    unless is_prerelease || current_branch == "main"
       abort <<~ERROR
-        ❌ Release must be run from the master branch!
+        ❌ Release must be run from the main branch!
 
         Current branch: #{current_branch}
 
-        To release a stable version, please switch to master:
-          git checkout master && git pull --rebase
+        To release a stable version, please switch to main:
+          git checkout main && git pull --rebase
 
         For pre-release versions (beta, alpha, rc, etc.), you can release from any branch:
           rake release[#{resolved_target_gem_version.sub(/(\d+\.\d+\.\d+)/, '\\1.beta.1')}]

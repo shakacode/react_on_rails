@@ -173,7 +173,7 @@ git filter-repo --to-subdirectory-filter react_on_rails_pro
 cd /path/to/react_on_rails
 git remote add pro-origin /tmp/react_on_rails_pro
 git fetch pro-origin
-git merge pro-origin/master --allow-unrelated-histories
+git merge pro-origin/main --allow-unrelated-histories
 
 # 4. Push branch and create PR
 git push -u origin merge-pro-subtree-with-ci

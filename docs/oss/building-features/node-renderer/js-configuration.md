@@ -55,7 +55,7 @@ Deprecated options:
 
 ### Testing example:
 
-[spec/dummy/client/node-renderer.js](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/client/node-renderer.js)
+[spec/dummy/client/node-renderer.js](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/client/node-renderer.js)
 
 ### Simple example:
 

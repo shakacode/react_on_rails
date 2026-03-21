@@ -80,7 +80,7 @@ RSpec.configure do |config|
 end
 ```
 
-See [lib/react_on_rails/test_helper.rb](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/lib/react_on_rails/test_helper.rb) for more details and customization options.
+See [lib/react_on_rails/test_helper.rb](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/lib/react_on_rails/test_helper.rb) for more details and customization options.
 
 By default, the helper triggers compilation for examples tagged with `:js`, `:server_rendering`, or `:controller`. You can pass custom metatags as an optional second parameter if you need compilation for other specs — for example, if you use Webpack to build CSS assets for request and feature specs:
 
@@ -606,7 +606,7 @@ When running tests in Docker, consider:
 - [Dev Server and Testing](./dev-server-and-testing.md) — How `bin/dev` (HMR vs static) interacts with Capybara, Playwright, Minitest system tests, and SSR request specs
 - [Configuration Reference](../configuration/README.md#build_test_command)
 - [Shakapacker Configuration](https://github.com/shakacode/shakapacker#configuration)
-- [TestHelper Source Code](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/lib/react_on_rails/test_helper.rb)
+- [TestHelper Source Code](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/lib/react_on_rails/test_helper.rb)
 
 ## Need Help?
 

@@ -8,7 +8,7 @@
 
 ---
 
-[![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md)[![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![Gem Downloads](https://img.shields.io/gem/dt/react_on_rails)](https://rubygems.org/gems/react_on_rails)
+[![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md)[![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=main&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=main) [![Gem Downloads](https://img.shields.io/gem/dt/react_on_rails)](https://rubygems.org/gems/react_on_rails)
 
 [![Integration Tests](https://github.com/shakacode/react_on_rails/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/integration-tests.yml)
 [![Gem Tests](https://github.com/shakacode/react_on_rails/actions/workflows/gem-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/gem-tests.yml)
@@ -218,7 +218,7 @@ _Requires creating a free account._
 - [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases and tutorials
 - **[forum.shakacode.com](https://forum.shakacode.com)** - Development discussions
 - **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)** - Updates and tips
-- [Projects using React on Rails](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) - Submit yours!
+- [Projects using React on Rails](https://github.com/shakacode/react_on_rails/tree/main/PROJECTS.md) - Submit yours!
 
 ## For AI Coding Assistants
 
@@ -243,7 +243,7 @@ See [React on Rails Pro documentation](docs/pro/home-pro.md) for advanced featur
 
 ## Contributing
 
-Bug reports and pull requests are welcome. To get started, see [Contributing](https://github.com/shakacode/react_on_rails/tree/master/CONTRIBUTING.md) and the [list of help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
+Bug reports and pull requests are welcome. To get started, see [Contributing](https://github.com/shakacode/react_on_rails/tree/main/CONTRIBUTING.md) and the [list of help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
 
 # Work with Us
 
@@ -251,7 +251,7 @@ ShakaCode is **[hiring passionate software engineers](https://www.shakacode.com/
 
 # License
 
-The gem is available as open source under the terms of the [MIT License](https://github.com/shakacode/react_on_rails/tree/master/LICENSE.md).
+The gem is available as open source under the terms of the [MIT License](https://github.com/shakacode/react_on_rails/tree/main/LICENSE.md).
 
 Note, some features are available only with a React on Rails Pro subscription. See [React on Rails Pro](https://pro.reactonrails.com/) for more information.
 

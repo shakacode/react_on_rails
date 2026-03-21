@@ -6,16 +6,16 @@
 #   bin/compare-bundle-sizes [base-branch]
 #
 # Arguments:
-#   base-branch  The branch to compare against (default: master)
+#   base-branch  The branch to compare against (default: main)
 #
 # Examples:
-#   bin/compare-bundle-sizes                    # Compare against master
+#   bin/compare-bundle-sizes                    # Compare against main
 #   bin/compare-bundle-sizes develop            # Compare against develop
 #   bin/compare-bundle-sizes feature/some-branch
 
 set -e
 
-BASE_BRANCH="${1:-master}"
+BASE_BRANCH="${1:-main}"
 CURRENT_BRANCH=$(git branch --show-current)
 STASHED=false
 

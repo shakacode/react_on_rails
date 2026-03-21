@@ -106,7 +106,7 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails/tree/master/packages/react-on-rails-pro-node-renderer#readme",
+  "homepage": "https://github.com/shakacode/react_on_rails/tree/main/packages/react-on-rails-pro-node-renderer#readme",
   "jest": {
     "clearMocks": true,
     "moduleNameMapper": {

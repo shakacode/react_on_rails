@@ -54,9 +54,9 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 # Example apps
 
-The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
+The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
 
-There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/execjs-compatible-dummy).
+There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/execjs-compatible-dummy).
 
 When you add a new feature, consider adding an example demonstrating it to the example apps.
 
@@ -139,7 +139,7 @@ After making changes, run `yalc push` from the package directory to update all l
 The dummy apps are part of the pnpm workspace, so changes are automatically linked.
 
 1. Build the package: `pnpm run build` (from root)
-2. Add `console.log('Hello!')` to [clientStartup.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/clientStartup.ts)
+2. Add `console.log('Hello!')` to [clientStartup.ts](https://github.com/shakacode/react_on_rails/blob/main/packages/react-on-rails/src/clientStartup.ts)
 3. Rebuild: `pnpm run build`
 4. Start the dummy server: `cd react_on_rails/spec/dummy && foreman start`
 5. Navigate to `http://localhost:3000/` - you'll see the message in the browser console
@@ -155,24 +155,24 @@ Adjust depending on the repo you pushed to and commit/branch you want to use, se
 ```ruby
 gem 'react_on_rails',
   git: 'https://github.com/shakacode/react_on_rails',
-  branch: 'master'
+  branch: 'main'
 gem 'react_on_rails_pro',
   git: 'https://github.com/shakacode/react_on_rails',
   glob: 'react_on_rails_pro/react_on_rails_pro.gemspec',
-  branch: 'master'
+  branch: 'main'
 ```
 
 ### JS
 
 Unfortunately, not all package managers allow depending on a single subfolder of a Git repo.
-The examples below are for the `master` branch of `react-on-rails` package.
+The examples below are for the `main` branch of `react-on-rails` package.
 
 #### PNPM (recommended, v9+)
 
 See [this issue](https://github.com/pnpm/pnpm/issues/4765).
 
 ```shell
-pnpm add "github:shakacode/react_on_rails/repo#master&path:packages/react-on-rails"
+pnpm add "github:shakacode/react_on_rails/repo#main&path:packages/react-on-rails"
 ```
 
 #### Yarn Berry
@@ -180,7 +180,7 @@ pnpm add "github:shakacode/react_on_rails/repo#master&path:packages/react-on-rai
 See [Yarn Git protocol documentation](https://yarnpkg.com/protocol/git#workspaces-support).
 
 ```shell
-yarn add "git@github.com:shakacode/react_on_rails.git#workspace=react-on-rails&head=master"
+yarn add "git@github.com:shakacode/react_on_rails.git#workspace=react-on-rails&head=main"
 ```
 
 #### NPM
@@ -384,14 +384,14 @@ bin/compare-bundle-sizes
 This script automatically:
 
 1. Stashes any uncommitted changes
-2. Checks out and builds the base branch (default: `master`)
+2. Checks out and builds the base branch (default: `main`)
 3. Checks out and builds your current branch
 4. Compares the size and total execution time (loading + running) and shows a detailed report
 
 Options:
 
 ```sh
-bin/compare-bundle-sizes main        # Compare against 'main' instead of 'master'
+bin/compare-bundle-sizes main        # Compare against 'main'
 bin/compare-bundle-sizes --hierarchical  # Group results by package
 ```
 
@@ -467,12 +467,12 @@ The CI-generated example apps (under `gen-examples/`) automatically resolve the 
 
 ## CI Testing and Optimization
 
-React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `master`. Contributors have access to local CI tools to validate changes before pushing.
+React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `main`. Contributors have access to local CI tools to validate changes before pushing.
 
 ### CI Behavior
 
 - **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback (~12 min vs ~45 min)
-- **On Master**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
+- **On Main**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
 - **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
 
 ### Local CI Tools
@@ -485,7 +485,7 @@ Analyzes your changes and runs appropriate tests locally before pushing:
 # Auto-detect what to test based on changed files
 bin/ci-local
 
-# Run all CI checks (same as master branch)
+# Run all CI checks (same as main branch)
 bin/ci-local --all
 
 # Quick check - only fast tests, skip slow integration tests
@@ -506,11 +506,11 @@ bin/ci-local origin/develop
 Analyzes git changes and recommends which CI jobs to run:
 
 ```bash
-# Check what changed since master
-script/ci-changes-detector origin/master
+# Check what changed since main
+script/ci-changes-detector origin/main
 
 # JSON output for scripting (requires jq)
-CI_JSON_OUTPUT=1 script/ci-changes-detector origin/master
+CI_JSON_OUTPUT=1 script/ci-changes-detector origin/main
 ```
 
 **Output example:**
@@ -542,7 +542,7 @@ If using Claude Code, run `/run-ci` for interactive CI execution that:
 
 - Run `bin/ci-local` before pushing to catch issues early
 - Use `bin/ci-local --fast` during rapid iteration
-- Trust the reduced matrix on PRs - master validates everything
+- Trust the reduced matrix on PRs - main validates everything
 - Separate docs-only changes into dedicated commits/PRs when possible
 
 ❌ **DON'T:**
@@ -624,7 +624,7 @@ React on Rails includes a performance benchmark workflow that measures RPS (requ
 
 #### When Benchmarks Run
 
-- **Automatically on master**: Benchmarks run on every push to master
+- **Automatically on main**: Benchmarks run on every push to main
 - **On PRs with labels**: Add the `benchmark` label to your PR to run benchmarks
 - **Manual trigger**: Use `gh workflow run` to run benchmarks with custom parameters (see [https://github.com/cli/cli#installation](https://github.com/cli/cli#installation) if you don't have `gh`):
 
