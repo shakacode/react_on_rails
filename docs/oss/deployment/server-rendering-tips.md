@@ -20,6 +20,31 @@ For the best performance with Server Rendering, consider using [React on Rails P
 2. Set `config.trace` to true. You will get the server invocation code that renders your component. If you're not using Shakapacker, you will also get the whole file used to set up the JavaScript context.
 3. If streaming SSR requests hang indefinitely, check whether your compression middleware (`Rack::Deflater`, `Rack::Brotli`) has an `:if` condition that calls `body.each`. This causes deadlocks with streaming responses. See the [Compression Middleware Compatibility](../building-features/streaming-server-rendering.md#compression-middleware-compatibility) section in the Streaming Server Rendering guide.
 
+## Disabling SSR in CI or Test Environments
+
+If your CI or test environment lacks an SSR server (e.g., no Node.js runtime available), components with `prerender: true` will throw errors. Rather than adding gem-level configuration, use a standard Rails view helper to control prerendering per-environment:
+
+```ruby
+# app/helpers/prerender_helper.rb
+module PrerenderHelper
+  def use_prerendering
+    return false if ENV["DISABLE_SSR"].present?
+
+    true
+  end
+end
+```
+
+Then replace hardcoded `prerender: true` calls with the helper:
+
+```erb
+<%= react_component("MyComponent", prerender: use_prerendering) %>
+```
+
+Set `DISABLE_SSR=1` in your CI environment to skip server rendering.
+
+This approach gives you per-component granularity (SEO-critical components can still hardcode `prerender: true`), and you can customize the logic however you like — for example, checking `Rails.env.test?` or reading a different env var.
+
 ## CSS
 
 Server bundles must always have CSS extracted.
