@@ -366,7 +366,7 @@ export default function Dashboard({ title, getReactOnRailsAsyncProp }) {
 }
 
 // Stats.jsx -- Async Server Component
-async function Stats({ statsPromise }) {
+export default async function Stats({ statsPromise }) {
   const stats = await statsPromise;
   return (
     <div>

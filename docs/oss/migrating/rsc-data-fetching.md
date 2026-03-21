@@ -285,6 +285,7 @@ export default function ProductList({ initialProducts }) {
     queryKey: ['products'],
     queryFn: () => fetch('/api/products').then((res) => res.json()),
     initialData: initialProducts,
+    staleTime: 60_000, // treat Rails-fetched data as fresh for 60 s
   });
 
   return (
@@ -418,9 +419,9 @@ If the data sources are independent (none depends on another's result), run them
 <%= stream_react_component_with_async_props("Dashboard",
       props: { title: "Dashboard" }) do |emit|
   threads = []
-  threads << Thread.new { emit.call("user", User.find(user_id).as_json) }
-  threads << Thread.new { emit.call("stats", Stats.for_user(user_id).as_json) }
-  threads << Thread.new { emit.call("posts", Post.where(user_id: user_id).limit(10).as_json) }
+  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { emit.call("user", User.find(user_id).as_json) } }
+  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { emit.call("stats", Stats.for_user(user_id).as_json) } }
+  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { emit.call("posts", Post.where(user_id: user_id).limit(10).as_json) } }
   threads.each(&:join)
   # Total: ~300ms (limited by slowest query)
 end %>
@@ -687,11 +688,12 @@ React on Rails **does not support Server Actions** (`'use server'`). Server Acti
 
 import { useState } from 'react';
 
-export default function CommentForm({ postId, csrfToken }) {
+export default function CommentForm({ postId }) {
   const [content, setContent] = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     await fetch('/api/comments', {
       method: 'POST',
       headers: {

@@ -155,11 +155,12 @@ All components include `'use client'` directives. Cannot use compound components
 
 import { useState } from 'react';
 
-export default function ContactForm({ csrfToken }) {
+export default function ContactForm() {
   const [name, setName] = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     await fetch('/api/users', {
       method: 'POST',
       headers: {

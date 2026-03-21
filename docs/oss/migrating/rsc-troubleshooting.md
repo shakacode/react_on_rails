@@ -51,10 +51,11 @@ export default function ClientButton() {
 // ClientForm.jsx -- Client Component
 'use client';
 
-export default function ClientForm({ csrfToken }) {
+export default function ClientForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     await fetch('/api/items', {
       method: 'POST',
       headers: {
@@ -432,9 +433,9 @@ end %>
 <%= stream_react_component_with_async_props("Page",
       props: { title: "Page" }) do |emit|
   threads = []
-  threads << Thread.new { emit.call("user", User.find(user_id).as_json) }
-  threads << Thread.new { emit.call("stats", Stats.for_user(user_id).as_json) }
-  threads << Thread.new { emit.call("posts", Post.where(user_id: user_id).limit(10).as_json) }
+  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { emit.call("user", User.find(user_id).as_json) } }
+  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { emit.call("stats", Stats.for_user(user_id).as_json) } }
+  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { emit.call("posts", Post.where(user_id: user_id).limit(10).as_json) } }
   threads.each(&:join)
 end %>
 ```
