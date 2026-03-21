@@ -8,6 +8,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 
 - [Create a new app](./oss/getting-started/create-react-on-rails-app.md)
 - [Quick Start](./oss/getting-started/quick-start.md)
+- [Tutorial — build a complete app](./oss/getting-started/tutorial.md)
 
 ### Adding React to an existing Rails app
 
@@ -31,6 +32,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 - [Core Concepts](./oss/core-concepts/how-react-on-rails-works.md)
 - [API Reference](./oss/api-reference/view-helpers-api.md)
 - [Deployment and troubleshooting](./oss/deployment/README.md)
+- [Configuration](./oss/configuration/README.md)
 - [Changelog](./oss/upgrading/changelog.md)
 
 ## Pro features
@@ -43,7 +45,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 ## Friendly evaluation policy
 
 - You can try React on Rails Pro without a license while evaluating.
-- If your organization is budget-constrained, contact us about free licenses.
+- If your organization is budget-constrained, [contact us](mailto:justin@shakacode.com) about free licenses.
 
 ## Need more help?
 
