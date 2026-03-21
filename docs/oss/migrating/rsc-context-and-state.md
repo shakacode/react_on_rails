@@ -98,9 +98,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import ProductDetails from './components/ProductDetails';
 
-export default async function ProductPage({ user, productId }) {
-  const product = await getProduct(productId);
-
+export default function ProductPage({ user, product }) {
   return (
     <div>
       <Header /> {/* Server Component -- outside providers */}
@@ -111,6 +109,13 @@ export default async function ProductPage({ user, productId }) {
     </div>
   );
 }
+```
+
+```erb
+<%# Rails view %>
+<%= stream_react_component("ProductPage",
+      props: { user: current_user.as_json(only: [:id, :name]),
+               product: @product.as_json }) %>
 ```
 
 **Key insight:** Components that don't need context (static header, footer) stay **outside** the provider wrapper, keeping them as Server Components with zero JavaScript cost.
@@ -221,15 +226,19 @@ export default function ReduxProvider({ children }) {
 }
 ```
 
+```erb
+<%# Rails view %>
+<%= stream_react_component("ProductPage",
+      props: { product: @product.as_json }) %>
+```
+
 ```jsx
 // ProductPage.jsx -- Server Component (migrated)
 import ReduxProvider from './ReduxProvider';
 import ProductSpecs from './ProductSpecs';
 import AddToCartButton from './AddToCartButton';
 
-export default async function ProductPage({ productId }) {
-  const product = await getProduct(productId);
-
+export default function ProductPage({ product }) {
   return (
     <ReduxProvider>
       <h1>{product.name}</h1> {/* Server-rendered */}
