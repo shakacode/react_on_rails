@@ -91,6 +91,27 @@ module ReactOnRails
         end
       end
 
+      context "when package.json uses custom indentation" do
+        before do
+          custom_json = [
+            "{",
+            "    \"dependencies\": {",
+            "        \"react-on-rails\": \"16.4.0.rc.4\"",
+            "    }",
+            "}"
+          ].join("\n")
+          File.write(package_json_path, "#{custom_json}\n")
+        end
+
+        it "preserves the original indentation width when writing" do
+          synchronizer.sync(write: true)
+
+          content = File.read(package_json_path)
+          expect(content).to include("\n    \"dependencies\":")
+          expect(content).to include("\n        \"react-on-rails\": \"16.4.0-rc.5\"")
+        end
+      end
+
       context "when package.json does not exist" do
         it "raises an error" do
           expect { synchronizer.sync }.to raise_error(ReactOnRails::Error, /package\.json not found/)

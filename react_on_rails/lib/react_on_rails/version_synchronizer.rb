@@ -83,7 +83,10 @@ module ReactOnRails
         package_json_data[change[:section]][change[:package]] = change[:to]
       end
 
-      File.write(package_json_path, "#{JSON.pretty_generate(package_json_data)}\n")
+      original_content = File.read(package_json_path)
+      indentation = detect_indentation(original_content)
+      json_state = JSON::State.new(indent: indentation, object_nl: "\n", array_nl: "\n", space: " ")
+      File.write(package_json_path, "#{json_state.generate(package_json_data)}\n")
     end
 
     def print_summary(changes, write:)
@@ -103,6 +106,12 @@ module ReactOnRails
       else
         io.puts "Dry run only. Re-run with WRITE=true to apply changes."
       end
+    end
+
+    def detect_indentation(content)
+      indented_key_line = content.each_line.find { |line| line.match?(/^[ \t]+"[^"\n]+":/) }
+      indentation = indented_key_line&.slice(/^[ \t]+/)
+      indentation.nil? ? "  " : indentation
     end
   end
 end
