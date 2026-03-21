@@ -32,18 +32,16 @@ Package names have changed:
 
 ## Version Alignment: Pro 3.x/4.x → 16.x
 
-Starting with version 16.2.0, React on Rails Pro version numbers were aligned with the core React on Rails gem. **Pro 16.x is the direct successor to Pro 3.x/4.x** — it is the same gem, with the same features, under a new version number.
+React on Rails Pro version numbers were aligned with the core React on Rails gem during the 16.x series. **Pro 16.x is the direct successor to Pro 3.x/4.x** — it is the same gem, with the same features, under a new version number.
 
-The mapping is:
+| Version        | Distribution              | Notes                                       |
+| -------------- | ------------------------- | ------------------------------------------- |
+| Pro 3.3.x      | GitHub Packages (private) | Last 3.x release                            |
+| Pro 4.0.0-rc.x | GitHub Packages (private) | Release candidates (pre-monorepo)           |
+| Pro 16.1.x     | GitHub Packages (private) | Version-aligned with core gem               |
+| Pro 16.2.0+    | RubyGems.org / npmjs.org  | First publicly distributed, version-aligned |
 
-| Old Version    | New Version                  | Notes                             |
-| -------------- | ---------------------------- | --------------------------------- |
-| Pro 3.3.x      | —                            | Last version on GitHub Packages   |
-| Pro 4.0.0-rc.x | —                            | Release candidates (pre-monorepo) |
-| Pro 16.2.0     | First aligned release        | Includes all 4.0.0-rc features    |
-| Pro 16.3.0+    | Continues aligned versioning |                                   |
-
-If you are upgrading from Pro 3.x or 4.0.0-rc.x, follow the full [Migration Steps](#migration-steps) below.
+If you are upgrading from Pro 3.x, 4.0.0-rc.x, or any GitHub Packages version (including 16.1.x), follow the full [Migration Steps](#migration-steps) below.
 
 ## Breaking Changes and Deprecation Policy
 
@@ -213,13 +211,24 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 For complete licensing details, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
 
+### Understanding the Pro npm packages
+
+React on Rails Pro has two npm packages with different purposes:
+
+| Package                            | Purpose                                                                     | When to install                                        |
+| ---------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `react-on-rails-pro`               | Client-side Pro features (immediate hydration, RSC, component registration) | **Always** — all Pro users need this                   |
+| `react-on-rails-pro-node-renderer` | Server-side Node.js rendering pool                                          | **Only** if using the standalone Node Renderer for SSR |
+
+If you only use ExecJS for SSR (the default), you do not need `react-on-rails-pro-node-renderer`.
+
 ### Additional Upgrade Notes
 
 #### Upgrading to 16.4.0 or later
 
 ##### JWT gem requirement
 
-`react_on_rails_pro` 16.x requires `jwt ~> 2.7`. If your Gemfile pins `jwt` to an older version (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
+`react_on_rails_pro` 16.4.0 and later requires `jwt ~> 2.7`. If your Gemfile pins `jwt` to an older version (e.g., `2.2.x` for compatibility with OAuth gems), you will need to upgrade it. Check for conflicts with:
 
 ```bash
 bundle update jwt
@@ -262,17 +271,6 @@ If your app overrides `custom_rsc_payload_template`, make sure that override res
 - gem "react_on_rails", "16.4.0"
   gem "react_on_rails_pro", "16.4.0"
 ```
-
-#### Understanding the Pro npm packages
-
-React on Rails Pro has two npm packages with different purposes:
-
-| Package                            | Purpose                                                                     | When to install                                        |
-| ---------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `react-on-rails-pro`               | Client-side Pro features (immediate hydration, RSC, component registration) | **Always** — all Pro users need this                   |
-| `react-on-rails-pro-node-renderer` | Server-side Node.js rendering pool                                          | **Only** if using the standalone Node Renderer for SSR |
-
-If you only use ExecJS for SSR (the default), you do not need `react-on-rails-pro-node-renderer`.
 
 ### Verify Migration
 
