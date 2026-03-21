@@ -66,7 +66,7 @@ Execution flow when terminal access is available:
 
 4. Filter comments:
    - Skip resolved threads.
-   - Skip replies where `in_reply_to_id` is set.
+   - Do not create standalone triage items from comments where `in_reply_to_id` is set, but use reply text as the latest thread context when it updates or narrows the unresolved concern.
    - Keep bot comments by default, but deduplicate duplicates and skip status-only bot posts.
    - Focus on correctness bugs, regressions, security issues, missing tests that hide bugs, and clear adjacent-code inconsistencies.
    - Skip style nits, speculative suggestions, documentation nits, changelog wording, duplicate comments, and "could consider" feedback unless I ask for polish work.
@@ -77,11 +77,12 @@ Execution flow when terminal access is available:
 5. Triage every remaining comment:
    - `MUST-FIX`: correctness bugs, regressions, security issues, missing tests that could hide a bug, and clear inconsistencies with adjacent code that would likely block merge.
    - `DISCUSS`: reasonable scope-expanding suggestions, architectural opinions, and comments that need a decision.
-   - `SKIPPED`: style preferences, documentation nits, comment requests, test-shape preferences, speculative suggestions, changelog wording, duplicate comments, status posts, summaries, and factually incorrect suggestions.
+   - `SKIPPED`: style preferences, documentation nits, comment requests, test-shape preferences, speculative suggestions, changelog wording, duplicate comments, status posts, non-actionable summaries, and factually incorrect suggestions.
    - Deduplicate overlapping comments before classifying them.
    - Verify reviewer claims locally before calling something `MUST-FIX`.
    - If a claim is wrong, classify it as `SKIPPED` and say why.
    - Preserve comment IDs and thread IDs for later replies and thread resolution.
+   - Treat actionable review summary bodies as normal feedback to classify (`MUST-FIX`/`DISCUSS` as appropriate); skip only boilerplate or status-only summaries.
    - Track only `MUST-FIX` items as your working checklist.
    - Use one checklist entry per must-fix item or deduplicated issue.
    - Use the subject format: `"{file}:{line} - {comment_summary} (@{username})"`.

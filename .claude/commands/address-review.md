@@ -82,7 +82,7 @@ gh api graphql --paginate -f owner="${OWNER}" -f name="${NAME}" -F pr={PR_NUMBER
 **Filtering comments:**
 
 - Skip comments belonging to already-resolved threads (match via `thread_id` and `is_resolved` from the GraphQL response)
-- Skip comments where `in_reply_to_id` is set (these are replies, not top-level comments)
+- Do not create standalone triage items from comments where `in_reply_to_id` is set, but use reply text as the latest thread context when it updates or narrows the unresolved concern
 - Do not skip bot-generated comments by default. Many actionable review comments in this repository come from bots.
 - Deduplicate repeated bot comments and skip bot status posts, summaries, and acknowledgments that do not require a code or documentation change
 - Treat as actionable by default only: correctness bugs, regressions, security issues, missing tests, and clear inconsistencies with adjacent code
@@ -101,7 +101,7 @@ Before creating any todos, classify every review comment into one of three categ
 
 - `MUST-FIX`: correctness bugs, regressions, security issues, missing tests that could hide a real bug, and clear inconsistencies with adjacent code that would likely block merge
 - `DISCUSS`: reasonable suggestions that expand scope, architectural opinions that are not clearly right or wrong, and comments where the reviewer claim may be correct but needs a user decision
-- `SKIPPED`: style preferences, documentation nits, comment requests, test-shape preferences, speculative suggestions, changelog wording, duplicate comments, status posts, summaries, and factually incorrect suggestions
+- `SKIPPED`: style preferences, documentation nits, comment requests, test-shape preferences, speculative suggestions, changelog wording, duplicate comments, status posts, non-actionable summaries, and factually incorrect suggestions
 
 Triage rules:
 
@@ -109,6 +109,7 @@ Triage rules:
 - Verify factual claims locally before classifying a comment as `MUST-FIX`.
 - If a claim appears wrong, classify it as `SKIPPED` and note briefly why.
 - Preserve the original review comment ID and thread ID when available so the command can reply to the correct place and resolve the correct thread later.
+- Treat actionable review summary bodies as normal feedback to classify (`MUST-FIX`/`DISCUSS` as appropriate); skip only boilerplate or status-only summaries.
 
 ## Step 5: Create Todo List
 
