@@ -34,6 +34,18 @@ RSpec.describe "sync_versions rake task" do
       expect(synchronizer).to have_received(:sync).with(write: false)
     end
 
+    it "runs in dry-run mode when DRY_RUN=true" do
+      synchronizer = instance_double(ReactOnRails::VersionSynchronizer)
+      allow(ReactOnRails::VersionSynchronizer).to receive(:new).and_return(synchronizer)
+      allow(synchronizer).to receive(:sync).with(write: false).and_return(sync_result)
+
+      ENV["DRY_RUN"] = "true"
+      ENV.delete("WRITE")
+      task = Rake::Task["react_on_rails:sync_versions"]
+      expect { task.invoke }.not_to raise_error
+      expect(synchronizer).to have_received(:sync).with(write: false)
+    end
+
     it "runs in write mode when WRITE=true" do
       synchronizer = instance_double(ReactOnRails::VersionSynchronizer)
       allow(ReactOnRails::VersionSynchronizer).to receive(:new).and_return(synchronizer)

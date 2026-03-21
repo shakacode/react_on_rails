@@ -1,10 +1,13 @@
 # frozen_string_literal: true
 
+require_relative "version_syntax_converter"
+
 module ReactOnRails
   # Synchronizes React on Rails npm package versions with loaded gem versions.
   # Dry-run is the default behavior. Use write mode to persist updates.
   class VersionSynchronizer
-    PACKAGE_SECTIONS = %w[dependencies devDependencies peerDependencies optionalDependencies].freeze
+    PACKAGE_SECTIONS = %w[dependencies devDependencies optionalDependencies].freeze
+    EXACT_VERSION_REGEX = /\A\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?\z/
     PACKAGE_VERSION_SOURCES = {
       "react-on-rails" => :react_on_rails,
       "react-on-rails-pro" => :react_on_rails_pro,
@@ -20,10 +23,10 @@ module ReactOnRails
     end
 
     def sync(write: false)
-      package_json_data = parse_package_json
+      package_json_data, original_content = parse_package_json
       changes = detect_changes(package_json_data)
 
-      apply_changes!(package_json_data, changes) if write && changes.any?
+      apply_changes!(package_json_data, changes, original_content) if write && changes.any?
       print_summary(changes, write: write)
 
       changed_files = write && changes.any? ? [package_json_path] : []
@@ -35,11 +38,14 @@ module ReactOnRails
     attr_reader :package_json_path, :io, :converter
 
     def parse_package_json
-      raise ReactOnRails::Error, "package.json not found at #{package_json_path}" unless File.exist?(package_json_path)
+      raise ReactOnRails::Error, "package.json not found at #{package_json_path}" unless File.file?(package_json_path)
 
-      JSON.parse(File.read(package_json_path))
+      content = File.read(package_json_path)
+      [JSON.parse(content), content]
     rescue JSON::ParserError => e
       raise ReactOnRails::Error, "Invalid JSON in #{package_json_path}: #{e.message}"
+    rescue SystemCallError => e
+      raise ReactOnRails::Error, "Unable to read #{package_json_path}: #{e.message}"
     end
 
     def detect_changes(package_json_data)
@@ -52,14 +58,17 @@ module ReactOnRails
         PACKAGE_VERSION_SOURCES.each do |package_name, source_key|
           next unless dependencies.key?(package_name)
 
+          current_version = dependencies[package_name]
+          next unless exact_version?(current_version)
+
           expected_version = expected_versions[source_key]
           next if expected_version.nil?
-          next if dependencies[package_name] == expected_version
+          next if current_version == expected_version
 
           changes << {
             section: section,
             package: package_name,
-            from: dependencies[package_name],
+            from: current_version,
             to: expected_version
           }
         end
@@ -78,15 +87,18 @@ module ReactOnRails
       versions
     end
 
-    def apply_changes!(package_json_data, changes)
+    def apply_changes!(package_json_data, changes, original_content)
       changes.each do |change|
         package_json_data[change[:section]][change[:package]] = change[:to]
       end
 
-      original_content = File.read(package_json_path)
       indentation = detect_indentation(original_content)
-      json_state = JSON::State.new(indent: indentation, object_nl: "\n", array_nl: "\n", space: " ")
-      File.write(package_json_path, "#{json_state.generate(package_json_data)}\n")
+      generated_json = JSON.generate(package_json_data,
+                                     indent: indentation,
+                                     object_nl: "\n",
+                                     array_nl: "\n",
+                                     space: " ")
+      write_atomically("#{generated_json}\n")
     end
 
     def print_summary(changes, write:)
@@ -103,9 +115,22 @@ module ReactOnRails
       if write
         io.puts "Updated file:"
         io.puts "  - #{package_json_path}"
+        io.puts "Run your package manager install command to refresh lockfile entries."
       else
         io.puts "Dry run only. Re-run with WRITE=true to apply changes."
       end
+    end
+
+    def exact_version?(version)
+      version.is_a?(String) && version.match?(EXACT_VERSION_REGEX)
+    end
+
+    def write_atomically(content)
+      tmp_path = "#{package_json_path}.tmp-#{Process.pid}-#{Thread.current.object_id}"
+      File.write(tmp_path, content)
+      File.rename(tmp_path, package_json_path)
+    ensure
+      File.delete(tmp_path) if tmp_path && File.exist?(tmp_path)
     end
 
     def detect_indentation(content)

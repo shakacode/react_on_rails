@@ -4,6 +4,7 @@ require "stringio"
 require "tmpdir"
 require "fileutils"
 require_relative "../../react_on_rails/spec_helper"
+require_relative "../../../lib/react_on_rails/version_synchronizer"
 require_relative "../../react_on_rails/support/version_test_helpers"
 
 module ReactOnRails
@@ -52,6 +53,7 @@ module ReactOnRails
           expect(read_package_json.dig("dependencies", "react-on-rails-pro")).to eq("16.4.0-rc.5")
           expect(read_package_json.dig("dependencies", "react-on-rails-pro-node-renderer")).to eq("16.4.0-rc.5")
           expect(io.string).to include("Updated file:")
+          expect(io.string).to include("refresh lockfile entries")
         end
       end
 
@@ -70,6 +72,28 @@ module ReactOnRails
 
           expect(result.changes.size).to eq(1)
           expect(read_package_json.dig("dependencies", "react-on-rails")).to eq("16.4.0-rc.5")
+        end
+      end
+
+      context "when package.json uses non-exact version specs" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => "workspace:*"
+            },
+            "peerDependencies" => {
+              "react-on-rails-pro" => ">=16.0.0"
+            }
+          )
+        end
+
+        it "skips non-exact specs instead of rewriting them" do
+          result = synchronizer.sync(write: true)
+
+          expect(result.changes).to eq([])
+          expect(result.changed_files).to eq([])
+          expect(read_package_json.dig("dependencies", "react-on-rails")).to eq("workspace:*")
+          expect(read_package_json.dig("peerDependencies", "react-on-rails-pro")).to eq(">=16.0.0")
         end
       end
 
@@ -113,6 +137,14 @@ module ReactOnRails
       end
 
       context "when package.json does not exist" do
+        it "raises an error" do
+          expect { synchronizer.sync }.to raise_error(ReactOnRails::Error, /package\.json not found/)
+        end
+      end
+
+      context "when package_json_path is a directory" do
+        let(:package_json_path) { tmpdir }
+
         it "raises an error" do
           expect { synchronizer.sync }.to raise_error(ReactOnRails::Error, /package\.json not found/)
         end
