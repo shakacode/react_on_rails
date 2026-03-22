@@ -6,7 +6,7 @@ React on Rails uses [ExecJS](https://github.com/rails/execjs) as the default ser
 
 ExecJS evaluates your server bundle in an isolated JavaScript context. It calls your render function synchronously, collects the resulting HTML string, and returns it to Rails. This synchronous model is the root of most limitations — ExecJS cannot wait for asynchronous operations to complete.
 
-By default, ExecJS uses the Node.js runtime. You can also use [mini_racer](https://github.com/rubyjs/mini_racer) (a V8 isolate), though Node.js generally provides better performance. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes.
+By default, ExecJS uses the Node.js runtime. You can also use [mini_racer](https://github.com/rubyjs/mini_racer) (a V8 isolate). Both runtimes share the same synchronous limitations described below. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes.
 
 ## Timer and Async Limitations
 

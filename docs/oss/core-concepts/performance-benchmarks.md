@@ -15,7 +15,7 @@ The default ExecJS renderer evaluates JavaScript synchronously inside a single-t
 | Async support     | None                          | None                          | Full (Promises, timers)    |
 | Streaming SSR     | Not supported                 | Not supported                 | Supported                  |
 | RSC support       | Not supported                 | Not supported                 | Supported                  |
-| Typical speedup   | Baseline                      | ~1-2x over mini_racer         | 10-100x over ExecJS        |
+| Typical speedup   | Baseline                      | Comparable                    | 10-100x over ExecJS        |
 
 The Node Renderer's persistent process supports full async rendering and multi-worker concurrency, which are the primary sources of the performance difference. ExecJS is limited to synchronous rendering within a single-threaded pool. For complex components with many async dependencies, this gap widens significantly.
 
