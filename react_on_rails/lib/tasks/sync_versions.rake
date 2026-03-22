@@ -4,10 +4,11 @@ require_relative "../react_on_rails"
 require_relative "../react_on_rails/version_synchronizer"
 
 namespace :react_on_rails do
-  desc "Sync React on Rails npm package versions with gem versions (dry-run by default)"
+  desc "Sync React on Rails npm package versions with gem versions (dry-run by default; WRITE=true applies changes)"
   task :sync_versions do
     write = ENV["WRITE"] == "true"
-    dry_run = ENV["DRY_RUN"] == "true" # Used for conflict validation; dry-run is the default behavior.
+    # DRY_RUN is a legacy explicit alias; behavior is dry-run unless WRITE=true.
+    dry_run = ENV["DRY_RUN"] == "true"
 
     raise ReactOnRails::Error, "WRITE and DRY_RUN cannot both be true" if write && dry_run
 

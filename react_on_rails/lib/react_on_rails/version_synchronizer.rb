@@ -2,6 +2,7 @@
 
 require "json"
 require_relative "version_syntax_converter"
+require_relative "version_checker"
 
 module ReactOnRails
   # Synchronizes React on Rails npm package versions with loaded gem versions.
@@ -10,7 +11,7 @@ module ReactOnRails
     PACKAGE_SECTIONS = %w[dependencies devDependencies optionalDependencies peerDependencies].freeze
     # Matches exact npm versions (e.g. "1.2.3", "1.2.3-rc.4") and rubygem-style
     # prerelease notation (e.g. "1.2.3.rc.4") so malformed copied values can be corrected.
-    EXACT_VERSION_REGEX = /\A\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?\z/
+    EXACT_VERSION_REGEX = /\A\d+\.\d+\.\d+(?:[-.][0-9A-Za-z]+(?:\.[0-9A-Za-z-]+)*)?\z/
     PACKAGE_VERSION_SOURCES = {
       "react-on-rails" => :react_on_rails,
       "react-on-rails-pro" => :react_on_rails_pro,
@@ -130,13 +131,16 @@ module ReactOnRails
       tmp_path = "#{package_json_path}.tmp-#{Process.pid}-#{Thread.current.object_id}"
       File.write(tmp_path, content)
       File.rename(tmp_path, package_json_path)
+    rescue SystemCallError => e
+      raise ReactOnRails::Error, "Unable to write #{package_json_path}: #{e.message}"
     ensure
+      # Rename failures leave the original file intact. Always clean up the temp file.
       cleanup_tmp_file(tmp_path)
     end
 
     def lockfile_present?
       package_dir = File.dirname(package_json_path)
-      %w[yarn.lock package-lock.json pnpm-lock.yaml bun.lock].any? do |lockfile_name|
+      %w[yarn.lock package-lock.json pnpm-lock.yaml bun.lock bun.lockb].any? do |lockfile_name|
         File.exist?(File.join(package_dir, lockfile_name))
       end
     end
@@ -156,7 +160,8 @@ module ReactOnRails
         io.puts "Updated file:"
         io.puts "  - #{package_json_path}"
         io.puts "Run your package manager install command to refresh lockfile entries."
-        io.puts "Write mode may normalize package.json formatting, including array wrapping."
+        io.puts "Write mode reformats package.json and may normalize whitespace/newline layout."
+        io.puts "For minified package.json files, indentation falls back to two spaces."
       else
         io.puts "Dry run only. Re-run with WRITE=true to apply changes."
       end
@@ -180,6 +185,7 @@ module ReactOnRails
     end
 
     def detect_indentation(content)
+      # If package.json is minified/single-line, there is no indentation sample to reuse.
       indented_key_line = content.each_line.find { |line| line.match?(/^[ \t]+"[^"\n]+":/) }
       indentation = indented_key_line&.slice(/^[ \t]+/)
       indentation.nil? ? "  " : indentation

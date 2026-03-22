@@ -5,7 +5,9 @@ require "rake"
 
 RSpec.describe "sync_versions rake task" do
   let(:rake_file) { File.expand_path("../../../lib/tasks/sync_versions.rake", __dir__) }
-  let(:sync_result) { ReactOnRails::VersionSynchronizer::Result.new(changes: [], changed_files: []) }
+  let(:sync_result) do
+    ReactOnRails::VersionSynchronizer::Result.new(changes: [], changed_files: [], unsupported_specs: [])
+  end
 
   before do
     Rake::Task.clear

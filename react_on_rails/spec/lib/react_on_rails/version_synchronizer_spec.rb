@@ -7,6 +7,7 @@ require_relative "../../react_on_rails/spec_helper"
 require_relative "../../../lib/react_on_rails/version_synchronizer"
 require_relative "../../react_on_rails/support/version_test_helpers"
 
+# rubocop:disable Metrics/ModuleLength
 module ReactOnRails
   RSpec.describe VersionSynchronizer do
     let(:io) { StringIO.new }
@@ -80,7 +81,8 @@ module ReactOnRails
           write_package_json(
             "dependencies" => {
               "react-on-rails" => "workspace:*",
-              "react-on-rails-pro" => ">=16.0.0"
+              "react-on-rails-pro" => ">=16.0.0",
+              "react-on-rails-pro-node-renderer" => "16.4.0-"
             }
           )
         end
@@ -100,10 +102,16 @@ module ReactOnRails
               section: "dependencies",
               package: "react-on-rails-pro",
               version: ">=16.0.0"
+            },
+            {
+              section: "dependencies",
+              package: "react-on-rails-pro-node-renderer",
+              version: "16.4.0-"
             }
           )
           expect(read_package_json.dig("dependencies", "react-on-rails")).to eq("workspace:*")
           expect(read_package_json.dig("dependencies", "react-on-rails-pro")).to eq(">=16.0.0")
+          expect(read_package_json.dig("dependencies", "react-on-rails-pro-node-renderer")).to eq("16.4.0-")
           expect(io.string).to include("Skipped non-exact version specs")
         end
       end
@@ -162,6 +170,23 @@ module ReactOnRails
         end
       end
 
+      context "when package.json is synchronized but bun.lockb exists" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => "16.4.0-rc.5"
+            }
+          )
+          File.write(File.join(tmpdir, "bun.lockb"), "binary lockfile marker\n")
+        end
+
+        it "prints a lockfile caveat in dry-run output" do
+          synchronizer.sync
+
+          expect(io.string).to include("Lockfiles may still pin different versions")
+        end
+      end
+
       context "when package.json uses custom indentation" do
         before do
           custom_json = [
@@ -189,6 +214,24 @@ module ReactOnRails
         end
       end
 
+      context "when writing package.json fails" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => "16.4.0.rc.4"
+            }
+          )
+        end
+
+        it "raises a wrapped write error" do
+          allow(File).to receive(:write).and_call_original
+          allow(File).to receive(:write).with(/\.tmp-\d+-\d+$/, any_args).and_raise(Errno::EACCES)
+
+          expect { synchronizer.sync(write: true) }
+            .to raise_error(ReactOnRails::Error, /Unable to write/)
+        end
+      end
+
       context "when package_json_path is a directory" do
         let(:package_json_path) { tmpdir }
 
@@ -207,3 +250,4 @@ module ReactOnRails
     end
   end
 end
+# rubocop:enable Metrics/ModuleLength
