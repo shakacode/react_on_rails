@@ -56,7 +56,7 @@ export default function ClientForm() {
     e.preventDefault();
     const formData = new FormData(e.target);
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-    await fetch('/api/items', {
+    const res = await fetch('/api/items', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -64,6 +64,7 @@ export default function ClientForm() {
       },
       body: JSON.stringify({ name: formData.get('name') }),
     });
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
   }
 
   return (

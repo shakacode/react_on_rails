@@ -161,7 +161,7 @@ export default function ContactForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-    await fetch('/api/users', {
+    const res = await fetch('/api/users', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -169,6 +169,7 @@ export default function ContactForm() {
       },
       body: JSON.stringify({ user: { name } }),
     });
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
   }
 
   return (

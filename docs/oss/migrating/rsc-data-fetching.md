@@ -697,7 +697,7 @@ export default function CommentForm({ postId }) {
   async function handleSubmit(e) {
     e.preventDefault();
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-    await fetch('/api/comments', {
+    const res = await fetch('/api/comments', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -705,6 +705,7 @@ export default function CommentForm({ postId }) {
       },
       body: JSON.stringify({ comment: { content, post_id: postId } }),
     });
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
     setContent('');
   }
 
