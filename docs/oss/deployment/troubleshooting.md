@@ -370,12 +370,6 @@ rule.use = rule.use.filter((item) => {
 
 3. **No browser-only code in component?** (see "window is not defined" above)
 
-### "SSR errors in CI or test environments"
-
-**Symptoms:** Components with `prerender: true` throw errors because no SSR server is available
-
-**Solution:** Use a view helper to conditionally disable prerendering. See [Disabling SSR in CI or Test Environments](server-rendering-tips.md#disabling-ssr-in-ci-or-test-environments).
-
 ### "Hydration mismatch warnings"
 
 **Symptoms:** React warnings about server/client content differences
