@@ -231,9 +231,8 @@ function ProductList({ products }) {
 
 ```erb
 <%# ERB view — Rails passes the data as props %>
-<%# In production, scope or paginate the query (e.g., Product.limit(50)) %>
 <%= stream_react_component("ProductList",
-      props: { products: Product.all.as_json }) %>
+      props: { products: Product.limit(50).as_json }) %>
 ```
 
 In React on Rails, data comes from Rails as props. The component simply renders it — no fetching, no loading states. For data that should stream progressively, use [async props](#data-fetching-in-react-on-rails-pro).
@@ -298,9 +297,8 @@ export default function ProductList({ initialProducts }) {
 
 ```erb
 <%# ERB view — Rails passes the data as props %>
-<%# In production, scope or paginate the query (e.g., Product.limit(50)) %>
 <%= stream_react_component("ProductsPage",
-      props: { products: Product.all.as_json }) %>
+      props: { products: Product.limit(50).as_json }) %>
 ```
 
 **How it works:**
@@ -407,6 +405,8 @@ When data sources are independent, use Ruby threads to fetch in parallel:
   # Total: 300ms (limited by slowest)
 end %>
 ```
+
+> **Note:** In production, wrap each thread body in a `rescue` to avoid incomplete streams if a query fails. An unhandled exception in any thread will be re-raised by `join`, skipping the remaining `emit.call` invocations.
 
 ### Solution 2: Progressive Streaming with Async Props
 
@@ -736,7 +736,7 @@ All mutations in React on Rails should go through Rails controllers via standard
 
 import { useState } from 'react';
 
-export default function CommentForm({ post_id, csrf_token }) {
+export default function CommentForm({ postId, csrfToken }) {
   const [content, setContent] = useState('');
 
   async function handleSubmit(e) {
@@ -745,9 +745,9 @@ export default function CommentForm({ post_id, csrf_token }) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-Token': csrf_token,
+        'X-CSRF-Token': csrfToken,
       },
-      body: JSON.stringify({ comment: { content, post_id } }),
+      body: JSON.stringify({ comment: { content, postId } }),
     });
     if (!response.ok) throw new Error(`Request failed: ${response.status}`);
     setContent('');
@@ -765,8 +765,8 @@ export default function CommentForm({ post_id, csrf_token }) {
 ```erb
 <%# ERB view — pass the CSRF token so the client component can make authenticated requests %>
 <%= stream_react_component("CommentForm",
-      props: { post_id: @post.id,
-               csrf_token: form_authenticity_token }) %>
+      props: { postId: @post.id,
+               csrfToken: form_authenticity_token }) %>
 ```
 
 This preserves Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
@@ -791,19 +791,19 @@ For features that need server-fetched initial data with client-side updates:
 ```erb
 <%# ERB view — Rails passes initial data as props %>
 <%= stream_react_component("ChatPage",
-      props: { channel_id: @channel.id,
-               initial_messages: @channel.messages.recent.as_json }) %>
+      props: { channelId: @channel.id,
+               initialMessages: @channel.messages.recent.as_json }) %>
 ```
 
 ```jsx
 // ChatPage.jsx -- Server Component
 import ChatWindow from './ChatWindow';
 
-export default function ChatPage({ channel_id, initial_messages }) {
+export default function ChatPage({ channelId, initialMessages }) {
   return (
     <div>
-      <ChannelHeader channelId={channel_id} />
-      <ChatWindow channelId={channel_id} initialMessages={initial_messages} />
+      <ChannelHeader channelId={channelId} />
+      <ChatWindow channelId={channelId} initialMessages={initialMessages} />
     </div>
   );
 }

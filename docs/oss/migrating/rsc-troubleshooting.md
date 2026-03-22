@@ -79,6 +79,12 @@ export default function ClientForm({ csrfToken }) {
 }
 ```
 
+```erb
+<%# ERB view — pass the CSRF token so the client component can make authenticated requests %>
+<%= stream_react_component("ClientForm",
+      props: { csrfToken: form_authenticity_token }) %>
+```
+
 > **Note:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controller endpoints for all mutations.
 
 ### Common Error: Passing Class Instances
@@ -499,7 +505,7 @@ In React on Rails, mutations go through Rails controller endpoints rather than S
 
 ```jsx
 // UserForm.test.jsx
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import UserForm from './UserForm';
 
 it('submits to the Rails endpoint', async () => {
@@ -509,11 +515,13 @@ it('submits to the Rails endpoint', async () => {
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Alice' } });
   fireEvent.click(screen.getByText('Submit'));
 
-  expect(global.fetch).toHaveBeenCalledWith(
-    '/api/users',
-    expect.objectContaining({
-      method: 'POST',
-    }),
+  await waitFor(() =>
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/users',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    ),
   );
 });
 ```

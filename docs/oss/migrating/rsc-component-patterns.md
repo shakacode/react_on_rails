@@ -192,7 +192,7 @@ export default function ProductPage({ product }) {
 'use client';
 
 import { useState } from 'react';
-import { addToCart } from '../actions'; // Calls a Rails controller endpoint
+import { addToCart } from '../api'; // Calls a Rails controller endpoint
 
 export default function AddToCartButton({ productId }) {
   const [quantity, setQuantity] = useState(1);
