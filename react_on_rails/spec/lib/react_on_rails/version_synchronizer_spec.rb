@@ -90,8 +90,21 @@ module ReactOnRails
 
           expect(result.changes).to eq([])
           expect(result.changed_files).to eq([])
+          expect(result.unsupported_specs).to contain_exactly(
+            {
+              section: "dependencies",
+              package: "react-on-rails",
+              version: "workspace:*"
+            },
+            {
+              section: "dependencies",
+              package: "react-on-rails-pro",
+              version: ">=16.0.0"
+            }
+          )
           expect(read_package_json.dig("dependencies", "react-on-rails")).to eq("workspace:*")
           expect(read_package_json.dig("dependencies", "react-on-rails-pro")).to eq(">=16.0.0")
+          expect(io.string).to include("Skipped non-exact version specs")
         end
       end
 

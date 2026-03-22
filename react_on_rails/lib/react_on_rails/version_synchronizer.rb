@@ -17,7 +17,7 @@ module ReactOnRails
       "react-on-rails-pro-node-renderer" => :react_on_rails_pro
     }.freeze
 
-    Result = Struct.new(:changes, :changed_files, keyword_init: true)
+    Result = Struct.new(:changes, :changed_files, :unsupported_specs, keyword_init: true)
 
     def initialize(package_json_path: VersionChecker::NodePackageVersion.package_json_path, io: $stdout)
       @package_json_path = package_json_path.to_s
@@ -27,13 +27,13 @@ module ReactOnRails
 
     def sync(write: false)
       package_json_data, original_content = parse_package_json
-      changes = detect_changes(package_json_data)
+      changes, unsupported_specs = detect_changes(package_json_data)
 
       apply_changes!(package_json_data, changes, original_content) if write && changes.any?
-      print_summary(changes, write: write)
+      print_summary(changes, unsupported_specs: unsupported_specs, write: write)
 
       changed_files = write && changes.any? ? [package_json_path] : []
-      Result.new(changes: changes, changed_files: changed_files)
+      Result.new(changes: changes, changed_files: changed_files, unsupported_specs: unsupported_specs)
     end
 
     private
@@ -53,8 +53,10 @@ module ReactOnRails
 
     def detect_changes(package_json_data)
       expected_versions = expected_package_versions
+      changes = []
+      unsupported_specs = []
 
-      PACKAGE_SECTIONS.each_with_object([]) do |section, changes|
+      PACKAGE_SECTIONS.each do |section|
         dependencies = package_json_data[section]
         next unless dependencies.is_a?(Hash)
 
@@ -62,7 +64,10 @@ module ReactOnRails
           next unless dependencies.key?(package_name)
 
           current_version = dependencies[package_name]
-          next unless exact_version?(current_version)
+          unless exact_version?(current_version)
+            unsupported_specs << { section: section, package: package_name, version: current_version }
+            next
+          end
 
           expected_version = expected_versions[source_key]
           next if expected_version.nil?
@@ -76,6 +81,8 @@ module ReactOnRails
           }
         end
       end
+
+      [changes, unsupported_specs]
     end
 
     def expected_package_versions
@@ -105,13 +112,14 @@ module ReactOnRails
       write_atomically("#{generated_json}\n")
     end
 
-    def print_summary(changes, write:)
+    def print_summary(changes, unsupported_specs:, write:)
       if changes.empty?
         print_no_changes_summary
-        return
+      else
+        print_changes_summary(changes, write: write)
       end
 
-      print_changes_summary(changes, write: write)
+      print_unsupported_specs(unsupported_specs)
     end
 
     def exact_version?(version)
@@ -151,6 +159,15 @@ module ReactOnRails
         io.puts "Write mode may normalize package.json formatting, including array wrapping."
       else
         io.puts "Dry run only. Re-run with WRITE=true to apply changes."
+      end
+    end
+
+    def print_unsupported_specs(unsupported_specs)
+      return if unsupported_specs.empty?
+
+      io.puts "Skipped non-exact version specs (not auto-updated):"
+      unsupported_specs.each do |spec|
+        io.puts "  - #{spec[:section]}.#{spec[:package]}: #{spec[:version]}"
       end
     end
 
