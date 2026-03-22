@@ -166,7 +166,8 @@ export default function UserForm({ csrfToken }) {
       },
       body: JSON.stringify({ user: { name } }),
     });
-    if (response.ok) setName('');
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+    setName('');
   }
 
   return (

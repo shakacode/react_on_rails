@@ -280,7 +280,7 @@ export default function ProductList({ initialProducts }) {
     queryKey: ['products'],
     queryFn: () => fetch('/api/products').then((res) => res.json()),
     initialData: initialProducts,
-    initialDataUpdatedAt: Date.now(), // Mark when Rails fetched the data
+    initialDataUpdatedAt: Date.now(), // Marks the data as fresh as of client render time
     staleTime: 5 * 60 * 1000, // Treat Rails-fetched data as fresh for 5 min
   });
 
@@ -749,7 +749,8 @@ export default function CommentForm({ post_id, csrf_token }) {
       },
       body: JSON.stringify({ comment: { content, post_id } }),
     });
-    if (response.ok) setContent('');
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+    setContent('');
   }
 
   return (
