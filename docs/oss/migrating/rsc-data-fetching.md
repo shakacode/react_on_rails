@@ -363,7 +363,7 @@ In React on Rails, the most critical performance pitfall is sequential data emis
   stats = DashboardStats.for(user)             # 300ms (waits for user)
   emit.call("stats", stats.as_json)
 
-  posts = user.posts.recent                    # 250ms (waits for stats too)
+  posts = user.posts.recent                    # 250ms (waits because calls are sequential)
   emit.call("posts", posts.as_json)
   # Total: 750ms (sequential)
 end %>
@@ -745,6 +745,13 @@ export default function CommentForm({ postId, csrfToken }) {
     </form>
   );
 }
+```
+
+```erb
+<%# ERB view — pass the CSRF token so the client component can make authenticated requests %>
+<%= stream_react_component("CommentForm",
+      props: { post_id: @post.id,
+               csrf_token: form_authenticity_token }) %>
 ```
 
 This preserves Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
