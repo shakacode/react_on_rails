@@ -16,7 +16,7 @@ See [Contributing](https://github.com/shakacode/react_on_rails/tree/main/CONTRIB
 2. Run `/update-changelog release` (or `rc`, `beta`, or an explicit version like `16.5.0.rc.10`) to:
    - Find merged PRs missing from the changelog
    - Add changelog entries under the appropriate category headings
-   - Auto-compute the next version based on changes (breaking -> major, features -> minor, fixes -> patch)
+   - Auto-compute the next version based on changes (breaking -> major, features -> minor, fixes -> patch) — skipped when an explicit version is provided
    - Stamp the version header (e.g., `### [16.5.0] - 2026-03-08`)
    - For `rc`/`beta`: collapse prior prerelease sections and deduplicate entries
    - **Automatically commit, push, and open a PR** with the changelog changes
