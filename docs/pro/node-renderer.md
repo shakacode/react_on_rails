@@ -65,7 +65,7 @@ Configure Rails to use the Node Renderer:
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
   config.renderer_url = ENV["REACT_RENDERER_URL"] || "http://localhost:3800"
-  config.renderer_password = ENV["RENDERER_PASSWORD"] || "changeme"
+  config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
 end
 ```
 
