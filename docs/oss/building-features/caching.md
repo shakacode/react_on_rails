@@ -1,7 +1,8 @@
 # SSR Caching: Prerender Caching and Fragment Caching
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+:::tip Pro Feature
+Available with [React on Rails Pro](https://pro.reactonrails.com). Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+:::
 
 Server-side rendering (SSR) is expensive. Every render evaluates JavaScript, assembles props from the database, serializes them to JSON, and produces HTML. React on Rails Pro provides two levels of caching that avoid repeating this work on every request. Both solve the same core problem — **eliminating redundant SSR** — but they operate at different layers and offer different tradeoffs.
 
@@ -94,7 +95,7 @@ It can be useful to log these to the rendered HTML page to debug caching issues.
 
 ## Level 2: Fragment Caching
 
-Fragment caching is the advanced option that delivers the biggest performance gains. It caches the entire rendered output — including the cost of assembling props from the database — so that on a cache hit, no database queries, no JSON serialization, and no JavaScript evaluation occur.
+Fragment caching is the advanced option that delivers the biggest performance gains. It caches the entire rendered output — including the cost of assembling props from the database — so that on a cache hit, no database queries, no JSON serialization, and no JavaScript evaluation occur. See also the [Fragment Caching overview](../../pro/fragment-caching.md).
 
 This is very similar to [Rails fragment caching](http://guides.rubyonrails.org/caching_with_rails.html#fragment-caching):
 

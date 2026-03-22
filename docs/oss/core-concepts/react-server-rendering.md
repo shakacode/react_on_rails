@@ -32,3 +32,7 @@ Server rendering is used for either SEO or performance reasons.
 1. Never access `window`. Animations, globals on window, etc. just don't make sense when you're trying to run some JavaScript code to output a string of HTML.
 2. JavaScript calls to `setTimeout`, `setInterval`, and `clearInterval` similarly don't make sense when server rendering.
 3. Promises and file system access don't work when server rendering with ExecJS. Instead, you can use the Node renderer or [React on Rails Pro](https://pro.reactonrails.com/).
+
+:::tip Pro Upgrade
+React on Rails Pro includes a [dedicated Node.js renderer](../../pro/node-renderer.md) that eliminates ExecJS limitations and improves SSR performance by 10-100x. It also supports [streaming SSR](../../pro/streaming-ssr.md) with React 18/19's `renderToPipeableStream` for faster Time to First Byte. [Learn more →](../../pro/upgrading-to-pro.md)
+:::

@@ -1,6 +1,8 @@
 # Server Rendering Tips
 
-For the best performance with Server Rendering, consider using [React on Rails Pro]
+:::tip Pro Upgrade
+For the best SSR performance, React on Rails Pro provides a [dedicated Node.js renderer](../../pro/node-renderer.md) (10-100x faster than ExecJS), [streaming SSR](../../pro/streaming-ssr.md) for faster TTFB, and [fragment caching](../../pro/fragment-caching.md) to skip redundant rendering entirely. [Learn more →](../../pro/upgrading-to-pro.md)
+:::
 
 ## General Tips
 
@@ -18,7 +20,7 @@ For the best performance with Server Rendering, consider using [React on Rails P
 
 1. First make sure your code works with server rendering disabled (`prerender: false`).
 2. Set `config.trace` to true. You will get the server invocation code that renders your component. If you're not using Shakapacker, you will also get the whole file used to set up the JavaScript context.
-3. If streaming SSR requests hang indefinitely, check whether your compression middleware (`Rack::Deflater`, `Rack::Brotli`) has an `:if` condition that calls `body.each`. This causes deadlocks with streaming responses. See the [Compression Middleware Compatibility](../building-features/streaming-server-rendering.md#compression-middleware-compatibility) section in the Streaming Server Rendering guide.
+3. If streaming SSR requests hang indefinitely, check whether your compression middleware (`Rack::Deflater`, `Rack::Brotli`) has an `:if` condition that calls `body.each`. This causes deadlocks with streaming responses. See the [Compression Middleware Compatibility](../../pro/streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
 
 ## CSS
 
