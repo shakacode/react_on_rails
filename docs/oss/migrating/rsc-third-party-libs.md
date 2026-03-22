@@ -137,60 +137,64 @@ All components include `'use client'` directives. Cannot use compound components
 
 ## Form Libraries
 
-| Library               | RSC Pattern                                                                                                                                       | Notes                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| **React Hook Form**   | Client-only (uses Context). Create a `'use client'` form component, import into Server Component. Can combine with Server Actions for submission. | Most popular option.                         |
-| **TanStack Form**     | Emerging alternative with RSC-aware architecture.                                                                                                 | Framework-agnostic.                          |
-| **React 19 built-in** | `useActionState` + `useFormStatus` hooks work natively with Server Actions.                                                                       | Reduces need for third-party form libraries. |
+| Library             | RSC Pattern                                                                                                                                         | Notes                               |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| **React Hook Form** | Client-only (uses Context). Create a `'use client'` form component, import into Server Component. Submit to Rails controller endpoints via `fetch`. | Most popular option.                |
+| **TanStack Form**   | Emerging alternative with RSC-aware architecture. Submit to Rails controller endpoints.                                                             | Framework-agnostic.                 |
+| **Standard forms**  | Use Rails' standard form helpers (`form_with`, `form_tag`) for non-React forms. For React forms, submit via `fetch` to Rails API endpoints.         | No library needed for simple forms. |
 
-### Server Action Form Pattern
+### Form Submission Pattern
 
-```jsx
-// actions.js
-'use server';
-
-export async function submitForm(formData) {
-  const name = formData.get('name');
-  // Server Actions run in Node.js, so this fetch needs an absolute URL.
-  // Point RAILS_BASE_URL at Rails' internal URL (for example
-  // http://127.0.0.1:3000 in development), not the public-facing domain.
-  const railsBaseUrl = process.env.RAILS_BASE_URL;
-  if (!railsBaseUrl) {
-    throw new Error('RAILS_BASE_URL environment variable is required for Server Actions');
-  }
-  // Note: This fetch runs server-side, so the Rails endpoint will not receive
-  // the browser's CSRF token. Use an API-only route or another non-session
-  // auth boundary. If you switch a Rails endpoint to
-  // `protect_from_forgery with: :null_session`, add another trust check
-  // (for example signed tokens, API keys, or same-origin validation) because
-  // `null_session` avoids the CSRF failure but does not authenticate the
-  // request.
-  const res = await fetch(new URL('/api/users', railsBaseUrl), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user: { name } }),
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to create user: ${res.status}`);
-  }
-}
-```
+> **Important:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controllers for all form submissions.
 
 ```jsx
-// Page.jsx -- Server Component (works without JavaScript)
-import { submitForm } from './actions';
+// UserForm.jsx -- Client Component
+'use client';
 
-export default function Page() {
+import { useState } from 'react';
+
+export default function UserForm({ csrfToken }) {
+  const [name, setName] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const response = await fetch('/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken,
+      },
+      body: JSON.stringify({ user: { name } }),
+    });
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+    setName('');
+  }
+
   return (
-    <form action={submitForm}>
-      <input type="text" name="name" />
+    <form onSubmit={handleSubmit}>
+      <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
       <button type="submit">Submit</button>
     </form>
   );
 }
 ```
 
-> **React on Rails note:** In most React on Rails applications, form submissions go through Rails controllers via standard form posts or API endpoints. Server Actions are a React concept that can complement this, but they are not a replacement for Rails' controller/model layer. For most mutations, continue using your existing Rails API endpoints.
+```erb
+<%# ERB view — pass the CSRF token so the client component can make authenticated requests %>
+<%= stream_react_component("UserForm",
+      props: { csrfToken: form_authenticity_token }) %>
+```
+
+**Pattern 2: Standard Rails form (no JavaScript required)**
+
+```erb
+<%= form_with(model: @user, url: users_path) do |f| %>
+  <%= f.text_field :name %>
+  <%= f.submit "Submit" %>
+<% end %>
+```
+
+Both patterns leverage Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
 
 ## Animation Libraries
 
@@ -353,7 +357,7 @@ Use `client-only` for:
 | ----------------- | ------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
 | **Styling**       | Tailwind, CSS Modules, Panda CSS                                    | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
 | **UI Components** | shadcn/ui, Radix (non-interactive)                                  | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
-| **Forms**         | React 19 `useActionState` + Server Actions                          | React Hook Form, TanStack Form               | Formik (less maintained)                           |
+| **Forms**         | Rails controller endpoints + standard forms                         | React Hook Form, TanStack Form               | Formik (less maintained)                           |
 | **Animation**     | CSS animations, Tailwind animate                                    | Framer Motion/Motion, React Spring           | --                                                 |
 | **Charts**        | Nivo (SSR support)                                                  | Recharts, Tremor, Chart.js                   | --                                                 |
 | **Data Fetching** | React on Rails Pro async props, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | --                                                 |
