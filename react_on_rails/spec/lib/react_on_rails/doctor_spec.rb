@@ -1204,6 +1204,20 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when Pro gem is installed and ExecJS is absent" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        hide_const("ExecJS")
+      end
+
+      it "only shows the NodeRenderer message" do
+        doctor.send(:check_server_rendering_engine)
+        info_messages = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
+        expect(info_messages).not_to include(a_string_including("ExecJS"))
+      end
+    end
+
     context "when Pro gem is not installed" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
