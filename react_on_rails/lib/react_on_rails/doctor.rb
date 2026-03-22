@@ -672,13 +672,15 @@ module ReactOnRails
 
       begin
         uses_node_renderer = ReactOnRails::Utils.react_on_rails_pro? &&
-                             defined?(ReactOnRailsPro) &&
-                             ReactOnRailsPro.configuration.node_renderer?
+                             pro_initializer_has_node_renderer?
 
         if uses_node_renderer
           checker.add_info("  Pro uses NodeRenderer for server rendering")
           if defined?(ExecJS) && ExecJS.runtime
             checker.add_info("  ExecJS available as fallback: #{ExecJS.runtime.name}")
+          else
+            checker.add_warning("  ⚠️  ExecJS fallback is enabled but ExecJS is not available")
+            checker.add_info("  💡 Install mini_racer or set renderer_use_fallback_exec_js = false")
           end
         elsif defined?(ExecJS)
           runtime_name = ExecJS.runtime.name if ExecJS.runtime
@@ -1262,6 +1264,15 @@ module ReactOnRails
         content.match?(/prerender:\s*true/) ||
           content.match?(/stream_react_component|cached_stream_react_component|rsc_payload_react_component/)
       end
+    rescue StandardError
+      false
+    end
+
+    def pro_initializer_has_node_renderer?
+      config_path = "config/initializers/react_on_rails_pro.rb"
+      return false unless File.exist?(config_path)
+
+      File.read(config_path).match?(/server_renderer\s*=\s*["']NodeRenderer["']/)
     rescue StandardError
       false
     end

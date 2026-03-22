@@ -1187,11 +1187,25 @@ RSpec.describe ReactOnRails::Doctor do
     let(:execjs_runtime) { Struct.new(:name).new("Node.js (V8)") }
     let(:execjs_module) { Struct.new(:runtime).new(execjs_runtime) }
 
-    context "when Pro gem is installed with NodeRenderer" do
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    def write_project_file(path, content)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
+
+    context "when Pro initializer has NodeRenderer" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        pro_config = Struct.new(:node_renderer?).new(true)
-        stub_const("ReactOnRailsPro", Struct.new(:configuration).new(pro_config))
+        write_project_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+          end
+        RUBY
       end
 
       it "labels ExecJS as fallback" do
@@ -1206,27 +1220,37 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
-    context "when Pro gem is installed with NodeRenderer and ExecJS is absent" do
+    context "when Pro initializer has NodeRenderer and ExecJS is absent" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        pro_config = Struct.new(:node_renderer?).new(true)
-        stub_const("ReactOnRailsPro", Struct.new(:configuration).new(pro_config))
+        write_project_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+          end
+        RUBY
         hide_const("ExecJS")
       end
 
-      it "only shows the NodeRenderer message" do
+      it "warns about missing ExecJS fallback" do
         doctor.send(:check_server_rendering_engine)
+
         info_messages = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
-        expect(info_messages).not_to include(a_string_including("ExecJS"))
+        expect(warning_messages).to include(
+          a_string_including("ExecJS fallback is enabled but ExecJS is not available")
+        )
       end
     end
 
-    context "when Pro gem is installed with ExecJS (default renderer)" do
+    context "when Pro initializer does not have NodeRenderer" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        pro_config = Struct.new(:node_renderer?).new(false)
-        stub_const("ReactOnRailsPro", Struct.new(:configuration).new(pro_config))
+        write_project_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+          ReactOnRailsPro.configure do |config|
+            config.prerender_caching = true
+          end
+        RUBY
       end
 
       it "reports ExecJS as primary engine" do
@@ -1237,6 +1261,21 @@ RSpec.describe ReactOnRails::Doctor do
         info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
         expect(info_messages).to include(a_string_including("ExecJS Runtime:"))
         expect(info_messages).not_to include(a_string_including("Pro uses NodeRenderer"))
+      end
+    end
+
+    context "when no Pro initializer exists" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      end
+
+      it "reports ExecJS as primary engine" do
+        stub_const("ExecJS", execjs_module)
+
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("ExecJS Runtime:"))
       end
     end
 
