@@ -280,6 +280,7 @@ export default function ProductList({ initialProducts }) {
     queryKey: ['products'],
     queryFn: () => fetch('/api/products').then((res) => res.json()),
     initialData: initialProducts,
+    staleTime: 5 * 60 * 1000, // Treat Rails-fetched data as fresh for 5 min
   });
 
   return (
@@ -919,7 +920,7 @@ For each component that fetches data:
 1. Remove the `'use client'` directive
 2. Remove `useState` for data, loading, and error
 3. Remove the `useEffect` data fetch
-4. Receive data as props from the Rails controller
+4. Receive data as props from Rails (controller and/or ERB view helper props)
 5. For streaming data, use `getReactOnRailsAsyncProp` with `stream_react_component_with_async_props` in the ERB view
 6. Remove API routes that were only used for client-side fetching by this component
 
