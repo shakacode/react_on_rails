@@ -79,9 +79,7 @@ module ReactOnRails
         before do
           write_package_json(
             "dependencies" => {
-              "react-on-rails" => "workspace:*"
-            },
-            "peerDependencies" => {
+              "react-on-rails" => "workspace:*",
               "react-on-rails-pro" => ">=16.0.0"
             }
           )
@@ -93,7 +91,25 @@ module ReactOnRails
           expect(result.changes).to eq([])
           expect(result.changed_files).to eq([])
           expect(read_package_json.dig("dependencies", "react-on-rails")).to eq("workspace:*")
-          expect(read_package_json.dig("peerDependencies", "react-on-rails-pro")).to eq(">=16.0.0")
+          expect(read_package_json.dig("dependencies", "react-on-rails-pro")).to eq(">=16.0.0")
+        end
+      end
+
+      context "when mismatches exist in peerDependencies" do
+        before do
+          write_package_json(
+            "peerDependencies" => {
+              "react-on-rails" => "16.4.0.rc.4"
+            }
+          )
+        end
+
+        it "updates peerDependencies in write mode" do
+          result = synchronizer.sync(write: true)
+
+          expect(result.changes.size).to eq(1)
+          expect(result.changed_files).to eq([package_json_path])
+          expect(read_package_json.dig("peerDependencies", "react-on-rails")).to eq("16.4.0-rc.5")
         end
       end
 
@@ -111,7 +127,25 @@ module ReactOnRails
           result = synchronizer.sync
 
           expect(result.changes).to eq([])
-          expect(io.string).to include("No version mismatches found")
+          expect(io.string).to include("No package.json version mismatches found")
+        end
+      end
+
+      context "when package.json is synchronized but a lockfile exists" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => "16.4.0-rc.5"
+            }
+          )
+          File.write(File.join(tmpdir, "package-lock.json"), "{}\n")
+        end
+
+        it "prints a lockfile caveat in dry-run output" do
+          result = synchronizer.sync
+
+          expect(result.changes).to eq([])
+          expect(io.string).to include("Lockfiles may still pin different versions")
         end
       end
 

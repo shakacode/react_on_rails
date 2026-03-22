@@ -1,12 +1,13 @@
 # frozen_string_literal: true
 
+require "json"
 require_relative "version_syntax_converter"
 
 module ReactOnRails
   # Synchronizes React on Rails npm package versions with loaded gem versions.
   # Dry-run is the default behavior. Use write mode to persist updates.
   class VersionSynchronizer
-    PACKAGE_SECTIONS = %w[dependencies devDependencies optionalDependencies].freeze
+    PACKAGE_SECTIONS = %w[dependencies devDependencies optionalDependencies peerDependencies].freeze
     EXACT_VERSION_REGEX = /\A\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?\z/
     PACKAGE_VERSION_SOURCES = {
       "react-on-rails" => :react_on_rails,
@@ -81,7 +82,7 @@ module ReactOnRails
       }
 
       pro_version = ReactOnRails::Utils.react_on_rails_pro_version
-      return versions if pro_version.blank?
+      return versions if pro_version.empty?
 
       versions[:react_on_rails_pro] = converter.rubygem_to_npm(pro_version)
       versions
@@ -94,6 +95,7 @@ module ReactOnRails
 
       indentation = detect_indentation(original_content)
       generated_json = JSON.generate(package_json_data,
+                                     ascii_only: false,
                                      indent: indentation,
                                      object_nl: "\n",
                                      array_nl: "\n",
@@ -103,22 +105,11 @@ module ReactOnRails
 
     def print_summary(changes, write:)
       if changes.empty?
-        io.puts "No version mismatches found in #{package_json_path}."
+        print_no_changes_summary
         return
       end
 
-      io.puts "Version mismatches detected in #{package_json_path}:"
-      changes.each do |change|
-        io.puts "  - #{change[:section]}.#{change[:package]}: #{change[:from]} -> #{change[:to]}"
-      end
-
-      if write
-        io.puts "Updated file:"
-        io.puts "  - #{package_json_path}"
-        io.puts "Run your package manager install command to refresh lockfile entries."
-      else
-        io.puts "Dry run only. Re-run with WRITE=true to apply changes."
-      end
+      print_changes_summary(changes, write: write)
     end
 
     def exact_version?(version)
@@ -131,6 +122,32 @@ module ReactOnRails
       File.rename(tmp_path, package_json_path)
     ensure
       File.delete(tmp_path) if tmp_path && File.exist?(tmp_path)
+    end
+
+    def lockfile_present?
+      package_dir = File.dirname(package_json_path)
+      File.exist?(File.join(package_dir, "yarn.lock")) || File.exist?(File.join(package_dir, "package-lock.json"))
+    end
+
+    def print_no_changes_summary
+      io.puts "No package.json version mismatches found in #{package_json_path}."
+      io.puts "Lockfiles may still pin different versions than package.json." if lockfile_present?
+    end
+
+    def print_changes_summary(changes, write:)
+      io.puts "Version mismatches detected in #{package_json_path}:"
+      changes.each do |change|
+        io.puts "  - #{change[:section]}.#{change[:package]}: #{change[:from]} -> #{change[:to]}"
+      end
+
+      if write
+        io.puts "Updated file:"
+        io.puts "  - #{package_json_path}"
+        io.puts "Run your package manager install command to refresh lockfile entries."
+        io.puts "Write mode may normalize package.json formatting."
+      else
+        io.puts "Dry run only. Re-run with WRITE=true to apply changes."
+      end
     end
 
     def detect_indentation(content)
