@@ -726,7 +726,7 @@ All mutations in React on Rails should go through Rails controllers via standard
 
 import { useState } from 'react';
 
-export default function CommentForm({ postId, csrfToken }) {
+export default function CommentForm({ post_id, csrf_token }) {
   const [content, setContent] = useState('');
 
   async function handleSubmit(e) {
@@ -735,9 +735,9 @@ export default function CommentForm({ postId, csrfToken }) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken,
+        'X-CSRF-Token': csrf_token,
       },
-      body: JSON.stringify({ comment: { content, post_id: postId } }),
+      body: JSON.stringify({ comment: { content, post_id } }),
     });
     if (response.ok) setContent('');
   }
