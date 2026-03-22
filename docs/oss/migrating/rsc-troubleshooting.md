@@ -427,11 +427,11 @@ The most common performance regression. Sequential `emit.call` in the Ruby block
 <%# BAD: Each computation blocks the next (750ms total) %>
 <%= stream_react_component_with_async_props("Page",
       props: { title: "Page" }) do |emit|
-  user = User.find(user_id)        # 200ms
+  user = User.find(params[:user_id])        # 200ms
   emit.call("user", user.as_json)
-  stats = Stats.for_user(user.id)  # 300ms (waits for user)
+  stats = Stats.for_user(user.id)           # 300ms (waits for user)
   emit.call("stats", stats.as_json)
-  posts = Post.where(user_id: user.id).limit(10)  # 250ms (waits for stats)
+  posts = Post.where(user_id: user.id).limit(10)  # 250ms (waits because calls are sequential)
   emit.call("posts", posts.as_json)
 end %>
 ```
@@ -444,6 +444,7 @@ end %>
       props: { title: "Page" }) do |emit|
   results = {}
   threads = []
+  user_id = params[:user_id]
   threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { results[:user] = User.find(user_id).as_json } }
   threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { results[:stats] = Stats.for_user(user_id).as_json } }
   threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { results[:posts] = Post.where(user_id: user_id).limit(10).as_json } }
