@@ -280,6 +280,7 @@ export default function ProductList({ initialProducts }) {
     queryKey: ['products'],
     queryFn: () => fetch('/api/products').then((res) => res.json()),
     initialData: initialProducts,
+    initialDataUpdatedAt: Date.now(), // Mark when Rails fetched the data
     staleTime: 5 * 60 * 1000, // Treat Rails-fetched data as fresh for 5 min
   });
 

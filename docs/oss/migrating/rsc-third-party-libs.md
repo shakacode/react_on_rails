@@ -183,7 +183,16 @@ export default function UserForm({ csrfToken }) {
       props: { csrfToken: form_authenticity_token }) %>
 ```
 
-This preserves Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
+**Pattern 2: Standard Rails form (no JavaScript required)**
+
+```erb
+<%= form_with(model: @user, url: users_path) do |f| %>
+  <%= f.text_field :name %>
+  <%= f.submit "Submit" %>
+<% end %>
+```
+
+Both patterns leverage Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
 
 ## Animation Libraries
 
