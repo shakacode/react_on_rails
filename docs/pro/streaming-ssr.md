@@ -1,6 +1,6 @@
 # Streaming Server-Side Rendering
 
-React on Rails Pro supports streaming server rendering using React 19's `renderToPipeableStream` API. Instead of waiting for the entire page to render before sending any HTML, streaming SSR sends HTML to the browser progressively as each part of the page becomes ready.
+React on Rails Pro supports streaming server rendering using React 18/19's `renderToPipeableStream` API. Instead of waiting for the entire page to render before sending any HTML, streaming SSR sends HTML to the browser progressively as each part of the page becomes ready.
 
 ## Why Streaming SSR?
 
@@ -75,7 +75,7 @@ const SlowDataComponent = async () => {
 export default MyStreamingComponent;
 ```
 
-> **Note:** The `async () => { ... }` function component pattern (`SlowDataComponent` above) is a React Server Components feature. If you are using streaming SSR without RSC, use a data-fetching library (such as React Query or SWR) with `<Suspense>` instead. See the [RSC tutorial](./react-server-components/tutorial.md) for setup details.
+> **Note:** The `async () => { ... }` function component pattern (`SlowDataComponent` above) is a React Server Components feature. If you are using streaming SSR without RSC, use a data-fetching library (such as React Query or SWR) with `<Suspense>` instead. For RSC-based streaming (which does support async components), see the [RSC tutorial](./react-server-components/tutorial.md).
 
 ```jsx
 // app/javascript/packs/registration.jsx
