@@ -20,7 +20,7 @@ Traditional SSR renders the full page on the server, then sends the complete HTM
 
 ## Prerequisites
 
-- React on Rails Pro v4.0.0.rc.5 or higher
+- React on Rails Pro
 - React 19
 - React on Rails v16.0.0 or higher
 - Node Renderer running (streaming requires Node.js, not ExecJS)
