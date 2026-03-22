@@ -331,7 +331,7 @@ export default function Homepage() {
 
 ## Pattern 4: Async Props with Suspense
 
-In React on Rails, use async props to stream data progressively. Each async prop resolves independently, and Suspense boundaries show fallbacks until the data arrives:
+In React on Rails, use async props to stream data progressively. Each async prop streams to the browser independently as it becomes ready, and Suspense boundaries show fallbacks until the data arrives:
 
 ```erb
 <%# ERB view — sync props render the shell, async props stream in %>

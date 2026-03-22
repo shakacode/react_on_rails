@@ -296,6 +296,7 @@ export default function ProductList({ initialProducts }) {
 
 ```erb
 <%# ERB view — Rails passes the data as props %>
+<%# In production, scope or paginate the query (e.g., Product.limit(50)) %>
 <%= stream_react_component("ProductsPage",
       props: { products: Product.all.as_json }) %>
 ```

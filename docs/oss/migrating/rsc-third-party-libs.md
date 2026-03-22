@@ -177,6 +177,12 @@ export default function UserForm({ csrfToken }) {
 }
 ```
 
+```erb
+<%# ERB view — pass the CSRF token so the client component can make authenticated requests %>
+<%= stream_react_component("UserForm",
+      props: { csrfToken: form_authenticity_token }) %>
+```
+
 This preserves Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
 
 ## Animation Libraries
