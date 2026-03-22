@@ -52,13 +52,19 @@ Streaming SSR provides the best of both approaches: the browser receives the ini
 
 ### Selective Hydration
 
-With streaming SSR and React 18+, components hydrate independently as their JavaScript loads:
+With streaming SSR and React 18+, components can hydrate independently as their JavaScript loads:
 
 - Navigation can become interactive while main content is still streaming
 - User interactions automatically prioritize hydration of the clicked component
 - No single "hydration wall" where the entire page freezes
 
-See [Selective Hydration in Streamed Components](../../pro/react-server-components/selective-hydration-in-streamed-components.md) for details on how this works in React on Rails.
+**Note:** By default, React on Rails uses `defer` scripts which delay all hydration until the page finishes streaming. To enable selective hydration, configure your initializer:
+
+```ruby
+config.generated_component_packs_loading_strategy = :async
+```
+
+See [Selective Hydration in Streamed Components](../../pro/react-server-components/selective-hydration-in-streamed-components.md) for complete details.
 
 ## React Server Components Impact
 
