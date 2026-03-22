@@ -91,9 +91,38 @@ module ReactOnRails
           result = synchronizer.sync
 
           expect(result.changes).to eq([])
+          expect(result.missing_source_specs).to contain_exactly(
+            {
+              section: "dependencies",
+              package: "react-on-rails-pro",
+              source: :react_on_rails_pro
+            },
+            {
+              section: "dependencies",
+              package: "react-on-rails-pro-node-renderer",
+              source: :react_on_rails_pro
+            }
+          )
           expect(io.string).to include("Skipped packages whose source gem is not loaded")
           expect(io.string).to include("dependencies.react-on-rails-pro (missing react_on_rails_pro gem)")
           expect(io.string).to include("dependencies.react-on-rails-pro-node-renderer (missing react_on_rails_pro gem)")
+        end
+      end
+
+      context "when package.json uses rubygem-style prerelease notation equivalent to npm syntax" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => "16.4.0.rc.5"
+            }
+          )
+        end
+
+        it "treats the package as already synchronized" do
+          result = synchronizer.sync
+
+          expect(result.changes).to eq([])
+          expect(io.string).to include("No package.json version mismatches found")
         end
       end
 
@@ -134,6 +163,29 @@ module ReactOnRails
           expect(read_package_json.dig("dependencies", "react-on-rails-pro")).to eq(">=16.0.0")
           expect(read_package_json.dig("dependencies", "react-on-rails-pro-node-renderer")).to eq("16.4.0-")
           expect(io.string).to include("Skipped non-exact version specs")
+        end
+      end
+
+      context "when prerelease metadata has too many dotted segments" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => "16.4.0.rc.1.2.3.4.5"
+            }
+          )
+        end
+
+        it "treats the version as unsupported for auto-update" do
+          result = synchronizer.sync(write: true)
+
+          expect(result.changes).to eq([])
+          expect(result.unsupported_specs).to contain_exactly(
+            {
+              section: "dependencies",
+              package: "react-on-rails",
+              version: "16.4.0.rc.1.2.3.4.5"
+            }
+          )
         end
       end
 
@@ -248,6 +300,28 @@ module ReactOnRails
           content = File.read(package_json_path)
           expect(content).to include("\n    \"name\": \"demo\"")
           expect(content).to include("\n        \"react-on-rails\": \"16.4.0-rc.5\"")
+        end
+      end
+
+      context "when mixed indentation contains spaces before tab-indented keys" do
+        before do
+          custom_json = [
+            "{",
+            "    \"name\": \"demo\",",
+            "\t\"dependencies\": {",
+            "\t\t\"react-on-rails\": \"16.4.0.rc.4\"",
+            "\t}",
+            "}"
+          ].join("\n")
+          File.write(package_json_path, "#{custom_json}\n")
+        end
+
+        it "preserves the space-based indentation style" do
+          synchronizer.sync(write: true)
+
+          content = File.read(package_json_path)
+          expect(content).to include("\n    \"name\": \"demo\"")
+          expect(content).not_to include("\t")
         end
       end
 

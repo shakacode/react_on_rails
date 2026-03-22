@@ -9,14 +9,15 @@ module ReactOnRails
   class VersionSynchronizer
     PACKAGE_SECTIONS = %w[dependencies devDependencies optionalDependencies peerDependencies].freeze
     # Matches exact npm versions and rubygem-style prerelease notation (e.g. "1.2.3.rc.4").
-    EXACT_VERSION_REGEX = /\A\d+\.\d+\.\d+(?:[-.][0-9A-Za-z]+(?:\.[0-9A-Za-z-]+)*)?\z/
+    # Prerelease/build segments are intentionally bounded to avoid matching arbitrarily long dotted suffixes.
+    EXACT_VERSION_REGEX = /\A\d+\.\d+\.\d+(?:[-.][0-9A-Za-z]+(?:\.[0-9A-Za-z-]+){0,4})?\z/
     PACKAGE_VERSION_SOURCES = {
       "react-on-rails" => :react_on_rails,
       "react-on-rails-pro" => :react_on_rails_pro,
       "react-on-rails-pro-node-renderer" => :react_on_rails_pro
     }.freeze
 
-    Result = Struct.new(:changes, :changed_files, :unsupported_specs, keyword_init: true)
+    Result = Struct.new(:changes, :changed_files, :unsupported_specs, :missing_source_specs, keyword_init: true)
 
     def initialize(package_json_path: VersionChecker::NodePackageVersion.package_json_path, io: $stdout)
       @package_json_path = package_json_path.to_s
@@ -35,7 +36,10 @@ module ReactOnRails
                     write: write)
 
       changed_files = write && changes.any? ? [package_json_path] : []
-      Result.new(changes: changes, changed_files: changed_files, unsupported_specs: unsupported_specs)
+      Result.new(changes: changes,
+                 changed_files: changed_files,
+                 unsupported_specs: unsupported_specs,
+                 missing_source_specs: missing_source_specs)
     end
 
     private
@@ -77,7 +81,8 @@ module ReactOnRails
             missing_source_specs << { section: section, package: package_name, source: source_key }
             next
           end
-          next if current_version == expected_version
+          normalized_current_version = converter.rubygem_to_npm(current_version)
+          next if normalized_current_version == expected_version
 
           changes << {
             section: section,
@@ -199,7 +204,13 @@ module ReactOnRails
 
     def detect_indentation(content)
       indentations = content.each_line.filter_map { |line| line.slice(/^[ \t]+(?="[^"\n]+":)/) }
-      indentation = indentations.min_by(&:length)
+      return "  " if indentations.empty?
+
+      # Compare indentation widths within the same whitespace character class to avoid tabs
+      # (length 1) always winning against space indentation.
+      char = indentations.first[0]
+      same_char = indentations.select { |indentation| indentation.chars.uniq == [char] }
+      indentation = (same_char.empty? ? indentations : same_char).min_by(&:length)
       indentation.nil? || indentation.empty? ? "  " : indentation
     end
   end

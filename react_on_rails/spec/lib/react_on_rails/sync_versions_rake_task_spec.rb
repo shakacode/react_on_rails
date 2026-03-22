@@ -5,21 +5,29 @@ require "rake"
 
 RSpec.describe "sync_versions rake task" do
   let(:rake_file) { File.expand_path("../../../lib/tasks/sync_versions.rake", __dir__) }
+  let(:env_seen) { { value: nil } }
   let(:sync_result) do
-    ReactOnRails::VersionSynchronizer::Result.new(changes: [], changed_files: [], unsupported_specs: [])
+    ReactOnRails::VersionSynchronizer::Result.new(changes: [],
+                                                  changed_files: [],
+                                                  unsupported_specs: [],
+                                                  missing_source_specs: [])
   end
 
   before do
     Rake::Task.clear
-    Rake::Task.define_task(:environment)
+    Rake::Task.define_task(:environment) do
+      env_seen[:value] = ENV.fetch("REACT_ON_RAILS_SKIP_VALIDATION", nil)
+    end
     load rake_file
     ENV.delete("WRITE")
     ENV.delete("DRY_RUN")
+    ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
   end
 
   after do
     ENV.delete("WRITE")
     ENV.delete("DRY_RUN")
+    ENV.delete("REACT_ON_RAILS_SKIP_VALIDATION")
   end
 
   describe "rake react_on_rails:sync_versions task" do
@@ -31,6 +39,17 @@ RSpec.describe "sync_versions rake task" do
       task = Rake::Task["react_on_rails:sync_versions"]
 
       expect(task.prerequisites).to include("environment")
+      expect(task.prerequisites).to include("prepare_sync_versions")
+    end
+
+    it "sets REACT_ON_RAILS_SKIP_VALIDATION before loading environment" do
+      synchronizer = instance_double(ReactOnRails::VersionSynchronizer)
+      allow(ReactOnRails::VersionSynchronizer).to receive(:new).and_return(synchronizer)
+      allow(synchronizer).to receive(:sync).with(write: false).and_return(sync_result)
+
+      Rake::Task["react_on_rails:sync_versions"].invoke
+
+      expect(env_seen[:value]).to eq("true")
     end
 
     it "runs in dry-run mode by default" do
