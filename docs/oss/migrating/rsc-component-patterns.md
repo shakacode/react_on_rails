@@ -192,7 +192,7 @@ export default function ProductPage({ product }) {
 'use client';
 
 import { useState } from 'react';
-import { addToCart } from '../actions'; // Server Action or API call for mutation
+import { addToCart } from '../actions'; // Rails API call for mutation
 
 export default function AddToCartButton({ productId }) {
   const [quantity, setQuantity] = useState(1);
