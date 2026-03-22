@@ -8,7 +8,7 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 **Cause**: A compression middleware (`Rack::Deflater`, `Rack::Brotli`) is configured with an `:if` condition that calls `body.each` to check the response size. This destructively consumes streaming chunks from the `SizedQueue`, causing a deadlock.
 
-**Fix**: See the "Compression Middleware Compatibility" section in the [Streaming Server Rendering guide](../oss/building-features/streaming-server-rendering.md).
+**Fix**: See the [Compression Middleware Compatibility](./streaming-ssr.md#compression-middleware-compatibility) section in the Streaming SSR guide.
 
 ## Node Renderer
 
