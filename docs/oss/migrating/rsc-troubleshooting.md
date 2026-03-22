@@ -58,7 +58,7 @@ export default function ClientForm({ csrfToken }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    await fetch('/api/items', {
+    const response = await fetch('/api/items', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -66,6 +66,7 @@ export default function ClientForm({ csrfToken }) {
       },
       body: JSON.stringify({ name }),
     });
+    if (response.ok) setName('');
   }
 
   return (
@@ -413,42 +414,50 @@ import { useState } from 'react';
 
 ### Server Waterfalls
 
-The most common performance regression. Sequential `await` calls create waterfalls on the server:
+The most common performance regression. Sequential `emit.call` in the Ruby block creates waterfalls:
 
-```jsx
-// BAD: Sequential fetching (750ms total)
-async function Page() {
-  const user = await getUser(); // 200ms
-  const stats = await getStats(user.id); // 300ms (waits for user)
-  const posts = await getPosts(user.id); // 250ms (waits for user AND stats)
-  // Total: 750ms (sequential)
-}
+```erb
+<%# BAD: Each computation blocks the next (750ms total) %>
+<%= stream_react_component_with_async_props("Page",
+      props: { title: "Page" }) do |emit|
+  user = User.find(user_id)        # 200ms
+  emit.call("user", user.as_json)
+  stats = Stats.for_user(user.id)  # 300ms (waits for user)
+  emit.call("stats", stats.as_json)
+  posts = Post.where(user_id: user.id).limit(10)  # 250ms (waits for stats)
+  emit.call("posts", posts.as_json)
+end %>
 ```
 
-**Fix 1:** If the user ID is available from props or route params, all three fetches can run in parallel:
+**Fix 1:** Use Ruby threads for independent data sources:
 
-```jsx
-// GOOD: Parallel fetching when userId is available upfront (300ms total)
-async function Page({ userId }) {
-  const [user, stats, posts] = await Promise.all([getUser(userId), getStats(userId), getPosts(userId)]);
-}
+```erb
+<%# GOOD: Fetch in parallel, then emit results serially %>
+<%= stream_react_component_with_async_props("Page",
+      props: { title: "Page" }) do |emit|
+  results = {}
+  threads = []
+  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { results[:user] = User.find(user_id).as_json } }
+  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { results[:stats] = Stats.for_user(user_id).as_json } }
+  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { results[:posts] = Post.where(user_id: user_id).limit(10).as_json } }
+  threads.each(&:join)
+  # Emit after all threads complete — avoids concurrent writes to the stream
+  results.each { |key, val| emit.call(key.to_s, val) }
+end %>
 ```
 
-**Fix 2:** If you must fetch the user first (e.g., stats and posts depend on user data), fetch the user first, then parallelize the dependent calls:
+**Fix 2:** Send fast data as sync props so the shell renders immediately, and stream slow data as async props:
 
-```jsx
-// GOOD: Fetch user first, then parallelize dependent calls (500ms total)
-async function Page() {
-  const user = await getUser(); // 200ms
-  const [stats, posts] = await Promise.all([
-    getStats(user.id), // 300ms ── start simultaneously
-    getPosts(user.id), // 250ms
-  ]);
-  // Total: 200 + 300 = 500ms (instead of 750ms)
-}
+```erb
+<%# GOOD: Critical data renders instantly, secondary data streams in %>
+<%= stream_react_component_with_async_props("Page",
+      props: { user: current_user.as_json }) do |emit|
+  emit.call("stats", Stats.for_user(current_user.id).as_json)
+  emit.call("posts", Post.where(user_id: current_user.id).limit(10).as_json)
+end %>
 ```
 
-See [Data Fetching Migration](rsc-data-fetching.md) for detailed patterns.
+See [Data Fetching Migration](rsc-data-fetching.md#avoiding-server-side-waterfalls) for detailed patterns.
 
 ### Missing Suspense Boundaries
 

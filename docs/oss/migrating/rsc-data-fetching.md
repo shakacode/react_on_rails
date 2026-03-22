@@ -310,6 +310,8 @@ export default function ProductList({ initialProducts }) {
 3. React Query uses `initialData` to populate the cache -- no loading state on first render
 4. Subsequent refetches happen client-side as usual
 
+> **Note:** `initialDataUpdatedAt: Date.now()` uses the client render timestamp, not the actual Rails fetch time. This is close enough for most apps. For precise control, pass a timestamp from your Rails controller (e.g., `(Time.now.to_f * 1000).to_i`) as a prop and use that instead. If you don't need timed refetching at all, use `staleTime: Infinity` to prevent automatic refetches entirely.
+
 ## Migrating from SWR
 
 SWR follows a similar pattern -- pass Rails props as `fallbackData` so the component renders immediately and SWR takes over for revalidation:
@@ -639,12 +641,13 @@ function Comments({ postId }) {
 **The two safe approaches:**
 
 ```jsx
-// CORRECT: Promise created in a Server Component, passed as a prop
+// CORRECT: Promise from getReactOnRailsAsyncProp, passed as a prop
 // Page.jsx -- Server Component
 import { Suspense } from 'react';
 
-export default async function Page({ id }) {
-  const commentsPromise = getComments(id); // Created once on the server
+export default function Page({ getReactOnRailsAsyncProp }) {
+  // getReactOnRailsAsyncProp returns a cached promise (same object on repeated calls)
+  const commentsPromise = getReactOnRailsAsyncProp('comments');
   return (
     <Suspense fallback={<p>Loading...</p>}>
       <Comments commentsPromise={commentsPromise} />
@@ -657,7 +660,7 @@ export default async function Page({ id }) {
 import { use } from 'react';
 
 export default function Comments({ commentsPromise }) {
-  const comments = use(commentsPromise); // Safe: stable reference from props
+  const comments = use(commentsPromise); // Safe: stable reference from async props
   return <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>;
 }
 ```
@@ -684,7 +687,7 @@ function Comments({ postId }) {
 }
 ```
 
-> **Rule:** Never create a raw promise for `use()` inside a Client Component. Either receive it from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query or SWR.
+> **Rule:** Never create a raw promise for `use()` inside a Client Component. Either receive it from a Server Component as a prop (via `getReactOnRailsAsyncProp` or another stable source), or use a Suspense-compatible library like TanStack Query or SWR.
 
 ## Request Deduplication with `React.cache()`
 
@@ -716,6 +719,10 @@ async function Navbar({ userId }) {
 - Uses `Object.is` for argument comparison (pass primitives, not objects)
 - Must be defined at **module level**, not inside components
 - Only works in Server Components
+
+> **Note:** `React.cache()` is only available in React Server Component environments. It is not available in Client Components or non-RSC server rendering (e.g., `renderToString`).
+
+For most React on Rails applications, you won't need `React.cache()` because data flows through Rails props and async props, both of which handle caching at their respective layers.
 
 ## Mutations: Rails Controllers, Not Server Actions
 

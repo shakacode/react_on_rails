@@ -158,7 +158,7 @@ export default function UserForm({ csrfToken }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    await fetch('/api/users', {
+    const response = await fetch('/api/users', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -166,6 +166,7 @@ export default function UserForm({ csrfToken }) {
       },
       body: JSON.stringify({ user: { name } }),
     });
+    if (response.ok) setName('');
   }
 
   return (
