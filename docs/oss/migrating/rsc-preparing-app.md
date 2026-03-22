@@ -504,7 +504,7 @@ In each view, replace `react_component` with `stream_react_component`:
 <%# app/views/products/show.html.erb %>
 <h1><%= @product.name %></h1>
 <%= react_component("ProductPage",
-      props: { product: @product.as_json },
+      props: { product: @product.as_json(include: [:specs, :reviews]) },
       prerender: true) %>
 ```
 
@@ -514,7 +514,7 @@ In each view, replace `react_component` with `stream_react_component`:
 <%# app/views/products/show.html.erb %>
 <h1><%= @product.name %></h1>
 <%= stream_react_component("ProductPage",
-      props: { product: @product.as_json },
+      props: { product: @product.as_json(include: [:specs, :reviews]) },
       prerender: true) %>
 ```
 
