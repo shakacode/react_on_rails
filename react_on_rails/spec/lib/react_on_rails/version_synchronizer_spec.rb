@@ -138,7 +138,7 @@ module ReactOnRails
               "react-on-rails" => "16.4.0-rc.5"
             }
           )
-          File.write(File.join(tmpdir, "package-lock.json"), "{}\n")
+          File.write(File.join(tmpdir, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n")
         end
 
         it "prints a lockfile caveat in dry-run output" do
