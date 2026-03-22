@@ -169,7 +169,7 @@ export default function ProductPage({ productId }) {
 ```erb
 <%# Rails view %>
 <%= stream_react_component("ProductPage",
-      props: { product: product.as_json(include: [:specs, :reviews]) }) %>
+      props: { product: @product.as_json(include: [:specs, :reviews]) }) %>
 ```
 
 ```jsx
