@@ -285,8 +285,8 @@ export default function ProductList({ initialProducts }) {
     queryKey: ['products'],
     queryFn: () => fetch('/api/products').then((res) => res.json()),
     initialData: initialProducts,
-    initialDataUpdatedAt: Date.now(), // mark when Rails fetched the data
-    staleTime: 60_000, // treat Rails-fetched data as fresh for 60 s
+    staleTime: 60_000, // don't refetch for 60 s after first render
+    initialDataUpdatedAt: Date.now(), // tells React Query the data is fresh as of render time
   });
 
   return (
@@ -307,6 +307,8 @@ export default function ProductList({ initialProducts }) {
 2. The Server Component passes the data to a Client Component as `initialData`
 3. React Query uses this data for the first render -- no loading state
 4. Subsequent refetches happen client-side as usual via the `queryFn`
+
+> **Note:** `initialDataUpdatedAt: Date.now()` uses the client render timestamp, not the actual Rails fetch time. This is close enough for most apps. For precise control, pass a timestamp from your Rails controller (e.g., `(Time.now.to_f * 1000).to_i`) as a prop and use that instead. If you don't need timed refetching at all, use `staleTime: Infinity` to prevent automatic refetches entirely.
 
 ## Migrating from SWR
 

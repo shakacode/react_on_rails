@@ -473,7 +473,6 @@ Async Server Components introduce new testing challenges. Vitest and Jest can te
 Unit Tests (Vitest/Jest)
 ├── Client Components -- full support with hooks mocking
 ├── Synchronous Server Components -- basic rendering tests
-├── Server Actions -- test as regular async functions
 └── Utility/helper functions -- standard unit tests
 
 Integration Tests
