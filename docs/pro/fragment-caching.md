@@ -41,7 +41,7 @@ A `cached_react_component_hash` variant is also available for cases where you ne
 
 ## Cache Warming
 
-Every deploy creates new cache keys for prerendered components (because the server bundle digest is included in the cache key when `prerender: true`). For client-only cached components, version your own cache key to invalidate on deploy. To avoid a storm of cold-cache misses under live traffic, warm your highest-traffic pages in background jobs immediately after deploy.
+When `prerender: true` is set, every deploy creates new cache keys automatically because the server bundle digest is included in the key. For client-only `cached_react_component` calls (without `prerender: true`), the bundle digest is **not** included — you must version your own cache key to invalidate on deploy. To avoid a storm of cold-cache misses under live traffic, warm your highest-traffic pages in background jobs immediately after deploy.
 
 See the [Cache Warming section](../oss/building-features/caching.md#cache-warming) in the caching guide for implementation patterns and real-world results.
 

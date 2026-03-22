@@ -1,6 +1,6 @@
 # Streaming Server-Side Rendering
 
-React on Rails Pro supports streaming server rendering using React 18/19's `renderToPipeableStream` API. Instead of waiting for the entire page to render before sending any HTML, streaming SSR sends HTML to the browser progressively as each part of the page becomes ready.
+React on Rails Pro supports streaming server rendering using React 19's `renderToPipeableStream` API. Instead of waiting for the entire page to render before sending any HTML, streaming SSR sends HTML to the browser progressively as each part of the page becomes ready.
 
 ## Why Streaming SSR?
 
@@ -75,6 +75,8 @@ const SlowDataComponent = async () => {
 export default MyStreamingComponent;
 ```
 
+> **Note:** The `async () => { ... }` function component pattern (`SlowDataComponent` above) is a React Server Components feature. If you are using streaming SSR without RSC, use a data-fetching library (such as React Query or SWR) with `<Suspense>` instead. See the [RSC tutorial](./react-server-components/tutorial.md) for setup details.
+
 ```jsx
 // app/javascript/packs/registration.jsx
 import ReactOnRails from 'react-on-rails';
@@ -97,15 +99,16 @@ ReactOnRails.register({ MyStreamingComponent });
 
 ### 4. Render The View Using The `stream_view_containing_react_components` Helper
 
-Ensure you have a controller that renders the view containing the React components. The controller must include the `ReactOnRails::Controller`, `ReactOnRailsPro::Stream` and `ActionController::Live` modules.
+Ensure you have a controller that renders the view containing the React components. The controller must include the `ReactOnRails::Controller` and `ReactOnRailsPro::Stream` modules.
 
 ```ruby
 # app/controllers/example_controller.rb
 
 class ExampleController < ApplicationController
-  include ActionController::Live
   include ReactOnRails::Controller
   include ReactOnRailsPro::Stream
+  # Note: ActionController::Live is already mixed in by ReactOnRailsPro::Stream,
+  # but you can include it explicitly if you prefer.
 
   def show
     stream_view_containing_react_components(template: 'example/show')
@@ -129,7 +132,7 @@ When a user visits the page, they'll experience the following sequence:
 2. As the React component processes and suspense boundaries resolve:
    - HTML chunks are streamed to the browser progressively
    - Each chunk updates a specific part of the page
-   - The browser renders these updates without a full page reload
+   - The browser renders these updates without a full-page reload
 
 For example, with our `MyStreamingComponent`, the sequence might be:
 
@@ -255,7 +258,7 @@ Streaming SSR is particularly valuable in specific scenarios. Here's when to con
 
 ### Understanding the Problem with Defer
 
-Deferred scripts (`defer: true`) only execute after the entire HTML document has finished parsing and streaming. This defeats the key benefit of React 18's Selective Hydration feature, which allows streamed components to hydrate as soon as they arrive—even while other parts of the page are still streaming.
+Deferred scripts (`defer: true`) only execute after the entire HTML document has finished parsing and streaming. This defeats the key benefit of React's Selective Hydration feature, which allows streamed components to hydrate as soon as they arrive—even while other parts of the page are still streaming.
 
 **Example Problem:**
 
@@ -339,7 +342,7 @@ React on Rails Pro automatically enables the `immediate_hydration` feature, whic
 - Components become interactive as soon as their JavaScript loads
 - No need to wait for DOMContentLoaded or full-page load
 - Optimal Time to Interactive (TTI) for both streaming and non-streaming pages
-- Works seamlessly with React 18's Selective Hydration
+- Works seamlessly with React's Selective Hydration
 
 **Note:** The `immediate_hydration` feature requires a React on Rails Pro license. It is enabled automatically — no configuration needed.
 
