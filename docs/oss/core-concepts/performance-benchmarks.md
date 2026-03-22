@@ -15,9 +15,9 @@ The default ExecJS renderer evaluates JavaScript synchronously inside a single-t
 | Async support     | None                          | None                          | Full (Promises, timers)    |
 | Streaming SSR     | Not supported                 | Not supported                 | Supported                  |
 | RSC support       | Not supported                 | Not supported                 | Supported                  |
-| Typical speedup   | Baseline                      | Comparable                    | 10-100x over ExecJS        |
+| Typical speedup   | Baseline                      | Comparable                    | 3-10x over ExecJS          |
 
-The Node Renderer's persistent process supports full async rendering and multi-worker concurrency, which are the primary sources of the performance difference. ExecJS is limited to synchronous rendering within a single-threaded pool. For complex components with many async dependencies, this gap widens significantly.
+The Node Renderer's persistent process supports full async rendering and multi-worker concurrency, which are the primary sources of the performance difference. Popmenu reported a [73% decrease in response times](#popmenu) after switching to Pro. ExecJS is limited to synchronous rendering within a single-threaded pool, so the gap widens for pages with many async data sources or large component trees.
 
 ## Bundle Splitting Impact
 
