@@ -12,7 +12,7 @@ By default, ExecJS uses the Node.js runtime. You can also use [mini_racer](https
 
 ### `setTimeout` and `setInterval`
 
-ExecJS does not support `setTimeout`, `setInterval`, or `clearInterval`. These functions rely on an event loop, which ExecJS does not provide. Calling them during server rendering will either throw an error or silently do nothing, depending on the runtime.
+ExecJS does not support `setTimeout`, `setInterval`, `clearTimeout`, or `clearInterval`. These functions rely on an event loop, which ExecJS does not provide. Calling them during server rendering will either throw an error or silently do nothing, depending on the runtime.
 
 **Common error messages:**
 
@@ -143,10 +143,10 @@ See the [Configuration Reference](../configuration/README.md) for details on the
 If ExecJS limitations are blocking your application, the [Node Renderer](../building-features/node-renderer/basics.md) (a React on Rails Pro feature) eliminates these constraints by running a dedicated Node.js process for server rendering. The Node renderer supports:
 
 - Full async/await and Promise resolution
-- `setTimeout` and `setInterval`
+- `setTimeout` and `setInterval` (requires setting `RENDERER_STUB_TIMERS=false`; timers are stubbed by default)
 - Streaming SSR with `renderToPipeableStream`
 - React Server Components
-- Node.js built-in modules
+- Node.js built-in modules (requires setting `RENDERER_SUPPORT_MODULES=true`)
 - Multi-worker concurrency
 
 The Node renderer typically delivers significantly faster SSR compared to ExecJS, with real-world results like Popmenu's [73% reduction in response times](https://www.shakacode.com/recent-work/popmenu/). See [OSS vs Pro](../getting-started/oss-vs-pro.md) for a full feature comparison.

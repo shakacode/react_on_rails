@@ -184,11 +184,14 @@ If components aren't loading or you suspect bundling issues:
 
 1. Check that your webpack entry points include the registration files
 2. Verify the manifest file exists at the expected path (check `public_output_path` in `config/shakapacker.yml` — defaults to `public/packs/`)
-3. Confirm the server bundle is generated (check `ssr-generated/` or your configured `server_bundle_output_path`)
+3. Confirm the server bundle is generated in your `server_bundle_output_path` (defaults to `ssr-generated/`):
 
 ```bash
-# Check if manifest exists and contains your bundles (adjust path to match your public_output_path)
-cat public/packs/manifest.json | grep "server-bundle"
+# Check that the server bundle exists (default private output path)
+ls ssr-generated/server-bundle.js
+
+# Check that the client manifest exists and contains your client bundles
+cat public/packs/manifest.json | grep "application"
 ```
 
 ## Pro Node Renderer Debugging

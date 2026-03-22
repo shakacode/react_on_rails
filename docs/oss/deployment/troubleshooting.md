@@ -461,7 +461,7 @@ bin/webpack --config-dump
 
 ```javascript
 // In browser console
-console.log(ReactOnRails.getComponents());
+console.log(ReactOnRails.registeredComponents());
 ```
 
 ## 🆘 Still Stuck?
