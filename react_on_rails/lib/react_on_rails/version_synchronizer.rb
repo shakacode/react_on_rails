@@ -5,12 +5,10 @@ require_relative "version_syntax_converter"
 require_relative "version_checker"
 
 module ReactOnRails
-  # Synchronizes React on Rails npm package versions with loaded gem versions.
-  # Dry-run is the default behavior. Use write mode to persist updates.
+  # rubocop:disable Metrics/ClassLength
   class VersionSynchronizer
     PACKAGE_SECTIONS = %w[dependencies devDependencies optionalDependencies peerDependencies].freeze
-    # Matches exact npm versions (e.g. "1.2.3", "1.2.3-rc.4") and rubygem-style
-    # prerelease notation (e.g. "1.2.3.rc.4") so malformed copied values can be corrected.
+    # Matches exact npm versions and rubygem-style prerelease notation (e.g. "1.2.3.rc.4").
     EXACT_VERSION_REGEX = /\A\d+\.\d+\.\d+(?:[-.][0-9A-Za-z]+(?:\.[0-9A-Za-z-]+)*)?\z/
     PACKAGE_VERSION_SOURCES = {
       "react-on-rails" => :react_on_rails,
@@ -28,10 +26,13 @@ module ReactOnRails
 
     def sync(write: false)
       package_json_data, original_content = parse_package_json
-      changes, unsupported_specs = detect_changes(package_json_data)
+      changes, unsupported_specs, missing_source_specs = detect_changes(package_json_data)
 
       apply_changes!(package_json_data, changes, original_content) if write && changes.any?
-      print_summary(changes, unsupported_specs: unsupported_specs, write: write)
+      print_summary(changes,
+                    unsupported_specs: unsupported_specs,
+                    missing_source_specs: missing_source_specs,
+                    write: write)
 
       changed_files = write && changes.any? ? [package_json_path] : []
       Result.new(changes: changes, changed_files: changed_files, unsupported_specs: unsupported_specs)
@@ -56,6 +57,7 @@ module ReactOnRails
       expected_versions = expected_package_versions
       changes = []
       unsupported_specs = []
+      missing_source_specs = []
 
       PACKAGE_SECTIONS.each do |section|
         dependencies = package_json_data[section]
@@ -71,7 +73,10 @@ module ReactOnRails
           end
 
           expected_version = expected_versions[source_key]
-          next if expected_version.nil?
+          if expected_version.nil?
+            missing_source_specs << { section: section, package: package_name, source: source_key }
+            next
+          end
           next if current_version == expected_version
 
           changes << {
@@ -83,7 +88,7 @@ module ReactOnRails
         end
       end
 
-      [changes, unsupported_specs]
+      [changes, unsupported_specs, missing_source_specs]
     end
 
     def expected_package_versions
@@ -113,7 +118,7 @@ module ReactOnRails
       write_atomically("#{generated_json}\n")
     end
 
-    def print_summary(changes, unsupported_specs:, write:)
+    def print_summary(changes, unsupported_specs:, missing_source_specs:, write:)
       if changes.empty?
         print_no_changes_summary
       else
@@ -121,6 +126,12 @@ module ReactOnRails
       end
 
       print_unsupported_specs(unsupported_specs)
+      return if missing_source_specs.empty?
+
+      io.puts "Skipped packages whose source gem is not loaded:"
+      missing_source_specs.each do |spec|
+        io.puts "  - #{spec[:section]}.#{spec[:package]} (missing #{spec[:source]} gem)"
+      end
     end
 
     def exact_version?(version)
@@ -134,7 +145,8 @@ module ReactOnRails
     rescue SystemCallError => e
       raise ReactOnRails::Error, "Unable to write #{package_json_path}: #{e.message}"
     ensure
-      # Rename failures leave the original file intact. Always clean up the temp file.
+      # On success tmp_path no longer exists (it was renamed), so this is a no-op.
+      # On failure, remove any partially-written temp file while preserving package_json_path.
       cleanup_tmp_file(tmp_path)
     end
 
@@ -159,7 +171,8 @@ module ReactOnRails
       if write
         io.puts "Updated file:"
         io.puts "  - #{package_json_path}"
-        io.puts "Run your package manager install command to refresh lockfile entries."
+        io.puts "Run your package manager install command to apply package.json updates."
+        io.puts "Lockfiles may still pin previous versions until install completes." if lockfile_present?
         io.puts "Write mode reformats package.json and may normalize whitespace/newline layout."
         io.puts "For minified package.json files, indentation falls back to two spaces."
       else
@@ -185,10 +198,10 @@ module ReactOnRails
     end
 
     def detect_indentation(content)
-      # If package.json is minified/single-line, there is no indentation sample to reuse.
-      indented_key_line = content.each_line.find { |line| line.match?(/^[ \t]+"[^"\n]+":/) }
-      indentation = indented_key_line&.slice(/^[ \t]+/)
-      indentation.nil? ? "  " : indentation
+      indentations = content.each_line.filter_map { |line| line.slice(/^[ \t]+(?="[^"\n]+":)/) }
+      indentation = indentations.min_by(&:length)
+      indentation.nil? || indentation.empty? ? "  " : indentation
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

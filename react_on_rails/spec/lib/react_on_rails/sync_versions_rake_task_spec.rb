@@ -11,6 +11,7 @@ RSpec.describe "sync_versions rake task" do
 
   before do
     Rake::Task.clear
+    Rake::Task.define_task(:environment)
     load rake_file
     ENV.delete("WRITE")
     ENV.delete("DRY_RUN")
@@ -24,6 +25,12 @@ RSpec.describe "sync_versions rake task" do
   describe "rake react_on_rails:sync_versions task" do
     it "exists" do
       expect(Rake::Task.task_defined?("react_on_rails:sync_versions")).to be true
+    end
+
+    it "depends on the Rails environment" do
+      task = Rake::Task["react_on_rails:sync_versions"]
+
+      expect(task.prerequisites).to include("environment")
     end
 
     it "runs in dry-run mode by default" do

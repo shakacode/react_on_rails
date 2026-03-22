@@ -54,7 +54,7 @@ module ReactOnRails
           expect(read_package_json.dig("dependencies", "react-on-rails-pro")).to eq("16.4.0-rc.5")
           expect(read_package_json.dig("dependencies", "react-on-rails-pro-node-renderer")).to eq("16.4.0-rc.5")
           expect(io.string).to include("Updated file:")
-          expect(io.string).to include("refresh lockfile entries")
+          expect(io.string).to include("apply package.json updates")
         end
       end
 
@@ -73,6 +73,27 @@ module ReactOnRails
 
           expect(result.changes.size).to eq(1)
           expect(read_package_json.dig("dependencies", "react-on-rails")).to eq("16.4.0-rc.5")
+        end
+      end
+
+      context "when pro packages are present but the pro gem is not loaded" do
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro_version).and_return("")
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails-pro" => "16.4.0-rc.5",
+              "react-on-rails-pro-node-renderer" => "16.4.0-rc.5"
+            }
+          )
+        end
+
+        it "prints a warning and skips those packages" do
+          result = synchronizer.sync
+
+          expect(result.changes).to eq([])
+          expect(io.string).to include("Skipped packages whose source gem is not loaded")
+          expect(io.string).to include("dependencies.react-on-rails-pro (missing react_on_rails_pro gem)")
+          expect(io.string).to include("dependencies.react-on-rails-pro-node-renderer (missing react_on_rails_pro gem)")
         end
       end
 
@@ -204,6 +225,28 @@ module ReactOnRails
 
           content = File.read(package_json_path)
           expect(content).to include("\n    \"dependencies\":")
+          expect(content).to include("\n        \"react-on-rails\": \"16.4.0-rc.5\"")
+        end
+      end
+
+      context "when the first indented key is nested deeper than a later key" do
+        before do
+          custom_json = [
+            "{",
+            "\"dependencies\": {",
+            "        \"react-on-rails\": \"16.4.0.rc.4\"",
+            "    },",
+            "    \"name\": \"demo\"",
+            "}"
+          ].join("\n")
+          File.write(package_json_path, "#{custom_json}\n")
+        end
+
+        it "uses the minimum detected indentation width" do
+          synchronizer.sync(write: true)
+
+          content = File.read(package_json_path)
+          expect(content).to include("\n    \"name\": \"demo\"")
           expect(content).to include("\n        \"react-on-rails\": \"16.4.0-rc.5\"")
         end
       end
