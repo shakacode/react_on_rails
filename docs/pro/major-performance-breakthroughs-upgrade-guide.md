@@ -1,10 +1,10 @@
 # React on Rails Pro: Major Performance Breakthroughs - React Server Components, SSR Streaming & Early Hydration
 
-**Subject: 🚀 Revolutionary Performance Breakthroughs: React Server Components, SSR Streaming & Early Hydration Now Available in React on Rails Pro v4 & React on Rails v15**
+**Subject: 🚀 Revolutionary Performance Breakthroughs: React Server Components, SSR Streaming & Early Hydration Now Available in React on Rails Pro v16**
 
 ---
 
-We're thrilled to announce a major update: [React on Rails Pro](https://pro.reactonrails.com/) v4 and [React on Rails](https://github.com/shakacode/react_on_rails) v15 now deliver **unprecedented performance improvements** that will transform your applications. These updates introduce multiple breakthrough technologies that work together to deliver the fastest possible user experience.
+We're thrilled to announce a major update. v16 now deliver **unprecedented performance improvements** that will transform your applications. These updates introduce multiple breakthrough technologies that work together to deliver the fastest possible user experience.
 
 ## 🎯 What This Means for Your Applications
 
@@ -98,13 +98,12 @@ These performance improvements aren't just nice-to-haves—they're essential for
 
 ---
 
-Adopting these features in React on Rails Pro v4 and React on Rails v15 will help you deliver **dramatically faster, leaner, and more SEO‑friendly applications** with fewer client‑side resources and eliminated performance bottlenecks.
+Adopting these features in React on Rails v16 will help you deliver **dramatically faster, leaner, and more SEO‑friendly applications** with fewer client‑side resources and eliminated performance bottlenecks.
 
 **Ready to get started?**
 
-1. Update to React on Rails v15
-2. Update to React on Rails Pro v4
-3. Follow our [RSC & SSR Streaming migration guide](./react-server-components/tutorial.md)
+1. Update to React on Rails v16 with the pro gem and packagfe installed.
+2. Follow our [RSC & SSR Streaming migration guide](./react-server-components/tutorial.md)
 
 Let's make your apps faster—together.
 
