@@ -7,7 +7,7 @@ namespace :react_on_rails do
   desc "Sync React on Rails npm package versions with gem versions (dry-run by default)"
   task :sync_versions do
     write = ENV["WRITE"] == "true"
-    dry_run = ENV["DRY_RUN"] == "true"
+    dry_run = ENV["DRY_RUN"] == "true" # Used for conflict validation; dry-run is the default behavior.
 
     raise ReactOnRails::Error, "WRITE and DRY_RUN cannot both be true" if write && dry_run
 

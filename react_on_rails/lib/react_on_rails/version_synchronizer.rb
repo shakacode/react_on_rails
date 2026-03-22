@@ -8,6 +8,8 @@ module ReactOnRails
   # Dry-run is the default behavior. Use write mode to persist updates.
   class VersionSynchronizer
     PACKAGE_SECTIONS = %w[dependencies devDependencies optionalDependencies peerDependencies].freeze
+    # Matches exact npm versions (e.g. "1.2.3", "1.2.3-rc.4") and rubygem-style
+    # prerelease notation (e.g. "1.2.3.rc.4") so malformed copied values can be corrected.
     EXACT_VERSION_REGEX = /\A\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?\z/
     PACKAGE_VERSION_SOURCES = {
       "react-on-rails" => :react_on_rails,
@@ -121,12 +123,14 @@ module ReactOnRails
       File.write(tmp_path, content)
       File.rename(tmp_path, package_json_path)
     ensure
-      File.delete(tmp_path) if tmp_path && File.exist?(tmp_path)
+      cleanup_tmp_file(tmp_path)
     end
 
     def lockfile_present?
       package_dir = File.dirname(package_json_path)
-      File.exist?(File.join(package_dir, "yarn.lock")) || File.exist?(File.join(package_dir, "package-lock.json"))
+      %w[yarn.lock package-lock.json pnpm-lock.yaml bun.lock].any? do |lockfile_name|
+        File.exist?(File.join(package_dir, lockfile_name))
+      end
     end
 
     def print_no_changes_summary
@@ -144,10 +148,18 @@ module ReactOnRails
         io.puts "Updated file:"
         io.puts "  - #{package_json_path}"
         io.puts "Run your package manager install command to refresh lockfile entries."
-        io.puts "Write mode may normalize package.json formatting."
+        io.puts "Write mode may normalize package.json formatting, including array wrapping."
       else
         io.puts "Dry run only. Re-run with WRITE=true to apply changes."
       end
+    end
+
+    def cleanup_tmp_file(tmp_path)
+      return unless tmp_path && File.exist?(tmp_path)
+
+      File.delete(tmp_path)
+    rescue SystemCallError
+      nil
     end
 
     def detect_indentation(content)
