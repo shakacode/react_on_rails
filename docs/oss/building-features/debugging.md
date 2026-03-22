@@ -155,8 +155,7 @@ Build errors and warnings appear in:
 To see the full bundler configuration for debugging build issues:
 
 ```bash
-# Install the binstub (one-time): rake shakapacker:binstubs
-bin/shakapacker-config --doctor
+bundle exec rake react_on_rails:doctor
 ```
 
 ### Browser Console
@@ -184,12 +183,12 @@ This returns a map of all components that have been registered with `ReactOnRail
 If components aren't loading or you suspect bundling issues:
 
 1. Check that your webpack entry points include the registration files
-2. Verify the manifest file exists at the expected path (`public/webpack/<environment>/manifest.json`)
+2. Verify the manifest file exists at the expected path (check `public_output_path` in `config/shakapacker.yml` — defaults to `public/packs/`)
 3. Confirm the server bundle is generated (check `ssr-generated/` or your configured `server_bundle_output_path`)
 
 ```bash
-# Check if manifest exists and contains your bundles
-cat public/webpack/development/manifest.json | grep "server-bundle"
+# Check if manifest exists and contains your bundles (adjust path to match your public_output_path)
+cat public/packs/manifest.json | grep "server-bundle"
 ```
 
 ## Pro Node Renderer Debugging

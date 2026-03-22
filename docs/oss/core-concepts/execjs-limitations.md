@@ -125,6 +125,7 @@ Enable `trace` mode to get detailed logging for timer calls and other server ren
 ReactOnRails.configure do |config|
   config.trace = true
   config.logging_on_server = true
+  config.replay_console = true
   config.raise_on_prerender_error = Rails.env.development?
 end
 ```
@@ -148,4 +149,4 @@ If ExecJS limitations are blocking your application, the [Node Renderer](../buil
 - Node.js built-in modules
 - Multi-worker concurrency
 
-The Node renderer typically delivers 10-100x faster SSR compared to ExecJS. See [OSS vs Pro](../getting-started/oss-vs-pro.md) for a full feature comparison.
+The Node renderer typically delivers significantly faster SSR compared to ExecJS, with real-world results like Popmenu's [73% reduction in response times](https://www.shakacode.com/recent-work/popmenu/). See [OSS vs Pro](../getting-started/oss-vs-pro.md) for a full feature comparison.

@@ -45,7 +45,7 @@ React on Rails Pro 4+ provides full RSC support with:
 ### Requirements
 
 - React on Rails Pro v4.0.0 or higher
-- React 19
+- React 19.0.x (19.1.x and later are not yet supported)
 - React on Rails v16.0.0 or higher
 - Node renderer (included with Pro)
 - Shakapacker or Rspack for bundling

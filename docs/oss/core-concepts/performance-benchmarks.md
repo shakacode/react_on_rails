@@ -15,7 +15,7 @@ The default ExecJS renderer evaluates JavaScript synchronously inside a single-t
 | Async support     | None                          | None                          | Full (Promises, timers)    |
 | Streaming SSR     | Not supported                 | Not supported                 | Supported                  |
 | RSC support       | Not supported                 | Not supported                 | Supported                  |
-| Typical speedup   | Baseline                      | Comparable                    | 10-100x over ExecJS        |
+| Typical speedup   | Baseline                      | Comparable                    | Several times over ExecJS  |
 
 The Node Renderer's persistent process supports full async rendering and multi-worker concurrency, which are the primary sources of the performance difference. ExecJS is limited to synchronous rendering within a single-threaded pool. For complex components with many async dependencies, this gap widens significantly.
 
@@ -52,7 +52,7 @@ Streaming SSR provides the best of both approaches: the browser receives the ini
 
 ### Selective Hydration
 
-With streaming SSR and React 19, components hydrate independently as their JavaScript loads:
+With streaming SSR and React 18+, components hydrate independently as their JavaScript loads:
 
 - Navigation can become interactive while main content is still streaming
 - User interactions automatically prioritize hydration of the clicked component
