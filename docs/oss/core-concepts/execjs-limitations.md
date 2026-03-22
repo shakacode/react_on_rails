@@ -12,16 +12,15 @@ By default, ExecJS uses the Node.js runtime. You can also use [mini_racer](https
 
 ### `setTimeout` and `setInterval`
 
-ExecJS does not support `setTimeout`, `setInterval`, `clearTimeout`, or `clearInterval`. These functions rely on an event loop, which ExecJS does not provide. Calling them during server rendering will either throw an error or silently do nothing, depending on the runtime.
+ExecJS does not support `setTimeout`, `setInterval`, `clearTimeout`, or `clearInterval`. These functions rely on an event loop, which ExecJS does not provide. React on Rails injects stub functions that silently replace these timer APIs. With `trace: true` in your configuration, the stubs log a warning to `console.error` with a stack trace; otherwise, calls are silently dropped.
 
-**Common error messages:**
+**What you'll see:** Timer callbacks are never executed. If `trace` is enabled, you'll see messages like:
 
 ```text
-ReferenceError: setTimeout is not defined
-TypeError: Cannot read property 'setTimeout' of undefined
+[React on Rails Rendering] setTimeout is not defined for server rendering.
 ```
 
-**Why this happens:** Many libraries use timers internally for debouncing, animations, polling, or deferred execution. When these libraries run during server rendering with ExecJS, the timer calls fail.
+**Why this matters:** Many libraries use timers internally for debouncing, animations, polling, or deferred execution. When these libraries run during server rendering with ExecJS, the timer callbacks are silently dropped, which can cause missing content or unexpected behavior.
 
 **Workarounds:**
 

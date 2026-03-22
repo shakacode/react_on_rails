@@ -194,7 +194,7 @@ React on Rails Pro adds [React Server Components](../../pro/react-server-compone
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
-- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - React Server Components, streaming SSR, and 10-100x faster SSR
+- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - React Server Components, streaming SSR, and 3-10x faster SSR
 
 ## 🆘 Need Help?
 

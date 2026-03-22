@@ -30,7 +30,7 @@ Code splitting with dynamic `import()` breaks your application into smaller chun
 - **Without splitting:** A single bundle contains all components, even those not needed on the current page
 - **With splitting:** Only the components required for the current route are loaded initially; others load on navigation
 
-For applications with many routes and components, code splitting typically reduces initial bundle size by 40-70%, depending on how much code is shared across routes.
+For applications with many routes and components, code splitting can substantially reduce initial bundle size. The actual reduction depends on how much code is shared across routes — apps with mostly independent route content typically see larger gains.
 
 ### Server Bundle Size
 

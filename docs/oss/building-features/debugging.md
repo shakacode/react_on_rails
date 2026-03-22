@@ -121,7 +121,7 @@ To see exactly what the server rendered, view the page source (not the DOM inspe
 
 1. Navigate to the page
 2. Right-click and select **View Page Source** (or use `Ctrl+U` / `Cmd+U`)
-3. Search for your component's container div (e.g., `id="MyComponent-react-component-0"`)
+3. Search for your component's container div (e.g., `id="MyComponent-react-component-<uuid>"` when `random_dom_id` is enabled, which is the default)
 
 The HTML inside that div is what the server produced. Compare it with what React expects to render on the client.
 
@@ -152,7 +152,7 @@ Build errors and warnings appear in:
 - **Terminal:** where webpack-dev-server or `bin/dev` runs
 - **Browser console:** webpack overlay may show compilation errors
 
-To see the full bundler configuration for debugging build issues:
+To run diagnostics on your React on Rails setup (checks configuration, file existence, and common issues):
 
 ```bash
 bundle exec rake react_on_rails:doctor
@@ -187,8 +187,8 @@ If components aren't loading or you suspect bundling issues:
 3. Confirm the server bundle is generated in your `server_bundle_output_path` (defaults to `ssr-generated/`):
 
 ```bash
-# Check that the server bundle exists (default private output path)
-ls ssr-generated/server-bundle.js
+# List the server bundle output directory (filename set via config.server_bundle_js_file)
+ls ssr-generated/
 
 # Check that the client manifest exists and contains your client bundles
 cat public/packs/manifest.json | grep "application"
