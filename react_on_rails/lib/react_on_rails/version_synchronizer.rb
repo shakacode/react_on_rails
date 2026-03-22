@@ -136,7 +136,7 @@ module ReactOnRails
 
     def lockfile_present?
       package_dir = File.dirname(package_json_path)
-      %w[yarn.lock package-lock.json pnpm-lock.yaml bun.lock].any? do |lockfile_name|
+      %w[yarn.lock package-lock.json pnpm-lock.yaml bun.lock bun.lockb].any? do |lockfile_name|
         File.exist?(File.join(package_dir, lockfile_name))
       end
     end
