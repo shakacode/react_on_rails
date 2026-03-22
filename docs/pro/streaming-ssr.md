@@ -77,6 +77,7 @@ export default MyStreamingComponent;
 
 ```jsx
 // app/javascript/packs/registration.jsx
+import ReactOnRails from 'react-on-rails';
 import MyStreamingComponent from '../components/MyStreamingComponent';
 
 ReactOnRails.register({ MyStreamingComponent });
@@ -331,33 +332,23 @@ With Shakapacker ≥ 8.2.0, using `async: true` provides the best performance:
 
 ## Immediate Hydration
 
-React on Rails Pro supports the `immediate_hydration` feature, which allows components to hydrate during the page loading state (before DOMContentLoaded). This works optimally with `async: true` scripts:
-
-```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
-  config.immediate_hydration = true # Enable early hydration
-
-  # Optional: Configure pack loading strategy globally
-  config.generated_component_packs_loading_strategy = :async
-end
-```
+React on Rails Pro automatically enables the `immediate_hydration` feature, which allows components to hydrate during the page loading state (before DOMContentLoaded). This works optimally with `async: true` scripts.
 
 **Benefits of `immediate_hydration` with `async: true`:**
 
 - Components become interactive as soon as their JavaScript loads
-- No need to wait for DOMContentLoaded or full page load
+- No need to wait for DOMContentLoaded or full-page load
 - Optimal Time to Interactive (TTI) for both streaming and non-streaming pages
 - Works seamlessly with React 18's Selective Hydration
 
-**Note:** The `immediate_hydration` feature requires a React on Rails Pro license.
+**Note:** The `immediate_hydration` feature requires a React on Rails Pro license. It is enabled automatically — no configuration needed.
 
 **Component-Level Control:**
 
-You can also enable immediate hydration on a per-component basis:
+You can disable immediate hydration for specific components:
 
 ```erb
-<%= react_component('MyComponent', props: {}, immediate_hydration: true) %>
+<%= react_component('MyComponent', props: {}, immediate_hydration: false) %>
 ```
 
 **generated_component_packs_loading_strategy Option:**

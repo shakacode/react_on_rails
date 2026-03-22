@@ -31,7 +31,7 @@ Use `cached_react_component` instead of `react_component`. The key differences:
 1. Props are passed as a **block** so they're only evaluated on cache miss
 2. You provide a `cache_key` (same as Rails fragment caching)
 
-```ruby
+```erb
 <%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
   some_slow_method_that_returns_props
 end %>
