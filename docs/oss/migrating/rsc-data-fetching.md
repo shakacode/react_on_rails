@@ -231,6 +231,7 @@ function ProductList({ products }) {
 
 ```erb
 <%# ERB view — Rails passes the data as props %>
+<%# In production, scope or paginate the query (e.g., Product.limit(50)) %>
 <%= stream_react_component("ProductList",
       props: { products: Product.all.as_json }) %>
 ```
@@ -374,27 +375,30 @@ end %>
 When data sources are independent, use Ruby threads to fetch in parallel:
 
 ```erb
-<%# GOOD: Independent queries run in parallel %>
+<%# GOOD: Fetch in parallel, then emit results serially %>
 <%= stream_react_component_with_async_props("Dashboard",
       props: { title: "My Dashboard" }) do |emit|
   user_id = params[:user_id]
+  results = {}
   threads = []
   threads << Thread.new do
     ActiveRecord::Base.connection_pool.with_connection do
-      emit.call("user", User.find(user_id).as_json)
+      results[:user] = User.find(user_id).as_json
     end
   end
   threads << Thread.new do
     ActiveRecord::Base.connection_pool.with_connection do
-      emit.call("stats", DashboardStats.compute.as_json)
+      results[:stats] = DashboardStats.compute.as_json
     end
   end
   threads << Thread.new do
     ActiveRecord::Base.connection_pool.with_connection do
-      emit.call("posts", Post.recent.as_json)
+      results[:posts] = Post.recent.as_json
     end
   end
   threads.each(&:join)
+  # Emit after all threads complete — avoids concurrent writes to the stream
+  results.each { |key, val| emit.call(key.to_s, val) }
   # Total: 300ms (limited by slowest)
 end %>
 ```
@@ -727,7 +731,7 @@ export default function CommentForm({ postId, csrfToken }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    await fetch('/api/comments', {
+    const response = await fetch('/api/comments', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -735,7 +739,7 @@ export default function CommentForm({ postId, csrfToken }) {
       },
       body: JSON.stringify({ comment: { content, post_id: postId } }),
     });
-    setContent('');
+    if (response.ok) setContent('');
   }
 
   return (
