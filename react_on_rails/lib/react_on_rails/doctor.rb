@@ -671,9 +671,11 @@ module ReactOnRails
       checker.add_info("\n🖥️  Server Rendering Engine:")
 
       begin
-        is_pro = ReactOnRails::Utils.react_on_rails_pro?
+        uses_node_renderer = ReactOnRails::Utils.react_on_rails_pro? &&
+                             defined?(ReactOnRailsPro) &&
+                             ReactOnRailsPro.configuration.node_renderer?
 
-        if is_pro
+        if uses_node_renderer
           checker.add_info("  Pro uses NodeRenderer for server rendering")
           if defined?(ExecJS) && ExecJS.runtime
             checker.add_info("  ExecJS available as fallback: #{ExecJS.runtime.name}")

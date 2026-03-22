@@ -1187,9 +1187,11 @@ RSpec.describe ReactOnRails::Doctor do
     let(:execjs_runtime) { Struct.new(:name).new("Node.js (V8)") }
     let(:execjs_module) { Struct.new(:runtime).new(execjs_runtime) }
 
-    context "when Pro gem is installed" do
+    context "when Pro gem is installed with NodeRenderer" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        pro_config = Struct.new(:node_renderer?).new(true)
+        stub_const("ReactOnRailsPro", Struct.new(:configuration).new(pro_config))
       end
 
       it "labels ExecJS as fallback" do
@@ -1204,9 +1206,11 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
-    context "when Pro gem is installed and ExecJS is absent" do
+    context "when Pro gem is installed with NodeRenderer and ExecJS is absent" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        pro_config = Struct.new(:node_renderer?).new(true)
+        stub_const("ReactOnRailsPro", Struct.new(:configuration).new(pro_config))
         hide_const("ExecJS")
       end
 
@@ -1215,6 +1219,24 @@ RSpec.describe ReactOnRails::Doctor do
         info_messages = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
         expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
         expect(info_messages).not_to include(a_string_including("ExecJS"))
+      end
+    end
+
+    context "when Pro gem is installed with ExecJS (default renderer)" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        pro_config = Struct.new(:node_renderer?).new(false)
+        stub_const("ReactOnRailsPro", Struct.new(:configuration).new(pro_config))
+      end
+
+      it "reports ExecJS as primary engine" do
+        stub_const("ExecJS", execjs_module)
+
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("ExecJS Runtime:"))
+        expect(info_messages).not_to include(a_string_including("Pro uses NodeRenderer"))
       end
     end
 
