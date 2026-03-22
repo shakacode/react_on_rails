@@ -94,10 +94,10 @@ CSS-in-JS is the most impactful compatibility challenge for RSC migration. Runti
 
 ### Runtime CSS-in-JS (Problematic)
 
-| Library               | RSC Status                                                                                                          | Notes                                                                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **styled-components** | In maintenance mode. v6.3.0+ added RSC support via React's `<style>` tag hoisting before entering maintenance mode. | The maintainer stated: "For new projects, I would not recommend adopting styled-components." React Context dependency is the root incompatibility. |
-| **Emotion**           | No native RSC support                                                                                               | Workaround: wrap all Emotion-styled components in `'use client'` files.                                                                            |
+| Library               | RSC Status                                                                                                                                                                                                                         | Notes                                                                                                                                              |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **styled-components** | In maintenance mode. The v6.3.x series added incremental RSC compatibility fixes (e.g., suppressing server-side warnings in v6.3.3, fixing `createGlobalStyle` unmount behavior with React 19's `precedence` attribute in v6.3.9). | The maintainer stated: "For new projects, I would not recommend adopting styled-components." React Context dependency is the root incompatibility. |
+| **Emotion**           | No native RSC support                                                                                                                                                                                                              | Workaround: wrap all Emotion-styled components in `'use client'` files.                                                                            |
 
 ### Zero-Runtime CSS-in-JS (RSC Compatible)
 

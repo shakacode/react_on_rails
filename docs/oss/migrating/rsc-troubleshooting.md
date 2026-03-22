@@ -619,11 +619,16 @@ async function DBComponent() {
 Client Components only have access to environment variables that are explicitly injected into the webpack bundle. In Shakapacker, you control this via `webpack.EnvironmentPlugin` or `webpack.DefinePlugin`:
 
 ```js
-// config/webpack/environment.js (Shakapacker)
-const { environment } = require('@rails/webpacker');
+// config/webpack/webpack.config.js (Shakapacker)
+const { generateWebpackConfig } = require('shakapacker');
+const webpack = require('webpack');
+
+const webpackConfig = generateWebpackConfig();
 
 // Only these variables are available in Client Components
-environment.plugins.prepend('Environment', new webpack.EnvironmentPlugin(['RAILS_ENV', 'PUBLIC_API_URL']));
+webpackConfig.plugins.push(new webpack.EnvironmentPlugin(['RAILS_ENV', 'PUBLIC_API_URL']));
+
+module.exports = webpackConfig;
 ```
 
 ```jsx
