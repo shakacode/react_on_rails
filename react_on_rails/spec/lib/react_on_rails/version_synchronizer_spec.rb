@@ -126,6 +126,41 @@ module ReactOnRails
         end
       end
 
+      context "when package.json uses npm alias syntax with an exact version" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => "npm:@scope/react-on-rails@16.4.0.rc.4"
+            }
+          )
+        end
+
+        it "updates the trailing alias version while preserving the alias target" do
+          result = synchronizer.sync(write: true)
+
+          expect(result.changes.size).to eq(1)
+          expect(read_package_json.dig("dependencies", "react-on-rails"))
+            .to eq("npm:@scope/react-on-rails@16.4.0-rc.5")
+        end
+      end
+
+      context "when npm alias syntax already matches via rubygem-style prerelease notation" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => "npm:@scope/react-on-rails@16.4.0.rc.5"
+            }
+          )
+        end
+
+        it "treats the dependency as synchronized" do
+          result = synchronizer.sync
+
+          expect(result.changes).to eq([])
+          expect(io.string).to include("No package.json version mismatches found")
+        end
+      end
+
       context "when package.json uses non-exact version specs" do
         before do
           write_package_json(
@@ -303,7 +338,7 @@ module ReactOnRails
         end
       end
 
-      context "when mixed indentation contains spaces before tab-indented keys" do
+      context "when mixed indentation contains more tab-indented keys than space-indented keys" do
         before do
           custom_json = [
             "{",
@@ -316,12 +351,37 @@ module ReactOnRails
           File.write(package_json_path, "#{custom_json}\n")
         end
 
-        it "preserves the space-based indentation style" do
+        it "preserves the dominant tab-based indentation style" do
+          synchronizer.sync(write: true)
+
+          content = File.read(package_json_path)
+          expect(content).to include("\n\t\"name\": \"demo\"")
+          expect(content).to include("\n\t\t\"react-on-rails\": \"16.4.0-rc.5\"")
+        end
+      end
+
+      context "when the first indented key uses tabs but most keys use spaces" do
+        before do
+          custom_json = [
+            "{",
+            "\t\"legacy\": {",
+            "\t\t\"enabled\": true",
+            "\t},",
+            "    \"dependencies\": {",
+            "        \"react-on-rails\": \"16.4.0.rc.4\"",
+            "    },",
+            "    \"name\": \"demo\"",
+            "}"
+          ].join("\n")
+          File.write(package_json_path, "#{custom_json}\n")
+        end
+
+        it "chooses the majority indentation character class" do
           synchronizer.sync(write: true)
 
           content = File.read(package_json_path)
           expect(content).to include("\n    \"name\": \"demo\"")
-          expect(content).not_to include("\t")
+          expect(content).to include("\n        \"react-on-rails\": \"16.4.0-rc.5\"")
         end
       end
 

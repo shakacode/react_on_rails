@@ -8,6 +8,7 @@ module ReactOnRails
   # rubocop:disable Metrics/ClassLength
   class VersionSynchronizer
     PACKAGE_SECTIONS = %w[dependencies devDependencies optionalDependencies peerDependencies].freeze
+    NPM_ALIAS_PREFIX = "npm:"
     # Matches exact npm versions and rubygem-style prerelease notation (e.g. "1.2.3.rc.4").
     # Prerelease/build segments are intentionally bounded to avoid matching arbitrarily long dotted suffixes.
     EXACT_VERSION_REGEX = /\A\d+\.\d+\.\d+(?:[-.][0-9A-Za-z]+(?:\.[0-9A-Za-z-]+){0,4})?\z/
@@ -71,7 +72,8 @@ module ReactOnRails
           next unless dependencies.key?(package_name)
 
           current_version = dependencies[package_name]
-          unless exact_version?(current_version)
+          parsed_spec = parse_supported_spec(current_version)
+          unless parsed_spec
             unsupported_specs << { section: section, package: package_name, version: current_version }
             next
           end
@@ -81,14 +83,14 @@ module ReactOnRails
             missing_source_specs << { section: section, package: package_name, source: source_key }
             next
           end
-          normalized_current_version = converter.rubygem_to_npm(current_version)
+          normalized_current_version = converter.rubygem_to_npm(parsed_spec[:version])
           next if normalized_current_version == expected_version
 
           changes << {
             section: section,
             package: package_name,
             from: current_version,
-            to: expected_version
+            to: rewritten_spec(parsed_spec, expected_version)
           }
         end
       end
@@ -141,6 +143,25 @@ module ReactOnRails
 
     def exact_version?(version)
       version.is_a?(String) && version.match?(EXACT_VERSION_REGEX)
+    end
+
+    def parse_supported_spec(version_spec)
+      return { version: version_spec, prefix: nil } if exact_version?(version_spec)
+      return unless version_spec.is_a?(String) && version_spec.start_with?(NPM_ALIAS_PREFIX)
+
+      at_index = version_spec.rindex("@")
+      return unless at_index && at_index > NPM_ALIAS_PREFIX.length
+
+      alias_version = version_spec[(at_index + 1)..]
+      return unless exact_version?(alias_version)
+
+      { version: alias_version, prefix: version_spec[0..at_index] }
+    end
+
+    def rewritten_spec(parsed_spec, expected_version)
+      return expected_version unless parsed_spec[:prefix]
+
+      "#{parsed_spec[:prefix]}#{expected_version}"
     end
 
     def write_atomically(content)
@@ -198,20 +219,28 @@ module ReactOnRails
       return unless tmp_path && File.exist?(tmp_path)
 
       File.delete(tmp_path)
-    rescue SystemCallError
-      nil
+    rescue SystemCallError => e
+      warn "react_on_rails: could not remove temp file #{tmp_path}: #{e.message}"
     end
 
     def detect_indentation(content)
       indentations = content.each_line.filter_map { |line| line.slice(/^[ \t]+(?="[^"\n]+":)/) }
       return "  " if indentations.empty?
 
-      # Compare indentation widths within the same whitespace character class to avoid tabs
-      # (length 1) always winning against space indentation.
-      char = indentations.first[0]
-      same_char = indentations.select { |indentation| indentation.chars.uniq == [char] }
-      indentation = (same_char.empty? ? indentations : same_char).min_by(&:length)
+      indentation = indentation_for_majority_char(indentations)
       indentation.nil? || indentation.empty? ? "  " : indentation
+    end
+
+    def indentation_for_majority_char(indentations)
+      # Compare indentation widths within the dominant whitespace character class to avoid tabs
+      # (length 1) always winning against space indentation.
+      char = predominant_indent_char(indentations)
+      same_char = indentations.select { |indentation| indentation.chars.uniq == [char] }
+      (same_char.empty? ? indentations : same_char).min_by(&:length)
+    end
+
+    def predominant_indent_char(indentations)
+      indentations.map { |indentation| indentation[0] }.tally.max_by { |_value, count| count }&.first || " "
     end
   end
   # rubocop:enable Metrics/ClassLength
