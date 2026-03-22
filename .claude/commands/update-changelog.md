@@ -23,9 +23,9 @@ This command serves three use cases at different points in the release lifecycle
 
 **Before a release** -- Stamp a version header and prepare for release:
 
-- Run `/update-changelog release` (or `rc` or `beta`) to add entries AND stamp the version header
-- The version is auto-computed from changelog content (see "Auto-Computing the Next Version" below)
-- Commit and push CHANGELOG.md
+- Run `/update-changelog release` (or `rc`, `beta`, or an explicit version like `16.5.0.rc.10`) to add entries AND stamp the version header
+- The version is auto-computed from changes (breaking -> major, features -> minor, fixes -> patch) — skipped when an explicit version is provided
+- The command automatically commits, pushes, and opens a PR — review and merge it
 - Then run `rake release` (no args needed -- it reads the version from CHANGELOG.md)
 - The release task automatically creates a GitHub release from the changelog section
 
@@ -324,7 +324,7 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Which PRs were skipped (and why)
 5. If in `release`/`rc`/`beta` mode or explicit-version mode, **automatically commit, push, and open a PR**:
    - Verify the working tree only has `CHANGELOG.md` changes; if there are other uncommitted changes, warn the user and stop
-   - Verify the current branch is `master` (`git branch --show-current`); if not, warn the user and stop
+   - Verify the current branch is `main` (`git branch --show-current`); if not, warn the user and stop
    - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
    - Stage only `CHANGELOG.md` (`git add CHANGELOG.md`) and commit with message `Update CHANGELOG.md for VERSION` (using the stamped version)
    - Push and open a PR with the changelog diff as the body
