@@ -26,7 +26,7 @@ The Pro Node Renderer replaces ExecJS with a dedicated Node.js server for 10-100
 
 ### Streaming SSR
 
-Stream HTML to the browser progressively using React 19's `renderToPipeableStream`, so users see content as it becomes ready instead of waiting for the slowest component. See the [Streaming SSR overview](./streaming-ssr.md).
+Stream HTML to the browser progressively using React 18/19's `renderToPipeableStream`, so users see content as it becomes ready instead of waiting for the slowest component. See the [Streaming SSR overview](./streaming-ssr.md).
 
 ### Fragment Caching
 
