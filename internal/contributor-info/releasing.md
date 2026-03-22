@@ -225,9 +225,10 @@ The task automatically converts Ruby gem format to npm semver format:
 
    **Option A - Use Claude Code (recommended):**
 
-   Run `/update-changelog 16.5.0` (using the already-released version) to analyze commits, write entries, and automatically open a PR. After the PR merges, sync the GitHub release:
+   Run `/update-changelog 16.5.0` (using the already-released version) to analyze commits, write entries, and automatically open a PR. After the PR merges, pull the updated changelog and sync the GitHub release:
 
    ```bash
+   git pull --rebase
    bundle exec rake "sync_github_release[16.5.0]"
    ```
 
