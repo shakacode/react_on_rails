@@ -3,6 +3,7 @@
 Generated from open-issue triage snapshot dated 2026-03-22.
 
 Field note: `Posted question` is the exact question posted to each issue during the 2026-03-22 triage pass.
+Field note: Most `ci/tooling` entries intentionally share the same routing question to keep maintenance-wave triage consistent.
 
 ## #2575 Update Pro install CTA after reactonrails.com launch
 
@@ -89,7 +90,7 @@ Field note: `Posted question` is the exact question posted to each issue during 
 - Domain: discussion/rfc
 - Labels: P3
 - Created: 2025-12-08
-- Context excerpt: Issue body is template boilerplate with no concrete implementation details; keep this in backlog until the issue is rewritten with a concrete, testable scope. ...
+- Reviewer note: Issue body is template boilerplate with no concrete implementation details; keep this in backlog until the issue is rewritten with a concrete, testable scope.
 - Posted question: Should this remain parked until the issue is rewritten with concrete scope and acceptance criteria?
 - Triage note: Relabeled from `P2` to `P3` on 2026-03-23 because scope is currently undefined.
 
@@ -119,7 +120,7 @@ Field note: `Posted question` is the exact question posted to each issue during 
 
 ## #2157 Improve test assertions: Replace ambiguous call_count patterns with explicit have_received checks
 
-- Domain: ci/tooling
+- Domain: testing
 - Labels: P3
 - Created: 2025-12-01
 - Context excerpt: ## Summary Some tests in the codebase use indirect `call_count` counter patterns to verify method invocations. These patterns are ambiguous because they: 1. **Prove absence indirectly** - asserting a count is lower doesn ...
