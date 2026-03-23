@@ -152,7 +152,7 @@ Field note: `Posted question` is the exact question posted to each issue during 
 - Domain: core/runtime
 - Labels: enhancement, P3
 - Created: 2022-06-27
-- Context excerpt: See https://reactjs.org/docs/strict-mode.html. This should help detect more bugs in RoR. ...
+- Context excerpt: See https://react.dev/reference/react/StrictMode. This should help detect more bugs in RoR. ...
 - Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
 
 ## #1196 Debugging Server Rendering with the Node VM Rendering Server
@@ -162,5 +162,4 @@ Field note: `Posted question` is the exact question posted to each issue during 
 - Created: 2019-02-20
 - Context excerpt: # Motivation Because server rendering often uses `react_component_hash` to get the meta tags for SEO, we can't just flip a switch and turn off server rendering to debug the code in the browser. Here are the steps to debu ...
 - Posted question: Should this be batched with related docs issues in a single docs PR, or handled separately?
-- Triage note: Verify whether this legacy Node VM doc is still needed or superseded by newer Node Renderer guidance before scheduling.
-- Status: Pending verification before scheduling.
+- Triage note: Pending verification before scheduling; confirm whether this legacy Node VM doc is still needed or superseded by newer Node Renderer guidance.
