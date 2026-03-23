@@ -61,17 +61,17 @@ Rails prepares the data in the controller and passes it as props. The component 
 - No loading spinner needed in the component itself
 - No JavaScript ships to the client for this component
 
-For pages with multiple data sources, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro) to stream the rendered HTML progressively.
+For pages with multiple data sources, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro) to stream the rendered HTML to the browser as React renders the component tree.
 
 ## Data Fetching in React on Rails Pro
 
-In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to deliver HTML progressively.
+In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree.
 
 This is the recommended data fetching pattern for React on Rails because:
 
 - It preserves Rails' controller/model/view architecture
 - It leverages Rails' existing data access layers (ActiveRecord, authorization, caching)
-- It supports streaming SSR for progressive HTML delivery
+- It supports streaming SSR — HTML streams to the browser as React renders
 - All data passes as props -- no client-side fetching or loading states needed
 
 ### How Streaming Works
@@ -123,11 +123,13 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 
 **How it works:**
 
-1. Rails passes all data as props to `stream_react_component`
+1. Rails loads all data synchronously and passes it as props to `stream_react_component`
 2. `stream_react_component` uses React's `renderToPipeableStream` for streaming SSR
-3. The HTML streams progressively to the browser as React renders the component tree
+3. HTML streams to the browser as React renders the component tree
 4. No client-side fetching, loading states, or error handling needed
 5. The component renders with zero JavaScript cost as a Server Component
+
+> **HTML streaming vs. progressive data streaming:** With synchronous props, all data is loaded in Rails before rendering begins. The streaming here is _HTML streaming_ — React sends rendered HTML to the browser as it processes the component tree, rather than waiting for the entire page to finish rendering. For progressive data streaming where slow data sources resolve independently via Suspense boundaries, see [Streaming SSR](../../pro/streaming-ssr.md).
 
 > **More details:** For setup instructions and configuration options, see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
 
@@ -183,7 +185,7 @@ function ProductList({ products }) {
       props: { products: Product.limit(50).as_json }) %>
 ```
 
-In React on Rails, data comes from Rails as props. The component simply renders it — no fetching, no loading states. For streaming SSR with progressive HTML delivery, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro).
+In React on Rails, data comes from Rails as props. The component simply renders it — no fetching, no loading states. For streaming HTML delivery, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro).
 
 ### Pattern 2: Rails Props as `initialData` (Keep React Query for Client Features)
 
@@ -397,7 +399,7 @@ function PostFeed({ posts }) {
 
 ### Solution 3: Pass All Data as Props
 
-Fetch all data in the controller and pass it as props. `stream_react_component` handles progressive HTML delivery via React's streaming SSR:
+Fetch all data in the controller and pass it as props. `stream_react_component` streams the rendered HTML to the browser via React's `renderToPipeableStream`:
 
 ```erb
 <%= stream_react_component("ProductPage",
@@ -440,7 +442,7 @@ function RelatedProducts({ products }) {
 }
 ```
 
-All data is available immediately as props. `stream_react_component` streams the rendered HTML progressively to the browser.
+All data is loaded in Rails before rendering begins. `stream_react_component` then streams the rendered HTML to the browser as React processes the component tree.
 
 ## The `use()` Hook for Client Components
 
@@ -676,9 +678,9 @@ export default function ChatWindow({ channelId, initialMessages }) {
 
 ## Loading States and Suspense Boundaries
 
-### Progressive Streaming Architecture
+### Streaming HTML Delivery
 
-Structure your page so critical content renders alongside secondary content, with `stream_react_component` handling progressive HTML delivery:
+With synchronous props, Rails loads all data before rendering begins. `stream_react_component` then streams the rendered HTML as React processes the component tree — the browser receives content as it's rendered rather than waiting for the entire page:
 
 ```erb
 <%# ERB view — Rails passes all data as props %>
@@ -770,7 +772,7 @@ For each component that fetches data:
 
 ### Step 4: Optimize
 
-10. Use `stream_react_component` for streaming SSR with progressive HTML delivery
+10. Use `stream_react_component` for streaming HTML delivery via React's `renderToPipeableStream`
 11. Parallelize independent Ruby queries with threads to avoid server-side waterfalls
 12. For client-side updates after initial render, use React Query or SWR with `initialData`/`fallbackData`
 

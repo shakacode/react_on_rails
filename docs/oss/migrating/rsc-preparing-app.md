@@ -504,7 +504,9 @@ In each view, replace `react_component` with `stream_react_component`:
 <%# app/views/products/show.html.erb %>
 <h1><%= @product.name %></h1>
 <%= react_component("ProductPage",
-      props: { product: @product.as_json(include: [:specs, :reviews]) },
+      props: { product: @product.as_json(
+                 include: { specs: { only: [:id, :label, :value] },
+                            reviews: { only: [:id, :text, :rating] } }) },
       prerender: true) %>
 ```
 
@@ -514,7 +516,9 @@ In each view, replace `react_component` with `stream_react_component`:
 <%# app/views/products/show.html.erb %>
 <h1><%= @product.name %></h1>
 <%= stream_react_component("ProductPage",
-      props: { product: @product.as_json(include: [:specs, :reviews]) }) %>
+      props: { product: @product.as_json(
+                 include: { specs: { only: [:id, :label, :value] },
+                            reviews: { only: [:id, :text, :rating] } }) }) %>
 ```
 
 `stream_react_component` automatically sets `prerender: true` and enables `immediate_hydration` for optimal selective hydration. The component renders identically -- the difference is that the response is now streamed, which will matter when you start adding Suspense boundaries and async Server Components.
