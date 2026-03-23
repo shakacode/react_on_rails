@@ -127,7 +127,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 
 ## #2156 Add OpenTelemetry support for Node Renderer
 
-- Domain: pro/rsc integration
+- Domain: pro/observability
 - Labels: P3
 - Created: 2025-12-01
 - Context excerpt: ## Summary Add OpenTelemetry instrumentation to the React on Rails Pro Node Renderer to enable distributed tracing and observability. ## Required Dependencies ```json "@opentelemetry/exporter-trace-otlp-http": "^0.203.0" ...
