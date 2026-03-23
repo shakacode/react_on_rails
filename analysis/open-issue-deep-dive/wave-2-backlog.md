@@ -107,7 +107,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Labels: P3
 - Created: 2025-12-07
 - Context excerpt: E.g. for React versions to be stated only once. See https://pnpm.io/catalogs. Note `convert` script will need to be updated as well. ...
-- Posted question: Should this run in the testing-quality maintenance wave, or be deferred behind release-critical runtime work?
+- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2169 Add performance tests for different SSR and client rendering operations
 
@@ -116,7 +116,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Created: 2025-12-04
 - Context excerpt: Ensure to mitigate CI runtime noise.
 - Triage note: Inferred scope is adding reproducible SSR/client performance benchmarks with CI-noise controls and stable baselines before gating changes.
-- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
+- Posted question: Should this run in the testing-quality maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2157 Improve test assertions: Replace ambiguous call_count patterns with explicit have_received checks
 
