@@ -89,6 +89,7 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 - Created: 2025-12-08
 - Context excerpt: Issue body is template boilerplate with no concrete implementation details; keep this in backlog until the issue is rewritten with a concrete, testable scope. ...
 - Posted question: Should this remain parked until the issue is rewritten with concrete scope and acceptance criteria?
+- Triage note: Kept in Wave 2 despite `P2` label because scope is currently undefined.
 
 ## #2184 Remove "Setup Node with V8 Crash Retry" action
 
@@ -100,19 +101,19 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 
 ## #2180 Use pnpm catalogs to decrease duplication between `package.json` files
 
-- Domain: core/runtime
+- Domain: ci/tooling
 - Labels: P3
 - Created: 2025-12-07
 - Context excerpt: E.g. for React versions to be stated only once. See https://pnpm.io/catalogs. Note `convert` script will need to be updated as well. ...
-- Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
+- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2169 Add performance tests for different SSR and client rendering operations
 
-- Domain: core/runtime
+- Domain: ci/tooling
 - Labels: P3
 - Created: 2025-12-04
-- Context excerpt: Ensure to mitigate CI runtime noise ...
-- Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
+- Context excerpt: Issue body is minimal (`Ensure to mitigate CI runtime noise`); inferred scope is adding reproducible SSR/client performance benchmarks with CI-noise controls and stable baselines before gating changes. ...
+- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2157 Improve test assertions: Replace ambiguous call_count patterns with explicit have_received checks
 
