@@ -96,7 +96,7 @@ Execution flow when terminal access is available:
      Quick actions:
       f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
       f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
-      d     — Discuss specific items before deciding (e.g., "d2,4")
+      d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
       r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
       m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
 
@@ -107,8 +107,8 @@ Execution flow when terminal access is available:
 
 7. Execute the chosen action:
    - **`f`**: Fix all must-fix items (if none exist, skip fix phase), resolve addressed must-fix threads, and if skipped items exist ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d` or `f+i`). Commit, ask for push confirmation, then push.
-   - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss and non-trivial skipped items; still reply/resolve trivial skipped items that are excluded from the follow-up issue. If there are no deferred items, skip issue creation and behave like `f`.
-   - **`d`**: Present requested items with full context, ask for a decision on each. Approved → fix like must-fix. Declined → optionally reply with rationale.
+   - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss and non-trivial skipped items; still reply/resolve trivial skipped items that are excluded from the follow-up issue. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient. If there are no deferred items, skip issue creation and behave like `f`.
+   - **`d`**: Present requested items with full context, ask for a decision on each. Bare `d` presents all DISCUSS items. Approved → fix like must-fix. Declined → optionally reply with rationale.
    - **`r`**: Post rationale replies to specified items. Do not resolve threads unless the user explicitly asks to resolve them.
    - **`m`**: Create a follow-up issue for deferred items, reply on each thread referencing it, and resolve `DISCUSS`/`SKIPPED` threads. Keep deferred `MUST-FIX` threads open by default unless the user explicitly asks to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
    - **Direct selection** (e.g., "1,2", "all must-fix", "1,3-5"): Address only selected items, then ask about remaining items.
@@ -154,7 +154,7 @@ SKIPPED (count):
 Quick actions:
   f     — Fix #N, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply/resolve trivial skipped rest
-  d     — Discuss specific items (e.g., "d2,4")
+  d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
   m     — No code changes, create follow-up issue for must-fix/discuss/non-trivial skipped items
 

@@ -136,7 +136,7 @@ After the triage list, present a **quick-action menu**:
 Quick actions:
   f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
-  d     — Discuss specific items before deciding (e.g., "d2,4")
+  d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve those threads
   m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
 
@@ -144,7 +144,8 @@ Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
 
 **Range syntax**: Support `N-M` to expand into individual item numbers (e.g., `3-5` becomes `3,4,5`). Ranges work everywhere: item selection, `d`, and `r`.
-- Generate `f` and `f+i` descriptions dynamically using actual item numbers and deferred targets from the current triage set.
+
+**Dynamic menu**: Generate `f` and `f+i` descriptions dynamically using actual item numbers and deferred targets from the current triage set (e.g., "Fix #1, #3" instead of "Fix must-fix items"). When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection.
 
 Wait for the user to choose an action before proceeding.
 
@@ -165,7 +166,7 @@ Wait for the user to choose an action before proceeding.
 
 1. Do everything in `f` for `MUST-FIX` items. If there are no `MUST-FIX` items, skip the fix phase and continue with deferred-item handling.
 2. Create a **follow-up GitHub issue** (see Step 8) bundling all `DISCUSS` and non-trivial `SKIPPED` items.
-3. For each deferred item in the follow-up issue, post a reply in the original location referencing the issue (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists.
+3. For each deferred item in the follow-up issue, post a reply in the original location referencing the issue (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 4. For trivial `SKIPPED` items that are not included in the follow-up issue (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads.
 5. If there are zero deferred items, skip issue creation and behave like `f`.
 6. Commit, then ask for push confirmation before pushing.
@@ -379,14 +380,12 @@ SKIPPED (3):
 Quick actions:
   f     — Fix #1, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix #1, create follow-up issue for #2, reply/resolve trivial skipped #3-5
-  d     — Discuss specific items (e.g., "d2,4")
+  d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
   m     — No code changes, create follow-up issue, merge-ready only when no must-fix items are deferred
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
-
-Note: The `f` line dynamically shows which must-fix items will be fixed and, when skipped items exist, the follow-up confirmation prompt with skipped count. The `f+i` line shows what will be fixed vs. deferred. When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection. When there are no `MUST-FIX` items, `f` and `f+i` skip code changes and proceed directly to discuss/skipped handling.
 
 # Important Notes
 
