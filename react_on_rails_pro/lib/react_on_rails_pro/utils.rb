@@ -6,8 +6,13 @@
 # require "active_support"
 # require "active_support/core_ext/string"
 
+# rubocop:disable Metrics/ModuleLength
+
 module ReactOnRailsPro
   module Utils
+    BUNDLE_HASH_MUTEX = Mutex.new
+    RSC_BUNDLE_HASH_MUTEX = Mutex.new
+
     ###########################################################
     # PUBLIC API
     ###########################################################
@@ -83,27 +88,78 @@ module ReactOnRailsPro
     end
 
     # Returns a string which should be used as a component in any cache key for
-    # react_component or react_component_hash when server rendering. This value is either
-    # the server bundle filename with the hash from webpack or an MD5 digest of the
-    # entire bundle.
+    # react_component or react_component_hash when server rendering.
+    # Value is either:
+    # - the hashed server bundle filename (when no copied assets are configured), or
+    # - an MD5 digest of server bundle contents plus copied asset contents.
     def self.bundle_hash
-      return @bundle_hash if @bundle_hash && !(Rails.env.development? || Rails.env.test?)
-
       server_bundle_js_file_path = ReactOnRails::Utils.server_bundle_js_file_path
+      asset_paths = bundle_hash_asset_paths
 
-      return @bundle_hash if @bundle_hash && bundle_mtime_same?(server_bundle_js_file_path)
+      hashed_file_name = hash_from_bundle_file_name(server_bundle_js_file_path, asset_paths)
 
-      @bundle_hash = calc_bundle_hash(server_bundle_js_file_path)
+      if contains_http_url?([server_bundle_js_file_path] + asset_paths)
+        # Intentionally do not assign @bundle_hash_signature in this branch.
+        # In development/test we want every call to re-fetch HTTP content and
+        # recompute the hash instead of memoizing by a local file signature.
+        result = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
+        BUNDLE_HASH_MUTEX.synchronize { @bundle_hash = result }
+        return result
+      end
+
+      BUNDLE_HASH_MUTEX.synchronize do
+        cached_bundle_hash = @bundle_hash
+        if cached_bundle_hash && !(Rails.env.development? || Rails.env.test?)
+          cached_bundle_hash
+        elsif hashed_file_name
+          @bundle_hash = hashed_file_name
+          @bundle_hash_signature = nil
+          @bundle_hash
+        else
+          current_signature = bundle_hash_signature(server_bundle_js_file_path, asset_paths)
+          unless @bundle_hash && @bundle_hash_signature == current_signature
+            next_hash = calc_bundle_hash(server_bundle_js_file_path, asset_paths)
+            @bundle_hash = next_hash
+            @bundle_hash_signature = current_signature
+          end
+
+          @bundle_hash
+        end
+      end
     end
 
     def self.rsc_bundle_hash
-      return @rsc_bundle_hash if @rsc_bundle_hash && !(Rails.env.development? || Rails.env.test?)
-
       server_rsc_bundle_js_file_path = rsc_bundle_js_file_path
+      asset_paths = bundle_hash_asset_paths
 
-      return @rsc_bundle_hash if @rsc_bundle_hash && bundle_mtime_same?(server_rsc_bundle_js_file_path)
+      hashed_file_name = hash_from_bundle_file_name(server_rsc_bundle_js_file_path, asset_paths)
 
-      @rsc_bundle_hash = calc_bundle_hash(server_rsc_bundle_js_file_path)
+      if contains_http_url?([server_rsc_bundle_js_file_path] + asset_paths)
+        # Keep HTTP-backed bundles always recomputed in development/test.
+        result = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
+        RSC_BUNDLE_HASH_MUTEX.synchronize { @rsc_bundle_hash = result }
+        return result
+      end
+
+      RSC_BUNDLE_HASH_MUTEX.synchronize do
+        cached_bundle_hash = @rsc_bundle_hash
+        if cached_bundle_hash && !(Rails.env.development? || Rails.env.test?)
+          cached_bundle_hash
+        elsif hashed_file_name
+          @rsc_bundle_hash = hashed_file_name
+          @rsc_bundle_hash_signature = nil
+          @rsc_bundle_hash
+        else
+          current_signature = bundle_hash_signature(server_rsc_bundle_js_file_path, asset_paths)
+          unless @rsc_bundle_hash && @rsc_bundle_hash_signature == current_signature
+            next_hash = calc_bundle_hash(server_rsc_bundle_js_file_path, asset_paths)
+            @rsc_bundle_hash = next_hash
+            @rsc_bundle_hash_signature = current_signature
+          end
+
+          @rsc_bundle_hash
+        end
+      end
     end
 
     # Returns the hashed file name when using Shakapacker. Useful for creating cache keys.
@@ -126,28 +182,135 @@ module ReactOnRailsPro
       end
     end
 
-    def self.calc_bundle_hash(server_bundle_js_file_path)
-      if Rails.env.development? || Rails.env.test?
-        @test_dev_server_bundle_mtime = File.mtime(server_bundle_js_file_path)
+    def self.calc_bundle_hash(server_bundle_js_file_path, asset_paths = bundle_hash_asset_paths)
+      digest = Digest::MD5.new
+      # Include logical paths so different declared bundle/asset sets produce
+      # different hashes even when some files are missing.
+      digest << "bundle:#{digest_path_key(server_bundle_js_file_path)}\0"
+      digest_bundle_content(digest, server_bundle_js_file_path)
+
+      asset_paths.each do |asset_path|
+        digest << "asset:#{digest_path_key(asset_path)}\0"
+        digest_asset_content(digest, asset_path)
       end
+
+      "#{digest.hexdigest}-#{Rails.env}"
+    end
+
+    def self.bundle_hash_signature(server_bundle_js_file_path, asset_paths)
+      ([server_bundle_js_file_path.to_s] + asset_paths).map { |file_path| file_signature(file_path) }.join("\0")
+    end
+
+    def self.file_signature(file_path)
+      path = file_path.to_s
+      return "url:#{path}" if http_url?(path)
+      return "missing:#{path}" unless File.exist?(path)
+      return "dir:#{path}" if File.directory?(path)
+
+      "#{path}:#{File.mtime(path).to_f}:#{File.size(path)}"
+    end
+
+    def self.hash_from_bundle_file_name(server_bundle_js_file_path, asset_paths)
+      return nil unless asset_paths.empty?
 
       server_bundle_basename = Pathname.new(server_bundle_js_file_path).basename.to_s
+      return nil unless contains_hash?(server_bundle_basename)
 
-      if contains_hash?(server_bundle_basename)
-        server_bundle_basename
+      server_bundle_basename
+    end
+
+    def self.digest_bundle_content(digest, bundle_path)
+      if http_url?(bundle_path)
+        digest << http_body_for_path(bundle_path)
       else
-        "#{Digest::MD5.file(server_bundle_js_file_path)}-#{Rails.env}"
+        return unless File.exist?(bundle_path)
+        return if File.directory?(bundle_path)
+
+        digest.file(bundle_path)
       end
     end
 
-    def self.bundle_mtime_same?(server_bundle_js_file_path)
-      @test_dev_server_bundle_mtime == File.mtime(server_bundle_js_file_path)
+    def self.digest_path_key(file_path)
+      path = file_path.to_s
+      return path if http_url?(path)
+
+      pathname = Pathname.new(path).cleanpath
+      rails_root = Rails.root.to_s
+      return pathname.to_s if rails_root.empty?
+
+      root_pathname = Pathname.new(rails_root).cleanpath
+      begin
+        relative_path = pathname.relative_path_from(root_pathname).to_s
+        return relative_path unless relative_path.start_with?("..#{File::SEPARATOR}") || relative_path == ".."
+      rescue ArgumentError
+        # Happens for unrelated roots (for example, different Windows drives).
+      end
+
+      pathname.to_s
     end
 
+    def self.digest_asset_content(digest, asset_path)
+      if http_url?(asset_path)
+        digest << http_body_for_path(asset_path)
+        return
+      end
+
+      unless File.exist?(asset_path)
+        Rails.logger&.warn("[ReactOnRailsPro] Asset not found for bundle hash: #{asset_path}")
+        return
+      end
+      return if File.directory?(asset_path)
+
+      digest.file(asset_path)
+    end
+
+    def self.http_body_for_path(path)
+      if Rails.env.production?
+        raise ReactOnRailsPro::Error, "Not expected to get HTTP url for bundle or assets in production mode"
+      end
+
+      response = HTTPX.get(path)
+      if response.is_a?(HTTPX::ErrorResponse)
+        raise ReactOnRailsPro::Error, "Failed to fetch bundle/asset for hashing from #{path}: #{response.error}"
+      end
+
+      status = response.status
+      if status != 200
+        raise ReactOnRailsPro::Error, "HTTP error #{status || 'unknown'} fetching #{path} for bundle hash"
+      end
+
+      response.body.to_s
+    rescue ReactOnRailsPro::Error
+      raise
+    rescue StandardError => e
+      raise ReactOnRailsPro::Error, "Failed to fetch bundle/asset for hashing from #{path}: #{e.message}"
+    end
+
+    # TODO: Need to consider if the configuration value has the ".js" on the end.
     def self.contains_hash?(server_bundle_basename)
-      # TODO: Need to consider if the configuration value has the ".js" on the end.
       ReactOnRails.configuration.server_bundle_js_file != server_bundle_basename &&
         ReactOnRailsPro.configuration.rsc_bundle_js_file != server_bundle_basename
+    end
+
+    def self.bundle_hash_asset_paths
+      asset_paths = Array(ReactOnRailsPro.configuration.assets_to_copy).compact.map(&:to_s)
+
+      if ReactOnRailsPro.configuration.enable_rsc_support
+        # Keep both hash families sensitive to manifest updates so shared node
+        # renderer cache state is invalidated consistently when RSC manifests change.
+        asset_paths << react_client_manifest_file_path.to_s
+        asset_paths << react_server_client_manifest_file_path.to_s
+      end
+
+      asset_paths.uniq.sort
+    end
+
+    def self.http_url?(path)
+      path.to_s.match?(%r{\Ahttps?://}i)
+    end
+
+    def self.contains_http_url?(paths)
+      paths.any? { |path| http_url?(path) }
     end
 
     def self.with_trace(message = nil)
@@ -232,3 +395,5 @@ module ReactOnRailsPro
     end
   end
 end
+
+# rubocop:enable Metrics/ModuleLength

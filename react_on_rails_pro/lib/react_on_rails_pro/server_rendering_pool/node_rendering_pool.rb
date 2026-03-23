@@ -30,11 +30,11 @@ module ReactOnRailsPro
         end
 
         def renderer_bundle_file_name
-          "#{ReactOnRailsPro::Utils.bundle_hash}.js"
+          "#{server_bundle_hash}.js"
         end
 
         def rsc_renderer_bundle_file_name
-          "#{ReactOnRailsPro::Utils.rsc_bundle_hash}.js"
+          "#{rsc_bundle_hash}.js"
         end
 
         # js_code: JavaScript expression that returns a string.

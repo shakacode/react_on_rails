@@ -6,6 +6,7 @@ import fs from 'fs';
 import fsExtra from 'fs-extra';
 import { buildVM, resetVM } from '../src/worker/vm';
 import { buildConfig } from '../src/shared/configBuilder';
+import { BUNDLE_COMPLETE_MARKER_FILE } from '../src/shared/utils.js';
 
 export const mkdirAsync = fsPromises.mkdir;
 const safeCopyFileAsync = async (src: string, dest: string) => {
@@ -18,6 +19,7 @@ export const BUNDLE_TIMESTAMP = 1495063024898;
 export const SECONDARY_BUNDLE_TIMESTAMP = 1495063024899;
 export const ASSET_UPLOAD_FILE = 'loadable-stats.json';
 export const ASSET_UPLOAD_OTHER_FILE = 'loadable-stats-other.json';
+export { BUNDLE_COMPLETE_MARKER_FILE };
 
 export function getFixtureBundle() {
   return path.resolve(__dirname, './fixtures/bundle.js');
@@ -57,13 +59,21 @@ export function vmSecondaryBundlePath(testName: string) {
   );
 }
 
+const writeBundleCompleteMarker = async (testName: string, bundleTimestamp: string | number) => {
+  const completeMarkerPath = bundleCompleteMarkerPath(testName, String(bundleTimestamp));
+  await mkdirAsync(path.dirname(completeMarkerPath), { recursive: true });
+  await fsPromises.writeFile(completeMarkerPath, '');
+};
+
 export async function createVmBundle(testName: string) {
   await safeCopyFileAsync(getFixtureBundle(), vmBundlePath(testName));
+  await writeBundleCompleteMarker(testName, BUNDLE_TIMESTAMP);
   return buildVM(vmBundlePath(testName));
 }
 
 export async function createSecondaryVmBundle(testName: string) {
   await safeCopyFileAsync(getFixtureSecondaryBundle(), vmSecondaryBundlePath(testName));
+  await writeBundleCompleteMarker(testName, SECONDARY_BUNDLE_TIMESTAMP);
   return buildVM(vmSecondaryBundlePath(testName));
 }
 
@@ -101,6 +111,10 @@ export function assetPath(testName: string, bundleTimestamp: string) {
 
 export function assetPathOther(testName: string, bundleTimestamp: string) {
   return path.resolve(serverBundleCachePath(testName), bundleTimestamp, ASSET_UPLOAD_OTHER_FILE);
+}
+
+export function bundleCompleteMarkerPath(testName: string, bundleTimestamp: string) {
+  return path.resolve(serverBundleCachePath(testName), bundleTimestamp, BUNDLE_COMPLETE_MARKER_FILE);
 }
 
 export async function createUploadedBundle(testName: string) {
