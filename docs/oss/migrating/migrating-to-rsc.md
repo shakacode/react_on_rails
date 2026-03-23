@@ -112,7 +112,7 @@ Tailored for React on Rails' multi-root architecture:
 
 1. **[Prepare your app](rsc-preparing-app.md)** -- set up the RSC infrastructure, add `'use client'` to all component entry points, and switch to streaming rendering. The app works identically -- nothing changes yet.
 2. **Pick a component and push the boundary down** -- move `'use client'` from the root component to its interactive children, letting parent components become Server Components.
-3. **Adopt advanced patterns** -- add Suspense boundaries, [async props](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for streaming data from Rails, and server-side data fetching.
+3. **Adopt advanced patterns** -- add Suspense boundaries, [`stream_react_component`](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for streaming SSR, and server-side data fetching.
 4. **Repeat for each registered component** -- migrate components one at a time, in any order.
 
 This approach lets you migrate incrementally, one component at a time, without ever breaking your app.
