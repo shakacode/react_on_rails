@@ -294,7 +294,11 @@ fi
 if [ -z "${MUST_FIX_BLOCK}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
   echo "No deferred items found; skip follow-up issue creation."
 else
-  SECTION_CONTENT="$(printf '%s\n\n' "${MUST_FIX_BLOCK}" "${DISCUSS_SECTION}" "${SKIPPED_SECTION}")"
+  SECTIONS=()
+  [ -n "${MUST_FIX_BLOCK}" ] && SECTIONS+=("${MUST_FIX_BLOCK}")
+  [ -n "${DISCUSS_SECTION}" ] && SECTIONS+=("${DISCUSS_SECTION}")
+  [ -n "${SKIPPED_SECTION}" ] && SECTIONS+=("${SKIPPED_SECTION}")
+  SECTION_CONTENT="$(printf '%s\n\n' "${SECTIONS[@]}")"
   gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
 ## Deferred review feedback from PR #${PR_NUMBER}
 
