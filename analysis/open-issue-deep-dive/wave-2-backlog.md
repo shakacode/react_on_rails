@@ -60,11 +60,11 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 
 ## #2214 Finish merging linting between Core and Pro
 
-- Domain: pro/rsc integration
+- Domain: ci/tooling
 - Labels: P3
 - Created: 2025-12-12
 - Context excerpt: We currently have separate Prettier and ESLint configurations, as well as .github/workflows/pro-lint.yml. To simplify and speed up CI, they should all be unified and .github/workflows/pro-lint.yml removed. ...
-- Posted question: Can we proceed with OSS-side prep now and defer Pro package changes until explicit approval?
+- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2199 Fix: Restore result-encoding in detect-invalid-ci-commands workflow
 
@@ -141,11 +141,11 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 
 ## #2003 Question: Should Pro package tests use matrix exclusion logic?
 
-- Domain: pro/rsc integration
+- Domain: ci/tooling
 - Labels: question, low priority, P3
 - Created: 2025-11-12
 - Context excerpt: ## Background The main test workflows (`main.yml`, `examples.yml`) have matrix exclusion logic to skip minimum dependency tests on PRs: ```yaml exclude: - dependency-level: ${{ github.event_name == 'pull_request' && gith ...
-- Posted question: Can we proceed with OSS-side prep now and defer Pro package changes until explicit approval?
+- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2001 Discussion: Consider renaming /run-skipped-ci to /run-full-ci
 
