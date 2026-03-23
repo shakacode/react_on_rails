@@ -293,7 +293,8 @@ Follow-up issue: https://github.com/org/repo/issues/NNN (if created)
 If `m` deferred any `MUST-FIX` items, report:
 
 ```text
-All review threads resolved and deferred to follow-up issue: https://github.com/org/repo/issues/NNN
+Deferred review feedback tracked in follow-up issue: https://github.com/org/repo/issues/NNN
+Deferred MUST-FIX threads remain open by default.
 PR is NOT merge-ready because must-fix items were deferred.
 ```
 
