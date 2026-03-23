@@ -123,7 +123,7 @@ Execution flow when terminal access is available:
 
 8. Create follow-up issue (when `f+i` or `m` is chosen):
    - Use `gh issue create` with title "Follow-up: Review feedback from PR #N"
-   - Include discuss items and non-trivial skipped items with reviewer username and comment link
+   - Include unresolved must-fix items when the action is `m`, plus discuss items and non-trivial skipped items, with reviewer username and comment link
    - Reference the issue in thread replies
    - Return the issue URL
 

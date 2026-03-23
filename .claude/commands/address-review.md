@@ -242,13 +242,16 @@ If the user explicitly asks to close out a `DISCUSS` or `SKIPPED` item, reply wi
 
 ## Step 8: Create Follow-Up Issue (when requested)
 
-When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, create a GitHub issue that bundles deferred items:
+When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, create a GitHub issue that bundles deferred items (for `m`, that includes unresolved `MUST-FIX` items):
 
 ```bash
-gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<'EOF'
+gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
 ## Deferred review feedback from PR #${PR_NUMBER}
 
 These items were triaged during review and deferred for follow-up.
+
+### Must-fix items (unresolved)
+${MUST_FIX_ITEMS}
 
 ### Discuss items
 ${DISCUSS_ITEMS}
@@ -264,6 +267,7 @@ EOF
 
 Rules for follow-up issues:
 
+- Include unresolved `MUST-FIX` items when the action is `m` (merge as-is)
 - Only include non-trivial `SKIPPED` items (skip pure duplicates and factually incorrect suggestions)
 - Include the original reviewer username and comment link for each item
 - Include enough context that someone can act on the issue without re-reading the full PR review
