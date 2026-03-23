@@ -126,6 +126,7 @@ Execution flow when terminal access is available:
    - Use `gh issue create` with title "Follow-up: Review feedback from PR #N"
    - For `f+i`, include discuss items and non-trivial skipped items (must-fix is already addressed)
    - For `m`, include deferred must-fix items, discuss items, and non-trivial skipped items
+   - Keep issue body structure consistent with `.claude/commands/address-review.md`: optional `### Must-fix items (deferred)` section, then `### Discuss items`, then `### Skipped items (non-trivial)`, plus original PR link
    - Reference the issue in thread replies
    - Return the issue URL
 

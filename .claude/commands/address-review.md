@@ -134,7 +134,7 @@ After the triage list, present a **quick-action menu**:
 
 ```text
 Quick actions:
-  f     — Fix must-fix items, reply-skip skipped items, then decide discuss items
+  f     — Fix must-fix items, reply/resolve skipped items, then decide discuss items
   f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
   d     — Discuss specific items before deciding (e.g., "d2,4")
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped") without auto-resolving unless requested
@@ -252,6 +252,13 @@ If the user explicitly asks to close out a `DISCUSS` or `SKIPPED` item, reply wi
 When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, create a GitHub issue that bundles deferred items:
 
 ```bash
+# Required shell vars for issue sections
+: "${DISCUSS_ITEMS:?Set DISCUSS_ITEMS before creating follow-up issue}"
+: "${SKIPPED_ITEMS:?Set SKIPPED_ITEMS before creating follow-up issue}"
+
+# For `f+i`, keep this empty. For `m`, include a heading and deferred must-fix bullets.
+MUST_FIX_SECTION="${MUST_FIX_SECTION:-}"
+
 gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
 ## Deferred review feedback from PR #${PR_NUMBER}
 
@@ -275,7 +282,7 @@ Rules for follow-up issues:
 
 - Only include non-trivial `SKIPPED` items (skip pure duplicates and factually incorrect suggestions)
 - For `f+i`, omit the must-fix section because must-fix items were addressed in the current PR
-- For `m`, include a must-fix section listing deferred blockers
+- For `m`, include a must-fix section with heading `### Must-fix items (deferred)` and deferred blockers
 - Include the original reviewer username and comment link for each item
 - Include enough context that someone can act on the issue without re-reading the full PR review
 - After creating the issue, reference it in thread replies (e.g., "Tracked in #NNN for follow-up")
@@ -329,7 +336,7 @@ SKIPPED (3):
 5. spec/helper_spec.rb:20 - "Consolidate assertions" (@claude[bot]) - test style preference
 
 Quick actions:
-  f     — Fix #1, reply-skip skipped items, then decide discuss items
+  f     — Fix #1, reply/resolve skipped items, then decide discuss items
   f+i   — Fix #1, create follow-up issue for #2, reply-skip #3-5
   d     — Discuss specific items (e.g., "d2,4")
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped") without auto-resolving
