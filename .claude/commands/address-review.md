@@ -170,7 +170,7 @@ Wait for the user to choose an action before proceeding.
 
 ### Action `d` — Discuss items
 
-Present the requested items with full context and ask the user for a decision on each. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks).
+Present the requested items with full context and ask the user for a decision on each. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items.
 
 ### Action `r` — Reply with rationale
 
@@ -266,7 +266,7 @@ ${DISCUSS_ITEMS}
 ${SKIPPED_ITEMS}
 
 ---
-Original PR: ${PR_URL}
+Original PR: https://github.com/${REPO}/pull/${PR_NUMBER}
 EOF
 )"
 ```
@@ -350,8 +350,7 @@ Note: The `f` line dynamically shows which must-fix items will be fixed. The `f+
 - **NEVER automatically address all review comments** - always wait for user direction
 - When given a specific review URL, no need to ask for more information
 - **ALWAYS reply to comments after addressing them** to close the feedback loop
-- After triage, always offer to post rationale replies for selected `SKIPPED`/declined items, but only post them with explicit user approval
-- User selection of `f`, `f+i`, or `m` counts as explicit approval to post rationale replies and resolve deferred-item threads for that action
+- After triage, always offer rationale replies for selected `SKIPPED`/declined items; selecting `f`, `f+i`, or `m` counts as explicit approval for the replies and associated thread-resolution behavior for that action
 - Always request push confirmation from the user before running `git push`
 - Resolve the review thread after replying when the concern is actually addressed and a thread ID is available
 - Default to real issues only. Do not spend a review cycle on optional polish unless the user explicitly asks for it
