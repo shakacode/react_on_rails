@@ -51,7 +51,7 @@ gh api repos/${REPO}/issues/comments/{COMMENT_ID} | jq '{body: .body, user: .use
 gh api repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID} | jq '{id: .id, body: .body, state: .state, user: .user.login, html_url: .html_url}'
 
 # Inline comments for this review
-gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id}]'
+gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, html_url: .html_url}]'
 ```
 
 Include the review body as a general comment when it contains actionable feedback. When the review body contains actionable feedback, note that it cannot be replied to via the `/replies` endpoint — responses to review summary bodies must be posted as general PR comments (see Step 7).
@@ -63,7 +63,7 @@ Include the review body as a general comment when it contains actionable feedbac
 gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews | jq -s '[.[].[] | select((.body // "") != "") | {id: .id, type: "review_summary", body: .body, state: .state, user: .user.login, html_url: .html_url}]'
 
 # Inline code review comments
-gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "review", path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id}]'
+gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "review", path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, html_url: .html_url}]'
 
 # General PR discussion comments (not tied to specific lines)
 gh api --paginate repos/${REPO}/issues/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "issue", body: .body, user: .user.login, html_url: .html_url}]'
@@ -252,14 +252,17 @@ If the user explicitly asks to close out a `DISCUSS` or `SKIPPED` item, reply wi
 When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, create a GitHub issue that bundles deferred items:
 
 ```bash
-# Required shell vars for issue sections
-: "${DISCUSS_ITEMS:?Set DISCUSS_ITEMS before creating follow-up issue}"
-: "${SKIPPED_ITEMS:?Set SKIPPED_ITEMS before creating follow-up issue}"
+# Optional section vars (may be empty when a triage bucket has no deferred items)
+: "${DISCUSS_ITEMS:=}"
+: "${SKIPPED_ITEMS:=}"
 
 # For `f+i`, keep this empty. For `m`, include a heading and deferred must-fix bullets.
 MUST_FIX_SECTION="${MUST_FIX_SECTION:-}"
 
-gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
+if [ -z "${MUST_FIX_SECTION}${DISCUSS_ITEMS}${SKIPPED_ITEMS}" ]; then
+  echo "No deferred items found; skip follow-up issue creation."
+else
+  gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
 ## Deferred review feedback from PR #${PR_NUMBER}
 
 These items were triaged during review and deferred for follow-up.
@@ -276,6 +279,7 @@ ${SKIPPED_ITEMS}
 Original PR: https://github.com/${REPO}/pull/${PR_NUMBER}
 EOF
 )"
+fi
 ```
 
 Rules for follow-up issues:
