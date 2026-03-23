@@ -114,7 +114,6 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Domain: ci/tooling
 - Labels: P3
 - Created: 2025-12-04
-- Context excerpt: Ensure to mitigate CI runtime noise.
 - Triage note: Inferred scope is adding reproducible SSR/client performance benchmarks with CI-noise controls and stable baselines before gating changes.
 - Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
