@@ -102,16 +102,16 @@ Execution flow when terminal access is available:
 
      Or pick items by number: "1,2", "all must-fix", "1,3-5"
      ```
-  - Support range syntax: `N-M` expands to individual items (e.g., `3-5` → `3,4,5`).
-  - If a range is malformed, reversed, or out of bounds, show a validation message and ask the user to retry (do not silently coerce it).
+   - Support range syntax: `N-M` expands to individual items (e.g., `3-5` → `3,4,5`).
+   - If a range is malformed, reversed, or out of bounds, show a validation message and ask the user to retry (do not silently coerce it).
    - Do not edit code yet.
 
 7. Execute the chosen action:
-  - **`f`**: Fix all must-fix items (if none exist, skip fix phase), resolve addressed must-fix threads, and if skipped items exist ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d`, `f+i`, or `r all discuss + resolve`). If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow.
+   - **`f`**: Fix all must-fix items (if none exist, skip fix phase), resolve addressed must-fix threads, and if skipped items exist ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d`, `f+i`, or `r all discuss + resolve`). If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow.
    - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss and non-trivial skipped items; still reply/resolve trivial skipped items that are excluded from the follow-up issue. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient. If there are no deferred items, skip issue creation and behave like `f`.
    - **`d`**: Present requested items with full context, ask for a decision on each. Bare `d` presents all DISCUSS items. Approved → fix like must-fix. Declined → optionally reply with rationale.
-  - **`r`**: Post rationale replies to specified items. Do not resolve threads unless the user explicitly asks to resolve them. Do not support `r all must-fix`; `MUST-FIX` items must be fixed (`f`) or explicitly deferred (`f+i`/`m`).
-  - **`m`**: Create a follow-up issue for deferred items, reply in the original location for each deferred item (review-comment replies for inline comments; issue comments for general/review-summary comments), and resolve `DISCUSS`/`SKIPPED` threads when threads exist. Keep deferred `MUST-FIX` threads open by default unless the user explicitly asks to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
+   - **`r`**: Post rationale replies to specified items. Do not resolve threads unless the user explicitly asks to resolve them. Do not support `r all must-fix`; `MUST-FIX` items must be fixed (`f`) or explicitly deferred (`f+i`/`m`).
+   - **`m`**: Create a follow-up issue for deferred items, reply in the original location for each deferred item (review-comment replies for inline comments; issue comments for general/review-summary comments), and resolve `DISCUSS`/`SKIPPED` threads when threads exist. Keep deferred `MUST-FIX` threads open by default unless the user explicitly asks to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
    - **Direct selection** (e.g., "1,2", "all must-fix", "1,3-5"): Address only selected items, then ask about remaining items.
    - Users can chain actions (e.g., `f+i` then `r7-9`).
    - Reply to each addressed review comment:
@@ -137,6 +137,7 @@ Execution flow when terminal access is available:
    - After `f+i`, tell me the PR is merge-ready
    - After `m`, only tell me the PR is merge-ready when no must-fix items were deferred; otherwise explicitly say it is not merge-ready
    - After direct selection, do not signal merge-ready automatically; first evaluate remaining `MUST-FIX`/`DISCUSS` items and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`
+   - After `d` or `r`, if unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready automatically; re-offer `f`, `f+i`, `d`, `r`, or `m`
    - Show the follow-up issue URL if one was created
    - Do not auto-merge
 

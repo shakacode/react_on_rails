@@ -158,7 +158,7 @@ Wait for the user to choose an action before proceeding.
 2. Reply to each addressed comment explaining the fix.
 3. Resolve the corresponding review threads.
 4. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
-5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss + resolve`.
+5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss + resolve`. If `f` starts with zero `MUST-FIX` items, show this discuss decision menu immediately.
 6. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
 7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
 8. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to defer to a follow-up issue, or `r all discuss + resolve` to decline and close.").
@@ -170,7 +170,7 @@ Wait for the user to choose an action before proceeding.
 3. For each deferred item in the follow-up issue, post a reply in the original location referencing the issue (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 4. For trivial `SKIPPED` items that are not included in the follow-up issue (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads.
 5. If there are zero deferred items, skip issue creation and behave like `f`.
-6. Commit, then ask for push confirmation before pushing.
+6. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
 7. Tell the user the PR is merge-ready.
 
 ### Action `d` — Discuss items
@@ -274,10 +274,7 @@ MUST_FIX_SECTION="$(cat <<'EOF'
 EOF
 )"
 
-MUST_FIX_BLOCK=""
-if [ -n "${MUST_FIX_SECTION}" ]; then
-  printf -v MUST_FIX_BLOCK '%s\n' "${MUST_FIX_SECTION}"
-fi
+MUST_FIX_BLOCK="${MUST_FIX_SECTION}"
 
 DISCUSS_SECTION=""
 if [ -n "${DISCUSS_ITEMS}" ]; then
@@ -300,17 +297,17 @@ else
     fi
     SECTION_CONTENT="${SECTION_CONTENT}${section}"
   done
-  gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
-## Deferred review feedback from PR #${PR_NUMBER}
+  issue_body_file="$(mktemp)"
+  {
+    printf '## Deferred review feedback from PR #%s\n\n' "${PR_NUMBER}"
+    printf 'These items were triaged during review and deferred for follow-up.\n\n'
+    printf '%s\n\n' "${SECTION_CONTENT}"
+    printf -- '---\n'
+    printf 'Original PR: https://github.com/%s/pull/%s\n' "${REPO}" "${PR_NUMBER}"
+  } > "${issue_body_file}"
 
-These items were triaged during review and deferred for follow-up.
-
-${SECTION_CONTENT}
-
----
-Original PR: https://github.com/${REPO}/pull/${PR_NUMBER}
-EOF
-)"
+  gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body-file "${issue_body_file}"
+  rm -f "${issue_body_file}"
 fi
 ```
 
@@ -343,6 +340,7 @@ PR is NOT merge-ready because must-fix items were deferred.
 ```
 
 If the action was direct item selection and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready. Re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`.
+If the action was `d` or `r` and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready; re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`.
 
 Do not automatically merge. Signal readiness (or non-readiness) and let the user decide.
 
@@ -396,7 +394,7 @@ Or pick items by number: "1,2", "all must-fix", "1,3-5"
 - **ALWAYS reply to comments after addressing them** to close the feedback loop
 - After triage, always offer rationale replies for selected `SKIPPED`/declined items; `f` requires explicit confirmation before skipped-item replies/resolution, while `f+i` and `m` include skipped-item handling in the chosen action flow
 - Always request push confirmation from the user before running `git push`
-- If this command conflicts with broader agent defaults, follow this command file (it is the more specific workflow instruction)
+- If this command conflicts with broader agent defaults, this file wins only for `/address-review` workflow behavior; do not override repository safety boundaries
 - Resolve the review thread after replying when the concern is actually addressed and a thread ID is available
 - Default to real issues only. Do not spend a review cycle on optional polish unless the user explicitly asks for it
 - Triage comments before creating todos. Only `MUST-FIX` items should become todos by default
