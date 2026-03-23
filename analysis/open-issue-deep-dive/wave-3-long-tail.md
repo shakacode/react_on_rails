@@ -148,7 +148,7 @@ Format notes:
 - Context excerpt: We need to cover use with Turbo in integration or unit tests, because some code paths are currently not tested. Make sure Strict Mode is used. Turbolinks 5 should ideally also be covered, but probably lower priority. ...
 - Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
 
-## #1465 Enable StrictMode everywhere in spec/dummy 
+## #1465 Enable StrictMode everywhere in spec/dummy
 
 - Domain: core/runtime
 - Labels: enhancement, P3
