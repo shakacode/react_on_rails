@@ -2,6 +2,8 @@
 
 Generated from open-issue triage snapshot dated 2026-03-22.
 
+Field note: `Posted question` is the exact question posted to each issue during the 2026-03-22 triage pass.
+
 ## Resolved After Snapshot, Before Execution
 
 - #1887 Investigate the ability to make RSC Payload smaller by removing props and stack objects from it — closed as duplicate of #2522 on 2026-03-23 (canonical issue tracked in Wave 1).
@@ -93,7 +95,7 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 - Labels: P3
 - Created: 2025-07-09
 - Context excerpt: We can slightly simplify code and improve shown errors by using the `cause` option of `Error` constructor. Original blocker #1745 is now merged, so this is unblocked. ...
-- Blocked by: #1745 (resolved; merged 2025-07-14)
+- Triage note: Previously blocked by #1745; that PR merged on 2025-07-14, so this issue is now unblocked and schedulable.
 - Posted question: Now that the blocker is resolved, should this be scheduled in the next implementation wave?
 
 ## #1692 Fix Coveralls setup
