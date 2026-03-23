@@ -121,7 +121,7 @@ Create a task list with TodoWrite containing **only the `MUST-FIX` items**:
 - Description: Include the full review comment text and any relevant context
 - All tasks should start with status: `"pending"`
 
-## Step 6: Present Triage to User
+## Step 6: Present Triage and Quick-Action Menu
 
 Present the triage to the user - **DO NOT automatically start addressing items**:
 
@@ -129,14 +129,68 @@ Present the triage to the user - **DO NOT automatically start addressing items**
 - `MUST-FIX ({count})`: list the todos created
 - `DISCUSS ({count})`: list items needing user choice, with a short reason
 - `SKIPPED ({count})`: list skipped comments with a short reason, including duplicates and factually incorrect suggestions
-- Wait for the user to tell you which items to address
-- Always offer an explicit optional follow-up to post rationale replies on selected `SKIPPED` or declined `DISCUSS` items
-- Never post those rationale replies unless the user explicitly selects which items to reply to
-- Ask two things when there are `SKIPPED` or declined `DISCUSS` items:
-  - Which items to address in code/tests/docs
-  - Which skipped/declined items (if any) should receive a rationale reply
 
-## Step 7: Address Items, Reply, and Resolve
+After the triage list, present a **quick-action menu**:
+
+```text
+Quick actions:
+  f     — Fix must-fix items, reply-skip the rest, push and suggest merge
+  f+i   — Fix must-fix + create follow-up issue for discuss/skipped items
+  d     — Discuss specific items before deciding (e.g., "d2,4")
+  r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped")
+  m     — Skip all fixes, create follow-up issue for everything, suggest merge as-is
+
+Or pick items by number: "1,2", "all must-fix", "1,3-5"
+```
+
+**Range syntax**: Support `N-M` to expand into individual item numbers (e.g., `3-5` becomes `3,4,5`). Ranges work everywhere: item selection, `d`, and `r`.
+
+Wait for the user to choose an action before proceeding.
+
+## Step 7: Execute the Chosen Action
+
+### Action `f` — Fix and merge-ready
+
+1. Address all `MUST-FIX` items (make code changes, run checks).
+2. Reply to each addressed comment explaining the fix.
+3. Resolve the corresponding review threads.
+4. For all `DISCUSS` and `SKIPPED` items, post a brief rationale reply (e.g., "Deferring — not required for this change") and resolve those threads.
+5. Commit, push, and tell the user the PR is merge-ready.
+
+### Action `f+i` — Fix, follow-up issue, and merge-ready
+
+1. Do everything in `f` for `MUST-FIX` items.
+2. Create a **follow-up GitHub issue** (see Step 8) bundling all `DISCUSS` and non-trivial `SKIPPED` items.
+3. For each deferred item, post a reply referencing the follow-up issue and resolve the thread.
+4. Commit, push, and tell the user the PR is merge-ready.
+
+### Action `d` — Discuss items
+
+Present the requested items with full context and ask the user for a decision on each. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks).
+
+### Action `r` — Reply with rationale
+
+Post rationale replies to the specified items explaining why they are being deferred or skipped. Resolve the threads after replying. Accept item numbers, ranges, or `r all skipped` / `r all discuss`.
+
+### Action `m` — Merge as-is
+
+1. Create a follow-up GitHub issue (see Step 8) bundling all items.
+2. Post a reply on each open thread referencing the follow-up issue.
+3. Resolve all threads.
+4. Tell the user the PR is merge-ready with no code changes.
+
+### Direct item selection (e.g., "1,2", "all must-fix", "1,3-5")
+
+Address only the selected items. After completing them:
+
+1. Reply and resolve threads for addressed items.
+2. Ask whether remaining items should receive rationale replies, a follow-up issue, or be left as-is.
+
+### Combination actions
+
+Users can chain actions: e.g., `f+i` then `r7-9`. After the first action completes, check if there are remaining un-replied items and offer the next logical action.
+
+### General rules for all actions
 
 When addressing items, after completing each selected item (whether `MUST-FIX` or `DISCUSS`), reply to the original review comment explaining how it was addressed.
 If the user selects `DISCUSS` items to address, treat them the same as `MUST-FIX`: make the code change, reply, and resolve the thread.
@@ -186,6 +240,47 @@ Do not resolve a thread if the fix is still pending, if you are unsure whether t
 
 If the user explicitly asks to close out a `DISCUSS` or `SKIPPED` item, reply with the rationale and resolve the thread only when the conversation is actually complete.
 
+## Step 8: Create Follow-Up Issue (when requested)
+
+When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, create a GitHub issue that bundles deferred items:
+
+```bash
+gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<'EOF'
+## Deferred review feedback from PR #${PR_NUMBER}
+
+These items were triaged during review and deferred for follow-up.
+
+### Discuss items
+${DISCUSS_ITEMS}
+
+### Skipped items (non-trivial)
+${SKIPPED_ITEMS}
+
+---
+Original PR: ${PR_URL}
+EOF
+)"
+```
+
+Rules for follow-up issues:
+
+- Only include non-trivial `SKIPPED` items (skip pure duplicates and factually incorrect suggestions)
+- Include the original reviewer username and comment link for each item
+- Include enough context that someone can act on the issue without re-reading the full PR review
+- After creating the issue, reference it in thread replies (e.g., "Tracked in #NNN for follow-up")
+- Return the issue URL to the user
+
+## Step 9: Merge-Ready Signal
+
+After completing the chosen action (`f`, `f+i`, or `m`), tell the user the PR is ready to merge:
+
+```text
+All review threads resolved. PR is merge-ready.
+Follow-up issue: https://github.com/org/repo/issues/NNN (if created)
+```
+
+Do not automatically merge. Just signal readiness and let the user decide.
+
 # Example Usage
 
 ```text
@@ -214,11 +309,17 @@ SKIPPED (3):
 4. src/helper.rb:45 - Same nil guard issue (@greptile-apps[bot]) - duplicate of #1
 5. spec/helper_spec.rb:20 - "Consolidate assertions" (@claude[bot]) - test style preference
 
-Which items would you like me to address? (e.g., "1", "1,2", or "all must-fix")
-Optional: I can also post rationale replies for skipped/declined items (e.g., "reply 3,5" or "reply all skipped").
+Quick actions:
+  f     — Fix #1, reply-skip the rest, push and suggest merge
+  f+i   — Fix #1, create follow-up issue for #2, reply-skip #3-5
+  d     — Discuss specific items (e.g., "d2")
+  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped")
+  m     — Merge as-is, create follow-up issue for all items
+
+Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
 
-Note: Only show the "Optional: rationale replies" line when there are `SKIPPED` or declined `DISCUSS` items. Omit it when every item is `MUST-FIX`.
+Note: The `f` line dynamically shows which must-fix items will be fixed. The `f+i` line shows what will be fixed vs. deferred. When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection.
 
 # Important Notes
 
