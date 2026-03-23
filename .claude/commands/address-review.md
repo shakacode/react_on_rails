@@ -268,13 +268,11 @@ SKIPPED_ITEMS="$(cat <<'EOF'
 EOF
 )"
 
-# For `f+i`, keep this empty. For `m`, include a heading and deferred must-fix bullets.
-MUST_FIX_SECTION="$(cat <<'EOF'
-<MUST_FIX_SECTION_OR_EMPTY>
+# For `f+i`, keep this empty. For `m`, include deferred must-fix bullets.
+MUST_FIX_ITEMS="$(cat <<'EOF'
+<MUST_FIX_ITEMS_BULLETS_OR_EMPTY>
 EOF
 )"
-
-MUST_FIX_BLOCK="${MUST_FIX_SECTION}"
 
 DISCUSS_SECTION=""
 if [ -n "${DISCUSS_ITEMS}" ]; then
@@ -286,11 +284,16 @@ if [ -n "${SKIPPED_ITEMS}" ]; then
   printf -v SKIPPED_SECTION '### Skipped items (non-trivial)\n%s\n' "${SKIPPED_ITEMS}"
 fi
 
-if [ -z "${MUST_FIX_BLOCK}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
+MUST_FIX_SECTION=""
+if [ -n "${MUST_FIX_ITEMS}" ]; then
+  printf -v MUST_FIX_SECTION '### Must-fix items (deferred)\n%s\n' "${MUST_FIX_ITEMS}"
+fi
+
+if [ -z "${MUST_FIX_SECTION}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
   echo "No deferred items found; skip follow-up issue creation."
 else
   SECTION_CONTENT=""
-  for section in "${MUST_FIX_BLOCK}" "${DISCUSS_SECTION}" "${SKIPPED_SECTION}"; do
+  for section in "${MUST_FIX_SECTION}" "${DISCUSS_SECTION}" "${SKIPPED_SECTION}"; do
     [ -z "${section}" ] && continue
     if [ -n "${SECTION_CONTENT}" ]; then
       SECTION_CONTENT="${SECTION_CONTENT}"$'\n\n'
@@ -315,7 +318,7 @@ Rules for follow-up issues:
 
 - Only include non-trivial `SKIPPED` items (skip pure duplicates and factually incorrect suggestions)
 - For `f+i`, omit the must-fix section because must-fix items were addressed in the current PR
-- For `m`, include a must-fix section with heading `### Must-fix items (deferred)` and deferred blockers
+- For `m`, include deferred must-fix bullets; the template adds heading `### Must-fix items (deferred)`
 - Omit any section heading when its corresponding item list is empty
 - Include the original reviewer username and comment link for each item
 - Include enough context that someone can act on the issue without re-reading the full PR review
