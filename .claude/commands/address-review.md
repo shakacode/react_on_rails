@@ -137,7 +137,7 @@ Quick actions:
   f     — Fix must-fix items, reply/resolve skipped items, then decide discuss items
   f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
   d     — Discuss specific items before deciding (e.g., "d2,4")
-  r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped") without auto-resolving unless requested
+  r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss") without auto-resolving unless requested
   m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
@@ -155,7 +155,7 @@ Wait for the user to choose an action before proceeding.
 2. Reply to each addressed comment explaining the fix.
 3. Resolve the corresponding review threads.
 4. For `SKIPPED` items, post a brief rationale reply and resolve those threads.
-5. Do **not** auto-resolve `DISCUSS` items in `f`; prompt the user to either discuss (`d`) or defer with follow-up issue (`f+i`).
+5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss) or `f+i` (create follow-up issue).
 6. Commit, then ask for push confirmation before pushing.
 7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
 
