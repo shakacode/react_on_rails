@@ -155,11 +155,11 @@ Wait for the user to choose an action before proceeding.
 ### Action `f` — Fix and merge-ready
 
 1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, skip directly to discuss/skipped handling.
-2. Reply to each addressed comment explaining the fix.
-3. Resolve the corresponding review threads.
-4. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
-5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss + resolve`. If `f` starts with zero `MUST-FIX` items, show this discuss decision menu immediately.
-6. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
+2. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
+3. Reply to each addressed comment explaining the fix.
+4. Resolve the corresponding review threads.
+5. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
+6. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss + resolve`. If `f` starts with zero `MUST-FIX` items, show this discuss decision menu immediately.
 7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
 8. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to defer to a follow-up issue, or `r all discuss + resolve` to decline and close.").
 
@@ -170,16 +170,16 @@ Wait for the user to choose an action before proceeding.
 3. For each deferred item in the follow-up issue, post a reply in the original location referencing the issue (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 4. For trivial `SKIPPED` items that are not included in the follow-up issue (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads.
 5. If there are zero deferred items, skip issue creation and behave like `f`.
-6. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
+6. No additional commit is required unless later steps introduce local changes; if they do, commit and ask for push confirmation before pushing.
 7. Tell the user the PR is merge-ready.
 
 ### Action `d` — Discuss items
 
-Present the requested items with full context and ask the user for a decision on each. If the user enters bare `d` with no item numbers, present all `DISCUSS` items. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items.
+Present the requested items with full context and ask the user for a decision on each. If the user enters bare `d` with no item numbers, present all `DISCUSS` items. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). For approved items that produce local changes, use the same commit/push-before-reply ordering as action `f`. After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items.
 
 ### Action `r` — Reply with rationale
 
-Post rationale replies to the specified items explaining why they are being deferred or skipped. By default, do not resolve threads in `r` unless the user explicitly asks to resolve them (for example, `r3,5 + resolve`). Accept item numbers, ranges, or `r all skipped` / `r all discuss`. Do not support `r all must-fix`; `MUST-FIX` items must be fixed (`f`) or explicitly deferred (`f+i` / `m`).
+Post rationale replies to the specified items explaining why they are being deferred or skipped. By default, do not resolve threads in `r` unless the user explicitly asks to resolve them (for example, `r3,5 + resolve`). Accept only `SKIPPED`/`DISCUSS` item numbers, ranges, `r all skipped`, or `r all discuss`. If the selection includes any `MUST-FIX` item (including `r all must-fix`), do not post replies; direct the user to `f` or explicit deferral (`f+i` / `m`).
 
 ### Action `m` — Merge as-is
 
@@ -194,9 +194,9 @@ Post rationale replies to the specified items explaining why they are being defe
 
 Address only the selected items. After completing them:
 
-1. Reply and resolve threads for addressed items.
-2. Ask whether remaining items should receive rationale replies, a follow-up issue, or be left as-is.
-3. Before any push, ask for user confirmation.
+1. If selected items produced local changes, commit and ask for push confirmation before pushing (skip this step when there are no local changes).
+2. Reply and resolve threads for addressed items.
+3. Ask whether remaining items should receive rationale replies, a follow-up issue, or be left as-is.
 
 ### Combination actions
 
