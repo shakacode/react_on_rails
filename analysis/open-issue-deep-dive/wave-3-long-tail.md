@@ -4,8 +4,8 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 
 ## Resolved After Snapshot, Before Execution
 
-- #1887 Investigate the ability to make RSC Payload smaller by removing props and stack objects from it — closed as duplicate of #2522 on 2026-03-23.
-- #1754 Add open telemetry support for react_on_rails — closed as duplicate of #2156 on 2026-03-23.
+- #1887 Investigate the ability to make RSC Payload smaller by removing props and stack objects from it — closed as duplicate of #2522 on 2026-03-23 (canonical issue tracked in Wave 1).
+- #1754 Add open telemetry support for react_on_rails — closed as duplicate of #2156 on 2026-03-23 (canonical issue tracked in Wave 2).
 
 ## #2527 RSC migration docs: Minor unverified references
 
@@ -93,7 +93,7 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 - Labels: P3
 - Created: 2025-07-09
 - Context excerpt: We can slightly simplify code and improve shown errors by using the `cause` option of `Error` constructor. Original blocker #1745 is now merged, so this is unblocked. ...
-- Previous blocker: #1745 (resolved; merged 2025-07-14)
+- Blocked by: #1745 (resolved; merged 2025-07-14)
 - Posted question: Now that the blocker is resolved, should this be scheduled in the next implementation wave?
 
 ## #1692 Fix Coveralls setup
@@ -161,3 +161,4 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 - Context excerpt: # Motivation Because server rendering often uses `react_component_hash` to get the meta tags for SEO, we can't just flip a switch and turn off server rendering to debug the code in the browser. Here are the steps to debu ...
 - Posted question: Should this be batched with related docs issues in a single docs PR, or handled separately?
 - Triage note: Verify whether this legacy Node VM doc is still needed or superseded by newer Node Renderer guidance before scheduling.
+- Status: Pending verification before scheduling.
