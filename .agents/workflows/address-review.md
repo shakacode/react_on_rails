@@ -95,10 +95,10 @@ Execution flow when terminal access is available:
      ```
      Quick actions:
        f     — Fix must-fix items, reply-skip the rest, push and suggest merge
-       f+i   — Fix must-fix + create follow-up issue for discuss/skipped items
+       f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
        d     — Discuss specific items before deciding (e.g., "d2,4")
        r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped")
-       m     — Skip all fixes, create follow-up issue for everything, suggest merge as-is
+       m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
 
      Or pick items by number: "1,2", "all must-fix", "1,3-5"
      ```
@@ -110,7 +110,7 @@ Execution flow when terminal access is available:
    - **`f+i`**: Same as `f`, but also create a follow-up GitHub issue bundling discuss and non-trivial skipped items. Reference the issue in thread replies.
    - **`d`**: Present requested items with full context, ask for a decision on each. Approved → fix like must-fix. Declined → optionally reply with rationale.
    - **`r`**: Post rationale replies to specified items, resolve threads. Accepts numbers, ranges, or `r all skipped` / `r all discuss`.
-   - **`m`**: Create a follow-up issue for all items, reply on each thread referencing it, resolve all threads, signal merge-ready with no code changes.
+   - **`m`**: Create a follow-up issue for `MUST-FIX`, `DISCUSS`, and non-trivial `SKIPPED` items, reply on each thread referencing it, and resolve all threads. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
    - **Direct selection** (e.g., "1,2", "all must-fix", "1,3-5"): Address only selected items, then ask about remaining items.
    - Users can chain actions (e.g., `f+i` then `r7-9`).
    - Reply to each addressed review comment:
@@ -123,12 +123,13 @@ Execution flow when terminal access is available:
 
 8. Create follow-up issue (when `f+i` or `m` is chosen):
    - Use `gh issue create` with title "Follow-up: Review feedback from PR #N"
-   - Include discuss items and non-trivial skipped items with reviewer username and comment link
+   - Include must-fix items, discuss items, and non-trivial skipped items with reviewer username and comment link
    - Reference the issue in thread replies
    - Return the issue URL
 
 9. Merge-ready signal:
-   - After `f`, `f+i`, or `m` completes, tell me the PR is merge-ready
+   - After `f` or `f+i`, tell me the PR is merge-ready
+   - After `m`, only tell me the PR is merge-ready when no must-fix items were deferred; otherwise explicitly say it is not merge-ready
    - Show the follow-up issue URL if one was created
    - Do not auto-merge
 
@@ -146,10 +147,10 @@ SKIPPED (count):
 
 Quick actions:
   f     — Fix #N, reply-skip the rest, push and suggest merge
-  f+i   — Fix #N, create follow-up issue for #M, reply-skip rest
+  f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply-skip rest
   d     — Discuss specific items (e.g., "d2")
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped")
-  m     — Merge as-is, create follow-up issue for all items
+  m     — No code changes, create follow-up issue for must-fix/discuss/non-trivial skipped items
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ````

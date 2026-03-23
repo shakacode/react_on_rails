@@ -135,10 +135,10 @@ After the triage list, present a **quick-action menu**:
 ```text
 Quick actions:
   f     — Fix must-fix items, reply-skip the rest, push and suggest merge
-  f+i   — Fix must-fix + create follow-up issue for discuss/skipped items
+  f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
   d     — Discuss specific items before deciding (e.g., "d2,4")
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped")
-  m     — Skip all fixes, create follow-up issue for everything, suggest merge as-is
+  m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
@@ -174,10 +174,11 @@ Post rationale replies to the specified items explaining why they are being defe
 
 ### Action `m` — Merge as-is
 
-1. Create a follow-up GitHub issue (see Step 8) bundling all items.
+1. Create a follow-up GitHub issue (see Step 8) bundling `MUST-FIX`, `DISCUSS`, and non-trivial `SKIPPED` items.
 2. Post a reply on each open thread referencing the follow-up issue.
 3. Resolve all threads.
-4. Tell the user the PR is merge-ready with no code changes.
+4. If any `MUST-FIX` items were deferred, explicitly tell the user the PR is **not merge-ready** without an override decision.
+5. Only signal merge-ready with no code changes when there are zero deferred `MUST-FIX` items.
 
 ### Direct item selection (e.g., "1,2", "all must-fix", "1,3-5")
 
@@ -245,10 +246,13 @@ If the user explicitly asks to close out a `DISCUSS` or `SKIPPED` item, reply wi
 When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, create a GitHub issue that bundles deferred items:
 
 ```bash
-gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<'EOF'
+gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
 ## Deferred review feedback from PR #${PR_NUMBER}
 
 These items were triaged during review and deferred for follow-up.
+
+### Must-fix items
+${MUST_FIX_ITEMS}
 
 ### Discuss items
 ${DISCUSS_ITEMS}
@@ -272,14 +276,21 @@ Rules for follow-up issues:
 
 ## Step 9: Merge-Ready Signal
 
-After completing the chosen action (`f`, `f+i`, or `m`), tell the user the PR is ready to merge:
+After completing the chosen action (`f`, `f+i`, or `m`), report merge readiness status:
 
 ```text
 All review threads resolved. PR is merge-ready.
 Follow-up issue: https://github.com/org/repo/issues/NNN (if created)
 ```
 
-Do not automatically merge. Just signal readiness and let the user decide.
+If `m` deferred any `MUST-FIX` items, report:
+
+```text
+All review threads resolved and deferred to follow-up issue: https://github.com/org/repo/issues/NNN
+PR is NOT merge-ready because must-fix items were deferred.
+```
+
+Do not automatically merge. Signal readiness (or non-readiness) and let the user decide.
 
 # Example Usage
 
@@ -314,7 +325,7 @@ Quick actions:
   f+i   — Fix #1, create follow-up issue for #2, reply-skip #3-5
   d     — Discuss specific items (e.g., "d2")
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped")
-  m     — Merge as-is, create follow-up issue for all items
+  m     — No code changes, create follow-up issue, merge-ready only when no must-fix items are deferred
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
@@ -332,6 +343,7 @@ Note: The `f` line dynamically shows which must-fix items will be fixed. The `f+
 - When given a specific review URL, no need to ask for more information
 - **ALWAYS reply to comments after addressing them** to close the feedback loop
 - After triage, always offer to post rationale replies for selected `SKIPPED`/declined items, but only post them with explicit user approval
+- User selection of `f`, `f+i`, or `m` counts as explicit approval to post rationale replies and resolve deferred-item threads for that action
 - Resolve the review thread after replying when the concern is actually addressed and a thread ID is available
 - Default to real issues only. Do not spend a review cycle on optional polish unless the user explicitly asks for it
 - Triage comments before creating todos. Only `MUST-FIX` items should become todos by default
