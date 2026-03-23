@@ -15,11 +15,11 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 
 ## #2574 AGENTS.md changes trigger unnecessary CI workflow runs
 
-- Domain: testing
+- Domain: ci/tooling
 - Labels: ci-tooling, P3
 - Created: 2026-03-09
 - Context excerpt: ## Problem Pushing a docs-only commit to a PR re-triggers the full CI suite, even when the previous push already completed all checks successfully. ## What happened (PR #2569) ### Push 1: `dadc6524` (code changes — rake ...
-- Posted question: Should this run in the testing-quality maintenance wave, or be deferred behind release-critical runtime work?
+- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2572 Incorporate Everything Claude Code (ECC) patterns for enhanced AI-assisted development
 
