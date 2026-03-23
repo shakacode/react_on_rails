@@ -5,8 +5,8 @@
 - Open issues reviewed: 85
 - Open issues already linked to an open PR: 10
 - Open issues without an open PR at review time: 75
-- Wave 1 (this PR): 35 issues
-- Wave 2 + Wave 3 (stacked follow-up PRs): 40 issues
+- Wave 1 (this PR): 34 issues
+- Wave 2 + Wave 3 (stacked follow-up PRs): 41 issues
 - Triage comments posted: 85/85
 
 ## Existing Open PR Coverage
@@ -16,10 +16,10 @@
 - #2766 upload-assets endpoint copies all files into all target bundle directories, duplicating bundles -> #2768
 - #2614 Replace NDJSON envelope with length-prefixed protocol for Node→Ruby streaming -> #2615
 - #2526 RSC migration docs: Structural and framing improvements -> #2661
-- #2496 Tracking: Improve RSC/Pro demo DX, version sync, and safety checks -> #112, #2797
+- #2496 Tracking: Improve RSC/Pro demo DX, version sync, and safety checks -> shakacode/react_on_rails#2797, shakacode/react_on_rails-demos#112
 - #2457 Make bundle hash depend on asset content for fully immutable bundle directories -> #2534
-- #2347 Enhancement: Extensible bin/dev precompile pattern as alternative to precompile_hook -> #112
-- #1960 feat: add Lefthook for Git hooks management -> #32, #112
+- #2347 Enhancement: Extensible bin/dev precompile pattern as alternative to precompile_hook -> shakacode/react_on_rails-demos#112
+- #1960 feat: add Lefthook for Git hooks management -> shakacode/package_json#32, shakacode/react_on_rails-demos#112
 
 ## Wave Definitions
 
