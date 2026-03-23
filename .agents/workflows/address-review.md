@@ -15,7 +15,7 @@ If the assistant has terminal access with `gh`, it should execute the workflow d
 
 ## Prompt
 
-```text
+````text
 Act as a pull request review triage assistant.
 
 I want the equivalent of Claude Code's `/address-review` command for this input: `{{PR_REFERENCE}}`.
@@ -52,11 +52,11 @@ Execution flow when terminal access is available:
      `gh api repos/${REPO}/issues/comments/{COMMENT_ID} | jq '{body: .body, user: .user.login, html_url: .html_url}'`
    - Specific review:
      `gh api repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID} | jq '{id: .id, body: .body, state: .state, user: .user.login, html_url: .html_url}'`
-     `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id}]'`
+     `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, html_url: .html_url}]'`
    - If the review body contains actionable feedback, include it as an additional general comment. Review summary bodies cannot use the `/replies` endpoint; post those responses as general PR comments (see step 7).
    - Full PR:
      `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews | jq -s '[.[].[] | select((.body // "") != "") | {id: .id, type: "review_summary", body: .body, state: .state, user: .user.login, html_url: .html_url}]'`
-     `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "review", path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id}]'`
+     `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "review", path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, html_url: .html_url}]'`
      `gh api --paginate repos/${REPO}/issues/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "issue", body: .body, user: .user.login, html_url: .html_url}]'`
    - Include actionable review summary bodies from `/pulls/{PR_NUMBER}/reviews` as additional general comments. Like specific review bodies, they cannot use the `/replies` endpoint and must be answered as general PR comments (see step 7).
    - For all review-comment paths, fetch thread metadata and match `thread_id` by `node_id`:
@@ -88,18 +88,32 @@ Execution flow when terminal access is available:
    - Use the subject format: `"{file}:{line} - {comment_summary} (@{username})"`.
    - For general comments, extract the must-fix action from the body.
 
-6. Present triage and wait:
+6. Present triage and quick-action menu:
    - Use a single numbering sequence across all categories.
    - Show counts for `MUST-FIX`, `DISCUSS`, and `SKIPPED`.
-   - Ask which items I want addressed.
-   - If there are skipped or declined discuss items, also ask which ones should receive rationale replies.
+   - After the triage list, present this quick-action menu:
+     ```
+     Quick actions:
+      f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
+      f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
+      d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
+      r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
+      m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
+
+     Or pick items by number: "1,2", "all must-fix", "1,3-5"
+     ```
+   - Support range syntax: `N-M` expands to individual items (e.g., `3-5` → `3,4,5`).
+   - If a range is malformed, reversed, or out of bounds, show a validation message and ask the user to retry (do not silently coerce it).
    - Do not edit code yet.
 
-7. After I choose items:
-   - Address the selected items in code, tests, or docs.
-   - Run relevant checks when possible.
-   - If the user selects `DISCUSS` items to address, treat them the same as `MUST-FIX`: make the change, reply, and resolve the thread.
-   - If the user selects `SKIPPED` or declined `DISCUSS` items for rationale replies, post the rationale reply without making code changes. Resolve those threads only with explicit user approval.
+7. Execute the chosen action:
+   - **`f`**: Fix all must-fix items (if none exist, skip fix phase). If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow. Then reply/resolve addressed must-fix threads. If skipped items exist, ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d`, `f+i`, or `r all discuss + resolve`).
+   - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss and non-trivial skipped items; still reply/resolve trivial skipped items that are excluded from the follow-up issue. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient. If there are no deferred items, skip issue creation and behave like `f`. No additional commit is needed unless later steps introduce local changes.
+   - **`d`**: Present requested items with full context, ask for a decision on each. Bare `d` presents all DISCUSS items. Approved → fix like must-fix (use the same commit/push-before-reply ordering as `f` when code changes occur). Declined → optionally reply with rationale.
+   - **`r`**: Post rationale replies only for `SKIPPED`/`DISCUSS` items. Do not resolve threads unless the user explicitly asks to resolve them. If selection includes any `MUST-FIX` item (including `r all must-fix`), direct the user to `f` or explicit deferral (`f+i`/`m`) instead of replying.
+   - **`m`**: Create a follow-up issue for deferred items, reply in the original location for each deferred item (review-comment replies for inline comments; issue comments for general/review-summary comments), and resolve `DISCUSS`/`SKIPPED` threads when threads exist. Keep deferred `MUST-FIX` threads open by default unless the user explicitly asks to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
+   - **Direct selection** (e.g., "1,2", "all must-fix", "1,3-5"): Address only selected items; if code changes were made, commit/push with confirmation before replying/resolving; then ask about remaining items.
+   - Users can chain actions (e.g., `f+i` then `r7-9`).
    - Reply to each addressed review comment:
      - Issue comments: `gh api repos/${REPO}/issues/{PR_NUMBER}/comments -X POST -f body="<response>"`
      - Review comment replies: `gh api repos/${REPO}/pulls/{PR_NUMBER}/comments/{COMMENT_ID}/replies -X POST -f body="<response>"`
@@ -107,6 +121,25 @@ Execution flow when terminal access is available:
    - Resolve threads only when the issue is actually handled or explicitly declined with my approval:
      `gh api graphql -f query='mutation($threadId:ID!) { resolveReviewThread(input:{threadId:$threadId}) { thread { id isResolved } } }' -f threadId="<THREAD_ID>"`
    - Do not resolve anything still in progress or uncertain.
+   - Ask for push confirmation before running `git push`.
+
+8. Create follow-up issue (when `f+i` or `m` is chosen):
+   - Use `gh issue create --repo "${REPO}"` with title "Follow-up: Review feedback from PR #N"
+   - For `f+i`, include discuss items and non-trivial skipped items (must-fix is already addressed)
+   - For `m`, include deferred must-fix items, discuss items, and non-trivial skipped items
+   - Keep issue body structure consistent: use an optional `### Must-fix items (deferred)` section (for `m` only), then `### Discuss items`, then `### Skipped items (non-trivial)`, plus the original PR link at the bottom
+   - Omit any section heading whose content bucket is empty
+   - Reference the issue in thread replies
+   - Return the issue URL
+
+9. Merge-ready signal:
+   - After `f`, tell me the PR is merge-ready only when no `DISCUSS` items remain unresolved
+   - After `f+i`, tell me the PR is merge-ready
+   - After `m`, only tell me the PR is merge-ready when no must-fix items were deferred; otherwise explicitly say it is not merge-ready
+   - After direct selection, do not signal merge-ready automatically; first evaluate remaining `MUST-FIX`/`DISCUSS` items and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`
+   - After `d` or `r`, if unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready automatically; re-offer `f`, `f+i`, `d`, `r`, or `m`
+   - Show the follow-up issue URL if one was created
+   - Do not auto-merge
 
 Output format for the triage:
 
@@ -120,7 +153,12 @@ DISCUSS (count):
 SKIPPED (count):
 3. item - short reason
 
-Then ask:
-- Which items should I address?
-- Optional: which skipped or declined items should get rationale replies?
-```
+Quick actions:
+  f     — Fix #N, then confirm whether to reply/resolve skipped items before deciding discuss items
+  f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply/resolve trivial skipped rest
+  d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
+  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
+  m     — No code changes, create follow-up issue for must-fix/discuss/non-trivial skipped items
+
+Or pick items by number: "1,2", "all must-fix", "1,3-5"
+````

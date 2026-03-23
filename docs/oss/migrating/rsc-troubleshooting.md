@@ -52,8 +52,9 @@ export default function ClientButton() {
 'use client';
 
 import { useState } from 'react';
+import ReactOnRails from 'react-on-rails';
 
-export default function ClientForm({ csrfToken }) {
+export default function ClientForm() {
   const [name, setName] = useState('');
 
   async function handleSubmit(e) {
@@ -62,7 +63,7 @@ export default function ClientForm({ csrfToken }) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken,
+        'X-CSRF-Token': ReactOnRails.authenticityToken(),
       },
       body: JSON.stringify({ name }),
     });
@@ -80,9 +81,8 @@ export default function ClientForm({ csrfToken }) {
 ```
 
 ```erb
-<%# ERB view — pass the CSRF token so the client component can make authenticated requests %>
-<%= stream_react_component("ClientForm",
-      props: { csrfToken: form_authenticity_token }) %>
+<%# ERB view %>
+<%= stream_react_component("ClientForm") %>
 ```
 
 > **Note:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controller endpoints for all mutations.
@@ -421,48 +421,60 @@ import { useState } from 'react';
 
 ### Server Waterfalls
 
-The most common performance regression. Sequential `emit.call` in the Ruby block creates waterfalls:
+The most common performance regression. Sequential queries in the Rails controller block rendering:
 
-```erb
-<%# BAD: Each computation blocks the next (750ms total) %>
-<%= stream_react_component_with_async_props("Page",
-      props: { title: "Page" }) do |emit|
-  user = User.find(params[:user_id])        # 200ms
-  emit.call("user", user.as_json)
-  stats = Stats.for_user(user.id)           # 300ms (waits for user)
-  emit.call("stats", stats.as_json)
-  posts = Post.where(user_id: user.id).limit(10)  # 250ms (waits because calls are sequential)
-  emit.call("posts", posts.as_json)
-end %>
+```ruby
+# BAD: Each query blocks the next (750ms total)
+def show
+  @user = User.find(params[:user_id])        # 200ms
+  @stats = Stats.for_user(@user.id)          # 300ms (waits for user)
+  @posts = Post.where(user_id: @user.id).limit(10)  # 250ms (sequential)
+  stream_view_containing_react_components(template: "pages/show")
+end
 ```
 
 **Fix 1:** Use Ruby threads for independent data sources:
 
-```erb
-<%# GOOD: Fetch in parallel, then emit results serially %>
-<%= stream_react_component_with_async_props("Page",
-      props: { title: "Page" }) do |emit|
+```ruby
+# GOOD: Fetch independent data in parallel
+def show
+  user_id = params[:user_id]
   results = {}
   threads = []
-  user_id = params[:user_id]
-  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { results[:user] = User.find(user_id).as_json } }
-  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { results[:stats] = Stats.for_user(user_id).as_json } }
-  threads << Thread.new { ActiveRecord::Base.connection_pool.with_connection { results[:posts] = Post.where(user_id: user_id).limit(10).as_json } }
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      results[:user] = User.find(user_id).as_json
+    end
+  end
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      results[:stats] = Stats.for_user(user_id).as_json
+    end
+  end
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      results[:posts] = Post.where(user_id: user_id).limit(10).as_json
+    end
+  end
   threads.each(&:join)
-  # Emit after all threads complete — avoids concurrent writes to the stream
-  results.each { |key, val| emit.call(key.to_s, val) }
-end %>
+  @page_props = { title: "Page" }.merge(results)
+  stream_view_containing_react_components(template: "pages/show")
+end
 ```
 
-**Fix 2:** Send fast data as sync props so the shell renders immediately, and stream slow data as async props:
+```erb
+<%# GOOD: All data fetched in parallel, rendered with streaming SSR %>
+<%= stream_react_component("Page", props: @page_props) %>
+```
+
+**Fix 2:** Prefetch critical data in the controller and pass all data as props:
 
 ```erb
-<%# GOOD: Critical data renders instantly, secondary data streams in %>
-<%= stream_react_component_with_async_props("Page",
-      props: { user: current_user.as_json }) do |emit|
-  emit.call("stats", Stats.for_user(current_user.id).as_json)
-  emit.call("posts", Post.where(user_id: current_user.id).limit(10).as_json)
-end %>
+<%# All data is passed as props — stream_react_component handles progressive HTML delivery %>
+<%= stream_react_component("Page",
+      props: { user: current_user.as_json(only: [:id, :name]),
+               stats: Stats.for_user(current_user.id).as_json,
+               posts: Post.where(user_id: current_user.id).limit(10).as_json }) %>
 ```
 
 See [Data Fetching Migration](rsc-data-fetching.md#avoiding-server-side-waterfalls) for detailed patterns.
@@ -507,12 +519,14 @@ In React on Rails, mutations go through Rails controller endpoints rather than S
 ```jsx
 // UserForm.test.jsx
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import ReactOnRails from 'react-on-rails';
 import UserForm from './UserForm';
 
 it('submits to the Rails endpoint', async () => {
   global.fetch = jest.fn(() => Promise.resolve({ ok: true }));
+  jest.spyOn(ReactOnRails, 'authenticityToken').mockReturnValue('test-token');
 
-  render(<UserForm csrfToken="test-token" />);
+  render(<UserForm />);
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Alice' } });
   fireEvent.click(screen.getByText('Submit'));
 

@@ -47,7 +47,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 
 ## #2409 Align spec/dummy/Procfile.dev SERVER_BUNDLE_ONLY value with template convention
 
-- Domain: pro/rsc integration
+- Domain: developer-experience
 - Labels: enhancement, P3
 - Created: 2026-02-14
 - Context excerpt: ## Description The `spec/dummy/Procfile.dev` uses `SERVER_BUNDLE_ONLY=true` while the project template at `lib/generators/react_on_rails/templates/base/base/Procfile.dev` uses `SERVER_BUNDLE_ONLY=yes`. Both values work e ...
@@ -85,14 +85,6 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Context excerpt: ## Problem Currently, setting up the development environment requires running multiple commands in different directories: ```bash # Root directory pnpm install bundle install # Dummy app cd spec/dummy pnpm install bundle ...
 - Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
 
-## #2182 Add support for react 19.2.1 and make a plan for implementing **Partial Pre-rendering** feature
-
-- Domain: discussion/rfc
-- Labels: P3
-- Created: 2025-12-08
-- Triage note: Issue body is template boilerplate with no concrete implementation details; relabeled from `P2` to `P3` on 2026-03-23 and kept in Wave 2 until scope is rewritten.
-- Posted question: Should this remain parked until the issue is rewritten with concrete scope and acceptance criteria?
-
 ## #2184 Remove "Setup Node with V8 Crash Retry" action
 
 - Domain: ci/tooling
@@ -100,6 +92,14 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Created: 2025-12-08
 - Context excerpt: It only seems to do something when using `yarn` https://github.com/shakacode/react_on_rails/blob/97fde8431e83631399dfb1df1f673b5c468dfd2a/.github/actions/setup-node-with-retry/action.yml#L43 but after #2121 we don't anym ...
 - Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
+
+## #2182 Add support for react 19.2.1 and make a plan for implementing **Partial Pre-rendering** feature
+
+- Domain: discussion/rfc
+- Labels: P3
+- Created: 2025-12-08
+- Triage note: Issue body is template boilerplate with no concrete implementation details; currently labeled `P3` in this snapshot and kept in Wave 2 until scope is rewritten.
+- Posted question: Should this remain parked until the issue is rewritten with concrete scope and acceptance criteria?
 
 ## #2180 Use pnpm catalogs to decrease duplication between `package.json` files
 
@@ -114,7 +114,6 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Domain: ci/tooling
 - Labels: P3
 - Created: 2025-12-04
-- Context excerpt: Ensure to mitigate CI runtime noise.
 - Triage note: Inferred scope is adding reproducible SSR/client performance benchmarks with CI-noise controls and stable baselines before gating changes.
 - Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
@@ -124,11 +123,11 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Labels: P3
 - Created: 2025-12-01
 - Context excerpt: ## Summary Some tests in the codebase use indirect `call_count` counter patterns to verify method invocations. These patterns are ambiguous because they: 1. **Prove absence indirectly** - asserting a count is lower doesn ...
-- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
+- Posted question: Should this run in the testing-quality maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2156 Add OpenTelemetry support for Node Renderer
 
-- Domain: pro/rsc integration
+- Domain: pro/observability
 - Labels: P3
 - Created: 2025-12-01
 - Context excerpt: ## Summary Add OpenTelemetry instrumentation to the React on Rails Pro Node Renderer to enable distributed tracing and observability. ## Required Dependencies ```json "@opentelemetry/exporter-trace-otlp-http": "^0.203.0" ...
