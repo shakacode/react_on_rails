@@ -82,8 +82,10 @@ This is the recommended data fetching pattern for React on Rails because:
 <%= stream_react_component("ProductPage",
       props: { name: product.name,
                price: product.price,
-               reviews: product.reviews.includes(:author).as_json,
-               recommendations: product.recommended_products.as_json }) %>
+               reviews: product.reviews.includes(:author)
+                          .as_json(only: [:id, :text, :rating]),
+               recommendations: product.recommended_products
+                          .as_json(only: [:id, :name, :price]) }) %>
 ```
 
 > **See also:** [React on Rails Pro streaming SSR](../../pro/streaming-ssr.md) for setup instructions and configuration options.
@@ -130,7 +132,7 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 5. The component renders with zero JavaScript cost as a Server Component
 
 > **HTML streaming vs. progressive data streaming:** With synchronous props, all data is loaded in Rails before rendering begins. The streaming here is _HTML streaming_ — React sends rendered HTML to the browser as it processes the component tree, rather than waiting for the entire page to finish rendering. For progressive data streaming where slow data sources resolve independently via Suspense boundaries, see [Streaming SSR](../../pro/streaming-ssr.md) (React on Rails Pro).
-
+>
 > **More details:** For setup instructions and configuration options, see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
 
 ## Migrating from React Query / TanStack Query
@@ -405,8 +407,10 @@ Fetch all data in the controller and pass it as props. `stream_react_component` 
 <%= stream_react_component("ProductPage",
       props: { name: product.name,
                price: product.price,
-               reviews: product.reviews.includes(:author).as_json,
-               related: product.recommended_products.as_json }) %>
+               reviews: product.reviews.includes(:author)
+                          .as_json(only: [:id, :text, :rating]),
+               related: product.recommended_products
+                          .as_json(only: [:id, :name, :price]) }) %>
 ```
 
 ```jsx
