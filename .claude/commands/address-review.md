@@ -259,6 +259,26 @@ When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, crea
 # For `f+i`, keep this empty. For `m`, include a heading and deferred must-fix bullets.
 MUST_FIX_SECTION="${MUST_FIX_SECTION:-}"
 
+DISCUSS_SECTION=""
+if [ -n "${DISCUSS_ITEMS}" ]; then
+  DISCUSS_SECTION=$(cat <<EOF
+### Discuss items
+${DISCUSS_ITEMS}
+
+EOF
+)
+fi
+
+SKIPPED_SECTION=""
+if [ -n "${SKIPPED_ITEMS}" ]; then
+  SKIPPED_SECTION=$(cat <<EOF
+### Skipped items (non-trivial)
+${SKIPPED_ITEMS}
+
+EOF
+)
+fi
+
 if [ -z "${MUST_FIX_SECTION}${DISCUSS_ITEMS}${SKIPPED_ITEMS}" ]; then
   echo "No deferred items found; skip follow-up issue creation."
 else
@@ -268,12 +288,7 @@ else
 These items were triaged during review and deferred for follow-up.
 
 ${MUST_FIX_SECTION}
-
-### Discuss items
-${DISCUSS_ITEMS}
-
-### Skipped items (non-trivial)
-${SKIPPED_ITEMS}
+${DISCUSS_SECTION}${SKIPPED_SECTION}
 
 ---
 Original PR: https://github.com/${REPO}/pull/${PR_NUMBER}
