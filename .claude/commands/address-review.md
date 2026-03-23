@@ -170,7 +170,7 @@ Wait for the user to choose an action before proceeding.
 3. For each deferred item in the follow-up issue, post a reply in the original location referencing the issue (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient.
 4. For trivial `SKIPPED` items that are not included in the follow-up issue (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads.
 5. If there are zero deferred items, skip issue creation and behave like `f`.
-6. Commit, then ask for push confirmation before pushing.
+6. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
 7. Tell the user the PR is merge-ready.
 
 ### Action `d` — Discuss items
