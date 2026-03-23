@@ -7,7 +7,7 @@
 - Open issues without an open PR at review time: 75
 - Wave 1 (this PR): 34 issues
 - Wave 2 + Wave 3 (stacked follow-up PRs): 41 issues
-- Triage comments posted: 85/85
+- Triage comments posted at snapshot time: 85/85
 
 ## Existing Open PR Coverage
 - #2802 RSC migration docs: fix fictional API names, missing associations, form_with, and CSRF token patterns -> #2803
