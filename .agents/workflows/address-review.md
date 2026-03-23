@@ -94,10 +94,10 @@ Execution flow when terminal access is available:
    - After the triage list, present this quick-action menu:
      ```
      Quick actions:
-       f     — Fix must-fix items, reply-skip the rest, push and suggest merge
+       f     — Fix must-fix items, reply-skip skipped items, then decide discuss items
        f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
        d     — Discuss specific items before deciding (e.g., "d2,4")
-       r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped")
+       r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped") without auto-resolving unless requested
        m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
 
      Or pick items by number: "1,2", "all must-fix", "1,3-5"
@@ -106,10 +106,10 @@ Execution flow when terminal access is available:
    - Do not edit code yet.
 
 7. Execute the chosen action:
-   - **`f`**: Fix all must-fix items, reply-skip discuss/skipped items, resolve all threads, commit, push, signal merge-ready.
-   - **`f+i`**: Same as `f`, but also create a follow-up GitHub issue bundling discuss and non-trivial skipped items. Reference the issue in thread replies.
+   - **`f`**: Fix all must-fix items, resolve addressed must-fix threads, reply/resolve skipped items, and keep discuss items for an explicit follow-up decision (`d` or `f+i`). Commit, ask for push confirmation, then push.
+   - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss and non-trivial skipped items. If there are no deferred items, skip issue creation and behave like `f`.
    - **`d`**: Present requested items with full context, ask for a decision on each. Approved → fix like must-fix. Declined → optionally reply with rationale.
-   - **`r`**: Post rationale replies to specified items, resolve threads. Accepts numbers, ranges, or `r all skipped` / `r all discuss`.
+   - **`r`**: Post rationale replies to specified items. Do not resolve threads unless the user explicitly asks to resolve them.
    - **`m`**: Create a follow-up issue for deferred items, reply on each thread referencing it, and resolve `DISCUSS`/`SKIPPED` threads. Keep deferred `MUST-FIX` threads open by default unless the user explicitly asks to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
    - **Direct selection** (e.g., "1,2", "all must-fix", "1,3-5"): Address only selected items, then ask about remaining items.
    - Users can chain actions (e.g., `f+i` then `r7-9`).
@@ -120,6 +120,7 @@ Execution flow when terminal access is available:
    - Resolve threads only when the issue is actually handled or explicitly declined with my approval:
      `gh api graphql -f query='mutation($threadId:ID!) { resolveReviewThread(input:{threadId:$threadId}) { thread { id isResolved } } }' -f threadId="<THREAD_ID>"`
    - Do not resolve anything still in progress or uncertain.
+   - Ask for push confirmation before running `git push`.
 
 8. Create follow-up issue (when `f+i` or `m` is chosen):
    - Use `gh issue create` with title "Follow-up: Review feedback from PR #N"
@@ -129,7 +130,8 @@ Execution flow when terminal access is available:
    - Return the issue URL
 
 9. Merge-ready signal:
-   - After `f` or `f+i`, tell me the PR is merge-ready
+   - After `f`, tell me the PR is merge-ready only when no `DISCUSS` items remain unresolved
+   - After `f+i`, tell me the PR is merge-ready
    - After `m`, only tell me the PR is merge-ready when no must-fix items were deferred; otherwise explicitly say it is not merge-ready
    - Show the follow-up issue URL if one was created
    - Do not auto-merge
@@ -147,10 +149,10 @@ SKIPPED (count):
 3. item - short reason
 
 Quick actions:
-  f     — Fix #N, reply-skip the rest, push and suggest merge
+  f     — Fix #N, reply-skip skipped items, then decide discuss items
   f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply-skip rest
-  d     — Discuss specific items (e.g., "d2")
-  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped")
+  d     — Discuss specific items (e.g., "d2,4")
+  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped") without auto-resolving
   m     — No code changes, create follow-up issue for must-fix/discuss/non-trivial skipped items
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"

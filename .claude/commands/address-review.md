@@ -134,10 +134,10 @@ After the triage list, present a **quick-action menu**:
 
 ```text
 Quick actions:
-  f     — Fix must-fix items, reply-skip the rest, push and suggest merge
+  f     — Fix must-fix items, reply-skip skipped items, then decide discuss items
   f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
   d     — Discuss specific items before deciding (e.g., "d2,4")
-  r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped")
+  r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped") without auto-resolving unless requested
   m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
@@ -154,15 +154,19 @@ Wait for the user to choose an action before proceeding.
 1. Address all `MUST-FIX` items (make code changes, run checks).
 2. Reply to each addressed comment explaining the fix.
 3. Resolve the corresponding review threads.
-4. For all `DISCUSS` and `SKIPPED` items, post a brief rationale reply (e.g., "Deferring — not required for this change") and resolve those threads.
-5. Commit, push, and tell the user the PR is merge-ready.
+4. For `SKIPPED` items, post a brief rationale reply and resolve those threads.
+5. Do **not** auto-resolve `DISCUSS` items in `f`; prompt the user to either discuss (`d`) or defer with follow-up issue (`f+i`).
+6. Commit, then ask for push confirmation before pushing.
+7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
 
 ### Action `f+i` — Fix, follow-up issue, and merge-ready
 
 1. Do everything in `f` for `MUST-FIX` items.
 2. Create a **follow-up GitHub issue** (see Step 8) bundling all `DISCUSS` and non-trivial `SKIPPED` items.
 3. For each deferred item, post a reply referencing the follow-up issue and resolve the thread.
-4. Commit, push, and tell the user the PR is merge-ready.
+4. If there are zero deferred items, skip issue creation and behave like `f`.
+5. Commit, then ask for push confirmation before pushing.
+6. Tell the user the PR is merge-ready.
 
 ### Action `d` — Discuss items
 
@@ -170,7 +174,7 @@ Present the requested items with full context and ask the user for a decision on
 
 ### Action `r` — Reply with rationale
 
-Post rationale replies to the specified items explaining why they are being deferred or skipped. Resolve the threads after replying. Accept item numbers, ranges, or `r all skipped` / `r all discuss`.
+Post rationale replies to the specified items explaining why they are being deferred or skipped. By default, do not resolve threads in `r` unless the user explicitly asks to resolve them (for example, `r3,5 + resolve`). Accept item numbers, ranges, or `r all skipped` / `r all discuss`.
 
 ### Action `m` — Merge as-is
 
@@ -187,6 +191,7 @@ Address only the selected items. After completing them:
 
 1. Reply and resolve threads for addressed items.
 2. Ask whether remaining items should receive rationale replies, a follow-up issue, or be left as-is.
+3. Before any push, ask for user confirmation.
 
 ### Combination actions
 
@@ -323,10 +328,10 @@ SKIPPED (3):
 5. spec/helper_spec.rb:20 - "Consolidate assertions" (@claude[bot]) - test style preference
 
 Quick actions:
-  f     — Fix #1, reply-skip the rest, push and suggest merge
+  f     — Fix #1, reply-skip skipped items, then decide discuss items
   f+i   — Fix #1, create follow-up issue for #2, reply-skip #3-5
-  d     — Discuss specific items (e.g., "d2")
-  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped")
+  d     — Discuss specific items (e.g., "d2,4")
+  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped") without auto-resolving
   m     — No code changes, create follow-up issue, merge-ready only when no must-fix items are deferred
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
@@ -346,6 +351,7 @@ Note: The `f` line dynamically shows which must-fix items will be fixed. The `f+
 - **ALWAYS reply to comments after addressing them** to close the feedback loop
 - After triage, always offer to post rationale replies for selected `SKIPPED`/declined items, but only post them with explicit user approval
 - User selection of `f`, `f+i`, or `m` counts as explicit approval to post rationale replies and resolve deferred-item threads for that action
+- Always request push confirmation from the user before running `git push`
 - Resolve the review thread after replying when the concern is actually addressed and a thread ID is available
 - Default to real issues only. Do not spend a review cycle on optional polish unless the user explicitly asks for it
 - Triage comments before creating todos. Only `MUST-FIX` items should become todos by default
