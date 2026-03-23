@@ -6,13 +6,13 @@ React on Rails uses [ExecJS](https://github.com/rails/execjs) as the default ser
 
 ExecJS evaluates your server bundle in an isolated JavaScript context. It calls your render function synchronously, collects the resulting HTML string, and returns it to Rails. This synchronous model is the root of most limitations — ExecJS cannot wait for asynchronous operations to complete.
 
-By default, ExecJS uses the Node.js runtime. You can also use [mini_racer](https://github.com/rubyjs/mini_racer) (a V8 isolate). Both runtimes share the same synchronous limitations described below. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes.
+ExecJS auto-detects the best available runtime via its `best_available` method, checking runtimes such as mini_racer, Bun, and Node.js. The exact priority can vary by ExecJS version (for example, Bun support was added in newer releases), so verify against the version you're running. Node.js is not guaranteed: ExecJS may choose a higher-priority runtime when one is available. You can override runtime selection with the `EXECJS_RUNTIME` environment variable. All runtimes share the same synchronous limitations described below. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for available runtimes.
 
 ## Timer and Async Limitations
 
-### `setTimeout` and `setInterval`
+### Timer Functions (`setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`)
 
-ExecJS does not support `setTimeout`, `setInterval`, `clearTimeout`, or `clearInterval`. These functions rely on an event loop, which ExecJS does not provide. React on Rails injects stub functions that silently replace these timer APIs. With `trace: true` in your configuration, the stubs log a warning to `console.error` with a stack trace; otherwise, calls are silently dropped.
+ExecJS does not support `setTimeout`, `setInterval`, `clearTimeout`, or `clearInterval`. These functions rely on an event loop, which ExecJS does not provide. React on Rails injects stubs for `setTimeout`, `setInterval`, and `clearTimeout` that silently drop calls to those APIs. `clearInterval` is **not** stubbed by React on Rails, so behavior depends on the ExecJS runtime: in `mini_racer` it can raise a `ReferenceError`, while Node-based runtimes provide `clearInterval`. With `trace: true` in your configuration, the three stubs log a warning to `console.error` with a stack trace; otherwise, calls are silently dropped.
 
 **What you'll see:** Timer callbacks are never executed. If `trace` is enabled, you'll see messages like:
 
@@ -105,7 +105,7 @@ This is because mini_racer's V8 isolate does not include the `TextEncoder` and `
 
 ## Pool Size Constraints
 
-On MRI Ruby, ExecJS uses a single-threaded JavaScript runtime, so `server_renderer_pool_size` must stay at 1 to avoid deadlocks. JRuby users can increase the pool size for concurrent rendering.
+On MRI Ruby, `server_renderer_pool_size` must stay at 1 to avoid deadlocks. This is because the combination of ExecJS contexts, the `ConnectionPool` gem, and MRI's threading model can cause deadlocks when multiple threads contend for JavaScript contexts (see [#1438](https://github.com/shakacode/react_on_rails/issues/1438)). JRuby users can increase the pool size for concurrent rendering thanks to JRuby's true multi-threading support.
 
 ```ruby
 # config/initializers/react_on_rails.rb

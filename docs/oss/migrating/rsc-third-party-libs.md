@@ -152,8 +152,9 @@ All components include `'use client'` directives. Cannot use compound components
 'use client';
 
 import { useState } from 'react';
+import ReactOnRails from 'react-on-rails';
 
-export default function UserForm({ csrfToken }) {
+export default function UserForm() {
   const [name, setName] = useState('');
 
   async function handleSubmit(e) {
@@ -162,7 +163,7 @@ export default function UserForm({ csrfToken }) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken,
+        'X-CSRF-Token': ReactOnRails.authenticityToken(),
       },
       body: JSON.stringify({ user: { name } }),
     });
@@ -180,19 +181,20 @@ export default function UserForm({ csrfToken }) {
 ```
 
 ```erb
-<%# ERB view — pass the CSRF token so the client component can make authenticated requests %>
-<%= stream_react_component("UserForm",
-      props: { csrfToken: form_authenticity_token }) %>
+<%# ERB view %>
+<%= stream_react_component("UserForm") %>
 ```
 
 **Pattern 2: Standard Rails form (no JavaScript required)**
 
 ```erb
-<%= form_with(model: @user, url: users_path) do |f| %>
+<%= form_with(model: @user, url: users_path, local: true) do |f| %>
   <%= f.text_field :name %>
   <%= f.submit "Submit" %>
 <% end %>
 ```
+
+> **Note:** `local: true` is required for Rails 5.1–6.0, where `form_with` defaults to `remote: true` (Ajax). Rails 6.1+ defaults to `local: true`, so it can be omitted on newer versions.
 
 Both patterns leverage Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
 
@@ -240,12 +242,12 @@ All major date libraries work in Server Components since they are pure utility f
 
 ## Data Fetching Libraries
 
-| Library                            | RSC Pattern                                                                                                      | Notes                                                                                                |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **React on Rails Pro async props** | Recommended for React on Rails. Rails streams props incrementally via `stream_react_component_with_async_props`. | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
-| **TanStack Query**                 | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`.               | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
-| **Apollo Client**                  | Server-side queries in Server Components, `ApolloProvider` for client queries.                                   | Requires `'use client'` wrapper for provider.                                                        |
-| **SWR**                            | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props.                         | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
+| Library                          | RSC Pattern                                                                                        | Notes                                                                                                |
+| -------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **React on Rails Pro streaming** | Recommended for React on Rails. Rails streams components via `stream_react_component`.             | See [Data Fetching Migration](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for details. |
+| **TanStack Query**               | Prefetch on server with `queryClient.prefetchQuery()`, hydrate on client with `HydrationBoundary`. | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
+| **Apollo Client**                | Server-side queries in Server Components, `ApolloProvider` for client queries.                     | Requires `'use client'` wrapper for provider.                                                        |
+| **SWR**                          | Client-only hooks. Use `fallbackData` pattern: fetch in Server Component, pass as props.           | See [Data Fetching Migration](rsc-data-fetching.md) for details.                                     |
 
 ## Internationalization
 
@@ -260,7 +262,7 @@ In React on Rails, authentication is handled by Rails (Devise, OmniAuth, etc.) b
 
 ```ruby
 # Rails controller handles auth, passes user to component
-stream_react_component("Dashboard", props: { user: current_user.as_json })
+stream_react_component("Dashboard", props: { user: current_user.as_json(only: [:id, :name, :email]) })
 ```
 
 This is a simpler model than client-side auth libraries -- Rails middleware handles sessions, CSRF protection, and authorization before any React code executes. See the [auth provider pattern](rsc-context-and-state.md#auth-provider) for passing auth data to nested Client Components via Context.
@@ -353,18 +355,18 @@ Use `client-only` for:
 
 ## Library Compatibility Decision Matrix
 
-| Category          | RSC-Native Choices                                                  | Requires `'use client'` Wrapper              | Avoid / Migrate Away From                          |
-| ----------------- | ------------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
-| **Styling**       | Tailwind, CSS Modules, Panda CSS                                    | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
-| **UI Components** | shadcn/ui, Radix (non-interactive)                                  | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
-| **Forms**         | Rails controller endpoints + standard forms                         | React Hook Form, TanStack Form               | Formik (less maintained)                           |
-| **Animation**     | CSS animations, Tailwind animate                                    | Framer Motion/Motion, React Spring           | --                                                 |
-| **Charts**        | Nivo (SSR support)                                                  | Recharts, Tremor, Chart.js                   | --                                                 |
-| **Data Fetching** | React on Rails Pro async props, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | --                                                 |
-| **State**         | Server Component props, `React.cache`                               | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
-| **i18n**          | Rails I18n + react-intl                                             | react-i18next, i18next                       | --                                                 |
-| **Auth**          | Rails auth (Devise, etc.) via controller props                      | --                                           | --                                                 |
-| **Date Utils**    | date-fns, dayjs (pure functions)                                    | --                                           | Moment.js (not tree-shakable)                      |
+| Category          | RSC-Native Choices                                                | Requires `'use client'` Wrapper              | Avoid / Migrate Away From                          |
+| ----------------- | ----------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| **Styling**       | Tailwind, CSS Modules, Panda CSS                                  | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
+| **UI Components** | shadcn/ui, Radix (non-interactive)                                | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
+| **Forms**         | Rails controller endpoints + standard forms                       | React Hook Form, TanStack Form               | Formik (less maintained)                           |
+| **Animation**     | CSS animations, Tailwind animate                                  | Framer Motion/Motion, React Spring           | --                                                 |
+| **Charts**        | Nivo (SSR support)                                                | Recharts, Tremor, Chart.js                   | --                                                 |
+| **Data Fetching** | React on Rails Pro streaming, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | --                                                 |
+| **State**         | Server Component props, `React.cache`                             | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
+| **i18n**          | Rails I18n + react-intl                                           | react-i18next, i18next                       | --                                                 |
+| **Auth**          | Rails auth (Devise, etc.) via controller props                    | --                                           | --                                                 |
+| **Date Utils**    | date-fns, dayjs (pure functions)                                  | --                                           | Moment.js (not tree-shakable)                      |
 
 ## Next Steps
 

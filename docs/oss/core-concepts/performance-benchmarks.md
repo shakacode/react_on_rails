@@ -10,7 +10,7 @@ The default ExecJS renderer evaluates JavaScript synchronously inside a single-t
 
 | Metric            | ExecJS (mini_racer)           | ExecJS (Node.js runtime)      | Node Renderer (Pro)        |
 | ----------------- | ----------------------------- | ----------------------------- | -------------------------- |
-| Architecture      | V8 isolate in Ruby process    | Persistent subprocess via IPC | Persistent Node.js workers |
+| Architecture      | V8 isolate in Ruby process    | New process per eval call     | Persistent Node.js workers |
 | Concurrency (MRI) | Single-threaded (pool size 1) | Single-threaded (pool size 1) | Multi-worker               |
 | Async support     | None                          | None                          | Full (Promises, timers)    |
 | Streaming SSR     | Not supported                 | Not supported                 | Supported                  |
@@ -107,15 +107,15 @@ See the [full case study](https://www.shakacode.com/recent-work/popmenu/).
 - **Largest Contentful Paint (LCP):** When the main content becomes visible
 - **Total Blocking Time (TBT):** Time the main thread is blocked during page load
 - **Client bundle size:** Total JavaScript downloaded by the browser
-- **Server render time:** Time spent in the SSR process (logged by React on Rails when `logging_on_server` is enabled)
+- **Server render time:** Time spent in the SSR process (not logged by default — measure wall clock time in Ruby around the render call; on Pro, enable `config.tracing = true` in `config/initializers/react_on_rails_pro.rb` to log render timings)
 
 ### Tools
 
 - **Chrome DevTools Performance tab:** Profile page load and hydration timing
 - **Lighthouse:** Automated performance scoring with LCP, TBT, and other Core Web Vitals
 - **`webpack-bundle-analyzer`:** Visualize bundle composition and identify large dependencies
-- **Rails server logs:** Server render timing when `config.logging_on_server = true`
-- **Node Renderer logs:** Per-request timing with `RENDERER_LOG_LEVEL` (Pro)
+- **Rails server logs:** Server-side console messages replayed to `Rails.logger` when `config.logging_on_server = true`
+- **Node Renderer logs:** Renderer lifecycle and error details controlled by `RENDERER_LOG_LEVEL` (Pro)
 
 ## Related Documentation
 

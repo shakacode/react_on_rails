@@ -169,7 +169,7 @@ export default function ProductPage({ productId }) {
 ```erb
 <%# ERB view — Rails passes the data as props %>
 <%= stream_react_component("ProductPage",
-      props: { product: @product.as_json }) %>
+      props: { product: @product.as_json(include: [:specs, :reviews]) }) %>
 ```
 
 ```jsx
@@ -329,49 +329,34 @@ export default function Homepage() {
 
 **Key insight:** `Homepage` (a Server Component) is the component that imports and renders `Header`, `MainContent`, and `Footer`. Since `Homepage` owns these children, they remain Server Components -- even though they're visually nested inside the Client Component `ColorProvider`.
 
-## Pattern 4: Async Props with Suspense
+## Pattern 4: Streaming with `stream_react_component`
 
-In React on Rails, use async props to stream data progressively. Each async prop streams to the browser independently as it becomes ready, and Suspense boundaries show fallbacks until the data arrives:
+In React on Rails, `stream_react_component` uses React's streaming SSR (`renderToPipeableStream`) to deliver HTML progressively. Rails passes all data as props, and the streaming infrastructure delivers the rendered output efficiently:
 
 ```erb
-<%# ERB view — sync props render the shell, async props stream in %>
-<%= stream_react_component_with_async_props("Dashboard",
-      props: { title: "Dashboard" }) do |emit|
-  emit.call("stats", DashboardStats.compute.as_json)
-  emit.call("revenue", RevenueChart.data.as_json)
-  emit.call("orders", Order.recent.as_json)
-end %>
+<%# ERB view — Rails passes all data as props %>
+<%= stream_react_component("Dashboard",
+      props: { title: "Dashboard",
+               stats: DashboardStats.compute.as_json,
+               revenue: RevenueChart.data.as_json,
+               orders: Order.recent.as_json }) %>
 ```
 
 ```jsx
 // Dashboard.jsx -- Server Component
-import { Suspense } from 'react';
-import { StatsSkeleton, ChartSkeleton, TableSkeleton } from './Skeletons';
-
-export default function Dashboard({ title, getReactOnRailsAsyncProp }) {
-  const statsPromise = getReactOnRailsAsyncProp('stats');
-  const revenuePromise = getReactOnRailsAsyncProp('revenue');
-  const ordersPromise = getReactOnRailsAsyncProp('orders');
-
+export default function Dashboard({ title, stats, revenue, orders }) {
   return (
     <div>
       <h1>{title}</h1>
-      <Suspense fallback={<StatsSkeleton />}>
-        <Stats statsPromise={statsPromise} />
-      </Suspense>
-      <Suspense fallback={<ChartSkeleton />}>
-        <RevenueChart revenuePromise={revenuePromise} />
-      </Suspense>
-      <Suspense fallback={<TableSkeleton />}>
-        <RecentOrders ordersPromise={ordersPromise} />
-      </Suspense>
+      <Stats stats={stats} />
+      <RevenueChart revenue={revenue} />
+      <RecentOrders orders={orders} />
     </div>
   );
 }
 
-// Stats.jsx -- Async Server Component (awaits the streamed prop)
-export default async function Stats({ statsPromise }) {
-  const stats = await statsPromise;
+// Stats.jsx -- Server Component (renders directly from props)
+export default function Stats({ stats }) {
   return (
     <div>
       <span>Revenue: {stats.revenue}</span>
@@ -381,63 +366,60 @@ export default async function Stats({ statsPromise }) {
 }
 ```
 
-Each `<Suspense>` boundary enables independent streaming -- the user sees content progressively as each async prop resolves, rather than waiting for the slowest query.
+`stream_react_component` streams the rendered HTML progressively to the browser. All data is available as props -- no client-side fetching or loading states needed.
 
-## Pattern 5: Async Props to Client Components via `use()`
+## Pattern 5: Server Data to Interactive Client Components
 
-Pass an async prop promise to a Client Component that resolves it with the `use()` hook. This lets data stream from Rails while the Client Component handles interactivity:
+Pass server-fetched data from Rails to a Client Component that adds interactivity. The Server Component receives the data as props and passes it to the Client Component:
 
 ```erb
-<%# ERB view — sync props render the shell, comments stream in %>
-<%= stream_react_component_with_async_props("PostPage",
-      props: { title: post.title, body: post.body }) do |emit|
-  emit.call("comments", post.comments.includes(:author).as_json)
-end %>
+<%# ERB view — Rails passes all data as props %>
+<%= stream_react_component("PostPage",
+      props: { title: post.title,
+               body: post.body,
+               comments: post.comments.includes(:author).as_json }) %>
 ```
 
 ```jsx
 // PostPage.jsx -- Server Component
-import { Suspense } from 'react';
 import Comments from './Comments';
 
-export default function PostPage({ title, body, getReactOnRailsAsyncProp }) {
-  const commentsPromise = getReactOnRailsAsyncProp('comments');
-
+export default function PostPage({ title, body, comments }) {
   return (
     <article>
       <h1>{title}</h1>
       <p>{body}</p>
-      <Suspense fallback={<p>Loading comments...</p>}>
-        <Comments commentsPromise={commentsPromise} />
-      </Suspense>
+      <Comments comments={comments} />
     </article>
   );
 }
 ```
 
-> **Requires React 19+.** The `use(promise)` pattern for server-to-client promise handoff is not available in React 18.
-
 ```jsx
-// Comments.jsx -- Client Component
+// Comments.jsx -- Client Component (adds interactivity like reply buttons)
 'use client';
 
-import { use } from 'react';
+import { useState } from 'react';
 
-export default function Comments({ commentsPromise }) {
-  const comments = use(commentsPromise); // Resolves the promise
+export default function Comments({ comments }) {
+  const [expanded, setExpanded] = useState({});
+
   return (
     <ul>
       {comments.map((c) => (
-        <li key={c.id}>{c.text}</li>
+        <li key={c.id}>
+          {c.text}
+          <button onClick={() => setExpanded((prev) => ({ ...prev, [c.id]: !prev[c.id] }))}>
+            {expanded[c.id] ? 'Collapse' : 'Reply'}
+          </button>
+        </li>
       ))}
     </ul>
   );
 }
 ```
 
-**Benefits:** The post title and body render immediately as sync props. Comments stream in when Rails calls `emit.call("comments", ...)`. The Client Component resolves the promise with `use()` and can add interactivity (e.g., reply buttons).
-
-> **Warning:** Never create promises inside Client Components for `use()` -- this causes the "uncached promise" runtime error. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components) for why and what to do instead.
+**Benefits:** The Server Component handles data display with zero JavaScript cost. The Client Component receives pre-fetched data as props and adds only the interactivity it needs (reply buttons, expand/collapse).
 
 ## Decision Guide: Server or Client Component?
 

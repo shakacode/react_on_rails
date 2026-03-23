@@ -150,7 +150,7 @@ Entries should be organized under these section headings **in the following orde
 
 ### Version Stamping with Rake Task
 
-When this command is invoked with `release`, `rc`, or `beta`, **use the rake task to stamp the version header** after adding entries:
+When this command is invoked with `release`, `rc`, `beta`, or an explicit version (e.g., `16.5.0.rc.10`), **use the rake task to stamp the version header** after adding entries:
 
 ```bash
 bundle exec rake "update_changelog[release]"   # stamp next stable version
