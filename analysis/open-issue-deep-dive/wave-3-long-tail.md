@@ -96,9 +96,9 @@ Format notes:
 - Domain: core/runtime
 - Labels: P3
 - Created: 2025-07-09
-- Context excerpt: We can slightly simplify code and improve shown errors by using the `cause` option of `Error` constructor. Blocked by #1745. See https://github.com/shakacode/react_on_rails/pull/1745/files/521c5b3d3b1e99d483eb5cb0bbf34c5 ...
-- Blocked by: #1745
-- Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
+- Context excerpt: We can slightly simplify code and improve shown errors by using the `cause` option of `Error` constructor. Original blocker #1745 is now merged, so this is unblocked. ...
+- Blocked by: #1745 (resolved; merged 2025-07-14)
+- Posted question: Now that the blocker is resolved, should this be scheduled in the next implementation wave?
 
 ## #1692 Fix Coveralls setup
 
@@ -131,6 +131,7 @@ Format notes:
 - Created: 2023-12-08
 - Context excerpt: Stealing the idea from https://github.com/reactjs/react-rails/issues/1134 ...
 - Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
+- Triage note: Still under consideration; may be deprioritized until Rspack stabilization.
 
 ## #1583 Convert spec/dummy/client to Typescript
 
@@ -163,3 +164,4 @@ Format notes:
 - Created: 2019-02-20
 - Context excerpt: # Motivation Because server rendering often uses `react_component_hash` to get the meta tags for SEO, we can't just flip a switch and turn off server rendering to debug the code in the browser. Here are the steps to debu ...
 - Posted question: Should this be batched with related docs issues in a single docs PR, or handled separately?
+- Triage note: Verify whether this legacy Node VM doc is still needed or superseded by newer Node Renderer guidance before scheduling.
