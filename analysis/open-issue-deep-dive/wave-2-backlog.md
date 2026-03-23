@@ -90,7 +90,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Domain: discussion/rfc
 - Labels: P3
 - Created: 2025-12-08
-- Triage note: Issue body is template boilerplate with no concrete implementation details; relabeled from `P2` to `P3` on 2026-03-23 and kept in Wave 2 until scope is rewritten.
+- Triage note: Issue body is template boilerplate with no concrete implementation details; currently labeled `P3` in this snapshot and kept in Wave 2 until scope is rewritten.
 - Posted question: Should this remain parked until the issue is rewritten with concrete scope and acceptance criteria?
 
 ## #2184 Remove "Setup Node with V8 Crash Retry" action
@@ -99,7 +99,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Labels: P3
 - Created: 2025-12-08
 - Context excerpt: It only seems to do something when using `yarn` https://github.com/shakacode/react_on_rails/blob/97fde8431e83631399dfb1df1f673b5c468dfd2a/.github/actions/setup-node-with-retry/action.yml#L43 but after #2121 we don't anym ...
-- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
+- Posted question: Should this run in the testing-quality maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2180 Use pnpm catalogs to decrease duplication between `package.json` files
 
