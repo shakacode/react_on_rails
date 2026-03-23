@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "securerandom"
 require_relative "version_syntax_converter"
 require_relative "version_checker"
 
@@ -150,6 +151,7 @@ module ReactOnRails
       return unless version_spec.is_a?(String) && version_spec.start_with?(NPM_ALIAS_PREFIX)
 
       at_index = version_spec.rindex("@")
+      # Ensure at least one package-name character appears after "npm:" and before the version separator.
       return unless at_index && at_index > NPM_ALIAS_PREFIX.length
 
       alias_version = version_spec[(at_index + 1)..]
@@ -165,10 +167,10 @@ module ReactOnRails
     end
 
     def write_atomically(content)
-      tmp_path = "#{package_json_path}.tmp-#{Process.pid}-#{Thread.current.object_id}"
+      tmp_path = "#{package_json_path}.tmp-#{Process.pid}-#{Thread.current.object_id}-#{SecureRandom.hex(4)}"
       File.write(tmp_path, content)
       File.rename(tmp_path, package_json_path)
-    rescue SystemCallError => e
+    rescue StandardError => e
       raise ReactOnRails::Error, "Unable to write #{package_json_path}: #{e.message}"
     ensure
       # On success tmp_path no longer exists (it was renamed), so this is a no-op.
@@ -202,7 +204,7 @@ module ReactOnRails
         io.puts "Write mode reformats package.json and may normalize whitespace/newline layout."
         io.puts "For minified package.json files, indentation falls back to two spaces."
       else
-        io.puts "Dry run only. Re-run with WRITE=true to apply changes."
+        io.puts "Dry run only. Re-run with REACT_ON_RAILS_WRITE=true to apply changes."
       end
     end
 
@@ -224,7 +226,8 @@ module ReactOnRails
     end
 
     def detect_indentation(content)
-      indentations = content.each_line.filter_map { |line| line.slice(/^[ \t]+(?="[^"\n]+":)/) }
+      normalized_content = content.gsub("\r\n", "\n")
+      indentations = normalized_content.each_line.filter_map { |line| line.slice(/^[ \t]+(?="[^"\n]+":)/) }
       return "  " if indentations.empty?
 
       indentation = indentation_for_majority_char(indentations)

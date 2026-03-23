@@ -402,7 +402,7 @@ module ReactOnRails
 
         it "raises a wrapped write error" do
           allow(File).to receive(:write).and_call_original
-          allow(File).to receive(:write).with(/\.tmp-\d+-\d+$/, any_args).and_raise(Errno::EACCES)
+          allow(File).to receive(:write).with(/\.tmp-\d+-\d+-[0-9a-f]+$/, any_args).and_raise(Errno::EACCES)
 
           expect { synchronizer.sync(write: true) }
             .to raise_error(ReactOnRails::Error, /Unable to write/)
