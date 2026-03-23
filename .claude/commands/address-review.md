@@ -134,7 +134,7 @@ After the triage list, present a **quick-action menu**:
 
 ```text
 Quick actions:
-  f     — Fix must-fix items, reply/resolve skipped items, then decide discuss items
+  f     — Fix must-fix items, reply/resolve skipped items (implicit approval), then decide discuss items
   f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
   d     — Discuss specific items before deciding (e.g., "d2,4")
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss") without auto-resolving unless requested
@@ -158,6 +158,7 @@ Wait for the user to choose an action before proceeding.
 5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss) or `f+i` (create follow-up issue).
 6. Commit, then ask for push confirmation before pushing.
 7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
+8. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review them or `f+i` to defer them with a follow-up issue.").
 
 ### Action `f+i` — Fix, follow-up issue, and merge-ready
 
@@ -259,7 +260,27 @@ When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, crea
 # For `f+i`, keep this empty. For `m`, include a heading and deferred must-fix bullets.
 MUST_FIX_SECTION="${MUST_FIX_SECTION:-}"
 
-if [ -z "${MUST_FIX_SECTION}${DISCUSS_ITEMS}${SKIPPED_ITEMS}" ]; then
+DISCUSS_SECTION=""
+if [ -n "${DISCUSS_ITEMS}" ]; then
+  DISCUSS_SECTION="$(cat <<EOF
+### Discuss items
+${DISCUSS_ITEMS}
+
+EOF
+)"
+fi
+
+SKIPPED_SECTION=""
+if [ -n "${SKIPPED_ITEMS}" ]; then
+  SKIPPED_SECTION="$(cat <<EOF
+### Skipped items (non-trivial)
+${SKIPPED_ITEMS}
+
+EOF
+)"
+fi
+
+if [ -z "${MUST_FIX_SECTION}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
   echo "No deferred items found; skip follow-up issue creation."
 else
   gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
@@ -268,12 +289,7 @@ else
 These items were triaged during review and deferred for follow-up.
 
 ${MUST_FIX_SECTION}
-
-### Discuss items
-${DISCUSS_ITEMS}
-
-### Skipped items (non-trivial)
-${SKIPPED_ITEMS}
+${DISCUSS_SECTION}${SKIPPED_SECTION}
 
 ---
 Original PR: https://github.com/${REPO}/pull/${PR_NUMBER}
@@ -287,6 +303,7 @@ Rules for follow-up issues:
 - Only include non-trivial `SKIPPED` items (skip pure duplicates and factually incorrect suggestions)
 - For `f+i`, omit the must-fix section because must-fix items were addressed in the current PR
 - For `m`, include a must-fix section with heading `### Must-fix items (deferred)` and deferred blockers
+- Omit any section heading when its corresponding item list is empty
 - Include the original reviewer username and comment link for each item
 - Include enough context that someone can act on the issue without re-reading the full PR review
 - After creating the issue, reference it in thread replies (e.g., "Tracked in #NNN for follow-up")
@@ -342,10 +359,10 @@ SKIPPED (3):
 5. spec/helper_spec.rb:20 - "Consolidate assertions" (@claude[bot]) - test style preference
 
 Quick actions:
-  f     — Fix #1, reply/resolve skipped items, then decide discuss items
+  f     — Fix #1, reply/resolve skipped items (implicit approval), then decide discuss items
   f+i   — Fix #1, create follow-up issue for #2, reply-skip #3-5
   d     — Discuss specific items (e.g., "d2,4")
-  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped") without auto-resolving
+  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss") without auto-resolving
   m     — No code changes, create follow-up issue, merge-ready only when no must-fix items are deferred
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"

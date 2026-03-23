@@ -52,11 +52,11 @@ Execution flow when terminal access is available:
      `gh api repos/${REPO}/issues/comments/{COMMENT_ID} | jq '{body: .body, user: .user.login, html_url: .html_url}'`
    - Specific review:
      `gh api repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID} | jq '{id: .id, body: .body, state: .state, user: .user.login, html_url: .html_url}'`
-    `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, html_url: .html_url}]'`
+     `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews/{REVIEW_ID}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, html_url: .html_url}]'`
    - If the review body contains actionable feedback, include it as an additional general comment. Review summary bodies cannot use the `/replies` endpoint; post those responses as general PR comments (see step 7).
    - Full PR:
      `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/reviews | jq -s '[.[].[] | select((.body // "") != "") | {id: .id, type: "review_summary", body: .body, state: .state, user: .user.login, html_url: .html_url}]'`
-    `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "review", path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, html_url: .html_url}]'`
+     `gh api --paginate repos/${REPO}/pulls/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "review", path: .path, body: .body, line: .line, start_line: .start_line, user: .user.login, in_reply_to_id: .in_reply_to_id, html_url: .html_url}]'`
      `gh api --paginate repos/${REPO}/issues/{PR_NUMBER}/comments | jq -s '[.[].[] | {id: .id, node_id: .node_id, type: "issue", body: .body, user: .user.login, html_url: .html_url}]'`
    - Include actionable review summary bodies from `/pulls/{PR_NUMBER}/reviews` as additional general comments. Like specific review bodies, they cannot use the `/replies` endpoint and must be answered as general PR comments (see step 7).
    - For all review-comment paths, fetch thread metadata and match `thread_id` by `node_id`:
@@ -97,7 +97,7 @@ Execution flow when terminal access is available:
        f     — Fix must-fix items, reply-skip skipped items, then decide discuss items
        f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
        d     — Discuss specific items before deciding (e.g., "d2,4")
-       r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped") without auto-resolving unless requested
+       r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss") without auto-resolving unless requested
        m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
 
      Or pick items by number: "1,2", "all must-fix", "1,3-5"
@@ -154,7 +154,7 @@ Quick actions:
   f     — Fix #N, reply-skip skipped items, then decide discuss items
   f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply-skip rest
   d     — Discuss specific items (e.g., "d2,4")
-  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped") without auto-resolving
+  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss") without auto-resolving
   m     — No code changes, create follow-up issue for must-fix/discuss/non-trivial skipped items
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
