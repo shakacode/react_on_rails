@@ -259,14 +259,6 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 - Context excerpt: Here's an example for PR https://github.com/shakacode/react_on_rails/pull/2247 2 files changed and: - summary: (done in 33.17 seconds) - ✔️ branch-lint (1.71 seconds) ``` gpf 1 ↵ ╭─────────────────────────────────────╮ │ ...
 - Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
-## #2182 Add support for react 19.2.1 and make a plan for implementing **Partial Pre-rendering** feature
-
-- Domain: core/runtime
-- Labels: P2
-- Created: 2025-12-08
-- Context excerpt: Issue body is template boilerplate with no concrete implementation details; triage should use title/labels and request a filled-out scope before scheduling implementation. ...
-- Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
-
 ## #2171 Fix CI failures for Dependabot PRs due to missing REACT_ON_RAILS_PRO_LICENSE secret
 
 - Domain: ci/tooling
