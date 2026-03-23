@@ -6,7 +6,7 @@ React on Rails uses [ExecJS](https://github.com/rails/execjs) as the default ser
 
 ExecJS evaluates your server bundle in an isolated JavaScript context. It calls your render function synchronously, collects the resulting HTML string, and returns it to Rails. This synchronous model is the root of most limitations — ExecJS cannot wait for asynchronous operations to complete.
 
-ExecJS auto-detects the best available runtime via its `best_available` method, checking (in order) mini_racer, Bun, Node.js, and others. This means ExecJS does **not** default to Node.js — it prefers mini_racer or Bun if either is installed. You can override the runtime with the `EXECJS_RUNTIME` environment variable. All runtimes share the same synchronous limitations described below. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes.
+ExecJS auto-detects the best available runtime via its `best_available` method, checking runtimes such as mini_racer, Bun, and Node.js. The exact priority can vary by ExecJS version (for example, Bun support was added in newer releases), so verify against the version you're running. In all cases, ExecJS does **not** always default to Node.js if a higher-priority runtime is available. You can override runtime selection with the `EXECJS_RUNTIME` environment variable. All runtimes share the same synchronous limitations described below. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for available runtimes.
 
 ## Timer and Async Limitations
 

@@ -65,7 +65,7 @@ Often caused by accessing props that are `nil` in Ruby but become `undefined` in
 
 **Timer callbacks silently dropped during SSR**
 
-React on Rails polyfills `setTimeout`, `setInterval`, and related timer functions as no-ops during ExecJS rendering, so you will not see a `setTimeout is not defined` error. Instead, timer callbacks are silently dropped and never execute. With `config.trace = true`, these calls log a warning to `console.error` with a stack trace to help you identify the source. See the [ExecJS Limitations](../core-concepts/execjs-limitations.md) guide for workarounds.
+During ExecJS rendering, React on Rails stubs `setTimeout`, `setInterval`, and `clearTimeout` as no-ops. Calls to those functions do not execute callbacks. Note that `clearInterval` is not stubbed, so code that calls it can still raise an error in ExecJS runtimes. With `config.trace = true`, calls to stubbed timer functions emit `console.error` warnings with stack traces; those warnings replay in browser devtools via `replay_console`, and also appear in Rails logs when `logging_on_server = true`. See the [ExecJS Limitations](../core-concepts/execjs-limitations.md) guide for workarounds.
 
 ### Using `trace` Mode
 
