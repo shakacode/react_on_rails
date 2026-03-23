@@ -27,6 +27,11 @@
 - `wave-2`: medium backlog (primarily P3 created in recent cycles)
 - `wave-3`: long-tail backlog / parked items
 
+## Format Notes
+
+- Context excerpts in wave files are intentionally truncated with `...`.
+- A `Blocked by` field is included only when the issue body explicitly names a blocker.
+
 ## Execution Notes
 
 - Every issue received a triage comment with domain, current PR coverage, and a concrete next-step question.

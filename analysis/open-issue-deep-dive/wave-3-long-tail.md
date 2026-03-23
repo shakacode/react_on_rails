@@ -2,11 +2,7 @@
 
 Generated from open-issue triage snapshot dated 2026-03-22.
 
-Format notes:
-- Context excerpts are intentionally truncated with `...`.
-- Add a `Blocked by` field when the issue body explicitly names a blocker.
-
-## Resolved Before Execution
+## Resolved After Snapshot, Before Execution
 
 - #1887 Investigate the ability to make RSC Payload smaller by removing props and stack objects from it — closed as duplicate of #2522 on 2026-03-23.
 - #1754 Add open telemetry support for react_on_rails — closed as duplicate of #2156 on 2026-03-23.
