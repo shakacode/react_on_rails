@@ -65,7 +65,13 @@ Often caused by accessing props that are `nil` in Ruby but become `undefined` in
 
 **Timer callbacks silently dropped during SSR**
 
-During ExecJS rendering, React on Rails stubs `setTimeout`, `setInterval`, and `clearTimeout` as no-ops, so callbacks never run. `clearInterval` is not stubbed by React on Rails, and behavior depends on runtime (for example, `mini_racer` may raise `ReferenceError` while Node-based runtimes provide it). With `config.trace = true`, calls to stubbed timer functions emit `console.error` warnings with stack traces. Those warnings replay in browser devtools via `replay_console`, and also appear in Rails logs when `logging_on_server = true`. See the [ExecJS Limitations](../core-concepts/execjs-limitations.md) guide for workarounds.
+During ExecJS rendering, React on Rails stubs `setTimeout`, `setInterval`, and `clearTimeout` as no-ops, so callbacks never run.
+
+`clearInterval` is **not** stubbed by React on Rails. Behavior depends on runtime: `mini_racer` may raise a `ReferenceError`, while Node-based runtimes provide `clearInterval`.
+
+With `config.trace = true`, calls to stubbed timer functions emit `console.error` warnings with stack traces. Those warnings replay in browser devtools via `replay_console`, and also appear in Rails logs when `logging_on_server = true`.
+
+See the [ExecJS Limitations](../core-concepts/execjs-limitations.md) guide for workarounds.
 
 ### Using `trace` Mode
 

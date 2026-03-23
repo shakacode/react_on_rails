@@ -107,7 +107,7 @@ See the [full case study](https://www.shakacode.com/recent-work/popmenu/).
 - **Largest Contentful Paint (LCP):** When the main content becomes visible
 - **Total Blocking Time (TBT):** Time the main thread is blocked during page load
 - **Client bundle size:** Total JavaScript downloaded by the browser
-- **Server render time:** Time spent in the SSR process (not logged by default — measure wall clock time in Ruby around the render call; on Pro, you can also enable `config.tracing = true` in `react_on_rails_pro.rb` to log render timings)
+- **Server render time:** Time spent in the SSR process (not logged by default — measure wall clock time in Ruby around the render call; on Pro, enable `config.tracing = true` in `config/initializers/react_on_rails_pro.rb` to log render timings)
 
 ### Tools
 
