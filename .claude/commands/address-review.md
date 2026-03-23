@@ -144,6 +144,7 @@ Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
 
 **Range syntax**: Support `N-M` to expand into individual item numbers (e.g., `3-5` becomes `3,4,5`). Ranges work everywhere: item selection, `d`, and `r`.
+If a range is malformed, reversed, or out of bounds, show a validation message and ask the user to retry (do not silently coerce it).
 
 **Dynamic menu**: Generate `f` and `f+i` descriptions dynamically using actual item numbers and deferred targets from the current triage set (e.g., "Fix #1, #3" instead of "Fix must-fix items"). When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection.
 
@@ -158,7 +159,7 @@ Wait for the user to choose an action before proceeding.
 3. Resolve the corresponding review threads.
 4. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
 5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss + resolve`.
-6. Commit, then ask for push confirmation before pushing.
+6. If local changes exist, commit and then ask for push confirmation before pushing. If there are no local changes, skip commit/push and continue decision flow.
 7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
 8. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to defer to a follow-up issue, or `r all discuss + resolve` to decline and close.").
 
@@ -178,13 +179,13 @@ Present the requested items with full context and ask the user for a decision on
 
 ### Action `r` — Reply with rationale
 
-Post rationale replies to the specified items explaining why they are being deferred or skipped. By default, do not resolve threads in `r` unless the user explicitly asks to resolve them (for example, `r3,5 + resolve`). Accept item numbers, ranges, or `r all skipped` / `r all discuss`.
+Post rationale replies to the specified items explaining why they are being deferred or skipped. By default, do not resolve threads in `r` unless the user explicitly asks to resolve them (for example, `r3,5 + resolve`). Accept item numbers, ranges, or `r all skipped` / `r all discuss`. Do not support `r all must-fix`; `MUST-FIX` items must be fixed (`f`) or explicitly deferred (`f+i` / `m`).
 
 ### Action `m` — Merge as-is
 
 1. Create a follow-up GitHub issue (see Step 8) bundling `MUST-FIX`, `DISCUSS`, and non-trivial `SKIPPED` items.
-2. Post a reply on each open thread referencing the follow-up issue.
-3. Resolve `DISCUSS` and `SKIPPED` threads after replying.
+2. Post replies in the original location for each deferred item: use review-comment replies for inline comments and issue comments for review summaries/general comments.
+3. Resolve `DISCUSS` and `SKIPPED` review threads after replying (resolve only when a thread exists).
 4. If any `MUST-FIX` items were deferred, keep those review threads open by default unless the user explicitly asks to close them.
 5. If any `MUST-FIX` items were deferred, explicitly tell the user the PR is **not merge-ready** without an override decision.
 6. Only signal merge-ready with no code changes when there are zero deferred `MUST-FIX` items.
@@ -257,39 +258,35 @@ When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, crea
 
 ```bash
 # Template inputs: replace each <...> placeholder before running this snippet.
-DISCUSS_ITEMS="<DISCUSS_ITEMS_BULLETS_OR_EMPTY>"
-SKIPPED_ITEMS="<SKIPPED_ITEMS_BULLETS_OR_EMPTY>"
+# Use single-quoted heredocs so pasted review text is treated as literal content.
+DISCUSS_ITEMS="$(cat <<'EOF'
+<DISCUSS_ITEMS_BULLETS_OR_EMPTY>
+EOF
+)"
+SKIPPED_ITEMS="$(cat <<'EOF'
+<SKIPPED_ITEMS_BULLETS_OR_EMPTY>
+EOF
+)"
 
 # For `f+i`, keep this empty. For `m`, include a heading and deferred must-fix bullets.
-MUST_FIX_SECTION="<MUST_FIX_SECTION_OR_EMPTY>"
+MUST_FIX_SECTION="$(cat <<'EOF'
+<MUST_FIX_SECTION_OR_EMPTY>
+EOF
+)"
 
 MUST_FIX_BLOCK=""
 if [ -n "${MUST_FIX_SECTION}" ]; then
-  MUST_FIX_BLOCK="$(cat <<EOF
-${MUST_FIX_SECTION}
-
-EOF
-)"
+  printf -v MUST_FIX_BLOCK '%s\n' "${MUST_FIX_SECTION}"
 fi
 
 DISCUSS_SECTION=""
 if [ -n "${DISCUSS_ITEMS}" ]; then
-  DISCUSS_SECTION="$(cat <<EOF
-### Discuss items
-${DISCUSS_ITEMS}
-
-EOF
-)"
+  printf -v DISCUSS_SECTION '### Discuss items\n%s\n' "${DISCUSS_ITEMS}"
 fi
 
 SKIPPED_SECTION=""
 if [ -n "${SKIPPED_ITEMS}" ]; then
-  SKIPPED_SECTION="$(cat <<EOF
-### Skipped items (non-trivial)
-${SKIPPED_ITEMS}
-
-EOF
-)"
+  printf -v SKIPPED_SECTION '### Skipped items (non-trivial)\n%s\n' "${SKIPPED_ITEMS}"
 fi
 
 if [ -z "${MUST_FIX_BLOCK}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
@@ -399,6 +396,7 @@ Or pick items by number: "1,2", "all must-fix", "1,3-5"
 - **ALWAYS reply to comments after addressing them** to close the feedback loop
 - After triage, always offer rationale replies for selected `SKIPPED`/declined items; `f` requires explicit confirmation before skipped-item replies/resolution, while `f+i` and `m` include skipped-item handling in the chosen action flow
 - Always request push confirmation from the user before running `git push`
+- If this command conflicts with broader agent defaults, follow this command file (it is the more specific workflow instruction)
 - Resolve the review thread after replying when the concern is actually addressed and a thread ID is available
 - Default to real issues only. Do not spend a review cycle on optional polish unless the user explicitly asks for it
 - Triage comments before creating todos. Only `MUST-FIX` items should become todos by default
