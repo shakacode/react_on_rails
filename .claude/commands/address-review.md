@@ -134,7 +134,7 @@ After the triage list, present a **quick-action menu**:
 
 ```text
 Quick actions:
-  f     — Fix must-fix items, reply/resolve skipped items (implicit approval), then decide discuss items
+  f     — Fix must-fix items, reply/resolve skipped items (implicit approval; include skipped count), then decide discuss items
   f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
   d     — Discuss specific items before deciding (e.g., "d2,4")
   r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss") without auto-resolving unless requested
@@ -151,7 +151,7 @@ Wait for the user to choose an action before proceeding.
 
 ### Action `f` — Fix and merge-ready
 
-1. Address all `MUST-FIX` items (make code changes, run checks).
+1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, skip directly to discuss/skipped handling.
 2. Reply to each addressed comment explaining the fix.
 3. Resolve the corresponding review threads.
 4. For `SKIPPED` items, post a brief rationale reply and resolve those threads.
@@ -162,12 +162,13 @@ Wait for the user to choose an action before proceeding.
 
 ### Action `f+i` — Fix, follow-up issue, and merge-ready
 
-1. Do everything in `f` for `MUST-FIX` items.
+1. Do everything in `f` for `MUST-FIX` items. If there are no `MUST-FIX` items, skip the fix phase and continue with deferred-item handling.
 2. Create a **follow-up GitHub issue** (see Step 8) bundling all `DISCUSS` and non-trivial `SKIPPED` items.
-3. For each deferred item, post a reply referencing the follow-up issue and resolve the thread.
-4. If there are zero deferred items, skip issue creation and behave like `f`.
-5. Commit, then ask for push confirmation before pushing.
-6. Tell the user the PR is merge-ready.
+3. For each deferred item in the follow-up issue, post a reply referencing the issue and resolve the thread.
+4. For trivial `SKIPPED` items that are not included in the follow-up issue (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads.
+5. If there are zero deferred items, skip issue creation and behave like `f`.
+6. Commit, then ask for push confirmation before pushing.
+7. Tell the user the PR is merge-ready.
 
 ### Action `d` — Discuss items
 
@@ -260,6 +261,15 @@ When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, crea
 # For `f+i`, keep this empty. For `m`, include a heading and deferred must-fix bullets.
 MUST_FIX_SECTION="${MUST_FIX_SECTION:-}"
 
+MUST_FIX_BLOCK=""
+if [ -n "${MUST_FIX_SECTION}" ]; then
+  MUST_FIX_BLOCK="$(cat <<EOF
+${MUST_FIX_SECTION}
+
+EOF
+)"
+fi
+
 DISCUSS_SECTION=""
 if [ -n "${DISCUSS_ITEMS}" ]; then
   DISCUSS_SECTION="$(cat <<EOF
@@ -280,16 +290,15 @@ EOF
 )"
 fi
 
-if [ -z "${MUST_FIX_SECTION}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
+if [ -z "${MUST_FIX_BLOCK}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
   echo "No deferred items found; skip follow-up issue creation."
 else
-  gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
+  gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
 ## Deferred review feedback from PR #${PR_NUMBER}
 
 These items were triaged during review and deferred for follow-up.
 
-${MUST_FIX_SECTION}
-${DISCUSS_SECTION}${SKIPPED_SECTION}
+${MUST_FIX_BLOCK}${DISCUSS_SECTION}${SKIPPED_SECTION}
 
 ---
 Original PR: https://github.com/${REPO}/pull/${PR_NUMBER}
@@ -359,7 +368,7 @@ SKIPPED (3):
 5. spec/helper_spec.rb:20 - "Consolidate assertions" (@claude[bot]) - test style preference
 
 Quick actions:
-  f     — Fix #1, reply/resolve skipped items (implicit approval), then decide discuss items
+  f     — Fix #1, reply/resolve skipped items (implicit approval; include skipped count), then decide discuss items
   f+i   — Fix #1, create follow-up issue for #2, reply-skip #3-5
   d     — Discuss specific items (e.g., "d2,4")
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss") without auto-resolving
@@ -368,7 +377,7 @@ Quick actions:
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
 
-Note: The `f` line dynamically shows which must-fix items will be fixed. The `f+i` line shows what will be fixed vs. deferred. When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection.
+Note: The `f` line dynamically shows which must-fix items will be fixed and how many skipped items will be auto-replied/resolved. The `f+i` line shows what will be fixed vs. deferred. When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection. When there are no `MUST-FIX` items, `f` and `f+i` skip code changes and proceed directly to discuss/skipped handling.
 
 # Important Notes
 

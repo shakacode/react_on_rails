@@ -94,7 +94,7 @@ Execution flow when terminal access is available:
    - After the triage list, present this quick-action menu:
      ```
      Quick actions:
-       f     — Fix must-fix items, reply-skip skipped items, then decide discuss items
+      f     — Fix must-fix items, reply-skip skipped items (implicit approval; include skipped count), then decide discuss items
        f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
        d     — Discuss specific items before deciding (e.g., "d2,4")
        r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss") without auto-resolving unless requested
@@ -106,8 +106,8 @@ Execution flow when terminal access is available:
    - Do not edit code yet.
 
 7. Execute the chosen action:
-   - **`f`**: Fix all must-fix items, resolve addressed must-fix threads, reply/resolve skipped items, and keep discuss items for an explicit follow-up decision (`d` or `f+i`). Commit, ask for push confirmation, then push.
-   - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss and non-trivial skipped items. If there are no deferred items, skip issue creation and behave like `f`.
+   - **`f`**: Fix all must-fix items (if none exist, skip fix phase), resolve addressed must-fix threads, reply/resolve skipped items, and keep discuss items for an explicit follow-up decision (`d` or `f+i`). Commit, ask for push confirmation, then push.
+   - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss and non-trivial skipped items; still reply/resolve trivial skipped items that are excluded from the follow-up issue. If there are no deferred items, skip issue creation and behave like `f`.
    - **`d`**: Present requested items with full context, ask for a decision on each. Approved → fix like must-fix. Declined → optionally reply with rationale.
    - **`r`**: Post rationale replies to specified items. Do not resolve threads unless the user explicitly asks to resolve them.
    - **`m`**: Create a follow-up issue for deferred items, reply on each thread referencing it, and resolve `DISCUSS`/`SKIPPED` threads. Keep deferred `MUST-FIX` threads open by default unless the user explicitly asks to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
@@ -123,10 +123,11 @@ Execution flow when terminal access is available:
    - Ask for push confirmation before running `git push`.
 
 8. Create follow-up issue (when `f+i` or `m` is chosen):
-   - Use `gh issue create` with title "Follow-up: Review feedback from PR #N"
+   - Use `gh issue create --repo "${REPO}"` with title "Follow-up: Review feedback from PR #N"
    - For `f+i`, include discuss items and non-trivial skipped items (must-fix is already addressed)
    - For `m`, include deferred must-fix items, discuss items, and non-trivial skipped items
    - Keep issue body structure consistent: use an optional `### Must-fix items (deferred)` section (for `m` only), then `### Discuss items`, then `### Skipped items (non-trivial)`, plus the original PR link at the bottom
+   - Omit any section heading whose content bucket is empty
    - Reference the issue in thread replies
    - Return the issue URL
 
@@ -151,7 +152,7 @@ SKIPPED (count):
 3. item - short reason
 
 Quick actions:
-  f     — Fix #N, reply-skip skipped items, then decide discuss items
+  f     — Fix #N, reply-skip skipped items (implicit approval; include skipped count), then decide discuss items
   f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply-skip rest
   d     — Discuss specific items (e.g., "d2,4")
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss") without auto-resolving
