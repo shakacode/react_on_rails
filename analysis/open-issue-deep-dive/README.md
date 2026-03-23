@@ -5,8 +5,9 @@
 - Open issues reviewed: 85
 - Open issues already linked to an open PR: 10
 - Open issues without an open PR at review time: 75
-- Wave 1 (this PR): 34 issues
-- Wave 2 + Wave 3 (stacked follow-up PRs): 41 issues
+- Wave 1 (PR #2810): 34 issues
+- Wave 2 (this PR #2811): 20 issues
+- Wave 3 (stacked follow-up PR #2812): 21 issues
 - Triage comments posted at snapshot time: 85/85
 
 ## Existing Open PR Coverage
@@ -26,6 +27,11 @@
 - `wave-1`: active / near-term items (P1/P2, release-critical, or newly created issues with concrete implementation scope)
 - `wave-2`: medium backlog (primarily P3 created in recent cycles)
 - `wave-3`: long-tail backlog / parked items
+
+## Format Notes
+
+- Context excerpts in wave files are intentionally truncated with `...`.
+- `Triage note` captures inferred scope, blocker history, pending verification, and other non-quoted analyst context.
 
 ## Execution Notes
 

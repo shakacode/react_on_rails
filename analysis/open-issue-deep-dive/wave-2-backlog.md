@@ -90,9 +90,8 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Domain: discussion/rfc
 - Labels: P3
 - Created: 2025-12-08
-- Reviewer note: Issue body is template boilerplate with no concrete implementation details; keep this in backlog until the issue is rewritten with a concrete, testable scope.
+- Triage note: Issue body is template boilerplate with no concrete implementation details; relabeled from `P2` to `P3` on 2026-03-23 and kept in Wave 2 until scope is rewritten.
 - Posted question: Should this remain parked until the issue is rewritten with concrete scope and acceptance criteria?
-- Triage note: Relabeled from `P2` to `P3` on 2026-03-23 because scope is currently undefined.
 
 ## #2184 Remove "Setup Node with V8 Crash Retry" action
 
@@ -115,7 +114,8 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Domain: ci/tooling
 - Labels: P3
 - Created: 2025-12-04
-- Context excerpt: Issue body is minimal (`Ensure to mitigate CI runtime noise`); inferred scope is adding reproducible SSR/client performance benchmarks with CI-noise controls and stable baselines before gating changes. ...
+- Context excerpt: Ensure to mitigate CI runtime noise.
+- Triage note: Inferred scope is adding reproducible SSR/client performance benchmarks with CI-noise controls and stable baselines before gating changes.
 - Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2157 Improve test assertions: Replace ambiguous call_count patterns with explicit have_received checks
