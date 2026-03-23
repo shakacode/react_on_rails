@@ -12,7 +12,7 @@ ExecJS auto-detects the best available runtime via its `best_available` method, 
 
 ### `setTimeout` and `setInterval`
 
-ExecJS does not support `setTimeout`, `setInterval`, `clearTimeout`, or `clearInterval`. These functions rely on an event loop, which ExecJS does not provide. React on Rails injects stub functions that silently replace these timer APIs. With `trace: true` in your configuration, the stubs log a warning to `console.error` with a stack trace; otherwise, calls are silently dropped.
+ExecJS does not support `setTimeout`, `setInterval`, `clearTimeout`, or `clearInterval`. These functions rely on an event loop, which ExecJS does not provide. React on Rails injects stubs for `setTimeout`, `setInterval`, and `clearTimeout` that silently drop calls to those APIs. `clearInterval` is **not** stubbed and will raise a `ReferenceError` if called under ExecJS. With `trace: true` in your configuration, the three stubs log a warning to `console.error` with a stack trace; otherwise, calls are silently dropped.
 
 **What you'll see:** Timer callbacks are never executed. If `trace` is enabled, you'll see messages like:
 
