@@ -294,7 +294,7 @@ Rules for follow-up issues:
 
 ## Step 9: Merge-Ready Signal
 
-After completing the chosen action (`f`, `f+i`, or `m`), report merge readiness status:
+After completing the chosen action (`f`, `f+i`, `m`, or direct item selection), report merge readiness status:
 
 ```text
 All review threads resolved. PR is merge-ready.
@@ -308,6 +308,8 @@ Deferred review feedback tracked in follow-up issue: https://github.com/org/repo
 Deferred MUST-FIX threads remain open by default.
 PR is NOT merge-ready because must-fix items were deferred.
 ```
+
+If the action was direct item selection and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready. Re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`.
 
 Do not automatically merge. Signal readiness (or non-readiness) and let the user decide.
 

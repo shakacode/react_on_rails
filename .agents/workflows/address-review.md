@@ -134,6 +134,7 @@ Execution flow when terminal access is available:
    - After `f`, tell me the PR is merge-ready only when no `DISCUSS` items remain unresolved
    - After `f+i`, tell me the PR is merge-ready
    - After `m`, only tell me the PR is merge-ready when no must-fix items were deferred; otherwise explicitly say it is not merge-ready
+   - After direct selection, do not signal merge-ready automatically; first evaluate remaining `MUST-FIX`/`DISCUSS` items and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`
    - Show the follow-up issue URL if one was created
    - Do not auto-merge
 
