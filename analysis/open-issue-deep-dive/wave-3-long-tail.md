@@ -4,6 +4,16 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 
 Field note: `Posted question` is the exact question posted to each issue during the 2026-03-22 triage pass.
 
+## Domain Breakdown (19 Issues)
+
+| Domain               | Count |
+| -------------------- | ----- |
+| core/runtime         | 9     |
+| ci/tooling           | 4     |
+| documentation        | 4     |
+| discussion/rfc       | 1     |
+| pro/rsc integration  | 1     |
+
 ## Resolved After Snapshot, Before Execution
 
 - #1887 Investigate the ability to make RSC Payload smaller by removing props and stack objects from it — closed as duplicate of #2522 on 2026-03-23 (canonical issue tracked in Wave 1).
@@ -163,3 +173,4 @@ Field note: `Posted question` is the exact question posted to each issue during 
 - Context excerpt: # Motivation Because server rendering often uses `react_component_hash` to get the meta tags for SEO, we can't just flip a switch and turn off server rendering to debug the code in the browser. Here are the steps to debu ...
 - Posted question: Should this be batched with related docs issues in a single docs PR, or handled separately?
 - Triage note: Pending verification before scheduling; confirm whether this legacy Node VM doc is still needed or superseded by newer Node Renderer guidance.
+- Action: Verify against current Node Renderer docs and decide keep/update/archive by 2026-03-30 before scheduling.
