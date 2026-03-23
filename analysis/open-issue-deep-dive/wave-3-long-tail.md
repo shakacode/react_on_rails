@@ -97,7 +97,7 @@ Format notes:
 - Labels: P3
 - Created: 2025-07-09
 - Context excerpt: We can slightly simplify code and improve shown errors by using the `cause` option of `Error` constructor. Original blocker #1745 is now merged, so this is unblocked. ...
-- Blocked by: #1745 (resolved; merged 2025-07-14)
+- Previous blocker: #1745 (resolved; merged 2025-07-14)
 - Posted question: Now that the blocker is resolved, should this be scheduled in the next implementation wave?
 
 ## #1692 Fix Coveralls setup
