@@ -2,6 +2,15 @@
 
 Generated from open-issue triage snapshot dated 2026-03-22.
 
+Format notes:
+- Context excerpts are intentionally truncated with `...`.
+- Add a `Blocked by` field when the issue body explicitly names a blocker.
+
+## Resolved Before Execution
+
+- #1887 Investigate the ability to make RSC Payload smaller by removing props and stack objects from it — closed as duplicate of #2522 on 2026-03-23.
+- #1754 Add open telemetry support for react_on_rails — closed as duplicate of #2156 on 2026-03-23.
+
 ## #2527 RSC migration docs: Minor unverified references
 
 - Domain: documentation
@@ -66,15 +75,6 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 - Context excerpt: # Add RBS Type Signatures to Improve Developer Experience ## Problem Currently, both `shakapacker` and `react_on_rails` lack static type information for their Ruby APIs. This means: - IDEs cannot provide accurate autocom ...
 - Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
 
-## #1887 Investigate the ability to make RSC Payload smaller by removing props and stack objects from it
-
-- Domain: pro/rsc integration
-- Labels: P3
-- Created: 2025-10-29
-- Context excerpt: Issue body is template boilerplate with no concrete payload optimization details; canonical actionable payload-size work was tracked separately in #2522. ...
-- Posted question: Merged into #2522 for canonical tracking; no standalone scheduling unless scope diverges.
-- Status update (2026-03-23): Closed as duplicate of #2522.
-
 ## #1862 Add rake task to generate and export reference webpack/rspack configurations
 
 - Domain: core/runtime
@@ -90,15 +90,6 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 - Created: 2025-09-26
 - Context excerpt: @AbanoubGhadban we will need to research if rspack can work with RORP RSC. This PR might be relevant: https://github.com/web-infra-dev/rspack/pull/5824 ...
 - Posted question: Do you want this prioritized for the next RSC stability wave?
-
-## #1754 Add open telemetry support for react_on_rails
-
-- Domain: core/runtime
-- Labels: P3
-- Created: 2025-08-25
-- Context excerpt: Other packages like Sidekiq are supported: https://github.com/open-telemetry/opentelemetry-ruby-contrib/tree/main/instrumentation This would be useful to see metrics on React on Rails, especially SSR. CC: @AbanoubGhadban ...
-- Posted question: Merged into #2156 for canonical tracking; no standalone scheduling unless scope diverges.
-- Status update (2026-03-23): Closed as duplicate of #2156.
 
 ## #1746 Use Error causes
 
