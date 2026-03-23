@@ -23,9 +23,9 @@ This command serves three use cases at different points in the release lifecycle
 
 **Before a release** -- Stamp a version header and prepare for release:
 
-- Run `/update-changelog release` (or `rc` or `beta`) to add entries AND stamp the version header
-- The version is auto-computed from changelog content (see "Auto-Computing the Next Version" below)
-- Commit and push CHANGELOG.md
+- Run `/update-changelog release` (or `rc`, `beta`, or an explicit version like `16.5.0.rc.10`) to add entries AND stamp the version header
+- The version is auto-computed from changes (breaking -> major, features -> minor, fixes -> patch) — skipped when an explicit version is provided
+- The command automatically commits, pushes, and opens a PR — review and merge it
 - Then run `rake release` (no args needed -- it reads the version from CHANGELOG.md)
 - The release task automatically creates a GitHub release from the changelog section
 
@@ -160,7 +160,7 @@ bundle exec rake "update_changelog[beta]"      # stamp next beta version
 
 The rake task handles:
 
-- Auto-computing the next version from changelog headings and git tags
+- Auto-computing the next version from git tags (prerelease index is determined solely from tags, not changelog headers)
 - Inserting the version header right after `### [Unreleased]`
 - Updating version diff links at the bottom of the file
 - For `rc`/`beta` modes: collapsing prior prerelease sections of the same base version into a single section
@@ -206,7 +206,7 @@ After adding an entry to the `### [Unreleased]` section, ensure the version diff
 The format at the bottom should be:
 
 ```markdown
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.19...master
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.19...main
 [16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/v16.1.1...v16.2.0.beta.19
 ```
 
@@ -220,7 +220,7 @@ When a new version is released:
    ### [16.2.0.beta.20] - 2025-12-12
    ```
 
-2. Update the `[unreleased]:` link to compare from the new version to master
+2. Update the `[unreleased]:` link to compare from the new version to main
 3. Add a new version link comparing the previous version to the new version
 
 ## Process
@@ -229,8 +229,8 @@ When a new version is released:
 
 #### Step 1: Fetch and read current state
 
-- **CRITICAL**: Run `git fetch origin master` to ensure you have the latest commits
-- After fetching, use `origin/master` for all comparisons, NOT local `master` branch
+- **CRITICAL**: Run `git fetch origin main` to ensure you have the latest commits
+- After fetching, use `origin/main` for all comparisons, NOT local `main` branch
 - Read the current CHANGELOG.md to understand the existing structure
 
 #### Step 2: Reconcile tags with changelog sections (DO THIS FIRST)
@@ -257,16 +257,16 @@ When a new version is released:
    e. **Move** matching entries from Unreleased into the new section
    f. **Add** any new entries for PRs in that tag that aren't in the changelog at all
    g. **Update version diff links** at the bottom of the file:
-   - Update `[unreleased]:` to compare from the newest tag to master
+   - Update `[unreleased]:` to compare from the newest tag to main
    - Add a link for each new version section
 
 5. Get the tag date with: `git log -1 --format="%Y-%m-%d" TAG_NAME`
 
 #### Step 3: Add new entries for post-tag commits
 
-1. Run `git log --oneline LATEST_TAG..origin/master` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
-2. Extract PR numbers: `git log --oneline LATEST_TAG..origin/master | grep -oE "#[0-9]+" | sort -u`
-3. If Step 2 found no missing tagged versions, verify no tag is ahead of master: `git log --oneline origin/master..LATEST_TAG` should be empty. If not, entries in "Unreleased" may belong to that tagged version — Step 2 should have caught this, so re-check.
+1. Run `git log --oneline LATEST_TAG..origin/main` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
+2. Extract PR numbers: `git log --oneline LATEST_TAG..origin/main | grep -oE "#[0-9]+" | sort -u`
+3. If Step 2 found no missing tagged versions, verify no tag is ahead of main: `git log --oneline origin/main..LATEST_TAG` should be empty. If not, entries in "Unreleased" may belong to that tagged version — Step 2 should have caught this, so re-check.
 4. For each PR number, check if it's already in CHANGELOG.md: `grep "PR XXX" CHANGELOG.md`
 5. For PRs not yet in the changelog:
    - Get PR details: `gh pr view NUMBER --json title,body,author --repo shakacode/react_on_rails`
@@ -324,7 +324,7 @@ If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
    - Which PRs were skipped (and why)
 5. If in `release`/`rc`/`beta` mode or explicit-version mode, **automatically commit, push, and open a PR**:
    - Verify the working tree only has `CHANGELOG.md` changes; if there are other uncommitted changes, warn the user and stop
-   - Verify the current branch is `master` (`git branch --show-current`); if not, warn the user and stop
+   - Verify the current branch is `main` (`git branch --show-current`); if not, warn the user and stop
    - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
    - Stage only `CHANGELOG.md` (`git add CHANGELOG.md`) and commit with message `Update CHANGELOG.md for VERSION` (using the stamped version)
    - Push and open a PR with the changelog diff as the body

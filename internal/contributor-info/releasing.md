@@ -13,13 +13,14 @@ See [Contributing](https://github.com/shakacode/react_on_rails/tree/main/CONTRIB
 **Always update CHANGELOG.md before running the release task.** The release task reads the version from CHANGELOG.md and automatically creates a GitHub release from the changelog section.
 
 1. Ensure all desired changes are merged to `main` branch
-2. Run `/update-changelog release` (or `rc` or `beta` for prereleases) to:
+2. Run `/update-changelog release` (or `rc`, `beta`, or an explicit version like `16.5.0.rc.10`) to:
    - Find merged PRs missing from the changelog
    - Add changelog entries under the appropriate category headings
-   - Auto-compute the next version based on changes (breaking -> major, features -> minor, fixes -> patch)
+   - Auto-compute the next version based on changes (breaking -> major, features -> minor, fixes -> patch) — skipped when an explicit version is provided
    - Stamp the version header (e.g., `### [16.5.0] - 2026-03-08`)
-3. Review the changelog entries and verify the computed version
-4. Commit and push CHANGELOG.md
+   - For `rc`/`beta`: collapse prior prerelease sections and deduplicate entries
+   - **Automatically commit, push, and open a PR** with the changelog changes
+3. Review the PR, verify the computed version, and merge
 
 If you forget this step, the release task will print a warning and the GitHub release will need to be created manually afterward using `sync_github_release`.
 
@@ -199,6 +200,10 @@ The task automatically converts Ruby gem format to npm semver format:
 
 - `### [16.5.0.rc.1]` -- correct (matches gem version format)
 
+**CHANGELOG.md compare links** at the bottom of the file MUST use the `v` prefix to match git tags:
+
+- `[16.5.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0.rc.1` -- correct
+
 ### 5. During the Release
 
 1. When prompted for **npm OTP**, enter your 2FA code from your authenticator app
@@ -220,9 +225,10 @@ The task automatically converts Ruby gem format to npm semver format:
 
    **Option A - Use Claude Code (recommended):**
 
-   Run `/update-changelog` to analyze commits, write changelog entries, and create a PR. Then sync the GitHub release:
+   Run `/update-changelog 16.5.0` (using the already-released version) to analyze commits, write entries, and automatically open a PR. After the PR merges, pull the updated changelog and sync the GitHub release:
 
    ```bash
+   git pull --rebase
    bundle exec rake "sync_github_release[16.5.0]"
    ```
 
