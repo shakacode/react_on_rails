@@ -362,7 +362,7 @@ For data that is truly independent, render multiple `stream_react_component` cal
 <%= stream_react_component("DashboardHeader",
       props: { title: "My Dashboard" }) %>
 <%= stream_react_component("UserProfile",
-      props: { user: User.find(params[:user_id]).as_json }) %>
+      props: { user: User.find(params[:user_id]).as_json(only: [:id, :name, :avatar_url]) }) %>
 <%= stream_react_component("StatsPanel",
       props: { stats: DashboardStats.compute.as_json }) %>
 <%= stream_react_component("PostFeed",

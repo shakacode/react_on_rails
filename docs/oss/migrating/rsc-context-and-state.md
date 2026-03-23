@@ -120,7 +120,7 @@ export default function ProductPage({ user, product }) {
 
 **Key insight:** Components that don't need context (static header, footer) stay **outside** the provider wrapper, keeping them as Server Components with zero JavaScript cost.
 
-## Pattern 3: Streaming Slow Data with Async Props
+## Pattern 3: Streaming Slow Data
 
 > **Note:** This section covers a cross-cutting concern (data fetching via `stream_react_component`) that affects how you structure context and state. For the full treatment of data fetching patterns, see [Data Fetching Migration](rsc-data-fetching.md).
 
