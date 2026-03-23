@@ -116,7 +116,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Created: 2025-12-04
 - Context excerpt: Ensure to mitigate CI runtime noise.
 - Triage note: Inferred scope is adding reproducible SSR/client performance benchmarks with CI-noise controls and stable baselines before gating changes.
-- Posted question: Should this run in the testing-quality maintenance wave, or be deferred behind release-critical runtime work?
+- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2157 Improve test assertions: Replace ambiguous call_count patterns with explicit have_received checks
 
@@ -124,7 +124,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Labels: P3
 - Created: 2025-12-01
 - Context excerpt: ## Summary Some tests in the codebase use indirect `call_count` counter patterns to verify method invocations. These patterns are ambiguous because they: 1. **Prove absence indirectly** - asserting a count is lower doesn ...
-- Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
+- Posted question: Should this run in the testing-quality maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2156 Add OpenTelemetry support for Node Renderer
 
