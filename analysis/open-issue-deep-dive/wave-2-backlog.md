@@ -76,7 +76,7 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 
 ## #2190 Add top-level setup script for unified dependency installation
 
-- Domain: core/runtime
+- Domain: developer-experience
 - Labels: AI_ON, P3
 - Created: 2025-12-09
 - Context excerpt: ## Problem Currently, setting up the development environment requires running multiple commands in different directories: ```bash # Root directory pnpm install bundle install # Dummy app cd spec/dummy pnpm install bundle ...
