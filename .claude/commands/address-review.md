@@ -253,8 +253,8 @@ When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, crea
 
 ```bash
 # Required shell vars for issue sections
-: "${DISCUSS_ITEMS:?Set DISCUSS_ITEMS before creating follow-up issue}"
-: "${SKIPPED_ITEMS:?Set SKIPPED_ITEMS before creating follow-up issue}"
+: "${DISCUSS_ITEMS:-}"
+: "${SKIPPED_ITEMS:-}"
 
 # For `f+i`, keep this empty. For `m`, include a heading and deferred must-fix bullets.
 MUST_FIX_SECTION="${MUST_FIX_SECTION:-}"
