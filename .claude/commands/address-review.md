@@ -156,10 +156,10 @@ Wait for the user to choose an action before proceeding.
 2. Reply to each addressed comment explaining the fix.
 3. Resolve the corresponding review threads.
 4. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
-5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss`.
+5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss + resolve`.
 6. Commit, then ask for push confirmation before pushing.
 7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
-8. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review them or `f+i` to defer them with a follow-up issue.").
+8. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to defer to a follow-up issue, or `r all discuss + resolve` to decline and close.").
 
 ### Action `f+i` — Fix, follow-up issue, and merge-ready
 
@@ -294,7 +294,14 @@ fi
 if [ -z "${MUST_FIX_BLOCK}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
   echo "No deferred items found; skip follow-up issue creation."
 else
-  SECTION_CONTENT="$(printf '%s\n\n' "${MUST_FIX_BLOCK}" "${DISCUSS_SECTION}" "${SKIPPED_SECTION}")"
+  SECTION_CONTENT=""
+  for section in "${MUST_FIX_BLOCK}" "${DISCUSS_SECTION}" "${SKIPPED_SECTION}"; do
+    [ -z "${section}" ] && continue
+    if [ -n "${SECTION_CONTENT}" ]; then
+      SECTION_CONTENT="${SECTION_CONTENT}"$'\n\n'
+    fi
+    SECTION_CONTENT="${SECTION_CONTENT}${section}"
+  done
   gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
 ## Deferred review feedback from PR #${PR_NUMBER}
 
@@ -322,7 +329,7 @@ Rules for follow-up issues:
 
 ## Step 9: Merge-Ready Signal
 
-After completing the chosen action (`f`, `f+i`, `m`, or direct item selection), report merge readiness status:
+After completing the chosen action (`f`, `f+i`, `d`, `r`, `m`, or direct item selection), report merge readiness status:
 
 ```text
 All review threads resolved. PR is merge-ready.
@@ -371,7 +378,7 @@ SKIPPED (3):
 
 Quick actions:
   f     — Fix #1, then confirm whether to reply/resolve skipped items before deciding discuss items
-  f+i   — Fix #1, create follow-up issue for #2, reply-skip #3-5
+  f+i   — Fix #1, create follow-up issue for #2, reply/resolve trivial skipped #3-5
   d     — Discuss specific items (e.g., "d2,4")
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
   m     — No code changes, create follow-up issue, merge-ready only when no must-fix items are deferred

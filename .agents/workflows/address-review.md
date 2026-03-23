@@ -153,7 +153,7 @@ SKIPPED (count):
 
 Quick actions:
   f     — Fix #N, then confirm whether to reply/resolve skipped items before deciding discuss items
-  f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply-skip rest
+  f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply/resolve trivial skipped rest
   d     — Discuss specific items (e.g., "d2,4")
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
   m     — No code changes, create follow-up issue for must-fix/discuss/non-trivial skipped items
