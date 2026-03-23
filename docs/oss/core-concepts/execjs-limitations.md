@@ -6,7 +6,7 @@ React on Rails uses [ExecJS](https://github.com/rails/execjs) as the default ser
 
 ExecJS evaluates your server bundle in an isolated JavaScript context. It calls your render function synchronously, collects the resulting HTML string, and returns it to Rails. This synchronous model is the root of most limitations — ExecJS cannot wait for asynchronous operations to complete.
 
-By default, ExecJS uses the Node.js runtime. You can also use [mini_racer](https://github.com/rubyjs/mini_racer) (a V8 isolate). Both runtimes share the same synchronous limitations described below. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes.
+ExecJS auto-detects the best available runtime via its `best_available` method, checking (in order) mini_racer, Bun, Node.js, and others. This means ExecJS does **not** default to Node.js — it prefers mini_racer or Bun if either is installed. You can override the runtime with the `EXECJS_RUNTIME` environment variable. All runtimes share the same synchronous limitations described below. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes.
 
 ## Timer and Async Limitations
 
@@ -105,7 +105,7 @@ This is because mini_racer's V8 isolate does not include the `TextEncoder` and `
 
 ## Pool Size Constraints
 
-On MRI Ruby, ExecJS uses a single-threaded JavaScript runtime, so `server_renderer_pool_size` must stay at 1 to avoid deadlocks. JRuby users can increase the pool size for concurrent rendering.
+On MRI Ruby, `server_renderer_pool_size` must stay at 1 to avoid deadlocks. This is because the combination of ExecJS contexts, the `ConnectionPool` gem, and MRI's threading model can cause deadlocks when multiple threads contend for JavaScript contexts (see [#1438](https://github.com/shakacode/react_on_rails/issues/1438)). JRuby users can increase the pool size for concurrent rendering thanks to JRuby's true multi-threading support.
 
 ```ruby
 # config/initializers/react_on_rails.rb

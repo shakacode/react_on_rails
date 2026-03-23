@@ -63,9 +63,9 @@ Often caused by accessing props that are `nil` in Ruby but become `undefined` in
 }
 ```
 
-**`setTimeout is not defined` or async errors**
+**Timer callbacks silently dropped during SSR**
 
-These occur when using ExecJS, which does not support timers or async operations. See the [ExecJS Limitations](../core-concepts/execjs-limitations.md) guide for workarounds.
+React on Rails polyfills `setTimeout`, `setInterval`, and related timer functions as no-ops during ExecJS rendering, so you will not see a `setTimeout is not defined` error. Instead, timer callbacks are silently dropped and never execute. With `config.trace = true`, these calls log a warning to `console.error` with a stack trace to help you identify the source. See the [ExecJS Limitations](../core-concepts/execjs-limitations.md) guide for workarounds.
 
 ### Using `trace` Mode
 
