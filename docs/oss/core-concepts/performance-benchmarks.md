@@ -107,7 +107,7 @@ See the [full case study](https://www.shakacode.com/recent-work/popmenu/).
 - **Largest Contentful Paint (LCP):** When the main content becomes visible
 - **Total Blocking Time (TBT):** Time the main thread is blocked during page load
 - **Client bundle size:** Total JavaScript downloaded by the browser
-- **Server render time:** Time spent in the SSR process (not logged by default — for ExecJS, measure wall clock time in Ruby around the render call; for the Node Renderer, use per-request timing via `RENDERER_LOG_LEVEL`)
+- **Server render time:** Time spent in the SSR process (not logged by default — measure wall clock time in Ruby around the render call; on Pro, you can also enable `config.tracing = true` in `react_on_rails_pro.rb` to log render timings)
 
 ### Tools
 
@@ -115,7 +115,7 @@ See the [full case study](https://www.shakacode.com/recent-work/popmenu/).
 - **Lighthouse:** Automated performance scoring with LCP, TBT, and other Core Web Vitals
 - **`webpack-bundle-analyzer`:** Visualize bundle composition and identify large dependencies
 - **Rails server logs:** Server-side console messages replayed to `Rails.logger` when `config.logging_on_server = true`
-- **Node Renderer logs:** Per-request timing with `RENDERER_LOG_LEVEL` (Pro)
+- **Node Renderer logs:** Renderer lifecycle and error details controlled by `RENDERER_LOG_LEVEL` (Pro)
 
 ## Related Documentation
 
