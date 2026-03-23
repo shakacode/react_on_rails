@@ -2,6 +2,8 @@
 
 Generated from open-issue triage snapshot dated 2026-03-22.
 
+Field note: `Posted question` is the exact question posted to each issue during the 2026-03-22 triage pass.
+
 ## #2575 Update Pro install CTA after reactonrails.com launch
 
 - Domain: documentation
@@ -85,11 +87,11 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 ## #2182 Add support for react 19.2.1 and make a plan for implementing **Partial Pre-rendering** feature
 
 - Domain: discussion/rfc
-- Labels: P2
+- Labels: P3
 - Created: 2025-12-08
 - Context excerpt: Issue body is template boilerplate with no concrete implementation details; keep this in backlog until the issue is rewritten with a concrete, testable scope. ...
 - Posted question: Should this remain parked until the issue is rewritten with concrete scope and acceptance criteria?
-- Triage note: Kept in Wave 2 despite `P2` label because scope is currently undefined.
+- Triage note: Relabeled from `P2` to `P3` on 2026-03-23 because scope is currently undefined.
 
 ## #2184 Remove "Setup Node with V8 Crash Retry" action
 
