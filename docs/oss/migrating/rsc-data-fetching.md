@@ -129,7 +129,7 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 4. No client-side fetching, loading states, or error handling needed
 5. The component renders with zero JavaScript cost as a Server Component
 
-> **HTML streaming vs. progressive data streaming:** With synchronous props, all data is loaded in Rails before rendering begins. The streaming here is _HTML streaming_ — React sends rendered HTML to the browser as it processes the component tree, rather than waiting for the entire page to finish rendering. For progressive data streaming where slow data sources resolve independently via Suspense boundaries, see [Streaming SSR](../../pro/streaming-ssr.md).
+> **HTML streaming vs. progressive data streaming:** With synchronous props, all data is loaded in Rails before rendering begins. The streaming here is _HTML streaming_ — React sends rendered HTML to the browser as it processes the component tree, rather than waiting for the entire page to finish rendering. For progressive data streaming where slow data sources resolve independently via Suspense boundaries, see [Streaming SSR](../../pro/streaming-ssr.md) (React on Rails Pro).
 
 > **More details:** For setup instructions and configuration options, see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
 
