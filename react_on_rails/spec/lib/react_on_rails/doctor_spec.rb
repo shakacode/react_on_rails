@@ -1088,6 +1088,213 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#check_server_bundle_prerender_consistency" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    def write_project_file(path, content)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
+
+    context "when views use stream_react_component (RSC/streaming apps)" do
+      it "reports consistent configuration" do
+        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = "server-bundle.js"
+          end
+        RUBY
+        write_project_file("app/views/hello_server/index.html.erb", <<~ERB)
+          <h1>Hello Server</h1>
+          <%= stream_react_component('HelloServer', props: @hello_server_props) %>
+        ERB
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+        expect(success_messages).to include(a_string_including("Server rendering configuration is consistent"))
+        expect(info_messages).not_to include(a_string_including("remove server_bundle_js_file"))
+      end
+    end
+
+    context "when views use cached_stream_react_component" do
+      it "reports consistent configuration" do
+        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = "server-bundle.js"
+          end
+        RUBY
+        write_project_file("app/views/posts/show.html.erb", <<~ERB)
+          <%= cached_stream_react_component('PostDetail', props: @post_props) %>
+        ERB
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+        expect(success_messages).to include(a_string_including("Server rendering configuration is consistent"))
+      end
+    end
+
+    context "when views use rsc_payload_react_component" do
+      it "reports consistent configuration" do
+        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = "server-bundle.js"
+          end
+        RUBY
+        write_project_file("app/views/posts/show.html.erb", <<~ERB)
+          <%= rsc_payload_react_component('PostDetail', props: @post_props) %>
+        ERB
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+        expect(success_messages).to include(a_string_including("Server rendering configuration is consistent"))
+      end
+    end
+
+    context "when views have no prerender or streaming helpers" do
+      it "suggests removing server_bundle_js_file" do
+        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = "server-bundle.js"
+          end
+        RUBY
+        write_project_file("app/views/hello_world/index.html.erb", <<~ERB)
+          <h1>Hello World</h1>
+          <%= react_component("HelloWorld", props: @hello_world_props) %>
+        ERB
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("remove server_bundle_js_file"))
+      end
+    end
+  end
+
+  describe "#check_server_rendering_engine" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:execjs_runtime) { Struct.new(:name).new("Node.js (V8)") }
+    let(:execjs_module) { Struct.new(:runtime).new(execjs_runtime) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    def write_project_file(path, content)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
+
+    context "when Pro initializer has NodeRenderer" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        write_project_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+          end
+        RUBY
+      end
+
+      it "labels ExecJS as fallback" do
+        stub_const("ExecJS", execjs_module)
+
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
+        expect(info_messages).to include(a_string_including("ExecJS available as fallback"))
+        expect(info_messages).not_to include(a_string_matching(/^\s+ExecJS Runtime:/))
+      end
+    end
+
+    context "when Pro initializer has NodeRenderer and ExecJS is absent" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        write_project_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+          end
+        RUBY
+        hide_const("ExecJS")
+      end
+
+      it "warns about missing ExecJS fallback" do
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+        expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
+        expect(warning_messages).to include(
+          a_string_including("ExecJS fallback is enabled but ExecJS is not available")
+        )
+      end
+    end
+
+    context "when Pro initializer does not have NodeRenderer" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        write_project_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+          ReactOnRailsPro.configure do |config|
+            config.prerender_caching = true
+          end
+        RUBY
+      end
+
+      it "reports ExecJS as primary engine" do
+        stub_const("ExecJS", execjs_module)
+
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("ExecJS Runtime:"))
+        expect(info_messages).not_to include(a_string_including("Pro uses NodeRenderer"))
+      end
+    end
+
+    context "when no Pro initializer exists" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      end
+
+      it "reports ExecJS as primary engine" do
+        stub_const("ExecJS", execjs_module)
+
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("ExecJS Runtime:"))
+      end
+    end
+
+    context "when Pro gem is not installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+      end
+
+      it "reports ExecJS as primary engine" do
+        stub_const("ExecJS", execjs_module)
+
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("ExecJS Runtime:"))
+      end
+    end
+  end
+
   describe "server bundle path Shakapacker integration" do
     let(:doctor) { described_class.new }
     let(:checker) { doctor.instance_variable_get(:@checker) }
