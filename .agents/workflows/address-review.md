@@ -94,7 +94,7 @@ Execution flow when terminal access is available:
    - After the triage list, present this quick-action menu:
      ```
      Quick actions:
-      f     — Fix must-fix items, then confirm whether to reply-skip skipped items before deciding discuss items
+      f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
       f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
       d     — Discuss specific items before deciding (e.g., "d2,4")
       r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
@@ -152,7 +152,7 @@ SKIPPED (count):
 3. item - short reason
 
 Quick actions:
-  f     — Fix #N, then confirm whether to reply-skip skipped items before deciding discuss items
+  f     — Fix #N, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply-skip rest
   d     — Discuss specific items (e.g., "d2,4")
   r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads

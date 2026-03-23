@@ -144,6 +144,7 @@ Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
 
 **Range syntax**: Support `N-M` to expand into individual item numbers (e.g., `3-5` becomes `3,4,5`). Ranges work everywhere: item selection, `d`, and `r`.
+- Generate `f` and `f+i` descriptions dynamically using actual item numbers and deferred targets from the current triage set.
 
 Wait for the user to choose an action before proceeding.
 
@@ -155,7 +156,7 @@ Wait for the user to choose an action before proceeding.
 2. Reply to each addressed comment explaining the fix.
 3. Resolve the corresponding review threads.
 4. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
-5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss) or `f+i` (create follow-up issue).
+5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss`.
 6. Commit, then ask for push confirmation before pushing.
 7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
 8. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review them or `f+i` to defer them with a follow-up issue.").
@@ -164,7 +165,7 @@ Wait for the user to choose an action before proceeding.
 
 1. Do everything in `f` for `MUST-FIX` items. If there are no `MUST-FIX` items, skip the fix phase and continue with deferred-item handling.
 2. Create a **follow-up GitHub issue** (see Step 8) bundling all `DISCUSS` and non-trivial `SKIPPED` items.
-3. For each deferred item in the follow-up issue, post a reply referencing the issue and resolve the thread.
+3. For each deferred item in the follow-up issue, post a reply in the original location referencing the issue (use review-comment replies for inline comments and issue comments for review summaries/general comments), and resolve the thread when one exists.
 4. For trivial `SKIPPED` items that are not included in the follow-up issue (duplicates, factually incorrect suggestions, status noise), still post rationale replies and resolve those threads.
 5. If there are zero deferred items, skip issue creation and behave like `f`.
 6. Commit, then ask for push confirmation before pushing.
@@ -172,7 +173,7 @@ Wait for the user to choose an action before proceeding.
 
 ### Action `d` — Discuss items
 
-Present the requested items with full context and ask the user for a decision on each. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items.
+Present the requested items with full context and ask the user for a decision on each. If the user enters bare `d` with no item numbers, present all `DISCUSS` items. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items.
 
 ### Action `r` — Reply with rationale
 
@@ -293,12 +294,13 @@ fi
 if [ -z "${MUST_FIX_BLOCK}${DISCUSS_SECTION}${SKIPPED_SECTION}" ]; then
   echo "No deferred items found; skip follow-up issue creation."
 else
+  SECTION_CONTENT="$(printf '%s\n\n' "${MUST_FIX_BLOCK}" "${DISCUSS_SECTION}" "${SKIPPED_SECTION}")"
   gh issue create --repo "${REPO}" --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --body "$(cat <<EOF
 ## Deferred review feedback from PR #${PR_NUMBER}
 
 These items were triaged during review and deferred for follow-up.
 
-${MUST_FIX_BLOCK}${DISCUSS_SECTION}${SKIPPED_SECTION}
+${SECTION_CONTENT}
 
 ---
 Original PR: https://github.com/${REPO}/pull/${PR_NUMBER}
@@ -389,7 +391,7 @@ Note: The `f` line dynamically shows which must-fix items will be fixed and, whe
 - **NEVER automatically address all review comments** - always wait for user direction
 - When given a specific review URL, no need to ask for more information
 - **ALWAYS reply to comments after addressing them** to close the feedback loop
-- After triage, always offer rationale replies for selected `SKIPPED`/declined items; selecting `f`, `f+i`, or `m` counts as explicit approval for the replies and associated thread-resolution behavior for that action
+- After triage, always offer rationale replies for selected `SKIPPED`/declined items; `f` requires explicit confirmation before skipped-item replies/resolution, while `f+i` and `m` include skipped-item handling in the chosen action flow
 - Always request push confirmation from the user before running `git push`
 - Resolve the review thread after replying when the concern is actually addressed and a thread ID is available
 - Default to real issues only. Do not spend a review cycle on optional polish unless the user explicitly asks for it
