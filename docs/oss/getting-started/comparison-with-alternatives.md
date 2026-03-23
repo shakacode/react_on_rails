@@ -167,7 +167,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 - **React Server Components** — full RSC support with Rails integration
 - **Streaming SSR** — progressive rendering with React 18's `renderToPipeableStream`
-- **Node renderer** — dedicated Node.js server for 10–100x faster SSR (replaces ExecJS)
+- **Node renderer** — dedicated Node.js server for 3-10x faster SSR (replaces ExecJS)
 - **Fragment caching** — cache rendered components with `cached_react_component`
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
