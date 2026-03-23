@@ -110,7 +110,7 @@ Execution flow when terminal access is available:
    - **`f+i`**: Same as `f`, but also create a follow-up GitHub issue bundling discuss and non-trivial skipped items. Reference the issue in thread replies.
    - **`d`**: Present requested items with full context, ask for a decision on each. Approved → fix like must-fix. Declined → optionally reply with rationale.
    - **`r`**: Post rationale replies to specified items, resolve threads. Accepts numbers, ranges, or `r all skipped` / `r all discuss`.
-   - **`m`**: Create a follow-up issue for `MUST-FIX`, `DISCUSS`, and non-trivial `SKIPPED` items, reply on each thread referencing it, and resolve all threads. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
+   - **`m`**: Create a follow-up issue for deferred items, reply on each thread referencing it, and resolve `DISCUSS`/`SKIPPED` threads. Keep deferred `MUST-FIX` threads open by default unless the user explicitly asks to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
    - **Direct selection** (e.g., "1,2", "all must-fix", "1,3-5"): Address only selected items, then ask about remaining items.
    - Users can chain actions (e.g., `f+i` then `r7-9`).
    - Reply to each addressed review comment:
@@ -123,7 +123,8 @@ Execution flow when terminal access is available:
 
 8. Create follow-up issue (when `f+i` or `m` is chosen):
    - Use `gh issue create` with title "Follow-up: Review feedback from PR #N"
-   - Include must-fix items, discuss items, and non-trivial skipped items with reviewer username and comment link
+   - For `f+i`, include discuss items and non-trivial skipped items (must-fix is already addressed)
+   - For `m`, include deferred must-fix items, discuss items, and non-trivial skipped items
    - Reference the issue in thread replies
    - Return the issue URL
 

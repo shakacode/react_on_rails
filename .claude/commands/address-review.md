@@ -176,9 +176,10 @@ Post rationale replies to the specified items explaining why they are being defe
 
 1. Create a follow-up GitHub issue (see Step 8) bundling `MUST-FIX`, `DISCUSS`, and non-trivial `SKIPPED` items.
 2. Post a reply on each open thread referencing the follow-up issue.
-3. Resolve all threads.
-4. If any `MUST-FIX` items were deferred, explicitly tell the user the PR is **not merge-ready** without an override decision.
-5. Only signal merge-ready with no code changes when there are zero deferred `MUST-FIX` items.
+3. Resolve `DISCUSS` and `SKIPPED` threads after replying.
+4. If any `MUST-FIX` items were deferred, keep those review threads open by default unless the user explicitly asks to close them.
+5. If any `MUST-FIX` items were deferred, explicitly tell the user the PR is **not merge-ready** without an override decision.
+6. Only signal merge-ready with no code changes when there are zero deferred `MUST-FIX` items.
 
 ### Direct item selection (e.g., "1,2", "all must-fix", "1,3-5")
 
@@ -251,8 +252,7 @@ gh issue create --title "Follow-up: Review feedback from PR #${PR_NUMBER}" --bod
 
 These items were triaged during review and deferred for follow-up.
 
-### Must-fix items
-${MUST_FIX_ITEMS}
+${MUST_FIX_SECTION}
 
 ### Discuss items
 ${DISCUSS_ITEMS}
@@ -269,6 +269,8 @@ EOF
 Rules for follow-up issues:
 
 - Only include non-trivial `SKIPPED` items (skip pure duplicates and factually incorrect suggestions)
+- For `f+i`, omit the must-fix section because must-fix items were addressed in the current PR
+- For `m`, include a must-fix section listing deferred blockers
 - Include the original reviewer username and comment link for each item
 - Include enough context that someone can act on the issue without re-reading the full PR review
 - After creating the issue, reference it in thread replies (e.g., "Tracked in #NNN for follow-up")
