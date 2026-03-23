@@ -23,7 +23,7 @@
 
 ## Wave Definitions
 
-- `wave-1`: active / near-term items (P1/P2, release-critical, or newly created issues)
+- `wave-1`: active / near-term items (P1/P2, release-critical, or newly created issues with concrete implementation scope)
 - `wave-2`: medium backlog (primarily P3 created in recent cycles)
 - `wave-3`: long-tail backlog / parked items
 
