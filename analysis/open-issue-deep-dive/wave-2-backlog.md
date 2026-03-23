@@ -47,7 +47,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 
 ## #2409 Align spec/dummy/Procfile.dev SERVER_BUNDLE_ONLY value with template convention
 
-- Domain: pro/rsc integration
+- Domain: developer-experience
 - Labels: enhancement, P3
 - Created: 2026-02-14
 - Context excerpt: ## Description The `spec/dummy/Procfile.dev` uses `SERVER_BUNDLE_ONLY=true` while the project template at `lib/generators/react_on_rails/templates/base/base/Procfile.dev` uses `SERVER_BUNDLE_ONLY=yes`. Both values work e ...
