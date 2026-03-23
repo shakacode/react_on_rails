@@ -134,10 +134,10 @@ After the triage list, present a **quick-action menu**:
 
 ```text
 Quick actions:
-  f     — Fix must-fix items, reply/resolve skipped items (implicit approval; include skipped count), then decide discuss items
+  f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
   d     — Discuss specific items before deciding (e.g., "d2,4")
-  r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss") without auto-resolving unless requested
+  r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve those threads
   m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
@@ -154,7 +154,7 @@ Wait for the user to choose an action before proceeding.
 1. Address all `MUST-FIX` items (make code changes, run checks). If there are no `MUST-FIX` items, skip directly to discuss/skipped handling.
 2. Reply to each addressed comment explaining the fix.
 3. Resolve the corresponding review threads.
-4. For `SKIPPED` items, post a brief rationale reply and resolve those threads.
+4. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n").
 5. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss) or `f+i` (create follow-up issue).
 6. Commit, then ask for push confirmation before pushing.
 7. Tell the user the PR is merge-ready only after `DISCUSS` items are resolved or explicitly deferred.
@@ -254,12 +254,12 @@ If the user explicitly asks to close out a `DISCUSS` or `SKIPPED` item, reply wi
 When the user chooses `f+i`, `m`, or explicitly asks for a follow-up issue, create a GitHub issue that bundles deferred items:
 
 ```bash
-# Optional section vars (may be empty when a triage bucket has no deferred items)
-: "${DISCUSS_ITEMS:=}"
-: "${SKIPPED_ITEMS:=}"
+# Template inputs: replace each <...> placeholder before running this snippet.
+DISCUSS_ITEMS="<DISCUSS_ITEMS_BULLETS_OR_EMPTY>"
+SKIPPED_ITEMS="<SKIPPED_ITEMS_BULLETS_OR_EMPTY>"
 
 # For `f+i`, keep this empty. For `m`, include a heading and deferred must-fix bullets.
-MUST_FIX_SECTION="${MUST_FIX_SECTION:-}"
+MUST_FIX_SECTION="<MUST_FIX_SECTION_OR_EMPTY>"
 
 MUST_FIX_BLOCK=""
 if [ -n "${MUST_FIX_SECTION}" ]; then
@@ -368,16 +368,16 @@ SKIPPED (3):
 5. spec/helper_spec.rb:20 - "Consolidate assertions" (@claude[bot]) - test style preference
 
 Quick actions:
-  f     — Fix #1, reply/resolve skipped items (implicit approval; include skipped count), then decide discuss items
+  f     — Fix #1, then confirm whether to reply/resolve skipped items before deciding discuss items
   f+i   — Fix #1, create follow-up issue for #2, reply-skip #3-5
   d     — Discuss specific items (e.g., "d2,4")
-  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss") without auto-resolving
+  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
   m     — No code changes, create follow-up issue, merge-ready only when no must-fix items are deferred
 
 Or pick items by number: "1,2", "all must-fix", "1,3-5"
 ```
 
-Note: The `f` line dynamically shows which must-fix items will be fixed and how many skipped items will be auto-replied/resolved. The `f+i` line shows what will be fixed vs. deferred. When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection. When there are no `MUST-FIX` items, `f` and `f+i` skip code changes and proceed directly to discuss/skipped handling.
+Note: The `f` line dynamically shows which must-fix items will be fixed and, when skipped items exist, the follow-up confirmation prompt with skipped count. The `f+i` line shows what will be fixed vs. deferred. When there are no `DISCUSS` or `SKIPPED` items, only show `f` and direct item selection. When there are no `MUST-FIX` items, `f` and `f+i` skip code changes and proceed directly to discuss/skipped handling.
 
 # Important Notes
 
