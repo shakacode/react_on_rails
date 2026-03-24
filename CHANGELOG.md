@@ -34,6 +34,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 2816](https://github.com/shakacode/react_on_rails/pull/2816) by
   [justin808](https://github.com/justin808).
 
+#### Breaking Changes
+
+- **[Pro]** **Minimum `async` gem version bumped to 2.29**: The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. If your Gemfile pins the `async` gem below 2.29, you will need to update it before upgrading React on Rails Pro. Run `bundle update async` to pick up the new minimum.
+
 #### Changed
 
 - **[Pro]** **Migrated from `Async::Variable` to `Async::Promise`**: Replaced deprecated `Async::Variable` (deprecated in async v2.29.0) with `Async::Promise` in the streaming helper. Uses `Promise#reject` for cleaner error propagation and `Promise#resolved?` for state checking instead of catching `FrozenError`. Minimum async gem version bumped from 2.6 to 2.29. [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808). Fixes [Issue 2563](https://github.com/shakacode/react_on_rails/issues/2563).
