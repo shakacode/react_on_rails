@@ -474,10 +474,7 @@ module ReactOnRails
     end
 
     def bundler_config_file_exists?
-      File.exist?("config/webpack/webpack.config.js") ||
-        File.exist?("config/webpack/webpack.config.ts") ||
-        File.exist?("config/rspack/rspack.config.js") ||
-        File.exist?("config/rspack/rspack.config.ts")
+      !resolved_webpack_config_path.nil?
     end
 
     def shakapacker_in_gemfile?
