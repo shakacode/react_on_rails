@@ -180,6 +180,22 @@ describe('injectRSCPayload', () => {
     );
   });
 
+  it('handles chunks that split across JSON object boundaries', async () => {
+    const mockRSC = createMockStream(['{"test": "data"}\n{"test": "dat', 'a2"}\n']);
+    const mockHTML = createMockStream(['<html><body>Hello</body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data"})</script>`,
+    );
+    expect(resultStr).toContain(
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data2"})</script>`,
+    );
+  });
+
   it('adds sanitized nonce attribute to injected RSC script tags', async () => {
     const mockRSC = createMockStream(['{"test": "data"}\n']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
