@@ -78,7 +78,7 @@ module ReactOnRails
         say "✅ Pro npm dependencies added", :green
       end
 
-      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
       def swap_base_gem_for_pro_in_gemfile
         gemfile_path = File.join(destination_root, "Gemfile")
         unless File.exist?(gemfile_path)
@@ -120,7 +120,8 @@ module ReactOnRails
           while line_index < gemfile_lines.length &&
                 line_continues_with_comma?(current_line) &&
                 gem_declaration_continues_on_next_line?(gemfile_lines[line_index])
-            current_line = gemfile_lines[line_index]
+            next_line = gemfile_lines[line_index]
+            current_line = next_line unless comment_or_blank_line?(next_line)
             line_index += 1
           end
         end
@@ -128,15 +129,25 @@ module ReactOnRails
         updated_content = updated_lines.join
         return if updated_content == gemfile_content
 
+        if options[:pretend]
+          say_status :pretend, "Would replace react_on_rails with react_on_rails_pro in Gemfile", :yellow
+          return
+        end
+
         File.write(gemfile_path, updated_content)
         say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
         bundle_install_after_gem_swap
       rescue StandardError => e
         add_gemfile_update_warning(gemfile_path, e)
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
       def bundle_install_after_gem_swap
+        if options[:pretend]
+          say_status :pretend, "Skipping bundle install in --pretend mode", :yellow
+          return
+        end
+
         say "📦 Running bundle install after Gemfile update...", :yellow
         install_status = Bundler.with_unbundled_env do
           gemfile_path = File.join(destination_root, "Gemfile")
@@ -182,16 +193,33 @@ module ReactOnRails
 
       def update_imports_to_pro_package
         files = js_files_for_import_update
-        updated_files = files.count do |file|
+        updated_files = 0
+
+        files.each do |file|
           content = File.read(file)
           updated_content = rewrite_react_on_rails_module_specifiers(content)
-          next false if updated_content == content
+          next if updated_content == content
+
+          if options[:pretend]
+            say_status :pretend, "Would update react-on-rails imports in #{file}", :yellow
+            updated_files += 1
+            next
+          end
 
           File.write(file, updated_content)
-          true
+          updated_files += 1
+        rescue StandardError => e
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  Could not update imports in #{file}: #{e.message}
+
+            Please update react-on-rails imports to react-on-rails-pro manually.
+          MSG
         end
 
-        return if updated_files.zero?
+        if updated_files.zero?
+          say "ℹ️  No react-on-rails imports required updates", :yellow
+          return
+        end
 
         say "✅ Updated react-on-rails imports in #{updated_files} file(s)", :green
       end
@@ -237,7 +265,7 @@ module ReactOnRails
       end
 
       def line_continues_with_comma?(line)
-        line_without_comment = line.sub(/\s+#.*$/, "").rstrip
+        line_without_comment = line.sub(/\s*#.*$/, "").rstrip
         line_without_comment.end_with?(",")
       end
 
@@ -246,6 +274,11 @@ module ReactOnRails
         return false if stripped.empty?
 
         !stripped.match?(/\Agem(?:\s|\()/)
+      end
+
+      def comment_or_blank_line?(line)
+        stripped = line.lstrip
+        stripped.empty? || stripped.start_with?("#")
       end
 
       def add_missing_gemfile_warning(gemfile_path)
@@ -266,8 +299,10 @@ module ReactOnRails
         MSG
       end
 
+      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def rewrite_non_comment_lines(content)
         in_block_comment = false
+        pending_dynamic_import = false
 
         content.lines.map do |line|
           stripped = line.lstrip
@@ -278,25 +313,49 @@ module ReactOnRails
           elsif stripped.start_with?("/*")
             in_block_comment = !stripped.include?("*/")
             line
-          elsif stripped.start_with?("//", "*")
+          elsif stripped.start_with?("//") || stripped.match?(/\A\*\s/)
             line
           else
             rewritten_line = yield line
+            if pending_dynamic_import
+              rewritten_line = rewrite_pending_dynamic_import_specifier(rewritten_line)
+              pending_dynamic_import = !import_call_closes_on_line?(rewritten_line)
+            elsif starts_pending_dynamic_import?(rewritten_line)
+              pending_dynamic_import = true
+            end
             in_block_comment = true if unclosed_block_comment_starts?(line)
             rewritten_line
           end
         end.join
       end
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def unclosed_block_comment_starts?(line)
         line_without_strings = line.gsub(
           /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/,
           ""
         )
-        opening_index = line_without_strings.index("/*")
+        line_without_inline_comment = line_without_strings.sub(%r{//.*$}, "")
+        opening_index = line_without_inline_comment.index("/*")
         return false unless opening_index
 
-        line_without_strings.index("*/", opening_index + 2).nil?
+        line_without_inline_comment.index("*/", opening_index + 2).nil?
+      end
+
+      def starts_pending_dynamic_import?(line)
+        return false unless line.match?(/\bimport\s*\(/)
+
+        !line.match?(%r{\bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
+      end
+
+      def rewrite_pending_dynamic_import_specifier(line)
+        line.sub(%r{(?<quote>["'])react-on-rails(?!-pro)(?=(?:["']|/))}) do
+          "#{Regexp.last_match[:quote]}react-on-rails-pro"
+        end
+      end
+
+      def import_call_closes_on_line?(line)
+        line.include?(")")
       end
 
       def print_success_message

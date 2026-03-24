@@ -133,6 +133,42 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).not_to include("  \"~> 16.0\"")
     end
 
+    it "replaces multiline declarations when trailing comma is followed by a tight inline comment" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails",#pinned for compatibility
+          "~> 16.0"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).not_to include("gem \"react_on_rails\",#pinned for compatibility")
+      expect(gemfile_content).not_to include("  \"~> 16.0\"")
+    end
+
+    it "consumes multiline declarations when comment-only lines appear before continuation lines" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails",
+          # pinned for compatibility
+          "~> 16.0"
+        gem "rails"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).to include("gem \"rails\"")
+      expect(gemfile_content).not_to include("~> 16.0")
+    end
+
     it "does not consume the next gem line when base declaration ends with a trailing comma" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -255,6 +291,22 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).not_to include("gem \"react_on_rails\" # pinned for compatibility")
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
+
+    it "does not modify Gemfile in --pretend mode" do
+      pretend_generator = described_class.new([], { pretend: true })
+      allow(pretend_generator).to receive(:destination_root).and_return(destination_root)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0"
+      RUBY
+
+      original_content = File.read(gemfile_path)
+      expect(pretend_generator).not_to receive(:bundle_install_after_gem_swap)
+
+      pretend_generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      expect(File.read(gemfile_path)).to eq(original_content)
+    end
   end
 
   describe "#bundle_install_after_gem_swap" do
@@ -276,6 +328,14 @@ describe ProGenerator, type: :generator do
       generator.send(:bundle_install_after_gem_swap)
 
       expect(GeneratorMessages.messages).to eq([])
+    end
+
+    it "skips bundle install in --pretend mode" do
+      pretend_generator = described_class.new([], { pretend: true })
+      allow(pretend_generator).to receive(:destination_root).and_return(destination_root)
+
+      expect(Bundler).not_to receive(:with_unbundled_env)
+      pretend_generator.send(:bundle_install_after_gem_swap)
     end
 
     it "uses bounded process waiting and warns on timeout" do
@@ -313,6 +373,11 @@ describe ProGenerator, type: :generator do
         import ReactOnRails from "react-on-rails";
         const ror = require("react-on-rails");
         const lazyRor = import(/* webpackChunkName: "ror" */ "react-on-rails");
+        const lazyRorMultiline = import(
+          /* webpackMode: "lazy" */
+          "react-on-rails/client"
+        );
+        const keepRor = require("react-on-rails"); // /* not a block comment start
         const commentLikeString = "/* not a JS comment";
         import ReactOnRailsServer from "react-on-rails/server";
         import ReactOnRailsClient from "react-on-rails/client";
@@ -346,6 +411,7 @@ describe ProGenerator, type: :generator do
       expect(File.read(application_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
       expect(File.read(application_js_path)).to include('require("react-on-rails-pro")')
       expect(File.read(application_js_path)).to include('import(/* webpackChunkName: "ror" */ "react-on-rails-pro")')
+      expect(File.read(application_js_path)).to include('"react-on-rails-pro/client"')
       expect(File.read(application_js_path)).to include('import ReactOnRailsServer from "react-on-rails-pro/server";')
       expect(File.read(application_js_path)).to include('import ReactOnRailsClient from "react-on-rails-pro/client";')
       expect(File.read(application_js_path)).to include('import "react-on-rails-pro";')
@@ -359,6 +425,16 @@ describe ProGenerator, type: :generator do
       expect(File.read(vue_component_path)).to include('import ReactOnRails from "react-on-rails-pro";')
       expect(File.read(vue_component_path)).to include('require("react-on-rails-pro")')
       expect(File.read(svelte_component_path)).to include('import ReactOnRails from "react-on-rails-pro";')
+    end
+
+    it "does not write files in --pretend mode" do
+      pretend_generator = described_class.new([], { pretend: true })
+      allow(pretend_generator).to receive(:destination_root).and_return(destination_root)
+      original_content = File.read(application_js_path)
+
+      pretend_generator.send(:update_imports_to_pro_package)
+
+      expect(File.read(application_js_path)).to eq(original_content)
     end
   end
 
