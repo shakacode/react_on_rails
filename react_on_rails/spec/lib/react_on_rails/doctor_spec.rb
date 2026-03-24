@@ -1699,7 +1699,7 @@ RSpec.describe ReactOnRails::Doctor do
         expect(doctor.send(:resolved_webpack_config_path)).to eq("config/custom/custom-bundler.config.js")
       end
 
-      it "prefers shakapacker-derived webpack config candidates over the default path" do
+      it "falls back to shakapacker-derived webpack config candidates when exact shakapacker path is not a file" do
         allow(File).to receive(:file?).and_return(false)
         allow(File).to receive(:file?).with("config/custom/webpack.config.ts").and_return(true)
         allow(doctor).to receive(:shakapacker_webpack_config_directory)
