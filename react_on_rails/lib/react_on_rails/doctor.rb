@@ -796,10 +796,11 @@ module ReactOnRails
 
       if runtime_config
         server_bundle_value = runtime_config.server_bundle_js_file
+        fallback_server_bundle = server_bundle_filename
         if server_bundle_value.present?
           checker.add_info("  server_bundle_js_file: #{server_bundle_value}")
         elsif server_bundle_value.nil?
-          checker.add_info("  server_bundle_js_file: #{server_bundle_filename} (initializer/default)")
+          checker.add_info("  server_bundle_js_file: #{fallback_server_bundle} (initializer/default)")
         else
           checker.add_info("  server_bundle_js_file: \"\" (disabled)")
         end
@@ -931,7 +932,9 @@ module ReactOnRails
 
       # Component registry timeout
       if runtime_config
-        checker.add_info("  component_registry_timeout: #{runtime_config.component_registry_timeout}ms")
+        # Default is 5000 ms; only report explicit non-default override.
+        checker.add_info("  component_registry_timeout: #{runtime_config.component_registry_timeout}ms") \
+          if runtime_config.component_registry_timeout != 5000
       else
         timeout_match = content.match(/config\.component_registry_timeout\s*=\s*([^\s\n,]+)/)
         checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms") if timeout_match
@@ -2371,12 +2374,13 @@ module ReactOnRails
 
       @resolved_pro_server_renderer =
         if ensure_rails_environment_loaded && defined?(ReactOnRailsPro)
+          # server_renderer is stored as a plain string in Pro config (for example, "NodeRenderer").
           ReactOnRailsPro.configuration.server_renderer
         elsif pro_initializer_has_node_renderer?
           "NodeRenderer"
         end
     rescue StandardError => e
-      checker.add_warning("  ⚠️  Could not read Pro runtime renderer configuration: #{e.message}")
+      checker.add_warning("⚠️  Could not read Pro runtime renderer configuration: #{e.message}")
       @resolved_pro_server_renderer = nil
     end
 

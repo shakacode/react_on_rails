@@ -181,6 +181,16 @@ RSpec.describe ReactOnRails::Doctor do
         a_string_including("server_bundle_js_file: server-bundle.js (initializer/default)")
       )
     end
+
+    it "omits component_registry_timeout when runtime value is the default" do
+      allow(runtime_config).to receive(:component_registry_timeout).and_return(5000)
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).not_to include(a_string_including("component_registry_timeout"))
+    end
   end
 
   describe "server bundle path detection" do
