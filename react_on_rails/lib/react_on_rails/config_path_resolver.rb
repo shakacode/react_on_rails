@@ -54,7 +54,7 @@ module ReactOnRails
           nil
         else
           rails_root = Rails.root.to_s
-          if rails_root.empty? || rails_root == "/" || !path.start_with?("#{rails_root}/")
+          if rails_root.empty? || !path.start_with?("#{rails_root}/")
             path
           else
             path.sub("#{rails_root}/", "")
