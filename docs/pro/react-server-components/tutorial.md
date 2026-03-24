@@ -18,4 +18,4 @@ This tutorial will guide you through learning [React Server Components (RSC)](ht
 
 Each part of the tutorial builds on the concepts from previous sections, so it's recommended to follow them in order. Let's begin with creating your first React Server Component!
 
-> **Already running Pro?** If you have an existing React on Rails Pro app and want to add RSC, see the [upgrade guide](./upgrading-existing-pro-app-to-rsc.md) for a streamlined path using the standalone `react_on_rails:rsc` generator.
+> **Already running Pro?** If you have an existing React on Rails Pro app and want to add RSC, see the [upgrade guide](./upgrading-existing-pro-app.md) for a streamlined path using the standalone `react_on_rails:rsc` generator.
