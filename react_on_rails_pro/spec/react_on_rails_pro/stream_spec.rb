@@ -2,7 +2,7 @@
 
 require "async"
 require "async/queue"
-require "async/variable"
+require "async/promise"
 require_relative "spec_helper"
 
 class StreamController

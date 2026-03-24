@@ -13,7 +13,7 @@
 
 require "async"
 require "async/queue"
-require "async/variable"
+require "async/promise"
 require "timeout"
 require_relative "spec_helper"
 
