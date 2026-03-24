@@ -336,7 +336,8 @@ module ReactOnRails
       }
 
       present_paths = paths_by_bundler.select { |_bundler, paths| paths.any? }
-      return fallback_path if present_paths.empty? || present_paths.one?
+      return fallback_path if present_paths.empty?
+      return present_paths.values.first.first if present_paths.one?
 
       configured_bundler = configured_assets_bundler
       if configured_bundler && paths_by_bundler[configured_bundler].any?
