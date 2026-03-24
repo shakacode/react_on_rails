@@ -768,6 +768,20 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.send(:detect_bundler_config_path)).to eq("config/custom/custom-bundler.config.js")
       end
 
+      it "honors explicit shakapacker config path even when both default bundler files exist" do
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(false)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.js").and_return(false)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/rspack/rspack.config.js")
+        allow(checker).to receive(:shakapacker_webpack_config_directory)
+          .with("config/rspack/rspack.config.js")
+          .and_return("config/rspack")
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/rspack/rspack.config.js")
+        expect(checker.messages.any? { |msg| msg[:content].include?("defaulting to webpack") }).to be false
+      end
+
       it "ignores directory-valued custom assets_bundler_config_path entries" do
         allow(File).to receive(:file?).with("config/custom").and_return(false)
         allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom")
