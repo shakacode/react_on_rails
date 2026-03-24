@@ -138,6 +138,7 @@ Before you start, audit your components using this classification:
 
 ## Related Guides
 
+- [Upgrading an Existing Pro App to RSC](../../pro/react-server-components/upgrading-existing-pro-app.md) — generator-based runbook for adding RSC to an existing Pro app, including legacy webpack compatibility and verification checklist
 - [React 19 Native Metadata](../building-features/react-19-native-metadata.md) — replace react-helmet and `react_component_hash` with React 19's built-in `<title>`, `<meta>`, and `<link>` hoisting. Native metadata works with streaming and RSC out of the box.
 
 ## References
