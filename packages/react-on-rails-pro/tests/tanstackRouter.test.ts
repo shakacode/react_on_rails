@@ -324,7 +324,7 @@ describe('tanstack-router integration (Pro)', () => {
       ),
     ).not.toThrow();
     expect(router.hydrate).not.toHaveBeenCalled();
-    expect(router.ssr).not.toBe(true);
+    expect(router.ssr).toBeFalsy();
   });
 
   it('builds SSR match payloads even when router.dehydrate is unavailable', async () => {
@@ -367,7 +367,7 @@ describe('tanstack-router integration (Pro)', () => {
     });
   });
 
-  it('enables SSR mode for async server rendering before returning dehydrated state', async () => {
+  it('does not set router.ssr on the server (effects do not run during renderToString)', async () => {
     const router = buildRouter();
 
     const result = await serverRenderTanStackAppAsync(
@@ -391,7 +391,7 @@ describe('tanstack-router integration (Pro)', () => {
     );
 
     expect(router.load).toHaveBeenCalled();
-    expect(router.ssr).toBe(true);
+    expect(router.ssr).toBeUndefined();
     expect(result.dehydratedState).toEqual({
       url: '/products?category=tools',
       dehydratedRouter: { matches: [{ id: 'products' }] },

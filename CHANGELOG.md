@@ -24,6 +24,15 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro]** **TanStack Router: removed dependency on internal `router.ssr` flag**: Server-side rendering no longer
+  sets the internal `router.ssr` property (unnecessary since React effects don't run during `renderToString`).
+  Client-side legacy hydration path now uses the correct `{ manifest: undefined }` shape matching TanStack Router's
+  internal `$_TSR` contract instead of a bare `true` boolean, improving forward compatibility. The recommended
+  `RouterClient`/`ssrRouter` hydration path was already free of this dependency.
+  Fixes [Issue 2647](https://github.com/shakacode/react_on_rails/issues/2647).
+
 ### [16.5.0] - 2026-03-25
 
 Stable release — no changes from 16.5.0.rc.0.

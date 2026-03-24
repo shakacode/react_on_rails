@@ -16,7 +16,7 @@ import type { RailsContext } from 'react-on-rails/types';
  * Flow:
  * 1. Create router with browser history
  * 2. Hydrate from dehydrated state provided by serverRenderTanStackAppAsync
- * 3. Set router.ssr = true to skip auto-load on mount (Transitioner behavior)
+ * 3. Set router.ssr to skip auto-load on mount (Transitioner behavior, legacy path only)
  * 4. After hydration, trigger router.load() to enable client-side navigation
  * 5. Return a React component that renders RouterProvider
  */
@@ -116,10 +116,14 @@ function TanStackHydrationApp({
       );
     }
 
-    // Keep SSR mode enabled on hydration paths so Transitioner does not run
-    // a client-only initial load before hydration settles.
-    if (!hasSsrRouter && hasSsrPayload && router.ssr !== true) {
-      router.ssr = true;
+    // Legacy hydration path only: signal SSR mode so the Transitioner skips its
+    // initial router.load() call, preventing a hydration mismatch.  The object
+    // shape matches TanStack Router's internal $_TSR hydration contract (the
+    // Transitioner only checks truthiness).  The new ssrRouter/RouterClient path
+    // does not need this — RouterClient sets router.ssr internally via its own
+    // hydrate() function.
+    if (!hasSsrRouter && hasSsrPayload && !router.ssr) {
+      router.ssr = { manifest: undefined };
     }
 
     routerRef.current = router;
