@@ -228,10 +228,7 @@ export function createApp(appName: string, options: CliOptions): void {
   const proRequested = options.pro || options.rsc;
   let proModeLabel: '--rsc' | '--pro' | null = null;
   if (proRequested) {
-    proModeLabel = '--pro';
-    if (options.rsc) {
-      proModeLabel = '--rsc';
-    }
+    proModeLabel = options.rsc ? '--rsc' : '--pro';
   }
   const baseSteps = 3; // rails new + add react_on_rails + run generator
   const totalSteps = baseSteps + (proRequested ? 1 : 0);
