@@ -413,33 +413,40 @@ export default function InteractiveFilters() {
 
 ## Common Mistakes
 
-### Mistake 1: Wrapping the entire tree in providers
+### Mistake 1: Wrapping the entire tree in providers unnecessarily
 
-Placing providers at the outermost level forces every child to be a Client Component, negating RSC benefits:
+Wrapping the entire component tree in a `'use client'` provider works correctly -- children passed from a Server Component remain Server Components (this is the "children as props" pattern). However, wrapping more than necessary has real costs:
+
+- Every child that **consumes** the context (via `useContext`) must be a Client Component
+- Provider scope is broader than needed, making refactoring harder
+- Context value changes trigger re-renders across a wider subtree
+
+Narrow the provider scope to only the subtree that actually needs the context:
 
 ```jsx
-// BAD: Everything inside Providers becomes client code
+// WIDER THAN NEEDED: Header and Footer don't use this context,
+// but they're inside the provider scope unnecessarily
 export default function ProductPage({ user, product }) {
   return (
     <Providers user={user}>
-      <Header /> {/* Now a Client Component -- wasted */}
+      <Header />
       <ProductDetails product={product} />
-      <Footer /> {/* Now a Client Component -- wasted */}
+      <Footer />
     </Providers>
   );
 }
 ```
 
 ```jsx
-// GOOD: Only wrap components that actually need context
+// BETTER: Only wrap components that actually need context
 export default function ProductPage({ user, product }) {
   return (
     <div>
-      <Header /> {/* Server Component -- zero JS */}
+      <Header /> {/* Server Component -- outside provider scope */}
       <Providers user={user}>
         <ProductDetails product={product} />
       </Providers>
-      <Footer /> {/* Server Component -- zero JS */}
+      <Footer /> {/* Server Component -- outside provider scope */}
     </div>
   );
 }

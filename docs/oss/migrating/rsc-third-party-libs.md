@@ -391,27 +391,27 @@ Starting a component migration only to discover that a deeply nested dependency 
 
 **Fix:** Before removing `'use client'` from a component, audit its import tree. Run a build with the change and look for errors like _"You're importing a component that needs useState."_ The [React Working Group compatibility list](https://github.com/reactwg/server-components/discussions/6) tracks library status.
 
-### Mistake 3: Importing the entire library instead of specific modules
+### Mistake 3: Using barrel imports across `'use client'` boundaries
 
-Many popular libraries offer direct import paths that avoid pulling in unnecessary code:
+In standard (non-RSC) builds, modern bundlers tree-shake barrel imports effectively -- `import { Button } from '@mui/material'` produces roughly the same output as the direct path import. However, **at `'use client'` boundaries**, the full transitive import graph is included in the client bundle because webpack must serialize the entire module for the RSC manifest. This makes import granularity matter specifically in RSC:
 
 ```jsx
-// BAD: Imports the entire MUI library, including unused components
+// AVOID at 'use client' boundaries: pulls in the full import graph
 import { Button } from '@mui/material';
 
-// GOOD: Imports only the Button module
+// PREFER: direct import keeps the client boundary small
 import Button from '@mui/material/Button';
 ```
 
 ```jsx
-// BAD: Imports all of lodash
+// AVOID at 'use client' boundaries
 import { debounce } from 'lodash';
 
-// GOOD: Imports only debounce
+// PREFER: imports only what's needed
 import debounce from 'lodash-es/debounce';
 ```
 
-This matters more with RSC because `'use client'` boundaries pull in everything they import transitively.
+> **Note:** Outside of `'use client'` files, barrel imports are generally fine with modern bundlers. This advice is specific to files that form RSC client boundaries.
 
 ### Mistake 4: Continuing to use runtime CSS-in-JS without a plan
 

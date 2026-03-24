@@ -769,25 +769,41 @@ Server Actions are **not supported** in React on Rails. The Node renderer is a r
 // BAD: Server Actions don't have access to Rails
 'use server';
 export async function createUser(name) {
-  // This runs on the Node renderer, NOT on Rails
-  await db.users.create({ name }); // No access to Rails DB
+  // The Node renderer is a render-only environment -- it has no database
+  // connection, no ORM, and no access to Rails models or sessions.
+  // This code will fail at runtime.
 }
 ```
 
 ```jsx
-// GOOD: Use Rails controller endpoints
+// GOOD: Use a Client Component that submits to a Rails controller endpoint
 'use client';
+
+import { useState } from 'react';
 import ReactOnRails from 'react-on-rails';
 
-async function createUser(name) {
-  await fetch('/api/users', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': ReactOnRails.authenticityToken(),
-    },
-    body: JSON.stringify({ user: { name } }),
-  });
+export default function CreateUserForm() {
+  const [name, setName] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    await fetch('/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': ReactOnRails.authenticityToken(),
+      },
+      body: JSON.stringify({ user: { name } }),
+    });
+    setName('');
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={name} onChange={(e) => setName(e.target.value)} />
+      <button type="submit">Create</button>
+    </form>
+  );
 }
 ```
 
