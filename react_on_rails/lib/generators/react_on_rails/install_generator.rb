@@ -280,7 +280,7 @@ module ReactOnRails
         # it on a clean worktree. On a dirty tree, use the read-only pro_gem_installed?
         # check to catch a missing gem without triggering auto-install.
         if has_worktree_issues && use_pro? && !pro_gem_installed?
-          required_flag = missing_pro_required_flag
+          required_flag = pro_requirement_flag
           GeneratorMessages.add_error(<<~MSG.strip)
             🚫 react_on_rails_pro gem is required for #{required_flag} but is not installed.
             Auto-install was skipped because the worktree has uncommitted changes.
@@ -499,7 +499,7 @@ module ReactOnRails
         flags << "--typescript" if options.typescript?
         flags << "--rspack" if options.rspack?
 
-        if options.rsc_pro?
+        if use_rsc_pro_mode?
           flags << "--rsc-pro"
         elsif options.rsc?
           flags << "--rsc"
@@ -519,10 +519,6 @@ module ReactOnRails
           2. Visit: #{Rainbow('http://localhost:3000/hello_server').cyan.underline} (or your configured port)
           3. Confirm the page streams and the Like button hydrates on click.
         MSG
-      end
-
-      def missing_pro_required_flag
-        pro_requirement_flag
       end
 
       def recovery_working_tree_lines

@@ -1715,6 +1715,7 @@ describe InstallGenerator, type: :generator do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
         deps = package_json["dependencies"] || {}
+        expect(deps).to include("react-on-rails-rsc")
         expect(deps["react-on-rails-pro"]).to eq(expected_npm_version)
         expect(deps["react-on-rails-pro-node-renderer"]).to eq(expected_npm_version)
       end
@@ -2003,12 +2004,13 @@ describe InstallGenerator, type: :generator do
 
       command = install_generator.send(:recovery_install_command)
 
-      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --rspack --rsc")
+      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --rspack --rsc-pro")
       expect(command).not_to include("--ignore-warnings")
       expect(command).not_to include("--force")
       expect(command).not_to include("--skip")
       expect(command).not_to include("--pretend")
       expect(command).not_to include("--pro")
+      expect(command).not_to match(/\s--rsc(\s|$)/)
     end
 
     specify "recovery_install_command includes --pro when requested without --rsc" do
