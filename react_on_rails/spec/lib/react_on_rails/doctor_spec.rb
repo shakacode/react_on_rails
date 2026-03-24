@@ -1767,6 +1767,22 @@ RSpec.describe ReactOnRails::Doctor do
 
         expect(doctor.send(:shakapacker_assets_bundler_config_path)).to eq("/opt/custom/bundler.config.js")
       end
+
+      it "returns nil when normalization removes the entire rails-root prefix" do
+        rails_root = Pathname.new("/tmp/myapp")
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(doctor).to receive(:require).with("shakapacker").and_return(true)
+        shakapacker_config = Struct.new(:assets_bundler_config_path).new("#{rails_root}/")
+        shakapacker_class = Class.new do
+          class << self
+            attr_accessor :config
+          end
+        end
+        stub_const("Shakapacker", shakapacker_class)
+        Shakapacker.config = shakapacker_config
+
+        expect(doctor.send(:shakapacker_assets_bundler_config_path)).to be_nil
+      end
     end
 
     describe "#bundler_config_directory" do
