@@ -11,7 +11,6 @@ Before running the generator, verify your environment:
 | Requirement              | Check command                                                        | Expected                          |
 | ------------------------ | -------------------------------------------------------------------- | --------------------------------- |
 | React on Rails Pro gem   | `bundle show react_on_rails_pro`                                     | v16.4.0+                          |
-| React on Rails gem       | `bundle show react_on_rails`                                         | v16.4.0+                          |
 | React on Rails Pro npm   | `pnpm list react-on-rails-pro`                                       | Matches gem version               |
 | React version            | `pnpm list react`                                                    | 19.0.x (19.1.x not yet supported) |
 | React DOM version        | `pnpm list react-dom`                                                | Must match `react` version        |
