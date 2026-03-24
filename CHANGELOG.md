@@ -24,6 +24,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **Global prerender env override**: Added `REACT_ON_RAILS_PRERENDER_OVERRIDE=true|false` to force prerender behavior
+  globally (env > component option > initializer default), useful for CI/test environments without an SSR server.
+  [PR 2816](https://github.com/shakacode/react_on_rails/pull/2816) by
+  [justin808](https://github.com/justin808).
+
 ### [16.4.0] - 2026-03-16
 
 #### Fixed
