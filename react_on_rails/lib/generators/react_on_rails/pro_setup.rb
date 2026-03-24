@@ -91,7 +91,7 @@ module ReactOnRails
       end
 
       def pro_flag_specified_for_context?
-        options[:pro] || options[:rsc] || options[:rsc_pro]
+        use_pro?
       end
 
       def pro_requirement_flag

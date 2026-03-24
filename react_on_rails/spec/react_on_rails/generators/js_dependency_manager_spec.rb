@@ -444,6 +444,11 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
   end
 
   describe "#rsc_packages_with_version" do
+    it "defines an explicit RSC package version pin independent from the React semver range prefix" do
+      expect(ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE).to eq("~19.0.4")
+      expect(ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN).to eq("19.0.4")
+    end
+
     it "pins react-on-rails-rsc to the React 19 compatibility track" do
       expected_pin = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
       expect(instance.send(:rsc_packages_with_version)).to eq([["react-on-rails-rsc@#{expected_pin}"], true])
@@ -471,6 +476,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc@19.0.4"])
       expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc"])
+      expect(warnings.join("\n")).to include("installed react-on-rails-rsc version may not match")
     end
   end
 
