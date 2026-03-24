@@ -63,7 +63,7 @@ module ReactOnRails
       # missing; callers fall back to discovered default config candidates.
       @shakapacker_assets_bundler_config_path = nil
     rescue StandardError => e
-      Rails.logger&.debug do
+      Rails.logger&.warn do
         "ReactOnRails could not read Shakapacker assets_bundler_config_path: #{e.class}: #{e.message}"
       end
       @shakapacker_assets_bundler_config_path = nil

@@ -492,9 +492,9 @@ module ReactOnRails
     end
 
     def bundler_config_file_exists?
-      # Keep shakapacker_configured? fast for install-guard call sites by
-      # checking generator-default paths before probing shakapacker-derived
-      # candidates that may require loading additional config.
+      # Fast path for common generator-default layouts. If none of these paths
+      # exist, we fall back to full candidate probing, which may load
+      # shakapacker-derived config.
       default_candidates = WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES
       return true if default_candidates.any? { |path| File.file?(path) }
 
@@ -549,6 +549,9 @@ module ReactOnRails
 
     def bundler_name_for_config_path(config_path)
       if explicit_shakapacker_bundler_config_path?(config_path)
+        # For explicit custom shakapacker paths without assets_bundler in
+        # shakapacker.yml, fallback inference uses path heuristics and can
+        # misclassify non-standard filenames.
         configured_assets_bundler || inferred_bundler_name(config_path)
       else
         inferred_bundler_name(config_path)
