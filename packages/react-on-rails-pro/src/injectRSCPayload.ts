@@ -46,8 +46,12 @@ function createRSCPayloadInitializationScript(cacheKey: string, sanitizedNonce?:
   return createScriptTag(cacheKeyJSArray(cacheKey), sanitizedNonce);
 }
 
-function createRSCPayloadChunk(chunk: string, cacheKey: string, sanitizedNonce?: string) {
-  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`, sanitizedNonce);
+function createRSCPayloadChunk(jsonLine: string, cacheKey: string, sanitizedNonce?: string) {
+  // Embed the JSON line directly as a JavaScript expression instead of re-stringifying it.
+  // JSON is a strict subset of JavaScript expressions, so this is always valid JS.
+  // createScriptTag's escapeScript() handles HTML-unsafe sequences (</script>, <!--)
+  // using JS-compatible escape sequences that preserve the parsed value.
+  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${jsonLine})`, sanitizedNonce);
 }
 
 /**
@@ -251,12 +255,33 @@ export default function injectRSCPayload(
         const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
         rscInitializationBuffers.push(Buffer.from(initializationScript));
 
-        // Process RSC payload stream asynchronously
+        // Process RSC payload stream asynchronously.
+        // Chunks may not align with JSON object boundaries, so we buffer
+        // incomplete lines (same approach as transformRSCStream).
         rscPromises.push(
           (async () => {
+            let lastIncompleteLine = '';
             for await (const chunk of stream ?? []) {
-              const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
-              const payloadScript = createRSCPayloadChunk(decodedChunk, rscPayloadKey, sanitizedNonce);
+              const decodedChunk =
+                lastIncompleteLine + (typeof chunk === 'string' ? chunk : decoder.decode(chunk));
+              const lines = decodedChunk.split('\n');
+
+              if (!decodedChunk.endsWith('\n')) {
+                lastIncompleteLine = lines.pop() ?? '';
+              } else {
+                lastIncompleteLine = '';
+              }
+
+              for (const line of lines) {
+                if (line.trim() !== '') {
+                  const payloadScript = createRSCPayloadChunk(line, rscPayloadKey, sanitizedNonce);
+                  rscPayloadBuffers.push(Buffer.from(payloadScript));
+                }
+              }
+              scheduleFlush();
+            }
+            if (lastIncompleteLine.trim() !== '') {
+              const payloadScript = createRSCPayloadChunk(lastIncompleteLine, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
               scheduleFlush();
             }

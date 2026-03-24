@@ -48,7 +48,7 @@ const setupTest = (mockRSC: Readable) => {
 
 describe('injectRSCPayload', () => {
   it('should inject RSC payload as script tags', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockRSC = createMockStream(['{"test": "data"}\n']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
@@ -56,12 +56,12 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>`,
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data"})</script>`,
     );
   });
 
   it('should handle multiple RSC payloads', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}', '{"test": "data2"}']);
+    const mockRSC = createMockStream(['{"test": "data"}\n', '{"test": "data2"}\n']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
@@ -69,15 +69,15 @@ describe('injectRSCPayload', () => {
     const resultStr = await collectStreamData(result);
 
     expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>`,
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data"})</script>`,
     );
     expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>`,
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data2"})</script>`,
     );
   });
 
   it('should add all ready html chunks before adding RSC payloads', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}', '{"test": "data2"}']);
+    const mockRSC = createMockStream(['{"test": "data"}\n', '{"test": "data2"}\n']);
     const mockHTML = createMockStream([
       '<html><body><div>Hello, world!</div></body></html>',
       '<div>Next chunk</div>',
@@ -91,13 +91,13 @@ describe('injectRSCPayload', () => {
       '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]</script>' +
         '<html><body><div>Hello, world!</div></body></html>' +
         '<div>Next chunk</div>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>',
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data"})</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data2"})</script>',
     );
   });
 
   it('adds delayed html chunks after RSC payloads', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}', '{"test": "data2"}']);
+    const mockRSC = createMockStream(['{"test": "data"}\n', '{"test": "data2"}\n']);
     const mockHTML = createMockStream({
       0: '<html><body><div>Hello, world!</div></body></html>',
       100: '<div>Next chunk</div>',
@@ -110,16 +110,16 @@ describe('injectRSCPayload', () => {
     expect(resultStr).toEqual(
       '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]</script>' +
         '<html><body><div>Hello, world!</div></body></html>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data"})</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data2"})</script>' +
         '<div>Next chunk</div>',
     );
   });
 
   it('handles the case when html is delayed', async () => {
     const mockRSC = createMockStream({
-      0: '{"test": "data"}',
-      150: '{"test": "data2"}',
+      0: '{"test": "data"}\n',
+      150: '{"test": "data2"}\n',
     });
     const mockHTML = createMockStream({
       100: ['<html><body><div>Hello, world!</div></body></html>', '<div>Next chunk</div>'],
@@ -134,15 +134,15 @@ describe('injectRSCPayload', () => {
       '<script>(self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]</script>' +
         '<html><body><div>Hello, world!</div></body></html>' +
         '<div>Next chunk</div>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data\\"}")</script>' +
-        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"test\\": \\"data2\\"}")</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data"})</script>' +
+        '<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test": "data2"})</script>' +
         '<div>Third chunk</div>',
     );
   });
 
   it('should include RSC payload that arrives after HTML stream finishes', async () => {
     const mockRSC = createMockStream({
-      300: '{"late": "rsc_data"}',
+      300: '{"late": "rsc_data"}\n',
     });
     const mockHTML = createMockStream({
       0: '<html><body>Hello</body></html>',
@@ -154,14 +154,14 @@ describe('injectRSCPayload', () => {
 
     expect(resultStr).toContain('<html><body>Hello</body></html>');
     expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"late\\": \\"rsc_data\\"}")</script>`,
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"late": "rsc_data"})</script>`,
     );
   });
 
   it('should include all RSC payloads arriving at different times after HTML stream finishes', async () => {
     const mockRSC = createMockStream({
-      200: '{"first": "chunk"}',
-      400: '{"second": "chunk"}',
+      200: '{"first": "chunk"}\n',
+      400: '{"second": "chunk"}\n',
     });
     const mockHTML = createMockStream({
       0: '<div>content</div>',
@@ -173,15 +173,15 @@ describe('injectRSCPayload', () => {
 
     expect(resultStr).toContain('<div>content</div>');
     expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"first\\": \\"chunk\\"}")</script>`,
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"first": "chunk"})</script>`,
     );
     expect(resultStr).toContain(
-      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"second\\": \\"chunk\\"}")</script>`,
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"second": "chunk"})</script>`,
     );
   });
 
   it('adds sanitized nonce attribute to injected RSC script tags', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockRSC = createMockStream(['{"test": "data"}\n']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
@@ -193,7 +193,7 @@ describe('injectRSCPayload', () => {
   });
 
   it('adds valid nonce attribute to injected RSC script tags', async () => {
-    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockRSC = createMockStream(['{"test": "data"}\n']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
