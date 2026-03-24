@@ -82,10 +82,22 @@ module ReactOnRails
         return unless File.exist?(gemfile_path)
 
         gemfile_content = File.read(gemfile_path)
-        updated_content = gemfile_content.gsub(
-          /^\s*gem\s+["']react_on_rails["'][^\n]*$/,
-          "gem 'react_on_rails_pro', '#{recommended_pro_gem_version}'"
-        )
+        pro_gem_pattern = /^\s*gem\s+["']react_on_rails_pro["']/
+        base_gem_pattern = /^(\s*)gem\s+["']react_on_rails["'][^\n]*$/
+
+        has_pro_gem_entry = gemfile_content.match?(pro_gem_pattern)
+        updated_lines = gemfile_content.lines.filter_map do |line|
+          match = line.match(base_gem_pattern)
+          next line unless match
+
+          if has_pro_gem_entry
+            nil
+          else
+            "#{match[1]}gem 'react_on_rails_pro', '~> #{recommended_pro_gem_version}'\n"
+          end
+        end
+
+        updated_content = updated_lines.join
         return if updated_content == gemfile_content
 
         File.write(gemfile_path, updated_content)
@@ -120,7 +132,7 @@ module ReactOnRails
         files = js_files_for_import_update
         updated_files = files.count do |file|
           content = File.read(file)
-          updated_content = content.gsub(/react-on-rails(?!-pro)/, "react-on-rails-pro")
+          updated_content = content.gsub(%r{react-on-rails(?!-pro)(?=['"/])}, "react-on-rails-pro")
           next false if updated_content == content
 
           File.write(file, updated_content)
