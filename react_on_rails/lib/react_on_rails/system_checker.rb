@@ -339,7 +339,7 @@ module ReactOnRails
 
       configured_bundler = configured_assets_bundler
       if configured_bundler && paths_by_bundler[configured_bundler].any?
-        return configured_bundler_path(paths_by_bundler, configured_bundler)
+        return warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
       end
 
       # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
@@ -351,7 +351,7 @@ module ReactOnRails
       paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first
     end
 
-    def configured_bundler_path(paths_by_bundler, configured_bundler)
+    def warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
       add_warning(
         "⚠️  Found both webpack and rspack configs. Using #{configured_bundler} from config/shakapacker.yml."
       )

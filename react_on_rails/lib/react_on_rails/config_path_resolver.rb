@@ -61,7 +61,7 @@ module ReactOnRails
     rescue LoadError, NameError
       # Doctor/install checks should degrade gracefully when Shakapacker is
       # missing; callers fall back to discovered default config candidates.
-      nil
+      @shakapacker_assets_bundler_config_path = nil
     rescue StandardError => e
       Rails.logger&.debug do
         "ReactOnRails could not read Shakapacker assets_bundler_config_path: #{e.class}: #{e.message}"
