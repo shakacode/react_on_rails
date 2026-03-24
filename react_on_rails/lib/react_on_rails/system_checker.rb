@@ -319,6 +319,8 @@ module ReactOnRails
       return nil unless resolved_config_path
       return resolved_config_path if explicit_shakapacker_bundler_config_path?(resolved_config_path)
 
+      # Re-scan candidate configs by bundler so we can emit clear warnings when
+      # both webpack and rspack configs exist in the project.
       resolve_default_bundler_config_path
     end
 
@@ -526,11 +528,8 @@ module ReactOnRails
 
     def existing_bundler_config_paths(bundler)
       bundler_prefix = "#{bundler}.config."
-      shakapacker_path = shakapacker_assets_bundler_config_path
-      configured_bundler = configured_assets_bundler
       webpack_config_candidates.select do |path|
         next false unless File.file?(path)
-        next true if !shakapacker_path.nil? && path == shakapacker_path && configured_bundler == bundler
 
         File.basename(path).start_with?(bundler_prefix)
       end

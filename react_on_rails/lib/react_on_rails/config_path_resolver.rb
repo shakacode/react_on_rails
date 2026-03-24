@@ -31,7 +31,7 @@ module ReactOnRails
       shakapacker_config_path = shakapacker_assets_bundler_config_path
       candidates << shakapacker_config_path if shakapacker_config_path
 
-      shakapacker_config_dir = shakapacker_webpack_config_directory(shakapacker_config_path)
+      shakapacker_config_dir = bundler_config_directory(shakapacker_config_path)
       if shakapacker_config_dir
         candidates.concat(%w[js ts cjs mjs].flat_map do |ext|
           [
@@ -56,11 +56,10 @@ module ReactOnRails
           nil
         else
           rails_root = Rails.root.to_s
-          if rails_root.empty? || !path.start_with?("#{rails_root}/")
-            path
-          else
-            path.sub("#{rails_root}/", "")
-          end
+          return path if rails_root.empty?
+
+          rails_root_prefix = rails_root == "/" ? "/" : "#{rails_root}/"
+          path.start_with?(rails_root_prefix) ? path.delete_prefix(rails_root_prefix) : path
         end
       rescue LoadError, StandardError
         # Doctor/install checks should degrade gracefully when Shakapacker is
@@ -70,7 +69,7 @@ module ReactOnRails
       end
     end
 
-    def shakapacker_webpack_config_directory(config_path)
+    def bundler_config_directory(config_path)
       return nil unless config_path
 
       directory = File.dirname(config_path)
