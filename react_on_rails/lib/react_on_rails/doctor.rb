@@ -1023,6 +1023,7 @@ module ReactOnRails
         if runtime_config.same_bundle_for_client_and_server
           component_configs << "same_bundle_for_client_and_server: #{runtime_config.same_bundle_for_client_and_server}"
         end
+        # Default is true; only report explicit non-default override.
         component_configs << "random_dom_id: #{runtime_config.random_dom_id}" if runtime_config.random_dom_id == false
       else
         components_subdir_match = content.match(/config\.components_subdirectory\s*=\s*["']([^"']+)["']/)
@@ -2345,6 +2346,7 @@ module ReactOnRails
         ensure_rails_environment_loaded ? ReactOnRails.configuration : nil
     rescue StandardError => e
       checker.add_warning("⚠️  Could not query React on Rails runtime configuration: #{e.message}")
+      # Memoize as nil to avoid repeated failed lookups on subsequent checks.
       @react_on_rails_runtime_configuration = nil
     end
 
