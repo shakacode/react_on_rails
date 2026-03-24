@@ -173,7 +173,8 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
   describe ".run_process_outside_bundle" do
     it "uses with_unbundled_context when Bundler is available" do
       expect(described_class).to receive(:with_unbundled_context).and_yield
-      expect_any_instance_of(Kernel).to receive(:system).with("foreman", "start", "-f", "Procfile.dev")
+      expect_any_instance_of(Kernel).to receive(:system)
+        .with(a_kind_of(Hash), "foreman", "start", "-f", "Procfile.dev")
 
       described_class.send(:run_process_outside_bundle, "foreman", ["start", "-f", "Procfile.dev"])
     end
