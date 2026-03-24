@@ -251,6 +251,22 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "replaces parenthesized Gemfile declarations without leaving trailing parentheses" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem("react_on_rails", "~> 16.0", require: false, if: ENV.fetch("ENABLE_ROR", false))
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\", require: false")
+      expect(gemfile_content).to include('if: ENV.fetch("ENABLE_ROR", false)')
+      expect(gemfile_content).not_to include("false))")
+    end
+
     it "replaces multiline parenthesized Gemfile declarations" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -288,6 +304,27 @@ describe ProGenerator, type: :generator do
       expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
       expect(gemfile_content).not_to include('"~> 16.0"')
+      expect(gemfile_content).not_to include("gem(")
+    end
+
+    it "handles nested parentheses in multiline parenthesized Gemfile options" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem(
+          "react_on_rails",
+          "~> 16.0",
+          if: ENV.fetch("ENABLE_ROR") { true }
+        )
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).not_to include('"react_on_rails"')
+      expect(gemfile_content).not_to include('if: ENV.fetch("ENABLE_ROR") { true }')
       expect(gemfile_content).not_to include("gem(")
     end
 
