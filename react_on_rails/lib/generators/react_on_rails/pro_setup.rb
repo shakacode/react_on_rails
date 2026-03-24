@@ -475,6 +475,8 @@ module ReactOnRails
       end
 
       def pro_gem_version_requirement
+        # RSC Pro uses exact pinning so the Pro gem version always matches the
+        # paired RSC package version generated in the same run.
         return ReactOnRails::VERSION if use_rsc_pro_mode?
 
         "~> #{recommended_pro_gem_version}"
