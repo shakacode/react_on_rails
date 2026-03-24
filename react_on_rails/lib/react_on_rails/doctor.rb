@@ -633,7 +633,7 @@ module ReactOnRails
 
       webpack_config_path = resolved_webpack_config_path
       if webpack_config_path
-        checker.add_success("✅ Webpack configuration: #{webpack_config_path}")
+        checker.add_success("✅ Bundler configuration: #{webpack_config_path}")
       else
         checker.add_warning("⚠️  Missing bundler configuration: webpack/rspack config file not found")
         checker.add_info(
