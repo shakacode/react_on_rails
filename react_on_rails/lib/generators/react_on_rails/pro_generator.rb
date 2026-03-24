@@ -106,8 +106,11 @@ module ReactOnRails
             unless pro_entry_added
               indentation = multiline_parenthesized_match[:indentation]
               quote = multiline_parenthesized_match[:quote]
-              updated_lines << "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
-                               "#{quote}~> #{recommended_pro_gem_version}#{quote}\n"
+              updated_lines << build_pro_gem_replacement_line(
+                indentation: indentation,
+                quote: quote,
+                suffix: multiline_parenthesized_match[:trailing_suffix]
+              )
               pro_entry_added = true
             end
 
@@ -126,8 +129,11 @@ module ReactOnRails
           unless pro_entry_added
             indentation = match[1]
             quote = match[2]
-            updated_lines << "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
-                             "#{quote}~> #{recommended_pro_gem_version}#{quote}\n"
+            updated_lines << build_pro_gem_replacement_line(
+              indentation: indentation,
+              quote: quote,
+              suffix: line[match.end(0)..]
+            )
             pro_entry_added = true
           end
 
@@ -164,6 +170,7 @@ module ReactOnRails
       # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
       def atomic_write_file(path, content)
+        original_mode = File.file?(path) ? File.stat(path).mode & 0o777 : nil
         temp_file = Tempfile.new([File.basename(path), ".tmp"], File.dirname(path))
         temp_path = temp_file.path
 
@@ -172,6 +179,7 @@ module ReactOnRails
         temp_file.fsync
         temp_file.close
         FileUtils.mv(temp_path, path)
+        File.chmod(original_mode, path) if original_mode
         temp_path = nil
       ensure
         temp_file&.close unless temp_file&.closed?
@@ -409,10 +417,25 @@ module ReactOnRails
 
       def unclosed_block_comment_starts?(line)
         line_without_inline_comment = line_without_string_literals_and_inline_comments(line)
-        opening_index = line_without_inline_comment.index("/*")
-        return false unless opening_index
+        comment_balance = 0
+        scan_index = 0
 
-        line_without_inline_comment.index("*/", opening_index + 2).nil?
+        while scan_index < line_without_inline_comment.length
+          next_opening = line_without_inline_comment.index("/*", scan_index)
+          next_closing = line_without_inline_comment.index("*/", scan_index)
+
+          break unless next_opening || next_closing
+
+          if next_opening && (!next_closing || next_opening < next_closing)
+            comment_balance += 1
+            scan_index = next_opening + 2
+          else
+            comment_balance -= 1 if comment_balance.positive?
+            scan_index = next_closing + 2
+          end
+        end
+
+        comment_balance.positive?
       end
 
       def starts_pending_multiline_module_call?(line)
@@ -501,7 +524,7 @@ module ReactOnRails
         ["#{comment_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
-      # rubocop:disable Metrics/CyclomaticComplexity
+      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def match_multiline_parenthesized_base_gem(lines, start_index)
         start_line = lines[start_index]
         start_match = start_line.match(/^(\s*)gem\s*\(\s*(?:#.*)?$/)
@@ -513,16 +536,25 @@ module ReactOnRails
 
         while line_index < lines.length
           line = lines[line_index]
-
-          if line.include?(")")
-            return nil unless found_base_gem_name
-
-            return { indentation: start_match[1], quote: base_gem_quote, next_index: line_index + 1 }
-          end
+          line_without_comment = line.sub(/\s*#.*$/, "")
 
           if comment_or_blank_line?(line)
             line_index += 1
             next
+          end
+
+          if line_without_comment.include?(")")
+            return nil unless found_base_gem_name
+
+            closing_index = line_without_comment.index(")")
+            trailing_suffix = line[(closing_index + 1)..]
+            trailing_suffix = "\n" if trailing_suffix.nil? || trailing_suffix.empty?
+            return {
+              indentation: start_match[1],
+              quote: base_gem_quote,
+              next_index: line_index + 1,
+              trailing_suffix: trailing_suffix
+            }
           end
 
           if !found_base_gem_name &&
@@ -540,7 +572,16 @@ module ReactOnRails
 
         nil
       end
-      # rubocop:enable Metrics/CyclomaticComplexity
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+
+      def build_pro_gem_replacement_line(indentation:, quote:, suffix:)
+        normalized_suffix = suffix || "\n"
+        normalized_suffix = "#{normalized_suffix}\n" unless normalized_suffix.end_with?("\n")
+        normalized_suffix = normalized_suffix.sub(/\A\s*,\s*["'][^"']*["']/, "")
+
+        "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
+          "#{quote}~> #{recommended_pro_gem_version}#{quote}#{normalized_suffix}"
+      end
 
       def print_success_message
         route = if File.exist?(File.join(destination_root, "app/controllers/hello_server_controller.rb"))

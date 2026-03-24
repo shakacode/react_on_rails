@@ -80,6 +80,22 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "preserves trailing Gemfile guards and options on replaced entries" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0", require: false, if: ENV["ENABLE_ROR"]
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\", require: false")
+      expect(gemfile_content).to include("if: ENV[\"ENABLE_ROR\"]")
+      expect(gemfile_content).not_to include("gem \"react_on_rails\",")
+    end
+
     it "preserves indentation when replacing a grouped Gemfile entry" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -255,6 +271,26 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "handles comments containing closing parentheses inside multiline parenthesized declarations" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem(
+          "react_on_rails",
+          # pinned :)
+          "~> 16.0"
+        )
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).not_to include('"~> 16.0"')
+      expect(gemfile_content).not_to include("gem(")
+    end
+
     it "removes base gem without adding duplicate react_on_rails_pro entries" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -347,6 +383,19 @@ describe ProGenerator, type: :generator do
       pretend_generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       expect(File.read(gemfile_path)).to eq(original_content)
+    end
+
+    it "preserves Gemfile file mode when writing updates" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+      File.chmod(0o644, gemfile_path)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      expect(File.stat(gemfile_path).mode & 0o777).to eq(0o644)
     end
   end
 
@@ -540,6 +589,12 @@ describe ProGenerator, type: :generator do
       rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
 
       expect(rewritten).to include('"react-on-rails-pro";')
+    end
+
+    it "detects unclosed block comments when multiple block markers appear on one line" do
+      source_line = "/* closed */ const keep = true; /* unclosed"
+
+      expect(generator.send(:unclosed_block_comment_starts?, source_line)).to be true
     end
   end
 
