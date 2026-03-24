@@ -103,12 +103,14 @@ RSpec.describe GeneratorHelper, type: :generator do
         end
       end
 
-      context "when manager.add returns false" do
-        it "returns false so fallback installation can run" do
-          packages = ["react"]
+      context "when package manager add returns false" do
+        it "returns false so callers can fall back" do
+          packages = ["react-on-rails-rsc@99.99.99"]
+
           allow(mock_manager).to receive(:add).with(packages, exact: true).and_return(false)
 
           result = add_npm_dependencies(packages)
+          expect(mock_manager).to have_received(:add).with(packages, exact: true)
           expect(result).to be false
         end
       end
