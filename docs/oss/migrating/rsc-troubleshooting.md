@@ -166,9 +166,9 @@ You can also check the browser DevTools **Network** tab: load your RSC page, fil
 
 ### Why It Happens
 
-The RSC client manifest maps each `'use client'` module to the JS chunks the browser needs to download. When a `'use client'` module is imported by multiple entry points (for example, both an RSC page and a heavy SSR/client page), the manifest can accumulate chunks from all of them.
+The RSC client manifest maps each `'use client'` module to the JS chunks the browser needs to download. When a `'use client'` module is imported by multiple entry points (for example, both an RSC page and a heavy SSR/client page), its mapping can include chunks that originate from both paths.
 
-When `PostsPage.jsx` (`'use client'`) statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment), `HelloWorldHooks.jsx` can inherit chunks from that heavier path. The result is additive contamination: one small component ends up carrying unrelated chunks because it appears in multiple chunk groups.
+When `PostsPage.jsx` (`'use client'`) statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment), `HelloWorldHooks.jsx` can inherit chunks from that heavier path. The result is chunk contamination: one small component ends up carrying unrelated chunks because it appears in multiple chunk groups.
 
 Redundant `'use client'` directives increase the risk. If a component is already imported by a `'use client'` parent, adding `'use client'` to it too creates extra manifest entries and extra opportunities to accumulate unrelated chunks. Keep `'use client'` only on files that must be server/client boundaries.
 
@@ -202,7 +202,7 @@ export default function RSCPage() {
 }
 ```
 
-The wrapper file doesn't appear in PostsPage's import tree, so it can stay mapped to a much smaller chunk footprint.
+The wrapper file doesn't appear in PostsPage's import tree, so it avoids inheriting PostsPage's heavier chunk groups and usually stays mapped to a much smaller chunk footprint.
 
 ### When the Wrapper Isn't Enough: Prop Injection
 
@@ -215,7 +215,21 @@ export { AddToCartButton } from './InteractiveWidgets';
 ```
 
 ```jsx
-// ProductCard.jsx -- no direct 'use client' imports
+// ProductCard.jsx BEFORE -- direct client import in a shared component
+import { AddToCartButton } from './InteractiveWidgets';
+
+export function ProductCard({ product }) {
+  return (
+    <div>
+      <h3>{product.name}</h3>
+      <AddToCartButton productId={product.id} />
+    </div>
+  );
+}
+```
+
+```jsx
+// ProductCard.jsx AFTER -- no direct 'use client' imports
 export function ProductCard({ product, addToCartButton }) {
   return (
     <div>
@@ -258,7 +272,7 @@ export default function SSRPage({ products }) {
 }
 ```
 
-The RSC path uses `InteractiveWidgetsClient` (thin wrapper) to keep the manifest footprint small, while the SSR path can import the full `InteractiveWidgets` module without affecting RSC chunk budgets.
+The RSC path uses `InteractiveWidgetsClient` (thin wrapper) to keep ProductCard's import edge clean, while the SSR path can import the full `InteractiveWidgets` module without affecting the RSC manifest for ProductCard.
 
 > **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, start with a thin wrapper. If contamination persists because the component is shared across RSC and non-RSC entry points, use prop injection to remove the shared import edge.
 
