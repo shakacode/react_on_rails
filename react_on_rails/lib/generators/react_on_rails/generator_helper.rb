@@ -136,20 +136,28 @@ module GeneratorHelper
     @pro_gem_installed = true
   end
 
-  # Check if Pro features should be enabled
-  # Returns true if --pro flag is set OR --rsc flag is set (RSC implies Pro)
+  # Check if first-class RSC Pro mode should be enabled.
+  # Returns true when --rsc-pro is set, or when users explicitly pass both --rsc and --pro.
+  #
+  # @return [Boolean] true if RSC Pro mode semantics should be applied
+  def use_rsc_pro_mode?
+    options[:rsc_pro] || (options[:rsc] && options[:pro])
+  end
+
+  # Check if Pro features should be enabled.
+  # Returns true if --pro, --rsc, or --rsc-pro is set (RSC implies Pro).
   #
   # @return [Boolean] true if Pro setup should be included
   def use_pro?
-    options[:pro] || options[:rsc]
+    options[:pro] || options[:rsc] || options[:rsc_pro]
   end
 
   # Check if RSC (React Server Components) should be enabled
-  # Returns true only if --rsc flag is explicitly set
+  # Returns true if --rsc or --rsc-pro is explicitly set
   #
   # @return [Boolean] true if RSC setup should be included
   def use_rsc?
-    options[:rsc]
+    options[:rsc] || options[:rsc_pro]
   end
 
   # Determine if the project is using rspack as the bundler.

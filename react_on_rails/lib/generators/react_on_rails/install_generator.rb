@@ -64,6 +64,12 @@ module ReactOnRails
                    default: false,
                    desc: "Install React Server Components support (includes Pro). Default: false"
 
+      # --rsc-pro
+      class_option :rsc_pro,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install first-class Pro RSC mode with matched Pro/RSC defaults. Default: false"
+
       # Hidden option: allows tests (and advanced users) to signal that Shakapacker
       # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
       # The CLI flag takes precedence over runtime detection (@shakapacker_just_installed):
@@ -181,7 +187,7 @@ module ReactOnRails
         # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
-                 pro: options.pro?, rsc: options.rsc?,
+                 pro: use_pro?, rsc: use_rsc?,
                  shakapacker_just_installed: shakapacker_just_installed?,
                  force: options[:force], skip: options[:skip], pretend: options[:pretend] }
 
@@ -242,8 +248,9 @@ module ReactOnRails
         # it on a clean worktree. On a dirty tree, use the read-only pro_gem_installed?
         # check to catch a missing gem without triggering auto-install.
         if has_worktree_issues && use_pro? && !pro_gem_installed?
+          required_flag = missing_pro_required_flag
           GeneratorMessages.add_error(<<~MSG.strip)
-            🚫 react_on_rails_pro gem is required for #{options[:rsc] ? '--rsc' : '--pro'} but is not installed.
+            🚫 react_on_rails_pro gem is required for #{required_flag} but is not installed.
             Auto-install was skipped because the worktree has uncommitted changes.
             Please add it manually:
               gem 'react_on_rails_pro', '~> #{recommended_pro_gem_version}'
@@ -432,6 +439,7 @@ module ReactOnRails
                                      rsc: use_rsc?,
                                      shakapacker_just_installed: shakapacker_just_installed?
                                    ))
+        GeneratorMessages.add_info(rsc_pro_verification_message) if use_rsc_pro_mode?
       end
 
       def shakapacker_setup_incomplete?
@@ -445,13 +453,33 @@ module ReactOnRails
         flags << "--typescript" if options.typescript?
         flags << "--rspack" if options.rspack?
 
-        if use_rsc?
+        if use_rsc_pro_mode?
+          flags << "--rsc-pro"
+        elsif use_rsc?
           flags << "--rsc"
         elsif options.pro?
           flags << "--pro"
         end
 
         ["rails generate react_on_rails:install", *flags].join(" ")
+      end
+
+      def rsc_pro_verification_message
+        <<~MSG
+
+          🔎 RSC Pro Verification:
+          ─────────────────────────────────────────────────────────────────────────
+          1. Start all processes: #{Rainbow('bin/dev').cyan}
+          2. Visit: #{Rainbow('http://localhost:3000/hello_server').cyan.underline}
+          3. Confirm the page streams and the Like button hydrates on click.
+        MSG
+      end
+
+      def missing_pro_required_flag
+        return "--rsc-pro" if use_rsc_pro_mode?
+        return "--rsc" if use_rsc?
+
+        "--pro"
       end
 
       def recovery_working_tree_lines

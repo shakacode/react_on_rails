@@ -27,6 +27,11 @@ RSpec.describe GeneratorHelper, type: :generator do
     @shell ||= Thor::Shell::Color.new
   end
 
+  # GeneratorHelper methods expect an options hash as provided by Thor generators.
+  def options
+    @options ||= {}
+  end
+
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
 
   describe "#print_generator_messages" do
@@ -171,6 +176,32 @@ RSpec.describe GeneratorHelper, type: :generator do
           a_hash_including(message: "This is normal before Shakapacker creates the package.json file.")
         )
       end
+    end
+  end
+
+  describe "RSC Pro mode helpers" do
+    it "enables rsc-pro mode for explicit --rsc-pro flag" do
+      allow(self).to receive(:options).and_return({ rsc_pro: true, rsc: false, pro: false })
+
+      expect(use_rsc_pro_mode?).to be(true)
+      expect(use_rsc?).to be(true)
+      expect(use_pro?).to be(true)
+    end
+
+    it "enables rsc-pro mode when --rsc and --pro are both set" do
+      allow(self).to receive(:options).and_return({ rsc_pro: false, rsc: true, pro: true })
+
+      expect(use_rsc_pro_mode?).to be(true)
+      expect(use_rsc?).to be(true)
+      expect(use_pro?).to be(true)
+    end
+
+    it "does not enable rsc-pro mode for standalone --pro" do
+      allow(self).to receive(:options).and_return({ rsc_pro: false, rsc: false, pro: true })
+
+      expect(use_rsc_pro_mode?).to be(false)
+      expect(use_rsc?).to be(false)
+      expect(use_pro?).to be(true)
     end
   end
 
