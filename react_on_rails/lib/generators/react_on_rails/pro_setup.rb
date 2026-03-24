@@ -68,7 +68,7 @@ module ReactOnRails
           #{context_line}
 
           Please add manually to your Gemfile:
-            gem '#{PRO_GEM_NAME}', '~> #{recommended_pro_gem_version}'
+            gem '#{PRO_GEM_NAME}', '#{pro_gem_version_requirement}'
 
           Then run: bundle install
 
@@ -92,7 +92,7 @@ module ReactOnRails
       end
 
       def pro_requirement_flag
-        return "--rsc-pro" if respond_to?(:use_rsc_pro_mode?) && use_rsc_pro_mode?
+        return "--rsc-pro" if use_rsc_pro_mode?
         return "--rsc" if options[:rsc]
 
         "--pro"
@@ -471,12 +471,13 @@ module ReactOnRails
       end
 
       def pro_gem_auto_install_command
-        version_requirement = if respond_to?(:use_rsc_pro_mode?) && use_rsc_pro_mode?
-                                recommended_pro_gem_version
-                              else
-                                "~> #{recommended_pro_gem_version}"
-                              end
-        "bundle add #{PRO_GEM_NAME} --version='#{version_requirement}' --strict"
+        "bundle add #{PRO_GEM_NAME} --version='#{pro_gem_version_requirement}' --strict"
+      end
+
+      def pro_gem_version_requirement
+        return ReactOnRails::VERSION if use_rsc_pro_mode?
+
+        "~> #{recommended_pro_gem_version}"
       end
 
       # Keep manual fallback pinned to the latest stable release (drop pre-release suffixes like .rc.N).

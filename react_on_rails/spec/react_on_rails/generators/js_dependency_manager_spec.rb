@@ -527,6 +527,9 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       allow(ReactOnRails::VersionSyntaxConverter).to receive(:new).and_raise(StandardError, "conversion failed")
 
       expect(instance.send(:rsc_packages_with_version)).to eq(["react-on-rails-rsc"])
+      expect(instance.say_status_calls).to include(
+        a_hash_including(message: a_string_including("conversion failed"))
+      )
     end
   end
 

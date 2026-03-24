@@ -2844,7 +2844,7 @@ describe InstallGenerator, type: :generator do
 
   context "when using --rsc-pro flag without Pro gem installed" do
     let(:install_generator) { described_class.new([], { rsc_pro: true }) }
-    let(:expected_pro_version) { Gem::Version.new(ReactOnRails::VERSION).release.to_s }
+    let(:expected_pro_version) { ReactOnRails::VERSION }
     let(:fake_pid) { 12_345 }
 
     before do
@@ -2865,7 +2865,20 @@ describe InstallGenerator, type: :generator do
               err: anything)
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("--rsc-pro")
-      expect(error_text).to include("~> #{expected_pro_version}")
+      expect(error_text).to include("gem 'react_on_rails_pro', '#{expected_pro_version}'")
+      expect(error_text).not_to include("~> #{expected_pro_version}")
+    end
+
+    specify "missing_pro_gem? keeps prerelease suffix when rsc-pro exact pinning is used" do
+      stub_const("ReactOnRails::VERSION", "16.4.0.rc.5")
+
+      expect(install_generator.send(:missing_pro_gem?)).to be true
+      expect(Process).to have_received(:spawn)
+        .with("bundle add react_on_rails_pro --version='16.4.0.rc.5' --strict",
+              out: anything,
+              err: anything)
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("gem 'react_on_rails_pro', '16.4.0.rc.5'")
     end
   end
 

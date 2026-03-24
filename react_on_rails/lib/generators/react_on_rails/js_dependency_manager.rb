@@ -416,8 +416,8 @@ module ReactOnRails
       def rsc_packages_with_version
         npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION)
         RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }
-      rescue StandardError
-        say_status :warning, "Could not determine RSC package version. Installing latest.", :yellow
+      rescue StandardError => e
+        say_status :warning, "Could not determine RSC package version (#{e.message}). Installing latest.", :yellow
         RSC_DEPENDENCIES
       end
 
