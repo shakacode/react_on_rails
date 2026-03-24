@@ -29,8 +29,10 @@ module ReactOnRails
       def run_generator
         # When invoked by install_generator, skip prerequisites (parent already validated)
         if options[:invoked_by_install] || prerequisites_met?
+          swap_base_gem_for_pro_in_gemfile unless options[:invoked_by_install]
           setup_pro
           add_pro_npm_dependencies
+          update_imports_to_pro_package unless options[:invoked_by_install]
           print_success_message unless options[:invoked_by_install]
         else
           GeneratorMessages.add_error(<<~MSG.strip)
@@ -73,6 +75,71 @@ module ReactOnRails
         say "📝 Adding Pro npm dependencies...", :yellow
         add_pro_dependencies
         say "✅ Pro npm dependencies added", :green
+      end
+
+      def swap_base_gem_for_pro_in_gemfile
+        gemfile_path = File.join(destination_root, "Gemfile")
+        return unless File.exist?(gemfile_path)
+
+        gemfile_content = File.read(gemfile_path)
+        updated_content = gemfile_content.gsub(
+          /^\s*gem\s+["']react_on_rails["'][^\n]*$/,
+          "gem 'react_on_rails_pro', '#{recommended_pro_gem_version}'"
+        )
+        return if updated_content == gemfile_content
+
+        File.write(gemfile_path, updated_content)
+        say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
+        bundle_install_after_gem_swap
+      end
+
+      def bundle_install_after_gem_swap
+        say "📦 Running bundle install after Gemfile update...", :yellow
+        install_succeeded = Dir.chdir(destination_root) do
+          Bundler.with_unbundled_env { system("bundle install") }
+        end
+
+        return if install_succeeded
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Automatic bundle install failed after swapping Gemfile entries.
+
+          Please run manually:
+            bundle install
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Could not run automatic bundle install: #{e.message}
+
+          Please run manually:
+            bundle install
+        MSG
+      end
+
+      def update_imports_to_pro_package
+        files = js_files_for_import_update
+        updated_files = files.count do |file|
+          content = File.read(file)
+          updated_content = content.gsub(/react-on-rails(?!-pro)/, "react-on-rails-pro")
+          next false if updated_content == content
+
+          File.write(file, updated_content)
+          true
+        end
+
+        return if updated_files.zero?
+
+        say "✅ Updated react-on-rails imports in #{updated_files} file(s)", :green
+      end
+
+      def js_files_for_import_update
+        js_extensions = %w[js jsx ts tsx mjs cjs].join(",")
+        %w[app/javascript client].flat_map do |root|
+          root_path = File.join(destination_root, root)
+          next [] unless Dir.exist?(root_path)
+
+          Dir.glob(File.join(root_path, "**", "*.{#{js_extensions}}"))
+        end
       end
 
       def print_success_message

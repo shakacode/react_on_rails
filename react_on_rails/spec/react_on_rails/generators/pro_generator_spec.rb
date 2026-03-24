@@ -55,6 +55,70 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  describe "#swap_base_gem_for_pro_in_gemfile" do
+    let(:generator) { described_class.new }
+    let(:gemfile_path) { File.join(destination_root, "Gemfile") }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+    end
+
+    it "replaces react_on_rails with react_on_rails_pro and runs bundle install" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem 'react_on_rails_pro', '#{expected_version}'")
+      expect(gemfile_content).not_to match(/gem\s+["']react_on_rails["']/)
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
+    it "does nothing when Gemfile has no react_on_rails entry" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "rails"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      original_content = File.read(gemfile_path)
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      expect(File.read(gemfile_path)).to eq(original_content)
+      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
+    end
+  end
+
+  describe "#update_imports_to_pro_package" do
+    let(:generator) { described_class.new }
+    let(:application_js_path) { File.join(destination_root, "app/javascript/packs/application.js") }
+    let(:server_js_path) { File.join(destination_root, "client/server.js") }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+      simulate_existing_file("app/javascript/packs/application.js", <<~JS)
+        import ReactOnRails from "react-on-rails";
+        const ror = require("react-on-rails");
+      JS
+      simulate_existing_file("client/server.js", "import ReactOnRails from \"react-on-rails-pro\";\n")
+    end
+
+    it "updates react-on-rails imports and requires to react-on-rails-pro" do
+      generator.send(:update_imports_to_pro_package)
+
+      expect(File.read(application_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
+      expect(File.read(application_js_path)).to include('require("react-on-rails-pro")')
+      expect(File.read(server_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
+    end
+  end
+
   # Integration test for standalone happy path
   # Uses before (not before(:all)) to allow mocking the Pro gem check
 
