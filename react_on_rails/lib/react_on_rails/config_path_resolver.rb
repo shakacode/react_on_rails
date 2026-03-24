@@ -56,10 +56,12 @@ module ReactOnRails
           nil
         else
           rails_root = Rails.root.to_s
-          return path if rails_root.empty?
-
-          rails_root_prefix = rails_root == "/" ? "/" : "#{rails_root}/"
-          path.start_with?(rails_root_prefix) ? path.delete_prefix(rails_root_prefix) : path
+          if rails_root.empty?
+            path
+          else
+            rails_root_prefix = rails_root == "/" ? "/" : "#{rails_root}/"
+            path.start_with?(rails_root_prefix) ? path.delete_prefix(rails_root_prefix) : path
+          end
         end
       rescue LoadError, StandardError
         # Doctor/install checks should degrade gracefully when Shakapacker is
