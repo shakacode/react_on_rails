@@ -111,7 +111,7 @@ RSpec.describe ReactOnRails::Doctor do
         i18n_output_format: nil,
         components_subdirectory: nil,
         same_bundle_for_client_and_server: false,
-        random_dom_id: true,
+        random_dom_id: nil,
         rendering_extension: nil,
         rendering_props_extension: nil,
         server_render_method: nil
@@ -148,6 +148,7 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).to include(a_string_including("server_bundle_js_file: runtime-server-bundle.js"))
       expect(info_messages).to include(a_string_including("prerender: true"))
       expect(info_messages).to include(a_string_including("auto_load_bundle: true"))
+      expect(info_messages).not_to include(a_string_including("random_dom_id:"))
       expect(info_messages).not_to include(a_string_including("initializer-server-bundle.js"))
     end
   end
@@ -1201,6 +1202,27 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when initializer is missing but runtime config is available" do
+      let(:runtime_config) do
+        instance_double(
+          ReactOnRails::Configuration,
+          server_bundle_js_file: "",
+          prerender: true
+        )
+      end
+
+      it "still performs the consistency check" do
+        allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(warning_messages).to include(
+          a_string_including("Server rendering is enabled but server_bundle_js_file is not configured")
+        )
+      end
+    end
+
     context "when views use stream_react_component (RSC/streaming apps)" do
       it "reports consistent configuration" do
         write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
@@ -1785,6 +1807,17 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("Could not load Rails environment") }).to be true
       end
+    end
+  end
+
+  describe "react_on_rails_runtime_configuration" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+
+    it "memoizes nil when rails environment cannot be loaded" do
+      expect(doctor).to receive(:ensure_rails_environment_loaded).once.and_return(false)
+
+      expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
+      expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
     end
   end
 
