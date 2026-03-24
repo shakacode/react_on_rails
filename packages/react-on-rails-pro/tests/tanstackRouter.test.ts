@@ -222,6 +222,53 @@ describe('tanstack-router integration (Pro)', () => {
     expect(observedProps[0]).toEqual({ userId: 42 });
   });
 
+  it('sets router.ssr to { manifest: undefined } on the legacy hydration path', () => {
+    const router = buildRouter();
+
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const result = renderFn(
+      {
+        __tanstackRouterDehydratedState: {
+          url: '/products?category=tools',
+          dehydratedRouter: { matches: [{ id: 'products' }] },
+        },
+      },
+      {
+        serverSide: false,
+        pathname: '/products',
+        search: '?category=tools',
+      } as unknown as RailsContext,
+    );
+
+    renderToString(
+      React.createElement(result as React.ComponentType<Record<string, unknown>>, {
+        __tanstackRouterDehydratedState: {
+          url: '/products?category=tools',
+          dehydratedRouter: { matches: [{ id: 'products' }] },
+        },
+      }),
+    );
+
+    expect(router.ssr).toEqual({ manifest: undefined });
+  });
+
   it('does not throw on client hydration when the SSR payload has no dehydrated router data', () => {
     const router = buildRouter();
     router.dehydrate = jest.fn().mockReturnValue(null);
