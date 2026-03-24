@@ -83,7 +83,7 @@ const { default: serverWebpackConfig } = require('./serverWebpackConfig');
 
 ### Legacy Export Shape (pre-v16.4.0)
 
-Older apps or apps upgraded from OSS export a plain function:
+Older Pro apps or apps upgraded from OSS export a plain function. These apps must upgrade to v16.4.0+ before adding RSC (see [Prerequisites](#prerequisites)):
 
 ```js
 // config/webpack/serverWebpackConfig.js
