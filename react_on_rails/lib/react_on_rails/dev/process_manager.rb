@@ -8,6 +8,14 @@ module ReactOnRails
       # Timeout for version check operations to prevent hanging
       VERSION_CHECK_TIMEOUT = 5
 
+      # Env vars set after Bundler.setup that must survive with_unbundled_env.
+      # with_unbundled_env restores the pre-Bundler env snapshot, so any var
+      # set at runtime (e.g. PORT by PortSelector) is lost. We capture them
+      # before entering the block and pass them explicitly to system().
+      # This follows the same pattern used by Rails' bundle_command (railties),
+      # Spring's process spawning, and this codebase's own PackGenerator.
+      ENV_KEYS_TO_PRESERVE = %w[PORT SHAKAPACKER_DEV_SERVER_PORT].freeze
+
       class << self
         # Check if a process is available and usable in the current execution context
         # This accounts for bundler context where system commands might be intercepted
@@ -98,14 +106,6 @@ module ReactOnRails
           # Process not available in either context
           nil
         end
-
-        # Env vars set after Bundler.setup that must survive with_unbundled_env.
-        # with_unbundled_env restores the pre-Bundler env snapshot, so any var
-        # set at runtime (e.g. PORT by PortSelector) is lost. We capture them
-        # before entering the block and pass them explicitly to system().
-        # This follows the same pattern used by Rails' bundle_command (railties),
-        # Spring's process spawning, and this codebase's own PackGenerator.
-        ENV_KEYS_TO_PRESERVE = %w[PORT SHAKAPACKER_DEV_SERVER_PORT].freeze
 
         # Run a process outside of bundler context
         # This allows using system-installed processes even when they're not in the Gemfile

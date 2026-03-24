@@ -179,6 +179,30 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       described_class.send(:run_process_outside_bundle, "foreman", ["start", "-f", "Procfile.dev"])
     end
 
+    it "preserves PORT and SHAKAPACKER_DEV_SERVER_PORT in env hash" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("PORT").and_return("3001")
+      allow(ENV).to receive(:[]).with("SHAKAPACKER_DEV_SERVER_PORT").and_return("3036")
+
+      expect(described_class).to receive(:with_unbundled_context).and_yield
+      expect_any_instance_of(Kernel).to receive(:system)
+        .with({ "PORT" => "3001", "SHAKAPACKER_DEV_SERVER_PORT" => "3036" }, "foreman", "start", "-f", "Procfile.dev")
+
+      described_class.send(:run_process_outside_bundle, "foreman", ["start", "-f", "Procfile.dev"])
+    end
+
+    it "omits unset env vars from the hash" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("PORT").and_return("3001")
+      allow(ENV).to receive(:[]).with("SHAKAPACKER_DEV_SERVER_PORT").and_return(nil)
+
+      expect(described_class).to receive(:with_unbundled_context).and_yield
+      expect_any_instance_of(Kernel).to receive(:system)
+        .with({ "PORT" => "3001" }, "foreman", "start", "-f", "Procfile.dev")
+
+      described_class.send(:run_process_outside_bundle, "foreman", ["start", "-f", "Procfile.dev"])
+    end
+
     it "falls back to direct system call when Bundler is not available" do
       hide_const("Bundler")
       expect_any_instance_of(Kernel).to receive(:system).with("foreman", "start", "-f", "Procfile.dev")
