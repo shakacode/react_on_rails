@@ -129,6 +129,10 @@ module ReactOnRails
         updated_content = updated_lines.join
         return if updated_content == gemfile_content
 
+        if has_pro_gem_entry
+          say "ℹ️  Existing react_on_rails_pro Gemfile entry detected; preserving current version constraint", :yellow
+        end
+
         if options[:pretend]
           say_status :pretend, "Would replace react_on_rails with react_on_rails_pro in Gemfile", :yellow
           return
