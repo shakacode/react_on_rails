@@ -26,6 +26,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
   def with_prerender_env_override_cleared
     original_prerender_override = ENV.fetch("REACT_ON_RAILS_PRERENDER_OVERRIDE", nil)
     ENV.delete("REACT_ON_RAILS_PRERENDER_OVERRIDE")
+    described_class.instance_variable_set(:@prerender_env_override_cache, nil)
     yield
   ensure
     if original_prerender_override.nil?
@@ -33,16 +34,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     else
       ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = original_prerender_override
     end
-  end
-
-  def build_render_options_with_clean_prerender_env(option:, attrs:)
-    if option == :prerender
-      with_prerender_env_override_cleared do
-        described_class.new(**attrs)
-      end
-    else
-      described_class.new(**attrs)
-    end
+    described_class.instance_variable_set(:@prerender_env_override_cache, nil)
   end
 
   it "works without raising error" do
@@ -183,6 +175,15 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       expect(opts.prerender).to be false
     end
 
+    it "overrides config default when env is false and no explicit option is set" do
+      ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = "false"
+      ReactOnRails.configuration.prerender = true
+      attrs = the_attrs
+      opts = described_class.new(**attrs)
+
+      expect(opts.prerender).to be false
+    end
+
     it "falls back to configured behavior for invalid env values" do
       ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = "definitely-not-boolean"
       ReactOnRails.configuration.prerender = true
@@ -214,9 +215,15 @@ describe ReactOnRails::ReactComponent::RenderOptions do
           options = {}
           options[option] = false
           attrs = the_attrs(options: options)
-          opts = build_render_options_with_clean_prerender_env(option: option, attrs: attrs)
-
-          expect(opts.public_send(option)).to be false
+          if option == :prerender
+            with_prerender_env_override_cleared do
+              opts = described_class.new(**attrs)
+              expect(opts.public_send(option)).to be false
+            end
+          else
+            opts = described_class.new(**attrs)
+            expect(opts.public_send(option)).to be false
+          end
         end
       end
 
@@ -224,9 +231,15 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         it "returns #{option} from config" do
           ReactOnRails.configuration.public_send(:"#{option}=", true)
           attrs = the_attrs
-          opts = build_render_options_with_clean_prerender_env(option: option, attrs: attrs)
-
-          expect(opts.public_send(option)).to be true
+          if option == :prerender
+            with_prerender_env_override_cleared do
+              opts = described_class.new(**attrs)
+              expect(opts.public_send(option)).to be true
+            end
+          else
+            opts = described_class.new(**attrs)
+            expect(opts.public_send(option)).to be true
+          end
         end
       end
     end

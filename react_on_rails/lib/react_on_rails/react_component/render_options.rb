@@ -4,6 +4,7 @@ require "react_on_rails/utils"
 
 module ReactOnRails
   module ReactComponent
+    # rubocop:disable Metrics/ClassLength
     class RenderOptions
       include Utils::Required
 
@@ -11,15 +12,18 @@ module ReactOnRails
 
       PRERENDER_OVERRIDE_ENV_KEY = "REACT_ON_RAILS_PRERENDER_OVERRIDE"
       PRERENDER_OVERRIDE_VALUES = { "true" => true, "false" => false }.freeze
+      PRERENDER_OVERRIDE_CACHE_MUTEX = Mutex.new
       class << self
         def prerender_env_override
           raw_value = ENV.fetch(PRERENDER_OVERRIDE_ENV_KEY, nil)
-          cached_override = @prerender_env_override_cache
-          return cached_override[:value] if cached_override && cached_override[:raw_value] == raw_value
+          PRERENDER_OVERRIDE_CACHE_MUTEX.synchronize do
+            cached_override = @prerender_env_override_cache
+            return cached_override[:value] if cached_override && cached_override[:raw_value] == raw_value
 
-          parsed_value = parse_prerender_env_override(raw_value)
-          @prerender_env_override_cache = { raw_value: raw_value, value: parsed_value }
-          parsed_value
+            parsed_value = parse_prerender_env_override(raw_value)
+            @prerender_env_override_cache = { raw_value: raw_value, value: parsed_value }
+            parsed_value
+          end
         end
 
         private
@@ -209,5 +213,6 @@ module ReactOnRails
         self.class.prerender_env_override
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end
