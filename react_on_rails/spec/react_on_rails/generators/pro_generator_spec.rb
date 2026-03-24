@@ -745,6 +745,17 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  describe "#pro_flag_specified_for_context?" do
+    let(:generator) { described_class.new }
+
+    it "delegates to use_pro? for consistent Pro/RSC flag semantics" do
+      allow(generator).to receive(:use_pro?).and_return(true)
+
+      expect(generator.send(:pro_flag_specified_for_context?)).to be(true)
+      expect(generator).to have_received(:use_pro?)
+    end
+  end
+
   # Integration test for standalone happy path
   # Uses before (not before(:all)) to allow mocking the Pro gem check
 
