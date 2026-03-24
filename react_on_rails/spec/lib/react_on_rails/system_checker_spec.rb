@@ -725,7 +725,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
-      it "returns false when explicit shakapacker assets_bundler_config_path is missing" do
+      it "falls back to discovered defaults when explicit shakapacker assets_bundler_config_path is missing" do
         allow(File).to receive(:file?).with("config/custom/missing.config.js").and_return(false)
         allow(File).to receive(:file?).with("config/custom/webpack.config.js").and_return(true)
         allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom/missing.config.js")
@@ -733,7 +733,7 @@ RSpec.describe ReactOnRails::SystemChecker do
           .with("config/custom/missing.config.js")
           .and_return("config/custom")
 
-        expect(checker.send(:shakapacker_configured?)).to be false
+        expect(checker.send(:shakapacker_configured?)).to be true
       end
 
       it "returns false when no bundler config file exists" do

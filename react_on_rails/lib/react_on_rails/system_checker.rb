@@ -15,14 +15,10 @@ module ReactOnRails
     attr_reader :messages
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
-    WEBPACK_CONFIG_CANDIDATE_PATHS = %w[
-      config/webpack/webpack.config.js
-      config/webpack/webpack.config.ts
-    ].freeze
-    RSPACK_CONFIG_CANDIDATE_PATHS = %w[
-      config/rspack/rspack.config.js
-      config/rspack/rspack.config.ts
-    ].freeze
+    # Keep JS before TS to match current default generator outputs and select
+    # the JS config deterministically when both defaults are present.
+    WEBPACK_CONFIG_CANDIDATE_PATHS = ConfigPathResolver::WEBPACK_DEFAULT_CONFIG_CANDIDATES
+    RSPACK_CONFIG_CANDIDATE_PATHS = ConfigPathResolver::RSPACK_DEFAULT_CONFIG_CANDIDATES
 
     def initialize
       @messages = []
@@ -338,6 +334,8 @@ module ReactOnRails
       }
 
       present_paths = paths_by_bundler.select { |_bundler, paths| paths.any? }
+      # If the initially resolved fallback disappears between file checks
+      # (TOCTOU), keep that fallback path to avoid an unexpected nil.
       return fallback_path if present_paths.empty?
       return present_paths.values.first.first if present_paths.one?
 
@@ -497,7 +495,11 @@ module ReactOnRails
 
     def bundler_config_file_exists?
       shakapacker_path = shakapacker_assets_bundler_config_path
-      return File.file?(shakapacker_path) if shakapacker_path.present?
+      if shakapacker_path.present?
+        return true if File.file?(shakapacker_path)
+
+        return !resolved_webpack_config_path.nil?
+      end
 
       !resolved_webpack_config_path.nil?
     end
