@@ -23,6 +23,19 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
   end
 
+  around do |example|
+    original_prerender_override = ENV.fetch("REACT_ON_RAILS_PRERENDER_OVERRIDE", nil)
+    ENV.delete("REACT_ON_RAILS_PRERENDER_OVERRIDE")
+
+    example.run
+  ensure
+    if original_prerender_override.nil?
+      ENV.delete("REACT_ON_RAILS_PRERENDER_OVERRIDE")
+    else
+      ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = original_prerender_override
+    end
+  end
+
   it "works without raising error" do
     attrs = the_attrs
 
@@ -134,6 +147,36 @@ describe ReactOnRails::ReactComponent::RenderOptions do
 
         expect(opts.html_options).to eq html_options
       end
+    end
+  end
+
+  describe "#prerender env override" do
+    it "overrides explicit option when env is true" do
+      ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = "true"
+      attrs = the_attrs(options: { prerender: false })
+      opts = described_class.new(**attrs)
+
+      expect(opts.prerender).to be true
+    end
+
+    it "overrides explicit option when env is false" do
+      ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = "false"
+      attrs = the_attrs(options: { prerender: true })
+      opts = described_class.new(**attrs)
+
+      expect(opts.prerender).to be false
+    end
+
+    it "falls back to configured behavior for invalid env values" do
+      ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = "definitely-not-boolean"
+      ReactOnRails.configuration.prerender = true
+      attrs = the_attrs
+      opts = described_class.new(**attrs)
+
+      expect(Rails.logger).to receive(:warn)
+        .with(/Ignoring REACT_ON_RAILS_PRERENDER_OVERRIDE/)
+
+      expect(opts.prerender).to be true
     end
   end
 

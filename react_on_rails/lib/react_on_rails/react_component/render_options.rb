@@ -9,6 +9,12 @@ module ReactOnRails
 
       attr_accessor :request_digest
 
+      PRERENDER_OVERRIDE_ENV_KEY = "REACT_ON_RAILS_PRERENDER_OVERRIDE"
+      PRERENDER_OVERRIDE_VALUES = {
+        "true" => true,
+        "false" => false
+      }.freeze
+
       NO_PROPS = {}.freeze
 
       # TODO: remove the required for named params
@@ -68,6 +74,9 @@ module ReactOnRails
       end
 
       def prerender
+        env_override = prerender_env_override
+        return env_override unless env_override.nil?
+
         retrieve_configuration_value_for(:prerender)
       end
 
@@ -171,6 +180,20 @@ module ReactOnRails
 
           ReactOnRailsPro.configuration.public_send(key)
         end
+      end
+
+      def prerender_env_override
+        raw_value = ENV.fetch(PRERENDER_OVERRIDE_ENV_KEY, nil)
+        return nil if raw_value.nil?
+
+        normalized_value = raw_value.strip.downcase
+        return PRERENDER_OVERRIDE_VALUES[normalized_value] if PRERENDER_OVERRIDE_VALUES.key?(normalized_value)
+
+        Rails.logger.warn(
+          "[REACT ON RAILS] Ignoring #{PRERENDER_OVERRIDE_ENV_KEY}=#{raw_value.inspect}. " \
+          "Expected 'true' or 'false'."
+        )
+        nil
       end
     end
   end
