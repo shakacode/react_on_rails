@@ -10,10 +10,33 @@ module ReactOnRails
       attr_accessor :request_digest
 
       PRERENDER_OVERRIDE_ENV_KEY = "REACT_ON_RAILS_PRERENDER_OVERRIDE"
-      PRERENDER_OVERRIDE_VALUES = {
-        "true" => true,
-        "false" => false
-      }.freeze
+      PRERENDER_OVERRIDE_VALUES = { "true" => true, "false" => false }.freeze
+      class << self
+        def prerender_env_override
+          raw_value = ENV.fetch(PRERENDER_OVERRIDE_ENV_KEY, nil)
+          cached_override = @prerender_env_override_cache
+          return cached_override[:value] if cached_override && cached_override[:raw_value] == raw_value
+
+          parsed_value = parse_prerender_env_override(raw_value)
+          @prerender_env_override_cache = { raw_value: raw_value, value: parsed_value }
+          parsed_value
+        end
+
+        private
+
+        def parse_prerender_env_override(raw_value)
+          return nil if raw_value.nil?
+
+          normalized_value = raw_value.strip.downcase
+          return PRERENDER_OVERRIDE_VALUES[normalized_value] if PRERENDER_OVERRIDE_VALUES.key?(normalized_value)
+
+          Rails.logger.warn(
+            "[REACT ON RAILS] Ignoring #{PRERENDER_OVERRIDE_ENV_KEY}=#{raw_value.inspect}. " \
+            "Expected 'true' or 'false'."
+          )
+          nil
+        end
+      end
 
       NO_PROPS = {}.freeze
 
@@ -183,17 +206,7 @@ module ReactOnRails
       end
 
       def prerender_env_override
-        raw_value = ENV.fetch(PRERENDER_OVERRIDE_ENV_KEY, nil)
-        return nil if raw_value.nil?
-
-        normalized_value = raw_value.strip.downcase
-        return PRERENDER_OVERRIDE_VALUES[normalized_value] if PRERENDER_OVERRIDE_VALUES.key?(normalized_value)
-
-        Rails.logger.warn(
-          "[REACT ON RAILS] Ignoring #{PRERENDER_OVERRIDE_ENV_KEY}=#{raw_value.inspect}. " \
-          "Expected 'true' or 'false'."
-        )
-        nil
+        self.class.prerender_env_override
       end
     end
   end
