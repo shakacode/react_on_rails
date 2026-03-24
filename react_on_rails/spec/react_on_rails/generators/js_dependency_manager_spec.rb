@@ -215,6 +215,14 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(result).to be(false)
     end
 
+    it "returns false when package manager add returns false" do
+      allow(mock_manager).to receive(:add).with(["some-package"], exact: true).and_return(false)
+
+      result = instance.send(:add_package, "some-package")
+
+      expect(result).to be(false)
+    end
+
     it "returns false and logs warning when add raises error" do
       allow(mock_manager).to receive(:add).and_raise(StandardError, "Network error")
       result = instance.send(:add_package, "some-package")
@@ -440,6 +448,9 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       allow(ReactOnRails::VersionSyntaxConverter).to receive(:new).and_raise(StandardError, "conversion failed")
 
       expect(instance.send(:rsc_packages_with_version)).to eq(["react-on-rails-rsc"])
+      expect(instance.say_status_calls).to include(
+        a_hash_including(message: a_string_including("conversion failed"))
+      )
     end
   end
 

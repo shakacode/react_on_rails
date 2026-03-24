@@ -253,7 +253,7 @@ module ReactOnRails
             🚫 react_on_rails_pro gem is required for #{required_flag} but is not installed.
             Auto-install was skipped because the worktree has uncommitted changes.
             Please add it manually:
-              gem 'react_on_rails_pro', '~> #{recommended_pro_gem_version}'
+              gem 'react_on_rails_pro', '#{pro_gem_version_requirement}'
             Then run: bundle install
           MSG
           return false
@@ -470,16 +470,13 @@ module ReactOnRails
           🔎 RSC Pro Verification:
           ─────────────────────────────────────────────────────────────────────────
           1. Start all processes: #{Rainbow('bin/dev').cyan}
-          2. Visit: #{Rainbow('http://localhost:3000/hello_server').cyan.underline}
+          2. Visit: #{Rainbow('http://localhost:3000/hello_server').cyan.underline} (or your configured port)
           3. Confirm the page streams and the Like button hydrates on click.
         MSG
       end
 
       def missing_pro_required_flag
-        return "--rsc-pro" if use_rsc_pro_mode?
-        return "--rsc" if use_rsc?
-
-        "--pro"
+        pro_requirement_flag
       end
 
       def recovery_working_tree_lines
