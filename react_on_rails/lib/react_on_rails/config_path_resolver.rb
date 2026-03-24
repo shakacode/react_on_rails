@@ -63,6 +63,9 @@ module ReactOnRails
           end
         end
       rescue LoadError, StandardError
+        # Doctor/install checks should degrade gracefully when Shakapacker is
+        # missing or partially configured; callers fall back to discovered
+        # default config candidates when this cannot be resolved.
         nil
       end
     end
