@@ -250,10 +250,18 @@ export function logSanitizedConfig() {
 
 function validatePasswordForProduction(aConfig: Config) {
   if (aConfig.password) return;
-  if (NODE_ENV === 'development' || NODE_ENV === 'test') return;
+
+  // Check both NODE_ENV and RAILS_ENV for production detection to stay consistent
+  // with master.ts and Ruby's Rails.env.production? check
+  const runtimeEnvs = [env.RAILS_ENV, env.NODE_ENV].filter((value): value is string => Boolean(value));
+  const allowMissingPassword =
+    runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
+  if (allowMissingPassword) return;
 
   throw new Error(
-    `RENDERER_PASSWORD must be set in production-like environments (current NODE_ENV: "${NODE_ENV}").\n\n` +
+    'RENDERER_PASSWORD must be set in production-like environments ' +
+      `(NODE_ENV: "${env.NODE_ENV ?? '(not set)'}", RAILS_ENV: "${env.RAILS_ENV ?? '(not set)'}").` +
+      '\n\n' +
       'In development and test environments, the renderer password is optional and no authentication\n' +
       'is required. In all other environments, you must explicitly configure a password to secure\n' +
       'communication between Rails and the Node Renderer.\n\n' +

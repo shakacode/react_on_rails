@@ -2,6 +2,7 @@ describe('configBuilder', () => {
   const originalRendererHost = process.env.RENDERER_HOST;
   const originalNodeEnv = process.env.NODE_ENV;
   const originalRendererPassword = process.env.RENDERER_PASSWORD;
+  const originalRailsEnv = process.env.RAILS_ENV;
 
   afterEach(() => {
     if (originalRendererHost === undefined) {
@@ -18,6 +19,11 @@ describe('configBuilder', () => {
       delete process.env.RENDERER_PASSWORD;
     } else {
       process.env.RENDERER_PASSWORD = originalRendererPassword;
+    }
+    if (originalRailsEnv === undefined) {
+      delete process.env.RAILS_ENV;
+    } else {
+      process.env.RAILS_ENV = originalRailsEnv;
     }
     jest.restoreAllMocks();
     jest.resetModules();
@@ -117,6 +123,46 @@ describe('configBuilder', () => {
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
       expect(() => buildConfig()).not.toThrow();
+    });
+
+    it('throws when RAILS_ENV is production even if NODE_ENV is development', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.RAILS_ENV = 'production';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
+    });
+
+    it('throws when RAILS_ENV is production and NODE_ENV is unset', () => {
+      delete process.env.NODE_ENV;
+      process.env.RAILS_ENV = 'production';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
+    });
+
+    it('does not throw when RAILS_ENV is development and NODE_ENV is development', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.RAILS_ENV = 'development';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).not.toThrow();
+    });
+
+    it('throws when neither NODE_ENV nor RAILS_ENV is set (fail-closed)', () => {
+      delete process.env.NODE_ENV;
+      delete process.env.RAILS_ENV;
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
     });
   });
 });
