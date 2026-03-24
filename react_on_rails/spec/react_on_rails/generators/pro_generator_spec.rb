@@ -178,6 +178,19 @@ describe ProGenerator, type: :generator do
       expect(generator).not_to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "warns when Gemfile is missing" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(gemfile_path).and_return(false)
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("Could not find Gemfile")
+      expect(warning_text).to include("non-standard Gemfile path")
+      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
+    end
+
     it "replaces base gem entries that include inline comments" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -214,7 +227,8 @@ describe ProGenerator, type: :generator do
 
       expect(Process).to have_received(:spawn).with(
         { "BUNDLE_GEMFILE" => File.join(destination_root, "Gemfile") },
-        "bundle install",
+        "bundle",
+        "install",
         out: $stdout,
         err: $stderr,
         chdir: destination_root
@@ -231,6 +245,8 @@ describe ProGenerator, type: :generator do
     let(:application_js_path) { File.join(destination_root, "app/javascript/packs/application.js") }
     let(:server_js_path) { File.join(destination_root, "client/server.js") }
     let(:frontend_js_path) { File.join(destination_root, "app/frontend/entrypoints/client.ts") }
+    let(:vue_component_path) { File.join(destination_root, "app/frontend/components/RorWidget.vue") }
+    let(:svelte_component_path) { File.join(destination_root, "frontend/components/RorWidget.svelte") }
 
     before do
       prepare_destination
@@ -243,9 +259,24 @@ describe ProGenerator, type: :generator do
         import CustomPackage from "react-on-rails-utils";
         const scoped = "@scope/react-on-rails";
         const url = "https://cdn.example.com/react-on-rails/client.js";
+        // import "react-on-rails";
+        /*
+         * import ReactOnRails from "react-on-rails";
+         */
       JS
       simulate_existing_file("client/server.js", "import ReactOnRails from \"react-on-rails-pro\";\n")
       simulate_existing_file("app/frontend/entrypoints/client.ts", "import ReactOnRails from \"react-on-rails\";\n")
+      simulate_existing_file("app/frontend/components/RorWidget.vue", <<~VUE)
+        <script>
+        import ReactOnRails from "react-on-rails";
+        const ror = require("react-on-rails");
+        </script>
+      VUE
+      simulate_existing_file("frontend/components/RorWidget.svelte", <<~SVELTE)
+        <script>
+          import ReactOnRails from "react-on-rails";
+        </script>
+      SVELTE
     end
 
     it "updates react-on-rails imports and requires to react-on-rails-pro" do
@@ -258,8 +289,13 @@ describe ProGenerator, type: :generator do
       expect(File.read(application_js_path)).to include('import CustomPackage from "react-on-rails-utils";')
       expect(File.read(application_js_path)).to include('const scoped = "@scope/react-on-rails";')
       expect(File.read(application_js_path)).to include('const url = "https://cdn.example.com/react-on-rails/client.js";')
+      expect(File.read(application_js_path)).to include('// import "react-on-rails";')
+      expect(File.read(application_js_path)).to include('* import ReactOnRails from "react-on-rails";')
       expect(File.read(server_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
       expect(File.read(frontend_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
+      expect(File.read(vue_component_path)).to include('import ReactOnRails from "react-on-rails-pro";')
+      expect(File.read(vue_component_path)).to include('require("react-on-rails-pro")')
+      expect(File.read(svelte_component_path)).to include('import ReactOnRails from "react-on-rails-pro";')
     end
   end
 

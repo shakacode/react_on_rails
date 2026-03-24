@@ -81,7 +81,10 @@ module ReactOnRails
       # rubocop:disable Metrics/AbcSize
       def swap_base_gem_for_pro_in_gemfile
         gemfile_path = File.join(destination_root, "Gemfile")
-        return unless File.exist?(gemfile_path)
+        unless File.exist?(gemfile_path)
+          add_missing_gemfile_warning(gemfile_path)
+          return
+        end
 
         gemfile_content = File.read(gemfile_path)
         pro_gem_pattern = /^\s*gem\s+["']react_on_rails_pro["']/
@@ -135,7 +138,8 @@ module ReactOnRails
           gemfile_path = File.join(destination_root, "Gemfile")
           pid = Process.spawn(
             { "BUNDLE_GEMFILE" => gemfile_path },
-            "bundle install",
+            "bundle",
+            "install",
             out: $stdout,
             err: $stderr,
             chdir: destination_root
@@ -149,6 +153,7 @@ module ReactOnRails
           GeneratorMessages.add_warning(<<~MSG.strip)
             ⚠️  Automatic bundle install timed out after #{ProSetup::AUTO_INSTALL_TIMEOUT} seconds.
 
+            Gemfile has been updated with react_on_rails_pro.
             Please run manually:
               bundle install
           MSG
@@ -158,6 +163,7 @@ module ReactOnRails
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Automatic bundle install failed after swapping Gemfile entries.
 
+          Gemfile has been updated with react_on_rails_pro.
           Please run manually:
             bundle install
         MSG
@@ -187,7 +193,7 @@ module ReactOnRails
       end
 
       def js_files_for_import_update
-        js_extensions = %w[js jsx ts tsx mjs cjs].join(",")
+        js_extensions = %w[js jsx ts tsx mjs cjs vue svelte].join(",")
         %w[app/javascript app/frontend frontend javascript client].flat_map do |root|
           root_path = File.join(destination_root, root)
           next [] unless Dir.exist?(root_path)
@@ -201,21 +207,64 @@ module ReactOnRails
           (?<prefix>
             \bfrom\s+|
             \bimport\s*\(\s*|
-            \brequire\s*\(\s*|
-            \bimport\s+
+            \brequire\s*\(\s*
           )
           (?<quote>["'])
           react-on-rails(?!-pro)
           (?=(?:["']|/))
         }x
 
-        content.gsub(module_specifier_pattern) do
-          "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+        side_effect_import_pattern = %r{
+          \A(?<prefix>\s*import\s+)
+          (?<quote>["'])
+          react-on-rails(?!-pro)
+          (?=(?:["']|/))
+        }x
+
+        rewrite_non_comment_lines(content) do |line|
+          rewritten_line = line.gsub(module_specifier_pattern) do
+            "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+          end
+
+          rewritten_line.gsub(side_effect_import_pattern) do
+            "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+          end
         end
       end
 
       def line_continues_with_comma?(line)
         line.rstrip.match?(/,\s*(?:#.*)?\z/)
+      end
+
+      def add_missing_gemfile_warning(gemfile_path)
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Could not find Gemfile at #{gemfile_path}.
+
+          Skipping automatic react_on_rails -> react_on_rails_pro Gemfile swap.
+          Please update your Gemfile manually if your app uses a non-standard Gemfile path.
+        MSG
+      end
+
+      def rewrite_non_comment_lines(content)
+        in_block_comment = false
+
+        content.lines.map do |line|
+          stripped = line.lstrip
+
+          if in_block_comment
+            in_block_comment = false if stripped.include?("*/")
+            line
+          elsif stripped.start_with?("/*")
+            in_block_comment = !stripped.include?("*/")
+            line
+          elsif stripped.start_with?("//", "*")
+            line
+          else
+            rewritten_line = yield line
+            in_block_comment = true if stripped.include?("/*") && !stripped.include?("*/")
+            rewritten_line
+          end
+        end.join
       end
 
       def print_success_message
