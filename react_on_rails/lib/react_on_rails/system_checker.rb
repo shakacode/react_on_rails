@@ -496,6 +496,9 @@ module ReactOnRails
     end
 
     def bundler_config_file_exists?
+      shakapacker_path = shakapacker_assets_bundler_config_path
+      return File.file?(shakapacker_path) if shakapacker_path.present?
+
       !resolved_webpack_config_path.nil?
     end
 
