@@ -15,10 +15,6 @@ module ReactOnRails
     attr_reader :messages
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
-    # Keep JS before TS to match current default generator outputs and select
-    # the JS config deterministically when both defaults are present.
-    WEBPACK_CONFIG_CANDIDATE_PATHS = ConfigPathResolver::WEBPACK_DEFAULT_CONFIG_CANDIDATES
-    RSPACK_CONFIG_CANDIDATE_PATHS = ConfigPathResolver::RSPACK_DEFAULT_CONFIG_CANDIDATES
 
     def initialize
       @messages = []
