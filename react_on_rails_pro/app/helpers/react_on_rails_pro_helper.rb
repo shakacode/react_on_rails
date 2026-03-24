@@ -451,7 +451,7 @@ module ReactOnRailsProHelper
       # If already resolved, the first chunk was returned successfully.
       # This is a post-first-chunk error. Re-raise so barrier.wait propagates it
       # (the response is already committed at that point, so only JS redirect is possible).
-      raise e if first_chunk_promise.resolved?
+      raise if first_chunk_promise.resolved?
 
       # Promise not yet resolved — this is a pre-first-chunk failure (e.g., shell error).
       # Reject the promise so .wait auto-raises in the caller,
