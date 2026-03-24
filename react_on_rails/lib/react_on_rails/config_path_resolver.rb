@@ -2,6 +2,18 @@
 
 module ReactOnRails
   module ConfigPathResolver
+    WEBPACK_CONFIG_CANDIDATE_PATHS = %w[
+      config/webpack/webpack.config.js
+      config/webpack/webpack.config.ts
+    ].freeze
+    RSPACK_CONFIG_CANDIDATE_PATHS = %w[
+      config/rspack/rspack.config.js
+      config/rspack/rspack.config.ts
+    ].freeze
+    DEFAULT_BUNDLER_CONFIG_CANDIDATE_PATHS = (
+      WEBPACK_CONFIG_CANDIDATE_PATHS + RSPACK_CONFIG_CANDIDATE_PATHS
+    ).freeze
+
     private
 
     def resolved_package_json_path
@@ -30,10 +42,7 @@ module ReactOnRails
         end)
       end
 
-      candidates << "config/webpack/webpack.config.js"
-      candidates << "config/webpack/webpack.config.ts"
-      candidates << "config/rspack/rspack.config.js"
-      candidates << "config/rspack/rspack.config.ts"
+      candidates.concat(DEFAULT_BUNDLER_CONFIG_CANDIDATE_PATHS)
       candidates.uniq
     end
 

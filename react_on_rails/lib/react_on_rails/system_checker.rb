@@ -15,14 +15,6 @@ module ReactOnRails
     attr_reader :messages
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
-    WEBPACK_CONFIG_CANDIDATE_PATHS = %w[
-      config/webpack/webpack.config.js
-      config/webpack/webpack.config.ts
-    ].freeze
-    RSPACK_CONFIG_CANDIDATE_PATHS = %w[
-      config/rspack/rspack.config.js
-      config/rspack/rspack.config.ts
-    ].freeze
 
     def initialize
       @messages = []
@@ -537,12 +529,16 @@ module ReactOnRails
     end
 
     def existing_bundler_config_paths(bundler)
-      candidate_paths = bundler == "rspack" ? RSPACK_CONFIG_CANDIDATE_PATHS : WEBPACK_CONFIG_CANDIDATE_PATHS
+      candidate_paths = if bundler == "rspack"
+                          ConfigPathResolver::RSPACK_CONFIG_CANDIDATE_PATHS
+                        else
+                          ConfigPathResolver::WEBPACK_CONFIG_CANDIDATE_PATHS
+                        end
       candidate_paths.select { |path| File.file?(path) }
     end
 
     def default_bundler_config_path?(path)
-      WEBPACK_CONFIG_CANDIDATE_PATHS.include?(path) || RSPACK_CONFIG_CANDIDATE_PATHS.include?(path)
+      ConfigPathResolver::DEFAULT_BUNDLER_CONFIG_CANDIDATE_PATHS.include?(path)
     end
 
     def explicit_shakapacker_bundler_config_path?(resolved_config_path)
