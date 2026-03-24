@@ -12,6 +12,7 @@ module ReactOnRails
       config/rspack/rspack.config.js
       config/rspack/rspack.config.ts
     ].freeze
+    ALL_DEFAULT_CONFIG_CANDIDATES = (WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES).freeze
 
     private
 
@@ -63,7 +64,7 @@ module ReactOnRails
       # missing; callers fall back to discovered default config candidates.
       @shakapacker_assets_bundler_config_path = nil
     rescue StandardError => e
-      Rails.logger&.warn do
+      Rails.logger&.debug do
         "ReactOnRails could not read Shakapacker assets_bundler_config_path: #{e.class}: #{e.message}"
       end
       @shakapacker_assets_bundler_config_path = nil
@@ -75,6 +76,8 @@ module ReactOnRails
       rails_root = Rails.root.to_s
       return path if rails_root.empty? || rails_root == "/"
 
+      # NOTE: Prefix normalization assumes matching separators and does not
+      # normalize Windows-style `\` vs `/` path variants.
       rails_root_prefix = "#{rails_root}/"
       normalized_path = path.start_with?(rails_root_prefix) ? path.delete_prefix(rails_root_prefix) : path
       normalized_path.empty? ? nil : normalized_path

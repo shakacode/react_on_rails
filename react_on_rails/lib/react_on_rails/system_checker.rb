@@ -317,6 +317,8 @@ module ReactOnRails
     def detect_bundler_config_path
       resolved_config_path = resolved_webpack_config_path
       return nil unless resolved_config_path
+      # Explicit shakapacker assets_bundler_config_path matches are treated as
+      # authoritative and intentionally bypass cross-bundler ambiguity warnings.
       return resolved_config_path if explicit_shakapacker_bundler_config_path?(resolved_config_path)
 
       # Re-scan candidate configs by bundler so we can emit clear warnings when
@@ -495,8 +497,7 @@ module ReactOnRails
       # Fast path for common generator-default layouts. If none of these paths
       # exist, we fall back to full candidate probing, which may load
       # shakapacker-derived config.
-      default_candidates = WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES
-      return true if default_candidates.any? { |path| File.file?(path) }
+      return true if ALL_DEFAULT_CONFIG_CANDIDATES.any? { |path| File.file?(path) }
 
       !resolved_webpack_config_path.nil?
     end
@@ -536,6 +537,9 @@ module ReactOnRails
     end
 
     def existing_bundler_config_paths(bundler)
+      # This runs only after detect_bundler_config_path has ruled out an exact
+      # explicit shakapacker path match, so directory-derived fallback
+      # candidates are intentionally considered here.
       # Custom shakapacker config paths (non-standard basenames) are handled
       # earlier via explicit_shakapacker_bundler_config_path? and intentionally
       # excluded from this `<bundler>.config.*` classifier.
