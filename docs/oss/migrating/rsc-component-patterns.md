@@ -501,7 +501,7 @@ export function ClientWrapper({ children }) {
 
 ### Mistake 3: Chunk contamination from shared `'use client'` files
 
-If your RSC page downloads unexpectedly large chunks, a shared `'use client'` component may be mapped to a heavy chunk group containing unrelated dependencies. This can cause the browser to download hundreds of kilobytes of JavaScript it doesn't need. See [Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) for how to detect and fix it.
+If your RSC page downloads unexpectedly large chunks, a shared `'use client'` component may accumulate chunks from multiple entry paths (including heavy SSR/client paths with unrelated dependencies). This can cause the browser to download hundreds of kilobytes of JavaScript it doesn't need. See [Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) for wrapper and prop-injection fixes.
 
 ### Mistake 4: Confusing `'use client'` with `'use server'`
 
