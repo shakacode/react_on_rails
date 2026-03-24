@@ -151,6 +151,21 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).not_to include(a_string_including("random_dom_id:"))
       expect(info_messages).not_to include(a_string_including("initializer-server-bundle.js"))
     end
+
+    it "uses runtime values when initializer file is missing" do
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+      expect(warning_messages).to include(
+        a_string_including("React on Rails configuration file not found: config/initializers/react_on_rails.rb")
+      )
+      expect(info_messages).to include(a_string_including("Using loaded runtime configuration values"))
+      expect(info_messages).to include(a_string_including("server_bundle_js_file: runtime-server-bundle.js"))
+    end
   end
 
   describe "server bundle path detection" do
@@ -231,6 +246,37 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     describe "#server_bundle_filename" do
+      context "when runtime config sets server_bundle_js_file to an empty string" do
+        let(:runtime_config) do
+          instance_double(ReactOnRails::Configuration, server_bundle_js_file: "")
+        end
+
+        before do
+          allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+        end
+
+        it "returns an empty string" do
+          filename = doctor.send(:server_bundle_filename)
+          expect(filename).to eq("")
+        end
+      end
+
+      context "when runtime config has nil server_bundle_js_file" do
+        let(:runtime_config) do
+          instance_double(ReactOnRails::Configuration, server_bundle_js_file: nil)
+        end
+
+        before do
+          allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+          allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(false)
+        end
+
+        it "falls back to the default filename" do
+          filename = doctor.send(:server_bundle_filename)
+          expect(filename).to eq("server-bundle.js")
+        end
+      end
+
       context "when react_on_rails.rb has custom filename" do
         let(:initializer_content) do
           'config.server_bundle_js_file = "custom-server-bundle.js"'
@@ -1320,12 +1366,12 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when Pro runtime config reports NodeRenderer without initializer text" do
       before do
-        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
         allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
       end
 
-      it "treats ExecJS as fallback" do
+      it "treats ExecJS as fallback without rechecking Pro availability" do
         stub_const("ExecJS", execjs_module)
+        expect(ReactOnRails::Utils).not_to receive(:react_on_rails_pro?)
 
         doctor.send(:check_server_rendering_engine)
 
