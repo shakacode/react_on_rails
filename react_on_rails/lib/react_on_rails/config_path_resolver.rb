@@ -17,6 +17,8 @@ module ReactOnRails
 
     def webpack_config_candidates
       candidates = []
+      shakapacker_config_path = shakapacker_assets_bundler_config_path
+      candidates << shakapacker_config_path if shakapacker_config_path
 
       shakapacker_config_dir = shakapacker_webpack_config_directory
       if shakapacker_config_dir
@@ -35,14 +37,22 @@ module ReactOnRails
       candidates.uniq
     end
 
-    def shakapacker_webpack_config_directory
+    def shakapacker_assets_bundler_config_path
       require "shakapacker"
       path = Shakapacker.config.assets_bundler_config_path.to_s
       return nil if path.empty?
 
-      directory = File.dirname(path)
       rails_root = Rails.root.to_s
-      directory.start_with?("#{rails_root}/") ? directory.sub("#{rails_root}/", "") : directory
+      path.start_with?("#{rails_root}/") ? path.sub("#{rails_root}/", "") : path
+    rescue LoadError, StandardError
+      nil
+    end
+
+    def shakapacker_webpack_config_directory
+      path = shakapacker_assets_bundler_config_path
+      return nil unless path
+
+      File.dirname(path)
     rescue LoadError, StandardError
       nil
     end

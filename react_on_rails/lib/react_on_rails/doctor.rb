@@ -630,9 +630,9 @@ module ReactOnRails
       if webpack_config_path
         checker.add_success("✅ Webpack configuration: #{webpack_config_path}")
       else
-        checker.add_warning("⚠️  Missing Webpack configuration: config/webpack/webpack.config.js")
+        checker.add_warning("⚠️  Missing bundler configuration: webpack/rspack config file not found")
         checker.add_info(
-          "ℹ️  If your app uses a custom webpack config location, this warning may be informational."
+          "ℹ️  Checked default config locations and Shakapacker assets_bundler_config_path, if available."
         )
       end
 

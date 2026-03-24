@@ -708,6 +708,16 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
+      it "returns true when shakapacker assets_bundler_config_path points to a custom config" do
+        allow(File).to receive(:exist?).with("config/custom/custom-bundler.config.js").and_return(true)
+        allow(checker).to receive_messages(
+          shakapacker_assets_bundler_config_path: "config/custom/custom-bundler.config.js",
+          shakapacker_webpack_config_directory: "config/custom"
+        )
+
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
+
       it "returns false when no bundler config file exists" do
         expect(checker.send(:shakapacker_configured?)).to be false
       end
