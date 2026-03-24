@@ -319,19 +319,17 @@ module ReactOnRails
       return nil unless resolved_config_path
       return resolved_config_path if explicit_shakapacker_bundler_config_path?(resolved_config_path)
 
-      resolve_default_bundler_config_path(resolved_config_path)
+      resolve_default_bundler_config_path
     end
 
-    def resolve_default_bundler_config_path(fallback_path)
+    def resolve_default_bundler_config_path
       paths_by_bundler = {
         "rspack" => existing_bundler_config_paths("rspack"),
         "webpack" => existing_bundler_config_paths("webpack")
       }
 
       present_paths = paths_by_bundler.select { |_bundler, paths| paths.any? }
-      # If the initially resolved fallback disappears between file checks
-      # (TOCTOU), keep that fallback path to avoid an unexpected nil.
-      return fallback_path if present_paths.empty?
+      return nil if present_paths.empty?
       return present_paths.values.first.first if present_paths.one?
 
       configured_bundler = configured_assets_bundler
@@ -345,7 +343,7 @@ module ReactOnRails
       add_warning(
         "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
       )
-      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first || fallback_path
+      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first
     end
 
     def configured_bundler_path(paths_by_bundler, configured_bundler)
@@ -528,14 +526,19 @@ module ReactOnRails
 
     def existing_bundler_config_paths(bundler)
       bundler_prefix = "#{bundler}.config."
+      shakapacker_path = shakapacker_assets_bundler_config_path
+      configured_bundler = configured_assets_bundler
       webpack_config_candidates.select do |path|
-        File.basename(path).start_with?(bundler_prefix) && File.file?(path)
+        next false unless File.file?(path)
+        next true if !shakapacker_path.nil? && path == shakapacker_path && configured_bundler == bundler
+
+        File.basename(path).start_with?(bundler_prefix)
       end
     end
 
     def explicit_shakapacker_bundler_config_path?(resolved_config_path)
       shakapacker_path = shakapacker_assets_bundler_config_path
-      !shakapacker_path.nil? && !shakapacker_path.empty? && shakapacker_path == resolved_config_path
+      !shakapacker_path.nil? && shakapacker_path == resolved_config_path
     end
 
     def configured_assets_bundler
