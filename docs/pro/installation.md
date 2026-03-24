@@ -8,7 +8,7 @@ Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHAN
 
 ## Version Format
 
-For the commands below, choose versions from the CHANGELOG and replace placeholders like
+For the commands below, choose versions 16.4.0 or greater from the CHANGELOG and replace placeholders like
 `<gem_version>` and `<npm_version>`. Note that for pre-release versions:
 
 - Gems use all periods: `16.4.0.beta.1`
