@@ -80,7 +80,12 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
   }
 
   console.log('');
-  const modeLabel = options.rsc ? ', mode: rsc' : options.pro ? ', mode: pro' : '';
+  let modeLabel = '';
+  if (options.rsc) {
+    modeLabel = ', mode: rsc';
+  } else if (options.pro) {
+    modeLabel = ', mode: pro';
+  }
   logInfo(
     `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${modeLabel}`,
   );
