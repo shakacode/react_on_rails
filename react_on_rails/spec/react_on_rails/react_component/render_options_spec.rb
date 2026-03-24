@@ -23,16 +23,25 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
   end
 
-  around do |example|
+  def with_prerender_env_override_cleared
     original_prerender_override = ENV.fetch("REACT_ON_RAILS_PRERENDER_OVERRIDE", nil)
     ENV.delete("REACT_ON_RAILS_PRERENDER_OVERRIDE")
-
-    example.run
+    yield
   ensure
     if original_prerender_override.nil?
       ENV.delete("REACT_ON_RAILS_PRERENDER_OVERRIDE")
     else
       ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = original_prerender_override
+    end
+  end
+
+  def build_render_options_with_clean_prerender_env(option:, attrs:)
+    if option == :prerender
+      with_prerender_env_override_cleared do
+        described_class.new(**attrs)
+      end
+    else
+      described_class.new(**attrs)
     end
   end
 
@@ -151,6 +160,13 @@ describe ReactOnRails::ReactComponent::RenderOptions do
   end
 
   describe "#prerender env override" do
+    around do |example|
+      original_prerender_config = ReactOnRails.configuration.prerender
+      with_prerender_env_override_cleared { example.run }
+    ensure
+      ReactOnRails.configuration.prerender = original_prerender_config
+    end
+
     it "overrides explicit option when env is true" do
       ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = "true"
       attrs = the_attrs(options: { prerender: false })
@@ -170,11 +186,22 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     it "falls back to configured behavior for invalid env values" do
       ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = "definitely-not-boolean"
       ReactOnRails.configuration.prerender = true
-      attrs = the_attrs
-      opts = described_class.new(**attrs)
 
       expect(Rails.logger).to receive(:warn)
         .with(/Ignoring REACT_ON_RAILS_PRERENDER_OVERRIDE/)
+        .once
+
+      attrs = the_attrs
+      opts = described_class.new(**attrs)
+
+      expect(opts.prerender).to be true
+      expect(opts.prerender).to be true
+    end
+
+    it "uses configured precedence when env var is absent" do
+      ReactOnRails.configuration.prerender = false
+      attrs = the_attrs(options: { prerender: true })
+      opts = described_class.new(**attrs)
 
       expect(opts.prerender).to be true
     end
@@ -187,8 +214,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
           options = {}
           options[option] = false
           attrs = the_attrs(options: options)
-
-          opts = described_class.new(**attrs)
+          opts = build_render_options_with_clean_prerender_env(option: option, attrs: attrs)
 
           expect(opts.public_send(option)).to be false
         end
@@ -198,8 +224,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         it "returns #{option} from config" do
           ReactOnRails.configuration.public_send(:"#{option}=", true)
           attrs = the_attrs
-
-          opts = described_class.new(**attrs)
+          opts = build_render_options_with_clean_prerender_env(option: option, attrs: attrs)
 
           expect(opts.public_send(option)).to be true
         end
