@@ -198,8 +198,8 @@ module ReactOnRails
     end
 
     def check_javascript_bundles
-      if server_bundle_filename.to_s.empty?
-        checker.add_info("ℹ️  server_bundle_js_file is blank (SSR disabled), skipping server bundle file check")
+      if server_bundle_filename.to_s.strip.empty?
+        checker.add_info("ℹ️  server_bundle_js_file is blank (SSR disabled), skipping SSR bundle existence check")
         return
       end
 
@@ -763,7 +763,9 @@ module ReactOnRails
         return
       end
 
-      checker.add_warning("⚠️  React on Rails configuration file not found: #{config_path}") unless initializer_exists
+      if !initializer_exists && runtime_config
+        checker.add_info("ℹ️  No config/initializers/react_on_rails.rb found (using runtime configuration)")
+      end
 
       begin
         content = initializer_exists ? File.read(config_path) : ""
@@ -796,6 +798,8 @@ module ReactOnRails
         server_bundle_value = runtime_config.server_bundle_js_file
         if server_bundle_value.present?
           checker.add_info("  server_bundle_js_file: #{server_bundle_value}")
+        elsif server_bundle_value.nil?
+          checker.add_info("  server_bundle_js_file: #{server_bundle_filename} (initializer/default)")
         else
           checker.add_info("  server_bundle_js_file: \"\" (disabled)")
         end
@@ -849,14 +853,18 @@ module ReactOnRails
 
       # Server renderer pool settings
       if runtime_config
-        checker.add_info("  server_renderer_pool_size: #{runtime_config.server_renderer_pool_size}")
+        # Default is 1; only report explicit non-default override.
+        checker.add_info("  server_renderer_pool_size: #{runtime_config.server_renderer_pool_size}") \
+          if runtime_config.server_renderer_pool_size != 1
       else
         pool_size_match = content.match(/config\.server_renderer_pool_size\s*=\s*([^\s\n,]+)/)
         checker.add_info("  server_renderer_pool_size: #{pool_size_match[1]}") if pool_size_match
       end
 
       if runtime_config
-        checker.add_info("  server_renderer_timeout: #{runtime_config.server_renderer_timeout} seconds")
+        # Default is 20 seconds; only report explicit non-default override.
+        checker.add_info("  server_renderer_timeout: #{runtime_config.server_renderer_timeout} seconds") \
+          if runtime_config.server_renderer_timeout != 20
       else
         timeout_match = content.match(/config\.server_renderer_timeout\s*=\s*([^\s\n,]+)/)
         checker.add_info("  server_renderer_timeout: #{timeout_match[1]} seconds") if timeout_match
@@ -1020,6 +1028,7 @@ module ReactOnRails
           component_configs << "components_subdirectory: #{runtime_config.components_subdirectory}"
           checker.add_info("    ℹ️  File-system based component registry enabled")
         end
+        # Default is false; only report explicit non-default override.
         if runtime_config.same_bundle_for_client_and_server
           component_configs << "same_bundle_for_client_and_server: #{runtime_config.same_bundle_for_client_and_server}"
         end
@@ -1343,7 +1352,13 @@ module ReactOnRails
 
       begin
         if runtime_config
-          server_bundle_set = runtime_config.server_bundle_js_file.present?
+          server_bundle_value = runtime_config.server_bundle_js_file
+          server_bundle_set =
+            if server_bundle_value.nil?
+              server_bundle_filename.to_s.strip.present?
+            else
+              server_bundle_value.present?
+            end
           prerender_set = runtime_config.prerender
         else
           content = File.read(config_path)
@@ -2351,8 +2366,8 @@ module ReactOnRails
     end
 
     def resolved_pro_server_renderer
-      return nil unless ReactOnRails::Utils.react_on_rails_pro?
       return @resolved_pro_server_renderer if defined?(@resolved_pro_server_renderer)
+      return (@resolved_pro_server_renderer = nil) unless ReactOnRails::Utils.react_on_rails_pro?
 
       @resolved_pro_server_renderer =
         if ensure_rails_environment_loaded && defined?(ReactOnRailsPro)

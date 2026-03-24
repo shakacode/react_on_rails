@@ -160,11 +160,26 @@ RSpec.describe ReactOnRails::Doctor do
       warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
       info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
 
-      expect(warning_messages).to include(
+      expect(warning_messages).not_to include(
         a_string_including("React on Rails configuration file not found: config/initializers/react_on_rails.rb")
+      )
+      expect(info_messages).to include(
+        a_string_including("No config/initializers/react_on_rails.rb found (using runtime configuration)")
       )
       expect(info_messages).to include(a_string_including("Using loaded runtime configuration values"))
       expect(info_messages).to include(a_string_including("server_bundle_js_file: runtime-server-bundle.js"))
+    end
+
+    it "shows initializer/default bundle value when runtime server_bundle_js_file is nil" do
+      allow(runtime_config).to receive(:server_bundle_js_file).and_return(nil)
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).to include(
+        a_string_including("server_bundle_js_file: server-bundle.js (initializer/default)")
+      )
     end
   end
 
@@ -305,6 +320,23 @@ RSpec.describe ReactOnRails::Doctor do
           expect(filename).to eq("server-bundle.js")
         end
       end
+    end
+  end
+
+  describe "#check_javascript_bundles" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    it "treats whitespace server_bundle_js_file as disabled SSR" do
+      allow(doctor).to receive(:server_bundle_filename).and_return("   ")
+
+      doctor.send(:check_javascript_bundles)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+
+      expect(info_messages).to include(a_string_including("skipping SSR bundle existence check"))
+      expect(warning_messages).to be_empty
     end
   end
 
@@ -1269,6 +1301,30 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when runtime server_bundle_js_file is nil and prerender is enabled" do
+      let(:runtime_config) do
+        instance_double(
+          ReactOnRails::Configuration,
+          server_bundle_js_file: nil,
+          prerender: true
+        )
+      end
+
+      it "treats nil as initializer/default fallback instead of disabled" do
+        allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
+
+        expect(warning_messages).not_to include(
+          a_string_including("Server rendering is enabled but server_bundle_js_file is not configured")
+        )
+        expect(success_messages).to include(a_string_including("Server rendering configuration is consistent"))
+      end
+    end
+
     context "when views use stream_react_component (RSC/streaming apps)" do
       it "reports consistent configuration" do
         write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
@@ -1864,6 +1920,17 @@ RSpec.describe ReactOnRails::Doctor do
 
       expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
       expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
+    end
+  end
+
+  describe "resolved_pro_server_renderer" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+
+    it "memoizes nil when Pro is not active" do
+      expect(ReactOnRails::Utils).to receive(:react_on_rails_pro?).once.and_return(false)
+
+      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
+      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
     end
   end
 
