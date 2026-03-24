@@ -12,13 +12,13 @@ module ReactOnRails
     end
 
     def resolved_webpack_config_path
-      webpack_config_candidates.find { |path| File.exist?(path) }
+      webpack_config_candidates.find { |path| File.file?(path) }
     end
 
     def webpack_config_candidates
       candidates = []
       shakapacker_config_path = shakapacker_assets_bundler_config_path
-      candidates << shakapacker_config_path if shakapacker_config_path
+      candidates << shakapacker_config_path if shakapacker_config_path && File.file?(shakapacker_config_path)
 
       shakapacker_config_dir = shakapacker_webpack_config_directory(shakapacker_config_path)
       if shakapacker_config_dir
@@ -43,13 +43,15 @@ module ReactOnRails
       return nil if path.empty?
 
       rails_root = Rails.root.to_s
+      return path if rails_root.empty? || rails_root == "/"
+
       path.start_with?("#{rails_root}/") ? path.sub("#{rails_root}/", "") : path
     rescue LoadError, StandardError
       nil
     end
 
-    def shakapacker_webpack_config_directory(config_path = nil)
-      path = config_path || shakapacker_assets_bundler_config_path
+    def shakapacker_webpack_config_directory(config_path)
+      path = config_path
       return nil unless path
 
       File.dirname(path)
