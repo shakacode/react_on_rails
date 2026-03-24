@@ -10,7 +10,8 @@ Before running the generator, verify your environment:
 
 | Requirement              | Check command                                                        | Expected                          |
 | ------------------------ | -------------------------------------------------------------------- | --------------------------------- |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                     | v16.4.0+                          |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                     | v4.0.0+                           |
+| React on Rails gem       | `bundle show react_on_rails`                                         | v16.0.0+                          |
 | React on Rails Pro npm   | `pnpm list react-on-rails-pro`                                       | Matches gem version               |
 | React version            | `pnpm list react`                                                    | 19.0.x (19.1.x not yet supported) |
 | React DOM version        | `pnpm list react-dom`                                                | Must match `react` version        |
@@ -63,9 +64,9 @@ The generator is idempotent -- safe to run multiple times.
 
 The generator automatically handles both webpack export shapes used across Pro app versions. No manual action is needed, but understanding the difference helps with troubleshooting.
 
-### Current Export Shape (v16.4.0+)
+### Current Export Shape
 
-Apps generated with React on Rails Pro v16.4.0+ export an object from `serverWebpackConfig.js`:
+Recent versions of the React on Rails Pro generator export an object from `serverWebpackConfig.js`:
 
 ```js
 // config/webpack/serverWebpackConfig.js
@@ -81,9 +82,9 @@ And `ServerClientOrBoth.js` destructures the import:
 const { default: serverWebpackConfig } = require('./serverWebpackConfig');
 ```
 
-### Legacy Export Shape (pre-v16.4.0)
+### Legacy Export Shape
 
-Older Pro apps or apps upgraded from OSS export a plain function. These apps must upgrade to v16.4.0+ before adding RSC (see [Prerequisites](#prerequisites)):
+Older Pro apps or apps upgraded from OSS export a plain function:
 
 ```js
 // config/webpack/serverWebpackConfig.js
