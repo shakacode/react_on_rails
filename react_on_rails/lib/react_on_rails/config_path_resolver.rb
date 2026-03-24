@@ -41,6 +41,9 @@ module ReactOnRails
         end)
       end
 
+      # Default fallback candidates intentionally mirror generator defaults
+      # (`.js` / `.ts`), while `.cjs` / `.mjs` are probed only within resolved
+      # shakapacker config directories above.
       candidates.concat(WEBPACK_DEFAULT_CONFIG_CANDIDATES)
       candidates.concat(RSPACK_DEFAULT_CONFIG_CANDIDATES)
       candidates.uniq
@@ -56,11 +59,12 @@ module ReactOnRails
           nil
         else
           rails_root = Rails.root.to_s
-          if rails_root.empty?
+          if rails_root.empty? || rails_root == "/"
             path
           else
-            rails_root_prefix = rails_root == "/" ? "/" : "#{rails_root}/"
-            path.start_with?(rails_root_prefix) ? path.delete_prefix(rails_root_prefix) : path
+            rails_root_prefix = "#{rails_root}/"
+            normalized_path = path.start_with?(rails_root_prefix) ? path.delete_prefix(rails_root_prefix) : path
+            normalized_path.empty? ? nil : normalized_path
           end
         end
       rescue LoadError, StandardError

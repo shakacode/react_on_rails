@@ -320,8 +320,11 @@ module ReactOnRails
       return resolved_config_path if explicit_shakapacker_bundler_config_path?(resolved_config_path)
 
       # Re-scan candidate configs by bundler so we can emit clear warnings when
-      # both webpack and rspack configs exist in the project.
-      resolve_default_bundler_config_path
+      # both webpack and rspack configs exist in the project. If a future
+      # candidate falls outside the `<bundler>.config.*` naming convention used
+      # by `existing_bundler_config_paths`, fall back to the originally
+      # discovered file.
+      resolve_default_bundler_config_path || resolved_config_path
     end
 
     def resolve_default_bundler_config_path
@@ -356,7 +359,7 @@ module ReactOnRails
     end
 
     def suggest_webpack_inspection(config_path)
-      bundler_name = config_path.include?("rspack") ? "rspack" : "webpack"
+      bundler_name = bundler_name_for_config_path(config_path)
       export_style = config_path.end_with?(".ts") ? "export default" : "module.exports"
 
       add_info("💡 To debug #{bundler_name} builds:")
@@ -408,7 +411,7 @@ module ReactOnRails
 
     def check_webpack_config_content(config_path)
       content = File.read(config_path)
-      bundler_name = config_path.include?("rspack") ? "rspack" : "webpack"
+      bundler_name = bundler_name_for_config_path(config_path)
 
       if react_on_rails_config?(content)
         add_success("✅ #{bundler_name.capitalize} config includes React on Rails environment configuration")
@@ -527,12 +530,27 @@ module ReactOnRails
     end
 
     def existing_bundler_config_paths(bundler)
+      # Custom shakapacker config paths (non-standard basenames) are handled
+      # earlier via explicit_shakapacker_bundler_config_path? and intentionally
+      # excluded from this `<bundler>.config.*` classifier.
       bundler_prefix = "#{bundler}.config."
       webpack_config_candidates.select do |path|
         next false unless File.file?(path)
 
         File.basename(path).start_with?(bundler_prefix)
       end
+    end
+
+    def bundler_name_for_config_path(config_path)
+      if explicit_shakapacker_bundler_config_path?(config_path)
+        configured_assets_bundler || inferred_bundler_name(config_path)
+      else
+        inferred_bundler_name(config_path)
+      end
+    end
+
+    def inferred_bundler_name(config_path)
+      config_path.include?("rspack") ? "rspack" : "webpack"
     end
 
     def explicit_shakapacker_bundler_config_path?(resolved_config_path)

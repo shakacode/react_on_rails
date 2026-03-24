@@ -837,6 +837,18 @@ RSpec.describe ReactOnRails::SystemChecker do
 
         expect(checker.send(:detect_bundler_config_path)).to be_nil
       end
+
+      it "falls back to resolved path if bundled classifier returns nil" do
+        allow(checker).to receive_messages(
+          resolved_webpack_config_path: "config/custom/custom-bundler.config.js",
+          resolve_default_bundler_config_path: nil
+        )
+        allow(checker).to receive(:explicit_shakapacker_bundler_config_path?)
+          .with("config/custom/custom-bundler.config.js")
+          .and_return(false)
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/custom/custom-bundler.config.js")
+      end
     end
 
     describe "#configured_assets_bundler" do
@@ -889,6 +901,19 @@ RSpec.describe ReactOnRails::SystemChecker do
         info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
 
         expect(info_messages).to include("Add to config/webpack/webpack.config.ts")
+      end
+
+      it "uses configured assets_bundler for explicit custom shakapacker config paths" do
+        allow(checker).to receive(:explicit_shakapacker_bundler_config_path?)
+          .with("config/custom/bundler.config.js")
+          .and_return(true)
+        allow(checker).to receive(:configured_assets_bundler).and_return("rspack")
+
+        checker.send(:suggest_webpack_inspection, "config/custom/bundler.config.js")
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
+
+        expect(info_messages).to include("debug rspack builds")
+        expect(info_messages).to include("rspack-stats.json")
       end
     end
 

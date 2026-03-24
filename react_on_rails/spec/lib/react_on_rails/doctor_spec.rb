@@ -1893,6 +1893,37 @@ RSpec.describe ReactOnRails::Doctor do
 
         expect(doctor.send(:shakapacker_assets_bundler_config_path)).to eq("/opt/custom/bundler.config.js")
       end
+
+      it "does not strip absolute paths when Rails.root is filesystem root" do
+        allow(Rails).to receive(:root).and_return(Pathname.new("/"))
+        allow(doctor).to receive(:require).with("shakapacker").and_return(true)
+        shakapacker_config = Struct.new(:assets_bundler_config_path).new("/opt/custom/bundler.config.js")
+        shakapacker_class = Class.new do
+          class << self
+            attr_accessor :config
+          end
+        end
+        stub_const("Shakapacker", shakapacker_class)
+        Shakapacker.config = shakapacker_config
+
+        expect(doctor.send(:shakapacker_assets_bundler_config_path)).to eq("/opt/custom/bundler.config.js")
+      end
+
+      it "returns nil when normalization strips to an empty relative path" do
+        rails_root = Pathname.new("/tmp/myapp")
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(doctor).to receive(:require).with("shakapacker").and_return(true)
+        shakapacker_config = Struct.new(:assets_bundler_config_path).new("#{rails_root}/")
+        shakapacker_class = Class.new do
+          class << self
+            attr_accessor :config
+          end
+        end
+        stub_const("Shakapacker", shakapacker_class)
+        Shakapacker.config = shakapacker_config
+
+        expect(doctor.send(:shakapacker_assets_bundler_config_path)).to be_nil
+      end
     end
 
     describe "#bundler_config_directory" do
