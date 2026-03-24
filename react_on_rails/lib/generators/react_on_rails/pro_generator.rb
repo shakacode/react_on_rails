@@ -78,7 +78,7 @@ module ReactOnRails
         say "✅ Pro npm dependencies added", :green
       end
 
-      # rubocop:disable Metrics/AbcSize
+      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
       def swap_base_gem_for_pro_in_gemfile
         gemfile_path = File.join(destination_root, "Gemfile")
         unless File.exist?(gemfile_path)
@@ -117,7 +117,9 @@ module ReactOnRails
           # Consume multiline gem declarations that continue with trailing commas.
           line_index += 1
           current_line = line
-          while line_index < gemfile_lines.length && line_continues_with_comma?(current_line)
+          while line_index < gemfile_lines.length &&
+                line_continues_with_comma?(current_line) &&
+                gem_declaration_continues_on_next_line?(gemfile_lines[line_index])
             current_line = gemfile_lines[line_index]
             line_index += 1
           end
@@ -130,7 +132,7 @@ module ReactOnRails
         say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
         bundle_install_after_gem_swap
       end
-      # rubocop:enable Metrics/AbcSize
+      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
 
       def bundle_install_after_gem_swap
         say "📦 Running bundle install after Gemfile update...", :yellow
@@ -233,7 +235,15 @@ module ReactOnRails
       end
 
       def line_continues_with_comma?(line)
-        line.rstrip.match?(/,\s*(?:#.*)?\z/)
+        line_without_comment = line.sub(/\s+#.*$/, "").rstrip
+        line_without_comment.end_with?(",")
+      end
+
+      def gem_declaration_continues_on_next_line?(line)
+        stripped = line.lstrip
+        return false if stripped.empty?
+
+        !stripped.start_with?("gem ")
       end
 
       def add_missing_gemfile_warning(gemfile_path)

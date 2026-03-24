@@ -133,6 +133,22 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).not_to include("  \"~> 16.0\"")
     end
 
+    it "does not consume the next gem line when base declaration ends with a trailing comma" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails",
+        gem "rails"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).to include("gem \"rails\"")
+    end
+
     it "preserves single quote style when replacing single-quoted Gemfile entries" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
