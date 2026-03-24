@@ -777,6 +777,23 @@ RSpec.describe ReactOnRails::SystemChecker do
         end).to be true
       end
 
+      it "prefers configured assets_bundler when both custom-directory candidates exist" do
+        allow(File).to receive(:file?).with("config/custom/missing.config.js").and_return(false)
+        allow(File).to receive(:file?).with("config/custom/webpack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/custom/rspack.config.js").and_return(true)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom/missing.config.js")
+        allow(checker).to receive(:shakapacker_webpack_config_directory)
+          .with("config/custom/missing.config.js")
+          .and_return("config/custom")
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("default:\n  assets_bundler: rspack\n")
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/custom/rspack.config.js")
+        expect(checker.messages.any? do |msg|
+          msg[:content].include?("Using rspack from config/shakapacker.yml")
+        end).to be true
+      end
+
       it "warns and defaults to webpack when both bundlers exist and config is ambiguous" do
         allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
         allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)

@@ -2,6 +2,8 @@
 
 module ReactOnRails
   module ConfigPathResolver
+    # Keep JS before TS to match generator defaults and to prefer the
+    # JavaScript config deterministically when both variants are present.
     WEBPACK_DEFAULT_CONFIG_CANDIDATES = %w[
       config/webpack/webpack.config.js
       config/webpack/webpack.config.ts
