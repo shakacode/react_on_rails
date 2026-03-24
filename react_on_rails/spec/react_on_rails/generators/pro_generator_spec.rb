@@ -247,6 +247,7 @@ describe ProGenerator, type: :generator do
       gemfile_content = File.read(gemfile_path)
       expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).not_to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\")")
       expect(gemfile_content).not_to include('gem("react_on_rails"')
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
