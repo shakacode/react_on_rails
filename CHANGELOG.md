@@ -36,7 +36,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
-- **Consolidated CSP nonce sanitization**: Extracted the duplicate `sanitizeNonce` logic from `RenderUtils.ts` (OSS) and `utils.ts` (Pro) into a single shared `sanitizeNonce` module in the OSS package (`react-on-rails/sanitizeNonce`). The Pro package now imports from the OSS package instead of maintaining its own copy. Behavior is unchanged: malformed nonces are silently dropped (sanitize-then-validate policy). [PR PENDING](https://github.com/shakacode/react_on_rails/pull/PENDING) by [justin808](https://github.com/justin808). Fixes [Issue 2582](https://github.com/shakacode/react_on_rails/issues/2582).
+- **Consolidated CSP nonce sanitization**: Extracted the duplicate `sanitizeNonce` logic from `RenderUtils.ts` (OSS) and `utils.ts` (Pro) into a single shared `sanitizeNonce` module in the OSS package (`react-on-rails/sanitizeNonce`). The Pro package now imports from the OSS package instead of maintaining its own copy. Behavior is unchanged: malformed nonces are silently dropped (sanitize-then-validate policy). [PR 2828](https://github.com/shakacode/react_on_rails/pull/2828) by [justin808](https://github.com/justin808). Fixes [Issue 2582](https://github.com/shakacode/react_on_rails/issues/2582).
 
 ### [16.4.0] - 2026-03-16
 
