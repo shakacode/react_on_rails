@@ -99,12 +99,21 @@ module ReactOnRails
           nil
         end
 
+        # Env vars set after Bundler.setup that must survive with_unbundled_env.
+        # with_unbundled_env restores the pre-Bundler env snapshot, so any var
+        # set at runtime (e.g. PORT by PortSelector) is lost. We capture them
+        # before entering the block and pass them explicitly to system().
+        # This follows the same pattern used by Rails' bundle_command (railties),
+        # Spring's process spawning, and this codebase's own PackGenerator.
+        ENV_KEYS_TO_PRESERVE = %w[PORT SHAKAPACKER_DEV_SERVER_PORT].freeze
+
         # Run a process outside of bundler context
         # This allows using system-installed processes even when they're not in the Gemfile
         def run_process_outside_bundle(process, args)
           if defined?(Bundler)
+            env_overrides = preserve_runtime_env_vars
             with_unbundled_context do
-              system(process, *args)
+              system(env_overrides, process, *args)
             end
           else
             # Fallback if Bundler is not available
@@ -166,6 +175,12 @@ module ReactOnRails
             After installation, try running this script again.
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           MSG
+        end
+
+        def preserve_runtime_env_vars
+          ENV_KEYS_TO_PRESERVE.each_with_object({}) do |key, hash|
+            hash[key] = ENV[key] if ENV[key]
+          end
         end
 
         def valid_procfile_path?(procfile)
