@@ -27,7 +27,7 @@ defaults:
 jobs:
   detect-changes:
     # Skip for Dependabot PRs — they can't access the Pro license secret
-    if: github.actor != 'dependabot[bot]'
+    if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
     permissions:
       contents: read
       actions: read
