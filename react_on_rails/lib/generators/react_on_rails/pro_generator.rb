@@ -149,13 +149,18 @@ module ReactOnRails
       # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
       def atomic_write_file(path, content)
-        Tempfile.create([File.basename(path), ".tmp"], File.dirname(path)) do |temp_file|
-          temp_file.write(content)
-          temp_file.flush
-          temp_file.fsync
-          temp_file.close
-          FileUtils.mv(temp_file.path, path)
-        end
+        temp_file = Tempfile.new([File.basename(path), ".tmp"], File.dirname(path))
+        temp_path = temp_file.path
+
+        temp_file.write(content)
+        temp_file.flush
+        temp_file.fsync
+        temp_file.close
+        FileUtils.mv(temp_path, path)
+        temp_path = nil
+      ensure
+        temp_file&.close unless temp_file&.closed?
+        File.delete(temp_path) if temp_path && File.exist?(temp_path)
       end
 
       def bundle_install_after_gem_swap
@@ -200,7 +205,7 @@ module ReactOnRails
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Could not run automatic bundle install: #{e.message}
+          ⚠️  Could not run automatic bundle install: #{e.class}: #{e.message}
 
           Please run manually:
             bundle install
@@ -226,7 +231,7 @@ module ReactOnRails
           updated_files += 1
         rescue StandardError => e
           GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  Could not update imports in #{file}: #{e.message}
+            ⚠️  Could not update imports in #{file}: #{e.class}: #{e.message}
 
             Please update react-on-rails imports to react-on-rails-pro manually.
           MSG
@@ -308,17 +313,17 @@ module ReactOnRails
 
       def add_gemfile_update_warning(gemfile_path, error)
         GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Could not update Gemfile at #{gemfile_path}: #{error.message}
+          ⚠️  Could not update Gemfile at #{gemfile_path}: #{error.class}: #{error.message}
 
           Skipping automatic react_on_rails -> react_on_rails_pro Gemfile swap.
           Please update your Gemfile manually.
         MSG
       end
 
-      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def rewrite_non_comment_lines(content)
         in_block_comment = false
-        pending_dynamic_import = false
+        pending_multiline_module_call = false
 
         content.lines.map do |line|
           stripped = line.lstrip
@@ -327,24 +332,36 @@ module ReactOnRails
             in_block_comment = false if stripped.include?("*/")
             line
           elsif stripped.start_with?("/*")
-            in_block_comment = !stripped.include?("*/")
-            line
+            if stripped.include?("*/")
+              rewritten_line = yield line
+              if pending_multiline_module_call
+                rewritten_line = rewrite_pending_module_specifier(rewritten_line)
+                pending_multiline_module_call = !module_call_closes_on_line?(rewritten_line)
+              elsif starts_pending_multiline_module_call?(rewritten_line)
+                pending_multiline_module_call = true
+              end
+              in_block_comment = true if unclosed_block_comment_starts?(line)
+              rewritten_line
+            else
+              in_block_comment = true
+              line
+            end
           elsif stripped.start_with?("//") || stripped.match?(/\A\*\s/)
             line
           else
             rewritten_line = yield line
-            if pending_dynamic_import
-              rewritten_line = rewrite_pending_dynamic_import_specifier(rewritten_line)
-              pending_dynamic_import = !import_call_closes_on_line?(rewritten_line)
-            elsif starts_pending_dynamic_import?(rewritten_line)
-              pending_dynamic_import = true
+            if pending_multiline_module_call
+              rewritten_line = rewrite_pending_module_specifier(rewritten_line)
+              pending_multiline_module_call = !module_call_closes_on_line?(rewritten_line)
+            elsif starts_pending_multiline_module_call?(rewritten_line)
+              pending_multiline_module_call = true
             end
             in_block_comment = true if unclosed_block_comment_starts?(line)
             rewritten_line
           end
         end.join
       end
-      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:enable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def unclosed_block_comment_starts?(line)
         line_without_strings = line.gsub(
@@ -358,19 +375,19 @@ module ReactOnRails
         line_without_inline_comment.index("*/", opening_index + 2).nil?
       end
 
-      def starts_pending_dynamic_import?(line)
-        return false unless line.match?(/\bimport\s*\(/)
+      def starts_pending_multiline_module_call?(line)
+        return false unless line.match?(/\b(?:import|require)\s*\(/)
 
-        !line.match?(%r{\bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
+        !line.match?(%r{\b(?:import|require)\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
       end
 
-      def rewrite_pending_dynamic_import_specifier(line)
+      def rewrite_pending_module_specifier(line)
         line.sub(%r{(?<quote>["'])react-on-rails(?!-pro)(?=(?:["']|/))}) do
           "#{Regexp.last_match[:quote]}react-on-rails-pro"
         end
       end
 
-      def import_call_closes_on_line?(line)
+      def module_call_closes_on_line?(line)
         line_without_strings = line.gsub(
           /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/,
           ""

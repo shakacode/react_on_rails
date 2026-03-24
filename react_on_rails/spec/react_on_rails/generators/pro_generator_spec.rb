@@ -398,6 +398,10 @@ describe ProGenerator, type: :generator do
           /* webpackMode: "lazy" */
           "react-on-rails/client"
         );
+        const lazyRorRequire = require(
+          "react-on-rails/server"
+        );
+        /* short comment */ import InlineReactOnRails from "react-on-rails";
         const keepRor = require("react-on-rails"); // /* not a block comment start
         const commentLikeString = "/* not a JS comment";
         import ReactOnRailsServer from "react-on-rails/server";
@@ -433,6 +437,10 @@ describe ProGenerator, type: :generator do
       expect(File.read(application_js_path)).to include('require("react-on-rails-pro")')
       expect(File.read(application_js_path)).to include('import(/* webpackChunkName: "ror" */ "react-on-rails-pro")')
       expect(File.read(application_js_path)).to include('"react-on-rails-pro/client"')
+      expect(File.read(application_js_path)).to include('"react-on-rails-pro/server"')
+      expect(File.read(application_js_path)).to include(
+        '/* short comment */ import InlineReactOnRails from "react-on-rails-pro";'
+      )
       expect(File.read(application_js_path)).to include('import ReactOnRailsServer from "react-on-rails-pro/server";')
       expect(File.read(application_js_path)).to include('import ReactOnRailsClient from "react-on-rails-pro/client";')
       expect(File.read(application_js_path)).to include('import "react-on-rails-pro";')
