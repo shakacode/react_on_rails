@@ -33,13 +33,13 @@ bundle add react_on_rails --strict
 # git add . && git commit -m "Prepare for React on Rails install"
 
 # Run the installer for TypeScript
-bundle exec rails generate react_on_rails:install --typescript
+bin/rails generate react_on_rails:install --typescript
 
 # Optional: Use Rspack for faster builds
-# bundle exec rails generate react_on_rails:install --typescript --rspack
+# bin/rails generate react_on_rails:install --typescript --rspack
 
 # For JavaScript instead of TypeScript, omit --typescript
-# bundle exec rails generate react_on_rails:install
+# bin/rails generate react_on_rails:install
 ```
 
 If the generator reports dependency-install warnings (for example, `JavaScript dependencies installation failed ...`), run your package manager install and compile once before moving on:
@@ -55,7 +55,7 @@ bundle exec rails shakapacker:compile
 
 Take a look at the files created by the generator.
 
-- jsx files created
+- Component files (`.tsx` for TypeScript, `.jsx` for JavaScript)
 - Shakapacker install
 - React component files in `client/`
 - A sample controller and view
@@ -99,7 +99,7 @@ You should see a page with a React component saying "Hello World"!
 
 Let's make a quick change to see hot reloading in action:
 
-1. Open `app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx`
+1. Open `app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx`
 2. Change the text from "Hello World" to "Hello from React!"
 3. Save the file
 4. Watch your browser automatically refresh
@@ -115,12 +115,12 @@ Now let's add a React component to one of your existing Rails views:
 mkdir -p app/javascript/src/SimpleCounter/ror_components
 
 # Create the component file
-touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.jsx
+touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.tsx
 ```
 
-Add this content to `SimpleCounter.jsx`:
+Add this content to `SimpleCounter.tsx`:
 
-```jsx
+```tsx
 import React, { useState } from 'react';
 
 const SimpleCounter = ({ initialCount = 0 }) => {
