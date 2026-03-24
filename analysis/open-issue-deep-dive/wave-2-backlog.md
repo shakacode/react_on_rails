@@ -29,7 +29,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Context excerpt: ## Summary After reviewing [everything-claude-code](https://github.com/affaan-m/everything-claude-code) (50K+ stars, Anthropic hackathon winner), several patterns would enhance our already solid Claude Code setup. ## Cur ...
 - Posted question: Is this still active for implementation, or should it remain a discussion-only backlog item?
 
-## #2552 RFC: Rename bundler-agnostic config files from *WebpackConfig.js to bundler-neutral names
+## #2552 RFC: Rename bundler-agnostic config files from \*WebpackConfig.js to bundler-neutral names
 
 - Domain: discussion/rfc
 - Labels: enhancement, P3
@@ -58,7 +58,7 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Domain: ci/tooling
 - Labels: P3
 - Created: 2025-12-15
-- Context excerpt: Currently our CI caches gems manually, but https://github.com/ruby/setup-ruby/?tab=readme-ov-file#caching-bundle-install-manually says > It is also possible to cache gems manually, **but this is not recommended because i ...
+- Context excerpt: Currently our CI caches gems manually, but https://github.com/ruby/setup-ruby/?tab=readme-ov-file#caching-bundle-install-manually says > It is also possible to cache gems manually, \*\*but this is not recommended because i ...
 - Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?
 
 ## #2214 Finish merging linting between Core and Pro
@@ -162,5 +162,5 @@ Field note: Most `ci/tooling` entries intentionally share the same routing quest
 - Domain: ci/tooling
 - Labels: enhancement, low priority, P3
 - Created: 2025-11-12
-- Context excerpt: ## Problem The `run-skipped-ci.yml` workflow uses a fixed 5-second wait before verifying that workflows are queued: ```javascript await new Promise(resolve => setTimeout(resolve, 5000)); ``` This approach has several iss ...
+- Context excerpt: ## Problem The `run-skipped-ci.yml` workflow uses a fixed 5-second wait before verifying that workflows are queued: `javascript await new Promise(resolve => setTimeout(resolve, 5000)); ` This approach has several iss ...
 - Posted question: Should this run in the CI/tooling maintenance wave, or be deferred behind release-critical runtime work?

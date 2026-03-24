@@ -6,13 +6,13 @@ Field note: `Posted question` is the exact question posted to each issue during 
 
 ## Domain Breakdown (19 Issues)
 
-| Domain               | Count |
-| -------------------- | ----- |
-| core/runtime         | 9     |
-| ci/tooling           | 4     |
-| documentation        | 4     |
-| discussion/rfc       | 1     |
-| pro/rsc integration  | 1     |
+| Domain              | Count |
+| ------------------- | ----- |
+| core/runtime        | 9     |
+| ci/tooling          | 4     |
+| documentation       | 4     |
+| discussion/rfc      | 1     |
+| pro/rsc integration | 1     |
 
 ## Resolved After Snapshot, Before Execution
 
@@ -48,7 +48,7 @@ Field note: `Posted question` is the exact question posted to each issue during 
 - Domain: documentation
 - Labels: documentation, P3
 - Created: 2025-11-12
-- Context excerpt: ## Overview Add compelling React Server Components (RSC) migration success stories to our documentation to give readers incentive to migrate. ## Success Stories to Feature ### 1. **Mux: 50,000 Lines Migrated** - **Articl ...
+- Context excerpt: ## Overview Add compelling React Server Components (RSC) migration success stories to our documentation to give readers incentive to migrate. ## Success Stories to Feature ### 1. **Mux: 50,000 Lines Migrated** - \*\*Articl ...
 - Posted question: Should this be batched with related docs issues in a single docs PR, or handled separately?
 
 ## #1959 CI/Build improvements: prepack scripts and yalc workflow fixes
@@ -129,7 +129,7 @@ Field note: `Posted question` is the exact question posted to each issue during 
 - Domain: core/runtime
 - Labels: P3
 - Created: 2024-06-08
-- Context excerpt: ```ruby ReactOnRails::PacksGenerator.instance.generate_packs_if_stale ``` Have this call create a lock file so it can't run concurrently. The lock file should expire within a short time. Here is how to do this: https://w ...
+- Context excerpt: `ruby ReactOnRails::PacksGenerator.instance.generate_packs_if_stale ` Have this call create a lock file so it can't run concurrently. The lock file should expire within a short time. Here is how to do this: https://w ...
 - Posted question: Do you want this scheduled in the next implementation wave, or parked until after active release work?
 
 ## #1590 Add support for Vite

@@ -7,7 +7,7 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 - Domain: documentation
 - Labels: (none)
 - Created: 2026-03-22
-- Context excerpt: ## Context In `.claude/commands/update-changelog.md`, the Version Stamping section header (line 153) reads: > When this command is invoked with `release`, `rc`, or `beta`, **use the rake task to stamp the version header* ...
+- Context excerpt: ## Context In `.claude/commands/update-changelog.md`, the Version Stamping section header (line 153) reads: > When this command is invoked with `release`, `rc`, or `beta`, \*_use the rake task to stamp the version header_ ...
 - Posted question: Should this be batched with related docs issues in a single docs PR, or handled separately?
 
 ## #2805 Improve /address-review with merge-ready quick actions and follow-up issue workflow
@@ -79,7 +79,7 @@ Generated from open-issue triage snapshot dated 2026-03-22.
 - Domain: documentation
 - Labels: (none)
 - Created: 2026-03-20
-- Context excerpt: ## Summary Several docs pages have fenced code blocks without language identifiers (e.g., bare ``` instead of ```ruby or ```bash). This prevents syntax highlighting on reactonrails.com and anywhere else the docs are rend ...
+- Context excerpt: ## Summary Several docs pages have fenced code blocks without language identifiers (e.g., bare `instead of`ruby or ```bash). This prevents syntax highlighting on reactonrails.com and anywhere else the docs are rend ...
 - Posted question: Should this be batched with related docs issues in a single docs PR, or handled separately?
 
 ## #2771 Doctor: migrate from regex config parsing to runtime config queries

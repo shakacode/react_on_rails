@@ -11,6 +11,7 @@
 - Triage comments posted at snapshot time: 85/85
 
 ## Existing Open PR Coverage
+
 - #2802 RSC migration docs: fix fictional API names, missing associations, form_with, and CSRF token patterns -> #2803
 - #2794 Track B: add react_on_rails:sync_versions for gem/npm lockstep -> #2797
 - #2781 Docs: Add missing content pages (RSC landing, ExecJS, debugging, benchmarks) -> #2785
@@ -32,6 +33,7 @@
 
 - Context excerpts in wave files are intentionally truncated with `...`.
 - `Triage note` captures inferred scope, blocker history, pending verification, and other non-quoted analyst context.
+
 ## Execution Notes
 
 - Every issue received a triage comment with domain, current PR coverage, and a concrete next-step question.
