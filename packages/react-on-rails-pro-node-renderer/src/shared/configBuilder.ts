@@ -248,6 +248,27 @@ export function logSanitizedConfig() {
   });
 }
 
+function validatePasswordForProduction(aConfig: Config) {
+  if (aConfig.password) return;
+  if (NODE_ENV === 'development' || NODE_ENV === 'test') return;
+
+  throw new Error(
+    `RENDERER_PASSWORD must be set in production-like environments (current NODE_ENV: "${NODE_ENV}").\n\n` +
+      'In development and test environments, the renderer password is optional and no authentication\n' +
+      'is required. In all other environments, you must explicitly configure a password to secure\n' +
+      'communication between Rails and the Node Renderer.\n\n' +
+      'To fix this, set the RENDERER_PASSWORD environment variable:\n\n' +
+      '  export RENDERER_PASSWORD="your-secure-password"\n\n' +
+      'Or pass it in the config object:\n\n' +
+      '  reactOnRailsProNodeRenderer({ password: process.env.RENDERER_PASSWORD });\n\n' +
+      'Environment matrix:\n' +
+      '  development — password optional (no authentication)\n' +
+      '  test        — password optional (no authentication)\n' +
+      '  staging     — RENDERER_PASSWORD required\n' +
+      '  production  — RENDERER_PASSWORD required',
+  );
+}
+
 /**
  * Lazily create the config
  */
@@ -318,6 +339,8 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     log.error('includeTimerPolyfills is renamed to stubTimers in RoRP 4.0');
     process.exit(1);
   }
+
+  validatePasswordForProduction(config);
 
   log.level = config.logLevel;
   return config;

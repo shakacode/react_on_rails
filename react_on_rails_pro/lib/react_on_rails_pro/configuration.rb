@@ -233,6 +233,38 @@ module ReactOnRailsPro
 
       uri = URI(renderer_url)
       self.renderer_password = uri.password
+
+      validate_renderer_password_for_production
+    end
+
+    def validate_renderer_password_for_production
+      return if renderer_password.present?
+      return unless node_renderer?
+      return if defined?(Rails) && (Rails.env.development? || Rails.env.test?)
+
+      raise ReactOnRailsPro::Error, <<~MSG
+        RENDERER_PASSWORD must be set in production-like environments (staging, production, etc.)
+        when using the NodeRenderer.
+
+        In development and test environments, the renderer password is optional and no authentication
+        is required. In all other environments, you must explicitly configure a password to secure
+        communication between Rails and the Node Renderer.
+
+        To fix this, set the RENDERER_PASSWORD environment variable and configure it in your initializer:
+
+          # config/initializers/react_on_rails_pro.rb
+          ReactOnRailsPro.configure do |config|
+            config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
+          end
+
+        Then set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
+
+        Environment matrix:
+          development — password optional (no authentication)
+          test        — password optional (no authentication)
+          staging     — RENDERER_PASSWORD required
+          production  — RENDERER_PASSWORD required
+      MSG
     end
   end
 end

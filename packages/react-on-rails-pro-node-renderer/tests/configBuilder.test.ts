@@ -1,11 +1,23 @@
 describe('configBuilder', () => {
   const originalRendererHost = process.env.RENDERER_HOST;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalRendererPassword = process.env.RENDERER_PASSWORD;
 
   afterEach(() => {
     if (originalRendererHost === undefined) {
       delete process.env.RENDERER_HOST;
     } else {
       process.env.RENDERER_HOST = originalRendererHost;
+    }
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+    if (originalRendererPassword === undefined) {
+      delete process.env.RENDERER_PASSWORD;
+    } else {
+      process.env.RENDERER_PASSWORD = originalRendererPassword;
     }
     jest.restoreAllMocks();
     jest.resetModules();
@@ -50,5 +62,61 @@ describe('configBuilder', () => {
     const envValues = envValuesUsedForRenderedConfig({ host: '' });
 
     expect(envValues.RENDERER_HOST).toBe(false);
+  });
+
+  describe('password validation in production-like environments', () => {
+    it('throws when no password is set in production', () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
+    });
+
+    it('throws when no password is set in staging', () => {
+      process.env.NODE_ENV = 'staging';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
+    });
+
+    it('does not throw when password is set via env in production', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RENDERER_PASSWORD = 'secure-password';
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).not.toThrow();
+    });
+
+    it('does not throw when password is set via config in production', () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig({ password: 'secure-password' })).not.toThrow();
+    });
+
+    it('does not throw in development without a password', () => {
+      process.env.NODE_ENV = 'development';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).not.toThrow();
+    });
+
+    it('does not throw in test without a password', () => {
+      process.env.NODE_ENV = 'test';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).not.toThrow();
+    });
   });
 });
