@@ -84,6 +84,74 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#check_react_on_rails_initializer" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:runtime_config) do
+      instance_double(
+        ReactOnRails::Configuration,
+        server_bundle_js_file: "runtime-server-bundle.js",
+        server_bundle_output_path: "runtime-ssr-output",
+        enforce_private_server_bundles: true,
+        prerender: true,
+        server_renderer_pool_size: 3,
+        server_renderer_timeout: 45,
+        raise_on_prerender_error: true,
+        generated_component_packs_loading_strategy: :async,
+        auto_load_bundle: true,
+        component_registry_timeout: 7000,
+        development_mode: false,
+        trace: false,
+        logging_on_server: false,
+        replay_console: false,
+        build_test_command: "RAILS_ENV=test bin/shakapacker",
+        build_production_command: "RAILS_ENV=production bin/shakapacker",
+        i18n_dir: nil,
+        i18n_yml_dir: nil,
+        i18n_output_format: nil,
+        components_subdirectory: nil,
+        same_bundle_for_client_and_server: false,
+        random_dom_id: true,
+        rendering_extension: nil,
+        rendering_props_extension: nil,
+        server_render_method: nil
+      )
+    end
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    def write_project_file(path, content)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
+
+    it "prefers runtime values over initializer regex parsing" do
+      write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+        ReactOnRails.configure do |config|
+          config.server_bundle_js_file = "initializer-server-bundle.js"
+          config.prerender = false
+          config.auto_load_bundle = false
+        end
+      RUBY
+
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+      expect(info_messages).to include(a_string_including("Using loaded runtime configuration values"))
+      expect(info_messages).to include(a_string_including("server_bundle_js_file: runtime-server-bundle.js"))
+      expect(info_messages).to include(a_string_including("prerender: true"))
+      expect(info_messages).to include(a_string_including("auto_load_bundle: true"))
+      expect(info_messages).not_to include(a_string_including("initializer-server-bundle.js"))
+    end
+  end
+
   describe "server bundle path detection" do
     let(:doctor) { described_class.new }
 
@@ -168,6 +236,7 @@ RSpec.describe ReactOnRails::Doctor do
         end
 
         before do
+          allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(nil)
           allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
           allow(File).to receive(:read).with("config/initializers/react_on_rails.rb").and_return(initializer_content)
         end
@@ -180,6 +249,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       context "when no custom filename is configured" do
         before do
+          allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(nil)
           allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(false)
         end
 
@@ -1103,6 +1173,34 @@ RSpec.describe ReactOnRails::Doctor do
       File.write(path, content)
     end
 
+    context "when runtime config conflicts with initializer text" do
+      let(:runtime_config) do
+        instance_double(
+          ReactOnRails::Configuration,
+          server_bundle_js_file: "",
+          prerender: true
+        )
+      end
+
+      it "uses runtime values and reports missing server bundle" do
+        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+          ReactOnRails.configure do |config|
+            config.server_bundle_js_file = "server-bundle.js"
+            config.prerender = false
+          end
+        RUBY
+
+        allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+        doctor.send(:check_server_bundle_prerender_consistency)
+
+        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+        expect(warning_messages).to include(
+          a_string_including("Server rendering is enabled but server_bundle_js_file is not configured")
+        )
+      end
+    end
+
     context "when views use stream_react_component (RSC/streaming apps)" do
       it "reports consistent configuration" do
         write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
@@ -1196,6 +1294,24 @@ RSpec.describe ReactOnRails::Doctor do
     def write_project_file(path, content)
       FileUtils.mkdir_p(File.dirname(path))
       File.write(path, content)
+    end
+
+    context "when Pro runtime config reports NodeRenderer without initializer text" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
+      end
+
+      it "treats ExecJS as fallback" do
+        stub_const("ExecJS", execjs_module)
+
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+        expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
+        expect(info_messages).to include(a_string_including("ExecJS available as fallback"))
+        expect(info_messages).not_to include(a_string_matching(/^\s+ExecJS Runtime:/))
+      end
     end
 
     context "when Pro initializer has NodeRenderer" do
