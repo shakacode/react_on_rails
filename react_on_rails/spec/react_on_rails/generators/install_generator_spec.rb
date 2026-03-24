@@ -1814,7 +1814,7 @@ describe InstallGenerator, type: :generator do
 
       output_text = GeneratorMessages.output.join("\n")
       expect(output_text).to include("RSC Pro Verification")
-      expect(output_text).to include("http://localhost:3000/hello_server")
+      expect(output_text).to include("http://localhost:<port>/hello_server")
       expect(output_text).to include("Like button hydrates on click")
     end
   end

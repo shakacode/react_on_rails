@@ -441,13 +441,13 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       converter = instance_double(ReactOnRails::VersionSyntaxConverter, rubygem_to_npm: "16.4.0-rc.5")
       allow(ReactOnRails::VersionSyntaxConverter).to receive(:new).and_return(converter)
 
-      expect(instance.send(:rsc_packages_with_version)).to eq(["react-on-rails-rsc@16.4.0-rc.5"])
+      expect(instance.send(:rsc_packages_with_version)).to eq([["react-on-rails-rsc@16.4.0-rc.5"], true])
     end
 
     it "falls back to unversioned package when conversion fails" do
       allow(ReactOnRails::VersionSyntaxConverter).to receive(:new).and_raise(StandardError, "conversion failed")
 
-      expect(instance.send(:rsc_packages_with_version)).to eq(["react-on-rails-rsc"])
+      expect(instance.send(:rsc_packages_with_version)).to eq([["react-on-rails-rsc"], false])
       expect(instance.say_status_calls).to include(
         a_hash_including(message: a_string_including("conversion failed"))
       )
@@ -456,7 +456,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
   describe "#add_rsc_dependencies" do
     it "installs version-pinned rsc dependency" do
-      allow(instance).to receive(:rsc_packages_with_version).and_return(["react-on-rails-rsc@16.4.0"])
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@16.4.0"], true])
 
       instance.send(:add_rsc_dependencies)
 
@@ -466,7 +466,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     end
 
     it "falls back to unversioned package when pinned install fails" do
-      allow(instance).to receive(:rsc_packages_with_version).and_return(["react-on-rails-rsc@16.4.0"])
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@16.4.0"], true])
 
       allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@16.4.0"]).and_return(false)
       allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)

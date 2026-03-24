@@ -381,11 +381,11 @@ module ReactOnRails
 
       def add_rsc_dependencies
         say "Installing React Server Components dependencies..."
-        rsc_packages = rsc_packages_with_version
+        rsc_packages, used_version_pins = rsc_packages_with_version
         return if add_packages(rsc_packages)
 
         manual_install_packages = rsc_packages
-        if rsc_packages != RSC_DEPENDENCIES
+        if used_version_pins
           say_status :warning,
                      "Could not install version-pinned RSC dependency. Retrying latest available package.",
                      :yellow
@@ -413,10 +413,10 @@ module ReactOnRails
       # Falls back to unversioned package names when version resolution fails.
       def rsc_packages_with_version
         npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION)
-        RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }
+        [RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }, true]
       rescue StandardError => e
         say_status :warning, "Could not determine RSC package version (#{e.message}). Installing latest.", :yellow
-        RSC_DEPENDENCIES
+        [RSC_DEPENDENCIES, false]
       end
 
       def remove_base_package_if_present
@@ -485,7 +485,7 @@ module ReactOnRails
                    else
                      pj.manager.add(packages_array, exact: true)
                    end
-          result ? true : false
+          !result.nil? && result != false
         rescue StandardError
           # Return false to trigger warning in calling method
           false

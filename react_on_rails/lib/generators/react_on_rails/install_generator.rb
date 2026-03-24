@@ -56,13 +56,15 @@ module ReactOnRails
       class_option :pro,
                    type: :boolean,
                    default: false,
-                   desc: "Install React on Rails Pro with Node Renderer. Default: false"
+                   desc: "Install React on Rails Pro with Node Renderer. " \
+                         "Combined with --rsc, uses --rsc-pro mode. Default: false"
 
       # --rsc
       class_option :rsc,
                    type: :boolean,
                    default: false,
-                   desc: "Install React Server Components support (includes Pro). Default: false"
+                   desc: "Install React Server Components support (includes Pro). " \
+                         "Combined with --pro, uses --rsc-pro mode. Default: false"
 
       # --rsc-pro
       class_option :rsc_pro,
@@ -470,7 +472,7 @@ module ReactOnRails
           🔎 RSC Pro Verification:
           ─────────────────────────────────────────────────────────────────────────
           1. Start all processes: #{Rainbow('bin/dev').cyan}
-          2. Visit: #{Rainbow('http://localhost:3000/hello_server').cyan.underline} (or your configured port)
+          2. Visit: #{Rainbow('http://localhost:<port>/hello_server').cyan.underline}
           3. Confirm the page streams and the Like button hydrates on click.
         MSG
       end
