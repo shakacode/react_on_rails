@@ -20,7 +20,7 @@ module ReactOnRails
       shakapacker_config_path = shakapacker_assets_bundler_config_path
       candidates << shakapacker_config_path if shakapacker_config_path
 
-      shakapacker_config_dir = shakapacker_webpack_config_directory
+      shakapacker_config_dir = shakapacker_config_path ? File.dirname(shakapacker_config_path) : nil
       if shakapacker_config_dir
         candidates.concat(%w[js ts cjs mjs].flat_map do |ext|
           [
