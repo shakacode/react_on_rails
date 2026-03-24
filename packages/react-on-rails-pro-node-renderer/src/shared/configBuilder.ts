@@ -57,7 +57,7 @@ export interface Config {
   // Number of workers that will be forked to serve rendering requests.
   workersCount: number;
   // The password expected to receive from the **Rails client** to authenticate rendering requests.
-  // If no password is set, no authentication will be required.
+  // In development/test it is optional; in other environments the renderer refuses to start without it.
   password: string | undefined;
   // Next 2 params, allWorkersRestartInterval and delayBetweenIndividualWorkerRestarts must both
   // be set if you wish to have automatic worker restarting, say to clear memory leaks.
