@@ -144,7 +144,7 @@ If someone imports `db-utils.js` from a Client Component (directly or transitive
 
 ## Chunk Contamination
 
-When a component with `'use client'` is also statically imported by a heavy Client Component, the RSC page may end up downloading much larger chunks than necessary. This doesn't always happen -- it depends on webpack's internal chunk group ordering -- but when it does, the impact can be severe (e.g., 382 KB instead of 8 KB).
+When a component with `'use client'` is statically imported by both a small RSC path and a heavier client path, the RSC page can inherit chunks from both paths. The impact can be severe (for example, 382 KB instead of 8 KB).
 
 ### How to Detect It
 
@@ -209,6 +209,12 @@ The wrapper file doesn't appear in PostsPage's import tree, so it can stay mappe
 If a shared component is used by both RSC and SSR/client paths, the wrapper alone may not fully isolate imports. In that case, remove the import edge by passing client elements as props.
 
 ```jsx
+// InteractiveWidgetsClient.jsx -- thin wrapper used by the RSC path
+'use client';
+export { AddToCartButton } from './InteractiveWidgets';
+```
+
+```jsx
 // ProductCard.jsx -- no direct 'use client' imports
 export function ProductCard({ product, addToCartButton }) {
   return (
@@ -221,7 +227,7 @@ export function ProductCard({ product, addToCartButton }) {
 ```
 
 ```jsx
-// RSCPage.jsx -- Server Component uses thin wrapper
+// RSCPage.jsx -- Server Component (prop injection via thin wrapper)
 import { AddToCartButton } from './InteractiveWidgetsClient';
 import { ProductCard } from './ProductCard';
 
@@ -237,7 +243,7 @@ export default function RSCPage({ products }) {
 ```
 
 ```jsx
-// SSRPage.jsx -- client/SSR path can keep direct client imports
+// SSRPage.jsx -- client/SSR path can import the heavier module directly
 import { AddToCartButton } from './InteractiveWidgets';
 import { ProductCard } from './ProductCard';
 
@@ -251,6 +257,8 @@ export default function SSRPage({ products }) {
   ));
 }
 ```
+
+The RSC path uses `InteractiveWidgetsClient` (thin wrapper) to keep the manifest footprint small, while the SSR path can import the full `InteractiveWidgets` module without affecting RSC chunk budgets.
 
 > **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, start with a thin wrapper. If contamination persists because the component is shared across RSC and non-RSC entry points, use prop injection to remove the shared import edge.
 
