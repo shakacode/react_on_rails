@@ -267,8 +267,7 @@ async function forAllElementsAsync(
  * - Therefore, if nextSibling exists (even whitespace or comments), the closing
  *   tag was parsed and the content is guaranteed to be complete
  *
- * Elements without a nextSibling will be hydrated later when their
- * immediate hydration script executes and calls reactOnRailsComponentLoaded().
+ * Elements without a nextSibling will be hydrated later on DOMContentLoaded.
  *
  * See: https://github.com/shakacode/react_on_rails/issues/2283
  */

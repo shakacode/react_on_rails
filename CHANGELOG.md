@@ -26,7 +26,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
-- **Removed `immediate_hydration` configuration and parameter**: The `immediate_hydration` config option, helper parameter, and `data-immediate-hydration` HTML attribute have been completely removed. Immediate hydration is now always enabled for React on Rails Pro users and disabled for non-Pro users, with no per-component override. Remove any `immediate_hydration` references from your initializer and helper calls. Closes [Issue 2142](https://github.com/shakacode/react_on_rails/issues/2142).
+- **Removed `immediate_hydration` configuration and parameter**: The `immediate_hydration` config option, helper parameter, `data-immediate-hydration` HTML attribute, and `redux_store` `immediate_hydration:` keyword argument have been completely removed. Immediate hydration is now always enabled for React on Rails Pro users and disabled for non-Pro users, with no per-component override. Remove any `immediate_hydration` references from your initializer and helper calls. Closes [Issue 2142](https://github.com/shakacode/react_on_rails/issues/2142).
+  [PR 2834](https://github.com/shakacode/react_on_rails/pull/2834) by
+  [justin808](https://github.com/justin808).
 
 #### Added
 
