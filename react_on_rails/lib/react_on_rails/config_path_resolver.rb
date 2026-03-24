@@ -54,7 +54,8 @@ module ReactOnRails
       path = config_path
       return nil unless path
 
-      File.dirname(path)
+      directory = File.dirname(path)
+      directory == "." ? nil : directory
     end
   end
 end
