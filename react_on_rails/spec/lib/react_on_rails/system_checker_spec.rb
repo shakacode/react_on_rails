@@ -180,6 +180,17 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
   end
 
+  describe "#check_webpack_configuration" do
+    it "mentions custom assets_bundler_config_path when no bundler config is found" do
+      allow(checker).to receive(:detect_bundler_config_path).and_return(nil)
+
+      checker.check_webpack_configuration
+
+      error_message = checker.messages.find { |msg| msg[:type] == :error }[:content]
+      expect(error_message).to include("assets_bundler_config_path")
+    end
+  end
+
   describe "#check_react_on_rails_gem" do
     context "when gem is loaded" do
       before do
@@ -734,6 +745,13 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
 
         expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
+      end
+
+      it "prefers webpack JavaScript config when both webpack defaults exist" do
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.js")
       end
 
       it "prefers the bundler configured in shakapacker.yml when both bundlers exist" do

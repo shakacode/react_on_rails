@@ -16,12 +16,12 @@ module ReactOnRails
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
     WEBPACK_CONFIG_CANDIDATE_PATHS = %w[
-      config/webpack/webpack.config.ts
       config/webpack/webpack.config.js
+      config/webpack/webpack.config.ts
     ].freeze
     RSPACK_CONFIG_CANDIDATE_PATHS = %w[
-      config/rspack/rspack.config.ts
       config/rspack/rspack.config.js
+      config/rspack/rspack.config.ts
     ].freeze
 
     def initialize
@@ -316,6 +316,7 @@ module ReactOnRails
           🚫 Bundler configuration not found.
 
           Expected one of: config/webpack/webpack.config.{js,ts} or config/rspack/rspack.config.{js,ts}
+          Also checks Shakapacker's configured assets_bundler_config_path when available.
           Run: rails generate react_on_rails:install
         MSG
       end
@@ -543,7 +544,7 @@ module ReactOnRails
 
     def explicit_shakapacker_bundler_config_path?(resolved_config_path)
       shakapacker_path = shakapacker_assets_bundler_config_path
-      shakapacker_path.present? && shakapacker_path == resolved_config_path && File.file?(shakapacker_path)
+      shakapacker_path.present? && shakapacker_path == resolved_config_path
     end
 
     def configured_assets_bundler
