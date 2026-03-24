@@ -26,7 +26,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
   def with_prerender_env_override_cleared
     original_prerender_override = ENV.fetch("REACT_ON_RAILS_PRERENDER_OVERRIDE", nil)
     ENV.delete("REACT_ON_RAILS_PRERENDER_OVERRIDE")
-    described_class.instance_variable_set(:@prerender_env_override_cache, nil)
+    described_class.reset_prerender_env_override_cache!
     yield
   ensure
     if original_prerender_override.nil?
@@ -34,7 +34,7 @@ describe ReactOnRails::ReactComponent::RenderOptions do
     else
       ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = original_prerender_override
     end
-    described_class.instance_variable_set(:@prerender_env_override_cache, nil)
+    described_class.reset_prerender_env_override_cache!
   end
 
   it "works without raising error" do
@@ -182,6 +182,14 @@ describe ReactOnRails::ReactComponent::RenderOptions do
       opts = described_class.new(**attrs)
 
       expect(opts.prerender).to be false
+    end
+
+    it "normalizes env values with case and whitespace" do
+      ENV["REACT_ON_RAILS_PRERENDER_OVERRIDE"] = " TRUE "
+      attrs = the_attrs(options: { prerender: false })
+      opts = described_class.new(**attrs)
+
+      expect(opts.prerender).to be true
     end
 
     it "falls back to configured behavior for invalid env values" do

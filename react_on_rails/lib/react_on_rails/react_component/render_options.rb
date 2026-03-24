@@ -26,6 +26,12 @@ module ReactOnRails
           end
         end
 
+        def reset_prerender_env_override_cache!
+          PRERENDER_OVERRIDE_CACHE_MUTEX.synchronize do
+            @prerender_env_override_cache = nil
+          end
+        end
+
         private
 
         def parse_prerender_env_override(raw_value)
@@ -38,6 +44,7 @@ module ReactOnRails
             "[REACT ON RAILS] Ignoring #{PRERENDER_OVERRIDE_ENV_KEY}=#{raw_value.inspect}. " \
             "Expected 'true' or 'false'."
           )
+          # Cache invalid values too so we warn once per unique raw env value.
           nil
         end
       end
