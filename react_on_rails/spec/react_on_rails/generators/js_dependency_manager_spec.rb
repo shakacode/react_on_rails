@@ -223,6 +223,14 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(result).to be(false)
     end
 
+    it "treats nil return as success for side-effect-only package managers" do
+      allow(mock_manager).to receive(:add).with(["some-package"], exact: true).and_return(nil)
+
+      result = instance.send(:add_package, "some-package")
+
+      expect(result).to be(true)
+    end
+
     it "returns false and logs warning when add raises error" do
       allow(mock_manager).to receive(:add).and_raise(StandardError, "Network error")
       result = instance.send(:add_package, "some-package")
@@ -436,44 +444,32 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
   end
 
   describe "#rsc_packages_with_version" do
-    it "pins react-on-rails-rsc to the current gem version" do
-      stub_const("ReactOnRails::VERSION", "16.4.0.rc.5")
-      converter = instance_double(ReactOnRails::VersionSyntaxConverter, rubygem_to_npm: "16.4.0-rc.5")
-      allow(ReactOnRails::VersionSyntaxConverter).to receive(:new).and_return(converter)
-
-      expect(instance.send(:rsc_packages_with_version)).to eq([["react-on-rails-rsc@16.4.0-rc.5"], true])
-    end
-
-    it "falls back to unversioned package when conversion fails" do
-      allow(ReactOnRails::VersionSyntaxConverter).to receive(:new).and_raise(StandardError, "conversion failed")
-
-      expect(instance.send(:rsc_packages_with_version)).to eq([["react-on-rails-rsc"], false])
-      expect(instance.say_status_calls).to include(
-        a_hash_including(message: a_string_including("conversion failed"))
-      )
+    it "pins react-on-rails-rsc to the React 19 compatibility track" do
+      expected_pin = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
+      expect(instance.send(:rsc_packages_with_version)).to eq([["react-on-rails-rsc@#{expected_pin}"], true])
     end
   end
 
   describe "#add_rsc_dependencies" do
     it "installs version-pinned rsc dependency" do
-      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@16.4.0"], true])
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.4"], true])
 
       instance.send(:add_rsc_dependencies)
 
       expect(instance.add_npm_dependencies_calls).to include(
-        a_hash_including(packages: ["react-on-rails-rsc@16.4.0"], dev: false)
+        a_hash_including(packages: ["react-on-rails-rsc@19.0.4"], dev: false)
       )
     end
 
     it "falls back to unversioned package when pinned install fails" do
-      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@16.4.0"], true])
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.4"], true])
 
-      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@16.4.0"]).and_return(false)
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@19.0.4"]).and_return(false)
       allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)
 
       instance.send(:add_rsc_dependencies)
 
-      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc@16.4.0"])
+      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc@19.0.4"])
       expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc"])
     end
   end

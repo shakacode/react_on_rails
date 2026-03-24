@@ -117,6 +117,18 @@ RSpec.describe GeneratorHelper, type: :generator do
         end
       end
 
+      context "when package manager add returns nil" do
+        it "treats nil as success for side-effect-only package managers" do
+          packages = %w[react react-dom]
+
+          allow(mock_manager).to receive(:add).with(packages, exact: true).and_return(nil)
+
+          result = add_npm_dependencies(packages)
+          expect(mock_manager).to have_received(:add).with(packages, exact: true)
+          expect(result).to be true
+        end
+      end
+
       context "when package_json gem raises an error" do
         it "returns false and logs warnings via say_status" do
           packages = ["react"]

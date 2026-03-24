@@ -125,6 +125,10 @@ module ReactOnRails
         react-on-rails-rsc
       ].freeze
 
+      # RSC package releases follow the React 19.0.x line (independent from gem versioning).
+      RSC_REACT_VERSION_RANGE = "~19.0.4"
+      RSC_PACKAGE_VERSION_PIN = RSC_REACT_VERSION_RANGE.delete_prefix("~")
+
       private
 
       def setup_js_dependencies
@@ -218,7 +222,7 @@ module ReactOnRails
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
         # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
         react_deps = if respond_to?(:use_rsc?) && use_rsc?
-                       %w[react@~19.0.4 react-dom@~19.0.4 prop-types]
+                       ["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}", "prop-types"]
                      else
                        REACT_DEPENDENCIES
                      end
@@ -409,14 +413,9 @@ module ReactOnRails
         MSG
       end
 
-      # Returns RSC package names pinned to the same version as the gem.
-      # Falls back to unversioned package names when version resolution fails.
+      # Returns RSC package names pinned to the RSC/React compatibility track.
       def rsc_packages_with_version
-        npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION)
-        [RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }, true]
-      rescue StandardError => e
-        say_status :warning, "Could not determine RSC package version (#{e.message}). Installing latest.", :yellow
-        [RSC_DEPENDENCIES, false]
+        [RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }, true]
       end
 
       def remove_base_package_if_present
@@ -485,7 +484,7 @@ module ReactOnRails
                    else
                      pj.manager.add(packages_array, exact: true)
                    end
-          !result.nil? && result != false
+          result != false
         rescue StandardError
           # Return false to trigger warning in calling method
           false
