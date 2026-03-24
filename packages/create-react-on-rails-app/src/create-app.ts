@@ -70,6 +70,10 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
     args.push('--rspack');
   }
 
+  if (options.pro && !options.rsc) {
+    args.push('--pro');
+  }
+
   if (options.rsc) {
     args.push('--rsc');
   }
@@ -220,11 +224,13 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
+  const proRequested = options.pro || options.rsc;
+  const proModeLabel = options.rsc ? '--rsc' : '--pro';
   const baseSteps = 3; // rails new + add react_on_rails + run generator
-  const totalSteps = baseSteps + (options.rsc ? 1 : 0);
+  const totalSteps = baseSteps + (proRequested ? 1 : 0);
   let currentStep = 1;
   const reactOnRailsGemPath = localGemPath('REACT_ON_RAILS_GEM_PATH');
-  const reactOnRailsProGemPath = options.rsc ? localGemPath('REACT_ON_RAILS_PRO_GEM_PATH') : null;
+  const reactOnRailsProGemPath = proRequested ? localGemPath('REACT_ON_RAILS_PRO_GEM_PATH') : null;
 
   // Step 1: Create Rails application
   // appName is validated by validateAppName() to be ^[a-zA-Z][a-zA-Z0-9]*([_-][a-zA-Z0-9]+)*$ only,
@@ -271,9 +277,9 @@ export function createApp(appName: string, options: CliOptions): void {
     process.exit(1);
   }
 
-  if (options.rsc) {
+  if (proRequested) {
     currentStep += 1;
-    logStep(currentStep, totalSteps, 'Adding react_on_rails_pro gem (--rsc)...');
+    logStep(currentStep, totalSteps, `Adding react_on_rails_pro gem (${proModeLabel})...`);
     try {
       const reactOnRailsProArgs = bundleAddArgs('react_on_rails_pro', reactOnRailsProGemPath, false);
       if (reactOnRailsProGemPath) {
@@ -282,15 +288,15 @@ export function createApp(appName: string, options: CliOptions): void {
       execLiveArgs('bundle', reactOnRailsProArgs, appPath);
       logStepDone('react_on_rails_pro gem added');
     } catch (error) {
-      logError('Failed to add react_on_rails_pro gem required by --rsc.');
+      logError(`Failed to add react_on_rails_pro gem required by ${proModeLabel}.`);
       if (error instanceof Error && error.message) {
         console.error(`Debug info: ${error.message}`);
       }
       cleanupAppDirectory(
         appPath,
         appName,
-        'Directory removed. Ensure react_on_rails_pro is installable in your Bundler/RubyGems setup, then rerun with --rsc.',
-        `Ensure react_on_rails_pro is installable, then delete the created "${appName}" directory and rerun with --rsc.`,
+        `Directory removed. Ensure react_on_rails_pro is installable in your Bundler/RubyGems setup, then rerun with ${proModeLabel}.`,
+        `Ensure react_on_rails_pro is installable, then delete the created "${appName}" directory and rerun with ${proModeLabel}.`,
       );
       process.exit(1);
     }

@@ -27,6 +27,7 @@ const baseOptions: CliOptions = {
   template: 'javascript',
   packageManager: 'npm',
   rspack: false,
+  pro: false,
   rsc: false,
 };
 
@@ -152,6 +153,14 @@ describe('buildGeneratorArgs', () => {
     ]);
   });
 
+  it('adds pro flag when enabled', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, pro: true })).toEqual([
+      '--pro',
+      '--force',
+      '--ignore-warnings',
+    ]);
+  });
+
   it('combines all enabled flags in order', () => {
     expect(
       buildGeneratorArgs({
@@ -166,6 +175,14 @@ describe('buildGeneratorArgs', () => {
   it('combines rspack and rsc flags without typescript', () => {
     expect(buildGeneratorArgs({ ...baseOptions, rspack: true, rsc: true })).toEqual([
       '--rspack',
+      '--rsc',
+      '--force',
+      '--ignore-warnings',
+    ]);
+  });
+
+  it('prefers --rsc over --pro when both are set', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, pro: true, rsc: true })).toEqual([
       '--rsc',
       '--force',
       '--ignore-warnings',
@@ -236,6 +253,39 @@ describe('createApp', () => {
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_server');
+    expect(processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('installs react_on_rails_pro and keeps hello_world route for --pro', () => {
+    const options = { ...baseOptions, pro: true };
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    createApp('my-app', options);
+
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(1, 'rails', [
+      'new',
+      'my-app',
+      '--database=postgresql',
+      '--skip-javascript',
+    ]);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      2,
+      'bundle',
+      ['add', 'react_on_rails', '--strict'],
+      appPath,
+    );
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(3, 'bundle', ['add', 'react_on_rails_pro'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      4,
+      'bundle',
+      ['exec', 'rails', 'generate', 'react_on_rails:install', '--pro', '--force', '--ignore-warnings'],
+      appPath,
+      expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
+    );
+    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(4);
+    expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
+    expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
+    expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_world');
     expect(processExitSpy).not.toHaveBeenCalled();
   });
 
