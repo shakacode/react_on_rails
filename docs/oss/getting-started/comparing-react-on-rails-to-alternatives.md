@@ -66,7 +66,7 @@ Choose React on Rails if your requirement is "treat React as a first-class front
 
 Official docs:
 
-- [react-rails README](https://github.com/shakacode/react-rails)
+- [react-rails README](https://github.com/reactjs/react-rails)
 
 ## Common Decision Patterns
 
@@ -96,3 +96,4 @@ That is especially important if your decision depends on:
 - [Installation into an Existing Rails App](./installation-into-an-existing-rails-app.md)
 - [OSS vs Pro](./oss-vs-pro.md)
 - [Upgrading to Pro](../../pro/upgrading-to-pro.md)
+- [Detailed Feature Matrix and Benchmarks](./comparison-with-alternatives.md)
