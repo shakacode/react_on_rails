@@ -691,6 +691,18 @@ describe ProGenerator, type: :generator do
       expect(rewritten.scan("react-on-rails-pro").size).to eq(1)
     end
 
+    it "does not treat quoted backticks as multiline template delimiters" do
+      source = <<~JS
+        const marker = "`"; // should not toggle template-literal tracking
+        import ReactOnRails from "react-on-rails";
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('const marker = "`";')
+      expect(rewritten).to include('import ReactOnRails from "react-on-rails-pro";')
+    end
+
     it "detects unclosed block comments when multiple block markers appear on one line" do
       source_line = "/* closed */ const keep = true; /* unclosed"
 

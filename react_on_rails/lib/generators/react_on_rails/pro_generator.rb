@@ -521,7 +521,9 @@ module ReactOnRails
       end
 
       def line_has_unescaped_backtick?(line)
-        update_multiline_template_literal_state(false, line)
+        line_without_quoted_literals = line.gsub(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/, "")
+        line_without_quoted_literals = line_without_quoted_literals.sub(%r{//.*$}, "")
+        update_multiline_template_literal_state(false, line_without_quoted_literals)
       end
 
       def update_multiline_template_literal_state(in_multiline_template_literal, line)
