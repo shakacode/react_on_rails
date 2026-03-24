@@ -127,6 +127,34 @@ Before you start, audit your components using this classification:
 | **Refactorable** (yellow) | Mix of data fetching and interactivity                     | Split into a Server Component (data) + Client Component (interaction) |
 | **Client-only** (red)     | Uses `useState`, `useEffect`, event handlers, browser APIs | Keep `'use client'` -- these remain Client Components                 |
 
+## Migration Readiness Checklist
+
+Before starting any component migration, verify these items. Skipping them is the most common source of wasted debugging time:
+
+### Infrastructure
+
+- [ ] **React 19 installed** -- both `react` and `react-dom` at 19.x, with matching versions (`yarn why react` shows no duplicates)
+- [ ] **Node renderer configured** -- RSC requires `NodeRenderer`, not ExecJS. If `config.server_renderer` is not set to `"NodeRenderer"`, migrate first
+- [ ] **`react-on-rails-rsc` 19.0.4+** -- earlier versions vendored stale React builds. Check with `yarn why react-on-rails-rsc`
+- [ ] **Three webpack bundles building** -- client, server, and RSC bundles all compile without errors
+- [ ] **RSC manifests generated** -- `react-client-manifest.json` and `react-server-client-manifest.json` exist in your webpack output directory
+- [ ] **RSC payload route mounted** -- `rsc_payload_route` in `config/routes.rb`
+- [ ] **Procfile.dev updated** -- separate watcher process for the RSC bundle (`RSC_BUNDLE_ONLY=yes bin/shakapacker --watch`)
+
+### Common Pre-Migration Mistakes
+
+These mistakes account for the majority of setup failures:
+
+| Mistake                                                         | Symptom                                                           | Fix                                                                                                                                               |
+| --------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing `rsc_payload_route` in routes                           | 404 on RSC payload requests                                       | Add `rsc_payload_route` to `config/routes.rb`                                                                                                     |
+| Only 2 webpack bundles (forgot RSC)                             | Components remain Client Components after removing `'use client'` | Create `rscWebpackConfig.js` and add to build pipeline ([Step 4](rsc-preparing-app.md#step-4-set-up-the-rsc-webpack-bundle))                      |
+| `'use client'` on bundle entry files instead of component files | Can't migrate components individually                             | Move `'use client'` to each component source file ([Step 5](rsc-preparing-app.md#step-5-add-use-client-to-all-registered-component-entry-points)) |
+| Missing `'use client'` on `.server.jsx` files                   | Auto-bundled components break after enabling RSC                  | `.server.jsx` is a bundle convention, not an RSC designation -- add `'use client'` to both `.client.jsx` and `.server.jsx`                        |
+| React version duplicates in `node_modules`                      | Cryptic hook errors, "Invalid hook call"                          | Deduplicate with `yarn why react` and webpack aliases                                                                                             |
+| Not switching to `stream_react_component`                       | No streaming benefits, components render synchronously            | Replace `react_component` with `stream_react_component` in views                                                                                  |
+| Missing `include ReactOnRailsPro::Stream` in controller         | `stream_view_containing_react_components` undefined               | Add the concern to controllers that render React components                                                                                       |
+
 ## Prerequisites
 
 - React 19+

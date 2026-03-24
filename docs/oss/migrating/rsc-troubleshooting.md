@@ -4,6 +4,23 @@ This guide covers the most common problems you'll encounter when migrating to Re
 
 > **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md)
 
+## Diagnostic Quick-Reference
+
+When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
+
+| Symptom                                                          | Most Likely Cause                                                            | Section                                                                          |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_  | Passing functions or class instances across the server-client boundary       | [Serialization Boundary Issues](#serialization-boundary-issues)                  |
+| Build error: _"needs useState/useEffect"_                        | Using hooks in a Server Component file                                       | [Error Message Catalog](#error-message-catalog)                                  |
+| RSC page downloads unexpectedly large JS chunks                  | Chunk contamination from shared `'use client'` modules                       | [Chunk Contamination](#chunk-contamination)                                      |
+| Component stays a Client Component after removing `'use client'` | Imported by another `'use client'` file, or RSC bundle not rebuilding        | [Accidental Client Components](#accidental-client-components)                    |
+| Hydration mismatch warnings in console                           | Server/client render output differs (timestamps, browser APIs, invalid HTML) | [Hydration Mismatches](#hydration-mismatches)                                    |
+| `ReferenceError: performance is not defined`                     | Node renderer VM context missing globals                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)         |
+| SSR hangs or times out on large pages                            | Stream backpressure deadlock                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                    |
+| Rails boot error about version mismatch                          | Gem and npm package at different versions                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)    |
+| 422 Unprocessable Entity on form submission                      | Missing CSRF token in fetch request                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions) |
+| Page is blank until all data loads                               | Missing `stream_react_component` or Suspense boundaries                      | [Performance Pitfalls](#performance-pitfalls)                                    |
+
 ## Serialization Boundary Issues
 
 Everything passed from a Server Component to a Client Component must be serializable by React. This is the most frequent source of migration errors.

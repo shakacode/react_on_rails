@@ -532,6 +532,56 @@ The `async: true` attribute enables React 18's Selective Hydration -- each compo
 
 If you use `auto_load_bundle` with Shakapacker >= 8.2.0 and React on Rails Pro, the `generated_component_packs_loading_strategy` already defaults to `:async`, so auto-generated pack tags are already configured correctly.
 
+## Common Setup Mistakes
+
+These are the most frequent mistakes encountered during RSC infrastructure setup. Check this section if something isn't working after completing the steps above.
+
+### Mistake 1: Wrong `react-on-rails-rsc` version
+
+Versions 19.0.0 through 19.0.3 vendored older builds of `react-server-dom-webpack` that are incompatible with React 19. Symptoms include cryptic rendering errors or RSC payloads that fail to deserialize on the client.
+
+**Fix:** Upgrade to `react-on-rails-rsc` 19.0.4 or later:
+
+```bash
+yarn add react-on-rails-rsc@latest
+```
+
+### Mistake 2: Forgetting the RSC bundle watcher in development
+
+After adding the RSC webpack config, you must also add a watcher process in `Procfile.dev`. Without it, the RSC bundle won't rebuild on file changes, and you'll see stale component output or errors about missing modules.
+
+**Symptom:** Changes to Server Components don't appear until you manually rebuild. Or, after removing `'use client'` from a component, it still behaves as a Client Component.
+
+**Fix:** Add the watcher line to `Procfile.dev`:
+
+```text
+rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+```
+
+### Mistake 3: Confusing `.server.jsx` with Server Components
+
+The `.server.jsx` file suffix is a **React on Rails auto-bundling convention** -- it means "include this file in the server bundle." It has nothing to do with React Server Components.
+
+**Symptom:** After enabling RSC, auto-bundled components with `.server.jsx` files break because the RSC infrastructure treats them as Server Components (they lack `'use client'`).
+
+**Fix:** Add `'use client'` to both `.client.jsx` and `.server.jsx` files during the initial setup (Step 5). Only remove it when you're ready to actually migrate that component to a Server Component.
+
+### Mistake 4: Mutating shared webpack config objects
+
+If your `serverWebpackConfig()` function returns the same object reference on repeated calls, `configureRsc()` will mutate the server config when modifying rules and resolve settings.
+
+**Symptom:** The server bundle behaves unexpectedly after adding the RSC bundle -- for example, it starts resolving `react-server` conditions or has the RSC loader in its chain.
+
+**Fix:** Ensure `serverWebpackConfig()` returns a fresh config object per call. If it doesn't, clone `module.rules` and `resolve` before mutating them in `configureRsc`.
+
+### Mistake 5: Missing `react-server` condition in RSC bundle
+
+If you're writing a custom RSC webpack config (not following Step 4a exactly), forgetting to add `react-server` to `resolve.conditionNames` means React will use its standard server entry points instead of the RSC-specific ones.
+
+**Symptom:** Runtime errors in the RSC bundle, or Server Components that behave like Client Components.
+
+**Fix:** Add `conditionNames: ['react-server', '...']` to the RSC bundle's `resolve` config.
+
 ## Verification Checklist
 
 After completing all steps, verify everything works:

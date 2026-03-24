@@ -411,6 +411,87 @@ export default function InteractiveFilters() {
 }
 ```
 
+## Common Mistakes
+
+### Mistake 1: Wrapping the entire tree in providers
+
+Placing providers at the outermost level forces every child to be a Client Component, negating RSC benefits:
+
+```jsx
+// BAD: Everything inside Providers becomes client code
+export default function ProductPage({ user, product }) {
+  return (
+    <Providers user={user}>
+      <Header /> {/* Now a Client Component -- wasted */}
+      <ProductDetails product={product} />
+      <Footer /> {/* Now a Client Component -- wasted */}
+    </Providers>
+  );
+}
+```
+
+```jsx
+// GOOD: Only wrap components that actually need context
+export default function ProductPage({ user, product }) {
+  return (
+    <div>
+      <Header /> {/* Server Component -- zero JS */}
+      <Providers user={user}>
+        <ProductDetails product={product} />
+      </Providers>
+      <Footer /> {/* Server Component -- zero JS */}
+    </div>
+  );
+}
+```
+
+### Mistake 2: Passing the entire I18n translation tree
+
+`I18n.t('.')` returns every translation key for the locale, which can be thousands of entries. Serializing this into props bloats the HTML page and the RSC payload:
+
+```ruby
+# BAD: Sends the entire translation tree (potentially hundreds of KB)
+messages: I18n.t('.').deep_stringify_keys
+
+# GOOD: Send only the subset this page needs
+messages: I18n.t('product_page').deep_stringify_keys
+```
+
+### Mistake 3: Reading Redux store in Server Components
+
+Server Components render once on the server and never re-render. They cannot subscribe to store changes:
+
+```jsx
+// BAD: useSelector is a hook -- breaks in Server Components
+export default function Dashboard({ user }) {
+  const theme = useSelector((state) => state.theme); // ERROR
+  return <div className={theme}>...</div>;
+}
+```
+
+**Fix:** Pass the value from Rails as a prop, or use a Client Component provider wrapper that reads the store and passes data via children.
+
+### Mistake 4: Creating new QueryClient on every render
+
+If the `QueryClient` is created without `useState`, React creates a new instance on every render, losing the cache:
+
+```jsx
+// BAD: New QueryClient on every render -- cache is lost
+'use client';
+export default function QueryProvider({ children }) {
+  const queryClient = new QueryClient(); // Re-created each render!
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
+// GOOD: useState ensures single instance
+'use client';
+import { useState } from 'react';
+export default function QueryProvider({ children }) {
+  const [queryClient] = useState(() => new QueryClient());
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+```
+
 ## Migration Checklist
 
 ### Phase 1: Audit
