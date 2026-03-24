@@ -50,29 +50,34 @@ module ReactOnRails
     end
 
     def shakapacker_assets_bundler_config_path
-      return @shakapacker_assets_bundler_config_path if defined?(@shakapacker_assets_bundler_config_path)
-
-      @shakapacker_assets_bundler_config_path = begin
-        require "shakapacker"
-        path = Shakapacker.config.assets_bundler_config_path.to_s
-        if path.empty?
-          nil
-        else
-          rails_root = Rails.root.to_s
-          if rails_root.empty? || rails_root == "/"
-            path
-          else
-            rails_root_prefix = "#{rails_root}/"
-            normalized_path = path.start_with?(rails_root_prefix) ? path.delete_prefix(rails_root_prefix) : path
-            normalized_path.empty? ? nil : normalized_path
-          end
-        end
-      rescue LoadError, StandardError
-        # Doctor/install checks should degrade gracefully when Shakapacker is
-        # missing or partially configured; callers fall back to discovered
-        # default config candidates when this cannot be resolved.
-        nil
+      if instance_variable_defined?(:@shakapacker_assets_bundler_config_path)
+        return @shakapacker_assets_bundler_config_path
       end
+
+      require "shakapacker"
+      @shakapacker_assets_bundler_config_path = normalize_shakapacker_assets_bundler_config_path(
+        Shakapacker.config.assets_bundler_config_path.to_s
+      )
+    rescue LoadError, NameError
+      # Doctor/install checks should degrade gracefully when Shakapacker is
+      # missing; callers fall back to discovered default config candidates.
+      nil
+    rescue StandardError => e
+      Rails.logger&.debug do
+        "ReactOnRails could not read Shakapacker assets_bundler_config_path: #{e.class}: #{e.message}"
+      end
+      @shakapacker_assets_bundler_config_path = nil
+    end
+
+    def normalize_shakapacker_assets_bundler_config_path(path)
+      return nil if path.empty?
+
+      rails_root = Rails.root.to_s
+      return path if rails_root.empty? || rails_root == "/"
+
+      rails_root_prefix = "#{rails_root}/"
+      normalized_path = path.start_with?(rails_root_prefix) ? path.delete_prefix(rails_root_prefix) : path
+      normalized_path.empty? ? nil : normalized_path
     end
 
     def bundler_config_directory(config_path)

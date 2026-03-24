@@ -915,6 +915,19 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(info_messages).to include("debug rspack builds")
         expect(info_messages).to include("rspack-stats.json")
       end
+
+      it "falls back to inferred bundler when custom shakapacker path has no assets_bundler setting" do
+        allow(checker).to receive(:explicit_shakapacker_bundler_config_path?)
+          .with("config/custom/bundler.config.js")
+          .and_return(true)
+        allow(checker).to receive(:configured_assets_bundler).and_return(nil)
+
+        checker.send(:suggest_webpack_inspection, "config/custom/bundler.config.js")
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
+
+        expect(info_messages).to include("debug webpack builds")
+        expect(info_messages).to include("webpack-stats.json")
+      end
     end
 
     describe "#standard_shakapacker_config?" do

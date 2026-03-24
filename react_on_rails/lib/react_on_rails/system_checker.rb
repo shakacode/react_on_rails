@@ -492,6 +492,12 @@ module ReactOnRails
     end
 
     def bundler_config_file_exists?
+      # Keep shakapacker_configured? fast for install-guard call sites by
+      # checking generator-default paths before probing shakapacker-derived
+      # candidates that may require loading additional config.
+      default_candidates = WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES
+      return true if default_candidates.any? { |path| File.file?(path) }
+
       !resolved_webpack_config_path.nil?
     end
 
@@ -550,6 +556,8 @@ module ReactOnRails
     end
 
     def inferred_bundler_name(config_path)
+      # Heuristic only: paths containing "rspack" are treated as rspack and all
+      # others as webpack. This is accurate for standard generator-created paths.
       config_path.include?("rspack") ? "rspack" : "webpack"
     end
 
