@@ -15,8 +15,8 @@ module ReactOnRails
       PRERENDER_OVERRIDE_CACHE_MUTEX = Mutex.new
       class << self
         def prerender_env_override
-          raw_value = ENV.fetch(PRERENDER_OVERRIDE_ENV_KEY, nil)
           PRERENDER_OVERRIDE_CACHE_MUTEX.synchronize do
+            raw_value = ENV.fetch(PRERENDER_OVERRIDE_ENV_KEY, nil)
             cached_override = @prerender_env_override_cache
             return cached_override[:value] if cached_override && cached_override[:raw_value] == raw_value
 
