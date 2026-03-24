@@ -24,6 +24,13 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **`create-react-on-rails-app --pro` support**: Added explicit `--pro` mode to the CLI, including
+  `react_on_rails_pro` gem installation and generator wiring for Pro-only setup (without requiring `--rsc`).
+  [PR 2818](https://github.com/shakacode/react_on_rails/pull/2818) by
+  [justin808](https://github.com/justin808).
+
 ### [16.4.0] - 2026-03-16
 
 #### Fixed
