@@ -14,46 +14,6 @@ module ReactOnRails
       Rainbow('To see the full output, set FULL_TEXT_ERRORS=true.').red
     } ...\n".freeze
 
-    def self.immediate_hydration_pro_install_warning(name, type = "Component")
-      "[REACT ON RAILS] Warning: immediate_hydration: true requires the React on Rails Pro gem to be installed.\n" \
-        "#{type} '#{name}' will fall back to standard hydration behavior.\n" \
-        "Visit https://reactonrails.com/docs/pro/ for installation details."
-    end
-
-    # Normalizes the immediate_hydration option value, enforcing Pro gem-availability requirements.
-    # Returns the normalized boolean value for immediate_hydration.
-    #
-    # @param value [Boolean, nil] The immediate_hydration option value
-    # @param name [String] The name of the component/store (for warning messages)
-    # @param type [String] The type ("Component" or "Store") for warning messages
-    # @return [Boolean] The normalized immediate_hydration value
-    # @raise [ArgumentError] If value is not a boolean or nil
-    #
-    # Logic:
-    # - Validates that value is true, false, or nil
-    # - If value is explicitly true (boolean) and Pro gem is not installed: warn and return false
-    # - If value is nil: return true for Pro installs, false for non-Pro installs
-    # - Otherwise: return the value as-is (allows explicit false to work)
-    def self.normalize_immediate_hydration(value, name, type = "Component")
-      # Type validation: only accept boolean or nil
-      unless [true, false, nil].include?(value)
-        raise ArgumentError,
-              "[REACT ON RAILS] immediate_hydration must be true, false, or nil. Got: #{value.inspect} (#{value.class})"
-      end
-
-      # Strict equality check: only trigger warning for explicit boolean true
-      if value == true && !react_on_rails_pro?
-        Rails.logger.warn immediate_hydration_pro_install_warning(name, type)
-        return false
-      end
-
-      # If nil, default based on Pro gem availability
-      return react_on_rails_pro? if value.nil?
-
-      # Return explicit value (including false)
-      value
-    end
-
     # https://forum.shakacode.com/t/yak-of-the-week-ruby-2-4-pathname-empty-changed-to-look-at-file-size/901
     # return object if truthy, else return nil
     def self.truthy_presence(obj)

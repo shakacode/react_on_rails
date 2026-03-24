@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **Removed `immediate_hydration` configuration and parameter**: The `immediate_hydration` config option, helper parameter, and `data-immediate-hydration` HTML attribute have been completely removed. Immediate hydration is now always enabled for React on Rails Pro users and disabled for non-Pro users, with no per-component override. Remove any `immediate_hydration` references from your initializer and helper calls. Closes [Issue 2142](https://github.com/shakacode/react_on_rails/issues/2142).
+
 #### Added
 
 - **[Pro]** **Auto-resolve renderer password from ENV**: `setup_renderer_password` now falls back to `ENV["RENDERER_PASSWORD"]` when neither `config.renderer_password` nor a URL-embedded password is set, aligning Rails-side behavior with the Node Renderer defaults. Blank values (`nil` or `""`) are treated identically and fall through the full resolution chain: config → URL → ENV. [PR 2921](https://github.com/shakacode/react_on_rails/pull/2921) by [justin808](https://github.com/justin808).

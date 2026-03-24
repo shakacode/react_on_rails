@@ -24,8 +24,8 @@ import {
   hydrateStore,
   renderOrHydrateAllComponents,
   hydrateAllStores,
-  renderOrHydrateImmediateHydratedComponents,
-  hydrateImmediateHydratedStores,
+  renderOrHydrateCompleteComponents,
+  hydrateCompleteStores,
   unmountAll,
 } from './ClientSideRenderer.ts';
 
@@ -47,7 +47,6 @@ type ReactOnRailsProSpecificFunctions = Pick<
   | 'serverRenderRSCReactComponent'
 >;
 
-// Pro client startup with immediate hydration support
 async function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded [PRO]');
   await Promise.all([hydrateAllStores(), renderOrHydrateAllComponents()]);
@@ -71,8 +70,8 @@ function clientStartup() {
   // eslint-disable-next-line no-underscore-dangle
   globalThis.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
-  void renderOrHydrateImmediateHydratedComponents();
-  void hydrateImmediateHydratedStores();
+  void renderOrHydrateCompleteComponents();
+  void hydrateCompleteStores();
 
   onPageLoaded(reactOnRailsPageLoaded);
   onPageUnloaded(reactOnRailsPageUnloaded);
@@ -164,7 +163,7 @@ export default function createReactOnRailsPro(
     // Reset options to defaults (only on first initialization)
     reactOnRailsPro.resetOptions();
 
-    // Run Pro client startup with immediate hydration support (only on first initialization)
+    // Run Pro client startup (only on first initialization)
     clientStartup();
   }
 

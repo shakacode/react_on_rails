@@ -896,7 +896,7 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def analyze_performance_config(content, runtime_config = nil)
       checker.add_info("\n⚡ Performance & Loading:")
 
@@ -937,14 +937,6 @@ module ReactOnRails
         checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
       end
 
-      # Deprecated immediate_hydration setting
-      immediate_hydration_match = content.match(/config\.immediate_hydration\s*=\s*([^\s\n,]+)/)
-      if immediate_hydration_match
-        checker.add_warning("  ⚠️  immediate_hydration: #{immediate_hydration_match[1]} (DEPRECATED)")
-        checker.add_info("    💡 This setting is no longer used. Immediate hydration is now automatic for Pro users.")
-        checker.add_info("    💡 Remove this line from your config/initializers/react_on_rails.rb file.")
-      end
-
       # Component registry timeout
       if runtime_config
         # Default is 5000 ms; only report explicit non-default override.
@@ -955,7 +947,7 @@ module ReactOnRails
         checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms") if timeout_match
       end
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     def analyze_development_config(content, runtime_config = nil)

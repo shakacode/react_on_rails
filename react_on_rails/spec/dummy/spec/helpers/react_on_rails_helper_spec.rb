@@ -211,8 +211,7 @@ describe ReactOnRailsHelper do
       <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
-        data-component-name="App" data-dom-id="App-react-component"
-        data-immediate-hydration="true">{"name":"My Test Name"}</script>
+        data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
       SCRIPT
     end
 
@@ -220,8 +219,7 @@ describe ReactOnRailsHelper do
       <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
-        data-component-name="App" data-dom-id="App-react-component"
-        data-immediate-hydration="true">{}</script>
+        data-component-name="App" data-dom-id="App-react-component">{}</script>
       SCRIPT
     end
 
@@ -334,8 +332,7 @@ describe ReactOnRailsHelper do
         <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
-          data-component-name="App" data-dom-id="App-react-component"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -350,8 +347,7 @@ describe ReactOnRailsHelper do
         <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component-0" \
-          data-component-name="App" data-dom-id="App-react-component-0"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component-0">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -372,8 +368,7 @@ describe ReactOnRailsHelper do
         <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
-          data-component-name="App" data-dom-id="App-react-component"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="App-react-component">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -390,8 +385,7 @@ describe ReactOnRailsHelper do
         <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-shaka_div" \
-          data-component-name="App" data-dom-id="shaka_div"
-          data-immediate-hydration="true">{"name":"My Test Name"}</script>
+          data-component-name="App" data-dom-id="shaka_div">{"name":"My Test Name"}</script>
         SCRIPT
       end
 
@@ -433,22 +427,26 @@ describe ReactOnRailsHelper do
       it { is_expected.to include '<div id="App-react-component-0"></div>' }
     end
 
-    describe "'immediate_hydration' tag option" do
-      let(:immediate_hydration_script) do
+    describe "Pro inline hydration script" do
+      let(:hydration_script) do
         %(typeof ReactOnRails === 'object' && ReactOnRails.reactOnRailsComponentLoaded('App-react-component-0');)
           .html_safe
       end
 
-      context "with 'immediate_hydration' == false" do
-        subject { react_component("App", immediate_hydration: false) }
-
-        it { is_expected.not_to include immediate_hydration_script }
-      end
-
-      context "without 'immediate_hydration' tag option" do
+      context "with Pro gem installed" do
         subject { react_component("App") }
 
-        it { is_expected.to include immediate_hydration_script }
+        it { is_expected.to include hydration_script }
+      end
+
+      context "without Pro gem installed" do
+        subject { react_component("App") }
+
+        before do
+          allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
+        end
+
+        it { is_expected.not_to include hydration_script }
       end
     end
   end
@@ -551,14 +549,14 @@ describe ReactOnRailsHelper do
   end
 
   describe "#redux_store" do
-    subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
+    subject(:store) { redux_store("reduxStore", props: props) }
 
     let(:props) do
       { name: "My Test Name" }
     end
 
     let(:react_store_script) do
-      '<script type="application/json" data-js-react-on-rails-store="reduxStore" data-immediate-hydration="true">' \
+      '<script type="application/json" data-js-react-on-rails-store="reduxStore">' \
         '{"name":"My Test Name"}' \
         "</script>"
     end
@@ -572,44 +570,6 @@ describe ReactOnRailsHelper do
     it {
       expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
-
-    context "without Pro gem installed" do
-      before do
-        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
-      end
-
-      context "with immediate_hydration option set to true (not recommended)" do
-        it "returns false for immediate_hydration and logs a warning" do
-          expect(Rails.logger).to receive(:warn)
-            .with(/immediate_hydration: true requires the React on Rails Pro gem to be installed/)
-
-          result = redux_store("reduxStore", props: props, immediate_hydration: true)
-
-          # Verify that the store tag does NOT have immediate hydration enabled
-          expect(result).not_to include('data-immediate-hydration="true"')
-        end
-      end
-
-      context "with immediate_hydration option set to false" do
-        it "returns false for immediate_hydration without warning" do
-          expect(Rails.logger).not_to receive(:warn)
-
-          result = redux_store("reduxStore", props: props, immediate_hydration: false)
-
-          # Verify that the store tag does NOT have immediate hydration enabled
-          expect(result).not_to include('data-immediate-hydration="true"')
-        end
-      end
-
-      context "without immediate_hydration option (nil)" do
-        it "defaults to false for non-Pro installs" do
-          result = redux_store("reduxStore", props: props)
-
-          # Verify that the store tag does NOT have immediate hydration enabled
-          expect(result).not_to include('data-immediate-hydration="true"')
-        end
-      end
-    end
   end
 
   describe "#server_render_js", :js, type: :system do
@@ -979,8 +939,7 @@ describe ReactOnRailsHelper do
         dom_id: "HelloWorld-react-component-0",
         react_component_name: "HelloWorld",
         trace: false,
-        store_dependencies: nil,
-        immediate_hydration: true
+        store_dependencies: nil
       )
     end
 
@@ -989,7 +948,7 @@ describe ReactOnRailsHelper do
         allow(helper).to receive(:csp_nonce).and_return("component-nonce-abc")
       end
 
-      it "adds nonce to the immediate hydration script" do
+      it "adds nonce to the Pro hydration script" do
         result = helper.send(:generate_component_script, render_options)
         expect(result).to include('nonce="component-nonce-abc"')
         expect(result).to include("reactOnRailsComponentLoaded")
@@ -1007,27 +966,19 @@ describe ReactOnRailsHelper do
         allow(helper).to receive(:csp_nonce).and_return(nil)
       end
 
-      it "does not add nonce to the immediate hydration script" do
+      it "does not add nonce to the Pro hydration script" do
         result = helper.send(:generate_component_script, render_options)
         expect(result).not_to include("nonce=")
         expect(result).to include("reactOnRailsComponentLoaded")
       end
     end
 
-    context "when immediate_hydration is disabled" do
-      let(:render_options) do
-        instance_double(
-          ReactOnRails::ReactComponent::RenderOptions,
-          client_props: { name: "World" },
-          dom_id: "HelloWorld-react-component-0",
-          react_component_name: "HelloWorld",
-          trace: false,
-          store_dependencies: nil,
-          immediate_hydration: false
-        )
+    context "when Pro gem is not installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
       end
 
-      it "does not include an immediate hydration script" do
+      it "does not include a hydration script" do
         result = helper.send(:generate_component_script, render_options)
         expect(result).not_to include("reactOnRailsComponentLoaded")
       end
@@ -1040,8 +991,7 @@ describe ReactOnRailsHelper do
     let(:redux_store_data) do
       {
         props: { count: 0 },
-        store_name: "MyStore",
-        immediate_hydration: true
+        store_name: "MyStore"
       }
     end
 
@@ -1050,7 +1000,7 @@ describe ReactOnRailsHelper do
         allow(helper).to receive(:csp_nonce).and_return("store-nonce-xyz")
       end
 
-      it "adds nonce to the immediate hydration script" do
+      it "adds nonce to the Pro hydration script" do
         result = helper.send(:generate_store_script, redux_store_data)
         expect(result).to include('nonce="store-nonce-xyz"')
         expect(result).to include("reactOnRailsStoreLoaded")
@@ -1068,23 +1018,19 @@ describe ReactOnRailsHelper do
         allow(helper).to receive(:csp_nonce).and_return(nil)
       end
 
-      it "does not add nonce to the immediate hydration script" do
+      it "does not add nonce to the Pro hydration script" do
         result = helper.send(:generate_store_script, redux_store_data)
         expect(result).not_to include("nonce=")
         expect(result).to include("reactOnRailsStoreLoaded")
       end
     end
 
-    context "when immediate_hydration is disabled" do
-      let(:redux_store_data) do
-        {
-          props: { count: 0 },
-          store_name: "MyStore",
-          immediate_hydration: false
-        }
+    context "when Pro gem is not installed" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
       end
 
-      it "does not include an immediate hydration script" do
+      it "does not include a hydration script" do
         result = helper.send(:generate_store_script, redux_store_data)
         expect(result).not_to include("reactOnRailsStoreLoaded")
       end

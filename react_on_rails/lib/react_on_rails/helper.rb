@@ -156,24 +156,19 @@ module ReactOnRails
     # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
     # Options
     #    defer: false -- pass as true if you wish to render this below your component.
-    #    immediate_hydration: nil -- React on Rails Pro (licensed) feature. When nil (default), Pro users
-    #                        get immediate hydration, non-Pro users don't. Can be explicitly overridden.
     #    auto_load_bundle: nil -- If true, automatically loads the generated pack for this store.
     #                      Defaults to ReactOnRails.configuration.auto_load_bundle if not specified.
     #                      Requires config.stores_subdirectory to be set (e.g., "ror_stores").
     #                      Store files should be placed in directories matching this name, e.g.:
     #                        app/javascript/bundles/ror_stores/commentsStore.js
     #                      The store file must export default a store generator function.
-    def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil, auto_load_bundle: nil)
-      immediate_hydration = ReactOnRails::Utils.normalize_immediate_hydration(immediate_hydration, store_name, "Store")
-
+    def redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil)
       # Auto-load store pack if configured
       should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle
       load_pack_for_generated_store(store_name, explicit_auto_load: auto_load_bundle == true) if should_auto_load
 
       redux_store_data = { store_name: store_name,
-                           props: props,
-                           immediate_hydration: immediate_hydration }
+                           props: props }
       if defer
         registered_stores_defer_render << redux_store_data
         "YOU SHOULD NOT SEE THIS ON YOUR VIEW -- Uses as a code block, like <% redux_store %> " \
