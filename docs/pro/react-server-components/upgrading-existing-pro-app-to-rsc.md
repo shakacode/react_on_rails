@@ -31,7 +31,7 @@ yarn why react
 ls config/initializers/react_on_rails_pro.rb
 ```
 
-> **React version note:** `react-on-rails-rsc` versions 19.0.0 through 19.0.3 vendored older builds of `react-server-dom-webpack` with known vulnerabilities (CVE-2025-55182, CVE-2025-67779, CVE-2026-23864). Use 19.0.4 or later.
+> **React version note:** `react-on-rails-rsc` versions 19.0.0 through 19.0.3 have known security vulnerabilities. Use `react-on-rails-rsc` **19.0.4 or later** (not to be confused with the `react` package version above). See the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
 
 ## Run the Generator
 
@@ -45,7 +45,7 @@ For TypeScript projects:
 bundle exec rails generate react_on_rails:rsc --typescript
 ```
 
-The generator is idempotent -- it skips files that already exist and checks for existing configuration before making changes.
+The generator is safe to re-run -- new files are skipped and existing-file patches are applied only when the target pattern is not already present. If a transform cannot be applied (e.g. because your config has been customized), the generator reports a warning but continues.
 
 ## What the Generator Creates and Modifies
 
@@ -71,8 +71,7 @@ The generator is idempotent -- it skips files that already exist and checks for 
 
 ### NPM dependencies added
 
-- `react-on-rails-rsc` -- RSC webpack loader, plugin, and runtime
-- `react-server-dom-webpack` -- React's RSC wire protocol
+- `react-on-rails-rsc` -- RSC webpack loader, plugin, runtime, and vendored `react-server-dom-webpack`
 
 ## Legacy vs Current Webpack Export Styles
 
@@ -146,12 +145,14 @@ Watch for build errors in the terminal output. All three bundles (client, server
 # RSC bundle should exist in your server bundle output directory
 ls ssr-generated/rsc-bundle.js
 
-# RSC manifests should exist in your webpack output directory
+# Server-client manifest is emitted by the server build into server_bundle_output_path
+ls ssr-generated/react-server-client-manifest.json
+
+# Client manifest is emitted by the client build into your webpack output directory
 ls public/packs/react-client-manifest.json
-ls public/packs/react-server-client-manifest.json
 ```
 
-> **Note:** The paths above assume default configuration. Your `server_bundle_output_path` and webpack output directory may differ.
+> **Note:** The paths above assume default configuration. Your `server_bundle_output_path` and webpack output directory may differ. If you're using `webpack-dev-server`, the client manifest may be served from memory and won't appear on disk — check the dev-server output URL instead.
 
 ### 3. Visit the example page
 
@@ -187,7 +188,7 @@ If the generator reports "Some RSC webpack transforms may not have applied corre
 
 Common causes:
 
-- **Missing `react-server-dom-webpack`**: Run `yarn install` or `npm install` to ensure the RSC npm dependencies were added
+- **Missing `react-on-rails-rsc`**: Run `yarn install` or `npm install` to ensure the RSC npm dependency was added
 - **`react-dom/server` import error**: The RSC config aliases `react-dom/server` to `false`. If you have a custom webpack config that re-adds it, remove that alias for the RSC bundle
 - **React version mismatch**: RSC requires React 19.0.x specifically. Check with `yarn why react`
 
