@@ -198,6 +198,11 @@ module ReactOnRails
     end
 
     def check_javascript_bundles
+      if server_bundle_filename.to_s.empty?
+        checker.add_info("ℹ️  server_bundle_js_file is blank (SSR disabled), skipping server bundle file check")
+        return
+      end
+
       server_bundle_path = determine_server_bundle_path
       if File.exist?(server_bundle_path)
         checker.add_success("✅ Server bundle file exists at #{server_bundle_path}")
@@ -675,7 +680,7 @@ module ReactOnRails
 
       begin
         pro_renderer = resolved_pro_server_renderer
-        uses_node_renderer = ReactOnRails::Utils.react_on_rails_pro? && pro_renderer == "NodeRenderer"
+        uses_node_renderer = pro_renderer == "NodeRenderer"
 
         if uses_node_renderer
           checker.add_info("  Pro uses NodeRenderer for server rendering")
@@ -750,15 +755,18 @@ module ReactOnRails
     def check_react_on_rails_initializer
       config_path = "config/initializers/react_on_rails.rb"
       runtime_config = react_on_rails_runtime_configuration
+      initializer_exists = File.exist?(config_path)
 
-      unless File.exist?(config_path)
+      unless runtime_config || initializer_exists
         checker.add_warning("⚠️  React on Rails configuration file not found: #{config_path}")
         checker.add_info("💡 Run 'rails generate react_on_rails:install' to create configuration file")
         return
       end
 
+      checker.add_warning("⚠️  React on Rails configuration file not found: #{config_path}") unless initializer_exists
+
       begin
-        content = File.read(config_path)
+        content = initializer_exists ? File.read(config_path) : ""
 
         checker.add_info("📋 React on Rails Configuration:")
         checker.add_info("📍 Documentation: https://reactonrails.com/docs/guides/configuration/")
@@ -1296,7 +1304,7 @@ module ReactOnRails
       runtime_config = react_on_rails_runtime_configuration
       if runtime_config
         configured_value = runtime_config.server_bundle_js_file
-        return configured_value if configured_value.present?
+        return configured_value unless configured_value.nil?
       end
 
       # Try to read from React on Rails initializer
