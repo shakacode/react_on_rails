@@ -29,6 +29,9 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **`create-react-on-rails-app --pro` support**: Added explicit `--pro` mode to the CLI, including
   `react_on_rails_pro` gem installation and generator wiring for Pro-only setup (without requiring `--rsc`).
   [PR 2818](https://github.com/shakacode/react_on_rails/pull/2818) by
+- **Global prerender env override**: Added `REACT_ON_RAILS_PRERENDER_OVERRIDE=true|false` to force prerender behavior
+  globally (env > component option > initializer default), useful for CI/test environments without an SSR server.
+  [PR 2816](https://github.com/shakacode/react_on_rails/pull/2816) by
   [justin808](https://github.com/justin808).
 
 ### [16.4.0] - 2026-03-16
