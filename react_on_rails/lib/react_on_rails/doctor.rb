@@ -1015,7 +1015,7 @@ module ReactOnRails
         if runtime_config.same_bundle_for_client_and_server
           component_configs << "same_bundle_for_client_and_server: #{runtime_config.same_bundle_for_client_and_server}"
         end
-        component_configs << "random_dom_id: #{runtime_config.random_dom_id}" unless runtime_config.random_dom_id
+        component_configs << "random_dom_id: #{runtime_config.random_dom_id}" if runtime_config.random_dom_id == false
       else
         components_subdir_match = content.match(/config\.components_subdirectory\s*=\s*["']([^"']+)["']/)
         if components_subdir_match
@@ -1327,12 +1327,12 @@ module ReactOnRails
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def check_server_bundle_prerender_consistency
       config_path = "config/initializers/react_on_rails.rb"
-      return unless File.exist?(config_path)
+      runtime_config = react_on_rails_runtime_configuration
+      return unless runtime_config || File.exist?(config_path)
 
       checker.add_info("\n🔍 Server Rendering Consistency:")
 
       begin
-        runtime_config = react_on_rails_runtime_configuration
         if runtime_config
           server_bundle_set = runtime_config.server_bundle_js_file.present?
           prerender_set = runtime_config.prerender
@@ -2333,7 +2333,8 @@ module ReactOnRails
     def react_on_rails_runtime_configuration
       return @react_on_rails_runtime_configuration if defined?(@react_on_rails_runtime_configuration)
 
-      @react_on_rails_runtime_configuration = ReactOnRails.configuration if ensure_rails_environment_loaded
+      @react_on_rails_runtime_configuration =
+        ensure_rails_environment_loaded ? ReactOnRails.configuration : nil
     rescue StandardError => e
       checker.add_warning("⚠️  Could not query React on Rails runtime configuration: #{e.message}")
       @react_on_rails_runtime_configuration = nil
