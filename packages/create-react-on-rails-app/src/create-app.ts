@@ -226,7 +226,7 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
   const proRequested = options.pro || options.rsc;
-  const proModeLabel = options.rsc ? '--rsc' : '--pro';
+  const proModeLabel = proRequested ? (options.rsc ? '--rsc' : '--pro') : null;
   const baseSteps = 3; // rails new + add react_on_rails + run generator
   const totalSteps = baseSteps + (proRequested ? 1 : 0);
   let currentStep = 1;
