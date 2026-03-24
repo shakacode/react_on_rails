@@ -368,11 +368,14 @@ module ReactOnRails
 
         content.lines.map do |line|
           stripped = line.lstrip
-          line_contains_unescaped_backtick = line_has_unescaped_backtick?(line)
+          line_for_template_literal_state = line_for_template_literal_tracking(line)
+          line_contains_unescaped_backtick =
+            line_has_unescaped_backtick?(line, line_for_tracking: line_for_template_literal_state)
 
           if in_multiline_template_literal || line_contains_unescaped_backtick
+            line_for_state_update = in_multiline_template_literal ? line : line_for_template_literal_state
             in_multiline_template_literal =
-              update_multiline_template_literal_state(in_multiline_template_literal, line)
+              update_multiline_template_literal_state(in_multiline_template_literal, line_for_state_update)
             line
           elsif in_block_comment
             if stripped.include?("*/")
@@ -520,10 +523,14 @@ module ReactOnRails
         line_without_comments.sub(/\s*#.*$/, "")
       end
 
-      def line_has_unescaped_backtick?(line)
+      def line_for_template_literal_tracking(line)
         line_without_quoted_literals = line.gsub(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/, "")
-        line_without_quoted_literals = line_without_quoted_literals.sub(%r{//.*$}, "")
-        update_multiline_template_literal_state(false, line_without_quoted_literals)
+        line_without_quoted_literals.sub(%r{//.*$}, "")
+      end
+
+      def line_has_unescaped_backtick?(line, line_for_tracking: nil)
+        line_to_track = line_for_tracking || line_for_template_literal_tracking(line)
+        update_multiline_template_literal_state(false, line_to_track)
       end
 
       def update_multiline_template_literal_state(in_multiline_template_literal, line)
@@ -550,36 +557,36 @@ module ReactOnRails
         ["#{comment_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
-      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
       def match_multiline_parenthesized_base_gem(lines, start_index)
         start_line = lines[start_index]
-        start_match = start_line.match(/^(\s*)gem\s*\(\s*(?:#.*)?$/)
+        start_match = start_line.match(/^(\s*)gem\s*\(/)
         return nil unless start_match
 
-        line_index = start_index + 1
+        line_index = start_index
         found_base_gem_name = false
         base_gem_quote = nil
         gem_name_line_index = nil
         gem_name_match_end = nil
-        paren_depth = 1
+        paren_depth = 0
 
         while line_index < lines.length
           line = lines[line_index]
           line_without_comment = line.sub(/\s*#.*$/, "")
           line_without_literals = line_without_string_literals_and_inline_comments(line, strip_ruby_comments: true)
 
-          if comment_or_blank_line?(line)
-            line_index += 1
-            next
+          if !found_base_gem_name &&
+             (gem_name_match = line_without_comment.match(/(["'])react_on_rails\1(?=\s*(?:,|\)|#|$))/))
+            found_base_gem_name = true
+            base_gem_quote = gem_name_match[1]
+            gem_name_line_index = line_index
+            gem_name_match_end = gem_name_match.end(0)
           end
 
           paren_depth += line_without_literals.count("(") - line_without_literals.count(")")
 
           if paren_depth <= 0
             return nil unless found_base_gem_name
-
-            closing_index = line_without_comment.rindex(")")
-            return nil unless closing_index
 
             declaration_fragment = lines[gem_name_line_index..line_index].join
             suffix = declaration_fragment[gem_name_match_end..]
@@ -592,24 +599,12 @@ module ReactOnRails
             }
           end
 
-          if !found_base_gem_name &&
-             (gem_name_match = line.match(/^\s*(["'])react_on_rails\1(?=\s*(?:,|\)|#|$))/))
-            found_base_gem_name = true
-            base_gem_quote = gem_name_match[1]
-            gem_name_line_index = line_index
-            gem_name_match_end = gem_name_match.end(0)
-            line_index += 1
-            next
-          end
-
-          return nil unless found_base_gem_name
-
           line_index += 1
         end
 
         nil
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
       def build_pro_gem_replacement_line(indentation:, quote:, suffix:, parenthesized_gem_call: false)
         normalized_suffix = suffix || "\n"

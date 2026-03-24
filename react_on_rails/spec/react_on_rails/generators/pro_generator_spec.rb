@@ -288,6 +288,26 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "replaces parenthesized declarations that start on the gem line and continue across lines" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem("react_on_rails",
+          "~> 16.0",
+          require: false
+        )
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\",")
+      expect(gemfile_content).to include("require: false")
+      expect(gemfile_content).not_to include('gem("react_on_rails"')
+      expect(gemfile_content.lines.any? { |line| line.strip == ")" }).to be false
+    end
+
     it "preserves options and guards in multiline parenthesized Gemfile declarations" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -701,6 +721,21 @@ describe ProGenerator, type: :generator do
 
       expect(rewritten).to include('const marker = "`";')
       expect(rewritten).to include('import ReactOnRails from "react-on-rails-pro";')
+    end
+
+    it "tracks multiline template literal state when quoted backticks and template delimiters share a line" do
+      source = <<~JS
+        const marker = "`"; const templateStart = `template header
+          import ReactOnRails from "react-on-rails";
+        `;
+        import ReactOnRails from "react-on-rails";
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('import ReactOnRails from "react-on-rails";')
+      expect(rewritten).to include('import ReactOnRails from "react-on-rails-pro";')
+      expect(rewritten.scan("react-on-rails-pro").size).to eq(1)
     end
 
     it "detects unclosed block comments when multiple block markers appear on one line" do
