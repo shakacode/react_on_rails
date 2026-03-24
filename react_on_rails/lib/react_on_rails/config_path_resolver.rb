@@ -20,7 +20,7 @@ module ReactOnRails
       shakapacker_config_path = shakapacker_assets_bundler_config_path
       candidates << shakapacker_config_path if shakapacker_config_path
 
-      shakapacker_config_dir = shakapacker_webpack_config_directory
+      shakapacker_config_dir = shakapacker_webpack_config_directory(shakapacker_config_path)
       if shakapacker_config_dir
         candidates.concat(%w[js ts cjs mjs].flat_map do |ext|
           [
@@ -48,13 +48,11 @@ module ReactOnRails
       nil
     end
 
-    def shakapacker_webpack_config_directory
-      path = shakapacker_assets_bundler_config_path
+    def shakapacker_webpack_config_directory(config_path = nil)
+      path = config_path || shakapacker_assets_bundler_config_path
       return nil unless path
 
       File.dirname(path)
-    rescue LoadError, StandardError
-      nil
     end
   end
 end
