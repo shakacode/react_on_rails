@@ -15,6 +15,21 @@
 import { RSCPayloadChunk } from 'react-on-rails/types';
 import { sanitizeNonce } from './utils.ts';
 
+export function replayConsoleLog(consoleReplayScript: string | undefined, sanitizedNonceValue?: string) {
+  const replayConsoleCode = (consoleReplayScript ?? '')
+    .trim()
+    .replace(/^<script[^>]*>/i, '')
+    .replace(/<\/script>$/i, '');
+  if (replayConsoleCode?.trim() !== '') {
+    const scriptElement = document.createElement('script');
+    if (sanitizedNonceValue) {
+      scriptElement.nonce = sanitizedNonceValue;
+    }
+    scriptElement.textContent = replayConsoleCode;
+    document.body.appendChild(scriptElement);
+  }
+}
+
 /**
  * Transforms an RSC stream and replays console logs on the client.
  *
@@ -47,19 +62,7 @@ export default function transformRSCStreamAndReplayConsoleLogs(
       const handleJsonChunk = (chunk: RSCPayloadChunk) => {
         const { html, consoleReplayScript = '' } = chunk;
         controller.enqueue(encoder.encode(html ?? ''));
-
-        const replayConsoleCode = consoleReplayScript
-          .trim()
-          .replace(/^<script[^>]*>/i, '')
-          .replace(/<\/script>$/i, '');
-        if (replayConsoleCode?.trim() !== '') {
-          const scriptElement = document.createElement('script');
-          if (sanitizedNonce) {
-            scriptElement.nonce = sanitizedNonce;
-          }
-          scriptElement.textContent = replayConsoleCode;
-          document.body.appendChild(scriptElement);
-        }
+        replayConsoleLog(consoleReplayScript, sanitizedNonce);
       };
 
       try {

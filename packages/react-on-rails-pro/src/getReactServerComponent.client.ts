@@ -16,7 +16,9 @@ import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
 import { RailsContext, RSCPayloadChunk } from 'react-on-rails/types';
 import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage, sanitizeNonce } from './utils.ts';
-import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
+import transformRSCStreamAndReplayConsoleLogs, {
+  replayConsoleLog,
+} from './transformRSCStreamAndReplayConsoleLogs.ts';
 
 declare global {
   interface Window {
@@ -90,21 +92,6 @@ const fetchRSC = ({
     );
   }
 };
-
-function replayConsoleLog(consoleReplayScript: string | undefined, sanitizedNonceValue?: string) {
-  const replayConsoleCode = (consoleReplayScript ?? '')
-    .trim()
-    .replace(/^<script[^>]*>/i, '')
-    .replace(/<\/script>$/i, '');
-  if (replayConsoleCode?.trim() !== '') {
-    const scriptElement = document.createElement('script');
-    if (sanitizedNonceValue) {
-      scriptElement.nonce = sanitizedNonceValue;
-    }
-    scriptElement.textContent = replayConsoleCode;
-    document.body.appendChild(scriptElement);
-  }
-}
 
 /**
  * Creates a ReadableStream of raw Flight data from preloaded RSC payload objects.
