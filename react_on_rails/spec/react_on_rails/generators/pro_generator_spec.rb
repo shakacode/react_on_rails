@@ -116,6 +116,23 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "replaces multiline declarations that have an inline comment after the trailing comma" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", # pinned for compatibility
+          "~> 16.0"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).not_to include("gem \"react_on_rails\", # pinned for compatibility")
+      expect(gemfile_content).not_to include("  \"~> 16.0\"")
+    end
+
     it "preserves single quote style when replacing single-quoted Gemfile entries" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -160,6 +177,22 @@ describe ProGenerator, type: :generator do
       expect(File.read(gemfile_path)).to eq(original_content)
       expect(generator).not_to have_received(:bundle_install_after_gem_swap)
     end
+
+    it "replaces base gem entries that include inline comments" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails" # pinned for compatibility
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).not_to include("gem \"react_on_rails\" # pinned for compatibility")
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
   end
 
   describe "#bundle_install_after_gem_swap" do
@@ -179,7 +212,13 @@ describe ProGenerator, type: :generator do
 
       generator.send(:bundle_install_after_gem_swap)
 
-      expect(Process).to have_received(:spawn).with("bundle install", out: $stdout, err: $stderr)
+      expect(Process).to have_received(:spawn).with(
+        { "BUNDLE_GEMFILE" => File.join(destination_root, "Gemfile") },
+        "bundle install",
+        out: $stdout,
+        err: $stderr,
+        chdir: destination_root
+      )
       expect(generator).to have_received(:wait_for_bundle_process).with(fake_pid)
       warning_text = GeneratorMessages.messages.join("\n")
       expect(warning_text).to include("timed out")

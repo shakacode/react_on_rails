@@ -85,7 +85,7 @@ module ReactOnRails
 
         gemfile_content = File.read(gemfile_path)
         pro_gem_pattern = /^\s*gem\s+["']react_on_rails_pro["']/
-        base_gem_pattern = /^(\s*)gem\s+(["'])react_on_rails\2(?=\s*(?:,|$))/
+        base_gem_pattern = /^(\s*)gem\s+(["'])react_on_rails\2(?=\s*(?:,|#|$))/
 
         has_pro_gem_entry = gemfile_content.match?(pro_gem_pattern)
         gemfile_lines = gemfile_content.lines
@@ -114,7 +114,7 @@ module ReactOnRails
           # Consume multiline gem declarations that continue with trailing commas.
           line_index += 1
           current_line = line
-          while line_index < gemfile_lines.length && current_line.rstrip.end_with?(",")
+          while line_index < gemfile_lines.length && line_continues_with_comma?(current_line)
             current_line = gemfile_lines[line_index]
             line_index += 1
           end
@@ -131,11 +131,16 @@ module ReactOnRails
 
       def bundle_install_after_gem_swap
         say "📦 Running bundle install after Gemfile update...", :yellow
-        install_status = Dir.chdir(destination_root) do
-          Bundler.with_unbundled_env do
-            pid = Process.spawn("bundle install", out: $stdout, err: $stderr)
-            wait_for_bundle_process(pid)
-          end
+        install_status = Bundler.with_unbundled_env do
+          gemfile_path = File.join(destination_root, "Gemfile")
+          pid = Process.spawn(
+            { "BUNDLE_GEMFILE" => gemfile_path },
+            "bundle install",
+            out: $stdout,
+            err: $stderr,
+            chdir: destination_root
+          )
+          wait_for_bundle_process(pid)
         end
 
         return if install_status&.success?
@@ -207,6 +212,10 @@ module ReactOnRails
         content.gsub(module_specifier_pattern) do
           "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
         end
+      end
+
+      def line_continues_with_comma?(line)
+        line.rstrip.match?(/,\s*(?:#.*)?\z/)
       end
 
       def print_success_message
