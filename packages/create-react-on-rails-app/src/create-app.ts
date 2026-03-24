@@ -70,6 +70,7 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
     args.push('--rspack');
   }
 
+  // --rsc supersedes --pro because RSC mode already requires Pro and the generator accepts a single mode flag.
   if (options.pro && !options.rsc) {
     args.push('--pro');
   }

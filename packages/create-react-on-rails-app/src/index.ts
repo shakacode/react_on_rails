@@ -44,6 +44,10 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
     process.exit(1);
   }
 
+  if (options.rsc && options.pro) {
+    logInfo('Note: --rsc takes precedence over --pro; --pro will be ignored.');
+  }
+
   if (options.rsc || options.pro) {
     const modeFlag = options.rsc ? '--rsc' : '--pro';
     logInfo(`Note: ${modeFlag} installs react_on_rails_pro and requires that gem to be installable.`);
@@ -76,8 +80,9 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
   }
 
   console.log('');
+  const modeLabel = options.rsc ? ', mode: rsc' : options.pro ? ', mode: pro' : '';
   logInfo(
-    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${options.rsc ? ', mode: rsc' : ''}${options.pro && !options.rsc ? ', mode: pro' : ''}`,
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${modeLabel}`,
   );
 
   createApp(appName, options);
@@ -117,8 +122,7 @@ What it does:
   3. Runs the React on Rails generator (Shakapacker, components, webpack config)
 
 After setup, run bin/dev and visit:
-  - http://localhost:3000/hello_world (default)
-  - http://localhost:3000/hello_world (--pro)
+  - http://localhost:3000/hello_world (default and --pro)
   - http://localhost:3000/hello_server (--rsc)
 
 --pro and --rsc support both JavaScript and TypeScript templates.
