@@ -763,7 +763,7 @@ end
 
 ### Mistake 2: Using Server Actions (`'use server'`)
 
-Server Actions are **not supported** in React on Rails. The Node renderer is a rendering server -- it has no access to Rails models, sessions, cookies, or CSRF protection. Using `'use server'` may appear to work in development but will fail in production.
+Server Actions are **not supported** in React on Rails in any environment. The Node renderer is a rendering server -- it has no access to Rails models, sessions, cookies, or CSRF protection.
 
 ```jsx
 // BAD: Server Actions don't have access to Rails

@@ -476,7 +476,7 @@ export default function Dashboard({ user }) {
 }
 ```
 
-**Fix:** Pass the value from Rails as a prop, or use a Client Component provider wrapper that reads the store and passes data via children.
+**Fix:** Keep the component as a Client Component (add `'use client'`), or pass the value from Rails as a prop to a Server Component that doesn't need the Redux store.
 
 ### Mistake 4: Creating new QueryClient on every render
 
