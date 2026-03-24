@@ -453,9 +453,9 @@ module ReactOnRails
         flags << "--typescript" if options.typescript?
         flags << "--rspack" if options.rspack?
 
-        if use_rsc_pro_mode?
+        if options.rsc_pro?
           flags << "--rsc-pro"
-        elsif use_rsc?
+        elsif options.rsc?
           flags << "--rsc"
         elsif options.pro?
           flags << "--pro"

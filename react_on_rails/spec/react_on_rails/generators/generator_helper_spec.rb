@@ -85,9 +85,10 @@ RSpec.describe GeneratorHelper, type: :generator do
         it "calls manager.add with exact: true" do
           packages = %w[react react-dom]
 
-          expect(mock_manager).to receive(:add).with(packages, exact: true)
+          allow(mock_manager).to receive(:add).with(packages, exact: true).and_return(true)
 
           result = add_npm_dependencies(packages)
+          expect(mock_manager).to have_received(:add).with(packages, exact: true)
           expect(result).to be true
         end
       end
@@ -96,10 +97,23 @@ RSpec.describe GeneratorHelper, type: :generator do
         it "calls manager.add with type: :dev and exact: true" do
           packages = ["@types/react", "@types/react-dom"]
 
-          expect(mock_manager).to receive(:add).with(packages, type: :dev, exact: true)
+          allow(mock_manager).to receive(:add).with(packages, type: :dev, exact: true).and_return(true)
 
           result = add_npm_dependencies(packages, dev: true)
+          expect(mock_manager).to have_received(:add).with(packages, type: :dev, exact: true)
           expect(result).to be true
+        end
+      end
+
+      context "when package manager add returns false" do
+        it "returns false so callers can fall back" do
+          packages = ["react-on-rails-rsc@99.99.99"]
+
+          allow(mock_manager).to receive(:add).with(packages, exact: true).and_return(false)
+
+          result = add_npm_dependencies(packages)
+          expect(mock_manager).to have_received(:add).with(packages, exact: true)
+          expect(result).to be false
         end
       end
 
