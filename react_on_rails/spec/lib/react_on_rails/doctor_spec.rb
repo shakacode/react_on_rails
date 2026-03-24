@@ -191,6 +191,26 @@ RSpec.describe ReactOnRails::Doctor do
       info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
       expect(info_messages).not_to include(a_string_including("component_registry_timeout"))
     end
+
+    it "omits enforce_private_server_bundles when runtime value is the default" do
+      allow(runtime_config).to receive(:enforce_private_server_bundles).and_return(false)
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).not_to include(a_string_including("enforce_private_server_bundles"))
+    end
+
+    it "omits raise_on_prerender_error when runtime value matches environment default" do
+      allow(runtime_config).to receive(:raise_on_prerender_error).and_return(Rails.env.development?)
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).not_to include(a_string_including("raise_on_prerender_error"))
+    end
   end
 
   describe "server bundle path detection" do

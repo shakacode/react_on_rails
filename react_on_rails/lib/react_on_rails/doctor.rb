@@ -53,6 +53,9 @@ module ReactOnRails
     MINITEST_HELPER_FILE = "test/test_helper.rb"
     DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
+    DEFAULT_SERVER_RENDERER_POOL_SIZE = 1
+    DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS = 20
+    DEFAULT_COMPONENT_REGISTRY_TIMEOUT_MS = 5000
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose
@@ -796,10 +799,10 @@ module ReactOnRails
 
       if runtime_config
         server_bundle_value = runtime_config.server_bundle_js_file
-        fallback_server_bundle = server_bundle_filename
         if server_bundle_value.present?
           checker.add_info("  server_bundle_js_file: #{server_bundle_value}")
         elsif server_bundle_value.nil?
+          fallback_server_bundle = server_bundle_filename
           checker.add_info("  server_bundle_js_file: #{fallback_server_bundle} (initializer/default)")
         else
           checker.add_info("  server_bundle_js_file: \"\" (disabled)")
@@ -827,7 +830,7 @@ module ReactOnRails
 
       # Enforce private server bundles
       if runtime_config
-        checker.add_info("  enforce_private_server_bundles: #{runtime_config.enforce_private_server_bundles}")
+        checker.add_info("  enforce_private_server_bundles: true") if runtime_config.enforce_private_server_bundles
       else
         enforce_private_match = content.match(/config\.enforce_private_server_bundles\s*=\s*([^\s\n,]+)/)
         checker.add_info("  enforce_private_server_bundles: #{enforce_private_match[1]}") if enforce_private_match
@@ -837,9 +840,16 @@ module ReactOnRails
       check_shakapacker_private_output_path(rails_bundle_path)
 
       # RSC bundle file (Pro feature)
-      rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
-      if rsc_bundle_match
-        checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_match[1]} (React Server Components - Pro)")
+      if runtime_config.respond_to?(:rsc_bundle_js_file)
+        rsc_bundle_value = runtime_config.rsc_bundle_js_file
+        if rsc_bundle_value.present?
+          checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_value} (React Server Components - Pro)")
+        end
+      else
+        rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
+        if rsc_bundle_match
+          checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_match[1]} (React Server Components - Pro)")
+        end
       end
 
       # Prerender setting
@@ -856,7 +866,7 @@ module ReactOnRails
       if runtime_config
         # Default is 1; only report explicit non-default override.
         checker.add_info("  server_renderer_pool_size: #{runtime_config.server_renderer_pool_size}") \
-          if runtime_config.server_renderer_pool_size != 1
+          if runtime_config.server_renderer_pool_size != DEFAULT_SERVER_RENDERER_POOL_SIZE
       else
         pool_size_match = content.match(/config\.server_renderer_pool_size\s*=\s*([^\s\n,]+)/)
         checker.add_info("  server_renderer_pool_size: #{pool_size_match[1]}") if pool_size_match
@@ -865,7 +875,7 @@ module ReactOnRails
       if runtime_config
         # Default is 20 seconds; only report explicit non-default override.
         checker.add_info("  server_renderer_timeout: #{runtime_config.server_renderer_timeout} seconds") \
-          if runtime_config.server_renderer_timeout != 20
+          if runtime_config.server_renderer_timeout != DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS
       else
         timeout_match = content.match(/config\.server_renderer_timeout\s*=\s*([^\s\n,]+)/)
         checker.add_info("  server_renderer_timeout: #{timeout_match[1]} seconds") if timeout_match
@@ -873,7 +883,8 @@ module ReactOnRails
 
       # Error handling
       if runtime_config
-        checker.add_info("  raise_on_prerender_error: #{runtime_config.raise_on_prerender_error}")
+        checker.add_info("  raise_on_prerender_error: #{runtime_config.raise_on_prerender_error}") \
+          if runtime_config.raise_on_prerender_error != Rails.env.development?
       else
         raise_on_error_match = content.match(/config\.raise_on_prerender_error\s*=\s*([^\s\n,]+)/)
         checker.add_info("  raise_on_prerender_error: #{raise_on_error_match[1]}") if raise_on_error_match
@@ -934,7 +945,7 @@ module ReactOnRails
       if runtime_config
         # Default is 5000 ms; only report explicit non-default override.
         checker.add_info("  component_registry_timeout: #{runtime_config.component_registry_timeout}ms") \
-          if runtime_config.component_registry_timeout != 5000
+          if runtime_config.component_registry_timeout != DEFAULT_COMPONENT_REGISTRY_TIMEOUT_MS
       else
         timeout_match = content.match(/config\.component_registry_timeout\s*=\s*([^\s\n,]+)/)
         checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms") if timeout_match
