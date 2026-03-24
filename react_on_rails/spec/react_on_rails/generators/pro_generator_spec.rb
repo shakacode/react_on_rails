@@ -270,6 +270,7 @@ describe ProGenerator, type: :generator do
       simulate_existing_file("app/javascript/packs/application.js", <<~JS)
         import ReactOnRails from "react-on-rails";
         const ror = require("react-on-rails");
+        const lazyRor = import(/* webpackChunkName: "ror" */ "react-on-rails");
         import ReactOnRailsClient from "react-on-rails/client";
         import "react-on-rails";
         import CustomPackage from "react-on-rails-utils";
@@ -300,6 +301,7 @@ describe ProGenerator, type: :generator do
 
       expect(File.read(application_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
       expect(File.read(application_js_path)).to include('require("react-on-rails-pro")')
+      expect(File.read(application_js_path)).to include('import(/* webpackChunkName: "ror" */ "react-on-rails-pro")')
       expect(File.read(application_js_path)).to include('import ReactOnRailsClient from "react-on-rails-pro/client";')
       expect(File.read(application_js_path)).to include('import "react-on-rails-pro";')
       expect(File.read(application_js_path)).to include('import CustomPackage from "react-on-rails-utils";')

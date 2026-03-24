@@ -208,7 +208,7 @@ module ReactOnRails
         module_specifier_pattern = %r{
           (?<prefix>
             \bfrom\s+|
-            \bimport\s*\(\s*|
+            \bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*|
             \brequire\s*\(\s*
           )
           (?<quote>["'])
