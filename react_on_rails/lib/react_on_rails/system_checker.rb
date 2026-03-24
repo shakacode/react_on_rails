@@ -15,6 +15,14 @@ module ReactOnRails
     attr_reader :messages
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
+    WEBPACK_CONFIG_CANDIDATE_PATHS = %w[
+      config/webpack/webpack.config.ts
+      config/webpack/webpack.config.js
+    ].freeze
+    RSPACK_CONFIG_CANDIDATE_PATHS = %w[
+      config/rspack/rspack.config.ts
+      config/rspack/rspack.config.js
+    ].freeze
 
     def initialize
       @messages = []
@@ -314,21 +322,25 @@ module ReactOnRails
     end
 
     def detect_bundler_config_path
+      resolved_config_path = resolved_webpack_config_path
+      return nil unless resolved_config_path
+      return resolved_config_path unless default_bundler_config_path?(resolved_config_path)
+
+      resolve_default_bundler_config_path(resolved_config_path)
+    end
+
+    def resolve_default_bundler_config_path(fallback_path)
       paths_by_bundler = {
         "rspack" => existing_bundler_config_paths("rspack"),
         "webpack" => existing_bundler_config_paths("webpack")
       }
 
       present_paths = paths_by_bundler.select { |_bundler, paths| paths.any? }
-      return nil if present_paths.empty?
-      return present_paths.values.first.first if present_paths.one?
+      return fallback_path if present_paths.empty? || present_paths.one?
 
       configured_bundler = configured_assets_bundler
       if configured_bundler && paths_by_bundler[configured_bundler].any?
-        add_warning(
-          "⚠️  Found both webpack and rspack configs. Using #{configured_bundler} from config/shakapacker.yml."
-        )
-        return paths_by_bundler[configured_bundler].first
+        return configured_bundler_path(paths_by_bundler, configured_bundler)
       end
 
       # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
@@ -337,7 +349,14 @@ module ReactOnRails
       add_warning(
         "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
       )
-      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first
+      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first || fallback_path
+    end
+
+    def configured_bundler_path(paths_by_bundler, configured_bundler)
+      add_warning(
+        "⚠️  Found both webpack and rspack configs. Using #{configured_bundler} from config/shakapacker.yml."
+      )
+      paths_by_bundler[configured_bundler].first
     end
 
     def suggest_webpack_inspection(config_path)
@@ -512,18 +531,12 @@ module ReactOnRails
     end
 
     def existing_bundler_config_paths(bundler)
-      candidate_paths = if bundler == "rspack"
-                          %w[
-                            config/rspack/rspack.config.ts
-                            config/rspack/rspack.config.js
-                          ]
-                        else
-                          %w[
-                            config/webpack/webpack.config.ts
-                            config/webpack/webpack.config.js
-                          ]
-                        end
-      candidate_paths.select { |path| File.exist?(path) }
+      candidate_paths = bundler == "rspack" ? RSPACK_CONFIG_CANDIDATE_PATHS : WEBPACK_CONFIG_CANDIDATE_PATHS
+      candidate_paths.select { |path| File.file?(path) }
+    end
+
+    def default_bundler_config_path?(path)
+      WEBPACK_CONFIG_CANDIDATE_PATHS.include?(path) || RSPACK_CONFIG_CANDIDATE_PATHS.include?(path)
     end
 
     def configured_assets_bundler

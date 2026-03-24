@@ -1813,9 +1813,9 @@ RSpec.describe ReactOnRails::Doctor do
   describe "private path resolution helpers" do
     describe "#resolved_webpack_config_path" do
       it "prioritizes shakapacker's exact assets_bundler_config_path" do
-        allow(File).to receive(:exist?).and_return(false)
-        allow(File).to receive(:exist?).with("config/custom/custom-bundler.config.js").and_return(true)
-        allow(File).to receive(:exist?).with("config/custom/webpack.config.js").and_return(true)
+        allow(File).to receive(:file?).and_return(false)
+        allow(File).to receive(:file?).with("config/custom/custom-bundler.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/custom/webpack.config.js").and_return(true)
         allow(doctor).to receive_messages(
           shakapacker_assets_bundler_config_path: "config/custom/custom-bundler.config.js",
           shakapacker_webpack_config_directory: "config/custom"
@@ -1825,24 +1825,24 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "prefers shakapacker-derived webpack config candidates over the default path" do
-        allow(File).to receive(:exist?).and_return(false)
-        allow(File).to receive(:exist?).with("config/custom/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).and_return(false)
+        allow(File).to receive(:file?).with("config/custom/webpack.config.ts").and_return(true)
         allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return("config/custom")
 
         expect(doctor.send(:resolved_webpack_config_path)).to eq("config/custom/webpack.config.ts")
       end
 
       it "resolves rspack config candidates from the shakapacker-derived directory" do
-        allow(File).to receive(:exist?).and_return(false)
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:file?).and_return(false)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
         allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return("config/rspack")
 
         expect(doctor.send(:resolved_webpack_config_path)).to eq("config/rspack/rspack.config.ts")
       end
 
       it "falls back to default rspack config paths when shakapacker directory is unavailable" do
-        allow(File).to receive(:exist?).and_return(false)
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(true)
+        allow(File).to receive(:file?).and_return(false)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.js").and_return(true)
         allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return(nil)
 
         expect(doctor.send(:resolved_webpack_config_path)).to eq("config/rspack/rspack.config.js")
@@ -1851,9 +1851,11 @@ RSpec.describe ReactOnRails::Doctor do
 
     describe "#shakapacker_assets_bundler_config_path" do
       it "normalizes shakapacker assets_bundler_config_path to a rails-relative path" do
+        rails_root = Pathname.new("/tmp/myapp")
+        allow(Rails).to receive(:root).and_return(rails_root)
         allow(doctor).to receive(:require).with("shakapacker").and_return(true)
         shakapacker_config = Struct.new(:assets_bundler_config_path).new(
-          "#{Rails.root}/config/custom/custom-bundler.config.ts"
+          "#{rails_root}/config/custom/custom-bundler.config.ts"
         )
         shakapacker_class = Class.new do
           class << self
@@ -1865,14 +1867,12 @@ RSpec.describe ReactOnRails::Doctor do
 
         expect(doctor.send(:shakapacker_assets_bundler_config_path)).to eq("config/custom/custom-bundler.config.ts")
       end
-    end
 
-    describe "#shakapacker_webpack_config_directory" do
-      it "extracts a directory from shakapacker's config file path" do
+      it "keeps absolute assets_bundler_config_path outside Rails.root unchanged" do
+        rails_root = Pathname.new("/tmp/myapp")
+        allow(Rails).to receive(:root).and_return(rails_root)
         allow(doctor).to receive(:require).with("shakapacker").and_return(true)
-        shakapacker_config = Struct.new(:assets_bundler_config_path).new(
-          "#{Rails.root}/config/custom/webpack.config.ts"
-        )
+        shakapacker_config = Struct.new(:assets_bundler_config_path).new("/opt/custom/bundler.config.js")
         shakapacker_class = Class.new do
           class << self
             attr_accessor :config
@@ -1881,7 +1881,14 @@ RSpec.describe ReactOnRails::Doctor do
         stub_const("Shakapacker", shakapacker_class)
         Shakapacker.config = shakapacker_config
 
-        expect(doctor.send(:shakapacker_webpack_config_directory)).to eq("config/custom")
+        expect(doctor.send(:shakapacker_assets_bundler_config_path)).to eq("/opt/custom/bundler.config.js")
+      end
+    end
+
+    describe "#shakapacker_webpack_config_directory" do
+      it "extracts a directory from shakapacker's config file path" do
+        expect(doctor.send(:shakapacker_webpack_config_directory, "config/custom/webpack.config.ts"))
+          .to eq("config/custom")
       end
     end
   end

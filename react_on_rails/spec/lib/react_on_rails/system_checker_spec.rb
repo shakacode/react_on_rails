@@ -677,43 +677,39 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     describe "#shakapacker_configured?" do
       before do
-        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive_messages(exist?: false, file?: false)
         allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
         allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
         allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        # Default all config files to missing
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(false)
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
       end
 
       it "returns true when webpack JS config exists" do
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.js").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
       it "returns true when webpack TS config exists" do
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
       it "returns true when rspack JS config exists" do
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.js").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
       it "returns true when rspack TS config exists" do
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
       it "returns true when shakapacker assets_bundler_config_path points to a custom config" do
-        allow(File).to receive(:exist?).with("config/custom/custom-bundler.config.js").and_return(true)
-        allow(checker).to receive_messages(
-          shakapacker_assets_bundler_config_path: "config/custom/custom-bundler.config.js",
-          shakapacker_webpack_config_directory: "config/custom"
-        )
+        allow(File).to receive(:file?).with("config/custom/custom-bundler.config.js").and_return(true)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path)
+          .and_return("config/custom/custom-bundler.config.js")
+        allow(checker).to receive(:shakapacker_webpack_config_directory)
+          .with("config/custom/custom-bundler.config.js")
+          .and_return("config/custom")
 
         expect(checker.send(:shakapacker_configured?)).to be true
       end
@@ -724,25 +720,25 @@ RSpec.describe ReactOnRails::SystemChecker do
 
       it "returns false when binaries are missing" do
         allow(File).to receive(:exist?).with("bin/shakapacker").and_return(false)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.js").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be false
       end
     end
 
     describe "#detect_bundler_config_path" do
       before do
-        allow(File).to receive(:exist?).and_return(false)
+        allow(File).to receive_messages(exist?: false, file?: false)
       end
 
       it "returns the existing webpack TypeScript config when only webpack exists" do
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
 
         expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
       end
 
       it "prefers the bundler configured in shakapacker.yml when both bundlers exist" do
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
         allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
         allow(File).to receive(:read).with("config/shakapacker.yml").and_return("default:\n  assets_bundler: rspack\n")
 
@@ -753,12 +749,33 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       it "warns and defaults to webpack when both bundlers exist and config is ambiguous" do
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
         allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(false)
 
         expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
         expect(checker.messages.any? { |msg| msg[:content].include?("defaulting to webpack") }).to be true
+      end
+
+      it "returns shakapacker's custom assets_bundler_config_path when present" do
+        allow(File).to receive(:file?).with("config/custom/custom-bundler.config.js").and_return(true)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path)
+          .and_return("config/custom/custom-bundler.config.js")
+        allow(checker).to receive(:shakapacker_webpack_config_directory)
+          .with("config/custom/custom-bundler.config.js")
+          .and_return("config/custom")
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/custom/custom-bundler.config.js")
+      end
+
+      it "ignores directory-valued custom assets_bundler_config_path entries" do
+        allow(File).to receive(:file?).with("config/custom").and_return(false)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom")
+        allow(checker).to receive(:shakapacker_webpack_config_directory)
+          .with("config/custom")
+          .and_return("config/custom")
+
+        expect(checker.send(:detect_bundler_config_path)).to be_nil
       end
     end
 
