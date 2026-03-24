@@ -38,10 +38,16 @@ describe ReactOnRails::ReactComponent::RenderOptions do
   def build_render_options_with_clean_prerender_env(option:, attrs:)
     if option == :prerender
       with_prerender_env_override_cleared do
-        described_class.new(**attrs)
+        render_options = described_class.new(**attrs)
+        return yield(render_options) if block_given?
+
+        render_options
       end
     else
-      described_class.new(**attrs)
+      render_options = described_class.new(**attrs)
+      return yield(render_options) if block_given?
+
+      render_options
     end
   end
 
@@ -214,9 +220,9 @@ describe ReactOnRails::ReactComponent::RenderOptions do
           options = {}
           options[option] = false
           attrs = the_attrs(options: options)
-          opts = build_render_options_with_clean_prerender_env(option: option, attrs: attrs)
-
-          expect(opts.public_send(option)).to be false
+          build_render_options_with_clean_prerender_env(option: option, attrs: attrs) do |opts|
+            expect(opts.public_send(option)).to be false
+          end
         end
       end
 
@@ -224,9 +230,9 @@ describe ReactOnRails::ReactComponent::RenderOptions do
         it "returns #{option} from config" do
           ReactOnRails.configuration.public_send(:"#{option}=", true)
           attrs = the_attrs
-          opts = build_render_options_with_clean_prerender_env(option: option, attrs: attrs)
-
-          expect(opts.public_send(option)).to be true
+          build_render_options_with_clean_prerender_env(option: option, attrs: attrs) do |opts|
+            expect(opts.public_send(option)).to be true
+          end
         end
       end
     end
