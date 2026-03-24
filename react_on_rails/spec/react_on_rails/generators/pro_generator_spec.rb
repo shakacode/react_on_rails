@@ -164,6 +164,22 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "replaces parenthesized Gemfile declarations" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem("react_on_rails", "~> 16.0")
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).not_to include('gem("react_on_rails"')
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
     it "removes base gem without adding duplicate react_on_rails_pro entries" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -207,6 +223,23 @@ describe ProGenerator, type: :generator do
       expect(generator).not_to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "warns and skips bundle install when Gemfile cannot be written" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0"
+      RUBY
+      allow(File).to receive(:write).and_call_original
+      allow(File).to receive(:write).with(gemfile_path, anything).and_raise(Errno::EACCES)
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("Could not update Gemfile")
+      expect(warning_text).to include("Please update your Gemfile manually")
+      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
+    end
+
     it "replaces base gem entries that include inline comments" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -234,6 +267,15 @@ describe ProGenerator, type: :generator do
       GeneratorMessages.clear
       allow(Bundler).to receive(:with_unbundled_env).and_yield
       allow(Process).to receive(:spawn).and_return(fake_pid)
+    end
+
+    it "returns without warnings when bundle install succeeds" do
+      allow(generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: true))
+
+      generator.send(:bundle_install_after_gem_swap)
+
+      expect(GeneratorMessages.messages).to eq([])
     end
 
     it "uses bounded process waiting and warns on timeout" do
@@ -271,6 +313,8 @@ describe ProGenerator, type: :generator do
         import ReactOnRails from "react-on-rails";
         const ror = require("react-on-rails");
         const lazyRor = import(/* webpackChunkName: "ror" */ "react-on-rails");
+        const commentLikeString = "/* not a JS comment";
+        import ReactOnRailsServer from "react-on-rails/server";
         import ReactOnRailsClient from "react-on-rails/client";
         import "react-on-rails";
         import CustomPackage from "react-on-rails-utils";
@@ -302,6 +346,7 @@ describe ProGenerator, type: :generator do
       expect(File.read(application_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
       expect(File.read(application_js_path)).to include('require("react-on-rails-pro")')
       expect(File.read(application_js_path)).to include('import(/* webpackChunkName: "ror" */ "react-on-rails-pro")')
+      expect(File.read(application_js_path)).to include('import ReactOnRailsServer from "react-on-rails-pro/server";')
       expect(File.read(application_js_path)).to include('import ReactOnRailsClient from "react-on-rails-pro/client";')
       expect(File.read(application_js_path)).to include('import "react-on-rails-pro";')
       expect(File.read(application_js_path)).to include('import CustomPackage from "react-on-rails-utils";')

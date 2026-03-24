@@ -87,8 +87,8 @@ module ReactOnRails
         end
 
         gemfile_content = File.read(gemfile_path)
-        pro_gem_pattern = /^\s*gem\s+["']react_on_rails_pro["']/
-        base_gem_pattern = /^(\s*)gem\s+(["'])react_on_rails\2(?=\s*(?:,|#|$))/
+        pro_gem_pattern = /^\s*gem(?:\s+|\(\s*)["']react_on_rails_pro["']/
+        base_gem_pattern = /^(\s*)gem(?:\s+|\(\s*)(["'])react_on_rails\2(?=\s*(?:,|\)|#|$))/
 
         has_pro_gem_entry = gemfile_content.match?(pro_gem_pattern)
         gemfile_lines = gemfile_content.lines
@@ -131,6 +131,8 @@ module ReactOnRails
         File.write(gemfile_path, updated_content)
         say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
         bundle_install_after_gem_swap
+      rescue StandardError => e
+        add_gemfile_update_warning(gemfile_path, e)
       end
       # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
 
@@ -243,7 +245,7 @@ module ReactOnRails
         stripped = line.lstrip
         return false if stripped.empty?
 
-        !stripped.start_with?("gem ")
+        !stripped.match?(/\Agem(?:\s|\()/)
       end
 
       def add_missing_gemfile_warning(gemfile_path)
@@ -252,6 +254,15 @@ module ReactOnRails
 
           Skipping automatic react_on_rails -> react_on_rails_pro Gemfile swap.
           Please update your Gemfile manually if your app uses a non-standard Gemfile path.
+        MSG
+      end
+
+      def add_gemfile_update_warning(gemfile_path, error)
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Could not update Gemfile at #{gemfile_path}: #{error.message}
+
+          Skipping automatic react_on_rails -> react_on_rails_pro Gemfile swap.
+          Please update your Gemfile manually.
         MSG
       end
 
@@ -271,10 +282,21 @@ module ReactOnRails
             line
           else
             rewritten_line = yield line
-            in_block_comment = true if stripped.include?("/*") && !stripped.include?("*/")
+            in_block_comment = true if unclosed_block_comment_starts?(line)
             rewritten_line
           end
         end.join
+      end
+
+      def unclosed_block_comment_starts?(line)
+        line_without_strings = line.gsub(
+          /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/,
+          ""
+        )
+        opening_index = line_without_strings.index("/*")
+        return false unless opening_index
+
+        line_without_strings.index("*/", opening_index + 2).nil?
       end
 
       def print_success_message
