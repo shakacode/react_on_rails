@@ -516,6 +516,31 @@ describe ProGenerator, type: :generator do
 
       expect(rewritten).to include('"react-on-rails-pro"')
     end
+
+    it "rewrites imports that appear after a block comment closes on the same line" do
+      source = <<~JS
+        /*
+         * explanatory comment
+         */ import ReactOnRails from "react-on-rails";
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('*/ import ReactOnRails from "react-on-rails-pro";')
+    end
+
+    it "rewrites multiline static imports when from and module specifier are on separate lines" do
+      source = <<~JS
+        import {
+          ReactOnRailsComponent
+        } from
+          "react-on-rails";
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('"react-on-rails-pro";')
+    end
   end
 
   # Integration test for standalone happy path

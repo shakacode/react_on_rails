@@ -348,20 +348,38 @@ module ReactOnRails
         MSG
       end
 
-      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/MethodLength
+      # rubocop:disable Metrics/PerceivedComplexity, Style/ExplicitBlockArgument
       def rewrite_non_comment_lines(content)
         in_block_comment = false
         pending_multiline_module_call_depth = 0
+        pending_multiline_static_import_specifier = false
 
         content.lines.map do |line|
           stripped = line.lstrip
 
           if in_block_comment
-            in_block_comment = false if stripped.include?("*/")
-            line
+            if stripped.include?("*/")
+              in_block_comment = false
+              rewritten_line, pending_multiline_module_call_depth, pending_multiline_static_import_specifier =
+                rewrite_line_after_block_comment_close(
+                  line,
+                  pending_multiline_module_call_depth,
+                  pending_multiline_static_import_specifier
+                ) { |line_fragment| yield line_fragment }
+              in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
+              rewritten_line
+            else
+              line
+            end
           elsif stripped.start_with?("/*")
             if stripped.include?("*/")
               rewritten_line = yield line
+              rewritten_line, pending_multiline_static_import_specifier =
+                update_pending_multiline_static_import_tracking(
+                  rewritten_line,
+                  pending_multiline_static_import_specifier
+                )
               rewritten_line, pending_multiline_module_call_depth =
                 update_pending_multiline_module_call_tracking(rewritten_line, pending_multiline_module_call_depth)
               in_block_comment = true if unclosed_block_comment_starts?(line)
@@ -374,6 +392,11 @@ module ReactOnRails
             line
           else
             rewritten_line = yield line
+            rewritten_line, pending_multiline_static_import_specifier =
+              update_pending_multiline_static_import_tracking(
+                rewritten_line,
+                pending_multiline_static_import_specifier
+              )
             rewritten_line, pending_multiline_module_call_depth =
               update_pending_multiline_module_call_tracking(rewritten_line, pending_multiline_module_call_depth)
             in_block_comment = true if unclosed_block_comment_starts?(line)
@@ -381,7 +404,8 @@ module ReactOnRails
           end
         end.join
       end
-      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:enable Metrics/PerceivedComplexity, Style/ExplicitBlockArgument
+      # rubocop:enable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/MethodLength
 
       def unclosed_block_comment_starts?(line)
         line_without_inline_comment = line_without_string_literals_and_inline_comments(line)
@@ -418,6 +442,31 @@ module ReactOnRails
         end
       end
 
+      def update_pending_multiline_static_import_tracking(line, pending_multiline_static_import_specifier)
+        rewritten_line = line
+        if pending_multiline_static_import_specifier
+          rewritten_line = rewrite_pending_module_specifier(rewritten_line)
+          pending_multiline_static_import_specifier = false
+        end
+
+        if starts_pending_multiline_static_import_specifier?(rewritten_line)
+          pending_multiline_static_import_specifier = true
+        end
+
+        [rewritten_line, pending_multiline_static_import_specifier]
+      end
+
+      def starts_pending_multiline_static_import_specifier?(line)
+        line_without_literals = line_without_string_literals_and_inline_comments(line)
+        return false unless line_without_literals.match?(
+          /\A\s*(?:import(?:\s+type)?\b.*\bfrom|import|[\w\}\],\*\$\s]+\s+from)\s*\z/
+        )
+        return false if line.match?(%r{\bfrom\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
+        return false if line.match?(%r{\A\s*import\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
+
+        true
+      end
+
       def module_call_parenthesis_delta(line, from_module_call_start: false)
         line_without_literals = line_without_string_literals_and_inline_comments(line)
         line_to_measure = if from_module_call_start
@@ -435,6 +484,21 @@ module ReactOnRails
           ""
         )
         line_without_strings.sub(%r{//.*$}, "")
+      end
+
+      def rewrite_line_after_block_comment_close(line, pending_depth, pending_multiline_static_import_specifier)
+        closing_index = line.index("*/")
+        return [line, pending_depth, pending_multiline_static_import_specifier] unless closing_index
+        return [line, pending_depth, pending_multiline_static_import_specifier] if closing_index >= line.length - 2
+
+        comment_prefix = line[0, closing_index + 2]
+        line_fragment = line[(closing_index + 2)..]
+        rewritten_fragment = yield line_fragment
+        rewritten_fragment, pending_multiline_static_import_specifier =
+          update_pending_multiline_static_import_tracking(rewritten_fragment, pending_multiline_static_import_specifier)
+        rewritten_fragment, pending_depth =
+          update_pending_multiline_module_call_tracking(rewritten_fragment, pending_depth)
+        ["#{comment_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
       # rubocop:disable Metrics/CyclomaticComplexity
