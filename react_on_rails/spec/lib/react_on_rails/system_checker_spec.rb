@@ -734,6 +734,16 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:exist?).and_return(false)
       end
 
+      it "returns custom shakapacker config path when defaults are absent" do
+        allow(File).to receive(:exist?).with("config/custom/custom-bundler.config.js").and_return(true)
+        allow(checker).to receive_messages(
+          shakapacker_assets_bundler_config_path: "config/custom/custom-bundler.config.js",
+          shakapacker_webpack_config_directory: "config/custom"
+        )
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/custom/custom-bundler.config.js")
+      end
+
       it "returns the existing webpack TypeScript config when only webpack exists" do
         allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
 

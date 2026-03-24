@@ -314,6 +314,10 @@ module ReactOnRails
     end
 
     def detect_bundler_config_path
+      resolved_config_path = resolved_webpack_config_path
+      known_paths = existing_bundler_config_paths("webpack") + existing_bundler_config_paths("rspack")
+      return resolved_config_path if resolved_config_path && !known_paths.include?(resolved_config_path)
+
       paths_by_bundler = {
         "rspack" => existing_bundler_config_paths("rspack"),
         "webpack" => existing_bundler_config_paths("webpack")
