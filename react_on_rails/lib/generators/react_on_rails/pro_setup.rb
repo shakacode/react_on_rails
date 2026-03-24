@@ -61,11 +61,13 @@ module ReactOnRails
         return false if attempt_pro_gem_auto_install
 
         context_line = pro_gem_requirement_context_line
+        prerelease_note = rsc_pro_prerelease_note
 
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
 
           #{context_line}
+          #{prerelease_note}
 
           Please add manually to your Gemfile:
             gem '#{PRO_GEM_NAME}', '#{pro_gem_version_requirement}'
@@ -88,7 +90,7 @@ module ReactOnRails
       end
 
       def pro_flag_specified_for_context?
-        options.key?(:pro) || options.key?(:rsc) || options.key?(:rsc_pro)
+        options[:pro] || options[:rsc] || options[:rsc_pro]
       end
 
       def pro_requirement_flag
@@ -96,6 +98,16 @@ module ReactOnRails
         return "--rsc" if options[:rsc]
 
         "--pro"
+      end
+
+      def rsc_pro_prerelease_note
+        return "" unless use_rsc_pro_mode?
+        return "" unless Gem::Version.new(ReactOnRails::VERSION).prerelease?
+
+        "Note: #{PRO_GEM_NAME} #{ReactOnRails::VERSION} may not be published yet. " \
+          "If you are testing from source, use a local Gemfile `path:` option."
+      rescue StandardError
+        ""
       end
 
       # Attempt to auto-install the Pro gem via bundle add.

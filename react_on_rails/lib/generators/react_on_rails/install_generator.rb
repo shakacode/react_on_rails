@@ -96,6 +96,8 @@ module ReactOnRails
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
+      HELLO_WORLD_ROUTE = "hello_world"
+      HELLO_SERVER_ROUTE = "hello_server"
       # Matches the stock `bin/dev` written by Rails 8.x. Rails 7.1 commonly
       # generated a foreman-based shell script instead, which stock_rails_bin_dev?
       # also recognizes so the React on Rails template can replace either variant.
@@ -391,8 +393,10 @@ module ReactOnRails
         if preserve_existing_bin_dev?
           if use_rsc? && !options.redux? && !options.new_app?
             say_status :warn,
-                       'Custom bin/dev detected: update DEFAULT_ROUTE to "hello_server" manually for --rsc',
+                       "Custom bin/dev detected: update DEFAULT_ROUTE to \"#{HELLO_SERVER_ROUTE}\" manually for --rsc",
                        :yellow
+          else
+            gsub_file "bin/dev", "DEFAULT_ROUTE = \"#{HELLO_WORLD_ROUTE}\"", "DEFAULT_ROUTE = \"#{HELLO_SERVER_ROUTE}\""
           end
         else
           copy_file("#{template_bin_path}/dev", "bin/dev")
@@ -472,10 +476,10 @@ module ReactOnRails
         # Determine what route and component will be created by the generator
         if use_rsc? && !options.redux?
           # RSC without Redux: HelloServer replaces HelloWorld
-          route = "hello_server"
+          route = HELLO_SERVER_ROUTE
           component_name = "HelloServer"
         else
-          route = "hello_world"
+          route = HELLO_WORLD_ROUTE
           component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
         end
 
@@ -518,7 +522,7 @@ module ReactOnRails
           🔎 RSC Pro Verification:
           ─────────────────────────────────────────────────────────────────────────
           1. Start all processes: #{Rainbow('bin/dev').cyan}
-          2. Visit: #{Rainbow('http://localhost:<port>/hello_server').cyan.underline}
+          2. Visit: #{Rainbow("http://localhost:<port>/#{HELLO_SERVER_ROUTE}").cyan.underline}
           3. Confirm the page streams and the Like button hydrates on click.
         MSG
       end

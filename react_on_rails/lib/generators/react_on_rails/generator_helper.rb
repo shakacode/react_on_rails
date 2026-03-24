@@ -34,7 +34,8 @@ module GeneratorHelper
                else
                  pj.manager.add(packages, exact: true)
                end
-      !result.nil? && result != false
+      # package_json#add can return nil for successful side-effect operations.
+      result != false
     rescue StandardError => e
       say_status :warning, "Could not add packages via package_json gem: #{e.message}", :yellow
       say_status :warning, "Will fall back to direct npm commands.", :yellow

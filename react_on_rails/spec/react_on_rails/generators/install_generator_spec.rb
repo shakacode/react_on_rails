@@ -1711,11 +1711,12 @@ describe InstallGenerator, type: :generator do
 
     it "pins Pro dependencies and installs the RSC dependency" do
       expected_npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION)
+      expected_rsc_npm_version = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
 
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
         deps = package_json["dependencies"] || {}
-        expect(deps).to include("react-on-rails-rsc")
+        expect(deps["react-on-rails-rsc"]).to eq(expected_rsc_npm_version)
         expect(deps["react-on-rails-pro"]).to eq(expected_npm_version)
         expect(deps["react-on-rails-pro-node-renderer"]).to eq(expected_npm_version)
       end
@@ -2881,6 +2882,8 @@ describe InstallGenerator, type: :generator do
               err: anything)
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("gem 'react_on_rails_pro', '16.4.0.rc.5'")
+      expect(error_text).to include("may not be published yet")
+      expect(error_text).to include("path:")
     end
   end
 
@@ -2966,6 +2969,28 @@ describe InstallGenerator, type: :generator do
 
     specify "missing_pro_gem? returns false without checking gem" do
       expect(install_generator.send(:missing_pro_gem?)).to be false
+    end
+  end
+
+  context "when force-checking Pro gem without pro-related flags" do
+    let(:install_generator) { described_class.new([], { pro: false, rsc: false, rsc_pro: false }) }
+    let(:fake_pid) { 12_345 }
+
+    before do
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+      allow(install_generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: false))
+    end
+
+    specify "missing_pro_gem?(force: true) uses generic context messaging" do
+      expect(install_generator.send(:missing_pro_gem?, force: true)).to be true
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("This generator requires the react_on_rails_pro gem.")
+      expect(error_text).not_to include("You specified")
     end
   end
 
