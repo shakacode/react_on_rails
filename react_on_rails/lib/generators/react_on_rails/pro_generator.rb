@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "rails/generators"
+require "tempfile"
+require "fileutils"
 require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
@@ -138,7 +140,7 @@ module ReactOnRails
           return
         end
 
-        File.write(gemfile_path, updated_content)
+        atomic_write_file(gemfile_path, updated_content)
         say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
         bundle_install_after_gem_swap
       rescue StandardError => e
@@ -146,15 +148,25 @@ module ReactOnRails
       end
       # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
+      def atomic_write_file(path, content)
+        Tempfile.create([File.basename(path), ".tmp"], File.dirname(path)) do |temp_file|
+          temp_file.write(content)
+          temp_file.flush
+          temp_file.fsync
+          temp_file.close
+          FileUtils.mv(temp_file.path, path)
+        end
+      end
+
       def bundle_install_after_gem_swap
         if options[:pretend]
           say_status :pretend, "Skipping bundle install in --pretend mode", :yellow
           return
         end
 
+        gemfile_path = File.join(destination_root, "Gemfile")
         say "📦 Running bundle install after Gemfile update...", :yellow
         install_status = Bundler.with_unbundled_env do
-          gemfile_path = File.join(destination_root, "Gemfile")
           pid = Process.spawn(
             { "BUNDLE_GEMFILE" => gemfile_path },
             "bundle",
@@ -275,7 +287,7 @@ module ReactOnRails
 
       def gem_declaration_continues_on_next_line?(line)
         stripped = line.lstrip
-        return false if stripped.empty?
+        return true if stripped.empty?
 
         !stripped.match?(/\Agem(?:\s|\()/)
       end
@@ -359,7 +371,12 @@ module ReactOnRails
       end
 
       def import_call_closes_on_line?(line)
-        line.include?(")")
+        line_without_strings = line.gsub(
+          /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/,
+          ""
+        )
+        line_without_comments = line_without_strings.sub(%r{//.*$}, "")
+        line_without_comments.include?(")")
       end
 
       def print_success_message

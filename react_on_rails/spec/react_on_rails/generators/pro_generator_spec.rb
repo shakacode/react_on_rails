@@ -169,6 +169,25 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).not_to include("~> 16.0")
     end
 
+    it "consumes multiline declarations when blank lines appear before continuation lines" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails",
+
+          "~> 16.0"
+        gem "rails"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).to include("gem \"rails\"")
+      expect(gemfile_content).not_to include("~> 16.0")
+    end
+
     it "does not consume the next gem line when base declaration ends with a trailing comma" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -267,8 +286,7 @@ describe ProGenerator, type: :generator do
         source "https://rubygems.org"
         gem "react_on_rails", "~> 16.0"
       RUBY
-      allow(File).to receive(:write).and_call_original
-      allow(File).to receive(:write).with(gemfile_path, anything).and_raise(Errno::EACCES)
+      allow(generator).to receive(:atomic_write_file).and_raise(Errno::EACCES)
       allow(generator).to receive(:bundle_install_after_gem_swap)
 
       generator.send(:swap_base_gem_for_pro_in_gemfile)
@@ -438,6 +456,19 @@ describe ProGenerator, type: :generator do
       pretend_generator.send(:update_imports_to_pro_package)
 
       expect(File.read(application_js_path)).to eq(original_content)
+    end
+
+    it "keeps multiline dynamic import tracking active when comments contain unrelated closing parentheses" do
+      source = <<~JS
+        const lazyRor = import(
+          /* webpackMode: "lazy" */ // some(comment)
+          "react-on-rails/client"
+        );
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('"react-on-rails-pro/client"')
     end
   end
 
