@@ -60,12 +60,7 @@ module ReactOnRails
         return false if pro_gem_installed?
         return false if attempt_pro_gem_auto_install
 
-        context_line = if options.key?(:pro) || options.key?(:rsc)
-                         flag = options[:rsc] ? "--rsc" : "--pro"
-                         "You specified #{flag}, which requires the react_on_rails_pro gem."
-                       else
-                         "This generator requires the react_on_rails_pro gem."
-                       end
+        context_line = pro_gem_requirement_context_line
 
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
@@ -85,6 +80,23 @@ module ReactOnRails
       end
 
       private
+
+      def pro_gem_requirement_context_line
+        return "This generator requires the react_on_rails_pro gem." unless pro_flag_specified_for_context?
+
+        "You specified #{pro_requirement_flag}, which requires the react_on_rails_pro gem."
+      end
+
+      def pro_flag_specified_for_context?
+        options.key?(:pro) || options.key?(:rsc) || options.key?(:rsc_pro)
+      end
+
+      def pro_requirement_flag
+        return "--rsc-pro" if respond_to?(:use_rsc_pro_mode?) && use_rsc_pro_mode?
+        return "--rsc" if options[:rsc]
+
+        "--pro"
+      end
 
       # Attempt to auto-install the Pro gem via bundle add.
       # Uses Process.spawn instead of Timeout.timeout to avoid Thread#raise corrupting
@@ -459,7 +471,12 @@ module ReactOnRails
       end
 
       def pro_gem_auto_install_command
-        "bundle add #{PRO_GEM_NAME} --version='~> #{recommended_pro_gem_version}' --strict"
+        version_requirement = if respond_to?(:use_rsc_pro_mode?) && use_rsc_pro_mode?
+                                recommended_pro_gem_version
+                              else
+                                "~> #{recommended_pro_gem_version}"
+                              end
+        "bundle add #{PRO_GEM_NAME} --version='#{version_requirement}' --strict"
       end
 
       # Keep manual fallback pinned to the latest stable release (drop pre-release suffixes like .rc.N).

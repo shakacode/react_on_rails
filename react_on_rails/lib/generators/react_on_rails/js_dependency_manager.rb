@@ -383,13 +383,24 @@ module ReactOnRails
 
       def add_rsc_dependencies
         say "Installing React Server Components dependencies..."
-        return if add_packages(RSC_DEPENDENCIES)
+        rsc_packages = rsc_packages_with_version
+        return if add_packages(rsc_packages)
+
+        manual_install_packages = rsc_packages
+        if rsc_packages != RSC_DEPENDENCIES
+          say_status :warning,
+                     "Could not install version-pinned RSC dependency. Retrying latest available package.",
+                     :yellow
+          return if add_packages(RSC_DEPENDENCIES)
+
+          manual_install_packages = RSC_DEPENDENCIES
+        end
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add React Server Components dependencies.
 
           You can install them manually by running:
-            npm install #{RSC_DEPENDENCIES.join(' ')}
+            npm install #{manual_install_packages.join(' ')}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -398,6 +409,16 @@ module ReactOnRails
           You can install them manually by running:
             npm install #{RSC_DEPENDENCIES.join(' ')}
         MSG
+      end
+
+      # Returns RSC package names pinned to the same version as the gem.
+      # Falls back to unversioned package names when version resolution fails.
+      def rsc_packages_with_version
+        npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION)
+        RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }
+      rescue StandardError
+        say_status :warning, "Could not determine RSC package version. Installing latest.", :yellow
+        RSC_DEPENDENCIES
       end
 
       def remove_base_package_if_present

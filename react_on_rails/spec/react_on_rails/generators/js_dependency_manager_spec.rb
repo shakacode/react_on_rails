@@ -58,6 +58,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       attr_writer :using_rspack
 
+      def use_rsc?
+        @use_rsc == true
+      end
+
+      attr_writer :use_rsc
+
       # Test helpers
       attr_writer :add_npm_dependencies_result
 
@@ -505,6 +511,46 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(warnings.size).to be > 0
       expect(warnings.first.to_s).to include("Failed to add TypeScript dependencies")
+    end
+  end
+
+  describe "#rsc_packages_with_version" do
+    it "pins react-on-rails-rsc to the current gem version" do
+      stub_const("ReactOnRails::VERSION", "16.4.0.rc.5")
+      converter = instance_double(ReactOnRails::VersionSyntaxConverter, rubygem_to_npm: "16.4.0-rc.5")
+      allow(ReactOnRails::VersionSyntaxConverter).to receive(:new).and_return(converter)
+
+      expect(instance.send(:rsc_packages_with_version)).to eq(["react-on-rails-rsc@16.4.0-rc.5"])
+    end
+
+    it "falls back to unversioned package when conversion fails" do
+      allow(ReactOnRails::VersionSyntaxConverter).to receive(:new).and_raise(StandardError, "conversion failed")
+
+      expect(instance.send(:rsc_packages_with_version)).to eq(["react-on-rails-rsc"])
+    end
+  end
+
+  describe "#add_rsc_dependencies" do
+    it "installs version-pinned rsc dependency" do
+      allow(instance).to receive(:rsc_packages_with_version).and_return(["react-on-rails-rsc@16.4.0"])
+
+      instance.send(:add_rsc_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(packages: ["react-on-rails-rsc@16.4.0"], dev: false)
+      )
+    end
+
+    it "falls back to unversioned package when pinned install fails" do
+      allow(instance).to receive(:rsc_packages_with_version).and_return(["react-on-rails-rsc@16.4.0"])
+
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@16.4.0"]).and_return(false)
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)
+
+      instance.send(:add_rsc_dependencies)
+
+      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc@16.4.0"])
+      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc"])
     end
   end
 
