@@ -235,6 +235,26 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "replaces multiline parenthesized Gemfile declarations" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem(
+          "react_on_rails",
+          "~> 16.0"
+        )
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).not_to include('"react_on_rails"')
+      expect(gemfile_content).not_to include('"~> 16.0"')
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
     it "removes base gem without adding duplicate react_on_rails_pro entries" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -410,6 +430,8 @@ describe ProGenerator, type: :generator do
         import CustomPackage from "react-on-rails-utils";
         const scoped = "@scope/react-on-rails";
         const url = "https://cdn.example.com/react-on-rails/client.js";
+        const importTemplate = 'import("react-on-rails")';
+        const fromTemplate = "import Example from \\"react-on-rails\\"";
         // import "react-on-rails";
         /*
          * import ReactOnRails from "react-on-rails";
@@ -447,6 +469,10 @@ describe ProGenerator, type: :generator do
       expect(File.read(application_js_path)).to include('import CustomPackage from "react-on-rails-utils";')
       expect(File.read(application_js_path)).to include('const scoped = "@scope/react-on-rails";')
       expect(File.read(application_js_path)).to include('const url = "https://cdn.example.com/react-on-rails/client.js";')
+      expect(File.read(application_js_path)).to include('const importTemplate = \'import("react-on-rails")\';')
+      expect(File.read(application_js_path)).to include(
+        'const fromTemplate = "import Example from \\"react-on-rails\\"";'
+      )
       expect(File.read(application_js_path)).to include('// import "react-on-rails";')
       expect(File.read(application_js_path)).to include('* import ReactOnRails from "react-on-rails";')
       expect(File.read(server_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
@@ -477,6 +503,18 @@ describe ProGenerator, type: :generator do
       rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
 
       expect(rewritten).to include('"react-on-rails-pro/client"')
+    end
+
+    it "keeps multiline module-call tracking active when wrapper parens close later" do
+      source = <<~JS
+        const wrappedLazyRor = someWrapper(import(
+          "react-on-rails"
+        ));
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('"react-on-rails-pro"')
     end
   end
 

@@ -100,6 +100,21 @@ module ReactOnRails
 
         while line_index < gemfile_lines.length
           line = gemfile_lines[line_index]
+          multiline_parenthesized_match = match_multiline_parenthesized_base_gem(gemfile_lines, line_index)
+
+          if multiline_parenthesized_match
+            unless pro_entry_added
+              indentation = multiline_parenthesized_match[:indentation]
+              quote = multiline_parenthesized_match[:quote]
+              updated_lines << "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
+                               "#{quote}~> #{recommended_pro_gem_version}#{quote}\n"
+              pro_entry_added = true
+            end
+
+            line_index = multiline_parenthesized_match[:next_index]
+            next
+          end
+
           match = line.match(base_gem_pattern)
 
           unless match
@@ -256,11 +271,20 @@ module ReactOnRails
       end
 
       def rewrite_react_on_rails_module_specifiers(content)
-        module_specifier_pattern = %r{
+        static_import_specifier_pattern = %r{
           (?<prefix>
-            \bfrom\s+|
-            \bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*|
-            \brequire\s*\(\s*
+            \A\s*(?:/\*.*?\*/\s*)?import(?:\s+type)?\s+.*?\s+from\s+|
+            \A\s*[\w\}\],\*\$\s]+\s+from\s+
+          )
+          (?<quote>["'])
+          react-on-rails(?!-pro)
+          (?=(?:["']|/))
+        }x
+
+        dynamic_or_require_specifier_pattern = %r{
+          (?<prefix>
+            (?<!["'`])\bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*|
+            (?<!["'`])\brequire\s*\(\s*
           )
           (?<quote>["'])
           react-on-rails(?!-pro)
@@ -275,7 +299,11 @@ module ReactOnRails
         }x
 
         rewrite_non_comment_lines(content) do |line|
-          rewritten_line = line.gsub(module_specifier_pattern) do
+          rewritten_line = line.gsub(static_import_specifier_pattern) do
+            "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+          end
+
+          rewritten_line = rewritten_line.gsub(dynamic_or_require_specifier_pattern) do
             "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
           end
 
@@ -320,10 +348,10 @@ module ReactOnRails
         MSG
       end
 
-      # rubocop:disable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def rewrite_non_comment_lines(content)
         in_block_comment = false
-        pending_multiline_module_call = false
+        pending_multiline_module_call_depth = 0
 
         content.lines.map do |line|
           stripped = line.lstrip
@@ -334,12 +362,8 @@ module ReactOnRails
           elsif stripped.start_with?("/*")
             if stripped.include?("*/")
               rewritten_line = yield line
-              if pending_multiline_module_call
-                rewritten_line = rewrite_pending_module_specifier(rewritten_line)
-                pending_multiline_module_call = !module_call_closes_on_line?(rewritten_line)
-              elsif starts_pending_multiline_module_call?(rewritten_line)
-                pending_multiline_module_call = true
-              end
+              rewritten_line, pending_multiline_module_call_depth =
+                update_pending_multiline_module_call_tracking(rewritten_line, pending_multiline_module_call_depth)
               in_block_comment = true if unclosed_block_comment_starts?(line)
               rewritten_line
             else
@@ -350,25 +374,17 @@ module ReactOnRails
             line
           else
             rewritten_line = yield line
-            if pending_multiline_module_call
-              rewritten_line = rewrite_pending_module_specifier(rewritten_line)
-              pending_multiline_module_call = !module_call_closes_on_line?(rewritten_line)
-            elsif starts_pending_multiline_module_call?(rewritten_line)
-              pending_multiline_module_call = true
-            end
+            rewritten_line, pending_multiline_module_call_depth =
+              update_pending_multiline_module_call_tracking(rewritten_line, pending_multiline_module_call_depth)
             in_block_comment = true if unclosed_block_comment_starts?(line)
             rewritten_line
           end
         end.join
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def unclosed_block_comment_starts?(line)
-        line_without_strings = line.gsub(
-          /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/,
-          ""
-        )
-        line_without_inline_comment = line_without_strings.sub(%r{//.*$}, "")
+        line_without_inline_comment = line_without_string_literals_and_inline_comments(line)
         opening_index = line_without_inline_comment.index("/*")
         return false unless opening_index
 
@@ -376,9 +392,10 @@ module ReactOnRails
       end
 
       def starts_pending_multiline_module_call?(line)
-        return false unless line.match?(/\b(?:import|require)\s*\(/)
+        line_without_literals = line_without_string_literals_and_inline_comments(line)
+        return false unless line_without_literals.match?(/(?<![\w$])(?:import|require)\s*\(/)
 
-        !line.match?(%r{\b(?:import|require)\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
+        !line.match?(%r{(?<!["'`])\b(?:import|require)\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
       end
 
       def rewrite_pending_module_specifier(line)
@@ -387,14 +404,79 @@ module ReactOnRails
         end
       end
 
-      def module_call_closes_on_line?(line)
+      def update_pending_multiline_module_call_tracking(line, pending_depth)
+        if pending_depth.positive?
+          rewritten_line = rewrite_pending_module_specifier(line)
+          updated_depth = pending_depth + module_call_parenthesis_delta(rewritten_line)
+          updated_depth = 0 if updated_depth <= 0
+          [rewritten_line, updated_depth]
+        elsif starts_pending_multiline_module_call?(line)
+          initial_depth = module_call_parenthesis_delta(line, from_module_call_start: true)
+          [line, initial_depth.positive? ? initial_depth : 0]
+        else
+          [line, pending_depth]
+        end
+      end
+
+      def module_call_parenthesis_delta(line, from_module_call_start: false)
+        line_without_literals = line_without_string_literals_and_inline_comments(line)
+        line_to_measure = if from_module_call_start
+                            line_without_literals.sub(/\A.*?(?<![\w$])(?:import|require)\s*\(/, "(")
+                          else
+                            line_without_literals
+                          end
+
+        line_to_measure.count("(") - line_to_measure.count(")")
+      end
+
+      def line_without_string_literals_and_inline_comments(line)
         line_without_strings = line.gsub(
           /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/,
           ""
         )
-        line_without_comments = line_without_strings.sub(%r{//.*$}, "")
-        line_without_comments.include?(")")
+        line_without_strings.sub(%r{//.*$}, "")
       end
+
+      # rubocop:disable Metrics/CyclomaticComplexity
+      def match_multiline_parenthesized_base_gem(lines, start_index)
+        start_line = lines[start_index]
+        start_match = start_line.match(/^(\s*)gem\s*\(\s*(?:#.*)?$/)
+        return nil unless start_match
+
+        line_index = start_index + 1
+        found_base_gem_name = false
+        base_gem_quote = nil
+
+        while line_index < lines.length
+          line = lines[line_index]
+
+          if line.include?(")")
+            return nil unless found_base_gem_name
+
+            return { indentation: start_match[1], quote: base_gem_quote, next_index: line_index + 1 }
+          end
+
+          if comment_or_blank_line?(line)
+            line_index += 1
+            next
+          end
+
+          if !found_base_gem_name &&
+             (gem_name_match = line.match(/^\s*(["'])react_on_rails\1(?=\s*(?:,|\)|#|$))/))
+            found_base_gem_name = true
+            base_gem_quote = gem_name_match[1]
+            line_index += 1
+            next
+          end
+
+          return nil unless found_base_gem_name
+
+          line_index += 1
+        end
+
+        nil
+      end
+      # rubocop:enable Metrics/CyclomaticComplexity
 
       def print_success_message
         route = if File.exist?(File.join(destination_root, "app/controllers/hello_server_controller.rb"))
