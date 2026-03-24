@@ -718,7 +718,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:file?).with("config/custom/custom-bundler.config.js").and_return(true)
         allow(checker).to receive(:shakapacker_assets_bundler_config_path)
           .and_return("config/custom/custom-bundler.config.js")
-        allow(checker).to receive(:shakapacker_webpack_config_directory)
+        allow(checker).to receive(:bundler_config_directory)
           .with("config/custom/custom-bundler.config.js")
           .and_return("config/custom")
 
@@ -729,7 +729,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:file?).with("config/custom/missing.config.js").and_return(false)
         allow(File).to receive(:file?).with("config/custom/webpack.config.js").and_return(true)
         allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom/missing.config.js")
-        allow(checker).to receive(:shakapacker_webpack_config_directory)
+        allow(checker).to receive(:bundler_config_directory)
           .with("config/custom/missing.config.js")
           .and_return("config/custom")
 
@@ -782,7 +782,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:file?).with("config/custom/webpack.config.js").and_return(true)
         allow(File).to receive(:file?).with("config/custom/rspack.config.js").and_return(true)
         allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom/missing.config.js")
-        allow(checker).to receive(:shakapacker_webpack_config_directory)
+        allow(checker).to receive(:bundler_config_directory)
           .with("config/custom/missing.config.js")
           .and_return("config/custom")
         allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
@@ -807,7 +807,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:file?).with("config/custom/custom-bundler.config.js").and_return(true)
         allow(checker).to receive(:shakapacker_assets_bundler_config_path)
           .and_return("config/custom/custom-bundler.config.js")
-        allow(checker).to receive(:shakapacker_webpack_config_directory)
+        allow(checker).to receive(:bundler_config_directory)
           .with("config/custom/custom-bundler.config.js")
           .and_return("config/custom")
 
@@ -820,7 +820,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
         allow(File).to receive(:file?).with("config/webpack/webpack.config.js").and_return(false)
         allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/rspack/rspack.config.js")
-        allow(checker).to receive(:shakapacker_webpack_config_directory)
+        allow(checker).to receive(:bundler_config_directory)
           .with("config/rspack/rspack.config.js")
           .and_return("config/rspack")
 
@@ -831,7 +831,7 @@ RSpec.describe ReactOnRails::SystemChecker do
       it "ignores directory-valued custom assets_bundler_config_path entries" do
         allow(File).to receive(:file?).with("config/custom").and_return(false)
         allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom")
-        allow(checker).to receive(:shakapacker_webpack_config_directory)
+        allow(checker).to receive(:bundler_config_directory)
           .with("config/custom")
           .and_return("config/custom")
 
