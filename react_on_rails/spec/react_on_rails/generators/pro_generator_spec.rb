@@ -288,6 +288,29 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "preserves options and guards in multiline parenthesized Gemfile declarations" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem(
+          "react_on_rails",
+          "~> 16.0",
+          require: false,
+          if: ENV["ENABLE_ROR"]
+        )
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\",")
+      expect(gemfile_content).to include("require: false,")
+      expect(gemfile_content).to include('if: ENV["ENABLE_ROR"]')
+      expect(gemfile_content).not_to include('"react_on_rails"')
+      expect(gemfile_content).not_to include('"~> 16.0"')
+    end
+
     it "handles comments containing closing parentheses inside multiline parenthesized declarations" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -308,6 +331,27 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).not_to include("gem(")
     end
 
+    it "handles inline Ruby comments containing parentheses in multiline parenthesized declarations" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem(
+          "react_on_rails",
+          "~> 16.0", # pinned :)
+          require: false
+        )
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      expect { generator.send(:swap_base_gem_for_pro_in_gemfile) }.not_to raise_error
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\",")
+      expect(gemfile_content).to include("require: false")
+      expect(gemfile_content).not_to include("gem(")
+      expect(gemfile_content).not_to include('"~> 16.0"')
+    end
+
     it "handles nested parentheses in multiline parenthesized Gemfile options" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -325,8 +369,9 @@ describe ProGenerator, type: :generator do
       expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
       expect(gemfile_content).not_to include('"react_on_rails"')
-      expect(gemfile_content).not_to include('if: ENV.fetch("ENABLE_ROR") { true }')
+      expect(gemfile_content).to include('if: ENV.fetch("ENABLE_ROR") { true }')
       expect(gemfile_content).not_to include("gem(")
+      expect(gemfile_content).not_to include('"~> 16.0"')
     end
 
     it "removes base gem without adding duplicate react_on_rails_pro entries" do
@@ -627,6 +672,23 @@ describe ProGenerator, type: :generator do
       rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
 
       expect(rewritten).to include('"react-on-rails-pro";')
+    end
+
+    it "does not rewrite imports inside multiline template literals" do
+      source = <<~JS
+        const importTemplate = `
+          import ReactOnRails from "react-on-rails";
+          const packageName = "react-on-rails/client";
+        `;
+        import ReactOnRails from "react-on-rails";
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('import ReactOnRails from "react-on-rails";')
+      expect(rewritten).to include('const packageName = "react-on-rails/client";')
+      expect(rewritten).to include("import ReactOnRails from \"react-on-rails-pro\";")
+      expect(rewritten.scan("react-on-rails-pro").size).to eq(1)
     end
 
     it "detects unclosed block comments when multiple block markers appear on one line" do

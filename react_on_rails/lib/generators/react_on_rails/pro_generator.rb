@@ -362,13 +362,19 @@ module ReactOnRails
       # rubocop:disable Metrics/PerceivedComplexity, Style/ExplicitBlockArgument
       def rewrite_non_comment_lines(content)
         in_block_comment = false
+        in_multiline_template_literal = false
         pending_multiline_module_call_depth = 0
         pending_multiline_static_import_specifier = false
 
         content.lines.map do |line|
           stripped = line.lstrip
+          line_contains_unescaped_backtick = line_has_unescaped_backtick?(line)
 
-          if in_block_comment
+          if in_multiline_template_literal || line_contains_unescaped_backtick
+            in_multiline_template_literal =
+              update_multiline_template_literal_state(in_multiline_template_literal, line)
+            line
+          elsif in_block_comment
             if stripped.include?("*/")
               in_block_comment = false
               rewritten_line, pending_multiline_module_call_depth, pending_multiline_static_import_specifier =
@@ -503,12 +509,28 @@ module ReactOnRails
         line_to_measure.count("(") - line_to_measure.count(")")
       end
 
-      def line_without_string_literals_and_inline_comments(line)
+      def line_without_string_literals_and_inline_comments(line, strip_ruby_comments: false)
         line_without_strings = line.gsub(
           /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/,
           ""
         )
-        line_without_strings.sub(%r{//.*$}, "")
+        line_without_comments = line_without_strings.sub(%r{//.*$}, "")
+        return line_without_comments unless strip_ruby_comments
+
+        line_without_comments.sub(/\s*#.*$/, "")
+      end
+
+      def line_has_unescaped_backtick?(line)
+        update_multiline_template_literal_state(false, line)
+      end
+
+      def update_multiline_template_literal_state(in_multiline_template_literal, line)
+        backticks = line.each_char.with_index.count do |char, index|
+          char == "`" && (index.zero? || line[index - 1] != "\\")
+        end
+        return in_multiline_template_literal if backticks.even?
+
+        !in_multiline_template_literal
       end
 
       def rewrite_line_after_block_comment_close(line, pending_depth, pending_multiline_static_import_specifier)
@@ -526,7 +548,7 @@ module ReactOnRails
         ["#{comment_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
-      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
       def match_multiline_parenthesized_base_gem(lines, start_index)
         start_line = lines[start_index]
         start_match = start_line.match(/^(\s*)gem\s*\(\s*(?:#.*)?$/)
@@ -535,12 +557,14 @@ module ReactOnRails
         line_index = start_index + 1
         found_base_gem_name = false
         base_gem_quote = nil
+        gem_name_line_index = nil
+        gem_name_match_end = nil
         paren_depth = 1
 
         while line_index < lines.length
           line = lines[line_index]
           line_without_comment = line.sub(/\s*#.*$/, "")
-          line_without_literals = line_without_string_literals_and_inline_comments(line)
+          line_without_literals = line_without_string_literals_and_inline_comments(line, strip_ruby_comments: true)
 
           if comment_or_blank_line?(line)
             line_index += 1
@@ -553,13 +577,16 @@ module ReactOnRails
             return nil unless found_base_gem_name
 
             closing_index = line_without_comment.rindex(")")
-            trailing_suffix = line[(closing_index + 1)..]
-            trailing_suffix = "\n" if trailing_suffix.nil? || trailing_suffix.empty?
+            return nil unless closing_index
+
+            declaration_fragment = lines[gem_name_line_index..line_index].join
+            suffix = declaration_fragment[gem_name_match_end..]
+            suffix = "\n" if suffix.nil? || suffix.empty?
             return {
               indentation: start_match[1],
               quote: base_gem_quote,
               next_index: line_index + 1,
-              trailing_suffix: trailing_suffix
+              trailing_suffix: suffix
             }
           end
 
@@ -567,6 +594,8 @@ module ReactOnRails
              (gem_name_match = line.match(/^\s*(["'])react_on_rails\1(?=\s*(?:,|\)|#|$))/))
             found_base_gem_name = true
             base_gem_quote = gem_name_match[1]
+            gem_name_line_index = line_index
+            gem_name_match_end = gem_name_match.end(0)
             line_index += 1
             next
           end
@@ -578,12 +607,17 @@ module ReactOnRails
 
         nil
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
       def build_pro_gem_replacement_line(indentation:, quote:, suffix:, parenthesized_gem_call: false)
         normalized_suffix = suffix || "\n"
         normalized_suffix = "#{normalized_suffix}\n" unless normalized_suffix.end_with?("\n")
-        normalized_suffix = normalized_suffix.sub(/\A\s*,\s*["'][^"']*["']/, "")
+        normalized_suffix = normalized_suffix.sub(
+          /\A(?<prefix>\s*,(?:\s*#.*\n|\s+)*)["'][^"']*["'](?<trailing_comma>\s*,)?/
+        ) do
+          Regexp.last_match[:trailing_comma] ? Regexp.last_match[:prefix] : ""
+        end
+        normalized_suffix = normalized_suffix.sub(/\A,[ \t]{2,}/, ", ")
         normalized_suffix = normalized_suffix.sub(/\)(\s*(?:#.*)?\n)\z/, '\1') if parenthesized_gem_call
 
         "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
