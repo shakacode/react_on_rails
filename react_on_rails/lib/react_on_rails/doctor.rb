@@ -53,9 +53,6 @@ module ReactOnRails
     MINITEST_HELPER_FILE = "test/test_helper.rb"
     DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
-    DEFAULT_SERVER_RENDERER_POOL_SIZE = 1
-    DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS = 20
-    DEFAULT_COMPONENT_REGISTRY_TIMEOUT_MS = 5000
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose
@@ -866,7 +863,7 @@ module ReactOnRails
       if runtime_config
         # Default is 1; only report explicit non-default override.
         checker.add_info("  server_renderer_pool_size: #{runtime_config.server_renderer_pool_size}") \
-          if runtime_config.server_renderer_pool_size != DEFAULT_SERVER_RENDERER_POOL_SIZE
+          if runtime_config.server_renderer_pool_size != ReactOnRails::DEFAULT_SERVER_RENDERER_POOL_SIZE
       else
         pool_size_match = content.match(/config\.server_renderer_pool_size\s*=\s*([^\s\n,]+)/)
         checker.add_info("  server_renderer_pool_size: #{pool_size_match[1]}") if pool_size_match
@@ -875,7 +872,7 @@ module ReactOnRails
       if runtime_config
         # Default is 20 seconds; only report explicit non-default override.
         checker.add_info("  server_renderer_timeout: #{runtime_config.server_renderer_timeout} seconds") \
-          if runtime_config.server_renderer_timeout != DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS
+          if runtime_config.server_renderer_timeout != ReactOnRails::DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS
       else
         timeout_match = content.match(/config\.server_renderer_timeout\s*=\s*([^\s\n,]+)/)
         checker.add_info("  server_renderer_timeout: #{timeout_match[1]} seconds") if timeout_match
@@ -927,7 +924,7 @@ module ReactOnRails
 
       # Auto load bundle
       if runtime_config
-        checker.add_info("  auto_load_bundle: #{runtime_config.auto_load_bundle}")
+        checker.add_info("  auto_load_bundle: true") if runtime_config.auto_load_bundle
       else
         auto_load_match = content.match(/config\.auto_load_bundle\s*=\s*([^\s\n,]+)/)
         checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
@@ -945,7 +942,7 @@ module ReactOnRails
       if runtime_config
         # Default is 5000 ms; only report explicit non-default override.
         checker.add_info("  component_registry_timeout: #{runtime_config.component_registry_timeout}ms") \
-          if runtime_config.component_registry_timeout != DEFAULT_COMPONENT_REGISTRY_TIMEOUT_MS
+          if runtime_config.component_registry_timeout != ReactOnRails::DEFAULT_COMPONENT_REGISTRY_TIMEOUT
       else
         timeout_match = content.match(/config\.component_registry_timeout\s*=\s*([^\s\n,]+)/)
         checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms") if timeout_match
@@ -958,10 +955,13 @@ module ReactOnRails
       checker.add_info("\n🔧 Development & Debugging:")
 
       if runtime_config
-        checker.add_info("  development_mode: #{runtime_config.development_mode}")
-        checker.add_info("  trace: #{runtime_config.trace}")
-        checker.add_info("  logging_on_server: #{runtime_config.logging_on_server}")
-        checker.add_info("  replay_console: #{runtime_config.replay_console}")
+        # Defaults are environment-sensitive for development_mode/trace and static for logging/replay.
+        checker.add_info("  development_mode: #{runtime_config.development_mode}") \
+          if runtime_config.development_mode != Rails.env.development?
+        checker.add_info("  trace: #{runtime_config.trace}") \
+          if runtime_config.trace != Rails.env.development?
+        checker.add_info("  logging_on_server: false") unless runtime_config.logging_on_server
+        checker.add_info("  replay_console: false") unless runtime_config.replay_console
         if runtime_config.build_test_command.present?
           checker.add_info("  build_test_command: #{runtime_config.build_test_command}")
         end
@@ -1328,6 +1328,7 @@ module ReactOnRails
       runtime_config = react_on_rails_runtime_configuration
       if runtime_config
         configured_value = runtime_config.server_bundle_js_file
+        # A blank runtime value intentionally disables SSR bundle checks; only nil falls back.
         return configured_value unless configured_value.nil?
       end
 

@@ -192,6 +192,34 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).not_to include(a_string_including("component_registry_timeout"))
     end
 
+    it "omits auto_load_bundle when runtime value is the default" do
+      allow(runtime_config).to receive(:auto_load_bundle).and_return(false)
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).not_to include(a_string_including("auto_load_bundle"))
+    end
+
+    it "omits development/debugging runtime values when they match defaults" do
+      allow(runtime_config).to receive_messages(
+        development_mode: Rails.env.development?,
+        trace: Rails.env.development?,
+        logging_on_server: true,
+        replay_console: true
+      )
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).not_to include(a_string_including("development_mode"))
+      expect(info_messages).not_to include(a_string_including("trace"))
+      expect(info_messages).not_to include(a_string_including("logging_on_server"))
+      expect(info_messages).not_to include(a_string_including("replay_console"))
+    end
+
     it "omits enforce_private_server_bundles when runtime value is the default" do
       allow(runtime_config).to receive(:enforce_private_server_bundles).and_return(false)
       allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
