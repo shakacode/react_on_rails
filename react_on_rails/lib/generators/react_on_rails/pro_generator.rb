@@ -8,6 +8,7 @@ require_relative "pro_setup"
 
 module ReactOnRails
   module Generators
+    # rubocop:disable Metrics/ClassLength
     class ProGenerator < Rails::Generators::Base
       include GeneratorHelper
       include JsDependencyManager
@@ -77,23 +78,45 @@ module ReactOnRails
         say "✅ Pro npm dependencies added", :green
       end
 
+      # rubocop:disable Metrics/AbcSize
       def swap_base_gem_for_pro_in_gemfile
         gemfile_path = File.join(destination_root, "Gemfile")
         return unless File.exist?(gemfile_path)
 
         gemfile_content = File.read(gemfile_path)
         pro_gem_pattern = /^\s*gem\s+["']react_on_rails_pro["']/
-        base_gem_pattern = /^(\s*)gem\s+["']react_on_rails["'][^\n]*$/
+        base_gem_pattern = /^(\s*)gem\s+(["'])react_on_rails\2(?=\s*(?:,|$))/
 
         has_pro_gem_entry = gemfile_content.match?(pro_gem_pattern)
-        updated_lines = gemfile_content.lines.filter_map do |line|
-          match = line.match(base_gem_pattern)
-          next line unless match
+        gemfile_lines = gemfile_content.lines
+        updated_lines = []
+        pro_entry_added = has_pro_gem_entry
+        line_index = 0
 
-          if has_pro_gem_entry
-            nil
-          else
-            "#{match[1]}gem 'react_on_rails_pro', '~> #{recommended_pro_gem_version}'\n"
+        while line_index < gemfile_lines.length
+          line = gemfile_lines[line_index]
+          match = line.match(base_gem_pattern)
+
+          unless match
+            updated_lines << line
+            line_index += 1
+            next
+          end
+
+          unless pro_entry_added
+            indentation = match[1]
+            quote = match[2]
+            updated_lines << "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
+                             "#{quote}~> #{recommended_pro_gem_version}#{quote}\n"
+            pro_entry_added = true
+          end
+
+          # Consume multiline gem declarations that continue with trailing commas.
+          line_index += 1
+          current_line = line
+          while line_index < gemfile_lines.length && current_line.rstrip.end_with?(",")
+            current_line = gemfile_lines[line_index]
+            line_index += 1
           end
         end
 
@@ -104,14 +127,28 @@ module ReactOnRails
         say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
         bundle_install_after_gem_swap
       end
+      # rubocop:enable Metrics/AbcSize
 
       def bundle_install_after_gem_swap
         say "📦 Running bundle install after Gemfile update...", :yellow
-        install_succeeded = Dir.chdir(destination_root) do
-          Bundler.with_unbundled_env { system("bundle install") }
+        install_status = Dir.chdir(destination_root) do
+          Bundler.with_unbundled_env do
+            pid = Process.spawn("bundle install", out: $stdout, err: $stderr)
+            wait_for_bundle_process(pid)
+          end
         end
 
-        return if install_succeeded
+        return if install_status&.success?
+
+        if install_status.nil?
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  Automatic bundle install timed out after #{ProSetup::AUTO_INSTALL_TIMEOUT} seconds.
+
+            Please run manually:
+              bundle install
+          MSG
+          return
+        end
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Automatic bundle install failed after swapping Gemfile entries.
@@ -132,7 +169,7 @@ module ReactOnRails
         files = js_files_for_import_update
         updated_files = files.count do |file|
           content = File.read(file)
-          updated_content = content.gsub(%r{react-on-rails(?!-pro)(?=['"/])}, "react-on-rails-pro")
+          updated_content = rewrite_react_on_rails_module_specifiers(content)
           next false if updated_content == content
 
           File.write(file, updated_content)
@@ -146,11 +183,29 @@ module ReactOnRails
 
       def js_files_for_import_update
         js_extensions = %w[js jsx ts tsx mjs cjs].join(",")
-        %w[app/javascript client].flat_map do |root|
+        %w[app/javascript app/frontend frontend javascript client].flat_map do |root|
           root_path = File.join(destination_root, root)
           next [] unless Dir.exist?(root_path)
 
           Dir.glob(File.join(root_path, "**", "*.{#{js_extensions}}"))
+        end.uniq
+      end
+
+      def rewrite_react_on_rails_module_specifiers(content)
+        module_specifier_pattern = %r{
+          (?<prefix>
+            \bfrom\s+|
+            \bimport\s*\(\s*|
+            \brequire\s*\(\s*|
+            \bimport\s+
+          )
+          (?<quote>["'])
+          react-on-rails(?!-pro)
+          (?=(?:["']|/))
+        }x
+
+        content.gsub(module_specifier_pattern) do
+          "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
         end
       end
 
@@ -172,5 +227,6 @@ module ReactOnRails
         MSG
       end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

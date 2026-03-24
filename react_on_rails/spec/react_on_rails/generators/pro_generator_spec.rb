@@ -75,7 +75,7 @@ describe ProGenerator, type: :generator do
 
       gemfile_content = File.read(gemfile_path)
       expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
-      expect(gemfile_content).to include("gem 'react_on_rails_pro', '~> #{expected_version}'")
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
       expect(gemfile_content).not_to match(/gem\s+["']react_on_rails["']/)
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
@@ -94,7 +94,40 @@ describe ProGenerator, type: :generator do
 
       gemfile_content = File.read(gemfile_path)
       expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
-      expect(gemfile_content).to include("  gem 'react_on_rails_pro', '~> #{expected_version}'")
+      expect(gemfile_content).to include("  gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
+    it "replaces multiline react_on_rails declaration without leaving orphan lines" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails",
+          "~> 16.0"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"~> #{expected_version}\"")
+      expect(gemfile_content).not_to include("gem \"react_on_rails\",")
+      expect(gemfile_content).not_to include("  \"~> 16.0\"")
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
+    it "preserves single quote style when replacing single-quoted Gemfile entries" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem 'react_on_rails', '~> 16.0'
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = Gem::Version.new(ReactOnRails::VERSION).release.to_s
+      expect(gemfile_content).to include("gem 'react_on_rails_pro', '~> #{expected_version}'")
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
@@ -129,10 +162,36 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  describe "#bundle_install_after_gem_swap" do
+    let(:generator) { described_class.new }
+    let(:fake_pid) { 23_456 }
+
+    before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
+      GeneratorMessages.clear
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+    end
+
+    it "uses bounded process waiting and warns on timeout" do
+      allow(generator).to receive(:wait_for_bundle_process).with(fake_pid).and_return(nil)
+
+      generator.send(:bundle_install_after_gem_swap)
+
+      expect(Process).to have_received(:spawn).with("bundle install", out: $stdout, err: $stderr)
+      expect(generator).to have_received(:wait_for_bundle_process).with(fake_pid)
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("timed out")
+      expect(warning_text).to include("bundle install")
+    end
+  end
+
   describe "#update_imports_to_pro_package" do
     let(:generator) { described_class.new }
     let(:application_js_path) { File.join(destination_root, "app/javascript/packs/application.js") }
     let(:server_js_path) { File.join(destination_root, "client/server.js") }
+    let(:frontend_js_path) { File.join(destination_root, "app/frontend/entrypoints/client.ts") }
 
     before do
       prepare_destination
@@ -141,9 +200,13 @@ describe ProGenerator, type: :generator do
         import ReactOnRails from "react-on-rails";
         const ror = require("react-on-rails");
         import ReactOnRailsClient from "react-on-rails/client";
+        import "react-on-rails";
         import CustomPackage from "react-on-rails-utils";
+        const scoped = "@scope/react-on-rails";
+        const url = "https://cdn.example.com/react-on-rails/client.js";
       JS
       simulate_existing_file("client/server.js", "import ReactOnRails from \"react-on-rails-pro\";\n")
+      simulate_existing_file("app/frontend/entrypoints/client.ts", "import ReactOnRails from \"react-on-rails\";\n")
     end
 
     it "updates react-on-rails imports and requires to react-on-rails-pro" do
@@ -152,8 +215,12 @@ describe ProGenerator, type: :generator do
       expect(File.read(application_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
       expect(File.read(application_js_path)).to include('require("react-on-rails-pro")')
       expect(File.read(application_js_path)).to include('import ReactOnRailsClient from "react-on-rails-pro/client";')
+      expect(File.read(application_js_path)).to include('import "react-on-rails-pro";')
       expect(File.read(application_js_path)).to include('import CustomPackage from "react-on-rails-utils";')
+      expect(File.read(application_js_path)).to include('const scoped = "@scope/react-on-rails";')
+      expect(File.read(application_js_path)).to include('const url = "https://cdn.example.com/react-on-rails/client.js";')
       expect(File.read(server_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
+      expect(File.read(frontend_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
     end
   end
 
