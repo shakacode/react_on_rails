@@ -10,8 +10,8 @@ Before running the generator, verify your environment:
 
 | Requirement              | Check command                                                        | Expected                          |
 | ------------------------ | -------------------------------------------------------------------- | --------------------------------- |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                     | v4.0.0+                           |
-| React on Rails gem       | `bundle show react_on_rails`                                         | v16.0.0+                          |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                     | v16.4.0+                          |
+| React on Rails gem       | `bundle show react_on_rails`                                         | v16.4.0+                          |
 | React on Rails Pro npm   | `pnpm list react-on-rails-pro`                                       | Matches gem version               |
 | React version            | `pnpm list react`                                                    | 19.0.x (19.1.x not yet supported) |
 | React DOM version        | `pnpm list react-dom`                                                | Must match `react` version        |
@@ -39,13 +39,14 @@ The generator is idempotent -- safe to run multiple times.
 
 ### What the Generator Creates
 
-| File                                                           | Purpose                                      |
-| -------------------------------------------------------------- | -------------------------------------------- |
-| `config/webpack/rscWebpackConfig.js`                           | RSC webpack bundle configuration             |
-| `client/app/components/HelloServer.jsx` (or `.tsx`)            | Example Server Component                     |
-| `client/app/components/HelloServer/LikeButton.jsx` (or `.tsx`) | Example Client Component used by HelloServer |
-| `app/controllers/hello_server_controller.rb`                   | Controller for the example RSC page          |
-| `app/views/hello_server/index.html.erb`                        | View for the example RSC page                |
+| File                                                                        | Purpose                                      |
+| --------------------------------------------------------------------------- | -------------------------------------------- |
+| `config/webpack/rscWebpackConfig.js`                                        | RSC webpack bundle configuration             |
+| `app/javascript/src/HelloServer/ror_components/HelloServer.jsx` (or `.tsx`) | React on Rails registration entry-point      |
+| `app/javascript/src/HelloServer/components/HelloServer.jsx` (or `.tsx`)     | Example Server Component                     |
+| `app/javascript/src/HelloServer/components/LikeButton.jsx` (or `.tsx`)      | Example Client Component used by HelloServer |
+| `app/controllers/hello_server_controller.rb`                                | Controller for the example RSC page          |
+| `app/views/hello_server/index.html.erb`                                     | View for the example RSC page                |
 
 ### What the Generator Modifies
 
@@ -63,9 +64,9 @@ The generator is idempotent -- safe to run multiple times.
 
 The generator automatically handles both webpack export shapes used across Pro app versions. No manual action is needed, but understanding the difference helps with troubleshooting.
 
-### Current Export Shape (Pro 4+)
+### Current Export Shape (v16.4.0+)
 
-Apps generated with React on Rails Pro 4+ export an object from `serverWebpackConfig.js`:
+Apps generated with React on Rails Pro v16.4.0+ export an object from `serverWebpackConfig.js`:
 
 ```js
 // config/webpack/serverWebpackConfig.js
@@ -81,7 +82,7 @@ And `ServerClientOrBoth.js` destructures the import:
 const { default: serverWebpackConfig } = require('./serverWebpackConfig');
 ```
 
-### Legacy Export Shape (Pre-Pro 4)
+### Legacy Export Shape (pre-v16.4.0)
 
 Older apps or apps upgraded from OSS export a plain function:
 
