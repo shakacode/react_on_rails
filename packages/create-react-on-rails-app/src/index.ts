@@ -113,6 +113,7 @@ Examples:
   $ npx create-react-on-rails-app my-app --rspack
   $ npx create-react-on-rails-app my-app --pro
   $ npx create-react-on-rails-app my-app --rsc
+  $ npx create-react-on-rails-app my-app --rspack --pro
   $ npx create-react-on-rails-app my-app --rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
