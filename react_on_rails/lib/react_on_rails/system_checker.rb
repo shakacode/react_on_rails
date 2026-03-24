@@ -324,6 +324,7 @@ module ReactOnRails
     def detect_bundler_config_path
       resolved_config_path = resolved_webpack_config_path
       return nil unless resolved_config_path
+      return resolved_config_path if explicit_shakapacker_bundler_config_path?(resolved_config_path)
       return resolved_config_path unless default_bundler_config_path?(resolved_config_path)
 
       resolve_default_bundler_config_path(resolved_config_path)
@@ -538,6 +539,11 @@ module ReactOnRails
 
     def default_bundler_config_path?(path)
       WEBPACK_CONFIG_CANDIDATE_PATHS.include?(path) || RSPACK_CONFIG_CANDIDATE_PATHS.include?(path)
+    end
+
+    def explicit_shakapacker_bundler_config_path?(resolved_config_path)
+      shakapacker_path = shakapacker_assets_bundler_config_path
+      shakapacker_path.present? && shakapacker_path == resolved_config_path && File.file?(shakapacker_path)
     end
 
     def configured_assets_bundler
