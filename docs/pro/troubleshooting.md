@@ -37,7 +37,8 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 - Profile memory using `node --inspect` and heap snapshots (see [Profiling guide](./profiling-server-side-rendering-code.md))
 - Search your server bundle code for module-level `Map`, `Set`, `{}` caches, and `_.memoize` calls — these are the most common leak sources
-- See the [Memory Leaks guide](./js-memory-leaks.md) for detailed patterns and fixes
+- Use `config.ssr_pre_hook_js` to run cleanup code before each render (e.g., clearing global state)
+- See the [Memory Leaks guide](./js-memory-leaks.md) for detailed patterns, an audit checklist, and fixes
 
 ### Workers killed during streaming
 

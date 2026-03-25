@@ -8,10 +8,12 @@ The Node Renderer reuses [V8 VM contexts](https://nodejs.org/api/vm.html) across
 
 This means **module-level state persists across all requests** for the lifetime of the worker process. Code that works fine in the browser — where each page navigation creates a fresh JavaScript context — can silently leak memory on the server.
 
-```
+```text
 Browser:  page load → JS context created → user navigates → context destroyed ✓
 Node SSR: worker starts → JS context created → request 1, 2, 3, ... 10,000 → same context ✗
 ```
+
+> **Migrating from ExecJS?** ExecJS creates a fresh JavaScript context per render, so module-level state is automatically cleared. When you switch to the Node Renderer, code that "worked fine" before may start leaking because the same context is now reused across requests.
 
 ## Common Leak Patterns
 
@@ -81,12 +83,34 @@ export function trackEvent(event, railsContext) {
 ### 4. Third-party libraries with internal caches
 
 Some libraries maintain internal caches or singletons that grow in SSR:
-- **Styled-components / Emotion**: CSS-in-JS libraries can accumulate style sheets
+- **Styled-components / Emotion**: CSS-in-JS libraries can accumulate style sheets. Use `ServerStyleSheet` (styled-components) or `extractCritical` (Emotion) and reset between renders
 - **Apollo Client**: GraphQL cache grows if not reset between renders
+- **MobX**: Observer components can leak if `useStaticRendering` is not enabled (mobx-react < v7)
 - **Amplitude / analytics SDKs**: Event queues accumulate if initialized during SSR
 - **i18n libraries**: Message catalogs may cache translations
 
 **Fix:** Check if your libraries have SSR-specific configuration. Many provide a `resetServerContext()` or similar function. Initialize analytics and tracking libraries only on the client side.
+
+### 5. Event listeners at module scope
+
+If code registers event listeners at module scope during SSR, they accumulate across requests:
+
+**Leaks:**
+```javascript
+// Every SSR render adds another listener — they're never removed
+process.on('unhandledRejection', (err) => {
+  reportError(err);
+});
+```
+
+**Fix:** Register listeners once (outside the render path), or guard with a flag:
+```javascript
+let listenerRegistered = false;
+if (!listenerRegistered) {
+  process.on('unhandledRejection', (err) => reportError(err));
+  listenerRegistered = true;
+}
+```
 
 ## Diagnosing Memory Leaks
 
@@ -181,3 +205,15 @@ When writing code that runs during SSR, always ask: **"If this module-level vari
 | `useMemo` inside components | Per-component lifecycle | Runs during SSR but result is per-render (OK) |
 
 The rule of thumb: **module-level mutable state is the danger zone.** React component-level state and hooks are fine because React creates and discards them per render.
+
+## Audit Checklist
+
+Use this to scan your server bundle code for potential leaks:
+
+- [ ] Search for module-level `new Map()`, `new Set()`, `const cache = {}`, `[]` — are any of these unbounded?
+- [ ] Search for `_.memoize` or `memoize(` at module scope — are they called with diverse SSR inputs?
+- [ ] Search for `setInterval` without corresponding `clearInterval` — timers leak if not cleaned up (only relevant when `stubTimers: false`)
+- [ ] Search for `process.on(` or `.addEventListener(` at module scope — listeners accumulate if added per render
+- [ ] Check third-party libraries for SSR cleanup functions (`resetServerContext`, `useStaticRendering`, etc.)
+- [ ] Verify `NODE_OPTIONS=--max-old-space-size=<MB>` is set in production
+- [ ] Verify `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts` are both configured

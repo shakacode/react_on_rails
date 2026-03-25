@@ -97,7 +97,7 @@ end
 
 ## Troubleshooting
 
-- See [JS Memory Leaks](../../../pro/js-memory-leaks.md).
+- See [Memory Leaks guide](../../../pro/js-memory-leaks.md).
 
 ## Upgrading
 
