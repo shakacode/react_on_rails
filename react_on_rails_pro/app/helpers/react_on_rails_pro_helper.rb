@@ -448,7 +448,10 @@ module ReactOnRailsProHelper
     rescue StandardError => e
       # Propagate the error to the calling fiber via the promise.
       # A promise can only be resolved/rejected once — check before acting.
-      # If already resolved, the first chunk was returned successfully.
+      # resolved? returns true for both fulfilled AND rejected states (i.e. "settled").
+      # The check-then-act sequence is safe because Async uses fiber cooperative
+      # scheduling — no other fiber can run between resolved? and reject below.
+      # If already settled, the first chunk was returned successfully.
       # This is a post-first-chunk error. Re-raise so barrier.wait propagates it
       # (the response is already committed at that point, so only JS redirect is possible).
       raise if first_chunk_promise.resolved?
