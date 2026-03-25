@@ -99,6 +99,18 @@ import registerServerComponent from 'react-on-rails-pro/registerServerComponent/
 import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
 ```
 
+## SSR Memory Safety (Node Renderer)
+
+IMPORTANT: The Node Renderer reuses V8 VM contexts across requests. Module-level mutable state persists for the worker's lifetime. When writing or modifying code that runs during SSR:
+
+- NEVER use unbounded module-level caches (`const cache = {}`, `new Map()`, `new Set()`) — they grow with every unique request and cause OOM
+- NEVER use `_.memoize` at module scope for functions called with diverse SSR inputs
+- ALWAYS set `NODE_OPTIONS=--max-old-space-size=<MB>` in production containers
+- ALWAYS enable worker rolling restarts (`allWorkersRestartInterval` + `delayBetweenIndividualWorkerRestarts`)
+- React component state and hooks (`useState`, `useMemo`) are fine — React creates and discards them per render
+
+See: https://www.shakacode.com/react-on-rails-pro/docs/js-memory-leaks/
+
 ## Documentation Links
 
 - Docs: https://www.shakacode.com/react-on-rails/docs/

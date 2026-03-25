@@ -4,6 +4,8 @@ For the best performance with Server Rendering, consider using [React on Rails P
 
 ## General Tips
 
+- **Module-level state persists across requests in the Node Renderer.** Any `Map`, `Set`, object cache, or `_.memoize` call at module scope will accumulate entries across all SSR requests and never be cleared. This is the most common cause of OOM in production. See the [Memory Leaks guide](../../pro/js-memory-leaks.md) for patterns to avoid.
+- **Set `NODE_OPTIONS=--max-old-space-size=<MB>` in production.** Without this, V8 defers garbage collection in containers, amplifying any memory leaks. Size it based on your container memory divided by worker count.
 - Your code can't reference `document`. Server-side JS execution does not have access to `document`,
   so jQuery and some other libraries won't work in this environment. You can debug this by putting in
   `console.log` statements in your code.
