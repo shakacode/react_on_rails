@@ -91,7 +91,7 @@ Results:
 | **FCP**                | 982 ms    | 350 ms                    | -64%                           |
 | **LCP**                | 982 ms    | 1,058 ms                  | +8% (tradeoff: more hydration) |
 
-> Note: the TTFB improvement here largely reflects server-side serialization work in this benchmark setup. Results vary by infrastructure, server load, and streaming behavior.
+> Note: the TTFB improvement here largely reflects server-side serialization work in this benchmark setup. These numbers come from before/after runs of the same page in one environment (not a multi-region production load test). Results vary by infrastructure, server load, and streaming behavior.
 
 The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** -- a 31:1 ratio.
 
@@ -103,9 +103,11 @@ The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** 
 
 ```jsx
 // Before: Server Component — entire element tree in Flight payload
+import clsx from 'clsx';
+
 export default function ProductTags({ tags }) {
   return (
-    <div className="flex flex-wrap gap-2 mt-3">
+    <div className={clsx('flex flex-wrap gap-2 mt-3')}>
       {tags.map((tag) => (
         <span
           key={tag}
@@ -123,9 +125,11 @@ export default function ProductTags({ tags }) {
 // After: Client Component — only tags array in Flight payload
 'use client';
 
+import clsx from 'clsx';
+
 export default function ProductTags({ tags }) {
   return (
-    <div className="flex flex-wrap gap-2 mt-3">
+    <div className={clsx('flex flex-wrap gap-2 mt-3')}>
       {tags.map((tag) => (
         <span
           key={tag}
@@ -168,7 +172,7 @@ scripts.forEach((script) => {
 console.log(`RSC payload: ${(rscPayloadSize / 1024).toFixed(1)} KB`);
 ```
 
-This is still an approximation. Validate the marker pattern against how your app emits Flight chunks. For React on Rails specifically, inspect the actual `<script>` payload format in your rendered HTML before relying on this heuristic.
+This is still an approximation. Validate the marker pattern against how your app emits Flight chunks. For React on Rails specifically, inspect the actual `<script>` payload format in your rendered HTML before relying on this heuristic, and adapt the filter condition if your app uses a different wrapper format (a `0` result may mean the regex missed your format, not that RSC is disabled).
 
 ### Analyzing Payload Composition
 
@@ -200,10 +204,10 @@ In the benchmark above, the payload reduction was significant even after compres
 
 ## The LCP Tradeoff
 
-Moving presentational components to the client increases the amount of JavaScript the browser must download and execute before those components render. This can slightly increase Largest Contentful Paint (LCP):
+Moving presentational components to the client increases the amount of JavaScript the browser must download and execute before those components fully hydrate. This can slightly increase Largest Contentful Paint (LCP):
 
 - **TTFB and FCP improve** because the server generates and streams a smaller payload faster
-- **LCP may increase** because components moved to the client render their element tree during JS execution/hydration; if the LCP element is inside one of those components, it now depends on JS timing
+- **LCP may increase** because React on Rails server-renders Client Components to HTML (so content is present before JS), but the browser's LCP timing can still be delayed by hydration of the client subtree
 
 In the benchmark, LCP increased by 8% (982 ms to 1,058 ms) -- a minor regression offset by the 64% FCP improvement and 42% payload reduction.
 
@@ -219,7 +223,7 @@ If LCP is your critical metric (e.g., for a landing page with a hero image), be 
 
 React on Rails embeds the RSC payload within a Rails-rendered HTML page. In setups where Flight data is embedded into inline `<script>` tags, the payload may be double-serialized: once by React's Flight serializer, then again when Rails embeds it in the page response. This double encoding can add significant overhead to already large payloads.
 
-See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) for details on this overhead and its impact.
+See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) (currently open) for details on this overhead and its impact.
 
 ## Decision Flowchart
 
