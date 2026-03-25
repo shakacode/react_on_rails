@@ -208,7 +208,13 @@ def compute_target_gem_version(current_gem_version:, version_input:)
   version = parse_gem_version_components(current_gem_version)
   case version_input.to_s.strip.downcase
   when "patch"
-    "#{version[:major]}.#{version[:minor]}.#{version[:patch] + 1}"
+    if version[:prerelease_type]
+      # Pre-release → stable: strip the pre-release suffix (e.g., 16.5.0.rc.0 → 16.5.0).
+      # This matches `gem bump --version patch` behavior from the gem-release gem.
+      "#{version[:major]}.#{version[:minor]}.#{version[:patch]}"
+    else
+      "#{version[:major]}.#{version[:minor]}.#{version[:patch] + 1}"
+    end
   when "minor"
     "#{version[:major]}.#{version[:minor] + 1}.0"
   when "major"
@@ -381,16 +387,17 @@ def extract_latest_changelog_version(monorepo_root:)
   nil
 end
 
-def warn_changelog_missing(monorepo_root:, version:)
+def require_changelog_section!(monorepo_root:, version:, allow_override:)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
   section = extract_changelog_section(changelog_path: changelog_path, version: version)
   return if section
 
-  puts "################################################################################"
-  puts "WARNING: No CHANGELOG.md section found for #{version}."
-  puts "Consider running /update-changelog to add entries before releasing."
-  puts "sync_github_release will fail without a matching changelog section."
-  puts "################################################################################"
+  message = "❌ No CHANGELOG.md section found for #{version}.\n   " \
+            "Add a ### [#{version}] section before releasing.\n   " \
+            "Run /update-changelog or: bundle exec rake \"update_changelog[release]\"\n   " \
+            "To skip this check: rake release[VERSION,false,true] or RELEASE_VERSION_POLICY_OVERRIDE=true"
+
+  handle_version_policy_violation!(message: message, allow_override: allow_override)
 end
 
 def changelog_dirty?(monorepo_root:)
@@ -711,7 +718,11 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
       ERROR
     end
 
-    warn_changelog_missing(monorepo_root: release_root, version: resolved_target_gem_version)
+    require_changelog_section!(
+      monorepo_root: release_root,
+      version: resolved_target_gem_version,
+      allow_override: allow_version_policy_override
+    )
     validate_release_version_policy!(
       monorepo_root: release_root,
       target_gem_version: resolved_target_gem_version,
