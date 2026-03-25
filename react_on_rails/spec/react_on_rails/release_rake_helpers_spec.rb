@@ -202,9 +202,26 @@ RSpec.describe "release.rake helper methods" do
       expect(resolve_version_input("", "/tmp/repo")).to eq("16.4.0")
     end
 
-    it "falls back to a patch bump when the changelog does not introduce a newer version" do
+    it "uses the current version when changelog version matches and is untagged" do
       allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.3.0")
       allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
+      allow(self).to receive(:version_tagged?).with("/tmp/repo", "16.3.0").and_return(false)
+
+      expect(resolve_version_input("", "/tmp/repo")).to eq("16.3.0")
+    end
+
+    it "falls back to a patch bump when changelog version matches but is already tagged" do
+      allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.3.0")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
+      allow(self).to receive(:version_tagged?).with("/tmp/repo", "16.3.0").and_return(true)
+
+      expect(resolve_version_input("", "/tmp/repo")).to eq("patch")
+    end
+
+    it "falls back to a patch bump when changelog version is older than current and untagged" do
+      allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.2.9")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
+      expect(self).not_to receive(:version_tagged?)
 
       expect(resolve_version_input("", "/tmp/repo")).to eq("patch")
     end
