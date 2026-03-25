@@ -535,7 +535,7 @@ def with_release_checkout(monorepo_root:, dry_run:)
 end
 
 def version_tagged?(monorepo_root, version)
-  tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags: false)
+  tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags: true)
   tagged_versions.include?(version)
 end
 
