@@ -5,7 +5,9 @@
  * are stripped first, then the result is validated against the expected nonce pattern.
  * If the sanitized value does not match, `undefined` is returned and no nonce
  * attribute will be emitted — the render proceeds without a nonce rather than
- * failing or logging potentially sensitive values.
+ * failing or logging potentially sensitive values. Note that if stripping yields
+ * a string that still matches the base64/base64url pattern, that stripped value
+ * is returned.
  *
  * CSP nonces should be base64 or base64url strings with optional trailing `=` padding.
  */

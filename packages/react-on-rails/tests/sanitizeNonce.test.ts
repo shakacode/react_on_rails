@@ -33,8 +33,9 @@ describe('sanitizeNonce', () => {
     expect(sanitizeNonce('abc123" onload=alert(1)')).toBeUndefined();
   });
 
-  it('strips dangerous characters from injection attempts', () => {
-    // After stripping non-base64 chars, the remaining alphanumeric string is valid
+  it('strips invalid chars from injection input and returns the remaining nonce text', () => {
+    // The output is attribute-safe and cannot inject markup; it may still be a nonce-like
+    // string that does not match any server-generated CSP nonce in practice.
     expect(sanitizeNonce('"><script>alert(1)</script>')).toBe('scriptalert1/script');
   });
 
