@@ -196,6 +196,24 @@ describe('injectRSCPayload', () => {
     );
   });
 
+  it('handles chunks that split a multibyte UTF-8 character', async () => {
+    const mockRSC = createMockStream([
+      Buffer.from('{"test":"'),
+      Buffer.from([0xf0, 0x9f]),
+      Buffer.from([0x98, 0x80]),
+      Buffer.from('"}\n'),
+    ]);
+    const mockHTML = createMockStream(['<html><body>Hello</body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test":"😀"})</script>`,
+    );
+  });
+
   it('adds sanitized nonce attribute to injected RSC script tags', async () => {
     const mockRSC = createMockStream(['{"test": "data"}\n']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);

@@ -92,7 +92,6 @@ export default function injectRSCPayload(
   safePipe(pipeableHtmlStream, htmlStream, (err) => {
     resultStream.emit('error', err);
   });
-  const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
 
   // ========================================
@@ -261,9 +260,11 @@ export default function injectRSCPayload(
         rscPromises.push(
           (async () => {
             let lastIncompleteLine = '';
+            const decoder = new TextDecoder();
             for await (const chunk of stream ?? []) {
               const decodedChunk =
-                lastIncompleteLine + (typeof chunk === 'string' ? chunk : decoder.decode(chunk));
+                lastIncompleteLine +
+                (typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true }));
               const lines = decodedChunk.split('\n');
 
               if (!decodedChunk.endsWith('\n')) {
@@ -280,8 +281,9 @@ export default function injectRSCPayload(
               }
               scheduleFlush();
             }
-            if (lastIncompleteLine.trim() !== '') {
-              const payloadScript = createRSCPayloadChunk(lastIncompleteLine, rscPayloadKey, sanitizedNonce);
+            const finalChunk = lastIncompleteLine + decoder.decode();
+            if (finalChunk.trim() !== '') {
+              const payloadScript = createRSCPayloadChunk(finalChunk, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
               scheduleFlush();
             }
