@@ -111,7 +111,10 @@ const createRSCStreamFromPreloadedPayloads = (payloads: RSCPayloadChunk[], cspNo
   let streamController: ReadableStreamController<Uint8Array> | undefined;
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
+      // Browser-only by design (callers read from window.REACT_ON_RAILS_RSC_PAYLOADS).
+      // If called outside the browser, close immediately to avoid hanging streams.
       if (typeof window === 'undefined') {
+        controller.close();
         return;
       }
       const handleChunk = (chunk: RSCPayloadChunk) => {

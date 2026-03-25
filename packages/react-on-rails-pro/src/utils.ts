@@ -51,6 +51,10 @@ export const sanitizeNonce = (nonce?: string) => {
 };
 
 export function replayConsoleLog(consoleReplayScript: string | undefined, sanitizedNonce?: string) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
   const replayConsoleCode = (consoleReplayScript ?? '')
     .trim()
     .replace(/^<script[^>]*>/i, '')

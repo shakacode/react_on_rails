@@ -273,9 +273,11 @@ export default function injectRSCPayload(
                 lastIncompleteLine = '';
               }
 
+              // Contract: upstream stream emits NDJSON (one payload object per line).
               for (const line of lines) {
-                if (line.trim() !== '') {
-                  const payloadScript = createRSCPayloadChunk(line, rscPayloadKey, sanitizedNonce);
+                const normalizedLine = line.trim();
+                if (normalizedLine !== '') {
+                  const payloadScript = createRSCPayloadChunk(normalizedLine, rscPayloadKey, sanitizedNonce);
                   rscPayloadBuffers.push(Buffer.from(payloadScript));
                 }
               }
