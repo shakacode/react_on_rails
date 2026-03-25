@@ -34,7 +34,12 @@ module ReactOnRails
 
       shakapacker_config_dir = bundler_config_directory(shakapacker_config_path)
       if shakapacker_config_dir
+        shakapacker_basename = File.basename(shakapacker_config_path.to_s)
+        shakapacker_config_ext = File.extname(shakapacker_config_path.to_s).delete_prefix(".")
         candidates.concat(%w[js ts cjs mjs].flat_map do |ext|
+          config_basenames = ["webpack.config.#{ext}", "rspack.config.#{ext}"]
+          next [] if ext == shakapacker_config_ext && config_basenames.include?(shakapacker_basename)
+
           [
             File.join(shakapacker_config_dir, "webpack.config.#{ext}"),
             File.join(shakapacker_config_dir, "rspack.config.#{ext}")
@@ -51,6 +56,8 @@ module ReactOnRails
     end
 
     def shakapacker_assets_bundler_config_path
+      # Use instance_variable_defined? instead of ||= so nil results are cached
+      # and we do not retry require/rescue work on each call.
       if instance_variable_defined?(:@shakapacker_assets_bundler_config_path)
         return @shakapacker_assets_bundler_config_path
       end

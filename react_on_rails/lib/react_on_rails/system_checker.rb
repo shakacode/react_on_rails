@@ -141,6 +141,7 @@ module ReactOnRails
           • config/shakapacker.yml
           • config/webpack/webpack.config.{js,ts}
           • config/rspack/rspack.config.{js,ts}
+          • assets_bundler_config_path target declared by Shakapacker (when configured)
 
           Run: bundle exec rails shakapacker:install
         MSG
@@ -329,37 +330,6 @@ module ReactOnRails
       resolve_default_bundler_config_path || resolved_config_path
     end
 
-    def resolve_default_bundler_config_path
-      paths_by_bundler = {
-        "rspack" => existing_bundler_config_paths("rspack"),
-        "webpack" => existing_bundler_config_paths("webpack")
-      }
-
-      present_paths = paths_by_bundler.select { |_bundler, paths| paths.any? }
-      return nil if present_paths.empty?
-      return present_paths.values.first.first if present_paths.one?
-
-      configured_bundler = configured_assets_bundler
-      if configured_bundler && paths_by_bundler[configured_bundler].any?
-        return warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
-      end
-
-      # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
-      # Webpack is the longer-established default; rspack users typically set
-      # assets_bundler explicitly in shakapacker.yml.
-      add_warning(
-        "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
-      )
-      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first
-    end
-
-    def warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
-      add_warning(
-        "⚠️  Found both webpack and rspack configs. Using #{configured_bundler} from config/shakapacker.yml."
-      )
-      paths_by_bundler[configured_bundler].first
-    end
-
     def suggest_webpack_inspection(config_path)
       bundler_name = bundler_name_for_config_path(config_path)
       export_style = config_path.end_with?(".ts") ? "export default" : "module.exports"
@@ -536,6 +506,37 @@ module ReactOnRails
              .strip
     end
 
+    def resolve_default_bundler_config_path
+      paths_by_bundler = {
+        "rspack" => existing_bundler_config_paths("rspack"),
+        "webpack" => existing_bundler_config_paths("webpack")
+      }
+
+      present_paths = paths_by_bundler.select { |_bundler, paths| paths.any? }
+      return nil if present_paths.empty?
+      return present_paths.values.first.first if present_paths.one?
+
+      configured_bundler = configured_assets_bundler
+      if configured_bundler && paths_by_bundler[configured_bundler].any?
+        return warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
+      end
+
+      # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
+      # Webpack is the longer-established default; rspack users typically set
+      # assets_bundler explicitly in shakapacker.yml.
+      add_warning(
+        "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
+      )
+      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first
+    end
+
+    def warn_and_pick_configured_bundler_path(paths_by_bundler, configured_bundler)
+      add_warning(
+        "⚠️  Found both webpack and rspack configs. Using #{configured_bundler} from config/shakapacker.yml."
+      )
+      paths_by_bundler[configured_bundler].first
+    end
+
     def existing_bundler_config_paths(bundler)
       # This runs only after detect_bundler_config_path has ruled out an exact
       # explicit shakapacker path match, so directory-derived fallback
@@ -543,6 +544,8 @@ module ReactOnRails
       # Custom shakapacker config paths (non-standard basenames) are handled
       # earlier via explicit_shakapacker_bundler_config_path? and intentionally
       # excluded from this `<bundler>.config.*` classifier.
+      # webpack_config_candidates may consult Shakapacker config paths, but that
+      # lookup is memoized by shakapacker_assets_bundler_config_path.
       bundler_prefix = "#{bundler}.config."
       webpack_config_candidates.select do |path|
         next false unless File.file?(path)
