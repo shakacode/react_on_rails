@@ -1,5 +1,11 @@
 describe('configBuilder', () => {
-  const envVarsToRestore = ['RENDERER_HOST', 'NODE_ENV', 'RENDERER_PASSWORD', 'RAILS_ENV'] as const;
+  const envVarsToRestore = [
+    'RENDERER_HOST',
+    'NODE_ENV',
+    'RENDERER_PASSWORD',
+    'RAILS_ENV',
+    'REPLAY_SERVER_ASYNC_OPERATION_LOGS',
+  ] as const;
   const savedEnvValues = Object.fromEntries(envVarsToRestore.map((key) => [key, process.env[key]]));
 
   afterEach(() => {
@@ -178,6 +184,16 @@ describe('configBuilder', () => {
       expect(() => buildConfig()).not.toThrow();
     });
 
+    it('does not throw when NODE_ENV uses mixed-case development value', () => {
+      process.env.NODE_ENV = 'Development';
+      process.env.RAILS_ENV = 'development';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).not.toThrow();
+    });
+
     it('throws when neither NODE_ENV nor RAILS_ENV is set (fail-closed)', () => {
       delete process.env.NODE_ENV;
       delete process.env.RAILS_ENV;
@@ -208,6 +224,41 @@ describe('configBuilder', () => {
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
       expect(() => buildConfig({ password: undefined })).not.toThrow();
+    });
+  });
+
+  describe('replayServerAsyncOperationLogs defaults', () => {
+    it('defaults to true in development-like runtime envs', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.RAILS_ENV = 'development';
+      delete process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+      const config = buildConfig();
+
+      expect(config.replayServerAsyncOperationLogs).toBe(true);
+    });
+
+    it('defaults to false when runtime envs are mixed (production-like)', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.RAILS_ENV = 'production';
+      delete process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+      const config = buildConfig({ password: 'secure-password' });
+
+      expect(config.replayServerAsyncOperationLogs).toBe(false);
+    });
+
+    it('treats mixed-case development values as development-like', () => {
+      process.env.NODE_ENV = 'Development';
+      process.env.RAILS_ENV = 'Test';
+      delete process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+      const config = buildConfig();
+
+      expect(config.replayServerAsyncOperationLogs).toBe(true);
     });
   });
 });

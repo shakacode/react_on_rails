@@ -260,6 +260,8 @@ module ReactOnRailsPro
           end
 
         Then set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
+        Note: setting ENV["RENDERER_PASSWORD"] alone is not enough on the Ruby side unless
+        config.renderer_password is explicitly assigned from ENV.
 
         Environment matrix:
           development — password optional (no authentication)

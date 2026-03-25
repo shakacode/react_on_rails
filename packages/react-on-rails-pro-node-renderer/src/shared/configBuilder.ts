@@ -142,8 +142,24 @@ function logLevel(level: string): LevelWithSilent {
   }
 }
 
+function normalizedRuntimeEnvs() {
+  return [env.RAILS_ENV, env.NODE_ENV]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.toLowerCase());
+}
+
+function runtimeEnvsAllowDevelopmentDefaults() {
+  const runtimeEnvs = normalizedRuntimeEnvs();
+  return runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
+}
+
 function defaultReplayServerAsyncOperationLogs() {
-  return truthy(env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? (env.NODE_ENV || 'production') === 'development');
+  if (env.REPLAY_SERVER_ASYNC_OPERATION_LOGS != null) {
+    return truthy(env.REPLAY_SERVER_ASYNC_OPERATION_LOGS);
+  }
+
+  // Keep default replay logging disabled outside development/test-like runtime envs.
+  return runtimeEnvsAllowDevelopmentDefaults();
 }
 
 const defaultConfig: Config = {
@@ -256,9 +272,7 @@ function validatePasswordForProduction(aConfig: Config): string | null {
   // Require all present runtime envs to be development/test; fail closed otherwise.
   // If either env indicates a production-like value, or neither env is set, password is required.
   // This stays consistent with master.ts and Ruby's Rails.env.production? checks.
-  const runtimeEnvs = [env.RAILS_ENV, env.NODE_ENV].filter((value): value is string => Boolean(value));
-  const allowMissingPassword =
-    runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
+  const allowMissingPassword = runtimeEnvsAllowDevelopmentDefaults();
   if (allowMissingPassword) return null;
 
   return (
@@ -280,7 +294,8 @@ function validatePasswordForProduction(aConfig: Config): string | null {
 }
 
 /**
- * Lazily create the config
+ * Lazily create the config.
+ * Undefined values in providedUserConfig are ignored so env/runtime defaults are preserved.
  */
 export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   userConfig = providedUserConfig || {};
