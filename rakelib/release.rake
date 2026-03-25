@@ -387,17 +387,26 @@ def extract_latest_changelog_version(monorepo_root:)
   nil
 end
 
-def require_changelog_section!(monorepo_root:, version:, allow_override:)
+def confirm_release!(version:, monorepo_root:)
   changelog_path = File.join(monorepo_root, "CHANGELOG.md")
-  section = extract_changelog_section(changelog_path: changelog_path, version: version)
-  return if section
+  has_changelog = extract_changelog_section(changelog_path: changelog_path, version: version)
 
-  message = "❌ No CHANGELOG.md section found for #{version}.\n   " \
-            "Add a ### [#{version}] section before releasing.\n   " \
-            "Run /update-changelog or: bundle exec rake \"update_changelog[release]\"\n   " \
-            "To skip this check: rake release[VERSION,false,true] or RELEASE_VERSION_POLICY_OVERRIDE=true"
-
-  handle_version_policy_violation!(message: message, allow_override: allow_override)
+  puts ""
+  puts "################################################################################"
+  puts "RELEASE CONFIRMATION"
+  puts "################################################################################"
+  puts "  Version:   #{version}"
+  if has_changelog
+    puts "  Changelog: ✓ section found"
+  else
+    puts "  Changelog: ✗ MISSING — no GitHub release will be created"
+    puts "             Run /update-changelog to add entries before releasing."
+  end
+  puts "################################################################################"
+  print "Proceed with release? [y/N] "
+  $stdout.flush
+  answer = $stdin.gets&.strip&.downcase
+  abort "Release aborted." unless answer == "y"
 end
 
 def changelog_dirty?(monorepo_root:)
@@ -517,6 +526,11 @@ def with_release_checkout(monorepo_root:, dry_run:)
   end
 end
 
+def version_tagged?(monorepo_root, version)
+  tagged_versions = tagged_release_gem_versions(monorepo_root, fetch_tags: false)
+  tagged_versions.include?(version)
+end
+
 def resolve_version_input(version_input, monorepo_root)
   stripped = version_input.to_s.strip
   return stripped unless stripped.empty?
@@ -526,6 +540,14 @@ def resolve_version_input(version_input, monorepo_root)
 
   if changelog_version && Gem::Version.new(changelog_version) > Gem::Version.new(current_version)
     puts "Found CHANGELOG.md version: #{changelog_version} (current: #{current_version})"
+    return changelog_version
+  end
+
+  # If the latest changelog version matches the current version but hasn't been
+  # tagged yet, use it. This handles the case where the changelog was updated
+  # and the version bumped in a prior step (e.g., RC → stable promotion).
+  if changelog_version && !version_tagged?(monorepo_root, changelog_version)
+    puts "Found untagged CHANGELOG.md version: #{changelog_version} (current: #{current_version})"
     return changelog_version
   end
 
@@ -718,17 +740,14 @@ task :release, %i[version dry_run override_version_policy] do |_t, args|
       ERROR
     end
 
-    require_changelog_section!(
-      monorepo_root: release_root,
-      version: resolved_target_gem_version,
-      allow_override: allow_version_policy_override
-    )
     validate_release_version_policy!(
       monorepo_root: release_root,
       target_gem_version: resolved_target_gem_version,
       allow_override: allow_version_policy_override,
       fetch_tags: true
     )
+
+    confirm_release!(version: resolved_target_gem_version, monorepo_root: release_root) unless is_dry_run
 
     # Having generated examples in-tree can interfere with publishing.
     sh_in_dir_for_release(release_root, "rm -rf gen-examples/examples")
