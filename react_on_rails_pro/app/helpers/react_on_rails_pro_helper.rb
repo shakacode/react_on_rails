@@ -129,7 +129,7 @@ module ReactOnRailsProHelper
     # Because setting prerender to false is equivalent to calling react_component with prerender: false
     options[:prerender] = true
     if options.key?(:immediate_hydration)
-      ActiveSupport::Deprecation.warn(
+      Rails.logger.warn(
         "[React on Rails] `immediate_hydration:` is no longer supported on stream_react_component. " \
         "Immediate hydration is always enabled for Pro. Remove this option."
       )

@@ -14,6 +14,7 @@
 
 import { createBaseClientObject, type BaseClientObjectType } from 'react-on-rails/@internal/base/client';
 import { createBaseFullObject } from 'react-on-rails/@internal/base/full';
+import { getRailsContext } from 'react-on-rails/context';
 import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
 import type { ReactOnRailsInternal, RegisteredComponent, Store, StoreGenerator } from 'react-on-rails/types';
@@ -70,8 +71,11 @@ function clientStartup() {
   // eslint-disable-next-line no-underscore-dangle
   globalThis.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
-  void renderOrHydrateCompleteComponents();
-  void hydrateCompleteStores();
+  const railsContext = getRailsContext();
+  if (railsContext?.rorPro !== false) {
+    void renderOrHydrateCompleteComponents();
+    void hydrateCompleteStores();
+  }
 
   onPageLoaded(reactOnRailsPageLoaded);
   onPageUnloaded(reactOnRailsPageUnloaded);
