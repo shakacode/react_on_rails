@@ -454,7 +454,7 @@ module ReactOnRailsProHelper
       # If already settled, the first chunk was returned successfully.
       # This is a post-first-chunk error. Re-raise so barrier.wait propagates it
       # (the response is already committed at that point, so only JS redirect is possible).
-      raise if first_chunk_promise.resolved?
+      raise e if first_chunk_promise.resolved?
 
       # Promise not yet resolved — this is a pre-first-chunk failure (e.g., shell error).
       # Reject the promise so .wait auto-raises in the caller,
@@ -464,8 +464,8 @@ module ReactOnRailsProHelper
       # Keep a defensive fallback for future Promise behavior changes.
       begin
         first_chunk_promise.reject(e)
-      rescue StandardError
-        raise e
+      rescue StandardError => reject_error
+        handle_reject_failure(reject_error, e)
       end
     end
 
@@ -473,6 +473,16 @@ module ReactOnRailsProHelper
     # Async::Promise#wait blocks until resolved, then returns the stored value.
     # If the promise was rejected, .wait automatically re-raises the exception.
     first_chunk_promise.wait
+  end
+
+  def handle_reject_failure(reject_error, original_error)
+    # Preserve existing behavior for known promise-state races (double resolve/reject).
+    raise original_error if reject_error.is_a?(FrozenError)
+
+    # Unexpected Promise API behavior: surface the reject failure with original context.
+    raise reject_error.exception(
+      "Promise#reject failed (#{reject_error.message}); original error: #{original_error.message}"
+    )
   end
 
   # Returns true if the stream was fully consumed, false if aborted (client disconnect).
