@@ -1,29 +1,14 @@
 describe('configBuilder', () => {
-  const originalRendererHost = process.env.RENDERER_HOST;
-  const originalNodeEnv = process.env.NODE_ENV;
-  const originalRendererPassword = process.env.RENDERER_PASSWORD;
-  const originalRailsEnv = process.env.RAILS_ENV;
+  const envVarsToRestore = ['RENDERER_HOST', 'NODE_ENV', 'RENDERER_PASSWORD', 'RAILS_ENV'] as const;
+  const savedEnvValues = Object.fromEntries(envVarsToRestore.map((key) => [key, process.env[key]]));
 
   afterEach(() => {
-    if (originalRendererHost === undefined) {
-      delete process.env.RENDERER_HOST;
-    } else {
-      process.env.RENDERER_HOST = originalRendererHost;
-    }
-    if (originalNodeEnv === undefined) {
-      delete process.env.NODE_ENV;
-    } else {
-      process.env.NODE_ENV = originalNodeEnv;
-    }
-    if (originalRendererPassword === undefined) {
-      delete process.env.RENDERER_PASSWORD;
-    } else {
-      process.env.RENDERER_PASSWORD = originalRendererPassword;
-    }
-    if (originalRailsEnv === undefined) {
-      delete process.env.RAILS_ENV;
-    } else {
-      process.env.RAILS_ENV = originalRailsEnv;
+    for (const key of envVarsToRestore) {
+      if (savedEnvValues[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = savedEnvValues[key];
+      }
     }
     jest.restoreAllMocks();
     jest.resetModules();
