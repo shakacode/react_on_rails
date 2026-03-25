@@ -274,14 +274,18 @@ export default function injectRSCPayload(
               }
 
               // Contract: upstream stream emits NDJSON (one payload object per line).
+              let bufferedPayloadInThisChunk = false;
               for (const line of lines) {
                 const normalizedLine = line.trim();
                 if (normalizedLine !== '') {
                   const payloadScript = createRSCPayloadChunk(normalizedLine, rscPayloadKey, sanitizedNonce);
                   rscPayloadBuffers.push(Buffer.from(payloadScript));
+                  bufferedPayloadInThisChunk = true;
                 }
               }
-              scheduleFlush();
+              if (bufferedPayloadInThisChunk) {
+                scheduleFlush();
+              }
             }
             const finalChunk = lastIncompleteLine + decoder.decode();
             if (finalChunk.trim() !== '') {

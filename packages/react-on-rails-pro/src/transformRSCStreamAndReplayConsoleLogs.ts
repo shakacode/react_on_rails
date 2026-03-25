@@ -50,31 +50,41 @@ export default function transformRSCStreamAndReplayConsoleLogs(
         replayConsoleLog(consoleReplayScript, sanitizedNonce);
       };
 
+      const parseAndHandleLines = (lines: string[]) => {
+        const jsonChunks = lines
+          .filter((line) => line.trim() !== '')
+          .map((line) => {
+            try {
+              return JSON.parse(line) as RSCPayloadChunk;
+            } catch (error) {
+              console.error('Error parsing JSON:', line, error);
+              throw error;
+            }
+          });
+
+        for (const jsonChunk of jsonChunks) {
+          handleJsonChunk(jsonChunk);
+        }
+      };
+
       try {
         while (!done) {
-          const decodedValue = typeof value === 'string' ? value : decoder.decode(value);
+          const decodedValue = typeof value === 'string' ? value : decoder.decode(value, { stream: true });
           const decodedChunks = lastIncompleteChunk + decodedValue;
           const chunks = decodedChunks.split('\n');
           lastIncompleteChunk = chunks.pop() ?? '';
 
-          const jsonChunks = chunks
-            .filter((line) => line.trim() !== '')
-            .map((line) => {
-              try {
-                return JSON.parse(line) as RSCPayloadChunk;
-              } catch (error) {
-                console.error('Error parsing JSON:', line, error);
-                throw error;
-              }
-            });
-
-          for (const jsonChunk of jsonChunks) {
-            handleJsonChunk(jsonChunk);
-          }
+          parseAndHandleLines(chunks);
 
           // eslint-disable-next-line no-await-in-loop
           ({ value, done } = await reader.read());
         }
+
+        const finalDecodedValue = lastIncompleteChunk + decoder.decode();
+        if (finalDecodedValue.trim() !== '') {
+          parseAndHandleLines(finalDecodedValue.split('\n'));
+        }
+
         controller.close();
       } catch (error) {
         console.error('Error transforming RSC stream:', error);

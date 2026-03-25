@@ -109,15 +109,18 @@ const createRSCStreamFromPreloadedPayloads = (payloads: RSCPayloadChunk[], cspNo
   const encoder = new TextEncoder();
   const sanitizedNonceValue = sanitizeNonce(cspNonce);
   let streamController: ReadableStreamController<Uint8Array> | undefined;
+  let closed = false;
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       // Browser-only by design (callers read from window.REACT_ON_RAILS_RSC_PAYLOADS).
       // If called outside the browser, close immediately to avoid hanging streams.
       if (typeof window === 'undefined') {
+        closed = true;
         controller.close();
         return;
       }
       const handleChunk = (chunk: RSCPayloadChunk) => {
+        if (closed) return;
         controller.enqueue(encoder.encode(chunk.html ?? ''));
         replayConsoleLog(chunk.consoleReplayScript, sanitizedNonceValue);
       };
@@ -134,9 +137,11 @@ const createRSCStreamFromPreloadedPayloads = (payloads: RSCPayloadChunk[], cspNo
 
   if (typeof document !== 'undefined' && document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+      closed = true;
       streamController?.close();
     });
   } else {
+    closed = true;
     streamController?.close();
   }
 
