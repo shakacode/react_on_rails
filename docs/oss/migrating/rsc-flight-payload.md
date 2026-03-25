@@ -91,13 +91,15 @@ Results:
 | **FCP**                | 982 ms    | 350 ms                    | -64%                           |
 | **LCP**                | 982 ms    | 1,058 ms                  | +8% (tradeoff: more hydration) |
 
+> Note: the TTFB improvement here largely reflects server-side serialization work in this benchmark setup. Results vary by infrastructure, server load, and streaming behavior.
+
 The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** -- a 31:1 ratio.
 
 ### How to Apply It
 
 **Step 1:** Identify presentational subtrees with high expansion ratios.
 
-**Step 2:** Add `'use client'` to those components. It must be the first line in the file (before imports). The directive tells React to send a client reference instead of the expanded element tree.
+**Step 2:** Add `'use client'` to those components. The directive must appear before any `import` statements. It tells React to send a client reference instead of the expanded element tree.
 
 ```jsx
 // Before: Server Component — entire element tree in Flight payload
@@ -166,7 +168,7 @@ scripts.forEach((script) => {
 console.log(`RSC payload: ${(rscPayloadSize / 1024).toFixed(1)} KB`);
 ```
 
-This is still an approximation. Validate the marker pattern against how your app emits Flight chunks.
+This is still an approximation. Validate the marker pattern against how your app emits Flight chunks. For React on Rails specifically, inspect the actual `<script>` payload format in your rendered HTML before relying on this heuristic.
 
 ### Analyzing Payload Composition
 
@@ -215,7 +217,7 @@ If LCP is your critical metric (e.g., for a landing page with a hero image), be 
 
 ## React on Rails: Double JSON.stringify Overhead
 
-React on Rails embeds the RSC payload within a Rails-rendered HTML page. Depending on your setup, the payload may be double-serialized: once by React's Flight serializer, then again when Rails embeds it in a `<script>` tag. This double encoding can add significant overhead to already large payloads.
+React on Rails embeds the RSC payload within a Rails-rendered HTML page. In setups where Flight data is embedded into inline `<script>` tags, the payload may be double-serialized: once by React's Flight serializer, then again when Rails embeds it in the page response. This double encoding can add significant overhead to already large payloads.
 
 See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) for details on this overhead and its impact.
 
@@ -230,8 +232,10 @@ Is the component interactive (hooks, events, browser APIs)?
     ├── No → Server Component (standard RSC rule)
     └── Yes → Is the element tree much larger than the data props?
         ├── No → Server Component
-        └── Yes → Consider Client Component (this optimization)
-            └── Measure payload before/after to confirm savings
+        └── Yes → Will moving to client keep JS bundle increase small?
+            ├── No → Server Component (bundle cost outweighs payload savings)
+            └── Yes → Consider Client Component (this optimization)
+                └── Measure payload before/after to confirm savings
 ```
 
 ## Summary
