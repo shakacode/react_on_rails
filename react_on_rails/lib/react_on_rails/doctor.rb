@@ -795,7 +795,13 @@ module ReactOnRails
       checker.add_info("\n🖥️  Server Rendering:")
 
       if runtime_config
-        server_bundle_value = runtime_config.server_bundle_js_file
+        raw_server_bundle_value = runtime_config.server_bundle_js_file
+        server_bundle_value =
+          if raw_server_bundle_value.is_a?(String)
+            raw_server_bundle_value.strip
+          else
+            raw_server_bundle_value
+          end
         if server_bundle_value.present?
           checker.add_info("  server_bundle_js_file: #{server_bundle_value}")
         elsif server_bundle_value.nil?
@@ -837,7 +843,14 @@ module ReactOnRails
       check_shakapacker_private_output_path(rails_bundle_path)
 
       # RSC bundle file (Pro feature)
-      if runtime_config.respond_to?(:rsc_bundle_js_file)
+      runtime_config_supports_rsc_bundle =
+        case runtime_config
+        when nil
+          false
+        else
+          runtime_config.respond_to?(:rsc_bundle_js_file)
+        end
+      if runtime_config_supports_rsc_bundle
         rsc_bundle_value = runtime_config.rsc_bundle_js_file
         if rsc_bundle_value.present?
           checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_value} (React Server Components - Pro)")
@@ -2384,12 +2397,19 @@ module ReactOnRails
       return @resolved_pro_server_renderer if defined?(@resolved_pro_server_renderer)
       return (@resolved_pro_server_renderer = nil) unless ReactOnRails::Utils.react_on_rails_pro?
 
+      rails_environment_loaded = ensure_rails_environment_loaded
       @resolved_pro_server_renderer =
-        if ensure_rails_environment_loaded && defined?(ReactOnRailsPro)
+        if rails_environment_loaded && defined?(ReactOnRailsPro)
           # server_renderer is stored as a plain string in Pro config (for example, "NodeRenderer").
           ReactOnRailsPro.configuration.server_renderer
         elsif pro_initializer_has_node_renderer?
           "NodeRenderer"
+        elsif rails_environment_loaded
+          checker.add_warning(
+            "⚠️  Could not determine Pro server renderer: ReactOnRailsPro is unavailable " \
+            "and no initializer match found."
+          )
+          nil
         end
     rescue StandardError => e
       checker.add_warning("⚠️  Could not read Pro runtime renderer configuration: #{e.message}")

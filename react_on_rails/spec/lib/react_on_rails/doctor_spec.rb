@@ -182,6 +182,18 @@ RSpec.describe ReactOnRails::Doctor do
       )
     end
 
+    it "treats whitespace-only runtime server_bundle_js_file as disabled" do
+      allow(runtime_config).to receive(:server_bundle_js_file).and_return("   ")
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).to include(
+        a_string_including('server_bundle_js_file: "" (disabled)')
+      )
+    end
+
     it "omits component_registry_timeout when runtime value is the default" do
       allow(runtime_config).to receive(:component_registry_timeout).and_return(5000)
       allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
@@ -1983,12 +1995,28 @@ RSpec.describe ReactOnRails::Doctor do
 
   describe "resolved_pro_server_renderer" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
 
     it "memoizes nil when Pro is not active" do
       expect(ReactOnRails::Utils).to receive(:react_on_rails_pro?).once.and_return(false)
 
       expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
       expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
+    end
+
+    it "warns once when Pro is active but runtime and initializer renderer sources are unavailable" do
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      allow(doctor).to receive_messages(
+        ensure_rails_environment_loaded: true,
+        pro_initializer_has_node_renderer?: false
+      )
+      hide_const("ReactOnRailsPro") if defined?(ReactOnRailsPro)
+
+      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
+      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
+
+      warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+      expect(warning_messages.count { |msg| msg.include?("Could not determine Pro server renderer") }).to eq(1)
     end
   end
 
