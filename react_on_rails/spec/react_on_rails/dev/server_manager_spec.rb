@@ -76,6 +76,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.start(:static)
     end
 
+    it "schedules a one-time browser open when requested" do
+      expect(described_class).to receive(:schedule_browser_open).with(3000, route: "/", once: true)
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev")
+
+      described_class.start(:development, nil, route: "/", open_browser_once: true)
+    end
+
     it "starts production-like mode" do
       env = { "NODE_ENV" => "production" }
       argv = ["bundle", "exec", "rails", "assets:precompile"]
@@ -916,6 +923,38 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
+    context "with browser flags" do
+      it "passes --open-browser to start" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(open_browser: true, open_browser_once: false)
+        )
+
+        described_class.run_from_command_line(["--open-browser"])
+      end
+
+      it "passes --open-browser-once to start" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(open_browser: false, open_browser_once: true)
+        )
+
+        described_class.run_from_command_line(["--open-browser-once"])
+      end
+
+      it "lets --no-open-browser override generated auto-open flags" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(open_browser: false, open_browser_once: false)
+        )
+
+        described_class.run_from_command_line(["--open-browser-once", "--no-open-browser"])
+      end
+    end
+
     context "with no arguments (default mode)" do
       it "starts development mode with no route" do
         expect(described_class).to receive(:start).with(
@@ -930,12 +969,26 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     context "with unknown command" do
       it "rejects and shows error message" do
-        expect_any_instance_of(Kernel).to receive(:puts).with("Unknown argument: invalid_command")
-        expect_any_instance_of(Kernel).to receive(:puts).with("Run 'dev help' for usage information")
         expect_any_instance_of(Kernel).to receive(:exit).with(1)
 
-        described_class.run_from_command_line(["invalid_command"])
+        expect do
+          described_class.run_from_command_line(["invalid_command"])
+        end.to output("Unknown argument: invalid_command\nRun 'dev help' for usage information\n").to_stdout
       end
+    end
+  end
+
+  describe ".print_server_info" do
+    it "normalizes root routes without a double slash" do
+      expect do
+        described_class.send(:print_server_info, "Title", ["Feature"], 3000, route: "/")
+      end.to output(%r{http://localhost:3000(?!/)}).to_stdout_from_any_process
+    end
+
+    it "normalizes routes passed with a leading slash" do
+      expect do
+        described_class.send(:print_server_info, "Title", ["Feature"], 3000, route: "/hello_world")
+      end.to output(%r{http://localhost:3000/hello_world}).to_stdout_from_any_process
     end
   end
 end

@@ -70,6 +70,31 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --new-app" do
+    before(:all) { run_generator_test_with_args(%w[--new-app], package_json: true) }
+
+    it "creates a root landing page" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include('root to: "home#index"')
+      end
+      assert_file "app/controllers/home_controller.rb"
+      assert_file "app/views/home/index.html.erb" do |content|
+        expect(content).to include("is ready.")
+        expect(content).to include("/hello_world")
+        expect(content).to include("Compare OSS and Pro")
+        expect(content).to include("https://github.com/shakacode/react-server-components-marketplace-demo")
+      end
+    end
+
+    it "uses the root path and one-time browser opening in bin/dev" do
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "/"')
+        expect(content).to include("AUTO_OPEN_BROWSER_ONCE = true")
+        expect(content).to include("--open-browser-once")
+      end
+    end
+  end
+
   context "with --redux" do
     before(:all) { run_generator_test_with_args(%w[--redux], package_json: true) }
 
@@ -1479,6 +1504,29 @@ describe InstallGenerator, type: :generator do
     it "sets DEFAULT_ROUTE to hello_server in bin/dev" do
       assert_file "bin/dev" do |content|
         expect(content).to include('DEFAULT_ROUTE = "hello_server"')
+      end
+    end
+  end
+
+  context "with --new-app --rsc" do
+    before(:all) { run_generator_test_with_args(%w[--new-app --rsc], package_json: true) }
+
+    it "creates a landing page that links to the RSC example" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include('root to: "home#index"')
+      end
+      assert_file "app/views/home/index.html.erb" do |content|
+        expect(content).to include("/hello_server")
+        expect(content).to include("React Server Components")
+        expect(content).to include("https://reactonrails.com/docs/pro/react-server-components/tutorial/")
+        expect(content).to include("https://github.com/shakacode/react-server-components-marketplace-demo")
+      end
+    end
+
+    it "keeps the root path as the default bin/dev URL" do
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "/"')
+        expect(content).to include("AUTO_OPEN_BROWSER_ONCE = true")
       end
     end
   end

@@ -76,6 +76,14 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      # Hidden option: used by create-react-on-rails-app to enable fresh-app
+      # scaffolding (landing page + browser-open defaults) without changing the
+      # behavior of install runs inside existing apps.
+      class_option :new_app,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
@@ -181,7 +189,7 @@ module ReactOnRails
         # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
-                 pro: options.pro?, rsc: options.rsc?,
+                 pro: options.pro?, rsc: options.rsc?, new_app: options.new_app?,
                  shakapacker_just_installed: shakapacker_just_installed?,
                  force: options[:force], skip: options[:skip], pretend: options[:pretend] }
 
@@ -342,19 +350,19 @@ module ReactOnRails
 
         # Copy bin scripts from templates
         template_bin_path = "#{__dir__}/templates/base/base/bin"
-        directory_options = {}
-        directory_options[:exclude_pattern] = %r{/dev(?:\.tt)?\z} if preserve_existing_bin_dev?
+        directory_options = { exclude_pattern: %r{/dev(?:\.tt)?\z} }
         directory template_bin_path, "bin", directory_options
 
-        # For --rsc without --redux, hello_world doesn't exist — update DEFAULT_ROUTE
-        if use_rsc? && !options.redux?
-          if preserve_existing_bin_dev?
+        if preserve_existing_bin_dev?
+          if use_rsc? && !options.redux? && !options.new_app?
             say_status :warn,
                        'Custom bin/dev detected: update DEFAULT_ROUTE to "hello_server" manually for --rsc',
                        :yellow
-          else
-            gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
           end
+        else
+          copy_file("#{template_bin_path}/dev", "bin/dev")
+          gsub_file "bin/dev", /^DEFAULT_ROUTE = .*$/, "DEFAULT_ROUTE = #{default_bin_dev_route.inspect}"
+          gsub_file "bin/dev", /^AUTO_OPEN_BROWSER_ONCE = .*$/, "AUTO_OPEN_BROWSER_ONCE = #{options.new_app?}"
         end
 
         # `directory` and `gsub_file` above are Thor actions that already honor
@@ -397,9 +405,16 @@ module ReactOnRails
       end
 
       def bin_scripts_to_chmod(template_bin_path)
-        files = Dir.children(template_bin_path)
-        files.reject! { |f| f == "dev" } if preserve_existing_bin_dev?
+        files = Dir.children(template_bin_path).reject { |filename| filename == "dev" }
+        files << "dev" unless preserve_existing_bin_dev?
         files.map { |filename| "bin/#{filename}" }
+      end
+
+      def default_bin_dev_route
+        return "/" if options.new_app?
+        return "hello_server" if use_rsc? && !options.redux?
+
+        "hello_world"
       end
 
       def stock_rails_bin_dev?
@@ -430,7 +445,8 @@ module ReactOnRails
                                      route: route,
                                      pro: use_pro?,
                                      rsc: use_rsc?,
-                                     shakapacker_just_installed: shakapacker_just_installed?
+                                     shakapacker_just_installed: shakapacker_just_installed?,
+                                     landing_page: options.new_app?
                                    ))
       end
 
