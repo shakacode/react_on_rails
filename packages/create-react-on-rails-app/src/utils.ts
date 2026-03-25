@@ -22,6 +22,33 @@ export function execLiveArgs(command: string, args: string[], cwd?: string, env?
   }
 }
 
+export function execCaptureArgs(
+  command: string,
+  args: string[],
+  cwd?: string,
+  env?: NodeJS.ProcessEnv,
+): string {
+  const result = spawnSync(command, args, {
+    stdio: 'pipe',
+    encoding: 'utf8',
+    cwd,
+    ...(env ? { env } : {}),
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    const stderr = result.stderr?.trim();
+    throw new Error(
+      stderr && stderr.length > 0
+        ? `Command "${command}" exited with code ${result.status}: ${stderr}`
+        : `Command "${command}" exited with code ${result.status}`,
+    );
+  }
+
+  return result.stdout?.trim() ?? '';
+}
+
 export function getCommandVersion(command: string): string | null {
   try {
     return execFileSync(command, ['--version'], { encoding: 'utf8', stdio: 'pipe' }).trim();

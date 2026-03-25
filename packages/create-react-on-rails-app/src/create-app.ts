@@ -3,6 +3,7 @@ import fs from 'fs';
 import { CliOptions } from './types.js';
 import {
   execLiveArgs,
+  execCaptureArgs,
   getCommandVersion,
   logStep,
   logStepDone,
@@ -12,6 +13,8 @@ import {
 } from './utils.js';
 
 const DOCS_URL = 'https://reactonrails.com/docs/';
+const DEFAULT_GIT_AUTHOR_NAME = 'React on Rails Generator';
+const DEFAULT_GIT_AUTHOR_EMAIL = 'generator@reactonrails.local';
 
 function cleanupAppDirectory(
   appPath: string,
@@ -60,7 +63,7 @@ function bundleAddArgs(gemName: string, localPath: string | null, strict: boolea
 }
 
 export function buildGeneratorArgs(options: CliOptions): string[] {
-  const args: string[] = [];
+  const args: string[] = ['--new-app'];
 
   if (options.template === 'typescript') {
     args.push('--typescript');
@@ -82,10 +85,9 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
   // --force makes the generator overwrite conflicting files without prompting,
   // which is safe for a freshly scaffolded app with no custom content yet.
   args.push('--force');
-  // The newly created app directory is not a git repo yet, so the generator's
-  // uncommitted-changes check would always warn. --ignore-warnings bypasses all
-  // generator validation warnings (git, Node version, package manager) which is
-  // acceptable for a fresh app where prerequisites were already checked above.
+  // Keep the create-app flow non-interactive. --ignore-warnings bypasses generator
+  // validation warnings (git, Node version, package manager) because the CLI
+  // already checked prerequisites and is driving a fresh-app automation path.
   args.push('--ignore-warnings');
 
   return args;
@@ -174,6 +176,111 @@ function normalizeGeneratedPackageManager(
   logStepDone('pnpm configuration applied');
 }
 
+function ensureGitRepository(appPath: string): void {
+  if (fs.existsSync(path.join(appPath, '.git'))) {
+    return;
+  }
+
+  execLiveArgs('git', ['init'], appPath);
+}
+
+function readGitConfig(appPath: string, key: string): string | null {
+  try {
+    const value = execCaptureArgs('git', ['config', '--get', key], appPath);
+    return value === '' ? null : value;
+  } catch {
+    return null;
+  }
+}
+
+function educationalGitEnv(appPath: string): NodeJS.ProcessEnv {
+  const userName = readGitConfig(appPath, 'user.name') ?? DEFAULT_GIT_AUTHOR_NAME;
+  const userEmail = readGitConfig(appPath, 'user.email') ?? DEFAULT_GIT_AUTHOR_EMAIL;
+
+  return {
+    ...process.env,
+    GIT_AUTHOR_NAME: userName,
+    GIT_AUTHOR_EMAIL: userEmail,
+    GIT_COMMITTER_NAME: userName,
+    GIT_COMMITTER_EMAIL: userEmail,
+  };
+}
+
+function gitHasPendingChanges(appPath: string): boolean {
+  return execCaptureArgs('git', ['status', '--porcelain'], appPath) !== '';
+}
+
+function createEducationalCommit(appPath: string, subject: string, body: string): void {
+  ensureGitRepository(appPath);
+
+  if (!gitHasPendingChanges(appPath)) {
+    return;
+  }
+
+  execLiveArgs('git', ['add', '-A'], appPath);
+  execLiveArgs('git', ['commit', '-m', subject, '-m', body], appPath, educationalGitEnv(appPath));
+}
+
+function railsBaselineCommitMessage(): { subject: string; body: string } {
+  return {
+    subject: 'Create Rails app with PostgreSQL',
+    body: 'Generate the fresh Rails baseline before adding React on Rails.',
+  };
+}
+
+function reactOnRailsGemCommitMessage(): { subject: string; body: string } {
+  return {
+    subject: 'Add react_on_rails gem',
+    body: 'Install the OSS gem so the next commit can run the React on Rails generator.',
+  };
+}
+
+function reactOnRailsProCommitMessage(modeFlag: string): { subject: string; body: string } {
+  return {
+    subject: 'Add react_on_rails_pro gem',
+    body: `Install the Pro gem required by ${modeFlag} before running the generator.`,
+  };
+}
+
+function generatorCommitMessage(options: CliOptions): { subject: string; body: string } {
+  const language = options.template === 'typescript' ? 'TypeScript' : 'JavaScript';
+  const bundler = options.rspack ? 'Rspack' : 'Webpack';
+
+  if (options.rsc) {
+    return {
+      subject: `Install React Server Components with ${language} and ${bundler}`,
+      body: 'Run react_on_rails:install --rsc to add the generated home page, HelloServer example, and Pro RSC wiring.',
+    };
+  }
+
+  if (options.pro) {
+    return {
+      subject: `Install React on Rails Pro with ${language} and ${bundler}`,
+      body: 'Run react_on_rails:install --pro to add the generated home page, SSR example, and Pro Node renderer wiring.',
+    };
+  }
+
+  return {
+    subject: `Install React on Rails with ${language} and ${bundler}`,
+    body: 'Run react_on_rails:install to add the generated home page, SSR example, and development workflow.',
+  };
+}
+
+function packageManagerCommitMessage(packageManager: CliOptions['packageManager']): {
+  subject: string;
+  body: string;
+} {
+  const body =
+    packageManager === 'pnpm'
+      ? 'Convert npm artifacts to pnpm, remove package-lock.json, and update bin/setup to use pnpm install.'
+      : `Normalize the generated app for ${packageManager}.`;
+
+  return {
+    subject: `Normalize the generated app for ${packageManager}`,
+    body,
+  };
+}
+
 function printSuccessMessage(appName: string, route: string): void {
   console.log('');
   logSuccess(`Created ${appName} with React on Rails!`);
@@ -187,7 +294,10 @@ function printSuccessMessage(appName: string, route: string): void {
     'Note: The generated app uses PostgreSQL by default. Start PostgreSQL before running bin/rails db:prepare.',
   );
   console.log('');
-  logInfo(`Then visit http://localhost:3000/${route}`);
+  logInfo(`Then visit http://localhost:3000${route}`);
+  logInfo('bin/dev will try to open the generated home page on first successful boot.');
+  console.log('');
+  logInfo('Educational git history: git log --oneline --reverse');
   console.log('');
   logInfo(`Documentation: ${DOCS_URL}`);
   console.log('');
@@ -242,6 +352,8 @@ export function createApp(appName: string, options: CliOptions): void {
   logStep(currentStep, totalSteps, 'Creating Rails application...');
   try {
     execLiveArgs('rails', ['new', appName, '--database=postgresql', '--skip-javascript']);
+    const { subject, body } = railsBaselineCommitMessage();
+    createEducationalCommit(appPath, subject, body);
     logStepDone('Rails application created');
   } catch (error) {
     logError('Failed to create Rails application. Check the output above for details.');
@@ -266,6 +378,8 @@ export function createApp(appName: string, options: CliOptions): void {
       logInfo(`Using local react_on_rails gem path: ${reactOnRailsGemPath}`);
     }
     execLiveArgs('bundle', reactOnRailsArgs, appPath);
+    const { subject, body } = reactOnRailsGemCommitMessage();
+    createEducationalCommit(appPath, subject, body);
     logStepDone('react_on_rails gem added');
   } catch (error) {
     logError('Failed to add react_on_rails gem. Check the output above for details.');
@@ -290,6 +404,8 @@ export function createApp(appName: string, options: CliOptions): void {
         logInfo(`Using local react_on_rails_pro gem path: ${reactOnRailsProGemPath}`);
       }
       execLiveArgs('bundle', reactOnRailsProArgs, appPath);
+      const { subject, body } = reactOnRailsProCommitMessage(proModeLabel ?? '--pro');
+      createEducationalCommit(appPath, subject, body);
       logStepDone('react_on_rails_pro gem added');
     } catch (error) {
       logError(`Failed to add react_on_rails_pro gem required by ${proModeLabel}.`);
@@ -320,6 +436,8 @@ export function createApp(appName: string, options: CliOptions): void {
         REACT_ON_RAILS_PACKAGE_MANAGER: options.packageManager,
       },
     );
+    const { subject, body } = generatorCommitMessage(options);
+    createEducationalCommit(appPath, subject, body);
     logStepDone('React on Rails setup complete');
   } catch (error) {
     logError('React on Rails generator failed. Check the output above for details.');
@@ -337,6 +455,10 @@ export function createApp(appName: string, options: CliOptions): void {
 
   try {
     normalizeGeneratedPackageManager(appPath, options.packageManager);
+    if (options.packageManager === 'pnpm') {
+      const { subject, body } = packageManagerCommitMessage(options.packageManager);
+      createEducationalCommit(appPath, subject, body);
+    }
   } catch (error) {
     logError(
       `Failed to finish ${options.packageManager} setup. The app was created, but package manager normalization did not complete.`,
@@ -356,5 +478,5 @@ export function createApp(appName: string, options: CliOptions): void {
 
   // Final success
   logStepDone('Done!');
-  printSuccessMessage(appName, options.rsc ? 'hello_server' : 'hello_world');
+  printSuccessMessage(appName, '');
 }
