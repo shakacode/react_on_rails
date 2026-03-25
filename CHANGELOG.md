@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [16.5.0] - 2026-03-25
+
+Stable release — no changes from 16.5.0.rc.0.
+
 ### [16.5.0.rc.0] - 2026-03-25
 
 #### Added
@@ -2042,7 +2046,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.5.0.rc.0...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...main
+[16.5.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.0.rc.0...v16.5.0
 [16.5.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0.rc.0
 [16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
