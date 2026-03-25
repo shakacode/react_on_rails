@@ -927,6 +927,7 @@ RSpec.describe ReactOnRails::SystemChecker do
 
         expect(info_messages).to include("debug webpack builds")
         expect(info_messages).to include("webpack-stats.json")
+        expect(info_messages).to include("assets_bundler not set in config/shakapacker.yml")
       end
     end
 

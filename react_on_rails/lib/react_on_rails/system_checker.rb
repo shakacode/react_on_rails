@@ -464,9 +464,9 @@ module ReactOnRails
     end
 
     def bundler_config_file_exists?
-      # Fast path for common generator-default layouts. If none of these paths
-      # exist, we fall back to full candidate probing, which may load
-      # shakapacker-derived config.
+      # Fast path for common generator-default layouts (.js/.ts only). If none
+      # of these paths exist, we fall back to full candidate probing, which can
+      # include .cjs/.mjs variants in shakapacker-derived directories.
       return true if ALL_DEFAULT_CONFIG_CANDIDATES.any? { |path| File.file?(path) }
 
       !resolved_webpack_config_path.nil?
@@ -555,14 +555,16 @@ module ReactOnRails
     end
 
     def bundler_name_for_config_path(config_path)
-      if explicit_shakapacker_bundler_config_path?(config_path)
-        # For explicit custom shakapacker paths without assets_bundler in
-        # shakapacker.yml, fallback inference uses path heuristics and can
-        # misclassify non-standard filenames.
-        configured_assets_bundler || inferred_bundler_name(config_path)
-      else
-        inferred_bundler_name(config_path)
-      end
+      return inferred_bundler_name(config_path) unless explicit_shakapacker_bundler_config_path?(config_path)
+
+      configured_bundler = configured_assets_bundler
+      return configured_bundler if configured_bundler
+
+      # For explicit custom shakapacker paths without assets_bundler in
+      # shakapacker.yml, fallback inference uses path heuristics and can
+      # misclassify non-standard filenames.
+      add_inferred_bundler_notice_once
+      inferred_bundler_name(config_path)
     end
 
     def inferred_bundler_name(config_path)
@@ -574,6 +576,13 @@ module ReactOnRails
     def explicit_shakapacker_bundler_config_path?(resolved_config_path)
       shakapacker_path = shakapacker_assets_bundler_config_path
       !shakapacker_path.nil? && shakapacker_path == resolved_config_path
+    end
+
+    def add_inferred_bundler_notice_once
+      return if @inferred_bundler_notice_shown
+
+      add_info("ℹ️  assets_bundler not set in config/shakapacker.yml; inferring bundler from config path name.")
+      @inferred_bundler_notice_shown = true
     end
 
     def configured_assets_bundler

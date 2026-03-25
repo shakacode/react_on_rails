@@ -37,6 +37,10 @@ module ReactOnRails
         shakapacker_basename = File.basename(shakapacker_config_path.to_s)
         shakapacker_config_ext = File.extname(shakapacker_config_path.to_s).delete_prefix(".")
         candidates.concat(%w[js ts cjs mjs].flat_map do |ext|
+          # Skip only exact standard-name duplicates. Non-standard configured
+          # paths (for example `custom.config.cjs`) still probe standard-name
+          # fallbacks in the same directory; any accidental duplicates are
+          # de-duplicated by `candidates.uniq` below.
           config_basenames = ["webpack.config.#{ext}", "rspack.config.#{ext}"]
           next [] if ext == shakapacker_config_ext && config_basenames.include?(shakapacker_basename)
 
@@ -71,8 +75,10 @@ module ReactOnRails
       # missing; callers fall back to discovered default config candidates.
       @shakapacker_assets_bundler_config_path = nil
     rescue StandardError => e
+      message = "ReactOnRails could not read Shakapacker assets_bundler_config_path: #{e.class}: #{e.message}"
+      warn(message) unless Rails.logger
       Rails.logger&.debug do
-        "ReactOnRails could not read Shakapacker assets_bundler_config_path: #{e.class}: #{e.message}"
+        message
       end
       @shakapacker_assets_bundler_config_path = nil
     end
