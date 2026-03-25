@@ -458,11 +458,11 @@ module ReactOnRailsProHelper
       # BEFORE the response is committed, enabling a proper HTTP redirect.
       # Do NOT re-raise here: the caller owns the error now.
       # Async runs fibers cooperatively; there is no yield/IO between resolved? and reject.
-      # Keep a fallback for future Promise behavior changes.
+      # Keep a defensive fallback for future Promise behavior changes.
       begin
         first_chunk_promise.reject(e)
-      rescue FrozenError
-        raise e.class, e.message, e.backtrace
+      rescue StandardError
+        raise e
       end
     end
 

@@ -534,6 +534,10 @@ describe ReactOnRailsProHelper do
         expect do
           stream_react_component(component_name, props: props, **component_options)
         end.to raise_error(StandardError, "node renderer crashed before first chunk")
+
+        @async_barrier.wait
+        @main_output_queue.close
+        while @main_output_queue.dequeue; end
       end
 
       it "calls on_complete when stream is fully consumed" do
