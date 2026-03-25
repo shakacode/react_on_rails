@@ -159,6 +159,18 @@ describe('configBuilder', () => {
       expect(processExit).toHaveBeenCalledWith(1);
     });
 
+    it('throws when NODE_ENV is staging even if RAILS_ENV is development', () => {
+      process.env.NODE_ENV = 'staging';
+      process.env.RAILS_ENV = 'development';
+      delete process.env.RENDERER_PASSWORD;
+      const processExit = mockProcessExit();
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
+    });
+
     it('throws when RAILS_ENV is production even if NODE_ENV is test', () => {
       process.env.NODE_ENV = 'test';
       process.env.RAILS_ENV = 'production';

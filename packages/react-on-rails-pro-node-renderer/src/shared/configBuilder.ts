@@ -142,6 +142,10 @@ function logLevel(level: string): LevelWithSilent {
   }
 }
 
+function defaultReplayServerAsyncOperationLogs() {
+  return truthy(env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? (env.NODE_ENV || 'production') === 'development');
+}
+
 const defaultConfig: Config = {
   // Use env port if we run on Heroku
   port: Number(env.RENDERER_PORT) || DEFAULT_PORT,
@@ -187,9 +191,7 @@ const defaultConfig: Config = {
   stubTimers: env.RENDERER_STUB_TIMERS === 'true' || !env.RENDERER_STUB_TIMERS,
 
   // default to true in development, otherwise it is set to false
-  replayServerAsyncOperationLogs: truthy(
-    env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? (env.NODE_ENV || 'production') === 'development',
-  ),
+  replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
 
   // Maximum number of VM contexts to keep in memory. Defaults to 2 since typically only two contexts
   // are needed - one for the server bundle and one for React Server Components (RSC) if enabled.
@@ -283,9 +285,8 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   const runtimeDefaultConfig = {
     ...defaultConfig,
     password: env.RENDERER_PASSWORD,
-    replayServerAsyncOperationLogs: truthy(
-      env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? (env.NODE_ENV || 'production') === 'development',
-    ),
+    // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
+    replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
   };
   config = { ...runtimeDefaultConfig, ...userConfig };
 
