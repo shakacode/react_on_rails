@@ -238,6 +238,8 @@ module ReactOnRailsPro
     end
 
     def validate_renderer_password_for_production
+      # setup_renderer_password already guards this, but keep the check here so this method
+      # remains safe if invoked directly in future refactors.
       return if renderer_password.present?
       return unless node_renderer?
       return if Rails.env.development? || Rails.env.test?

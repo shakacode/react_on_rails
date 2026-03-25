@@ -215,5 +215,14 @@ describe('configBuilder', () => {
 
       expect(() => buildConfig()).not.toThrow();
     });
+
+    it('does not treat undefined user password as override when env password exists', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RENDERER_PASSWORD = 'late-loaded-password';
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig({ password: undefined })).not.toThrow();
+    });
   });
 });

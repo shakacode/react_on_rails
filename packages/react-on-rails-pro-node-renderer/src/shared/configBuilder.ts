@@ -242,7 +242,8 @@ export function logSanitizedConfig() {
   log.info({
     'Node Renderer version': packageJson.version,
     'Protocol version': packageJson.protocolVersion,
-    'Default settings': defaultConfig,
+    // These are module-load defaults; final runtime settings are shown below.
+    'Default settings (module-load)': defaultConfig,
     'ENV values used for settings (use "RENDERER_" prefix)': envValuesUsed(),
     'Customized values for settings from config object (overrides ENV)': sanitizedSettings(userConfig),
     'Final renderer settings': sanitizedSettings(config, '<NOT PROVIDED>'),
@@ -252,8 +253,9 @@ export function logSanitizedConfig() {
 function validatePasswordForProduction(aConfig: Config): string | null {
   if (aConfig.password) return null;
 
-  // Check both NODE_ENV and RAILS_ENV for production detection to stay consistent
-  // with master.ts and Ruby's Rails.env.production? check
+  // Require all present runtime envs to be development/test; fail closed otherwise.
+  // If either env indicates a production-like value, or neither env is set, password is required.
+  // This stays consistent with master.ts and Ruby's Rails.env.production? checks.
   const runtimeEnvs = [env.RAILS_ENV, env.NODE_ENV].filter((value): value is string => Boolean(value));
   const allowMissingPassword =
     runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
@@ -288,7 +290,11 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
   };
-  config = { ...runtimeDefaultConfig, ...userConfig };
+  // Ignore undefined overrides so late-bound env defaults (for example password) are preserved.
+  const userConfigWithoutUndefined = Object.fromEntries(
+    Object.entries(userConfig).filter(([, value]) => value !== undefined),
+  ) as Partial<Config>;
+  config = { ...runtimeDefaultConfig, ...userConfigWithoutUndefined };
 
   // Handle bundlePath deprecation
   if ('bundlePath' in userConfig) {
