@@ -11,10 +11,14 @@ bin/rails db:prepare
 bin/dev
 ```
 
-Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) to see your React component.
+On fresh apps, `bin/dev` will try to open [http://localhost:3000](http://localhost:3000) the first time the app boots successfully.
+The generated home page links to the example pages, the key files React on Rails created for you,
+and follow-on docs for OSS vs Pro, React Server Components, and the marketplace demo.
+The generated app also includes a step-by-step git history so you can inspect each major scaffold phase with `git log`.
 
 This creates a TypeScript app by default. For JavaScript, use `--template javascript`.
-For React Server Components (RSC), add `--rsc` and visit `/hello_server` after setup.
+For React Server Components (RSC), add `--rsc`. The CLI installs `react_on_rails_pro`
+automatically and the home page links to `/hello_server`.
 `--rsc` requires `react_on_rails_pro` to be installable in your environment
 ([Pro setup docs](../../pro/installation.md)).
 RSC supports both JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
@@ -57,15 +61,18 @@ The CLI runs these steps automatically:
 1. **Creates a Rails app** (`rails new` with PostgreSQL, no default JS)
 2. **Adds required gems** (`bundle add react_on_rails`, plus `react_on_rails_pro` for `--rsc`)
 3. **Runs the generator** (`rails generate react_on_rails:install` with your selected flags)
+4. **Creates educational git commits** for each logical setup step
 
 After completion, you get:
 
 - A Rails 7+ app with PostgreSQL
 - Shakapacker configured with Webpack (or Rspack) and HMR
 - A working HelloWorld React component (TypeScript by default)
+- A generated home page at `/` with links to the example pages, important project files, and Pro/RSC learning resources
+- A teaching-friendly git history that separates Rails creation, gem installation, generator output, and pnpm normalization
 - Optional RSC setup (`--rsc`) with HelloServer route and Pro Node renderer wiring
 - Server-side rendering ready
-- Development scripts (`bin/dev` with hot reloading)
+- Development scripts (`bin/dev` with hot reloading and first-run browser open)
 
 ## Prerequisites
 
@@ -74,10 +81,11 @@ The CLI checks for these before starting:
 - **Node.js 18+**
 - **Ruby 3.0+**
 - **Rails 7.0+** (`gem install rails`)
+- **git**
 - **npm or pnpm**
 - **PostgreSQL** running locally (needed at `bin/rails db:prepare`, not validated by the CLI)
 
-If any of the first four are missing, you'll get a clear error message with installation instructions.
+If any of the first five are missing, you'll get a clear error message with installation instructions.
 
 ## Adding to an Existing Rails App
 
