@@ -968,11 +968,15 @@ module ReactOnRails
       checker.add_info("\n🔧 Development & Debugging:")
 
       if runtime_config
-        # Defaults are environment-sensitive for development_mode/trace and static for logging/replay.
+        # development_mode/trace default to Rails.env.development?, so only
+        # surface explicit runtime divergence from that environment-driven
+        # default.
         checker.add_info("  development_mode: #{runtime_config.development_mode}") \
           if runtime_config.development_mode != Rails.env.development?
         checker.add_info("  trace: #{runtime_config.trace}") \
           if runtime_config.trace != Rails.env.development?
+        # logging_on_server/replay_console default to true in all environments,
+        # so any non-truthy runtime value is worth surfacing.
         unless runtime_config.logging_on_server
           checker.add_info("  logging_on_server: #{runtime_config.logging_on_server.inspect}")
         end
@@ -1053,11 +1057,12 @@ module ReactOnRails
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def analyze_component_loading_config(content, runtime_config = nil)
       component_configs = []
+      filesystem_registry_enabled = false
 
       if runtime_config
         if runtime_config.components_subdirectory.present?
           component_configs << "components_subdirectory: #{runtime_config.components_subdirectory}"
-          checker.add_info("    ℹ️  File-system based component registry enabled")
+          filesystem_registry_enabled = true
         end
         # Default is false; only report explicit non-default override.
         if runtime_config.same_bundle_for_client_and_server
@@ -1069,7 +1074,7 @@ module ReactOnRails
         components_subdir_match = content.match(/config\.components_subdirectory\s*=\s*["']([^"']+)["']/)
         if components_subdir_match
           component_configs << "components_subdirectory: #{components_subdir_match[1]}"
-          checker.add_info("    ℹ️  File-system based component registry enabled")
+          filesystem_registry_enabled = true
         end
 
         same_bundle_match = content.match(/config\.same_bundle_for_client_and_server\s*=\s*([^\s\n,]+)/)
@@ -1083,6 +1088,7 @@ module ReactOnRails
 
       checker.add_info("\n📦 Component Loading:")
       component_configs.each { |config| checker.add_info("  #{config}") }
+      checker.add_info("    ℹ️  File-system based component registry enabled") if filesystem_registry_enabled
     end
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
@@ -2391,7 +2397,7 @@ module ReactOnRails
 
       @react_on_rails_runtime_configuration =
         ensure_rails_environment_loaded ? ReactOnRails.configuration : nil
-    rescue StandardError => e
+    rescue StandardError, LoadError => e
       checker.add_warning("⚠️  Could not query React on Rails runtime configuration: #{e.message}")
       # Memoize as nil to avoid repeated failed lookups on subsequent checks.
       @react_on_rails_runtime_configuration = nil
@@ -2405,7 +2411,7 @@ module ReactOnRails
       @resolved_pro_server_renderer =
         if rails_environment_loaded && defined?(ReactOnRailsPro)
           # server_renderer is stored as a plain string in Pro config (for example, "NodeRenderer").
-          ReactOnRailsPro.configuration.server_renderer
+          ReactOnRailsPro.configuration.server_renderer.to_s
         elsif pro_initializer_has_node_renderer?
           "NodeRenderer"
         elsif rails_environment_loaded
