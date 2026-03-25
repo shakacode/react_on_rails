@@ -102,6 +102,27 @@ export default function ClientForm() {
 <%= stream_react_component("ClientForm") %>
 ```
 
+### Common Error: railsContext Contains Functions
+
+When using React on Rails Pro with RSC, the `railsContext` object includes non-serializable functions (`addPostSSRHook`, `getRSCPayloadStream`). Passing the entire `railsContext` to a Client Component causes:
+
+```
+Functions cannot be passed directly to Client Components
+unless you explicitly expose it by marking it with "use server".
+```
+
+**Fix:** Strip non-serializable properties before passing to Client Components:
+
+```jsx
+// Server Component (render function)
+const MyPage = (props, railsContext) => {
+  const { addPostSSRHook, getRSCPayloadStream, ...serializableContext } = railsContext;
+  return () => (
+    <ClientComponent {...props} railsContext={serializableContext} />
+  );
+};
+```
+
 > **Note:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controller endpoints for all mutations.
 
 ### Common Error: Passing Class Instances
@@ -712,6 +733,8 @@ end
 | SSR hangs indefinitely / request timeout on large RSC payloads                                                               | Stream backpressure deadlock when RSC payload exceeds 16 KB                                                                                                                                        | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                                                                                                                                                 |
 | `"The 'react-on-rails' package version does not match the gem version"`                                                      | Gem and npm package installed at different versions                                                                                                                                                | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                   |
 | `"The 'react-on-rails' package version is not an exact version"`                                                             | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json                                                                                                                    | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                    |
+| RSC payload returns `ServerComponentFetchError: Error parsing JSON` or `SyntaxError` in development                          | Rails' `annotate_rendered_view_with_filenames` wraps the RSC payload JSON in `<!-- BEGIN -->` / `<!-- END -->` HTML comments                                                                       | Upgrade to React on Rails Pro 16.4.0+ which renders RSC templates with `formats: [:text]`. For older versions, disable `config.action_view.annotate_rendered_view_with_filenames` for the RSC controller.                                                              |
+| `railsContext` causes "Functions cannot be passed directly to Client Components"                                             | `railsContext` includes non-serializable functions (`addPostSSRHook`, `getRSCPayloadStream`) added by Pro                                                                                          | Destructure and exclude function properties before passing to Client Components. See [railsContext Contains Functions](#common-error-railscontext-contains-functions)                                                                                                   |
 
 ## Environment Variable Access
 

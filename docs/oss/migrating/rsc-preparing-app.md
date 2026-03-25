@@ -448,6 +448,28 @@ import { Provider } from 'react-redux';
 >
 > For more on this distinction, see [File Suffixes vs. RSC Directive](https://github.com/shakacode/react_on_rails/pull/2406).
 
+### Transpiled languages (ReScript, Reason, etc.)
+
+If you use ReScript or other transpiled languages, the compiled `.bs.js` files don't preserve directives. Add `'use client'` to the **wrapper `.jsx` files** in `ror_components/`, not to the `.res` source files.
+
+For example, with `.client.jsx` / `.server.jsx` pairs:
+
+```jsx
+// ListingsShow.client.jsx — add 'use client' here
+'use client';
+import ListingsShow from '../ListingsShow';
+export default ListingsShow;
+```
+
+```jsx
+// ListingsShow.server.jsx — add 'use client' here too
+'use client';
+import ListingsShow from '../ListingsShow';
+export default ListingsShow;
+```
+
+> **Common mistake:** Developers often add `'use client'` to JS/JSX entry points but forget the ReScript ones. The pack generator will **silently** register components without `'use client'` as server components via `registerServerComponent`. There is no warning — the component just breaks at runtime. After adding the directive, verify with `bin/rails react_on_rails:generate_packs` and check that the output shows all components as "Client components."
+
 ### What about the bundle entry files?
 
 Adding `'use client'` to `client-bundle.js` or `server-bundle.js` would technically work -- it would make all imported components Client Components, achieving the same immediate effect. However, we recommend placing the directive on **individual component files** instead. The reason is forward-looking: when you later want to convert a specific component to a Server Component (by removing `'use client'`), you need granular control per component. If the directive is only on the bundle entry file, you'd have to move it to every individual component file at that point anyway.
@@ -459,6 +481,8 @@ After adding `'use client'` to all entry points, rebuild all three bundles and v
 ## Step 6: Switch to Streaming Rendering
 
 Replace synchronous view helpers and controller rendering with their streaming equivalents.
+
+> **Warning: Compression middleware.** If your app uses `Rack::Deflater`, `Rack::Brotli`, or similar compression middleware, streaming responses will deadlock. The middleware calls `body.each` to check the response size, which blocks on `ActionController::Live::Buffer`. See [Compression Middleware Compatibility](../building-features/streaming-server-rendering.md#compression-middleware-compatibility) for the fix.
 
 ### 6a. Update controllers
 
