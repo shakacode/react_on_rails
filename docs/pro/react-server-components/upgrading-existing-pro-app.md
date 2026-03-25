@@ -8,16 +8,16 @@ This guide walks you through adding React Server Components to an existing React
 
 Before running the generator, verify your environment:
 
-| Requirement              | Check command                                                        | Expected                          |
-| ------------------------ | -------------------------------------------------------------------- | --------------------------------- |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                     | v4.0.0+                           |
-| React on Rails gem       | `bundle show react_on_rails`                                         | v16.0.0+                          |
-| React on Rails Pro npm   | `pnpm list react-on-rails-pro`                                       | Matches gem version               |
-| React version            | `pnpm list react`                                                    | 19.0.x (19.1.x not yet supported) |
-| React DOM version        | `pnpm list react-dom`                                                | Must match `react` version        |
-| Node.js                  | `node --version`                                                     | 20+                               |
-| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                       | File exists                       |
-| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"` | NodeRenderer enabled              |
+| Requirement              | Check command                                                                                | Expected                          |
+| ------------------------ | -------------------------------------------------------------------------------------------- | --------------------------------- |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                             | v16.4.0+                          |
+| React on Rails gem       | `bundle show react_on_rails`                                                                 | v16.4.0+                          |
+| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` | Matches gem version               |
+| React version            | `npm ls react` / `yarn why react` / `pnpm list react`                                        | 19.0.x (19.1.x not yet supported) |
+| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom`                            | Must match `react` version        |
+| Node.js                  | `node --version`                                                                             | 20+                               |
+| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                               | File exists                       |
+| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                         | NodeRenderer enabled              |
 
 If React is below 19.0.x, upgrade it first:
 
@@ -66,7 +66,7 @@ The generator automatically handles both webpack export shapes used across Pro a
 
 ### Current Export Shape
 
-Recent versions of the React on Rails Pro generator export an object from `serverWebpackConfig.js`:
+Recent versions of the React on Rails Pro generator export an object from `serverWebpackConfig.js` (introduced via [PR 2424](https://github.com/shakacode/react_on_rails/pull/2424)):
 
 ```js
 // config/webpack/serverWebpackConfig.js
