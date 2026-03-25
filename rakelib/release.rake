@@ -216,9 +216,13 @@ def compute_target_gem_version(current_gem_version:, version_input:)
       "#{version[:major]}.#{version[:minor]}.#{version[:patch] + 1}"
     end
   when "minor"
-    # For prerelease inputs, gem-release drops the suffix and increments minor/major normally.
+    # NOTE: From a pre-release (e.g., 16.5.0.rc.0), this produces 16.6.0, not 16.5.0.
+    # To promote a pre-release to its stable version, use "patch" instead.
+    # This matches `gem bump --version minor` behavior from the gem-release gem.
     "#{version[:major]}.#{version[:minor] + 1}.0"
   when "major"
+    # NOTE: From a pre-release (e.g., 16.5.0.rc.0), this produces 17.0.0.
+    # To promote a pre-release to its stable version, use "patch" instead.
     "#{version[:major] + 1}.0.0"
   else
     abort "❌ Unsupported semver bump keyword #{version_input.inspect}"

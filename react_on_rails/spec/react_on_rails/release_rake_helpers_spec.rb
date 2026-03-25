@@ -54,6 +54,18 @@ RSpec.describe "release.rake helper methods" do
       expect(compute_target_gem_version(current_gem_version: "16.5.0.rc.0", version_input: "patch")).to eq("16.5.0")
     end
 
+    it "increments minor from prerelease base (use 'patch' to promote RC to stable)" do
+      # 16.5.0.rc.0 + "minor" → 16.6.0, NOT 16.5.0
+      # This matches gem-release behavior. To promote 16.5.0.rc.0 → 16.5.0, use "patch".
+      expect(compute_target_gem_version(current_gem_version: "16.5.0.rc.0", version_input: "minor")).to eq("16.6.0")
+    end
+
+    it "increments major from prerelease base (use 'patch' to promote RC to stable)" do
+      # 16.5.0.rc.0 + "major" → 17.0.0, NOT 16.5.0
+      # This matches gem-release behavior. To promote 16.5.0.rc.0 → 16.5.0, use "patch".
+      expect(compute_target_gem_version(current_gem_version: "16.5.0.rc.0", version_input: "major")).to eq("17.0.0")
+    end
+
     it "passes through explicit versions unchanged" do
       expect(compute_target_gem_version(current_gem_version: "16.3.4",
                                         version_input: "16.4.0.rc.1")).to eq("16.4.0.rc.1")
