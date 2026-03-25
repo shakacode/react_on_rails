@@ -205,6 +205,7 @@ RSpec.describe "release.rake helper methods" do
     it "falls back to a patch bump when the changelog does not introduce a newer version" do
       allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.3.0")
       allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
+      allow(self).to receive(:version_tagged?).with("/tmp/repo", "16.3.0").and_return(true)
 
       expect(resolve_version_input("", "/tmp/repo")).to eq("patch")
     end
