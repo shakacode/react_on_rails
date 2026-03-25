@@ -462,7 +462,7 @@ module ReactOnRailsProHelper
       begin
         first_chunk_promise.reject(e)
       rescue FrozenError
-        raise e
+        raise e.class, e.message, e.backtrace
       end
     end
 
