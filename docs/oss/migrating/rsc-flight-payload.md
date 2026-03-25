@@ -14,7 +14,7 @@ Every server-rendered element becomes a JSON array in the payload:
 ["$","div",null,{"className":"flex items-center justify-between px-4 py-2 bg-white shadow-sm rounded-lg","children":[...]}]
 ```
 
-A typical Flight payload breaks down as:
+In a Tailwind-heavy app with repeated card/list components, a Flight payload often breaks down as:
 
 | Category              | Approximate share | Description                                                           |
 | --------------------- | ----------------- | --------------------------------------------------------------------- |
@@ -97,7 +97,7 @@ The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** 
 
 **Step 1:** Identify presentational subtrees with high expansion ratios.
 
-**Step 2:** Add `'use client'` to those components. They don't need hooks -- the directive just tells React to send a client reference instead of the expanded element tree.
+**Step 2:** Add `'use client'` to those components. It must be the first line in the file (before imports). The directive tells React to send a client reference instead of the expanded element tree.
 
 ```jsx
 // Before: Server Component — entire element tree in Flight payload
@@ -158,12 +158,15 @@ The Flight payload is embedded in `<script>` tags in the HTML response. To extra
 const scripts = document.querySelectorAll('script');
 let rscPayloadSize = 0;
 scripts.forEach((script) => {
-  if (script.textContent && script.textContent.includes('$')) {
+  // Heuristic: Flight records usually contain element tuples like ["$","div",...]
+  if (script.textContent && /\["\$","[a-zA-Z]/.test(script.textContent)) {
     rscPayloadSize += new Blob([script.textContent]).size;
   }
 });
 console.log(`RSC payload: ${(rscPayloadSize / 1024).toFixed(1)} KB`);
 ```
+
+This is still an approximation. Validate the marker pattern against how your app emits Flight chunks.
 
 ### Analyzing Payload Composition
 
@@ -171,7 +174,10 @@ To understand what's taking up space in your payload, parse the Flight data and 
 
 ```js
 // Rough breakdown of payload composition
-const payload = /* extracted payload text */;
+const payload = Array.from(document.querySelectorAll('script'))
+  .map((script) => script.textContent || '')
+  .filter((text) => /\["\$","[a-zA-Z]/.test(text))
+  .join('\n');
 const classNameMatches = payload.match(/"className":"[^"]*"/g) || [];
 const classNameBytes = classNameMatches.reduce((sum, m) => sum + m.length, 0);
 const totalBytes = new Blob([payload]).size;
@@ -195,7 +201,7 @@ In the benchmark above, the payload reduction was significant even after compres
 Moving presentational components to the client increases the amount of JavaScript the browser must download and execute before those components render. This can slightly increase Largest Contentful Paint (LCP):
 
 - **TTFB and FCP improve** because the server generates and streams a smaller payload faster
-- **LCP may increase** because the browser must hydrate more components before the largest element paints
+- **LCP may increase** because components moved to the client render their element tree during JS execution/hydration; if the LCP element is inside one of those components, it now depends on JS timing
 
 In the benchmark, LCP increased by 8% (982 ms to 1,058 ms) -- a minor regression offset by the 64% FCP improvement and 42% payload reduction.
 
@@ -232,7 +238,7 @@ Is the component interactive (hooks, events, browser APIs)?
 
 The standard RSC advice -- "make everything a Server Component unless it needs interactivity" -- is a good starting point but not the full picture. For presentational components with high expansion ratios that render many times on a page, moving them to Client Components can dramatically reduce the Flight payload with minimal JS cost. Always measure to confirm the tradeoff is favorable for your specific page.
 
-## Next Steps
+## Related Articles
 
 - [Component Tree Restructuring Patterns](rsc-component-patterns.md) -- the foundational patterns for splitting server and client components
 - [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) -- debugging payload duplication and other RSC issues
