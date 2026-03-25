@@ -50,6 +50,10 @@ RSpec.describe "release.rake helper methods" do
       expect(compute_target_gem_version(current_gem_version: "16.3.4", version_input: "major")).to eq("17.0.0")
     end
 
+    it "strips prerelease suffix on patch bumps from prerelease versions" do
+      expect(compute_target_gem_version(current_gem_version: "16.5.0.rc.0", version_input: "patch")).to eq("16.5.0")
+    end
+
     it "passes through explicit versions unchanged" do
       expect(compute_target_gem_version(current_gem_version: "16.3.4",
                                         version_input: "16.4.0.rc.1")).to eq("16.4.0.rc.1")
@@ -136,6 +140,28 @@ RSpec.describe "release.rake helper methods" do
         expect(section).to include("Feature A")
         expect(section).not_to include("### [16.4.0] - 2026-03-08")
         expect(section).not_to include("Bug B")
+      end
+    end
+
+    it "returns nil when the matching section has no content" do
+      changelog = <<~CHANGELOG
+        # Change Log
+
+        ### [Unreleased]
+
+        ### [16.4.0] - 2026-03-08
+
+        ### [16.3.0] - 2026-02-01
+        #### Fixed
+        - Bug B
+      CHANGELOG
+
+      Dir.mktmpdir do |dir|
+        changelog_path = File.join(dir, "CHANGELOG.md")
+        File.write(changelog_path, changelog)
+
+        section = extract_changelog_section(changelog_path: changelog_path, version: "16.4.0")
+        expect(section).to be_nil
       end
     end
   end

@@ -296,7 +296,10 @@ def extract_changelog_section(changelog_path:, version:)
 
   end_index = ((start_index + 1)...lines.length).find { |idx| lines[idx].start_with?("### [") } || lines.length
   # Skip the version header line itself; GitHub release title already contains the version.
-  lines[(start_index + 1)...end_index].join.strip
+  content = lines[(start_index + 1)...end_index].join.strip
+  return nil if content.empty?
+
+  content
 end
 
 # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
