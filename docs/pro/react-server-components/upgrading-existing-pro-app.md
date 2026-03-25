@@ -140,11 +140,11 @@ All three builds should succeed without errors.
 
 ### Generated Files Check
 
-Verify these files exist in your webpack output directory (typically `public/webpack/production/` or `public/webpack/development/`):
+Verify these files exist in the expected locations:
 
-- [ ] `rsc-bundle.js` -- the RSC bundle
-- [ ] `react-client-manifest.json` -- maps client component references to browser chunks
-- [ ] `react-server-client-manifest.json` -- maps client component references for SSR
+- [ ] `react-client-manifest.json` -- in your webpack output directory (typically `public/webpack/development/` or `public/webpack/production/`)
+- [ ] `react-server-client-manifest.json` -- in the same webpack output directory
+- [ ] `rsc-bundle.js` -- in your `server_bundle_output_path` directory (default: `ssr-generated/`)
 
 ### Route Check
 
