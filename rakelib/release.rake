@@ -546,7 +546,9 @@ def resolve_version_input(version_input, monorepo_root)
   # If the latest changelog version matches the current version but hasn't been
   # tagged yet, use it. This handles the case where the changelog was updated
   # and the version bumped in a prior step (e.g., RC → stable promotion).
-  if changelog_version && !version_tagged?(monorepo_root, changelog_version)
+  if changelog_version &&
+      Gem::Version.new(changelog_version) == Gem::Version.new(current_version) &&
+      !version_tagged?(monorepo_root, changelog_version)
     puts "Found untagged CHANGELOG.md version: #{changelog_version} (current: #{current_version})"
     return changelog_version
   end
