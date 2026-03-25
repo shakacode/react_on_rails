@@ -1035,6 +1035,22 @@ describe ReactOnRailsHelper do
         expect(result).not_to include("reactOnRailsStoreLoaded")
       end
     end
+
+    it "escapes store_name when serializing data-js-react-on-rails-store" do
+      injected_store_name = 'MyStore" onmouseover="alert(1)'
+      result = helper.send(
+        :generate_store_script,
+        {
+          props: { count: 0 },
+          store_name: injected_store_name
+        }
+      )
+
+      expect(result).to include(
+        'data-js-react-on-rails-store="MyStore&quot; onmouseover=&quot;alert(1)"'
+      )
+      expect(result).not_to include('data-js-react-on-rails-store="MyStore" onmouseover=')
+    end
   end
 
   describe "#wrap_console_script_with_nonce" do

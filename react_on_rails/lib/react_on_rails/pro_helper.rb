@@ -41,7 +41,7 @@ module ReactOnRails
       store_hydration_data = content_tag(:script,
                                          json_safe_and_pretty(redux_store_data[:props]).html_safe,
                                          type: "application/json",
-                                         "data-js-react-on-rails-store" => redux_store_data[:store_name].html_safe)
+                                         "data-js-react-on-rails-store" => redux_store_data[:store_name])
 
       # Add immediate invocation script for Pro users to enable hydration during streaming
       store_hydration_scripts = if ReactOnRails::Utils.react_on_rails_pro?

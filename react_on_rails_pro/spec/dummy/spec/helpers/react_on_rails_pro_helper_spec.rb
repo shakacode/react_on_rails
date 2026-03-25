@@ -387,6 +387,20 @@ describe ReactOnRailsProHelper do
         allow(self).to receive(:response).and_return(mocked_rails_response)
       end
 
+      it "warns when immediate_hydration option is passed" do
+        mock_request_and_response
+        allow(ActiveSupport::Deprecation).to receive(:warn)
+
+        stream_react_component(
+          component_name,
+          props: props,
+          immediate_hydration: false,
+          **component_options
+        )
+
+        expect(ActiveSupport::Deprecation).to have_received(:warn).with(include("immediate_hydration"))
+      end
+
       it "returns the component shell that exist in the initial chunk with the consoleReplayScript" do
         mock_request_and_response
         initial_result = stream_react_component(component_name, props: props, **component_options)
