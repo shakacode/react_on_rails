@@ -44,6 +44,12 @@ describe('configBuilder', () => {
     return { buildConfig, logSanitizedConfig, info };
   }
 
+  function mockProcessExit() {
+    return jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit: ${code ?? 0}`);
+    }) as never);
+  }
+
   function envValuesUsedForRenderedConfig(userConfig: { host?: string }) {
     const { buildConfig, logSanitizedConfig, info } = loadConfigBuilderWithMockedLogger();
 
@@ -74,19 +80,23 @@ describe('configBuilder', () => {
     it('throws when no password is set in production', () => {
       process.env.NODE_ENV = 'production';
       delete process.env.RENDERER_PASSWORD;
+      const processExit = mockProcessExit();
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
-      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
     });
 
     it('throws when no password is set in staging', () => {
       process.env.NODE_ENV = 'staging';
       delete process.env.RENDERER_PASSWORD;
+      const processExit = mockProcessExit();
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
-      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
     });
 
     it('does not throw when password is set via env in production', () => {
@@ -129,20 +139,36 @@ describe('configBuilder', () => {
       process.env.NODE_ENV = 'development';
       process.env.RAILS_ENV = 'production';
       delete process.env.RENDERER_PASSWORD;
+      const processExit = mockProcessExit();
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
-      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
     });
 
     it('throws when RAILS_ENV is production and NODE_ENV is unset', () => {
       delete process.env.NODE_ENV;
       process.env.RAILS_ENV = 'production';
       delete process.env.RENDERER_PASSWORD;
+      const processExit = mockProcessExit();
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
-      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
+    });
+
+    it('throws when RAILS_ENV is production even if NODE_ENV is test', () => {
+      process.env.NODE_ENV = 'test';
+      process.env.RAILS_ENV = 'production';
+      delete process.env.RENDERER_PASSWORD;
+      const processExit = mockProcessExit();
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
     });
 
     it('does not throw when RAILS_ENV is development and NODE_ENV is development', () => {
@@ -159,10 +185,23 @@ describe('configBuilder', () => {
       delete process.env.NODE_ENV;
       delete process.env.RAILS_ENV;
       delete process.env.RENDERER_PASSWORD;
+      const processExit = mockProcessExit();
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
 
-      expect(() => buildConfig()).toThrow('RENDERER_PASSWORD must be set');
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
+    });
+
+    it('does not throw when password is set after module import', () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      process.env.RENDERER_PASSWORD = 'late-loaded-password';
+
+      expect(() => buildConfig()).not.toThrow();
     });
   });
 });

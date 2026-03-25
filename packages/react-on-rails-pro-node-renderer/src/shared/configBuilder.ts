@@ -18,7 +18,6 @@ const DEFAULT_PORT = 3800;
 const DEFAULT_LOG_LEVEL = 'info';
 const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
-const NODE_ENV = env.NODE_ENV || 'production';
 
 /* Update ./docs/node-renderer/js-configuration.md when something here changes */
 // Node renderer configuration
@@ -189,7 +188,7 @@ const defaultConfig: Config = {
 
   // default to true in development, otherwise it is set to false
   replayServerAsyncOperationLogs: truthy(
-    env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? NODE_ENV === 'development',
+    env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? (env.NODE_ENV || 'production') === 'development',
   ),
 
   // Maximum number of VM contexts to keep in memory. Defaults to 2 since typically only two contexts
@@ -248,32 +247,31 @@ export function logSanitizedConfig() {
   });
 }
 
-function validatePasswordForProduction(aConfig: Config) {
-  if (aConfig.password) return;
+function validatePasswordForProduction(aConfig: Config): string | null {
+  if (aConfig.password) return null;
 
   // Check both NODE_ENV and RAILS_ENV for production detection to stay consistent
   // with master.ts and Ruby's Rails.env.production? check
   const runtimeEnvs = [env.RAILS_ENV, env.NODE_ENV].filter((value): value is string => Boolean(value));
   const allowMissingPassword =
     runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
-  if (allowMissingPassword) return;
+  if (allowMissingPassword) return null;
 
-  throw new Error(
+  return (
     'RENDERER_PASSWORD must be set in production-like environments ' +
-      `(NODE_ENV: "${env.NODE_ENV ?? '(not set)'}", RAILS_ENV: "${env.RAILS_ENV ?? '(not set)'}").` +
-      '\n\n' +
-      'In development and test environments, the renderer password is optional and no authentication\n' +
-      'is required. In all other environments, you must explicitly configure a password to secure\n' +
-      'communication between Rails and the Node Renderer.\n\n' +
-      'To fix this, set the RENDERER_PASSWORD environment variable:\n\n' +
-      '  export RENDERER_PASSWORD="your-secure-password"\n\n' +
-      'Or pass it in the config object:\n\n' +
-      '  reactOnRailsProNodeRenderer({ password: process.env.RENDERER_PASSWORD });\n\n' +
-      'Environment matrix:\n' +
-      '  development — password optional (no authentication)\n' +
-      '  test        — password optional (no authentication)\n' +
-      '  staging     — RENDERER_PASSWORD required\n' +
-      '  production  — RENDERER_PASSWORD required',
+    `(NODE_ENV: "${env.NODE_ENV ?? '(not set)'}", RAILS_ENV: "${env.RAILS_ENV ?? '(not set)'}").` +
+    '\n\n' +
+    'In development and test environments, the renderer password is optional and no authentication\n' +
+    'is required. In all other environments, you must explicitly configure a password to secure\n' +
+    'communication between Rails and the Node Renderer.\n\n' +
+    'To fix this, set the RENDERER_PASSWORD environment variable:\n\n' +
+    '  export RENDERER_PASSWORD="your-secure-password"\n\n' +
+    'Or pass it in the config object:\n\n' +
+    '  reactOnRailsProNodeRenderer({ password: process.env.RENDERER_PASSWORD });\n\n' +
+    'Environment matrix:\n' +
+    '  development — password optional (no authentication)\n' +
+    '  test        — password optional (no authentication)\n' +
+    '  all other environments (staging, production, qa, preview, etc.) — RENDERER_PASSWORD required'
   );
 }
 
@@ -282,7 +280,14 @@ function validatePasswordForProduction(aConfig: Config) {
  */
 export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   userConfig = providedUserConfig || {};
-  config = { ...defaultConfig, ...userConfig };
+  const runtimeDefaultConfig = {
+    ...defaultConfig,
+    password: env.RENDERER_PASSWORD,
+    replayServerAsyncOperationLogs: truthy(
+      env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? (env.NODE_ENV || 'production') === 'development',
+    ),
+  };
+  config = { ...runtimeDefaultConfig, ...userConfig };
 
   // Handle bundlePath deprecation
   if ('bundlePath' in userConfig) {
@@ -348,7 +353,11 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     process.exit(1);
   }
 
-  validatePasswordForProduction(config);
+  const passwordValidationError = validatePasswordForProduction(config);
+  if (passwordValidationError) {
+    log.error(passwordValidationError);
+    process.exit(1);
+  }
 
   log.level = config.logLevel;
   return config;

@@ -240,7 +240,7 @@ module ReactOnRailsPro
     def validate_renderer_password_for_production
       return if renderer_password.present?
       return unless node_renderer?
-      return if defined?(Rails) && (Rails.env.development? || Rails.env.test?)
+      return if Rails.env.development? || Rails.env.test?
 
       raise ReactOnRailsPro::Error, <<~MSG
         RENDERER_PASSWORD must be set in production-like environments (staging, production, etc.)
