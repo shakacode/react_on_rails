@@ -527,6 +527,15 @@ describe ReactOnRailsProHelper do
         expect(on_complete_called).to be false
       end
 
+      it "propagates pre-first-chunk errors to the caller" do
+        allow(self).to receive(:internal_stream_react_component)
+          .and_raise(StandardError, "node renderer crashed before first chunk")
+
+        expect do
+          stream_react_component(component_name, props: props, **component_options)
+        end.to raise_error(StandardError, "node renderer crashed before first chunk")
+      end
+
       it "calls on_complete when stream is fully consumed" do
         mock_request_and_response
 

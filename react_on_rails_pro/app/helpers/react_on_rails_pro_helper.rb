@@ -457,7 +457,13 @@ module ReactOnRailsProHelper
       # Reject the promise so .wait auto-raises in the caller,
       # BEFORE the response is committed, enabling a proper HTTP redirect.
       # Do NOT re-raise here: the caller owns the error now.
-      first_chunk_promise.reject(e)
+      # Async runs fibers cooperatively; there is no yield/IO between resolved? and reject.
+      # Keep a fallback for future Promise behavior changes.
+      begin
+        first_chunk_promise.reject(e)
+      rescue FrozenError
+        raise e
+      end
     end
 
     # Wait for and return the first chunk (blocking).
