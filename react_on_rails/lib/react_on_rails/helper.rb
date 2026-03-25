@@ -57,6 +57,14 @@ module ReactOnRails
     # random_dom_id can be set to override the default from the config/initializers. That's only
     # used if you have multiple instance of the same component on the Rails view.
     def react_component(component_name, options = {})
+      if options.key?(:immediate_hydration)
+        Rails.logger.warn(
+          "[React on Rails] `immediate_hydration:` is no longer supported on react_component. " \
+          "Remove this option."
+        )
+        options.delete(:immediate_hydration)
+      end
+
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
@@ -113,6 +121,14 @@ module ReactOnRails
     #    <%= react_helmet_app["componentHtml"] %>
     #
     def react_component_hash(component_name, options = {})
+      if options.key?(:immediate_hydration)
+        Rails.logger.warn(
+          "[React on Rails] `immediate_hydration:` is no longer supported on react_component_hash. " \
+          "Remove this option."
+        )
+        options.delete(:immediate_hydration)
+      end
+
       options[:prerender] = true
 
       internal_result = internal_react_component(component_name, options)

@@ -325,6 +325,14 @@ describe ReactOnRailsHelper do
       expect(expect(react_app).target).to script_tag_be_included(react_definition_script)
     }
 
+    it "warns when immediate_hydration option is passed" do
+      allow(Rails.logger).to receive(:warn)
+
+      react_component("App", props: props, immediate_hydration: false)
+
+      expect(Rails.logger).to have_received(:warn).with(include("immediate_hydration"))
+    end
+
     context "with 'random_dom_id' option set to false" do
       subject(:react_app) { react_component("App", props: props, random_dom_id: false) }
 
@@ -470,6 +478,14 @@ describe ReactOnRailsHelper do
       expect(react_app).to be_a(Hash)
       expect(react_app).to have_key("componentHtml")
       expect(react_app).to have_key("title")
+    end
+
+    it "warns when immediate_hydration option is passed" do
+      allow(Rails.logger).to receive(:warn)
+
+      react_component_hash("App", props: props, immediate_hydration: false)
+
+      expect(Rails.logger).to have_received(:warn).with(include("immediate_hydration"))
     end
   end
 

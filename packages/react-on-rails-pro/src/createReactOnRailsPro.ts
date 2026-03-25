@@ -72,7 +72,7 @@ function clientStartup() {
   globalThis.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
   const railsContext = getRailsContext();
-  if (railsContext?.rorPro !== false) {
+  if (railsContext?.rorPro === true) {
     void renderOrHydrateCompleteComponents();
     void hydrateCompleteStores();
   }
