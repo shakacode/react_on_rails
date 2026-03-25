@@ -963,7 +963,7 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     def analyze_development_config(content, runtime_config = nil)
       checker.add_info("\n🔧 Development & Debugging:")
 
@@ -973,8 +973,12 @@ module ReactOnRails
           if runtime_config.development_mode != Rails.env.development?
         checker.add_info("  trace: #{runtime_config.trace}") \
           if runtime_config.trace != Rails.env.development?
-        checker.add_info("  logging_on_server: false") unless runtime_config.logging_on_server
-        checker.add_info("  replay_console: false") unless runtime_config.replay_console
+        unless runtime_config.logging_on_server
+          checker.add_info("  logging_on_server: #{runtime_config.logging_on_server.inspect}")
+        end
+        unless runtime_config.replay_console
+          checker.add_info("  replay_console: #{runtime_config.replay_console.inspect}")
+        end
         if runtime_config.build_test_command.present?
           checker.add_info("  build_test_command: #{runtime_config.build_test_command}")
         end
@@ -1016,7 +1020,7 @@ module ReactOnRails
         checker.add_info("  build_production_command: #{build_prod_match[1]}") if build_prod_match
       end
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def analyze_i18n_config(content, runtime_config = nil)
@@ -2408,6 +2412,11 @@ module ReactOnRails
           checker.add_warning(
             "⚠️  Could not determine Pro server renderer: ReactOnRailsPro is unavailable " \
             "and no initializer match found."
+          )
+          nil
+        else
+          checker.add_info(
+            "ℹ️  Could not determine Pro server renderer: Rails environment unavailable and no initializer match found."
           )
           nil
         end

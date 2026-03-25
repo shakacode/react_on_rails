@@ -232,6 +232,17 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages).not_to include(a_string_including("replay_console"))
     end
 
+    it "reports nil logging/replay values explicitly when runtime config is unexpected" do
+      allow(runtime_config).to receive_messages(logging_on_server: nil, replay_console: nil)
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).to include(a_string_including("logging_on_server: nil"))
+      expect(info_messages).to include(a_string_including("replay_console: nil"))
+    end
+
     it "omits enforce_private_server_bundles when runtime value is the default" do
       allow(runtime_config).to receive(:enforce_private_server_bundles).and_return(false)
       allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
@@ -2017,6 +2028,20 @@ RSpec.describe ReactOnRails::Doctor do
 
       warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
       expect(warning_messages.count { |msg| msg.include?("Could not determine Pro server renderer") }).to eq(1)
+    end
+
+    it "adds an info message when Rails env is unavailable and initializer fallback is absent" do
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+      allow(doctor).to receive_messages(
+        ensure_rails_environment_loaded: false,
+        pro_initializer_has_node_renderer?: false
+      )
+
+      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
+
+      info_messages = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+      expect(info_messages.any? { |msg| msg.include?("Rails environment unavailable and no initializer match found") })
+        .to be true
     end
   end
 
