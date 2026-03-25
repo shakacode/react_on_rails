@@ -216,6 +216,7 @@ def compute_target_gem_version(current_gem_version:, version_input:)
       "#{version[:major]}.#{version[:minor]}.#{version[:patch] + 1}"
     end
   when "minor"
+    # For prerelease inputs, gem-release drops the suffix and increments minor/major normally.
     "#{version[:major]}.#{version[:minor] + 1}.0"
   when "major"
     "#{version[:major] + 1}.0.0"
