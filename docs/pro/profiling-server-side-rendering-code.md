@@ -8,17 +8,15 @@ This guide uses the RORP dummy app in profiling the server-side code.
 
 1. Run node-renderer using the `--inspect` node option.
 
-   Open the `spec/dummy/Procfile.dev` file and update the `node-renderer` process to run the renderer using `node --inspect` command. Change the following line
-
-   ```bash
-   node-renderer: RENDERER_LOG_LEVEL=debug yarn run node-renderer
-   ```
-
-   To
+   Open `spec/dummy/Procfile.dev` and make sure the `node-renderer` process runs the renderer
+   directly with `node --inspect`. The current dummy app already uses:
 
    ```bash
    node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
    ```
+
+   If your app still launches the renderer through a package script, temporarily switch it to this
+   direct `node --inspect` form while profiling.
 
 1. Run the App
 
