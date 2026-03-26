@@ -1,6 +1,6 @@
 # Using ReactOnRails in JavaScript
 
-You can easily render React components in your JavaScript with `render` method. Under React 18+, it returns a React root. Under React 16/17, it returns the rendered component instance.
+You can easily render React components in your JavaScript with the `render` method. Under React 18+, it returns a React root. Under React 16/17, legacy return values vary by render or hydrate path, such as a component instance, an element, or `void`.
 
 ```js
 /**
@@ -40,5 +40,5 @@ Imagine that some external JavaScript decides when a component should mount with
 ```
 
 For subsequent updates on the same DOM node, let the mounted React component manage its own
-state or props flow. `ReactOnRails.render` skips duplicate renders for the same connected node,
-so calling it repeatedly on `#root` will be ignored unless that node is replaced first.
+state or props flow. The public `ReactOnRails.render` API does not deduplicate repeated calls,
+so calling it again on `#root` will invoke React again unless you unmount or replace that node first.
