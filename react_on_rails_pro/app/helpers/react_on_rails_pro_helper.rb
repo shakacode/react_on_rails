@@ -448,8 +448,9 @@ module ReactOnRailsProHelper
       # Propagate the error to the calling fiber via the promise.
       # A promise can only be resolved/rejected once — check before acting.
       # resolved? returns true for both fulfilled and rejected states ("settled").
-      # Safe without a lock: Async uses cooperative scheduling, so no fiber switch
-      # can occur between resolved? and reject/raise below.
+      # Safe without a lock: only this task can reject here, and Async uses
+      # cooperative scheduling so no fiber switch can occur between resolved?
+      # and reject/raise below.
       # If already settled, the first chunk was returned successfully.
       # This is a post-first-chunk error. Re-raise so barrier.wait propagates it
       # (the response is already committed at that point, so only JS redirect is possible).

@@ -22,7 +22,7 @@ RSpec.describe Async::Promise do
 
     expect { promise.resolve("first") }.not_to raise_error
     expect { promise.resolve("second") }.not_to raise_error
-    expect(promise.wait).to eq("first")
+    expect(promise.wait).to eq("first") # safe: already resolved, no fiber yield needed
   end
 
   it "reports resolved after reject" do
@@ -30,5 +30,12 @@ RSpec.describe Async::Promise do
     promise.reject(StandardError.new("boom"))
 
     expect(promise.resolved?).to be true
+  end
+
+  it "re-raises the exception on wait after reject" do
+    promise = described_class.new
+    promise.reject(StandardError.new("boom"))
+
+    expect { promise.wait }.to raise_error(StandardError, "boom")
   end
 end
