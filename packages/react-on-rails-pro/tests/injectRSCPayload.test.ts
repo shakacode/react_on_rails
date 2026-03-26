@@ -214,6 +214,23 @@ describe('injectRSCPayload', () => {
     );
   });
 
+  it('normalizes CRLF on the final buffered payload chunk', async () => {
+    const mockRSC = createMockStream(['{"test":"data"}\r\n', '{"final":"chunk"}\r']);
+    const mockHTML = createMockStream(['<html><body>Hello</body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain(
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test":"data"})</script>`,
+    );
+    expect(resultStr).toContain(
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"final":"chunk"})</script>`,
+    );
+    expect(resultStr).not.toContain('\r');
+  });
+
   it('emits an error instead of embedding malformed NDJSON as invalid JavaScript', async () => {
     const mockRSC = createMockStream(['{"test":"data"}\n', '{"broken": }\n']);
     const mockHTML = createMockStream(['<html><body>Hello</body></html>']);

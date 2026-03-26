@@ -287,8 +287,8 @@ export default function injectRSCPayload(
                 scheduleFlush();
               }
             }
-            const finalChunk = lastIncompleteLine + decoder.decode();
-            if (finalChunk.trim() !== '') {
+            const finalChunk = (lastIncompleteLine + decoder.decode()).trim();
+            if (finalChunk !== '') {
               const payloadScript = createRSCPayloadChunk(finalChunk, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
               scheduleFlush();
