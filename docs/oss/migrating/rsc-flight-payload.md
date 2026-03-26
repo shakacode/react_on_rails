@@ -97,6 +97,7 @@ Results:
 | **LCP**                | 982 ms    | 1,058 ms                  | +8% (tradeoff: more hydration) |
 
 The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** -- a 31:1 ratio.
+In this benchmark, the TTFB improvement came primarily from the server serializing far less Flight data before it could emit the first byte. The wire-size reduction alone would not normally explain the full change.
 
 ### How to Apply It
 
@@ -105,6 +106,7 @@ The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** 
 **Step 2:** Add `'use client'` to those components. The directive must appear at the top of the file, before any `import` statements. It tells React to send a client reference instead of the expanded element tree.
 
 Before adding `'use client'`, confirm the component and its import tree are free of server-only dependencies (`server-only`, `next/headers`, direct DB queries, API-key-bearing helpers, etc.). If any exist, move that work into a parent Server Component and pass the results down as props first.
+After the change, inspect the resulting client bundle or import tree as well. Any direct or transitive import under that file now becomes client code, so server-only helpers must be pulled out before you keep the directive.
 
 Note: Client Components cannot be `async` functions. If the component you want to convert is currently loading its own data with `async`/`await`, move that fetch into a parent Server Component first and pass the data down as props before adding `'use client'`.
 
@@ -166,6 +168,7 @@ The Flight payload is embedded in `<script>` tags in the HTML response. To extra
 ```js
 // In browser console: extract RSC payload size
 // Heuristic only: inspect your rendered RSC script tags first and adjust the filter if needed.
+// If your framework exposes explicit RSC markers/attributes, prefer those over content matching.
 const scripts = document.querySelectorAll('script');
 let rscPayloadSize = 0;
 scripts.forEach((script) => {
@@ -228,7 +231,7 @@ If LCP is your critical metric (e.g., for a landing page with a hero image), be 
 
 React on Rails embeds the RSC payload within a Rails-rendered HTML page. In setups where Flight data is embedded into inline `<script>` tags, the Flight payload (already a serialized wire format) gets JSON-encoded again when Rails embeds it in the page response. That extra encoding can add significant overhead to already large payloads. This applies to the current inline-script embedding path discussed in issue #2522; apps that serve the payload through a separate endpoint are a different case.
 
-See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) (currently open) for details on this overhead and its impact. There is no workaround at this time; follow the issue for updates.
+For larger Flight payloads, this double-encoding can add meaningful overhead. See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) (currently open) for measurements and progress toward a fix.
 
 ## Decision Flowchart
 
