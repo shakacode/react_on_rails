@@ -138,7 +138,7 @@ For a deeper dive into selective hydration, see our [Selective Hydration in Stre
 Before following the component migration patterns below, complete the infrastructure setup with the
 current generator-based runbook:
 
-1. Install and configure the Node Renderer. See [Pro Installation](../installation.md#node-renderer-installation) and [Node Renderer basics](../../oss/building-features/node-renderer/basics.md).
+1. Install and configure the Node Renderer. See [Pro Installation](../installation.md#install-react-on-rails-pro-node-renderer) and [Node Renderer basics](../../oss/building-features/node-renderer/basics.md).
 2. Run `bundle exec rails generate react_on_rails:rsc` (or `--typescript`) to enable `config.enable_rsc_support`, add the RSC webpack bundle, and generate the example files.
 3. Use [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md) for the full checklist, legacy webpack compatibility notes, and verification steps.
 
