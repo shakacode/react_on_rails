@@ -199,7 +199,7 @@ React on Rails Pro adds [React Server Components](../../pro/react-server-compone
 ## 🆘 Need Help?
 
 - **[Troubleshooting Guide](../deployment/troubleshooting.md)** - Common issues and solutions
-- **[React + Rails Slack](https://reactrails.slack.com)** - Join our community
+- **[React + Rails Slack](https://invite.reactrails.com)** - Join our community
 - **[GitHub Issues](https://github.com/shakacode/react_on_rails/issues)** - Report bugs
 
 ## 📋 Quick Reference

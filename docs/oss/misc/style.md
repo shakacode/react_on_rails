@@ -22,7 +22,7 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 
 - [ShakaCode Javascript](https://github.com/shakacode/style-guide-javascript)
 - Use the [eslint-config-shakacode](https://github.com/shakacode/style-guide-javascript/tree/master/packages/eslint-config-shakacode) NPM package with ESLint.
-- [JSDoc](http://usejsdoc.org/)
+- [JSDoc](https://jsdoc.app/)
 
 ### Git coding Standards
 

@@ -8,7 +8,7 @@ Now the server will interpret your JavaScript. The default is to use [ExecJS](ht
 
 Note: if you use the [mini_racer](https://github.com/rubyjs/mini_racer) runtime and run into a `ReferenceError: TextEncoder is not defined` error, see [this comment](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717) for a solution.
 
-If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
+If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://reactonrails.com/docs/pro/).
 
 If you open the HTML source of any web page using React on Rails, you'll see the 3 parts of React on Rails rendering:
 
