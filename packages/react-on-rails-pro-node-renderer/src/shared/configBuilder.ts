@@ -225,6 +225,7 @@ function envValuesUsed() {
     RENDERER_BUNDLE_PATH:
       !userConfig.serverBundleCachePath && !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
     RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
+    // Explicit password overrides, including empty strings, intentionally suppress the env-derived value here.
     RENDERER_PASSWORD: userConfig.password === undefined && env.RENDERER_PASSWORD && '<MASKED>',
     RENDERER_SUPPORT_MODULES: !('supportModules' in userConfig) && env.RENDERER_SUPPORT_MODULES,
     RENDERER_STUB_TIMERS: !('stubTimers' in userConfig) && env.RENDERER_STUB_TIMERS,
@@ -246,6 +247,7 @@ function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: 
   return aConfig && Object.keys(aConfig).length > 0
     ? {
         ...aConfig,
+        // Treat empty strings as "not provided" in diagnostics even though they are still explicit overrides.
         password: aConfig.password ? '<MASKED>' : defaultValue,
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
@@ -308,7 +310,8 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   if (Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined) {
     log.warn(
       'buildConfig({ password: undefined }) preserves the env/default password. ' +
-        'Pass null or an empty string to clear it in development/test-like environments.',
+        'Pass null or an empty string to clear it only in development/test-like environments; ' +
+        'production-like environments still require an explicit truthy password.',
     );
   }
   const runtimeDefaultConfig = {

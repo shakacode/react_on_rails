@@ -97,6 +97,9 @@ The Node Renderer reads `RENDERER_PASSWORD` directly from `process.env`. Rails d
 read that env var for `config.renderer_password`, so the initializer assignment above is required on
 the Ruby side.
 
+If neither `NODE_ENV` nor `RAILS_ENV` is set, the Node Renderer treats the environment as
+production-like and still requires `RENDERER_PASSWORD`.
+
 For local development, you can either omit the password entirely (no authentication) or set a convenience default:
 
 ```ruby

@@ -229,6 +229,7 @@ module ReactOnRailsPro
     end
 
     def setup_renderer_password
+      # If a password is already configured explicitly, skip URL extraction and production validation.
       return if renderer_password.present?
 
       uri = URI(renderer_url)
