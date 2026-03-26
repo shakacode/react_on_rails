@@ -14,7 +14,7 @@ Every server-rendered element becomes a JSON array in the payload:
 ["$","div",null,{"className":"flex items-center justify-between px-4 py-2 bg-white shadow-sm rounded-lg","children":[...]}]
 ```
 
-In a Tailwind-heavy app with repeated card/list components, a Flight payload often breaks down as:
+In one benchmark of a Tailwind-heavy app with repeated card/list components, the Flight payload broke down approximately as:
 
 | Category              | Approximate share | Description                                                           |
 | --------------------- | ----------------- | --------------------------------------------------------------------- |
@@ -103,6 +103,8 @@ The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** 
 **Step 1:** Identify presentational subtrees with high expansion ratios.
 
 **Step 2:** Add `'use client'` to those components. The directive must appear at the top of the file, before any `import` statements. It tells React to send a client reference instead of the expanded element tree.
+
+Note: Client Components cannot be `async` functions. If the component you want to convert is currently loading its own data with `async`/`await`, move that fetch into a parent Server Component first and pass the data down as props before adding `'use client'`.
 
 ```jsx
 // Before: Server Component — entire element tree in Flight payload
@@ -210,7 +212,7 @@ In the benchmark above, the payload reduction was significant even after compres
 Moving presentational components to the client increases the amount of JavaScript the browser must download and execute before those components fully hydrate. This can slightly increase Largest Contentful Paint (LCP):
 
 - **TTFB and FCP improve** because the server generates and streams a smaller payload faster
-- **LCP may increase** because React on Rails server-renders Client Components to HTML (so content is present before JS), but the browser's LCP timing can still be delayed by hydration of the client subtree
+- **LCP may increase** because the converted components now require their JavaScript bundle to be parsed and executed before hydration completes, which can slightly delay when React considers those subtrees ready. This is most noticeable when the LCP element itself sits inside a converted component.
 
 In the benchmark, LCP increased by 8% (982 ms to 1,058 ms) -- a minor regression offset by the 64% FCP improvement and 42% payload reduction.
 
@@ -235,14 +237,16 @@ Use this flowchart when deciding whether a presentational component should be a 
 ```text
 Is the component interactive (hooks, events, browser APIs)?
 ├── Yes → Client Component (standard RSC rule)
-└── No → Is it repeated many times on the page?
-    ├── No → Server Component (standard RSC rule)
-    └── Yes → Is the element tree much larger than the data props?
-        ├── No → Server Component
-        └── Yes → Will moving to client keep JS bundle increase small?
-            ├── No → Server Component (bundle cost outweighs payload savings)
-            └── Yes → Consider Client Component (this optimization)
-                └── Measure payload before/after to confirm savings
+└── No → Does it access server-only resources (DB, API keys, server-only imports)?
+    ├── Yes → Server Component (cannot be a Client Component)
+    └── No → Is it repeated many times on the page?
+        ├── No → Server Component (standard RSC rule)
+        └── Yes → Is the element tree much larger than the data props?
+            ├── No → Server Component
+            └── Yes → Will moving to client keep JS bundle increase small?
+                ├── No → Server Component (bundle cost outweighs payload savings)
+                └── Yes → Consider Client Component (this optimization)
+                    └── Measure payload before/after to confirm savings
 ```
 
 ## Summary
