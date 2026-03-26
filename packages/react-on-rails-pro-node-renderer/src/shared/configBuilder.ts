@@ -250,7 +250,8 @@ function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: 
   return aConfig && Object.keys(aConfig).length > 0
     ? {
         ...aConfig,
-        // Treat empty strings as "not provided" in diagnostics even though they are still explicit overrides.
+        // Treat empty or otherwise falsy password overrides as "not provided" in diagnostics even though
+        // they still flow through as explicit overrides and fail validation in production-like envs.
         password: aConfig.password ? '<MASKED>' : defaultValue,
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
@@ -313,8 +314,8 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   if (Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined) {
     log.warn(
       'buildConfig({ password: undefined }) preserves the env/default password. ' +
-        'Pass null or an empty string to clear it only in development/test-like environments; ' +
-        'production-like environments still require an explicit truthy password.',
+        'An empty string is treated as an absent password and only works in development/test-like ' +
+        'environments; production-like environments still require an explicit truthy password.',
     );
   }
   const runtimeDefaultConfig = {
