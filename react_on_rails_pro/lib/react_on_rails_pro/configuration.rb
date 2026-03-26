@@ -229,7 +229,8 @@ module ReactOnRailsPro
     end
 
     def setup_renderer_password
-      # If a password is already configured explicitly, skip URL extraction and production validation.
+      # Explicit passwords, including values loaded from ENV in the initializer, skip URL extraction.
+      # Blank values fall through so URL extraction and production validation still catch misconfiguration.
       return if renderer_password.present?
 
       uri = URI(renderer_url)
@@ -270,6 +271,7 @@ module ReactOnRailsPro
           test        — password optional (no authentication)
           staging     — RENDERER_PASSWORD required
           production  — RENDERER_PASSWORD required
+          (any other) — RENDERER_PASSWORD required
       MSG
     end
   end

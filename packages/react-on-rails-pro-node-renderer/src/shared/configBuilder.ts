@@ -150,6 +150,9 @@ function normalizedRuntimeEnvs() {
 
 function runtimeEnvsAllowDevelopmentDefaults() {
   const runtimeEnvs = normalizedRuntimeEnvs();
+  // Fail closed: every present runtime env must be development/test before we allow
+  // missing-password defaults. Any production-like value, or no env at all, still
+  // requires an explicit password.
   return runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
 }
 
@@ -323,6 +326,8 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   // Ignore undefined overrides so late-bound env defaults (for example password) are preserved.
   // Null and empty-string remain explicit overrides and therefore still fail password validation in
   // production-like environments.
+  // The cast is intentional: userConfig is already typed as Partial<Config>, and this filter only
+  // drops undefined entries from that known key set.
   const userConfigWithoutUndefined = Object.fromEntries(
     Object.entries(userConfig).filter(([, value]) => value !== undefined),
   ) as Partial<Config>;
