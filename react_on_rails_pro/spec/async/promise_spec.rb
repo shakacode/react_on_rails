@@ -3,6 +3,9 @@
 require_relative "../react_on_rails_pro/spec_helper"
 require "async/promise"
 
+# Contract canary for the Async::Promise semantics that consumer_stream_async relies on.
+# These examples only call wait on already-settled promises, so they do not require a
+# running reactor to observe the resolved/rejected behavior under test.
 RSpec.describe Async::Promise do
   it "reports unresolved before resolution" do
     promise = described_class.new
