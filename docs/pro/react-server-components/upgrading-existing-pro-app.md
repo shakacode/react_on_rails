@@ -22,9 +22,14 @@ Before running the generator, verify your environment:
 If React is below 19.0.4, upgrade it first:
 
 ```bash
-npm install react@~19.0.4 react-dom@~19.0.4
-# or: yarn add react@~19.0.4 react-dom@~19.0.4
-# or: pnpm add react@~19.0.4 react-dom@~19.0.4
+# pnpm
+pnpm add react@~19.0.4 react-dom@~19.0.4
+
+# npm
+npm install react@~19.0.4 react-dom@~19.0.4 --save-exact
+
+# yarn
+yarn add react@~19.0.4 react-dom@~19.0.4 --exact
 ```
 
 > **React 19.0.4+** is recommended. Earlier 19.0.x versions (19.0.0--19.0.3) have known security vulnerabilities — see the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
