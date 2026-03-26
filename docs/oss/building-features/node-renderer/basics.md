@@ -55,11 +55,14 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    mkdir renderer-app
    cd renderer-app
    ```
-2. Make sure you have **Node.js** version **14** or higher and **Yarn** installed.
-3. Init node application and install the `react-on-rails-pro-node-renderer` package.
+2. Make sure you have **Node.js 18+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**.
+3. Initialize a Node application and install the `react-on-rails-pro-node-renderer` package.
    ```sh
-   yarn init
-   yarn add react-on-rails-pro-node-renderer
+   npm init -y
+   npm install react-on-rails-pro-node-renderer
+   # or: pnpm add react-on-rails-pro-node-renderer
+   # or: yarn add react-on-rails-pro-node-renderer
+   # or: bun add react-on-rails-pro-node-renderer
    ```
 4. Configure a JavaScript file that will launch the rendering server per the docs in [Node Renderer JavaScript Configuration](./js-configuration.md). For example, create a file `node-renderer.js`. Here is a simple example that uses all the defaults except for serverBundleCachePath:
 

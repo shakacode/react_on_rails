@@ -5,23 +5,40 @@
 
 Because the renderer communicates over a port to the server, you can start a renderer instance locally in your application and debug it.
 
-## Yalc vs Yarn Link
+## Monorepo Workflow
 
-The project is setup to use [yalc](https://github.com/whitecolor/yalc). This means that at the top level
-directory, `yalc publish` will send the node package files to the global yalc store. Running `yarn` in the
-`/spec/dummy/client` directory will copy the files from the global yalc store over to the local `node_modules`
-directory.
+For renderer debugging inside this repo, use the Pro dummy app at `react_on_rails_pro/spec/dummy`.
+It is a `pnpm` workspace app and already points at the local packages in this monorepo.
 
 ## Debugging the Node Renderer
 
-1. cd to the top level of the project.
-1. `yarn` to install any libraries.
-1. To compile renderer files on changes, open console and run `yarn build:dev`.
-1. Open another console tab and run `RENDERER_LOG_LEVEL=debug yarn start`
-1. Reload the browser page that causes the renderer issue. You can then update the JS code, and restart the `yarn start` to run the renderer with the new code.
-1. Be sure to restart the rails server if you change any ruby code in loaded gems.
-1. Note, the default setup for spec/dummy to reference the pro renderer is to use yalc, which may or may not be using a link, which means that you have to re-run yarn to get the files updated when changing the renderer.
-1. Check out the top level nps task `nps renderer.debug` and `spec/dummy/package.json` which has script `"node-renderer-debug"`.
+1. From the repo root, install dependencies and build the local packages:
+   ```bash
+   pnpm install
+   pnpm run build
+   ```
+1. In one terminal, start the Pro dummy bundle watcher:
+   ```bash
+   cd react_on_rails_pro/spec/dummy
+   pnpm run build:dev:watch
+   ```
+1. In another terminal, start the renderer with verbose logging:
+   ```bash
+   cd react_on_rails_pro/spec/dummy
+   RENDERER_LOG_LEVEL=debug pnpm run node-renderer
+   ```
+1. If you want to attach a debugger instead, run:
+   ```bash
+   cd react_on_rails_pro/spec/dummy
+   pnpm run node-renderer-debug
+   ```
+1. Reload the page that triggers the SSR issue and reproduce the problem.
+1. If you change Ruby code in loaded gems, restart the Rails server.
+1. If you change code under `packages/react-on-rails-pro-node-renderer`, rebuild that package before restarting the renderer:
+   ```bash
+   pnpm --filter react-on-rails-pro-node-renderer run build
+   ```
+1. If you are debugging an external app instead of the monorepo dummy app, refresh the installed renderer package using your local package workflow (for example `yalc`, `npm pack`, or a workspace link) before rerunning the renderer.
 
 ## Debugging Memory Leaks
 
@@ -29,7 +46,8 @@ If worker memory grows over time, use heap snapshots to find the source:
 
 1. Start the renderer with `--expose-gc` to enable forced GC before snapshots:
    ```bash
-   node --expose-gc node-renderer.js
+   cd react_on_rails_pro/spec/dummy
+   RENDERER_PORT=3800 node --expose-gc client/node-renderer.js
    ```
 2. Take heap snapshots at different times using `v8.writeHeapSnapshot()` (triggered via `SIGUSR2` signal or a custom endpoint).
 3. Load both snapshots in Chrome DevTools (Memory tab → Load) and use the **Comparison** view to see which objects accumulated between snapshots.

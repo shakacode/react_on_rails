@@ -8,7 +8,7 @@ Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHAN
 
 ## Version Format
 
-For the commands below, choose versions 16.4.0 or greater from the CHANGELOG and replace placeholders like
+For the commands below, choose versions 16.5.0 or greater from the CHANGELOG and replace placeholders like
 `<gem_version>` and `<npm_version>`. Note that for pre-release versions:
 
 - Gems use all periods: `16.4.0.beta.1`
@@ -76,7 +76,7 @@ See [License Configuration](#license-configuration-production-only) below for ot
 
 ## Adding React Server Components
 
-RSC requires React on Rails Pro and React 19.0.x. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
+RSC requires React on Rails Pro and React 19 with a compatible `react-on-rails-rsc` version. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
 
 ```bash
 # Fresh install with RSC
@@ -98,7 +98,7 @@ The sections below describe manual installation steps. Use these if you need fin
 
 ## Prerequisites
 
-Ensure your **Rails** app is using the **react_on_rails** gem, version 16.4.0 or higher.
+Ensure your **Rails** app is using the **react_on_rails** gem, version 16.5.0 or higher.
 
 ## Install react_on_rails_pro Gem
 

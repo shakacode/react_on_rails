@@ -12,7 +12,7 @@ Before starting, make sure you have:
 - **🚨 Shakapacker 6+** (7+ recommended for React on Rails 16)
 - **Rails 7+** application (Rails 5.2+ supported)
 - **Ruby 3.0+** (required)
-- **Node.js 20+** and a package manager (**npm**, **Yarn**, or **pnpm**)
+- **Node.js 18+** and a package manager (**npm**, **pnpm**, **Yarn**, or **bun**)
 - **Foreman or Overmind** (for running `bin/dev`)
 - **Basic familiarity** with React and Rails
 

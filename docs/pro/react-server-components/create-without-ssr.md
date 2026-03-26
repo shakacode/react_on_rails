@@ -12,23 +12,26 @@ To use Server Components in your React on Rails Pro project, you need to follow 
 
 ```bash
 # Pick one JS package manager command (Pro includes all base package functionality):
-yarn add --exact react-on-rails-pro@16.4.0
-# npm install --save-exact react-on-rails-pro@16.4.0
-# pnpm add --save-exact react-on-rails-pro@16.4.0
+yarn add --exact react-on-rails-pro@16.5.0
+# npm install --save-exact react-on-rails-pro@16.5.0
+# pnpm add --save-exact react-on-rails-pro@16.5.0
 
 # Then add the Ruby gems:
-bundle add react_on_rails --version "16.4.0" --strict
-bundle add react_on_rails_pro --version "16.4.0" --strict
+bundle add react_on_rails --version "16.5.0" --strict
+bundle add react_on_rails_pro --version "16.5.0" --strict
 ```
 
 Also, install version 19 of React, React DOM, and `react-on-rails-rsc`:
 
 ```bash
-yarn add react@19.0.0 react-dom@19.0.0 react-on-rails-rsc@19.0.0
+yarn add react@19.0.3 react-dom@19.0.3 react-on-rails-rsc@19.0.4
+# npm install react@19.0.3 react-dom@19.0.3 react-on-rails-rsc@19.0.4
+# pnpm add react@19.0.3 react-dom@19.0.3 react-on-rails-rsc@19.0.4
 ```
 
 > [!NOTE]
-> While React Server Components in React 19 are stable, the underlying APIs used to implement React Server Components bundlers may break between minor versions (19.x). According to the [React Documentation](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components). React on Rails Pro currently only supports React 19.0.x.
+> React on Rails Pro currently supports React 19 with `react-on-rails-rsc` in the range `>= 19.0.2 <= 19.2.3`.
+> The example above uses the versions shipped in this repo today.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 
