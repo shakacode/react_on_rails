@@ -109,11 +109,9 @@ Note: Client Components cannot be `async` functions. If the component you want t
 ```jsx
 // Before: Server Component — entire element tree in Flight payload
 // (No 'use client' directive — React renders this on the server.)
-import clsx from 'clsx';
-
 export default function ProductTags({ tags }) {
   return (
-    <div className={clsx('flex flex-wrap gap-2 mt-3')}>
+    <div className="flex flex-wrap gap-2 mt-3">
       {tags.map((tag) => (
         <span
           key={tag}
@@ -131,11 +129,9 @@ export default function ProductTags({ tags }) {
 // After: Client Component — only tags array in Flight payload
 'use client';
 
-import clsx from 'clsx';
-
 export default function ProductTags({ tags }) {
   return (
-    <div className={clsx('flex flex-wrap gap-2 mt-3')}>
+    <div className="flex flex-wrap gap-2 mt-3">
       {tags.map((tag) => (
         <span
           key={tag}
@@ -167,6 +163,7 @@ The Flight payload is embedded in `<script>` tags in the HTML response. To extra
 
 ```js
 // In browser console: extract RSC payload size
+// Heuristic only: inspect your rendered RSC script tags first and adjust the filter if needed.
 const scripts = document.querySelectorAll('script');
 let rscPayloadSize = 0;
 scripts.forEach((script) => {
