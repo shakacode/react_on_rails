@@ -63,11 +63,14 @@ Sometimes the right move is to make a purely presentational component a Client C
 
 ### When to Apply This Pattern
 
-A component is a candidate for this optimization when **all three** conditions are true:
+A component is a candidate for this optimization when these signals line up:
 
-1. **High expansion ratio** -- the rendered element tree is much larger than the data props (roughly 5:1 or higher)
+1. **High per-instance expansion** -- the rendered element tree is several times larger than the data props
 2. **Repeated many times on the page** -- the component renders per-item in a list (e.g., product cards, review snippets, tag lists)
 3. **Heavy className density** -- the component has many utility CSS classes (especially Tailwind) that inflate the element tree
+4. **Bundle scope is narrow** -- the component is not part of a shared client bundle loaded on many pages where it never renders
+
+Treat ratio and repetition count together. A 3:1 component rendered 60 times can be a better target than a 10:1 component rendered once.
 
 ### Real-World Example
 
@@ -80,6 +83,8 @@ This was demonstrated on a product search page rendering 36 products, each with 
 | **FeaturesList**   | ~190 B per feature item                   | ~30 B (string)                   | 6:1           |
 | **ProductTags**    | ~155 B per tag                            | ~10 B (string)                   | 15:1          |
 
+These before/after numbers came from the same page in one benchmark environment. Large TTFB gains here mainly reflect less server-side serialization work, so expect smaller or different results in multi-region production systems, under different server load, or with different streaming/caching behavior.
+
 Results:
 
 | Metric                 | Before    | After                     | Change                         |
@@ -90,8 +95,6 @@ Results:
 | **TTFB**               | 808 ms    | 245 ms                    | -70%                           |
 | **FCP**                | 982 ms    | 350 ms                    | -64%                           |
 | **LCP**                | 982 ms    | 1,058 ms                  | +8% (tradeoff: more hydration) |
-
-> Note: the TTFB improvement here largely reflects server-side serialization work in this benchmark setup. These numbers come from before/after runs of the same page in one environment (not a multi-region production load test). Results vary by infrastructure, server load, and streaming behavior.
 
 The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** -- a 31:1 ratio.
 
@@ -190,7 +193,7 @@ const totalBytes = new Blob([payload]).size;
 console.log(`className share: ${((classNameBytes / totalBytes) * 100).toFixed(1)}%`);
 ```
 
-If className strings account for 40%+ of your payload, you likely have components that would benefit from this optimization.
+If className strings account for a large share of your payload, that is a strong signal to investigate this optimization. Even 30%+ can be worth examining on larger pages.
 
 ## Compression Effectiveness
 
@@ -221,7 +224,7 @@ If LCP is your critical metric (e.g., for a landing page with a hero image), be 
 
 ## React on Rails: Double JSON.stringify Overhead
 
-React on Rails embeds the RSC payload within a Rails-rendered HTML page. In setups where Flight data is embedded into inline `<script>` tags, the payload may be double-serialized: once by React's Flight serializer, then again when Rails embeds it in the page response. This double encoding can add significant overhead to already large payloads.
+React on Rails embeds the RSC payload within a Rails-rendered HTML page. In setups where Flight data is embedded into inline `<script>` tags, the payload may be double-serialized: once by React's Flight serializer, then again when Rails embeds it in the page response. This double encoding can add significant overhead to already large payloads. This applies to the current inline-script embedding path discussed in issue #2522; apps that serve the payload through a separate endpoint are a different case.
 
 See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) (currently open) for details on this overhead and its impact.
 
