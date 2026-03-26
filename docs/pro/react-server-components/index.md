@@ -46,7 +46,7 @@ Current React on Rails Pro releases provide full RSC support with:
 
 - React on Rails Pro v16.5.0 or higher
 - React on Rails v16.5.0 or higher
-- React 19 with a compatible `react-on-rails-rsc` version (currently `>= 19.0.2 <= 19.2.3`)
+- React 19 with a compatible `react-on-rails-rsc` version
 - Node renderer — installed separately via `react-on-rails-pro-node-renderer` npm package (see [Pro Installation](../installation.md#install-react-on-rails-pro-node-renderer))
 - Shakapacker or Rspack for bundling
 

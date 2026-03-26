@@ -47,6 +47,7 @@ If worker memory grows over time, use heap snapshots to find the source:
 1. Start the renderer with `--expose-gc` to enable forced GC before snapshots:
    ```bash
    cd react_on_rails_pro/spec/dummy
+   # Adjust the port if your Rails app points at a different renderer URL.
    RENDERER_PORT=3800 node --expose-gc client/node-renderer.js
    ```
 2. Take heap snapshots at different times using `v8.writeHeapSnapshot()` (triggered via `SIGUSR2` signal or a custom endpoint).

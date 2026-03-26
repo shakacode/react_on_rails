@@ -200,8 +200,8 @@ _Requires creating a free account._
 
 - Ruby on Rails >= 5
 - Shakapacker >= 6.0 (CI tested: 8.2.0 - 9.5.0; autobundling requires >= 7.0)
-- Ruby >= 3.0 (CI tested: 3.2 - 3.4)
-- Node.js >= 18 (CI tested: 20 - 22)
+- Ruby >= 3.0 (package minimum; CI tested: 3.2 - 3.4)
+- Node.js >= 18 (package minimum; CI tested: 20 - 22)
 - A JavaScript package manager (npm, yarn, pnpm, or bun)
 
 # 🆘 Get Help & Support
