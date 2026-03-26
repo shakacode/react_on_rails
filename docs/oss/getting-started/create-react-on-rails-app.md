@@ -74,8 +74,8 @@ The CLI checks for these before starting:
 - **Node.js 18+**
 - **Ruby 3.0+**
 - **Rails 7.0+** (`gem install rails`)
-- **PostgreSQL** running locally (needed at `bin/rails db:prepare`, not validated by the CLI)
 - **npm or pnpm**
+- **PostgreSQL** running locally (needed at `bin/rails db:prepare`, not validated by the CLI)
 
 If any of the first four are missing, you'll get a clear error message with installation instructions.
 
