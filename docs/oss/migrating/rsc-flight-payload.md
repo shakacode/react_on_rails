@@ -22,7 +22,7 @@ In one benchmark of a Tailwind-heavy app with repeated card/list components, the
 | **Structural JSON**   | ~25%              | The `["$","div",null,{...}]` wrappers around every element            |
 | **Content data**      | ~27%              | Actual text, numbers, and data values                                 |
 
-In contrast, when a Client Component is referenced from a Server Component, the payload contains only a lightweight **client reference** (module ID + data props). The browser renders the element tree locally from the JavaScript bundle it already has.
+In contrast, when a Client Component is referenced from a Server Component, the payload contains only a lightweight **client reference** (module ID + chunk metadata) plus the serialized props. The browser renders the element tree locally from the JavaScript bundle it already has.
 
 ## Why "All Display-Only = Server" Is an Oversimplification
 
@@ -55,7 +55,7 @@ export default function StarRating({ rating, count }) {
 
 As a Server Component, the Flight payload contains the **entire expanded element tree** -- every `<span>`, every className string, every `★` character. The 30 bytes of data (`rating` + `count`) expands to ~498 bytes in the payload. That's a 16:1 expansion ratio.
 
-As a Client Component, the payload contains only the client reference and props -- roughly 30 bytes. The browser renders the element tree from the JS bundle.
+As a Client Component, the payload contains only the client reference plus serialized props -- a fraction of the expanded element tree. The browser renders the element tree from the JS bundle.
 
 ## The Counterintuitive Pattern: Presentational Client Components
 
@@ -103,6 +103,8 @@ The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** 
 **Step 1:** Identify presentational subtrees with high expansion ratios.
 
 **Step 2:** Add `'use client'` to those components. The directive must appear at the top of the file, before any `import` statements. It tells React to send a client reference instead of the expanded element tree.
+
+Before adding `'use client'`, confirm the component and its import tree are free of server-only dependencies (`server-only`, `next/headers`, direct DB queries, API-key-bearing helpers, etc.). If any exist, move that work into a parent Server Component and pass the results down as props first.
 
 Note: Client Components cannot be `async` functions. If the component you want to convert is currently loading its own data with `async`/`await`, move that fetch into a parent Server Component first and pass the data down as props before adding `'use client'`.
 
@@ -186,7 +188,7 @@ To understand what's taking up space in your payload, parse the Flight data and 
 const payload = Array.from(document.querySelectorAll('script'))
   .map((script) => script.textContent || '')
   .filter((text) => /\["\$","[a-zA-Z]/.test(text))
-  .join('\n');
+  .join('');
 const classNameMatches = payload.match(/"className":"[^"]*"/g) || [];
 const classNameBytes = classNameMatches.reduce((sum, m) => sum + new Blob([m]).size, 0);
 const totalBytes = new Blob([payload]).size;
