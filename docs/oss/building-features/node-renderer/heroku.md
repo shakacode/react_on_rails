@@ -25,10 +25,14 @@ web: bin/runsvdir-dyno
 
 `/Procfile.web`
 
-```text
-puma: bundle exec puma -C config/puma.rb
-renderer: pnpm run node-renderer
-```
+Your `/Procfile.web` should keep the `puma` line and use the `renderer` line that matches your
+package manager:
+
+| Package manager | `renderer` line                    |
+| --------------- | ---------------------------------- |
+| npm             | `renderer: npm run node-renderer`  |
+| yarn            | `renderer: yarn node-renderer`     |
+| pnpm            | `renderer: pnpm run node-renderer` |
 
 Define the script in your root `package.json` so Heroku can run it from the app root:
 
@@ -39,8 +43,6 @@ Define the script in your root `package.json` so Heroku can run it from the app 
   }
 }
 ```
-
-If you use `npm` or `yarn` instead of `pnpm`, replace `pnpm run node-renderer` in `Procfile.web` with the equivalent `npm run node-renderer` or `yarn node-renderer` command.
 
 Be sure your node-renderer script sets some port, like 3800, which is also set as the
 `config.renderer_url` for your Rails server.
