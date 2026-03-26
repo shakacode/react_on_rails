@@ -23,14 +23,14 @@ React on Rails installs the matching `react-on-rails` JavaScript package during 
 If you manage versions manually, keep the Ruby gem and npm package on the same release. Pre-release gems use dots while npm uses hyphens.
 
 ```ruby
-gem "react_on_rails", "16.5.0"
+gem "react_on_rails", "16.4.0"
 ```
 
 ```bash
-npm install react-on-rails@16.5.0 --save-exact
-# or: yarn add react-on-rails@16.5.0 --exact
-# or: pnpm add react-on-rails@16.5.0 --save-exact
-# or: bun add react-on-rails@16.5.0 --exact
+npm install react-on-rails@16.4.0 --save-exact
+# or: yarn add react-on-rails@16.4.0 --exact
+# or: pnpm add react-on-rails@16.4.0 --save-exact
+# or: bun add react-on-rails@16.4.0 --exact
 ```
 
 ## 2. Run the generator

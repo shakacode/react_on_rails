@@ -10,8 +10,8 @@ Before running the generator, verify your environment:
 
 | Requirement              | Check command                                                                                | Expected                                                                                                |
 | ------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                             | v16.5.0+                                                                                                |
-| React on Rails gem       | `bundle show react_on_rails`                                                                 | v16.5.0+                                                                                                |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                             | v16.4.0+                                                                                                |
+| React on Rails gem       | `bundle show react_on_rails`                                                                 | v16.4.0+                                                                                                |
 | React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` | Matches gem version                                                                                     |
 | React version            | `npm ls react` / `yarn why react` / `pnpm list react`                                        | 19.0.4+ (see [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for security context) |
 | React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom`                            | Must match `react` version                                                                              |

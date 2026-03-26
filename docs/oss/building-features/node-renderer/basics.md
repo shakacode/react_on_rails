@@ -85,7 +85,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
 Create `config/initializers/react_on_rails_pro.rb` and configure the **renderer server**. See configuration values in [Configuration](../../configuration/configuration-pro.md). Pay attention to:
 
 1. Set `config.server_renderer = "NodeRenderer"`
-2. Leave the default of `config.prerender_caching = true` and ensure your Rails cache is properly configured to handle the additional cache load.
+2. Decide whether to enable `config.prerender_caching = true`. The default is `false`; turn it on only if you want Rails cache-backed SSR result caching and your cache is configured for the additional load.
 3. Configure values beginning with `renderer_`
 4. Use ENV values for values like `renderer_url` so that your deployed server is properly configured. If the ENV value is unset, the default for the renderer_url is `localhost:3800`.
 5. Here's a tiny example using mostly defaults:
