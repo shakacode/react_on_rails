@@ -102,7 +102,7 @@ The **2.2 KB client JS increase** produced a **67 KB Flight payload reduction** 
 
 **Step 1:** Identify presentational subtrees with high expansion ratios.
 
-**Step 2:** Add `'use client'` to those components. The directive must appear before any `import` statements. It tells React to send a client reference instead of the expanded element tree.
+**Step 2:** Add `'use client'` to those components. The directive must appear at the top of the file, before any `import` statements. It tells React to send a client reference instead of the expanded element tree.
 
 ```jsx
 // Before: Server Component — entire element tree in Flight payload
@@ -188,7 +188,7 @@ const payload = Array.from(document.querySelectorAll('script'))
   .filter((text) => /\["\$","[a-zA-Z]/.test(text))
   .join('\n');
 const classNameMatches = payload.match(/"className":"[^"]*"/g) || [];
-const classNameBytes = classNameMatches.reduce((sum, m) => sum + m.length, 0);
+const classNameBytes = classNameMatches.reduce((sum, m) => sum + new Blob([m]).size, 0);
 const totalBytes = new Blob([payload]).size;
 console.log(`className share: ${((classNameBytes / totalBytes) * 100).toFixed(1)}%`);
 ```
