@@ -260,7 +260,7 @@ spec:
 
 ### Kubernetes tips for React on Rails
 
-- **Secrets**: Store `SECRET_KEY_BASE` and `DATABASE_URL` in Kubernetes Secrets, not in environment variables on the Deployment spec directly.
+- **Secrets**: Use Kubernetes Secrets with `secretKeyRef` (as shown above) rather than hardcoding values directly in the `env` section. Never commit secret values to your manifest files.
 - **Migrations**: Run migrations as a Kubernetes Job or init container before the Deployment rolls out:
 
   ```yaml
@@ -347,8 +347,8 @@ spec:
 ### Deploy
 
 ```bash
-cpflow deploy-image -a myapp   # build + push image
-cpflow deploy -a myapp          # deploy to Control Plane
+cpflow build-image -a myapp    # build + push image to registry
+cpflow deploy-image -a myapp   # deploy the pushed image to Control Plane
 ```
 
 ### Control Plane tips for React on Rails
@@ -374,7 +374,7 @@ containers:
     ports:
       - containerPort: 3000
     env:
-      - name: REACT_ON_RAILS_PRO_NODE_RENDERER_URL
+      - name: REACT_RENDERER_URL
         value: 'http://localhost:3800'
 
   - name: node-renderer
