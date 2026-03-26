@@ -34,11 +34,11 @@ Imagine that some external JavaScript decides when a component should mount with
 <div id="root"></div>
 
 <script>
-  var input = $('#input');
-  ReactOnRails.render('componentName', { value: input.val() }, 'root');
+  const input = document.getElementById('input');
+  ReactOnRails.render('componentName', { value: input.value }, 'root');
 </script>
 ```
 
 For subsequent updates on the same DOM node, let the mounted React component manage its own
 state or props flow. The public `ReactOnRails.render` API does not deduplicate repeated calls,
-so calling it again on `#root` will invoke React again unless you unmount or replace that node first.
+so calling it on `#root` will invoke React unless you unmount or replace that node first.
