@@ -23,7 +23,7 @@ import formAutoContent from 'form-auto-content';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
 import worker, { disableHttp2 } from '../src/worker';
-import { resetForTest, serverBundleCachePath, getFixtureBundle } from './helper';
+import { resetForTest, serverBundleCachePath, getFixtureBundle, getFixtureSecondaryBundle } from './helper';
 
 const testName = 'uploadRaceCondition';
 const serverBundleCachePathForTest = () => serverBundleCachePath(testName);
@@ -176,14 +176,14 @@ describe('concurrent upload isolation (issue #2449)', () => {
         gemVersion,
         protocolVersion,
         railsEnv,
-        targetBundles: [bundleHashA],
+        [`bundle_${bundleHashA}`]: fs.createReadStream(getFixtureBundle()),
         asset1: fs.createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
       });
       const formB = formAutoContent({
         gemVersion,
         protocolVersion,
         railsEnv,
-        targetBundles: [bundleHashB],
+        [`bundle_${bundleHashB}`]: fs.createReadStream(getFixtureBundle()),
         asset1: fs.createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
       });
 
@@ -282,7 +282,7 @@ describe('concurrent upload isolation (issue #2449)', () => {
         gemVersion,
         protocolVersion,
         railsEnv,
-        targetBundles: [bundleHashA],
+        [`bundle_${bundleHashA}`]: fs.createReadStream(getFixtureBundle()),
         asset1: fs.createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
         asset2: fs.createReadStream(path.join(tmpDirA, 'manifest.json')),
       });
@@ -290,7 +290,7 @@ describe('concurrent upload isolation (issue #2449)', () => {
         gemVersion,
         protocolVersion,
         railsEnv,
-        targetBundles: [bundleHashB],
+        [`bundle_${bundleHashB}`]: fs.createReadStream(getFixtureBundle()),
         asset1: fs.createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
         asset2: fs.createReadStream(path.join(tmpDirB, 'manifest.json')),
       });
@@ -349,14 +349,14 @@ describe('concurrent upload isolation (issue #2449)', () => {
         gemVersion,
         protocolVersion,
         railsEnv,
-        targetBundles: [sharedBundleHash],
+        [`bundle_${sharedBundleHash}`]: fs.createReadStream(getFixtureBundle()),
         asset1: fs.createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
       });
       const formB = formAutoContent({
         gemVersion,
         protocolVersion,
         railsEnv,
-        targetBundles: [sharedBundleHash],
+        [`bundle_${sharedBundleHash}`]: fs.createReadStream(getFixtureBundle()),
         asset1: fs.createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
       });
 
@@ -528,12 +528,12 @@ describe('concurrent upload isolation (issue #2449)', () => {
         asset1: fs.createReadStream(path.join(tmpDirA, 'loadable-stats.json')),
       });
 
-      // Upload-assets request: sends the same-named asset to the same bundle
+      // Upload-assets request: sends bundle + the same-named asset to the same bundle
       const uploadForm = formAutoContent({
         gemVersion,
         protocolVersion,
         railsEnv,
-        targetBundles: [bundleTimestamp],
+        [`bundle_${bundleTimestamp}`]: fs.createReadStream(getFixtureBundle()),
         asset1: fs.createReadStream(path.join(tmpDirB, 'loadable-stats.json')),
       });
 

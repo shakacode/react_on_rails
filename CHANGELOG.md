@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro] Fixed bundle duplication in remote node renderer asset uploads**: When RSC support is enabled, running `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` no longer duplicates bundle JS files across bundle directories. Previously, both the server bundle and RSC bundle were copied into every target directory; now each bundle is placed only in its own directory while shared assets (manifests, stats) are correctly distributed to all. [PR 2768](https://github.com/shakacode/react_on_rails/pull/2768) by [AbanoubGhadban](https://github.com/AbanoubGhadban). Fixes [Issue 2766](https://github.com/shakacode/react_on_rails/issues/2766).
+
 ### [16.5.0] - 2026-03-25
 
 Stable release — no changes from 16.5.0.rc.0.
