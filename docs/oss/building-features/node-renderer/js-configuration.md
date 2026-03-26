@@ -1,7 +1,7 @@
 # Node Renderer JavaScript Configuration
 
 > **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
+> Free or very low cost for startups and small companies. [Get a license →](https://reactonrails.com/docs/pro/)
 
 You can configure the node-renderer entirely with ENV values from your own launch file or
 `package.json` script. The package does not ship a standalone `node-renderer` CLI.
@@ -61,11 +61,12 @@ Deprecated options:
 
 ### Simple example:
 
-Create a file `client/node-renderer.js`
+Create a file `client/node-renderer.js`. The generator uses this filename and CommonJS syntax so
+the file runs directly with `node client/node-renderer.js` without extra ESM configuration.
 
 ```js
-import path from 'path';
-import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
+const path = require('path');
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 const config = {
   // Save bundles to relative "./.node-renderer-bundles" dir of our app root
