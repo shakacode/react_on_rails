@@ -238,8 +238,9 @@ module ReactOnRailsPro
     end
 
     def validate_renderer_password_for_production
-      # setup_renderer_password already guards this, but keep the check here so this method
-      # remains safe if invoked directly in future refactors.
+      # Defense-in-depth: if called directly in a future refactor, skip validation when a password
+      # is already configured. When invoked from setup_renderer_password, that early return
+      # guarantees renderer_password is nil at this point.
       return if renderer_password.present?
       return unless node_renderer?
       return if Rails.env.development? || Rails.env.test?

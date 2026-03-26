@@ -22,17 +22,19 @@ describe('configBuilder', () => {
 
   function loadConfigBuilderWithMockedLogger() {
     const info = jest.fn();
+    const error = jest.fn();
+    const warn = jest.fn();
     jest.doMock('../src/shared/log', () => ({
       __esModule: true,
       default: {
         info,
-        error: jest.fn(),
-        warn: jest.fn(),
+        error,
+        warn,
         fatal: jest.fn(),
       },
     }));
     const { buildConfig, logSanitizedConfig } = jest.requireActual('../src/shared/configBuilder');
-    return { buildConfig, logSanitizedConfig, info };
+    return { buildConfig, logSanitizedConfig, info, error, warn };
   }
 
   function mockProcessExit() {
@@ -65,6 +67,37 @@ describe('configBuilder', () => {
     const envValues = envValuesUsedForRenderedConfig({ host: '' });
 
     expect(envValues.RENDERER_HOST).toBe(false);
+  });
+
+  it('does not mark RENDERER_PASSWORD as env-provided when password is explicitly overridden', () => {
+    process.env.RENDERER_PASSWORD = 'env-password';
+    const { buildConfig, logSanitizedConfig, info } = loadConfigBuilderWithMockedLogger();
+
+    buildConfig({ password: '' });
+    logSanitizedConfig();
+
+    const logPayload = info.mock.calls[0][0] as Record<string, unknown>;
+    const envValues = logPayload['ENV values used for settings (use "RENDERER_" prefix)'] as Record<
+      string,
+      unknown
+    >;
+
+    expect(envValues.RENDERER_PASSWORD).toBe(false);
+  });
+
+  it('masks module-load password defaults in sanitized logs', () => {
+    process.env.RENDERER_PASSWORD = 'env-password';
+    const { buildConfig, logSanitizedConfig, info } = loadConfigBuilderWithMockedLogger();
+
+    buildConfig();
+    logSanitizedConfig();
+
+    const logPayload = info.mock.calls[0][0] as Record<string, unknown>;
+    const defaultSettings = logPayload[
+      'Default settings at module load (env-backed values may lag current runtime)'
+    ] as Record<string, unknown>;
+
+    expect(defaultSettings.password).toBe('<MASKED>');
   });
 
   describe('password validation in production-like environments', () => {
@@ -200,10 +233,13 @@ describe('configBuilder', () => {
       delete process.env.RENDERER_PASSWORD;
       const processExit = mockProcessExit();
 
-      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+      const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
 
       expect(() => buildConfig()).toThrow('process.exit: 1');
       expect(processExit).toHaveBeenCalledWith(1);
+      expect(error).toHaveBeenCalledWith(
+        expect.stringContaining('(neither set) — treated as production-like; RENDERER_PASSWORD required'),
+      );
     });
 
     it('does not throw when password is set after module import', () => {
@@ -221,9 +257,12 @@ describe('configBuilder', () => {
       process.env.NODE_ENV = 'production';
       process.env.RENDERER_PASSWORD = 'late-loaded-password';
 
-      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+      const { buildConfig, warn } = loadConfigBuilderWithMockedLogger();
 
       expect(() => buildConfig({ password: undefined })).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('buildConfig({ password: undefined }) preserves the env/default password'),
+      );
     });
   });
 

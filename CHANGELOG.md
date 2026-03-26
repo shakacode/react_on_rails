@@ -34,6 +34,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [PR 2816](https://github.com/shakacode/react_on_rails/pull/2816) by
   [justin808](https://github.com/justin808).
 
+#### Fixed
+
+- **[Pro]** **Renderer password config logging and undefined override warnings**: The Pro Node Renderer now masks module-load password defaults in diagnostic logs, warns when `buildConfig({ password: undefined })` preserves the env/default password, and documents the Ruby-side `RENDERER_PASSWORD` initializer requirement more explicitly. [PR 2829](https://github.com/shakacode/react_on_rails/pull/2829) by [justin808](https://github.com/justin808).
+
 ### [16.4.0] - 2026-03-16
 
 #### Fixed

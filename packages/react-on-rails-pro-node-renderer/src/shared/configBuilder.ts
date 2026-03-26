@@ -225,7 +225,7 @@ function envValuesUsed() {
     RENDERER_BUNDLE_PATH:
       !userConfig.serverBundleCachePath && !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
     RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
-    RENDERER_PASSWORD: !userConfig.password && env.RENDERER_PASSWORD && '<MASKED>',
+    RENDERER_PASSWORD: userConfig.password === undefined && env.RENDERER_PASSWORD && '<MASKED>',
     RENDERER_SUPPORT_MODULES: !('supportModules' in userConfig) && env.RENDERER_SUPPORT_MODULES,
     RENDERER_STUB_TIMERS: !('stubTimers' in userConfig) && env.RENDERER_STUB_TIMERS,
     RENDERER_ALL_WORKERS_RESTART_INTERVAL:
@@ -258,8 +258,10 @@ export function logSanitizedConfig() {
   log.info({
     'Node Renderer version': packageJson.version,
     'Protocol version': packageJson.protocolVersion,
-    // These are module-load defaults; final runtime settings are shown below.
-    'Default settings (module-load)': defaultConfig,
+    'Default settings at module load (env-backed values may lag current runtime)': sanitizedSettings(
+      defaultConfig,
+      '<NOT PROVIDED AT MODULE LOAD>',
+    ),
     'ENV values used for settings (use "RENDERER_" prefix)': envValuesUsed(),
     'Customized values for settings from config object (overrides ENV)': sanitizedSettings(userConfig),
     'Final renderer settings': sanitizedSettings(config, '<NOT PROVIDED>'),
@@ -267,6 +269,8 @@ export function logSanitizedConfig() {
 }
 
 function validatePasswordForProduction(aConfig: Config): string | null {
+  // Only a truthy password satisfies the production-like requirement. Null, undefined, and empty strings are
+  // all treated as missing passwords.
   if (aConfig.password) return null;
 
   // Require all present runtime envs to be development/test; fail closed otherwise.
@@ -289,6 +293,7 @@ function validatePasswordForProduction(aConfig: Config): string | null {
     'Environment matrix:\n' +
     '  development — password optional (no authentication)\n' +
     '  test        — password optional (no authentication)\n' +
+    '  (neither set) — treated as production-like; RENDERER_PASSWORD required\n' +
     '  all other environments (staging, production, qa, preview, etc.) — RENDERER_PASSWORD required'
   );
 }
@@ -296,9 +301,16 @@ function validatePasswordForProduction(aConfig: Config): string | null {
 /**
  * Lazily create the config.
  * Undefined values in providedUserConfig are ignored so env/runtime defaults are preserved.
+ * Passing password: undefined means "keep the env/default password", not "clear the password".
  */
 export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   userConfig = providedUserConfig || {};
+  if (Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined) {
+    log.warn(
+      'buildConfig({ password: undefined }) preserves the env/default password. ' +
+        'Pass null or an empty string to clear it in development/test-like environments.',
+    );
+  }
   const runtimeDefaultConfig = {
     ...defaultConfig,
     password: env.RENDERER_PASSWORD,
@@ -306,6 +318,8 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
   };
   // Ignore undefined overrides so late-bound env defaults (for example password) are preserved.
+  // Null and empty-string remain explicit overrides and therefore still fail password validation in
+  // production-like environments.
   const userConfigWithoutUndefined = Object.fromEntries(
     Object.entries(userConfig).filter(([, value]) => value !== undefined),
   ) as Partial<Config>;

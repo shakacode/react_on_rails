@@ -93,6 +93,10 @@ export RENDERER_PASSWORD="your-secure-password"
 config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
 ```
 
+The Node Renderer reads `RENDERER_PASSWORD` directly from `process.env`. Rails does not automatically
+read that env var for `config.renderer_password`, so the initializer assignment above is required on
+the Ruby side.
+
 For local development, you can either omit the password entirely (no authentication) or set a convenience default:
 
 ```ruby
