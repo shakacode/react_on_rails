@@ -161,8 +161,7 @@ function defaultReplayServerAsyncOperationLogs() {
     return truthy(env.REPLAY_SERVER_ASYNC_OPERATION_LOGS);
   }
 
-  // Keep default replay logging disabled outside development/test-like runtime envs.
-  return runtimeEnvsAllowDevelopmentDefaults();
+  return env.NODE_ENV?.toLowerCase() === 'development';
 }
 
 const defaultConfig: Config = {
@@ -209,7 +208,7 @@ const defaultConfig: Config = {
   // default to true if empty, otherwise it is set to false
   stubTimers: env.RENDERER_STUB_TIMERS === 'true' || !env.RENDERER_STUB_TIMERS,
 
-  // default to true in development, otherwise it is set to false
+  // Default to true in development, otherwise it is set to false.
   replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
 
   // Maximum number of VM contexts to keep in memory. Defaults to 2 since typically only two contexts
@@ -306,8 +305,8 @@ function validatePasswordForProduction(aConfig: Config): string | null {
 
 /**
  * Lazily create the config.
- * Undefined values in providedUserConfig are ignored so env/runtime defaults are preserved.
  * Passing password: undefined means "keep the env/default password", not "clear the password".
+ * Other undefined keys retain normal JavaScript spread semantics.
  */
 export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   userConfig = providedUserConfig || {};
@@ -324,15 +323,10 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
   };
-  // Ignore undefined overrides so late-bound env defaults (for example password) are preserved.
-  // Null and empty-string remain explicit overrides and therefore still fail password validation in
-  // production-like environments.
-  // The cast is intentional: userConfig is already typed as Partial<Config>, and this filter only
-  // drops undefined entries from that known key set.
-  const userConfigWithoutUndefined = Object.fromEntries(
-    Object.entries(userConfig).filter(([, value]) => value !== undefined),
-  ) as Partial<Config>;
-  config = { ...runtimeDefaultConfig, ...userConfigWithoutUndefined };
+  config = { ...runtimeDefaultConfig, ...userConfig };
+  if (Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined) {
+    config.password = runtimeDefaultConfig.password;
+  }
 
   // Handle bundlePath deprecation
   if ('bundlePath' in userConfig) {

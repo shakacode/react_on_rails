@@ -288,12 +288,22 @@ describe('configBuilder', () => {
         expect.stringContaining('buildConfig({ password: undefined }) preserves the env/default password'),
       );
     });
+
+    it('keeps normal spread semantics for non-password undefined overrides', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RENDERER_PASSWORD = 'late-loaded-password';
+      process.env.RENDERER_WORKERS_COUNT = '7';
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ workersCount: undefined }).workersCount).toBeUndefined();
+    });
   });
 
   describe('replayServerAsyncOperationLogs defaults', () => {
-    it('defaults to true in development-like runtime envs', () => {
+    it('defaults to true when NODE_ENV is development', () => {
       process.env.NODE_ENV = 'development';
-      process.env.RAILS_ENV = 'development';
+      delete process.env.RAILS_ENV;
       delete process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS;
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
@@ -302,7 +312,7 @@ describe('configBuilder', () => {
       expect(config.replayServerAsyncOperationLogs).toBe(true);
     });
 
-    it('defaults to false when runtime envs are mixed (production-like)', () => {
+    it('defaults to true when NODE_ENV is development even if RAILS_ENV is production', () => {
       process.env.NODE_ENV = 'development';
       process.env.RAILS_ENV = 'production';
       delete process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS;
@@ -310,12 +320,23 @@ describe('configBuilder', () => {
       const { buildConfig } = loadConfigBuilderWithMockedLogger();
       const config = buildConfig({ password: 'secure-password' });
 
+      expect(config.replayServerAsyncOperationLogs).toBe(true);
+    });
+
+    it('defaults to false in test when no explicit override is provided', () => {
+      process.env.NODE_ENV = 'test';
+      delete process.env.RAILS_ENV;
+      delete process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+      const config = buildConfig();
+
       expect(config.replayServerAsyncOperationLogs).toBe(false);
     });
 
-    it('treats mixed-case development values as development-like', () => {
+    it('treats mixed-case NODE_ENV development values as development', () => {
       process.env.NODE_ENV = 'Development';
-      process.env.RAILS_ENV = 'Test';
+      delete process.env.RAILS_ENV;
       delete process.env.REPLAY_SERVER_ASYNC_OPERATION_LOGS;
 
       const { buildConfig } = loadConfigBuilderWithMockedLogger();

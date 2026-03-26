@@ -200,6 +200,18 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             end
           end.not_to raise_error
         end
+
+        it "raises when renderer_password is explicitly set to blank in production" do
+          allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = ""
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
       end
 
       context "when using NodeRenderer in development/test environments" do
