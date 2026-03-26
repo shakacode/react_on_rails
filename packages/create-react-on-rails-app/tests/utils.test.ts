@@ -1,8 +1,9 @@
-import { execFileSync } from 'child_process';
-import { detectPackageManager } from '../src/utils';
+import { execFileSync, spawnSync } from 'child_process';
+import { detectPackageManager, execCaptureArgs, execLiveArgs } from '../src/utils';
 
 jest.mock('child_process');
 const mockedExecFileSync = jest.mocked(execFileSync);
+const mockedSpawnSync = jest.mocked(spawnSync);
 
 describe('detectPackageManager', () => {
   const originalEnv = process.env;
@@ -52,5 +53,64 @@ describe('detectPackageManager', () => {
       throw new Error('command not found');
     });
     expect(detectPackageManager()).toBeNull();
+  });
+});
+
+describe('command helpers', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = {
+      ...originalEnv,
+      HOME: '/tmp/home',
+      PATH: '/usr/bin:/bin',
+    };
+    mockedSpawnSync.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('merges parent environment into execLiveArgs child env', () => {
+    mockedSpawnSync.mockReturnValue({ status: 0 } as ReturnType<typeof spawnSync>);
+
+    execLiveArgs('git', ['status'], '/tmp/app', { CUSTOM_FLAG: 'yes' });
+
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      'git',
+      ['status'],
+      expect.objectContaining({
+        stdio: 'inherit',
+        cwd: '/tmp/app',
+        env: expect.objectContaining({
+          HOME: '/tmp/home',
+          PATH: '/usr/bin:/bin',
+          CUSTOM_FLAG: 'yes',
+        }),
+      }),
+    );
+  });
+
+  it('merges parent environment into execCaptureArgs child env', () => {
+    mockedSpawnSync.mockReturnValue({ status: 0, stdout: 'ok', stderr: '' } as ReturnType<typeof spawnSync>);
+
+    const result = execCaptureArgs('git', ['status'], '/tmp/app', { CUSTOM_FLAG: 'yes' });
+
+    expect(result).toBe('ok');
+    expect(mockedSpawnSync).toHaveBeenCalledWith(
+      'git',
+      ['status'],
+      expect.objectContaining({
+        stdio: 'pipe',
+        encoding: 'utf8',
+        cwd: '/tmp/app',
+        env: expect.objectContaining({
+          HOME: '/tmp/home',
+          PATH: '/usr/bin:/bin',
+          CUSTOM_FLAG: 'yes',
+        }),
+      }),
+    );
   });
 });

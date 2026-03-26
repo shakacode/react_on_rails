@@ -102,8 +102,12 @@ expect_git_history() {
     printf '%s\n' "$expected" >&2
     echo "Actual:" >&2
     printf '%s\n' "$actual" >&2
-    exit 1
+    return 1
   fi
+
+  git -C "$app_dir" ls-files --error-unmatch .gitignore .gitattributes >/dev/null 2>&1
+  ! git -C "$app_dir" ls-files | grep -q '^tmp/cache/'
+  ! git -C "$app_dir" ls-files | grep -q '^node_modules/'
 }
 
 echo "Verifying generated files..."
@@ -118,6 +122,7 @@ grep -q "Pro quick start" "$APP_TS_DIR/app/views/home/index.html.erb"
 grep -q "react-server-components-marketplace-demo" "$APP_TS_DIR/app/views/home/index.html.erb"
 test -f "$APP_TS_DIR/app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_TS_DIR/bin/dev"
+grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_TS_DIR/bin/dev"
 grep -q -- '--open-browser-once' "$APP_TS_DIR/bin/dev"
 test -f "$APP_TS_DIR/pnpm-lock.yaml"
 ! test -f "$APP_TS_DIR/package-lock.json"
@@ -136,10 +141,16 @@ grep -q "hello_world" "$APP_JS_DIR/config/routes.rb"
 ! grep -q "gem \"react_on_rails_pro\"" "$APP_JS_DIR/Gemfile"
 test -f "$APP_JS_DIR/app/views/home/index.html.erb"
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_JS_DIR/bin/dev"
+grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_JS_DIR/bin/dev"
 test -f "$APP_JS_DIR/pnpm-lock.yaml"
 ! test -f "$APP_JS_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_JS_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_JS_DIR/bin/setup"
+expect_git_history "$APP_JS_DIR" \
+  "Create Rails app with PostgreSQL" \
+  "Add react_on_rails gem" \
+  "Install React on Rails with JavaScript and Webpack" \
+  "Normalize the generated app for pnpm"
 
 grep -q "gem \"react_on_rails\"" "$APP_RSPACK_DIR/Gemfile"
 grep -q "path: \"$RUBY_GEM_DIR\"" "$APP_RSPACK_DIR/Gemfile"
@@ -148,11 +159,17 @@ grep -q "hello_world" "$APP_RSPACK_DIR/config/routes.rb"
 test -f "$APP_RSPACK_DIR/app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx"
 test -f "$APP_RSPACK_DIR/app/views/home/index.html.erb"
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_RSPACK_DIR/bin/dev"
+grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_RSPACK_DIR/bin/dev"
 grep -q '"@rspack/core"' "$APP_RSPACK_DIR/package.json"
 test -f "$APP_RSPACK_DIR/pnpm-lock.yaml"
 ! test -f "$APP_RSPACK_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_RSPACK_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_RSPACK_DIR/bin/setup"
+expect_git_history "$APP_RSPACK_DIR" \
+  "Create Rails app with PostgreSQL" \
+  "Add react_on_rails gem" \
+  "Install React on Rails with TypeScript and Rspack" \
+  "Normalize the generated app for pnpm"
 
 grep -q "gem \"react_on_rails_pro\"" "$APP_RSC_JS_DIR/Gemfile"
 grep -q "path: \"$RUBY_PRO_GEM_DIR\"" "$APP_RSC_JS_DIR/Gemfile"
@@ -164,6 +181,7 @@ grep -q "/hello_server" "$APP_RSC_JS_DIR/app/views/home/index.html.erb"
 test -f "$APP_RSC_JS_DIR/app/javascript/src/HelloServer/components/HelloServer.jsx"
 grep -q "stream_react_component('HelloServer'" "$APP_RSC_JS_DIR/app/views/hello_server/index.html.erb"
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_RSC_JS_DIR/bin/dev"
+grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_RSC_JS_DIR/bin/dev"
 test -f "$APP_RSC_JS_DIR/pnpm-lock.yaml"
 ! test -f "$APP_RSC_JS_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_RSC_JS_DIR/package.json"
@@ -181,10 +199,18 @@ grep -q 'root to: "home#index"' "$APP_RSC_TS_DIR/config/routes.rb"
 grep -q "hello_server" "$APP_RSC_TS_DIR/config/routes.rb"
 grep -q "/hello_server" "$APP_RSC_TS_DIR/app/views/home/index.html.erb"
 test -f "$APP_RSC_TS_DIR/app/javascript/src/HelloServer/components/HelloServer.tsx"
+grep -q 'DEFAULT_ROUTE = "/"' "$APP_RSC_TS_DIR/bin/dev"
+grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_RSC_TS_DIR/bin/dev"
 test -f "$APP_RSC_TS_DIR/pnpm-lock.yaml"
 ! test -f "$APP_RSC_TS_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_RSC_TS_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_RSC_TS_DIR/bin/setup"
+expect_git_history "$APP_RSC_TS_DIR" \
+  "Create Rails app with PostgreSQL" \
+  "Add react_on_rails gem" \
+  "Add react_on_rails_pro gem" \
+  "Install React Server Components with TypeScript and Webpack" \
+  "Normalize the generated app for pnpm"
 
 grep -q "gem \"react_on_rails_pro\"" "$APP_RSC_RSPACK_DIR/Gemfile"
 grep -q "path: \"$RUBY_PRO_GEM_DIR\"" "$APP_RSC_RSPACK_DIR/Gemfile"
@@ -197,10 +223,17 @@ test -f "$APP_RSC_RSPACK_DIR/app/javascript/src/HelloServer/components/HelloServ
 grep -q "stream_react_component('HelloServer'" "$APP_RSC_RSPACK_DIR/app/views/hello_server/index.html.erb"
 grep -q "\"@rspack/core\"" "$APP_RSC_RSPACK_DIR/package.json"
 grep -q 'DEFAULT_ROUTE = "/"' "$APP_RSC_RSPACK_DIR/bin/dev"
+grep -q 'AUTO_OPEN_BROWSER_ONCE = true' "$APP_RSC_RSPACK_DIR/bin/dev"
 test -f "$APP_RSC_RSPACK_DIR/pnpm-lock.yaml"
 ! test -f "$APP_RSC_RSPACK_DIR/package-lock.json"
 grep -q '"packageManager": "pnpm@' "$APP_RSC_RSPACK_DIR/package.json"
 grep -q 'system!("pnpm install")' "$APP_RSC_RSPACK_DIR/bin/setup"
+expect_git_history "$APP_RSC_RSPACK_DIR" \
+  "Create Rails app with PostgreSQL" \
+  "Add react_on_rails gem" \
+  "Add react_on_rails_pro gem" \
+  "Install React Server Components with TypeScript and Rspack" \
+  "Normalize the generated app for pnpm"
 
 echo "Smoke test passed."
 if [[ "${KEEP_WORKDIR:-0}" == "1" ]]; then

@@ -1,6 +1,10 @@
 import { execFileSync, spawnSync } from 'child_process';
 import chalk from 'chalk';
 
+function childEnv(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return env ? { ...process.env, ...env } : process.env;
+}
+
 /**
  * Execute a command and stream output to the current terminal.
  *
@@ -12,7 +16,7 @@ export function execLiveArgs(command: string, args: string[], cwd?: string, env?
   const result = spawnSync(command, args, {
     stdio: 'inherit',
     cwd,
-    ...(env ? { env } : {}),
+    env: childEnv(env),
   });
   if (result.error) {
     throw result.error;
@@ -32,7 +36,7 @@ export function execCaptureArgs(
     stdio: 'pipe',
     encoding: 'utf8',
     cwd,
-    ...(env ? { env } : {}),
+    env: childEnv(env),
   });
   if (result.error) {
     throw result.error;

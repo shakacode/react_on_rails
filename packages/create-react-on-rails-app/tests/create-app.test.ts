@@ -262,7 +262,53 @@ describe('createApp', () => {
   function gitCommitCalls(): Array<[string, string[], string | undefined, NodeJS.ProcessEnv | undefined]> {
     return mockedExecLiveArgs.mock.calls.filter(
       (call): call is [string, string[], string | undefined, NodeJS.ProcessEnv | undefined] =>
-        call[0] === 'git' && Array.isArray(call[1]) && call[1][0] === 'commit',
+        call[0] === 'git' && Array.isArray(call[1]) && call[1].includes('commit'),
+    );
+  }
+
+  function gitCommitSubjects(): string[] {
+    return gitCommitCalls().map(([, args]) => {
+      const subjectIndex = args.indexOf('-m');
+      return subjectIndex >= 0 ? args[subjectIndex + 1] : '';
+    });
+  }
+
+  function expectFallbackGitIdentityOnCommits(): void {
+    for (const [, args, , env] of gitCommitCalls()) {
+      expect(args).toEqual(expect.arrayContaining(['-c', 'commit.gpgsign=false', 'commit']));
+      expect(env).toEqual(
+        expect.objectContaining({
+          GIT_AUTHOR_NAME: 'React on Rails Generator',
+          GIT_AUTHOR_EMAIL: 'generator@reactonrails.local',
+          GIT_COMMITTER_NAME: 'React on Rails Generator',
+          GIT_COMMITTER_EMAIL: 'generator@reactonrails.local',
+        }),
+      );
+    }
+  }
+
+  function expectGitIdentityLookedUpOncePerApp(): void {
+    const gitConfigCalls = mockedExecCaptureArgs.mock.calls.filter(
+      (call): call is [string, string[], string | undefined, NodeJS.ProcessEnv | undefined] =>
+        call[0] === 'git' && Array.isArray(call[1]) && call[1][0] === 'config',
+    );
+
+    expect(gitConfigCalls).toEqual([
+      ['git', ['config', '--get', 'user.name'], expect.any(String)],
+      ['git', ['config', '--get', 'user.email'], expect.any(String)],
+    ]);
+  }
+
+  function expectRailsGitScaffoldRestored(appPath: string): void {
+    expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
+      path.join(appPath, '.gitignore'),
+      expect.stringContaining('/tmp/*'),
+      'utf8',
+    );
+    expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
+      path.join(appPath, '.gitattributes'),
+      expect.stringContaining('db/schema.rb linguist-generated'),
+      'utf8',
     );
   }
 
@@ -277,6 +323,7 @@ describe('createApp', () => {
       'my-app',
       '--database=postgresql',
       '--skip-javascript',
+      '--skip-git',
     ]);
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       4,
@@ -305,12 +352,15 @@ describe('createApp', () => {
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000');
-    expect(gitCommitCalls().map(([, args]) => args[2])).toEqual([
+    expect(gitCommitSubjects()).toEqual([
       'Create Rails app with PostgreSQL',
       'Add react_on_rails gem',
       'Add react_on_rails_pro gem',
       'Install React Server Components with JavaScript and Webpack',
     ]);
+    expectRailsGitScaffoldRestored(appPath);
+    expectFallbackGitIdentityOnCommits();
+    expectGitIdentityLookedUpOncePerApp();
     expect(processExitSpy).not.toHaveBeenCalled();
   });
 
@@ -325,6 +375,7 @@ describe('createApp', () => {
       'my-app',
       '--database=postgresql',
       '--skip-javascript',
+      '--skip-git',
     ]);
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       4,
@@ -353,6 +404,7 @@ describe('createApp', () => {
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000');
+    expectRailsGitScaffoldRestored(appPath);
     expect(processExitSpy).not.toHaveBeenCalled();
   });
 
@@ -408,6 +460,7 @@ describe('createApp', () => {
       'my-app',
       '--database=postgresql',
       '--skip-javascript',
+      '--skip-git',
     ]);
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       4,
@@ -473,12 +526,15 @@ describe('createApp', () => {
       expect.stringContaining('system!("pnpm install")'),
       'utf8',
     );
-    expect(gitCommitCalls().map(([, args]) => args[2])).toEqual([
+    expect(gitCommitSubjects()).toEqual([
       'Create Rails app with PostgreSQL',
       'Add react_on_rails gem',
       'Install React on Rails with JavaScript and Webpack',
       'Normalize the generated app for pnpm',
     ]);
+    expectRailsGitScaffoldRestored(appPath);
+    expectFallbackGitIdentityOnCommits();
+    expectGitIdentityLookedUpOncePerApp();
   });
 
   it('skips pnpm import when no package-lock.json exists but still runs pnpm install', () => {
@@ -519,19 +575,11 @@ describe('createApp', () => {
       return '';
     });
 
-    mockedExecLiveArgs
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {
+    mockedExecLiveArgs.mockImplementation((command, args) => {
+      if (command === 'pnpm' && args[0] === 'import') {
         throw new Error('pnpm import failed');
-      });
+      }
+    });
 
     expect(() => createApp('my-app', { ...baseOptions, packageManager: 'pnpm' })).toThrow('process.exit');
 
@@ -576,6 +624,28 @@ describe('createApp', () => {
     expect(mockedLogInfo).toHaveBeenCalledWith(
       'Directory removed. Fix the Rails app creation issue and rerun.',
     );
+  });
+
+  it('keeps scaffolding when educational git commit creation fails', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    mockedExecLiveArgs.mockImplementation((command, args) => {
+      if (command === 'git' && args.includes('commit')) {
+        throw new Error('git commit failed');
+      }
+    });
+
+    createApp('my-app', baseOptions);
+
+    expect(mockedLogInfo).toHaveBeenCalledWith(
+      'Educational git history paused after "Create Rails app with PostgreSQL" because git commit automation failed. The app scaffold will continue.',
+    );
+    expect(mockedLogInfo).toHaveBeenCalledWith(
+      'Educational git history is partial because git commit automation was skipped after an earlier failure.',
+    );
+    expect(mockedFs.rmSync).not.toHaveBeenCalledWith(appPath, { recursive: true, force: true });
+    expect(gitCommitCalls()).toHaveLength(1);
+    expect(processExitSpy).not.toHaveBeenCalled();
   });
 
   it('skips cleanup logging when app directory was never created', () => {
