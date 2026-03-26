@@ -118,7 +118,7 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 
 - **Active Community** - [Thousands of production sites use React on Rails](https://publicwww.com/websites/%22react-on-rails%22++-undeveloped.com+depth%3Aall/)
 - **[React on Rails Discussions](https://github.com/shakacode/react_on_rails/discussions)** - Ask questions and share knowledge
-- **[React + Rails Slack](https://invite.reactrails.com)** - Real-time community help
+- **[React + Rails Slack](https://reactrails.slack.com)** - Real-time community help
 - **[GitHub Issues](https://github.com/shakacode/react_on_rails/issues)** - Report bugs
 
 ### Professional Support

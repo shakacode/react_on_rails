@@ -33,7 +33,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 - [API Reference](./oss/api-reference/view-helpers-api.md)
 - [Deployment and troubleshooting](./oss/deployment/README.md)
 - [Configuration](./oss/configuration/README.md)
-- [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
+- [Changelog](./oss/upgrading/changelog.md)
 
 ## Pro features
 
