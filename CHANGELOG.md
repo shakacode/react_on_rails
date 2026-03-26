@@ -31,7 +31,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   Client-side legacy hydration path now uses the correct `{ manifest: undefined }` shape matching TanStack Router's
   internal `$_TSR` contract instead of a bare `true` boolean, improving forward compatibility. The recommended
   `RouterClient`/`ssrRouter` hydration path was already free of this dependency.
-  Fixes [Issue 2647](https://github.com/shakacode/react_on_rails/issues/2647).
+  Fixes [Issue 2647](https://github.com/shakacode/react_on_rails/issues/2647). [PR 2833](https://github.com/shakacode/react_on_rails/pull/2833) by [justin808](https://github.com/justin808).
 
 ### [16.5.0] - 2026-03-25
 
