@@ -115,8 +115,15 @@ function extractBundlesAndAssets(
       assertAsset(value, key);
       providedNewBundles.push({ timestamp: primaryBundleTimestamp, bundle: value });
     } else if (key.startsWith('bundle_')) {
-      assertAsset(value, key);
-      providedNewBundles.push({ timestamp: key.slice('bundle_'.length), bundle: value });
+      const timestamp = key.slice('bundle_'.length);
+      if (!timestamp) {
+        log.warn(
+          'Received form field with key "bundle_" but no hash suffix — possible bug in the Ruby client',
+        );
+      } else {
+        assertAsset(value, key);
+        providedNewBundles.push({ timestamp, bundle: value });
+      }
     } else if (isAsset(value)) {
       assetsToCopy.push(value);
     }
