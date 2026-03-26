@@ -47,7 +47,7 @@ Some combinations that I often run:
   pnpm dlx npm-check-updates -u -a && rm -rf node_modules && pnpm install
   ```
 
-Use the equivalent `npx npm-check-updates -u -a && npm install` or `yarn dlx npm-check-updates -u -a && yarn install` flow if your app does not use `pnpm`.
+Use the equivalent `npx npm-check-updates -u -a && npm install` or `npx npm-check-updates -u -a && yarn install` flow if your app does not use `pnpm`.
 
 **Option 2: Using your package manager's upgrade command**
 
@@ -63,8 +63,9 @@ To upgrade a specific package:
 pnpm up [package] --latest
 ```
 
-Equivalent commands for other package managers are `npm update` / `npm install <package>@latest`
-and `yarn upgrade` / `yarn add <package>@latest`.
+Equivalent commands for other package managers are `npm install <package>@latest` and `yarn add <package>@latest`.
+Note that `npm update` is not the same as `pnpm up --latest` because it respects existing semver
+ranges instead of updating package.json to the latest available versions.
 
 ### Adding New Dependencies
 
