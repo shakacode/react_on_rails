@@ -73,13 +73,14 @@ end
 
 The renderer password secures communication between Rails and the Node Renderer. React on Rails Pro enforces secure defaults by environment:
 
-| Environment           | Password Required? | Behavior                                               |
-| --------------------- | ------------------ | ------------------------------------------------------ |
-| `development`         | No                 | Optional — no authentication if unset                  |
-| `test`                | No                 | Optional — no authentication if unset                  |
-| `staging`             | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing |
-| `production`          | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing |
-| `qa`, `preview`, etc. | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing |
+| Environment           | Password Required? | Behavior                                                 |
+| --------------------- | ------------------ | -------------------------------------------------------- |
+| `development`         | No                 | Optional — no authentication if unset                    |
+| `test`                | No                 | Optional — no authentication if unset                    |
+| `(neither set)`       | **Yes**            | Treated as production-like; `RENDERER_PASSWORD` required |
+| `staging`             | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
+| `production`          | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
+| `qa`, `preview`, etc. | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
 
 In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without an explicit `RENDERER_PASSWORD`. Set the same password on both sides:
 

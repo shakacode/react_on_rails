@@ -281,7 +281,7 @@ function validatePasswordForProduction(aConfig: Config): string | null {
 
   // Require all present runtime envs to be development/test; fail closed otherwise.
   // If either env indicates a production-like value, or neither env is set, password is required.
-  // This stays consistent with master.ts and Ruby's Rails.env.production? checks.
+  // This preserves a fail-closed invariant across the renderer startup path and the Ruby-side checks.
   const allowMissingPassword = runtimeEnvsAllowDevelopmentDefaults();
   if (allowMissingPassword) return null;
 
@@ -313,9 +313,9 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   userConfig = providedUserConfig || {};
   if (Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined) {
     log.warn(
-      'buildConfig({ password: undefined }) preserves the env/default password. ' +
-        'An empty string is treated as an absent password and only works in development/test-like ' +
-        'environments; production-like environments still require an explicit truthy password.',
+      'buildConfig({ password: undefined }) preserves the env/default password rather than clearing it. ' +
+        'To explicitly clear the password, pass an empty string; note that an empty string is treated as ' +
+        'absent and will fail validation in production-like environments.',
     );
   }
   const runtimeDefaultConfig = {
