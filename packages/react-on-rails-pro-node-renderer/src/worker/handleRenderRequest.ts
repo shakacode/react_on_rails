@@ -77,7 +77,7 @@ async function prepareResult(
  * @param assetsToCopy might be null
  */
 async function handleNewBundleProvided(
-  renderingRequest: string,
+  requestContext: string,
   providedNewBundle: ProvidedNewBundle,
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
@@ -95,7 +95,7 @@ async function handleNewBundleProvided(
 
     if (!wasLockAcquired) {
       const msg = formatExceptionMessage(
-        renderingRequest,
+        requestContext,
         errorMessage,
         `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
       );
@@ -114,7 +114,7 @@ async function handleNewBundleProvided(
       const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
       if (!fileExists) {
         const msg = formatExceptionMessage(
-          renderingRequest,
+          requestContext,
           error,
           `Unexpected error when moving the bundle from ${providedNewBundle.bundle.savedFilePath} \
 to ${bundleFilePathPerTimestamp})`,
@@ -143,7 +143,7 @@ to ${bundleFilePathPerTimestamp})`,
         await unlock(lockfileName);
       } catch (error) {
         const msg = formatExceptionMessage(
-          renderingRequest,
+          requestContext,
           error,
           `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
         );
@@ -154,14 +154,14 @@ to ${bundleFilePathPerTimestamp})`,
 }
 
 export async function handleNewBundlesProvided(
-  renderingRequest: string,
+  requestContext: string,
   providedNewBundles: ProvidedNewBundle[],
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
   log.info('Worker received new bundles: %s', providedNewBundles);
 
   const handlingPromises = providedNewBundles.map((providedNewBundle) =>
-    handleNewBundleProvided(renderingRequest, providedNewBundle, assetsToCopy),
+    handleNewBundleProvided(requestContext, providedNewBundle, assetsToCopy),
   );
   // Defensive: use allSettled so that if handleNewBundleProvided ever throws
   // unexpectedly, all in-flight operations still complete before the handler
