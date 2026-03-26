@@ -1,6 +1,18 @@
 # React on Rails Pro
 
+This is the canonical Pro landing page and route map. Start here if you are deciding whether to upgrade, then jump to the feature-specific entry page that matches your need.
+
 Node rendering, caching, streaming SSR, and React Server Components for [React on Rails](https://github.com/shakacode/react_on_rails). Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version and upgrade notes.
+
+## Route Map
+
+| Need                    | Start here                                            | Then read                                                                           |
+| ----------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Compare OSS and Pro     | [Upgrade to Pro](./upgrading-to-pro.md)               | [OSS vs Pro comparison](../oss/getting-started/oss-vs-pro.md)                       |
+| Dedicated Node.js SSR   | [Node Renderer](./node-renderer.md)                   | [Node Renderer technical docs](../oss/building-features/node-renderer/basics.md)    |
+| Progressive SSR         | [Streaming SSR](./streaming-ssr.md)                   | [Streaming SSR guide](../oss/building-features/streaming-server-rendering.md)       |
+| Cache rendered output   | [Fragment Caching](./fragment-caching.md)             | [SSR caching guide](../oss/building-features/caching.md)                            |
+| React Server Components | [RSC tutorial](./react-server-components/tutorial.md) | [Upgrade existing Pro app](./react-server-components/upgrading-existing-pro-app.md) |
 
 ## Getting Started
 

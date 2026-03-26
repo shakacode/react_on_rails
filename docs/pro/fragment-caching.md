@@ -2,6 +2,8 @@
 
 Fragment caching is a React on Rails Pro feature that caches the complete rendered output of a React component — including the cost of computing props from the database, serializing them to JSON, and evaluating JavaScript. On a cache hit, none of that work happens.
 
+> **Route map**: Start at [React on Rails Pro](./home-pro.md) if you're choosing a path. This page is the canonical fragment caching overview; use the SSR caching guide and Pro configuration docs for the lower-level cache settings and tradeoffs.
+
 ## Why Fragment Caching?
 
 Every server-rendered React component involves multiple expensive steps:
