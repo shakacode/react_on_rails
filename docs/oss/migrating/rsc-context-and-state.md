@@ -131,8 +131,10 @@ In React on Rails, data comes from Rails as props. Rails loads all data synchron
 ```erb
 <%= stream_react_component("ProductPage",
       props: { name: product.name, price: product.price,
-               reviews: product.reviews.includes(:author).as_json,
-               recommendations: RecommendationService.for(product).as_json }) %>
+               reviews: product.reviews
+                          .as_json(only: [:id, :text, :rating]),
+               recommendations: RecommendationService.for(product)
+                          .as_json(only: [:id, :name, :price]) }) %>
 ```
 
 The component renders with all data available as props. `stream_react_component` streams the HTML to the browser as React processes the component tree:
