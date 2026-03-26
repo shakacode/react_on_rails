@@ -228,7 +228,7 @@ To migrate to React on Rails Pro:
   end
   ```
 
-See the [React on Rails Pro Configuration docs](docs/oss/configuration/configuration-pro.md) for more details.
+  See the [React on Rails Pro Configuration docs](docs/oss/configuration/configuration-pro.md) for more details.
 
 - **Streaming View Helpers Moved to Pro Gem**: The following view helpers have been removed from the open-source gem and are now only available in React on Rails Pro:
   - `stream_react_component` - Progressive SSR using React 18+ streaming
