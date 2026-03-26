@@ -5,6 +5,9 @@ Renderer so you can find slow paths and bottlenecks.
 
 The examples below use the sample app in `react_on_rails_pro/spec/dummy`.
 
+**Prerequisite:** This guide assumes you have [Overmind](https://github.com/DarthSim/overmind)
+installed. On macOS, you can install it with `brew install overmind`.
+
 ## Profiling Server-Side Code Running On Node Renderer
 
 1. Start the sample app with Overmind.
