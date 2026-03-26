@@ -258,7 +258,7 @@ Rails.application.config.after_initialize do
 end
 ```
 
-**Note:** This workaround is not recommended for production. Upgrade to 16.2.0+ for the proper fix.
+**Note:** This workaround is not recommended for production. Upgrade to 16.4.0+ for the proper fix.
 
 ## For Coding Agents
 
