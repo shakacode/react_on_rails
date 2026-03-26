@@ -61,15 +61,15 @@ Deprecated options:
 
 ### Simple example:
 
-Create a file './node-renderer.js'
+Create a file `client/node-renderer.js`
 
 ```js
 import path from 'path';
 import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
 
 const config = {
-  // Save bundles to relative "./.node-renderer-bundles" dir of our app
-  serverBundleCachePath: path.resolve(__dirname, './.node-renderer-bundles'),
+  // Save bundles to relative "./.node-renderer-bundles" dir of our app root
+  serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
 
   // All other values are the defaults, as described above
 };
@@ -92,7 +92,7 @@ And add a root-level script to the `scripts` section of your `package.json`
 
 ```json
   "scripts": {
-    "node-renderer": "node ./node-renderer.js"
+    "node-renderer": "node client/node-renderer.js"
   },
 ```
 
