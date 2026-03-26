@@ -464,20 +464,25 @@ module ReactOnRailsProHelper
       begin
         first_chunk_promise.reject(e)
       rescue StandardError => reject_error
-        handle_reject_failure(reject_error, e)
+        # If reject itself fails, resolve with a wrapped error so wait unblocks and
+        # the caller can still fail fast instead of deadlocking indefinitely.
+        first_chunk_promise.resolve(handle_reject_failure(reject_error, e))
       end
     end
 
     # Wait for and return the first chunk (blocking).
     # Async::Promise#wait blocks until resolved, then returns the stored value.
     # If the promise was rejected, .wait automatically re-raises the exception.
-    first_chunk_promise.wait
+    first_chunk_or_error = first_chunk_promise.wait
+    raise first_chunk_or_error if first_chunk_or_error.is_a?(StandardError)
+
+    first_chunk_or_error
   end
 
   def handle_reject_failure(reject_error, original_error)
     # Async::Promise#reject is expected to be a no-op for settled promises.
-    # If it raises, surface the reject failure with the original error context.
-    raise reject_error.exception(
+    # If it raises, wrap with the original error context for the caller to raise.
+    reject_error.exception(
       "Promise#reject failed (#{reject_error.message}); original error: #{original_error.message}"
     )
   end

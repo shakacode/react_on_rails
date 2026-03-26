@@ -547,6 +547,25 @@ describe ReactOnRailsProHelper do
         expect(on_complete_called).to be false
       end
 
+      it "does not deadlock if Promise#reject raises before first chunk" do
+        promise = Async::Promise.new
+        allow(Async::Promise).to receive(:new).and_return(promise)
+        allow(promise).to receive(:reject).and_raise(StandardError, "reject failed")
+        allow(self).to receive(:internal_stream_react_component)
+          .and_raise(StandardError, "node renderer crashed before first chunk")
+
+        expect do
+          Async::Task.current.with_timeout(5) do
+            stream_react_component(component_name, props: props, **component_options)
+          end
+        end.to raise_error(
+          StandardError,
+          "Promise#reject failed (reject failed); original error: node renderer crashed before first chunk"
+        )
+
+        Async::Task.current.with_timeout(5) { @async_barrier.wait }
+      end
+
       it "calls on_complete when stream is fully consumed" do
         mock_request_and_response
 
