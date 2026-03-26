@@ -108,6 +108,7 @@ Note: Client Components cannot be `async` functions. If the component you want t
 
 ```jsx
 // Before: Server Component — entire element tree in Flight payload
+// (No 'use client' directive — React renders this on the server.)
 import clsx from 'clsx';
 
 export default function ProductTags({ tags }) {
@@ -228,7 +229,7 @@ If LCP is your critical metric (e.g., for a landing page with a hero image), be 
 
 React on Rails embeds the RSC payload within a Rails-rendered HTML page. In setups where Flight data is embedded into inline `<script>` tags, the Flight payload (already a serialized wire format) gets JSON-encoded again when Rails embeds it in the page response. That extra encoding can add significant overhead to already large payloads. This applies to the current inline-script embedding path discussed in issue #2522; apps that serve the payload through a separate endpoint are a different case.
 
-See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) (currently open) for details on this overhead and its impact.
+See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) (currently open) for details on this overhead and its impact. There is no workaround at this time; follow the issue for updates.
 
 ## Decision Flowchart
 
@@ -257,4 +258,4 @@ The standard RSC advice -- "make everything a Server Component unless it needs i
 
 - [Component Tree Restructuring Patterns](rsc-component-patterns.md) -- the foundational patterns for splitting server and client components
 - [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) -- debugging payload duplication and other RSC issues
-- [Data Fetching Migration](rsc-data-fetching.md) -- optimizing how data flows through server components
+- [Data Fetching Migration](rsc-data-fetching.md) -- migrating data-fetching patterns to Server Components
