@@ -246,7 +246,7 @@ For existing apps, use the standalone Pro generator to avoid re-processing base 
 rails generate react_on_rails:pro
 ```
 
-See the [React on Rails Pro overview](../../pro/react-on-rails-pro.md) for feature details.
+See the [React on Rails Pro overview](../../pro/home-pro.md) for feature details.
 
 ### React Server Components Support
 

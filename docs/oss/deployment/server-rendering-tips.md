@@ -16,7 +16,7 @@ For the best SSR performance, React on Rails Pro provides a [dedicated Node.js r
   in your top-level React component. Since the Hash passed in `props` from the view helper applies to
   both client- and server-side code, the best way to do this is to use a Render-Function.
 - If you're serious about server-side rendering, it's worth the effort to have different entry points for client-side and server-side rendering. It's worth the extra complexity. The point is that you have separate files for top-level client and server side, and you pass some extra option indicating that rendering is happening server-side.
-- You can enable Node.js server rendering via [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
+- You can enable Node.js server rendering via [React on Rails Pro](https://reactonrails.com/docs/pro/).
 
 ## Troubleshooting Server Rendering
 
