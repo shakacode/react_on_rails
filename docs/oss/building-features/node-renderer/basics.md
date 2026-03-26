@@ -1,7 +1,7 @@
 # Node Renderer Basics
 
-> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/home-pro.md).
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 ## Requirements
 

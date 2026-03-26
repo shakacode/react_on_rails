@@ -993,7 +993,7 @@ Access methods:
 ## Need Help?
 
 - **Documentation:** [React on Rails Guides](https://reactonrails.com/docs/)
-- **Pro Features:** [React on Rails Pro](https://pro.reactonrails.com/)
+- **Pro Features:** [React on Rails Pro](../../pro/home-pro.md)
 - **Support:** [ShakaCode Forum](https://forum.shakacode.com/)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)
 
