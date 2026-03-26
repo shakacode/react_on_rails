@@ -45,38 +45,43 @@ export default class LengthPrefixedStreamParser {
   feed(chunk: Uint8Array, onChunk: (content: Uint8Array, metadata: Record<string, unknown>) => void): void {
     this.buf = concatBytes(this.buf, chunk);
 
-    let progressed = true;
-    while (progressed) {
-      progressed = false;
+    let canExtract = true;
+    while (canExtract) {
       if (this.state === 'header') {
-        while (this.buf[0] === 0x0a) {
-          this.buf = this.buf.subarray(1);
-          progressed = true;
-        }
-
         const idx = this.buf.indexOf(0x0a); // \n
         if (idx >= 0) {
           const header = this.buf.subarray(0, idx);
           this.buf = this.buf.subarray(idx + 1);
           const tabIdx = header.indexOf(0x09); // \t
           if (tabIdx < 0) {
-            throw new Error(`Invalid stream header: ${JSON.stringify(decoder.decode(header))}`);
+            throw new Error(
+              `Malformed length-prefixed header: missing tab separator in: ${JSON.stringify(decoder.decode(header))}`,
+            );
           }
-          this.metadata = JSON.parse(decoder.decode(header.subarray(0, tabIdx)));
+          const metaStr = decoder.decode(header.subarray(0, tabIdx));
+          try {
+            this.metadata = JSON.parse(metaStr);
+          } catch {
+            throw new Error(
+              `Malformed length-prefixed header: invalid metadata JSON: ${JSON.stringify(metaStr)}`,
+            );
+          }
           const lenHex = decoder.decode(header.subarray(tabIdx + 1));
           this.contentLen = parseInt(lenHex, 16);
           if (Number.isNaN(this.contentLen)) {
             throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
           }
           this.state = 'content';
-          progressed = true;
+        } else {
+          canExtract = false;
         }
       } else if (this.buf.length >= this.contentLen) {
         const content = this.buf.subarray(0, this.contentLen);
         this.buf = this.buf.subarray(this.contentLen);
         onChunk(content, this.metadata);
         this.state = 'header';
-        progressed = true;
+      } else {
+        canExtract = false;
       }
     }
   }
