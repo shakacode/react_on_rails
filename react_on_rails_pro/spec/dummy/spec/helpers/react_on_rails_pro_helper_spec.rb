@@ -3,6 +3,7 @@
 require "async"
 require "async/queue"
 require "async/barrier"
+require "timeout"
 require "rails_helper"
 require "support/script_tag_utils"
 
@@ -411,7 +412,7 @@ describe ReactOnRailsProHelper do
         expect(initial_result).to include(react_component_div_with_initial_chunk)
 
         # Wait for async task to complete
-        @async_barrier.wait
+        Timeout.timeout(5) { @async_barrier.wait }
         @main_output_queue.close
 
         # Subsequent chunks should be in the output queue
@@ -520,7 +521,7 @@ describe ReactOnRailsProHelper do
           **component_options
         )
 
-        @async_barrier.wait
+        Timeout.timeout(5) { @async_barrier.wait }
         @main_output_queue.close
         while @main_output_queue.dequeue; end
 
@@ -540,7 +541,7 @@ describe ReactOnRailsProHelper do
           stream_react_component(component_name, props: props, on_complete: on_complete, **component_options)
         end.to raise_error(StandardError, "node renderer crashed before first chunk")
 
-        @async_barrier.wait
+        Timeout.timeout(5) { @async_barrier.wait }
         @main_output_queue.close
         while @main_output_queue.dequeue; end
 

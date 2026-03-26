@@ -5,6 +5,7 @@
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 
 require "react_on_rails/helper"
+require "async/promise"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
@@ -428,8 +429,6 @@ module ReactOnRailsProHelper
   end
 
   def consumer_stream_async(on_complete:)
-    require "async/promise"
-
     if @async_barrier.nil?
       raise ReactOnRails::Error,
             "You must call stream_view_containing_react_components to render the view containing the react component"
@@ -476,10 +475,8 @@ module ReactOnRailsProHelper
   end
 
   def handle_reject_failure(reject_error, original_error)
-    # Preserve existing behavior for known promise-state races (double resolve/reject).
-    raise original_error if reject_error.is_a?(FrozenError)
-
-    # Unexpected Promise API behavior: surface the reject failure with original context.
+    # Async::Promise#reject is expected to be a no-op for settled promises.
+    # If it raises, surface the reject failure with the original error context.
     raise reject_error.exception(
       "Promise#reject failed (#{reject_error.message}); original error: #{original_error.message}"
     )
