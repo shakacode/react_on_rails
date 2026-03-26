@@ -342,6 +342,30 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
   });
 
+  test('post /upload-assets ignores targetBundles when bundle_<hash> fields are present (backward compat)', async () => {
+    const bundleHash = 'compat-bundle-hash';
+
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+      password: 'my_password',
+    });
+
+    // Simulates the Ruby client sending both bundle_<hash> (new) and targetBundles (legacy).
+    // The endpoint should derive targets from bundle_<hash> and ignore targetBundles.
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      password: 'my_password',
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
+      targetBundles: [bundleHash],
+      asset1: createReadStream(getFixtureAsset()),
+    });
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+    expect(res.statusCode).toBe(200);
+    expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
+  });
+
   test('post /upload-assets with multiple bundles and assets', async () => {
     const bundleHash = 'some-bundle-hash';
     const bundleHashOther = 'some-other-bundle-hash';
