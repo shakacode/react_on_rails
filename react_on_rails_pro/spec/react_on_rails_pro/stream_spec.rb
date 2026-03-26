@@ -626,7 +626,7 @@ RSpec.describe "Streaming API" do
     end
 
     describe "exception handling" do
-      it "propagates pre-first-chunk errors without committing the response" do
+      it "does not commit the response when render_to_string raises" do
         _queues, controller, stream = setup_stream_test(component_count: 0)
 
         # Simulate a renderer/shell error during render_to_string, before any
