@@ -46,11 +46,9 @@ Define the script in your root `package.json` so Heroku can run it from the app 
 
 > **Note:** This fixed-port example is for the same-dyno deployment above. If you deploy the
 > renderer as a separate Heroku app, configure the renderer to use `process.env.PORT` instead.
-> Heroku runs the inline `RENDERER_PORT=3800 ...` syntax on Linux dynos; if you reuse this script
-> locally on Windows, use `cross-env` or set `RENDERER_PORT` separately before running it.
 
-Be sure your node-renderer script listens on the same port (for example `3800`) that you reference
-inside the full Rails `config.renderer_url` value (for example `http://localhost:3800`).
+Be sure your node-renderer script listens on the same port (for example `3800`) and set the full
+Rails `config.renderer_url` value accordingly, for example `http://localhost:3800`.
 
 ### Modifying Precompile Task
 
