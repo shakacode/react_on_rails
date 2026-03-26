@@ -83,7 +83,7 @@ This was demonstrated on a product search page rendering 36 products, each with 
 | **FeaturesList**   | ~190 B per feature item                   | ~30 B (string)                   | 6:1           |
 | **ProductTags**    | ~155 B per tag                            | ~10 B (string)                   | 15:1          |
 
-These before/after numbers came from the same page in one benchmark environment. Large TTFB gains here mainly reflect less server-side serialization work, so expect smaller or different results in multi-region production systems, under different server load, or with different streaming/caching behavior.
+These before/after numbers came from the same page in one benchmark environment. The large TTFB gain here is most representative of buffered or non-streaming SSR, where the server finishes more work before sending bytes. Streaming deployments may see smaller or different TTFB changes, and results will also vary under different server load, caching, or multi-region production setups.
 
 Results:
 
@@ -224,7 +224,7 @@ If LCP is your critical metric (e.g., for a landing page with a hero image), be 
 
 ## React on Rails: Double JSON.stringify Overhead
 
-React on Rails embeds the RSC payload within a Rails-rendered HTML page. In setups where Flight data is embedded into inline `<script>` tags, the payload may be double-serialized: once by React's Flight serializer, then again when Rails embeds it in the page response. This double encoding can add significant overhead to already large payloads. This applies to the current inline-script embedding path discussed in issue #2522; apps that serve the payload through a separate endpoint are a different case.
+React on Rails embeds the RSC payload within a Rails-rendered HTML page. In setups where Flight data is embedded into inline `<script>` tags, the Flight payload (already a serialized wire format) gets JSON-encoded again when Rails embeds it in the page response. That extra encoding can add significant overhead to already large payloads. This applies to the current inline-script embedding path discussed in issue #2522; apps that serve the payload through a separate endpoint are a different case.
 
 See [issue #2522](https://github.com/shakacode/react_on_rails/issues/2522) (currently open) for details on this overhead and its impact.
 
