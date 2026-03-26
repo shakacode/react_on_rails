@@ -5,23 +5,22 @@
 
 Because the renderer communicates over a port to the server, you can start a renderer instance locally in your application and debug it.
 
-## Yalc vs Yarn Link
+## Yalc Workflow
 
-The project is setup to use [yalc](https://github.com/whitecolor/yalc). This means that at the top level
-directory, `yalc publish` will send the node package files to the global yalc store. Running `yarn` in the
-`/spec/dummy/client` directory will copy the files from the global yalc store over to the local `node_modules`
-directory.
+For repo contributors, the monorepo still uses [yalc](https://github.com/whitecolor/yalc) to wire local
+`react-on-rails-pro-node-renderer` changes into `react_on_rails_pro/spec/dummy`. Running `pnpm install` in
+`react_on_rails_pro/spec/dummy` triggers the dummy app's preinstall hook, which rebuilds the local packages
+and refreshes the yalc link.
 
 ## Debugging the Node Renderer
 
-1. cd to the top level of the project.
-1. `yarn` to install any libraries.
-1. To compile renderer files on changes, open console and run `yarn build:dev`.
-1. Open another console tab and run `RENDERER_LOG_LEVEL=debug yarn start`
-1. Reload the browser page that causes the renderer issue. You can then update the JS code, and restart the `yarn start` to run the renderer with the new code.
+1. `cd react_on_rails_pro/spec/dummy`
+1. Run `bundle && pnpm install`
+1. Start the dummy app with `overmind start -f Procfile.dev` (or `foreman start -f Procfile.dev`). The current `Procfile.dev` already runs the renderer with `node --inspect client/node-renderer.js`.
+1. Reload the browser page that causes the renderer issue. You can then update the JS code and rerun the same command to restart the renderer with the new code.
 1. Be sure to restart the rails server if you change any ruby code in loaded gems.
-1. Note, the default setup for spec/dummy to reference the pro renderer is to use yalc, which may or may not be using a link, which means that you have to re-run yarn to get the files updated when changing the renderer.
-1. Check out the top level nps task `nps renderer.debug` and `spec/dummy/package.json` which has script `"node-renderer-debug"`.
+1. If you change code under `packages/react-on-rails-pro-node-renderer` or `react_on_rails_pro`, rerun `pnpm install` in `react_on_rails_pro/spec/dummy` to refresh the yalc link before testing again.
+1. For a dedicated debugger session, run `pnpm run node-renderer-debug` from `react_on_rails_pro/spec/dummy`, or `cd react_on_rails_pro && nps renderer.debug` to debug the package directly.
 
 ## Debugging Memory Leaks
 
@@ -29,7 +28,7 @@ If worker memory grows over time, use heap snapshots to find the source:
 
 1. Start the renderer with `--expose-gc` to enable forced GC before snapshots:
    ```bash
-   node --expose-gc node-renderer.js
+   RENDERER_PORT=3800 node --expose-gc client/node-renderer.js
    ```
 2. Take heap snapshots at different times using `v8.writeHeapSnapshot()` (triggered via `SIGUSR2` signal or a custom endpoint).
 3. Load both snapshots in Chrome DevTools (Memory tab → Load) and use the **Comparison** view to see which objects accumulated between snapshots.
