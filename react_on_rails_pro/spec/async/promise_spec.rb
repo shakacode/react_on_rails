@@ -17,6 +17,14 @@ RSpec.describe Async::Promise do
     expect(promise.resolved?).to be true
   end
 
+  it "ignores a second resolve call" do
+    promise = described_class.new
+
+    expect { promise.resolve("first") }.not_to raise_error
+    expect { promise.resolve("second") }.not_to raise_error
+    expect(promise.wait).to eq("first")
+  end
+
   it "reports resolved after reject" do
     promise = described_class.new
     promise.reject(StandardError.new("boom"))
