@@ -100,7 +100,7 @@ describe('configBuilder', () => {
     expect(defaultSettings.password).toBe('<MASKED>');
   });
 
-  it('treats an empty-string password as not provided in sanitized logs', () => {
+  it('labels an empty-string password override explicitly in sanitized logs', () => {
     const { buildConfig, logSanitizedConfig, info } = loadConfigBuilderWithMockedLogger();
 
     buildConfig({ password: '' });
@@ -109,7 +109,7 @@ describe('configBuilder', () => {
     const logPayload = info.mock.calls[0][0] as Record<string, unknown>;
     const finalSettings = logPayload['Final renderer settings'] as Record<string, unknown>;
 
-    expect(finalSettings.password).toBe('<NOT PROVIDED>');
+    expect(finalSettings.password).toBe('<EMPTY STRING>');
   });
 
   describe('password validation in production-like environments', () => {
@@ -174,6 +174,18 @@ describe('configBuilder', () => {
     it('throws when RAILS_ENV is production even if NODE_ENV is development', () => {
       process.env.NODE_ENV = 'development';
       process.env.RAILS_ENV = 'production';
+      delete process.env.RENDERER_PASSWORD;
+      const processExit = mockProcessExit();
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
+    });
+
+    it('throws when NODE_ENV is production even if RAILS_ENV is development', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.RAILS_ENV = 'development';
       delete process.env.RENDERER_PASSWORD;
       const processExit = mockProcessExit();
 

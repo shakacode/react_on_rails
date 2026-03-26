@@ -250,9 +250,9 @@ function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: 
   return aConfig && Object.keys(aConfig).length > 0
     ? {
         ...aConfig,
-        // Treat empty or otherwise falsy password overrides as "not provided" in diagnostics even though
-        // they still flow through as explicit overrides and fail validation in production-like envs.
-        password: aConfig.password ? '<MASKED>' : defaultValue,
+        // Distinguish explicit empty-string overrides from truly missing passwords in diagnostics.
+        // Empty strings still flow through as explicit overrides and fail validation in production-like envs.
+        password: aConfig.password === '' ? '<EMPTY STRING>' : aConfig.password ? '<MASKED>' : defaultValue,
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
         gracefulWorkerRestartTimeout: aConfig.gracefulWorkerRestartTimeout || defaultValue,
