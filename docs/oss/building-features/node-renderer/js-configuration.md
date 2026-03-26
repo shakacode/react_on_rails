@@ -111,6 +111,10 @@ For advanced use cases, you can customize the Fastify server instance by importi
 
 When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
 
+The advanced examples below use ES modules for readability. If you want this file to keep running
+as `node client/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
+example above or switch the file to `.mjs` or `"type": "module"`.
+
 ```js
 import masterRun from 'react-on-rails-pro-node-renderer/master';
 import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';

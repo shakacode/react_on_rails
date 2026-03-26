@@ -39,7 +39,7 @@ For example, if your images live in `app/javascript/images`, then `"images/fooba
 to `app/javascript/images/foobar.jpg` with a custom alias like this:
 
 ```javascript
-resolve: {
+  resolve: {
     alias: {
       images: join(process.cwd(), 'app', 'javascript', 'images'),
     },
