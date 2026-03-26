@@ -1,28 +1,35 @@
 # Profiling Server-Side Renderer In RORP
 
-This guide helps you profile the server-side code running in RORP node-renderer. It may help you find slow parts or bottlenecks in code.
+This guide helps you profile the server-side code running in the React on Rails Pro (RORP) Node
+Renderer so you can find slow paths and bottlenecks.
 
-This guide uses the RORP dummy app in profiling the server-side code.
+The examples below use the sample app in `react_on_rails_pro/spec/dummy`.
 
 ## Profiling Server-Side Code Running On Node Renderer
 
-1. Run node-renderer using the `--inspect` node option.
-
-   Open `spec/dummy/Procfile.dev` and make sure the `node-renderer` process runs the renderer
-   directly with `node --inspect`. The current dummy app already uses:
+1. Start the sample app with Overmind.
 
    ```bash
-   node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
+   cd react_on_rails_pro/spec/dummy
+   overmind start -f Procfile.dev
    ```
 
-   If your app still launches the renderer through a package script, temporarily switch it to this
-   direct `node --inspect` form while profiling.
-
-1. Run the App
+1. In a second terminal, stop only the managed `node-renderer` process.
 
    ```bash
-   bin/dev
+   cd react_on_rails_pro/spec/dummy
+   overmind stop node-renderer
    ```
+
+1. In that second terminal, restart the renderer manually with the Node inspector enabled.
+
+   ```bash
+   cd react_on_rails_pro/spec/dummy
+   RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
+   ```
+
+   Keep this terminal open while you profile. If your app usually starts the renderer through a
+   package script, temporarily switch to this direct `node --inspect` command while profiling.
 
 1. Visit `chrome://inspect` on Chrome browser and you should see something like this:
 
@@ -36,7 +43,7 @@ This guide uses the RORP dummy app in profiling the server-side code.
 
    ![Chrome Performance Tab](https://github.com/shakacode/react_on_rails_pro/assets/7099193/20848091-d446-4690-988b-09db59ddf9e0)
 
-1. Open the web app you want to test and refresh it multiple times. We use the React on Rails Pro dummy app for this tutorial. So, we will open it in the browser by going to [http://localhost:3000](http://localhost:3000)
+1. Open the web app you want to test and refresh it multiple times. In the sample app, that means visiting [http://localhost:3000](http://localhost:3000).
 
    ![RORP Dummy App](https://github.com/shakacode/react_on_rails_pro/assets/7099193/8dc1ef3d-62e4-492d-a5b4-c693b7f7e08c)
 
@@ -92,7 +99,7 @@ To see the renderer behavior while there are many requests coming to it, you can
    sudo apt-get install apache2-utils
    ```
 
-1. Do all steps in `Profiling Server-Side Code Running On Node Renderer` section except the step number 6. Instead of opening the page in the browser, let the `ab` tool make many HTTP requests for you by running the following command.
+1. Do all steps in `Profiling Server-Side Code Running On Node Renderer` section except the step where you open the page in the browser. Instead of opening the page in the browser, let the `ab` tool make many HTTP requests for you by running the following command.
 
    ```bash
    ab -n 100 -c 10 http://localhost:3000/
