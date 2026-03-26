@@ -1837,13 +1837,15 @@ describe InstallGenerator, type: :generator do
     it "does not chmod copied bin scripts in pretend mode" do
       allow(install_generator).to receive(:directory)
       allow(install_generator).to receive(:use_rsc?).and_return(false)
+      allow(install_generator).to receive(:say_status)
 
-      expect(install_generator).to receive(:say_status)
-        .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
       expect(Dir).not_to receive(:chdir)
       expect(File).not_to receive(:chmod)
 
       install_generator.send(:add_bin_scripts)
+
+      expect(install_generator).to have_received(:say_status)
+        .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
     end
 
     it "does not install typescript dependencies in pretend mode" do

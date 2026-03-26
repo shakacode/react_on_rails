@@ -2,7 +2,14 @@ import path from 'path';
 import fs from 'fs';
 import { validateAppName, buildGeneratorArgs, createApp } from '../src/create-app';
 import { CliOptions } from '../src/types';
-import { execCaptureArgs, execLiveArgs, getCommandVersion, logError, logInfo, logStepDone } from '../src/utils';
+import {
+  execCaptureArgs,
+  execLiveArgs,
+  getCommandVersion,
+  logError,
+  logInfo,
+  logStepDone,
+} from '../src/utils';
 
 jest.mock('fs');
 jest.mock('../src/utils', () => ({
@@ -281,7 +288,16 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       10,
       'bundle',
-      ['exec', 'rails', 'generate', 'react_on_rails:install', '--new-app', '--rsc', '--force', '--ignore-warnings'],
+      [
+        'exec',
+        'rails',
+        'generate',
+        'react_on_rails:install',
+        '--new-app',
+        '--rsc',
+        '--force',
+        '--ignore-warnings',
+      ],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
@@ -320,7 +336,16 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       10,
       'bundle',
-      ['exec', 'rails', 'generate', 'react_on_rails:install', '--new-app', '--pro', '--force', '--ignore-warnings'],
+      [
+        'exec',
+        'rails',
+        'generate',
+        'react_on_rails:install',
+        '--new-app',
+        '--pro',
+        '--force',
+        '--ignore-warnings',
+      ],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
@@ -341,13 +366,31 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
       10,
       'bundle',
-      ['exec', 'rails', 'generate', 'react_on_rails:install', '--new-app', '--rsc', '--force', '--ignore-warnings'],
+      [
+        'exec',
+        'rails',
+        'generate',
+        'react_on_rails:install',
+        '--new-app',
+        '--rsc',
+        '--force',
+        '--ignore-warnings',
+      ],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
     expect(mockedExecLiveArgs).not.toHaveBeenCalledWith(
       'bundle',
-      ['exec', 'rails', 'generate', 'react_on_rails:install', '--new-app', '--pro', '--force', '--ignore-warnings'],
+      [
+        'exec',
+        'rails',
+        'generate',
+        'react_on_rails:install',
+        '--new-app',
+        '--pro',
+        '--force',
+        '--ignore-warnings',
+      ],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
