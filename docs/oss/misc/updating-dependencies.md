@@ -10,18 +10,22 @@ Delete any unwanted version constraints from your Gemfile and run:
 bundle update
 ```
 
-## Node/Yarn
+## Node Dependencies
+
+Run the commands below from the directory that contains your `package.json`. In current React on
+Rails apps, that is usually the app root rather than a `client/` subdirectory.
 
 ### Checking for Outdated Packages
 
 Check for outdated versions of packages:
 
 ```bash
-cd client
-yarn outdated
+pnpm outdated
 ```
 
-Read CHANGELOGs of major updated packages before you update. You might not be ready for some updates.
+Use the equivalent `npm outdated` or `yarn outdated` command if your app uses a different package
+manager. Read CHANGELOGs of major updated packages before you update. You might not be ready for
+some updates.
 
 ### Updating All Dependencies
 
@@ -31,9 +35,8 @@ Read CHANGELOGs of major updated packages before you update. You might not be re
 2. Run these commands. You may or may not need to `rm -rf` your `node_modules` directory.
 
    ```bash
-   cd client
-   ncu -u -a
-   yarn
+   pnpm dlx npm-check-updates -u -a
+   pnpm install
    ```
 
 Some combinations that I often run:
@@ -41,34 +44,40 @@ Some combinations that I often run:
 - Remove old installed `node_modules` so you only get what corresponds to `package.json`:
 
   ```bash
-  ncu -u -a && rm -rf node_modules && yarn
+  pnpm dlx npm-check-updates -u -a && rm -rf node_modules && pnpm install
   ```
 
-**Option 2: Using yarn upgrade**
+Use the equivalent `npx npm-check-updates -u -a && npm install` or `yarn dlx npm-check-updates -u -a && yarn install` flow if your app does not use `pnpm`.
+
+**Option 2: Using your package manager's upgrade command**
 
 To update all dependencies:
 
 ```bash
-cd client
-yarn upgrade
+pnpm up --latest
 ```
 
 To upgrade a specific package:
 
 ```bash
-yarn upgrade [package]
+pnpm up [package] --latest
 ```
+
+Equivalent commands for other package managers are `npm update` / `npm install <package>@latest`
+and `yarn upgrade` / `yarn add <package>@latest`.
 
 ### Adding New Dependencies
 
 Typically, you can add your Node dependencies as you normally would:
 
 ```bash
-cd client
-yarn add module_name@version
+pnpm add module_name@version
 # or for dev dependencies
-yarn add --dev module_name@version
+pnpm add -D module_name@version
 ```
+
+If your app uses `npm` or `yarn`, use the corresponding `npm install` or `yarn add` command in the
+same directory as `package.json`.
 
 ### Verify After Updates
 
