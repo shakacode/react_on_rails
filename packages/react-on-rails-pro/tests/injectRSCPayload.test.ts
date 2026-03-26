@@ -214,6 +214,26 @@ describe('injectRSCPayload', () => {
     );
   });
 
+  it('emits an error instead of embedding malformed NDJSON as invalid JavaScript', async () => {
+    const mockRSC = createMockStream(['{"test":"data"}\n', '{"broken": }\n']);
+    const mockHTML = createMockStream(['<html><body>Hello</body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const errorPromise = new Promise<Error>((resolve) => {
+      result.once('error', (error) => resolve(error as Error));
+    });
+    const resultStr = await collectStreamData(result);
+    const error = await errorPromise;
+
+    expect(resultStr).toContain('<html><body>Hello</body></html>');
+    expect(resultStr).toContain(
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test":"data"})</script>`,
+    );
+    expect(resultStr).not.toContain('{"broken": }');
+    expect(error.message).toContain('Malformed NDJSON line in RSC stream');
+  });
+
   it('adds sanitized nonce attribute to injected RSC script tags', async () => {
     const mockRSC = createMockStream(['{"test": "data"}\n']);
     const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);

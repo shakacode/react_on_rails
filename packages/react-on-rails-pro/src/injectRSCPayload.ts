@@ -48,9 +48,14 @@ function createRSCPayloadInitializationScript(cacheKey: string, sanitizedNonce?:
 
 function createRSCPayloadChunk(jsonLine: string, cacheKey: string, sanitizedNonce?: string) {
   // Embed the JSON line directly as a JavaScript expression instead of re-stringifying it.
-  // JSON is a strict subset of JavaScript expressions, so this is always valid JS.
+  // Valid JSON is a strict subset of JavaScript expressions, so parseable JSON is safe to embed.
   // createScriptTag's escapeScript() handles HTML-unsafe sequences (</script>, <!--)
   // using JS-compatible escape sequences that preserve the parsed value.
+  try {
+    JSON.parse(jsonLine);
+  } catch {
+    throw new Error(`Malformed NDJSON line in RSC stream: ${jsonLine.slice(0, 100)}`);
+  }
   return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${jsonLine})`, sanitizedNonce);
 }
 
@@ -266,12 +271,7 @@ export default function injectRSCPayload(
                 lastIncompleteLine +
                 (typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true }));
               const lines = decodedChunk.split('\n');
-
-              if (!decodedChunk.endsWith('\n')) {
-                lastIncompleteLine = lines.pop() ?? '';
-              } else {
-                lastIncompleteLine = '';
-              }
+              lastIncompleteLine = lines.pop() ?? '';
 
               // Contract: upstream stream emits NDJSON (one payload object per line).
               let bufferedPayloadInThisChunk = false;

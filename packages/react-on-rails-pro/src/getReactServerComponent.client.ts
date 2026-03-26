@@ -141,6 +141,8 @@ const createRSCStreamFromPreloadedPayloads = (payloads: RSCPayloadChunk[], cspNo
       streamController?.close();
     });
   } else {
+    // Once parsing is past "loading", all inline <script> tags that push into this array
+    // have already executed, so the preloaded payload list is complete and can be closed now.
     closed = true;
     streamController?.close();
   }
