@@ -27,7 +27,7 @@ end
 
 # Shown below are the defaults for configuration
 ReactOnRails.configure do |config|
-  # See ../configuration/README.md for the rest
+  # See https://reactonrails.com/docs/configuration/ for the rest
 
   # This allows you to add additional values to the Rails Context. Implement one static method
   # called `custom_context(view_context)` and return a Hash.

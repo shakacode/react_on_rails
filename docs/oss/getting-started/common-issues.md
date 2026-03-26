@@ -24,7 +24,6 @@ This checks your environment, dependencies, and configuration for common problem
 ### Quick Checklist
 
 1. **Component registered?**
-
    - With auto-bundling: Component must be in a `ror_components` directory
    - Without auto-bundling: Check for `ReactOnRails.register({ ComponentName })`
 
@@ -196,7 +195,6 @@ yarn add react-on-rails
    ```
 
 2. **Check webpack-dev-server is running:**
-
    - Look for webpack output in terminal
    - Check `http://localhost:3035` responds
 
