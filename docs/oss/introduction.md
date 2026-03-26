@@ -68,12 +68,6 @@ Detailed integration instructions for existing Rails applications with Shakapack
 
 Step-by-step walkthrough building a full app with Redux, routing, and deployment.
 
-### 🔍 Comparing Rails + Frontend Options?
-
-**[Comparison Guide →](./getting-started/comparing-react-on-rails-to-alternatives.md)**
-
-Compare React on Rails with Hotwire/Turbo, Inertia Rails, and react-rails.
-
 ### 👀 Learn by Example?
 
 - **[Spec/Dummy App](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy)** - Simple example in this repo
