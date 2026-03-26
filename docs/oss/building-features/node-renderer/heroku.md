@@ -27,23 +27,23 @@ web: bin/runsvdir-dyno
 
 ```text
 puma: bundle exec puma -C config/puma.rb
-renderer: bin/node-renderer
+renderer: pnpm run node-renderer
 ```
 
-### bin/node-renderer
+Define the script in your root `package.json` so Heroku can run it from the app root:
 
-```bash
-#!/bin/bash
-cd client
-yarn run node-renderer
+```json
+{
+  "scripts": {
+    "node-renderer": "RENDERER_PORT=3800 node client/node-renderer.js"
+  }
+}
 ```
 
-Be sure your script to run the node-renderer sets some port, like 3800 which is also set as the
-config.renderer_url for your Rails server.
+If you use `npm` or `yarn` instead of `pnpm`, use the equivalent script command in `Procfile.web`.
 
-### node-renderer
-
-Any task in client/package.json that starts the node-renderer
+Be sure your node-renderer script sets some port, like 3800, which is also set as the
+`config.renderer_url` for your Rails server.
 
 ### Modifying Precompile Task
 

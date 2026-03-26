@@ -3,13 +3,15 @@
 > **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
 > Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
-You can configure the node-renderer with only ENV values using the provided bin file `node-renderer`.
+You can configure the node-renderer entirely with ENV values from your own launch file or
+`package.json` script. The package does not ship a standalone `node-renderer` CLI.
 
-You can also create a custom configuration file to setup and launch the node-renderer.
+For most apps, create a small configuration file to set up and launch the node-renderer.
 
 The values in this file must be kept in sync with the `config/initializers/react_on_rails_pro.rb` file, as documented in [Configuration](../../configuration/configuration-pro.md).
 
-Here are the options available for the JavaScript renderer configuration object, as well as the available default ENV values if using the command line program node-renderer.
+Here are the options available for the JavaScript renderer configuration object, as well as the
+available default ENV values if you wire them into your own launch script.
 
 [//]: # 'If you change text here, you may want to update comments in packages/node-renderer/src/shared/configBuilder.ts as well.'
 
@@ -86,15 +88,15 @@ else if (process.env.CI) {
 reactOnRailsProNodeRenderer(config);
 ```
 
-And add this line to your `scripts` section of `package.json`
+And add a root-level script to the `scripts` section of your `package.json`
 
 ```json
   "scripts": {
-    "start": "echo 'Starting React on Rails Pro Node Renderer.' && node ./node-renderer.js"
+    "node-renderer": "node ./node-renderer.js"
   },
 ```
 
-`yarn start` will run the renderer.
+Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` command for your app).
 
 ## Custom Fastify Configuration
 
