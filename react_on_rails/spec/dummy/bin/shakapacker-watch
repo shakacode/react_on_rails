@@ -12,10 +12,9 @@ cleanup() {
   exit 0
 }
 
-trap cleanup INT TERM
-
 bin/shakapacker "$@" &
 child_pid=$!
+trap cleanup INT TERM
 
 if wait "$child_pid"; then
   status=0
