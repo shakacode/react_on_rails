@@ -288,8 +288,13 @@ export default function injectRSCPayload(
               }
             }
             const finalChunk = lastIncompleteLine + decoder.decode();
-            if (finalChunk.trim() !== '') {
-              const payloadScript = createRSCPayloadChunk(finalChunk, rscPayloadKey, sanitizedNonce);
+            const normalizedFinalChunk = finalChunk.trim();
+            if (normalizedFinalChunk !== '') {
+              const payloadScript = createRSCPayloadChunk(
+                normalizedFinalChunk,
+                rscPayloadKey,
+                sanitizedNonce,
+              );
               rscPayloadBuffers.push(Buffer.from(payloadScript));
               scheduleFlush();
             }
