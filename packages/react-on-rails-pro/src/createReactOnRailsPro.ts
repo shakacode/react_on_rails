@@ -73,6 +73,8 @@ function clientStartup() {
 
   const railsContext = getRailsContext();
   if (railsContext?.rorPro === true) {
+    // Streaming pages can trigger these incrementally as markup arrives. The later
+    // page-loaded sweep is safe because ClientSideRenderer memoizes by DOM/store id.
     void renderOrHydrateCompleteComponents();
     void hydrateCompleteStores();
   }

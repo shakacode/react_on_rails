@@ -327,10 +327,12 @@ describe ReactOnRailsHelper do
 
     it "warns when immediate_hydration option is passed" do
       allow(Rails.logger).to receive(:warn)
+      ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
 
       react_component("App", props: props, immediate_hydration: false)
+      react_component("App", props: props, immediate_hydration: false)
 
-      expect(Rails.logger).to have_received(:warn).with(include("immediate_hydration"))
+      expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
     end
 
     context "with 'random_dom_id' option set to false" do
@@ -482,10 +484,12 @@ describe ReactOnRailsHelper do
 
     it "warns when immediate_hydration option is passed" do
       allow(Rails.logger).to receive(:warn)
+      ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
 
       react_component_hash("App", props: props, immediate_hydration: false)
+      react_component_hash("App", props: props, immediate_hydration: false)
 
-      expect(Rails.logger).to have_received(:warn).with(include("immediate_hydration"))
+      expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
     end
   end
 
@@ -586,6 +590,16 @@ describe ReactOnRailsHelper do
     it {
       expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
+
+    it "warns once when immediate_hydration option is passed" do
+      allow(Rails.logger).to receive(:warn)
+      ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
+
+      redux_store("reduxStore", props: props, immediate_hydration: false)
+      redux_store("reduxStore", props: props, immediate_hydration: true)
+
+      expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
+    end
   end
 
   describe "#server_render_js", :js, type: :system do

@@ -20,6 +20,30 @@ module ReactOnRails
     include ReactOnRails::ProHelper
 
     COMPONENT_HTML_KEY = "componentHtml"
+    IMMEDIATE_HYDRATION_WARNING_MUTEX = Mutex.new
+
+    class << self
+      def warn_removed_immediate_hydration_option(helper_name)
+        should_warn = IMMEDIATE_HYDRATION_WARNING_MUTEX.synchronize do
+          @removed_immediate_hydration_warnings ||= {}
+          next false if @removed_immediate_hydration_warnings[helper_name]
+
+          @removed_immediate_hydration_warnings[helper_name] = true
+        end
+
+        return unless should_warn
+
+        Rails.logger.warn(
+          "[React on Rails] `immediate_hydration:` is no longer supported on #{helper_name}. Remove this option."
+        )
+      end
+
+      def reset_removed_immediate_hydration_warnings!
+        IMMEDIATE_HYDRATION_WARNING_MUTEX.synchronize do
+          @removed_immediate_hydration_warnings = {}
+        end
+      end
+    end
 
     # react_component_name: can be a React function or class component or a "Render-Function".
     # "Render-Functions" differ from a React function in that they take two parameters, the
@@ -58,10 +82,7 @@ module ReactOnRails
     # used if you have multiple instance of the same component on the Rails view.
     def react_component(component_name, options = {})
       if options.key?(:immediate_hydration)
-        Rails.logger.warn(
-          "[React on Rails] `immediate_hydration:` is no longer supported on react_component. " \
-          "Remove this option."
-        )
+        ReactOnRails::Helper.warn_removed_immediate_hydration_option("react_component")
         options.delete(:immediate_hydration)
       end
 
@@ -122,10 +143,7 @@ module ReactOnRails
     #
     def react_component_hash(component_name, options = {})
       if options.key?(:immediate_hydration)
-        Rails.logger.warn(
-          "[React on Rails] `immediate_hydration:` is no longer supported on react_component_hash. " \
-          "Remove this option."
-        )
+        ReactOnRails::Helper.warn_removed_immediate_hydration_option("react_component_hash")
         options.delete(:immediate_hydration)
       end
 
@@ -178,7 +196,9 @@ module ReactOnRails
     #                      Store files should be placed in directories matching this name, e.g.:
     #                        app/javascript/bundles/ror_stores/commentsStore.js
     #                      The store file must export default a store generator function.
-    def redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil)
+    def redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil, immediate_hydration: nil)
+      ReactOnRails::Helper.warn_removed_immediate_hydration_option("redux_store") unless immediate_hydration.nil?
+
       # Auto-load store pack if configured
       should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle
       load_pack_for_generated_store(store_name, explicit_auto_load: auto_load_bundle == true) if should_auto_load
