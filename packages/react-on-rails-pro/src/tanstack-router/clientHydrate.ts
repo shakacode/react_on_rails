@@ -161,11 +161,18 @@ function TanStackHydrationApp({
     let cancelled = false;
     // `cancelled` only suppresses logging for a discarded mount. The in-flight load still
     // completes unless the router exposes a best-effort cancelLoad() hook.
-    router.load().catch((err: unknown) => {
-      if (!cancelled) {
-        console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);
-      }
-    });
+    router
+      .load()
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);
+        }
+      })
+      .finally(() => {
+        // Legacy hydration only: clear the temporary SSR hint after the first
+        // client load has completed so it cannot influence later navigations.
+        router.ssr = undefined;
+      });
 
     return () => {
       cancelled = true;

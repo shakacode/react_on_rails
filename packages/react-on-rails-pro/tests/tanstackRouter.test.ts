@@ -1,5 +1,7 @@
 import * as React from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
+import { act } from 'react-dom/test-utils';
 import {
   createTanStackRouterRenderFunction,
   serverRenderTanStackAppAsync,
@@ -267,6 +269,71 @@ describe('tanstack-router integration (Pro)', () => {
     );
 
     expect(router.ssr).toEqual({ manifest: undefined });
+  });
+
+  it('clears router.ssr after the post-hydration legacy load settles', async () => {
+    const router = buildRouter();
+    let resolveLoad: (() => void) | undefined;
+    router.load = jest.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
+
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+      },
+    };
+    const clientApp = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props));
+    });
+
+    expect(router.load).toHaveBeenCalledTimes(1);
+    expect(router.ssr).toEqual({ manifest: undefined });
+
+    if (!resolveLoad) {
+      throw new Error('Expected router.load to be invoked during hydration.');
+    }
+
+    await act(async () => {
+      resolveLoad?.();
+      await Promise.resolve();
+    });
+
+    expect(router.ssr).toBeUndefined();
+
+    await act(async () => {
+      root.unmount();
+    });
   });
 
   it('does not throw on client hydration when the SSR payload has no dehydrated router data', () => {
