@@ -31,13 +31,12 @@ some updates.
 
 **Option 1: Using npm-check-updates (Recommended)**
 
-1. Install [npm-check-updates](https://www.npmjs.com/package/npm-check-updates)
-2. Run these commands. You may or may not need to `rm -rf` your `node_modules` directory.
+Run these commands. You may or may not need to `rm -rf` your `node_modules` directory.
 
-   ```bash
-   pnpm dlx npm-check-updates -u -a
-   pnpm install
-   ```
+```bash
+pnpm dlx npm-check-updates -u -a
+pnpm install
+```
 
 Some combinations that I often run:
 
