@@ -133,6 +133,9 @@ After setup, run bin/dev and visit:
   - /hello_world (default and --pro example page)
   - /hello_server (--rsc example page)
 
+Inspect the generated setup history with:
+  - git log --oneline --reverse
+
 The generated app includes one git commit per logical setup step.`,
   )
   .addHelpText(

@@ -14,14 +14,16 @@ bin/dev
 On fresh apps, `bin/dev` will try to open [http://localhost:3000](http://localhost:3000) the first time the app boots successfully.
 The generated home page links to the example pages, the key files React on Rails created for you,
 and follow-on docs for OSS vs Pro, React Server Components, and the marketplace demo.
-The generated app also includes a step-by-step git history so you can inspect each major scaffold phase with `git log`.
+The generated app also includes a step-by-step git history so you can inspect each major scaffold phase with `git log --oneline --reverse`.
 
 This creates a TypeScript app by default. For JavaScript, use `--template javascript`.
+For React on Rails Pro without RSC, add `--pro`. The CLI installs `react_on_rails_pro`
+automatically and keeps the generated SSR example at `/hello_world`.
 For React Server Components (RSC), add `--rsc`. The CLI installs `react_on_rails_pro`
 automatically and the home page links to `/hello_server`.
 `--rsc` requires `react_on_rails_pro` to be installable in your environment
 ([Pro setup docs](../../pro/installation.md)).
-RSC supports both JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
+`--pro` and `--rsc` support both JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 
 ## Options
 
@@ -31,6 +33,9 @@ npx create-react-on-rails-app my-app --template javascript
 
 # Use Rspack for ~20x faster builds
 npx create-react-on-rails-app my-app --rspack
+
+# Generate React on Rails Pro setup
+npx create-react-on-rails-app my-app --pro
 
 # Generate React Server Components setup (includes react_on_rails_pro)
 npx create-react-on-rails-app my-app --rsc
@@ -51,6 +56,7 @@ npx create-react-on-rails-app my-app --rspack --rsc
 | ---------------------------- | -------------------------------------------------------------- | ------------- |
 | `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`  |
 | `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`       |
+| `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | `false`       |
 | `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`       |
 | `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected |
 
@@ -59,7 +65,7 @@ npx create-react-on-rails-app my-app --rspack --rsc
 The CLI runs these steps automatically:
 
 1. **Creates a Rails app** (`rails new` with PostgreSQL, no default JS)
-2. **Adds required gems** (`bundle add react_on_rails`, plus `react_on_rails_pro` for `--rsc`)
+2. **Adds required gems** (`bundle add react_on_rails`, plus `react_on_rails_pro` for `--pro` / `--rsc`)
 3. **Runs the generator** (`rails generate react_on_rails:install` with your selected flags)
 4. **Creates educational git commits** for each logical setup step
 
@@ -70,6 +76,8 @@ After completion, you get:
 - A working HelloWorld React component (TypeScript by default)
 - A generated home page at `/` with links to the example pages, important project files, and Pro/RSC learning resources
 - A teaching-friendly git history that separates Rails creation, gem installation, generator output, and pnpm normalization
+- Standard Rails git scaffold files (`.gitignore` and `.gitattributes`) preserved in the generated app
+- Optional Pro setup (`--pro`) with Pro Node renderer wiring and the generated `/hello_world` example
 - Optional RSC setup (`--rsc`) with HelloServer route and Pro Node renderer wiring
 - Server-side rendering ready
 - Development scripts (`bin/dev` with hot reloading and first-run browser open)
