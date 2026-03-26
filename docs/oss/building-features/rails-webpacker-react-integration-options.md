@@ -15,7 +15,7 @@ These gems provide advanced integration of React with [shakacode/shakapacker](ht
 | [react-rails](https://github.com/reactjs/react-rails)                   | ✅              | ✅                          |              |                       |                         |          |
 | [webpacker-react](https://github.com/renchap/webpacker-react)           | ✅              |                             |              |                       |                         |          |
 
-Note, Node SSR for React on Rails requires [React on Rails Pro](https://pro.reactonrails.com/).
+Note, Node SSR for React on Rails requires [React on Rails Pro](https://reactonrails.com/docs/pro/).
 
 ---
 

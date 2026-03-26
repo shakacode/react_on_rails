@@ -1,7 +1,7 @@
 # Node Renderer Debugging
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
+> Free or very low cost for startups and small companies. [Get a license →](https://reactonrails.com/docs/pro/)
 
 Because the renderer communicates over a port to the server, you can start a renderer instance locally in your application and debug it.
 
