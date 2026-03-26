@@ -2,11 +2,13 @@
 
 require "rails/generators"
 require_relative "generator_helper"
+require_relative "demo_page_config"
 
 module ReactOnRails
   module Generators
     class ReactNoReduxGenerator < Rails::Generators::Base
       include GeneratorHelper
+      include DemoPageConfig
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
@@ -15,6 +17,11 @@ module ReactOnRails
                    type: :boolean,
                    default: false,
                    desc: "Generate TypeScript files"
+
+      class_option :new_app,
+                   type: :boolean,
+                   default: false,
+                   hide: true
 
       def copy_base_files
         base_js_path = "base/base"
@@ -33,13 +40,17 @@ module ReactOnRails
 
       def create_appropriate_templates
         base_path = "base/base"
-        config = {
-          component_name: "HelloWorld"
-        }
 
         # Only create the view template - no manual bundle needed for auto-bundling
         template("#{base_path}/app/views/hello_world/index.html.erb.tt",
-                 "app/views/hello_world/index.html.erb", config)
+                 "app/views/hello_world/index.html.erb",
+                 build_hello_world_view_config(
+                   component_name: "HelloWorld",
+                   source_path: "app/javascript/src/HelloWorld/",
+                   landing_page: options[:new_app],
+                   redux: false,
+                   rsc_demo: false
+                 ))
       end
     end
   end

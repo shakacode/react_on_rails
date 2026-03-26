@@ -93,6 +93,12 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("--open-browser-once")
       end
     end
+
+    it "adds a return link from the SSR demo to the landing page" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include("Return to the generated home page")
+      end
+    end
   end
 
   context "with --redux" do
@@ -1529,6 +1535,12 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("AUTO_OPEN_BROWSER_ONCE = true")
       end
     end
+
+    it "adds a return link from the RSC demo to the landing page" do
+      assert_file "app/views/hello_server/index.html.erb" do |content|
+        expect(content).to include("Return to the generated home page")
+      end
+    end
   end
 
   context "with --rsc --redux" do
@@ -1543,6 +1555,13 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
+    end
+
+    it "links the Redux SSR demo to the RSC demo" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include("/hello_server")
+        expect(content).to include("Open the RSC demo")
+      end
     end
 
     it "creates hello_world route and controller for Redux" do
@@ -1837,15 +1856,13 @@ describe InstallGenerator, type: :generator do
     it "does not chmod copied bin scripts in pretend mode" do
       allow(install_generator).to receive(:directory)
       allow(install_generator).to receive(:use_rsc?).and_return(false)
-      allow(install_generator).to receive(:say_status)
 
+      expect(install_generator).to receive(:say_status)
+        .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
       expect(Dir).not_to receive(:chdir)
       expect(File).not_to receive(:chmod)
 
       install_generator.send(:add_bin_scripts)
-
-      expect(install_generator).to have_received(:say_status)
-        .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
     end
 
     it "does not install typescript dependencies in pretend mode" do

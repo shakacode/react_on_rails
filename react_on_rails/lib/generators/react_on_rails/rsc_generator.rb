@@ -32,6 +32,16 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      class_option :new_app,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
+      class_option :redux,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       def run_generator
         # When invoked by install_generator, skip prerequisites (parent already validated)
         if options[:invoked_by_install] || prerequisites_met?

@@ -200,12 +200,15 @@ module ReactOnRails
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
                                                           invoked_by_install: true,
+                                                          new_app: options.new_app?,
+                                                          rsc: options.rsc?,
                                                           force: options[:force], skip: options[:skip],
                                                           pretend: options[:pretend] }
         elsif !use_rsc?
           # Only generate HelloWorld if RSC is not enabled
           # For RSC, HelloServer replaces HelloWorld as the example component
           invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript?,
+                                                        new_app: options.new_app?,
                                                         force: options[:force], skip: options[:skip],
                                                         pretend: options[:pretend] }
         end
@@ -222,6 +225,7 @@ module ReactOnRails
         return unless use_rsc?
 
         invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true,
+                                           new_app: options.new_app?, redux: options.redux?,
                                            force: options[:force], skip: options[:skip],
                                            pretend: options[:pretend] }
       end

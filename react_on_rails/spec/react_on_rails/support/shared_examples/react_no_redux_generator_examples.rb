@@ -7,6 +7,10 @@ shared_examples "no_redux_generator" do
 
     assert_file("app/views/hello_world/index.html.erb") do |contents|
       expect(contents).to match(/"HelloWorld"/)
+      expect(contents).to include("React SSR Demo")
+      expect(contents).to include("What this page shows")
+      expect(contents).to include("Inspect these files next")
+      expect(contents).to include("Compare OSS and Pro")
     end
   end
 
