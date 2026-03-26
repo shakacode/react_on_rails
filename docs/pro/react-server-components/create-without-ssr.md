@@ -31,7 +31,9 @@ yarn add react@19.0.4 react-dom@19.0.4 react-on-rails-rsc@19.0.4
 
 > [!NOTE]
 > React on Rails Pro currently supports React 19 with a compatible `react-on-rails-rsc` version.
-> The example above uses the current stable `19.0.4` line.
+> The example above pins `19.0.4`; update to the latest `19.x` patch that your `react-on-rails-rsc`
+> compatibility range allows. The RSC bundler APIs used internally can change between React minor
+> versions. See the [React documentation on Server Components](https://react.dev/reference/rsc/server-components#how-do-i-build-support-for-server-components) for details.
 
 2. Enable support for Server Components in React on Rails Pro configuration:
 

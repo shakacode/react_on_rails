@@ -30,6 +30,7 @@ gem "react_on_rails", "16.5.0"
 npm install react-on-rails@16.5.0 --save-exact
 # or: yarn add react-on-rails@16.5.0 --exact
 # or: pnpm add react-on-rails@16.5.0 --save-exact
+# or: bun add react-on-rails@16.5.0 --exact
 ```
 
 ## 2. Run the generator
