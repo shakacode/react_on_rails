@@ -40,7 +40,7 @@ Define the script in your root `package.json` so Heroku can run it from the app 
 }
 ```
 
-If you use `npm` or `yarn` instead of `pnpm`, use the equivalent script command in `Procfile.web`.
+If you use `npm` or `yarn` instead of `pnpm`, replace `pnpm run node-renderer` in `Procfile.web` with the equivalent `npm run node-renderer` or `yarn node-renderer` command.
 
 Be sure your node-renderer script sets some port, like 3800, which is also set as the
 `config.renderer_url` for your Rails server.
