@@ -57,6 +57,9 @@ COPY . .
 # Precompile assets (builds client and server bundles)
 RUN SECRET_KEY_BASE_DUMMY=1 bundle exec rails assets:precompile
 
+# Remove node_modules — not needed at runtime and saves hundreds of MBs
+RUN rm -rf node_modules
+
 ###############################################################################
 # Runtime stage — lean image for production
 ###############################################################################
