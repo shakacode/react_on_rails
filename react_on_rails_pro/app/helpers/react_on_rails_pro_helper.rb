@@ -460,26 +460,13 @@ module ReactOnRailsProHelper
       # BEFORE the response is committed, enabling a proper HTTP redirect.
       # Do NOT re-raise here: the caller owns the error now.
       # Async runs fibers cooperatively; there is no yield/IO between resolved? and reject.
-      # Keep a defensive fallback for future Promise behavior changes.
-      begin
-        first_chunk_promise.reject(e)
-      rescue StandardError => reject_error
-        handle_reject_failure(reject_error, e)
-      end
+      first_chunk_promise.reject(e)
     end
 
     # Wait for and return the first chunk (blocking).
     # Async::Promise#wait blocks until resolved, then returns the stored value.
     # If the promise was rejected, .wait automatically re-raises the exception.
     first_chunk_promise.wait
-  end
-
-  def handle_reject_failure(reject_error, original_error)
-    # Async::Promise#reject is expected to be a no-op for settled promises.
-    # If it raises, surface the reject failure with the original error context.
-    raise reject_error.exception(
-      "Promise#reject failed (#{reject_error.message}); original error: #{original_error.message}"
-    )
   end
 
   # Returns true if the stream was fully consumed, false if aborted (client disconnect).
