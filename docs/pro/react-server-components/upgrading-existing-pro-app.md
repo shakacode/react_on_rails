@@ -8,21 +8,23 @@ This guide walks you through adding React Server Components to an existing React
 
 Before running the generator, verify your environment:
 
-| Requirement              | Check command                                                                                | Expected                                                                                     |
-| ------------------------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                             | v16.4.0+                                                                                     |
-| React on Rails gem       | `bundle show react_on_rails`                                                                 | v16.4.0+                                                                                     |
-| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` | Matches gem version                                                                          |
+| Requirement              | Check command                                                                                | Expected                                                                                                |
+| ------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                             | v16.4.0+                                                                                                |
+| React on Rails gem       | `bundle show react_on_rails`                                                                 | v16.4.0+                                                                                                |
+| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` | Matches gem version                                                                                     |
 | React version            | `npm ls react` / `yarn why react` / `pnpm list react`                                        | 19.0.4+ (see [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for security context) |
-| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom`                            | Must match `react` version                                                                   |
-| Node.js                  | `node --version`                                                                             | 20+                                                                                          |
-| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                               | File exists                                                                                  |
-| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                         | NodeRenderer enabled                                                                         |
+| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom`                            | Must match `react` version                                                                              |
+| Node.js                  | `node --version`                                                                             | 20+                                                                                                     |
+| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                               | File exists                                                                                             |
+| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                         | NodeRenderer enabled                                                                                    |
 
 If React is below 19.0.4, upgrade it first:
 
 ```bash
-pnpm add react@~19.0.4 react-dom@~19.0.4
+npm install react@~19.0.4 react-dom@~19.0.4
+# or: yarn add react@~19.0.4 react-dom@~19.0.4
+# or: pnpm add react@~19.0.4 react-dom@~19.0.4
 ```
 
 > **React 19.0.4+** is recommended. Earlier 19.0.x versions (19.0.0--19.0.3) have known security vulnerabilities — see the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
