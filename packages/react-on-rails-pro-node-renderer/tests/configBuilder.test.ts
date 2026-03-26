@@ -100,6 +100,18 @@ describe('configBuilder', () => {
     expect(defaultSettings.password).toBe('<MASKED>');
   });
 
+  it('treats an empty-string password as not provided in sanitized logs', () => {
+    const { buildConfig, logSanitizedConfig, info } = loadConfigBuilderWithMockedLogger();
+
+    buildConfig({ password: '' });
+    logSanitizedConfig();
+
+    const logPayload = info.mock.calls[0][0] as Record<string, unknown>;
+    const finalSettings = logPayload['Final renderer settings'] as Record<string, unknown>;
+
+    expect(finalSettings.password).toBe('<NOT PROVIDED>');
+  });
+
   describe('password validation in production-like environments', () => {
     it('throws when no password is set in production', () => {
       process.env.NODE_ENV = 'production';

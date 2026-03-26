@@ -246,7 +246,7 @@ function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: 
   return aConfig && Object.keys(aConfig).length > 0
     ? {
         ...aConfig,
-        password: aConfig.password != null ? '<MASKED>' : defaultValue,
+        password: aConfig.password ? '<MASKED>' : defaultValue,
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
         gracefulWorkerRestartTimeout: aConfig.gracefulWorkerRestartTimeout || defaultValue,
