@@ -246,12 +246,20 @@ function envValuesUsed() {
 }
 
 function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: string) {
+  let sanitizedPassword = defaultValue;
+
+  if (aConfig?.password === '') {
+    sanitizedPassword = '<EMPTY STRING>';
+  } else if (aConfig?.password) {
+    sanitizedPassword = '<MASKED>';
+  }
+
   return aConfig && Object.keys(aConfig).length > 0
     ? {
         ...aConfig,
         // Distinguish explicit empty-string overrides from truly missing passwords in diagnostics.
         // Empty strings still flow through as explicit overrides and fail validation in production-like envs.
-        password: aConfig.password === '' ? '<EMPTY STRING>' : aConfig.password ? '<MASKED>' : defaultValue,
+        password: sanitizedPassword,
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
         gracefulWorkerRestartTimeout: aConfig.gracefulWorkerRestartTimeout || defaultValue,
