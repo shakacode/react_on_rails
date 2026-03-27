@@ -1,7 +1,7 @@
 # React Server Components in React on Rails Pro
 
-> **Pro Feature** — React Server Components require [React on Rails Pro](https://pro.reactonrails.com/) 4+ with the node renderer.
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — React Server Components require [React on Rails Pro](https://reactonrails.com/docs/pro/) 4+ with the node renderer.
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
 ## What Are React Server Components?
 

@@ -1,7 +1,7 @@
 # Node Renderer JavaScript Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
 You can configure the node-renderer with only ENV values using the provided bin file `node-renderer`.
 

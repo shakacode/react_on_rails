@@ -32,6 +32,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   internal `$_TSR` contract instead of a bare `true` boolean, improving forward compatibility. The recommended
   `RouterClient`/`ssrRouter` hydration path was already free of this dependency.
   Fixes [Issue 2647](https://github.com/shakacode/react_on_rails/issues/2647). [PR 2833](https://github.com/shakacode/react_on_rails/pull/2833) by [justin808](https://github.com/justin808).
+- **[Pro] Fixed bundle duplication in remote node renderer asset uploads**: When RSC support is enabled, running `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` no longer duplicates bundle JS files across bundle directories. Previously, both the server bundle and RSC bundle were copied into every target directory; now each bundle is placed only in its own directory while shared assets (manifests, stats) are correctly distributed to all. [PR 2768](https://github.com/shakacode/react_on_rails/pull/2768) by [AbanoubGhadban](https://github.com/AbanoubGhadban). Fixes [Issue 2766](https://github.com/shakacode/react_on_rails/issues/2766).
 
 ### [16.5.0] - 2026-03-25
 
@@ -60,6 +61,15 @@ Stable release — no changes from 16.5.0.rc.0.
 - **Preserve runtime env vars across `Bundler.with_unbundled_env`**: Fixed `PORT` and `SHAKAPACKER_DEV_SERVER_PORT` being lost when `ProcessManager` runs foreman/overmind inside `Bundler.with_unbundled_env`, breaking auto-detected ports from `PortSelector`. Env vars are now captured before the unbundled block and passed explicitly to `system()`. [PR 2836](https://github.com/shakacode/react_on_rails/pull/2836) by [ihabadham](https://github.com/ihabadham).
 - **Fix doctor prerender check and ExecJS display for Pro/RSC apps**: `uses_prerender_in_views?` now detects Pro streaming helpers (`stream_react_component`, `cached_stream_react_component`, `rsc_payload_react_component`) that implicitly enable prerender. Server rendering engine display now correctly detects NodeRenderer configuration from the Pro initializer. [PR 2773](https://github.com/shakacode/react_on_rails/pull/2773) by [ihabadham](https://github.com/ihabadham).
 - **Fix doctor false positives for custom layouts**: `react_on_rails:doctor` now resolves `package.json` from `node_modules_location` config (instead of assuming repo root) and discovers webpack/rspack configs across common custom locations. Missing bundler config downgraded from error to contextual warning. [PR 2612](https://github.com/shakacode/react_on_rails/pull/2612) by [justin808](https://github.com/justin808).
+
+#### Breaking Changes
+
+- **[Pro]** **Minimum `async` gem version bumped to 2.29**: The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. If your Gemfile pins the `async` gem below 2.29, you will need to update it before upgrading React on Rails Pro. Run `bundle update async` to pick up the new minimum.
+  [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808).
+
+#### Changed
+
+- **[Pro]** **Migrated from `Async::Variable` to `Async::Promise`**: The streaming helper internals now use `Async::Promise` for async v2.29+ compatibility while preserving pre-first-chunk error propagation behavior. [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808). Fixes [Issue 2563](https://github.com/shakacode/react_on_rails/issues/2563).
 
 ### [16.4.0] - 2026-03-16
 
