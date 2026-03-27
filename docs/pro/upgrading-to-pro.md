@@ -54,6 +54,9 @@ yarn remove react-on-rails && yarn add react-on-rails-pro@16.4.0 --exact
 
 # pnpm
 pnpm remove react-on-rails && pnpm add react-on-rails-pro@16.4.0 --save-exact
+
+# bun
+bun remove react-on-rails && bun add react-on-rails-pro@16.4.0 --exact
 ```
 
 Then update your imports:
