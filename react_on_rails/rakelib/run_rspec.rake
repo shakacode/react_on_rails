@@ -81,10 +81,12 @@ namespace :run_rspec do
   ExampleType.all[:shakapacker_examples].each do |example_type|
     desc "Runs RSpec for #{example_type.name_pretty} only"
     task example_type.rspec_task_name_short => example_type.gen_task_name do
-      # Use unbundled mode for pinned React version examples to ensure the example app's
-      # Gemfile and gem versions are used, not the parent workspace's bundle
+      # Use unbundled mode for all generated example apps to ensure each app's
+      # Gemfile and gem versions are used instead of the parent workspace bundle.
+      # This prevents mismatches when a generated app resolves a newer dependency
+      # patch version than the monorepo lockfile (for example shakapacker).
       run_tests_in(File.join(examples_dir, example_type.name),
-                   unbundled: example_type.pinned_react_version?)
+                   unbundled: true)
     end
   end
 
@@ -192,12 +194,10 @@ end
 #   :rspec_args - additional rspec arguments (default: "")
 #   :env_vars - additional environment variables (default: "")
 #   :unbundled - run with unbundled_sh_in_dir for Bundler isolation (default: false)
-#                This is required for pinned version examples because they have different
-#                gem versions (e.g., Shakapacker 8.2.0) pinned in their Gemfile than the
-#                parent workspace (Shakapacker 9.x). Without bundle isolation, Bundler
-#                would inherit the parent's gem resolution and use the wrong versions.
-#                Latest version examples don't need this because they use the same versions
-#                as the parent workspace.
+#                This is required for example apps because they may resolve different
+#                gem versions than the parent workspace lockfile. Without bundle
+#                isolation, Bundler can inherit the parent Gemfile and load mismatched
+#                gems relative to the generated app's node dependencies.
 def run_tests_in(dir, options = {})
   path = calc_path(dir)
 

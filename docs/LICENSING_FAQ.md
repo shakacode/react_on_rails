@@ -31,13 +31,13 @@
 import ReactOnRails from 'react-on-rails-pro';
 ```
 
-See the [Installation Guide](../react_on_rails_pro/docs/installation.md) for details.
+See the [Installation Guide](./pro/installation.md) for details.
 
 ### Q: How will the monorepo structure maintain license separation?
 
 **A:** The monorepo will have clear directory-based license boundaries:
 
-```
+```text
 react_on_rails/ (monorepo root)
 ├── lib/
 │   ├── react_on_rails/           # MIT Licensed
@@ -86,7 +86,7 @@ react_on_rails/ (monorepo root)
 
 ### Q: When will this happen?
 
-**A:** The merger is planned as a 7-phase process. Each phase maintains full functionality and CI compliance. See [MONOREPO_MERGER_PLAN_REF.md](./MONOREPO_MERGER_PLAN_REF.md) for details.
+**A:** The merger is planned as a 7-phase process. Each phase maintains full functionality and CI compliance. See [MONOREPO_MERGER_PLAN_REF.md](../internal/planning/MONOREPO_MERGER_PLAN_REF.md) for details.
 
 ### Q: What if something goes wrong during the merger?
 
@@ -119,7 +119,7 @@ react_on_rails/ (monorepo root)
 - Node.js rendering process management
 - Premium support and consultation
 
-See [REACT-ON-RAILS-PRO-LICENSE.md](../REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
+See [REACT-ON-RAILS-PRO-LICENSE.md](https://github.com/shakacode/react_on_rails/blob/main/REACT-ON-RAILS-PRO-LICENSE.md) for complete Pro license terms.
 
 ### Q: Can I modify the MIT-licensed interface files?
 
@@ -142,4 +142,4 @@ Production use requires a valid subscription.
 
 ---
 
-_For more information about the monorepo merger, see [MONOREPO_MERGER_PLAN_REF.md](./MONOREPO_MERGER_PLAN_REF.md)_
+_For more information about the monorepo merger, see [MONOREPO_MERGER_PLAN_REF.md](../internal/planning/MONOREPO_MERGER_PLAN_REF.md)_

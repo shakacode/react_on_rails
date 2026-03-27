@@ -45,6 +45,62 @@ describe GeneratorMessages do
       rsc: false
     )
 
+    expect(message).to include("bin/rails db:prepare")
     expect(message).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
+  end
+
+  it "shows Pro upgrade hint for standard (non-Pro) install" do
+    message = described_class.helpful_message_after_installation(
+      component_name: "HelloWorld",
+      route: "hello_world",
+      pro: false,
+      rsc: false
+    )
+
+    expect(message).to include("React on Rails Pro")
+    expect(message).to include("https://reactonrails.com/docs/pro/upgrading-to-pro/")
+  end
+
+  it "does not show Pro upgrade hint when --pro is used" do
+    message = described_class.helpful_message_after_installation(
+      component_name: "HelloWorld",
+      route: "hello_world",
+      pro: true,
+      rsc: false
+    )
+
+    expect(message).not_to include("React on Rails Pro")
+  end
+
+  it "does not show Pro upgrade hint when --rsc is used" do
+    message = described_class.helpful_message_after_installation(
+      component_name: "HelloServer",
+      route: "hello_server",
+      pro: false,
+      rsc: true
+    )
+
+    expect(message).not_to include("React on Rails Pro")
+  end
+
+  describe ".detect_package_manager" do
+    it "returns bun when bun.lock exists" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
+      allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+      allow(File).to receive(:exist?).with("bun.lock").and_return(true)
+
+      expect(described_class.detect_package_manager).to eq("bun")
+    end
+
+    it "returns bun when bun.lockb exists" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
+      allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+      allow(File).to receive(:exist?).with("bun.lock").and_return(false)
+      allow(File).to receive(:exist?).with("bun.lockb").and_return(true)
+
+      expect(described_class.detect_package_manager).to eq("bun")
+    end
   end
 end

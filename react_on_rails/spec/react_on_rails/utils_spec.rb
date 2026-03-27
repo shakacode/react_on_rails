@@ -470,18 +470,18 @@ module ReactOnRails
 
       describe ".wrap_message" do
         subject(:stripped_heredoc) do
-          <<-MSG.strip_heredoc
-          Something to wrap
-          with 2 lines
+          <<~MSG
+            Something to wrap
+            with 2 lines
           MSG
         end
 
         let(:expected) do
-          msg = <<-MSG.strip_heredoc
-          ================================================================================
-          Something to wrap
-          with 2 lines
-          ================================================================================
+          msg = <<~MSG
+            ================================================================================
+            Something to wrap
+            with 2 lines
+            ================================================================================
           MSG
           Rainbow(msg).red
         end
@@ -737,7 +737,18 @@ module ReactOnRails
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(true)
+
+            expect(described_class.detect_package_manager).to eq(:bun)
+          end
+
+          it "returns :bun when bun.lock exists" do
+            allow(File).to receive(:exist?).and_call_original
+            allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lock")).and_return(true)
 
             expect(described_class.detect_package_manager).to eq(:bun)
           end
@@ -747,6 +758,7 @@ module ReactOnRails
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "package-lock.json")).and_return(true)
 
@@ -758,6 +770,7 @@ module ReactOnRails
             allow(File).to receive(:exist?).with(package_json_path).and_return(true)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "yarn.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "pnpm-lock.yaml")).and_return(false)
+            allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lock")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "bun.lockb")).and_return(false)
             allow(File).to receive(:exist?).with(File.join(Rails.root, "package-lock.json")).and_return(false)
 
@@ -1011,7 +1024,7 @@ module ReactOnRails
     end
 
     describe ".normalize_immediate_hydration" do
-      context "with Pro license" do
+      context "with Pro gem installed" do
         before do
           allow(described_class).to receive(:react_on_rails_pro?).and_return(true)
         end
@@ -1026,7 +1039,7 @@ module ReactOnRails
           expect(result).to be false
         end
 
-        it "returns true when value is nil (Pro default)" do
+        it "returns true when value is nil (Pro-install default)" do
           result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")
           expect(result).to be true
         end
@@ -1040,14 +1053,14 @@ module ReactOnRails
         end
       end
 
-      context "without Pro license" do
+      context "without Pro gem installed" do
         before do
           allow(described_class).to receive(:react_on_rails_pro?).and_return(false)
         end
 
         it "returns false and logs warning when value is explicitly true" do
           expect(Rails.logger).to receive(:warn)
-            .with(/immediate_hydration: true requires a React on Rails Pro license/)
+            .with(/immediate_hydration: true requires the React on Rails Pro gem to be installed/)
 
           result = described_class.normalize_immediate_hydration(true, "TestComponent", "Component")
           expect(result).to be false
@@ -1060,7 +1073,7 @@ module ReactOnRails
           expect(result).to be false
         end
 
-        it "returns false when value is nil (non-Pro default)" do
+        it "returns false when value is nil (non-Pro-install default)" do
           expect(Rails.logger).not_to receive(:warn)
 
           result = described_class.normalize_immediate_hydration(nil, "TestComponent", "Component")

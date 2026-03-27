@@ -108,7 +108,7 @@ Outside the analysis directory:
 - **Main Migration Plan**: `/docs/MONOREPO_MERGER_PLAN.md` (authoritative source)
 - **Path Management Guide**: `/.claude/docs/managing-file-paths.md` (validation procedures)
 - **Build Script Testing**: `/.claude/docs/testing-build-scripts.md` (artifact verification)
-- **CI Monitoring**: `/.claude/docs/master-health-monitoring.md` (CI status checks)
+- **CI Monitoring**: `/.claude/docs/main-health-monitoring.md` (CI status checks)
 - **Contributing Guide**: `/CONTRIBUTING.md` (developer instructions)
 
 ---
@@ -195,7 +195,7 @@ Outside this analysis directory:
 - **Main Migration Plan**: `/docs/MONOREPO_MERGER_PLAN.md` (authoritative source)
 - **Path Management Guide**: `/managing-file-paths.md` (validation procedures)
 - **Build Script Testing**: `/testing-build-scripts.md` (artifact verification)
-- **CI Monitoring**: `/master-health-monitoring.md` (CI status checks)
+- **CI Monitoring**: `/main-health-monitoring.md` (CI status checks)
 - **Contributing Guide**: `/CONTRIBUTING.md` (developer instructions)
 
 ## Workflow Tips

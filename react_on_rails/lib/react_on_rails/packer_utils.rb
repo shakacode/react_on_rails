@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "pathname"
 require "shakapacker"
 
 module ReactOnRails
@@ -112,10 +113,10 @@ module ReactOnRails
     def self.check_manifest_not_cached
       return unless ::Shakapacker.config.cache_manifest?
 
-      msg = <<-MSG.strip_heredoc
-          ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
-          ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
-          To fix this: edit your config/shakapacker.yml file and set cache_manifest to false for test.
+      msg = <<~MSG
+        ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
+        ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
+        To fix this: edit your config/shakapacker.yml file and set cache_manifest to false for test.
       MSG
       puts wrap_message(msg)
       exit!
@@ -137,7 +138,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
         config/shakapacker.yml to enable nested entries. for more information read
-        https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
+        https://reactonrails.com/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation/#enable-nested_entries-for-shakapacker
       MSG
 
       raise ReactOnRails::Error, msg
@@ -227,11 +228,22 @@ module ReactOnRails
     end
 
     def self.resolve_hook_script_path(hook_value)
-      # Hook value might be a script path relative to Rails root
-      return nil unless defined?(Rails) && Rails.respond_to?(:root)
+      return nil if hook_value.blank?
 
-      potential_path = Rails.root.join(hook_value.to_s.strip)
+      potential_path = project_root.join(hook_value.to_s.strip)
       potential_path if potential_path.file?
+    end
+
+    def self.project_root
+      return Rails.root if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+
+      bundle_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+      if bundle_gemfile && !bundle_gemfile.strip.empty?
+        gemfile_path = Pathname.new(bundle_gemfile).expand_path
+        return gemfile_path.dirname if gemfile_path.file?
+      end
+
+      Pathname.new(Dir.pwd)
     end
 
     # Check if a hook script file contains the self-guard pattern that prevents

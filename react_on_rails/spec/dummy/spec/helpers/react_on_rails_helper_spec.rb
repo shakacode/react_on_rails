@@ -208,7 +208,7 @@ describe ReactOnRailsHelper do
     let(:id) { "App-react-component-0" }
 
     let(:react_definition_script) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
@@ -217,7 +217,7 @@ describe ReactOnRailsHelper do
     end
 
     let(:react_definition_script_no_params) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json" class="js-react-on-rails-component" \
         id="js-react-on-rails-component-App-react-component" \
         data-component-name="App" data-dom-id="App-react-component"
@@ -238,6 +238,71 @@ describe ReactOnRailsHelper do
       end
 
       it { is_expected.to include json_props_sanitized }
+    end
+
+    context "when server rendering returns clientProps" do
+      before do
+        allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_return(
+          "html" => "<div>SSR App</div>",
+          "consoleReplayScript" => "",
+          "clientProps" => {
+            "__tanstackRouterDehydratedState" => { "url" => "/products?category=tools" }
+          }
+        )
+        allow(ReactOnRails::ServerRenderingJsCode).to receive(:js_code_renderer)
+          .and_return(ReactOnRails::ServerRenderingJsCode)
+      end
+
+      it "merges clientProps into the component props JSON for client hydration" do
+        result = react_component("App", props: props, prerender: true)
+
+        expect(result).to include('"name":"My Test Name"')
+        expect(result).to include('"__tanstackRouterDehydratedState":{"url":"/products?category=tools"}')
+        expect(result).to include('<div id="App-react-component"><div>SSR App</div></div>')
+      end
+
+      it "merges clientProps when original props are provided as a JSON string" do
+        result = react_component("App", props: '{"name":"My Test Name"}', prerender: true)
+
+        expect(result).to include('"name":"My Test Name"')
+        expect(result).to include('"__tanstackRouterDehydratedState":{"url":"/products?category=tools"}')
+      end
+
+      it "treats nil props as an empty hash when merging clientProps" do
+        result = react_component("App", prerender: true)
+
+        expect(result).to include('"__tanstackRouterDehydratedState":{"url":"/products?category=tools"}')
+      end
+
+      it "raises a clear error when JSON string props parse to a non-Hash value" do
+        expect do
+          react_component("App", props: '["not","a","hash"]', prerender: true)
+        end.to raise_error(ReactOnRails::Error, /Cannot merge result\["clientProps"\] into non-Hash props/)
+      end
+
+      it "normalizes symbol and string keys so clientProps can override existing props" do
+        allow(ReactOnRails::ServerRenderingPool).to receive(:server_render_js_with_console_logging).and_return(
+          "html" => "<div>SSR App</div>",
+          "consoleReplayScript" => "",
+          "clientProps" => {
+            "name" => "Name from clientProps"
+          }
+        )
+
+        result = react_component("App", props: { name: "My Test Name" }, prerender: true)
+        expect(result).to include('"name":"Name from clientProps"')
+        expect(result.scan('"name":').length).to eq(1)
+      end
+
+      it "raises a clear error when merge_client_props sees both string and symbol versions of a key" do
+        expect do
+          helper.send(
+            :merge_client_props,
+            { name: "symbol value", "name" => "string value" },
+            { "name" => "value from clientProps" }
+          )
+        end.to raise_error(ReactOnRails::Error, /both string and symbol versions of "name"/)
+      end
     end
 
     describe "API with component name only (no props or other options)" do
@@ -266,7 +331,7 @@ describe ReactOnRailsHelper do
       subject(:react_app) { react_component("App", props: props, random_dom_id: false) }
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
@@ -282,7 +347,7 @@ describe ReactOnRailsHelper do
       subject(:react_app) { react_component("App", props: props, random_dom_id: true) }
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component-0" \
           data-component-name="App" data-dom-id="App-react-component-0"
@@ -304,7 +369,7 @@ describe ReactOnRailsHelper do
       end
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-App-react-component" \
           data-component-name="App" data-dom-id="App-react-component"
@@ -322,7 +387,7 @@ describe ReactOnRailsHelper do
       let(:id) { "shaka_div" }
 
       let(:react_definition_script) do
-        <<-SCRIPT.strip_heredoc
+        <<~SCRIPT
           <script type="application/json" class="js-react-on-rails-component" \
           id="js-react-on-rails-component-shaka_div" \
           data-component-name="App" data-dom-id="shaka_div"
@@ -410,6 +475,81 @@ describe ReactOnRailsHelper do
     end
   end
 
+  describe "#server_render_js error serialization" do
+    let(:runtime_available) do
+      ExecJS.runtime&.available?
+    rescue ExecJS::RuntimeUnavailable
+      false
+    end
+
+    let(:runtime_context) do
+      ExecJS.compile(<<~JS)
+        function runGeneratedCode(generatedCode) {
+          var ReactOnRails = {
+            handleError: function() { return ''; },
+            getConsoleReplayScript: function() { return ''; }
+          };
+          // Evaluate generated wrapper JS in a test sandbox before Ruby post-processing.
+          return eval(generatedCode);
+        }
+      JS
+    end
+
+    before do
+      skip "ExecJS runtime not available" unless runtime_available
+    end
+
+    it "generates JS with safe error property access for non-Error throws" do
+      captured_results = []
+
+      allow(ReactOnRails::ServerRenderingPool)
+        .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
+          # Validate generated JS behavior directly before Ruby-side post-processing.
+          runtime_result = runtime_context.call("runGeneratedCode", js_code)
+          captured_results << JSON.parse(runtime_result)
+          {
+            "html" => "",
+            "consoleReplayScript" => "",
+            "hasErrors" => true,
+            "renderingError" => { "message" => "stub", "stack" => nil }
+          }
+        end
+
+      throw_cases = [
+        { expression: "(function() { throw null; })()", message: "null", stack: nil },
+        { expression: "(function() { throw { code: 42 }; })()", message: "[object Object]", stack: nil },
+        { expression: "(function() { throw new Error(\"boom\"); })()", message: "boom", stack: :present }
+      ]
+
+      throw_cases.each do |throw_case|
+        expect { server_render_js(throw_case[:expression]) }.not_to raise_error
+        captured_result = captured_results.last
+        expect(captured_result).to be_a(Hash)
+        expect(captured_result["hasErrors"]).to be(true)
+        expect(captured_result.dig("renderingError", "message")).to eq(throw_case[:message])
+
+        if throw_case[:stack] == :present
+          expect(captured_result.dig("renderingError", "stack")).to include("Error: boom")
+        else
+          expect(captured_result.dig("renderingError", "stack")).to be_nil
+        end
+      end
+
+      expect(captured_results.length).to eq(throw_cases.length)
+    end
+
+    it "raises PrerenderError when throw_js_errors is true and JS throws a non-Error value" do
+      allow(ReactOnRails::ServerRenderingPool)
+        .to receive(:server_render_js_with_console_logging) do |js_code, _opts|
+          runtime_context.call("runGeneratedCode", js_code)
+        end
+
+      expect do
+        server_render_js("(function() { throw 42; })()", throw_js_errors: true)
+      end.to raise_error(ReactOnRails::PrerenderError)
+    end
+  end
+
   describe "#redux_store" do
     subject(:store) { redux_store("reduxStore", props: props, immediate_hydration: true) }
 
@@ -433,14 +573,15 @@ describe ReactOnRailsHelper do
       expect(expect(store).target).to script_tag_be_included(react_store_script)
     }
 
-    context "without Pro license" do
+    context "without Pro gem installed" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
       end
 
       context "with immediate_hydration option set to true (not recommended)" do
         it "returns false for immediate_hydration and logs a warning" do
-          expect(Rails.logger).to receive(:warn).with(/immediate_hydration: true requires a React on Rails Pro license/)
+          expect(Rails.logger).to receive(:warn)
+            .with(/immediate_hydration: true requires the React on Rails Pro gem to be installed/)
 
           result = redux_store("reduxStore", props: props, immediate_hydration: true)
 
@@ -461,7 +602,7 @@ describe ReactOnRailsHelper do
       end
 
       context "without immediate_hydration option (nil)" do
-        it "defaults to false for non-Pro users" do
+        it "defaults to false for non-Pro installs" do
           result = redux_store("reduxStore", props: props)
 
           # Verify that the store tag does NOT have immediate hydration enabled
@@ -498,6 +639,24 @@ describe ReactOnRailsHelper do
       ob = PlainReactOnRailsHelper.new
       expect { ob.send(:rails_context, server_side: true) }.not_to raise_error
       expect { ob.send(:rails_context, server_side: false) }.not_to raise_error
+    end
+
+    it "adds cspNonce when a nonce is available" do
+      helper = PlainReactOnRailsHelper.new
+      allow(helper).to receive(:csp_nonce).and_return("nonce123")
+
+      context = helper.send(:rails_context, server_side: true)
+
+      expect(context[:cspNonce]).to eq("nonce123")
+    end
+
+    it "omits cspNonce when nonce is not available" do
+      helper = PlainReactOnRailsHelper.new
+      allow(helper).to receive(:csp_nonce).and_return(nil)
+
+      context = helper.send(:rails_context, server_side: true)
+
+      expect(context).not_to have_key(:cspNonce)
     end
   end
 

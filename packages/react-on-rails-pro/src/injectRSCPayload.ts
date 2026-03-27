@@ -13,10 +13,10 @@
  */
 
 import { PassThrough } from 'stream';
-import { finished } from 'stream/promises';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
-import { createRSCPayloadKey } from './utils.ts';
+import { createRSCPayloadKey, sanitizeNonce } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
+import safePipe from './safePipe.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
 // that isn't a recognized escape character, the backslash is ignored, and the character
@@ -34,16 +34,20 @@ function cacheKeyJSArray(cacheKey: string) {
   return `(self.REACT_ON_RAILS_RSC_PAYLOADS||={})[${JSON.stringify(cacheKey)}]||=[]`;
 }
 
-function createScriptTag(script: string) {
-  return `<script>${escapeScript(script)}</script>`;
+function nonceAttribute(sanitizedNonce?: string) {
+  return sanitizedNonce ? ` nonce="${sanitizedNonce}"` : '';
 }
 
-function createRSCPayloadInitializationScript(cacheKey: string) {
-  return createScriptTag(cacheKeyJSArray(cacheKey));
+function createScriptTag(script: string, sanitizedNonce?: string) {
+  return `<script${nonceAttribute(sanitizedNonce)}>${escapeScript(script)}</script>`;
 }
 
-function createRSCPayloadChunk(chunk: string, cacheKey: string) {
-  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`);
+function createRSCPayloadInitializationScript(cacheKey: string, sanitizedNonce?: string) {
+  return createScriptTag(cacheKeyJSArray(cacheKey), sanitizedNonce);
+}
+
+function createRSCPayloadChunk(chunk: string, cacheKey: string, sanitizedNonce?: string) {
+  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`, sanitizedNonce);
 }
 
 /**
@@ -76,9 +80,14 @@ export default function injectRSCPayload(
   pipeableHtmlStream: PipeableOrReadableStream,
   rscRequestTracker: RSCRequestTracker,
   domNodeId: string | undefined,
+  cspNonce?: string,
 ) {
+  const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
-  pipeableHtmlStream.pipe(htmlStream);
+  const resultStream = new PassThrough();
+  safePipe(pipeableHtmlStream, htmlStream, (err) => {
+    resultStream.emit('error', err);
+  });
   const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
 
@@ -113,7 +122,6 @@ export default function injectRSCPayload(
   // ========================================
 
   let flushTimeout: NodeJS.Timeout | null = null;
-  const resultStream = new PassThrough();
   let hasReceivedFirstHtmlChunk = false;
 
   /**
@@ -190,7 +198,6 @@ export default function injectRSCPayload(
   const endResultStream = () => {
     if (flushTimeout) clearTimeout(flushTimeout);
     flush();
-    rscRequestTracker.clear();
     if (!resultStream.writableEnded) {
       resultStream.end();
     }
@@ -241,7 +248,7 @@ export default function injectRSCPayload(
         //
         // The initialization script creates: (self.REACT_ON_RAILS_RSC_PAYLOADS||={})[cacheKey]||=[]
         // This creates a global array that the client-side RSCProvider monitors for new chunks.
-        const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey);
+        const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
         rscInitializationBuffers.push(Buffer.from(initializationScript));
 
         // Process RSC payload stream asynchronously
@@ -249,7 +256,7 @@ export default function injectRSCPayload(
           (async () => {
             for await (const chunk of stream ?? []) {
               const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
-              const payloadScript = createRSCPayloadChunk(decodedChunk, rscPayloadKey);
+              const payloadScript = createRSCPayloadChunk(decodedChunk, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
               scheduleFlush();
             }
@@ -257,10 +264,41 @@ export default function injectRSCPayload(
         );
       });
 
-      // Wait for HTML stream to complete, then wait for all RSC promises
-      await finished(htmlStream).then(() => Promise.all(rscPromises));
-    } catch {
-      endResultStream();
+      // Wait for HTML stream to close.
+      // 'close' fires after BOTH normal 'end' and destroy(), and the resulting
+      // promise never rejects. This guarantees Promise.allSettled below always
+      // runs, preventing dangling RSC promises when htmlStream is destroyed
+      // (e.g., by React's fatalError calling destination.destroy(error)).
+      //
+      // Why not finished()? finished() rejects when the stream is destroyed with
+      // an error, which would skip the .then() chain and leave RSC promises as
+      // dangling fire-and-forget — the exact bug this fixes.
+      await new Promise<void>((resolve) => {
+        htmlStream.once('close', resolve);
+      });
+
+      // ALWAYS wait for all RSC promises to settle, regardless of how htmlStream
+      // closed. Promise.allSettled never rejects, so all promises are guaranteed
+      // to be awaited — no dangling fire-and-forget promises.
+      //
+      // Rejections are surfaced on resultStream for observability (errorReporter
+      // in the node renderer) without aborting output.
+      const settledResults = await Promise.allSettled(rscPromises);
+      for (const settledResult of settledResults) {
+        if (settledResult.status === 'rejected') {
+          resultStream.emit(
+            'error',
+            settledResult.reason instanceof Error
+              ? settledResult.reason
+              : new Error(String(settledResult.reason)),
+          );
+        }
+      }
+    } catch (e) {
+      // Guard against unexpected errors (e.g., onRSCPayloadGenerated throws).
+      // Without this catch, rscPromise would reject before the close handler
+      // attaches .catch(), causing an unhandled promise rejection.
+      resultStream.emit('error', e instanceof Error ? e : new Error(String(e)));
     }
   };
 
@@ -268,15 +306,6 @@ export default function injectRSCPayload(
   // EVENT HANDLERS - Coordinate the three data sources
   // ========================================
 
-  /**
-   * HTML data handler - receives chunks from React's rendering stream.
-   *
-   * RESPONSIBILITIES:
-   * - Buffer HTML chunks for coordinated flushing
-   * - Track when first HTML chunk arrives (enables streaming)
-   * - Initialize RSC processing on first HTML data
-   * - Schedule flush to send combined data
-   */
   htmlStream.on('data', (chunk: Buffer) => {
     htmlBuffers.push(chunk);
     hasReceivedFirstHtmlChunk = true;
@@ -289,44 +318,33 @@ export default function injectRSCPayload(
   });
 
   /**
-   * Prevent unhandled error crash. Error alone is not the end of the stream —
-   * termination is handled by the 'close' event below.
+   * Report errors on htmlStream by emitting them on resultStream, where they
+   * propagate to handleStreamError → errorReporter in the node renderer.
    */
-  htmlStream.on('error', () => {});
-
-  /**
-   * 'close' fires after both normal 'end' and destroy().
-   * When htmlStream ends normally, readableEnded is true — the 'end' handler handles cleanup.
-   * When htmlStream is destroyed (e.g., source stream failure), readableEnded stays false
-   * and 'end' never fires — this handler ensures resultStream is still properly terminated.
-   */
-  htmlStream.on('close', () => {
-    if (!htmlStream.readableEnded && !resultStream.writableEnded) {
-      endResultStream();
-    }
+  htmlStream.on('error', (err) => {
+    resultStream.emit('error', err instanceof Error ? err : new Error(String(err)));
   });
 
   /**
-   * HTML stream completion handler.
-   *
-   * CLEANUP RESPONSIBILITIES:
-   * - Cancel any pending flush timeout
-   * - Perform final flush to send remaining buffered data
-   * - Wait for RSC processing to complete
-   * - Clean up RSC payload streams
-   * - Close result stream
+   * 'close' fires after both normal 'end' and destroy(), so this single handler
+   * covers all termination paths:
+   * - No rscPromise: end resultStream immediately (no RSC to wait for).
+   * - With rscPromise: wait for RSC to finish, then flush remaining data and close.
    */
-  htmlStream.on('end', () => {
-    const cleanup = () => {
-      endResultStream();
-    };
-
+  htmlStream.on('close', () => {
     if (!rscPromise) {
-      cleanup();
+      endResultStream();
+      rscRequestTracker.clear();
       return;
     }
 
-    rscPromise.then(cleanup).catch(() => endResultStream());
+    rscPromise
+      .then(() => endResultStream())
+      .catch((e: unknown) => {
+        resultStream.emit('error', e instanceof Error ? e : new Error(String(e)));
+        endResultStream();
+      })
+      .finally(() => rscRequestTracker.clear());
   });
 
   return resultStream;

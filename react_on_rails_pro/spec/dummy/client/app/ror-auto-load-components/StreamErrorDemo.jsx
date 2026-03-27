@@ -1,15 +1,12 @@
-'use client';
-
 import React, { Suspense } from 'react';
 
-const AlwaysFailsAsync = async () => {
+const AlwaysFailsAsync = () => {
   if (typeof window !== 'undefined') {
     return <div>Client-side fallback</div>;
   }
-  await new Promise((_resolve, reject) => {
+  return new Promise((_resolve, reject) => {
     setTimeout(() => reject(new Error('Async component crashed during server rendering!')), 2000);
   });
-  return null;
 };
 
 const StreamErrorDemo = () => (

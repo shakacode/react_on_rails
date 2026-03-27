@@ -2,6 +2,69 @@
 
 You are helping to add an entry to the CHANGELOG.md file for the React on Rails project.
 
+## Arguments
+
+This command accepts an optional argument: `$ARGUMENTS`
+
+- **No argument** (`/update-changelog`): Add entries to `[Unreleased]` without stamping a version header. Use this during development.
+- **`release`** (`/update-changelog release`): Add entries and stamp a version header. Auto-compute the next version based on changes (breaking -> major, added features -> minor, fixes -> patch). Then `rake release` (with no args) will pick up this version automatically.
+- **`rc`** (`/update-changelog rc`): Same as `release`, but stamps an RC prerelease version (e.g., `16.5.0.rc.0`). Auto-increments the RC index if prior RCs exist for the same base version.
+- **`beta`** (`/update-changelog beta`): Same as `rc`, but stamps a beta prerelease version (e.g., `16.5.0.beta.0`).
+- **Explicit version** (`/update-changelog 16.5.0.rc.10`): Add entries and stamp the exact version provided. Skips auto-computation — use this when you already know the target version. The version string must look like a semver version (with optional `.rc.N` or `.beta.N` suffix).
+
+## When to Use This
+
+This command serves three use cases at different points in the release lifecycle:
+
+**During development** -- Add entries to `[Unreleased]` as PRs merge:
+
+- Run `/update-changelog` to find merged PRs missing from the changelog
+- Entries accumulate under `### [Unreleased]`
+
+**Before a release** -- Stamp a version header and prepare for release:
+
+- Run `/update-changelog release` (or `rc`, `beta`, or an explicit version like `16.5.0.rc.10`) to add entries AND stamp the version header
+- The version is auto-computed from changes (breaking -> major, features -> minor, fixes -> patch) — skipped when an explicit version is provided
+- The command automatically commits, pushes, and opens a PR — review and merge it
+- Then run `rake release` (no args needed -- it reads the version from CHANGELOG.md)
+- The release task automatically creates a GitHub release from the changelog section
+
+**After a release you forgot to update the changelog for** -- Catch-up mode:
+
+- The command can retroactively find commits between tags and add missing entries
+- Ask the user whether to stamp a version header or add to `[Unreleased]`
+
+### Why changelog comes BEFORE the release
+
+- `rake release` automatically creates a GitHub release if a changelog section exists -- no separate `sync_github_release` step needed
+- The release task warns if no changelog section is found for the target version
+- A premature version header (if release fails) is harmless -- you'll release eventually
+- A missing changelog after release means the GitHub release must be created manually
+
+## Auto-Computing the Next Version
+
+When stamping a version header (`release`, `rc`, or `beta`), compute the next version as follows:
+
+1. **Find the latest stable version tag** using semver sort:
+
+   ```bash
+   git tag -l 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1
+   ```
+
+2. **Determine bump type from changelog content**:
+   - If changes include `#### Breaking Changes` or `#### ⚠️ Breaking Changes` -> **major** bump
+   - If changes include `#### Added`, `#### New Features`, `#### Features`, or `#### Enhancements` -> **minor** bump
+   - If changes only include `#### Fixed`, `#### Security`, `#### Improved`, `#### Changed`, `#### Deprecated`, or `#### Removed` -> **patch** bump
+
+3. **Compute the version**:
+   - For `release`: Apply the bump to the latest stable tag (e.g., `16.4.0` + minor -> `16.5.0`)
+   - For `rc`: Apply the bump, then find the next RC index based **only on git tags** (e.g., if `v16.5.0.rc.0` tag exists -> `16.5.0.rc.1`). **Do NOT use changelog headers** to determine the next index — a version header in the changelog is a draft that may not have been released yet. Only git tags represent shipped versions.
+   - For `beta`: Same as RC but with beta suffix
+
+4. **Verify**: Check that the computed version is newer than ALL existing tags (stable and prerelease). If not, ask the user what to do.
+
+5. **Show the computed version to the user and ask for confirmation** before stamping the header. If the bump type is ambiguous (e.g., changes could reasonably be classified as patch vs minor, or the changelog headings don't clearly signal the bump level), explain your reasoning for the suggested bump and ask the user to confirm or override before proceeding.
+
 ## Critical Requirements
 
 1. **User-visible changes only**: Only add changelog entries for user-visible changes:
@@ -78,29 +141,37 @@ Entries should be organized under these section headings **in the following orde
 - `#### API Improvements` - API changes and improvements
 - `#### Generator Improvements` - Generator-specific changes
 - `#### Performance` - Performance improvements
-- `#### Pro License Features` - React on Rails Pro features
 
 **Prefer standard headings.** Only use custom headings when the change needs more specific categorization.
 
+**Pro entries**: Pro-specific changes use an inline `**[Pro]**` tag prefix within the standard category sections (e.g., `- **[Pro]** **Feature name**: Description...`). Do NOT create separate `#### Pro` subsections.
+
 **Only include section headings that have entries.**
 
-### Version Management
+### Version Stamping with Rake Task
 
-After adding entries, use the rake task to manage version headers:
+When this command is invoked with `release`, `rc`, `beta`, or an explicit version (e.g., `16.5.0.rc.10`), **use the rake task to stamp the version header** after adding entries:
 
 ```bash
-bundle exec rake update_changelog
+bundle exec rake "update_changelog[release]"   # stamp next stable version
+bundle exec rake "update_changelog[rc]"        # stamp next RC version
+bundle exec rake "update_changelog[beta]"      # stamp next beta version
 ```
 
-This will:
+The rake task handles:
 
-- Add headers for the new version right after `### [Unreleased]`
-- Update version diff links at the bottom of the file
+- Auto-computing the next version from git tags (prerelease index is determined solely from tags, not changelog headers)
+- Inserting the version header right after `### [Unreleased]`
+- Updating version diff links at the bottom of the file
+- For `rc`/`beta` modes: collapsing prior prerelease sections of the same base version into a single section
+
+Do NOT manually insert version headers or update diff links -- the rake task does this correctly.
 
 **When to use which tool:**
 
-- **`/update-changelog` (Claude Code)**: Full automation - analyzes commits, writes changelog entries, and creates a PR. Use this for comprehensive changelog updates.
-- **`bundle exec rake update_changelog`**: Quick version header addition only. Use this if you just want the version header added and plan to write entries manually.
+- **`/update-changelog release` (Claude Code)**: Full automation -- analyzes commits, writes changelog entries, then calls the rake task to stamp the version header. Use before a release.
+- **`/update-changelog` (Claude Code, no args)**: Adds entries to `[Unreleased]` during development. Does not stamp a version header.
+- **`bundle exec rake "update_changelog[mode]"`**: Header-only stamping for users who want to write entries manually.
 
 ### Finding the Most Recent Version
 
@@ -126,7 +197,7 @@ To determine the most recent version:
 
 4. **The first match after `### [Unreleased]`** is the most recent version in the changelog.
 
-**IMPORTANT**: Git tags use `v` prefix (e.g., `v16.2.0.beta.20`) but the changelog and compare links use versions WITHOUT the `v` prefix (e.g., `16.2.0.beta.20`). Strip the `v` when adding to the changelog.
+**IMPORTANT**: Git tags use `v` prefix (e.g., `v16.2.0.beta.20`). Changelog **headers** use versions WITHOUT the `v` prefix (e.g., `### [16.2.0.beta.20]`), but compare **links** at the bottom of the file MUST use the `v` prefix to match the git tag (e.g., `.../compare/v16.1.1...v16.2.0.beta.20`). Strip the `v` only for changelog headers, not for compare link URLs.
 
 ### Version Links
 
@@ -135,8 +206,8 @@ After adding an entry to the `### [Unreleased]` section, ensure the version diff
 The format at the bottom should be:
 
 ```markdown
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...master
-[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.2.0.beta.19...main
+[16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/v16.1.1...v16.2.0.beta.19
 ```
 
 When a new version is released:
@@ -149,7 +220,7 @@ When a new version is released:
    ### [16.2.0.beta.20] - 2025-12-12
    ```
 
-2. Update the `[unreleased]:` link to compare from the new version to master
+2. Update the `[unreleased]:` link to compare from the new version to main
 3. Add a new version link comparing the previous version to the new version
 
 ## Process
@@ -158,8 +229,8 @@ When a new version is released:
 
 #### Step 1: Fetch and read current state
 
-- **CRITICAL**: Run `git fetch origin master` to ensure you have the latest commits
-- After fetching, use `origin/master` for all comparisons, NOT local `master` branch
+- **CRITICAL**: Run `git fetch origin main` to ensure you have the latest commits
+- After fetching, use `origin/main` for all comparisons, NOT local `main` branch
 - Read the current CHANGELOG.md to understand the existing structure
 
 #### Step 2: Reconcile tags with changelog sections (DO THIS FIRST)
@@ -168,10 +239,10 @@ When a new version is released:
 
 1. Get the latest git tag: `git tag --sort=-v:refname | head -5`
 2. Get the most recent version header in CHANGELOG.md (the first `### [VERSION] - DATE` after `### [Unreleased]`)
-3. **Compare them.** If the latest git tag (minus the `v` prefix) does NOT match the latest changelog version header, there are tagged releases missing from the changelog. For example:
-   - Latest tag: `v16.4.0.rc.4`
-   - Latest changelog version: `### [16.4.0.rc.3]`
+3. **Compare them.** If the latest git tag (minus the `v` prefix) does NOT appear anywhere in the changelog version headers, there are tagged releases missing from the changelog. **Important**: Don't just compare against the _top_ changelog header — a version header may exist _above_ the latest tag if it was stamped as a draft before tagging. Check whether the tag's version appears in _any_ `### [X.Y.Z]` header. For example:
+   - Latest tag: `v16.4.0.rc.4`, and no `### [16.4.0.rc.4]` header exists anywhere in CHANGELOG.md
    - **Result: `16.4.0.rc.4` is missing and needs its own section**
+   - But if `### [16.5.0.rc.0]` is the top header (a draft, not yet tagged) and `### [16.4.0.rc.4]` exists below it, then nothing is missing — the top header is simply a pre-release draft
 
 4. For EACH missing tagged version (there may be multiple):
    a. Find commits in that tag vs the previous tag: `git log --oneline PREV_TAG..MISSING_TAG`
@@ -186,23 +257,56 @@ When a new version is released:
    e. **Move** matching entries from Unreleased into the new section
    f. **Add** any new entries for PRs in that tag that aren't in the changelog at all
    g. **Update version diff links** at the bottom of the file:
-   - Update `[unreleased]:` to compare from the newest tag to master
+   - Update `[unreleased]:` to compare from the newest tag to main
    - Add a link for each new version section
 
 5. Get the tag date with: `git log -1 --format="%Y-%m-%d" TAG_NAME`
 
 #### Step 3: Add new entries for post-tag commits
 
-1. Run `git log --oneline LATEST_TAG..origin/master` to find commits after the latest tag
-2. Extract PR numbers: `git log --oneline LATEST_TAG..origin/master | grep -oE "#[0-9]+" | sort -u`
-3. For each PR number, check if it's already in CHANGELOG.md: `grep "PR XXX" CHANGELOG.md`
-4. For PRs not yet in the changelog:
+1. Run `git log --oneline LATEST_TAG..origin/main` to find commits after the latest tag (LATEST_TAG is the most recent git tag, i.e., the same one identified in Step 2)
+2. Extract PR numbers: `git log --oneline LATEST_TAG..origin/main | grep -oE "#[0-9]+" | sort -u`
+3. If Step 2 found no missing tagged versions, verify no tag is ahead of main: `git log --oneline origin/main..LATEST_TAG` should be empty. If not, entries in "Unreleased" may belong to that tagged version — Step 2 should have caught this, so re-check.
+4. For each PR number, check if it's already in CHANGELOG.md: `grep "PR XXX" CHANGELOG.md`
+5. For PRs not yet in the changelog:
    - Get PR details: `gh pr view NUMBER --json title,body,author --repo shakacode/react_on_rails`
    - **Never ask the user for PR details** - get them from git history or the GitHub API
    - Validate that the change is user-visible (per the criteria above). Skip CI, lint, refactoring, test-only changes.
    - Add the entry to `### [Unreleased]` under the appropriate category heading
 
-#### Step 4: Verify and finalize
+#### Step 4: Stamp version header (only when a version mode or explicit version is given)
+
+If the user passed `release`, `rc`, `beta`, or an explicit version string as an argument:
+
+**For `release`, `rc`, or `beta` keywords:**
+
+1. Run the rake task to stamp the version header:
+
+   ```bash
+   bundle exec rake "update_changelog[release]"   # or rc, or beta
+   ```
+
+2. The rake task will:
+   - Auto-compute the next version
+   - Insert the header after `### [Unreleased]`
+   - Update diff links at the bottom
+   - For `rc`/`beta`: collapse prior prerelease sections
+
+3. **Verify** the computed version looks correct. If not, the user can manually adjust.
+
+**For an explicit version string** (e.g., `16.5.0.rc.10`):
+
+1. Pass the explicit version directly to the rake task:
+
+   ```bash
+   bundle exec rake "update_changelog[16.5.0.rc.10]"
+   ```
+
+2. **Verify** the stamped header and diff links match the requested version.
+
+If no argument was passed, skip this step -- entries stay in `### [Unreleased]`.
+
+#### Step 5: Verify and finalize
 
 1. **Verify formatting**:
    - Bold description with period
@@ -210,77 +314,61 @@ When a new version is released:
    - Proper author link
    - Consistent with existing entries
    - File ends with a newline character
-2. **Verify version sections are in order** (Unreleased → newest tag → older tags)
-3. **Verify version diff links** at the bottom of the file are correct
+   - **No duplicate section headings** (e.g., don't create two `#### Fixed` sections — merge entries into the existing heading)
+2. **Verify version sections are in order** (Unreleased -> newest tag -> older tags)
+3. **Verify version diff links** at the bottom of the file are correct (compare links MUST use the `v` prefix to match git tags)
 4. **Show the user** a summary of what was done:
    - Which version sections were created
    - Which entries were moved from Unreleased
    - Which new entries were added
    - Which PRs were skipped (and why)
+5. If in `release`/`rc`/`beta` mode or explicit-version mode, **automatically commit, push, and open a PR**:
+   - Verify the working tree only has `CHANGELOG.md` changes; if there are other uncommitted changes, warn the user and stop
+   - Verify the current branch is `main` (`git branch --show-current`); if not, warn the user and stop
+   - Create a feature branch (e.g., `changelog-16.4.0.rc.10`)
+   - Stage only `CHANGELOG.md` (`git add CHANGELOG.md`) and commit with message `Update CHANGELOG.md for VERSION` (using the stamped version)
+   - Push and open a PR with the changelog diff as the body
+   - If the push or PR creation fails, the CHANGELOG is already stamped locally — fix the issue (e.g., authentication, branch protection), then run `git push -u origin <branch>` and `gh pr create` manually
+   - Remind the user to run `rake release` (no args) after merge to publish and auto-create the GitHub release
 
-### For Beta to Non-Beta Version Release
+### For Prerelease Versions (RC and Beta)
 
-When releasing from beta to a stable version (e.g., git tag `v16.1.0.beta.3` → `v16.1.0`):
+When the user passes `rc` or `beta` as an argument:
 
-1. **Remove all beta version labels** from the changelog:
-   - Change `### [16.1.0.beta.1]`, `### [16.1.0.beta.2]`, etc. to a single `### [16.1.0]` section
-   - Combine all beta entries into the stable release section
-
-2. **Consolidate duplicate entries**:
-   - If bug fixes or changes were made to features introduced in earlier betas, keep only the final state
-   - Remove redundant changelog entries for fixes to beta features
-   - Keep the most recent/accurate description of each change
-
-3. **Update version diff links** using `bundle exec rake update_changelog`
-
-### For New Beta Version Release
-
-When a new beta version is released (e.g., `16.2.0.beta.20`):
-
-1. **Check the latest git tag** to confirm the new version:
+1. **Find the latest tag** (stable or prerelease) using semver sort:
 
    ```bash
-   git tag --sort=-v:refname | head -5
+   git tag -l 'v*' --sort=-v:refname | head -10
    ```
 
-   This shows the latest tags (e.g., `v16.2.0.beta.20`). Strip the `v` prefix for changelog use.
+2. **Auto-compute the next prerelease version** using the process in "Auto-Computing the Next Version" above.
 
-2. **Find the most recent version** in the changelog by looking for the first `### [VERSION] - DATE` after `### [Unreleased]`
+3. **Always collapse prior prereleases into the current prerelease** (this is the default behavior):
+   - Combine all prior prerelease changelog entries into the new prerelease version section
+   - Remove previous prerelease version sections (e.g., remove `### [16.5.0.rc.0]` when creating `### [16.5.0.rc.1]`)
+   - When collapsing, **consolidate duplicate category headings** — if both the Unreleased section and a prior prerelease section have `#### Fixed`, merge all entries under a single `#### Fixed` heading
+   - **Remove orphaned version diff links** at the bottom of the file for collapsed prerelease sections
+   - Add any new user-visible changes from commits since the last prerelease
+   - Update version diff links to point from the last stable version to the new prerelease
+   - This keeps the changelog clean with a single prerelease section that accumulates all changes since the last stable release
 
-3. **Insert the new version header immediately after `### [Unreleased]`**:
+**Note**: The new version header must be inserted **immediately after `### [Unreleased]`** (see Step 4). This ensures correct ordering of version headers.
 
-   ```markdown
-   ### [Unreleased]
+### For Prerelease to Stable Version Release
 
-   ### [16.2.0.beta.20] - 2025-12-12
+When releasing from prerelease to a stable version (e.g., `v16.5.0.rc.1` -> `v16.5.0`):
 
-   ### [16.2.0.beta.19] - 2025-12-10
-   ```
+1. **Remove all prerelease version labels** from the changelog:
+   - Change `### [16.5.0.rc.0]`, `### [16.5.0.rc.1]`, etc. to a single `### [16.5.0]` section
+   - Also handle beta versions: `### [16.5.0.beta.1]` etc.
+   - Combine all prerelease entries into the stable release section
 
-4. **Update the version diff links at the bottom of the file**:
-   - Change the `[unreleased]:` link to compare from the new version to master
-   - Add a new link for the new version comparing to the previous version:
+2. **Consolidate duplicate entries**:
+   - If bug fixes or changes were made to features introduced in earlier prereleases, keep only the final state
+   - Remove redundant changelog entries for fixes to prerelease features
+   - Keep the most recent/accurate description of each change
 
-   ```markdown
-   [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.20...master
-   [16.2.0.beta.20]: https://github.com/shakacode/react_on_rails/compare/16.2.0.beta.19...16.2.0.beta.20
-   [16.2.0.beta.19]: https://github.com/shakacode/react_on_rails/compare/16.1.1...16.2.0.beta.19
-   ```
-
-5. **For changelog entries**, ask the user which approach to take:
-
-   **Option 1: Process changes since last beta**
-   - Only add entries for commits since the previous beta version
-   - Maintains detailed history of what changed in each beta
-
-   **Option 2: Collapse all prior betas into current beta**
-   - Combine all beta changelog entries into the new beta version
-   - Removes previous beta version sections
-   - Cleaner changelog with less version noise
-
-After the user chooses, proceed with that approach.
-
-**CRITICAL**: The new version header must be inserted **immediately after `### [Unreleased]`**, NOT after "Changes since the last non-beta release." or any other text. This ensures correct ordering of version headers.
+3. **Update version diff links** at the bottom to point to the stable version
 
 ## Examples
 
@@ -330,9 +418,9 @@ To migrate to React on Rails Pro:
    import ReactOnRails from 'react-on-rails-pro';
 ```
 
-## Beta Release Changelog Curation
+## Prerelease Changelog Curation
 
-When consolidating beta versions into a stable release, carefully curate entries to include only user-facing changes:
+When consolidating prerelease versions (beta, RC) into a stable release, carefully curate entries to include only user-facing changes:
 
 **Remove these types of entries:**
 
@@ -342,12 +430,12 @@ When consolidating beta versions into a stable release, carefully curate entries
    - CI/build script improvements
    - Internal tooling changes
 
-2. **Beta-specific fixes**:
-   - Bugs introduced during the beta cycle (not present in last stable)
-   - Fixes for new beta-only features (e.g., bin/dev in 16.2.0.beta)
-   - Generator handling of beta/RC version formats
+2. **Prerelease-specific fixes**:
+   - Bugs introduced during the prerelease cycle (not present in last stable)
+   - Fixes for new prerelease-only features
+   - Generator handling of prerelease version formats
 
-3. **Pro-specific features** (move to Pro changelog):
+3. **Pro-specific features** (tag with `**[Pro]**` inline):
    - Node renderer fixes/improvements
    - Streaming-related changes
    - Async loading features (Pro-exclusive)
@@ -368,12 +456,12 @@ When consolidating beta versions into a stable release, carefully curate entries
 
 For each suspicious entry:
 
-1. Check git history: `git log --oneline <last_stable>..<current_beta> -- <file>`
-2. Determine when bug was introduced (stable vs beta cycle)
-3. Verify whether fix applies to stable users or only beta users
+1. Check git history: `git log --oneline <last_stable>..<current_prerelease> -- <file>`
+2. Determine when bug was introduced (stable vs prerelease cycle)
+3. Verify whether fix applies to stable users or only prerelease users
 4. Check PR description for context about what was broken
 
-**Example reference:** See [PR #2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of beta changelog curation with detailed investigation notes.
+**Example reference:** See [PR 2072](https://github.com/shakacode/react_on_rails/pull/2072) for a complete example of prerelease changelog curation with detailed investigation notes.
 
 ## Additional Notes
 

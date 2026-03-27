@@ -1,6 +1,6 @@
 // React Server Components webpack configuration
 // This creates the RSC bundle based on the server webpack config
-// See: https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/
+// See: https://reactonrails.com/docs/pro/react-server-components/
 
 const serverWebpackModule = require('./serverWebpackConfig');
 

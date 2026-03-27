@@ -216,7 +216,7 @@ bin/ci-rerun-failures
 
 **IMPORTANT: Poll every 30 seconds, NOT 180 seconds.** CI jobs typically complete in 3-15 minutes, so 30-second polling gives responsive feedback.
 
-**See**: [master-health-monitoring.md](master-health-monitoring.md)
+**See**: [main-health-monitoring.md](main-health-monitoring.md)
 
 ## Red Flags: When to STOP and Test More
 
@@ -400,7 +400,7 @@ If the answer is **YES**, spend the 15 minutes.
 ## Related Documentation
 
 - [testing-build-scripts.md](testing-build-scripts.md) - Build script testing requirements
-- [master-health-monitoring.md](master-health-monitoring.md) - Post-merge monitoring
+- [main-health-monitoring.md](main-health-monitoring.md) - Post-merge monitoring
 - [pr-testing-agent.md](pr-testing-agent.md) - Comprehensive PR testing guide
 - [CLAUDE.md](../../CLAUDE.md) - Full development guide
 - [SWITCHING_CI_CONFIGS.md](../../SWITCHING_CI_CONFIGS.md) - Testing minimum vs latest

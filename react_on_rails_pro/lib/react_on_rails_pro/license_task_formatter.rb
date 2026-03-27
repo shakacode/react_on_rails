@@ -64,9 +64,9 @@ module ReactOnRailsPro
 
       puts ""
       if info[:status] == :expired
-        puts "WARNING: License has expired. Renew at https://www.shakacode.com/react-on-rails-pro/"
+        puts "WARNING: License has expired. Renew at https://pro.reactonrails.com/"
       else
-        puts "WARNING: License expires within 30 days. Renew at https://www.shakacode.com/react-on-rails-pro/"
+        puts "WARNING: License expires within 30 days. Renew at https://pro.reactonrails.com/"
       end
     end
   end

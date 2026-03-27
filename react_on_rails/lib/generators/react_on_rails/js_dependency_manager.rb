@@ -17,11 +17,15 @@ module ReactOnRails
     # - add_npm_dependencies(packages, dev: false): Add packages via package_json gem
     # - package_json: Access to PackageJson instance (always available via shakapacker)
     # - destination_root: Generator destination directory
+    # - using_rspack?: Returns true if rspack is the configured bundler
+    #   (called unconditionally; provided by GeneratorHelper)
+    # - using_swc?: Returns true if SWC is the configured transpiler
+    #   (called unconditionally; provided by GeneratorHelper)
     #
     # == Optional Methods
     # Including classes may define:
-    # - options.rspack?: Returns true if --rspack flag is set (for Rspack support)
-    # - options.typescript?: Returns true if --typescript flag is set (for TypeScript support)
+    # - use_pro?: Returns true if React on Rails Pro should be used
+    # - use_rsc?: Returns true if React Server Components should be used
     #
     # == Installation Behavior
     # The module ALWAYS runs package manager install after adding dependencies.
@@ -49,15 +53,17 @@ module ReactOnRails
     # to handle all JS dependency installation via package_json gem.
     module JsDependencyManager
       # Core React dependencies required for React on Rails
-      # Note: @babel/preset-react and babel plugins are NOT included here because:
-      # - Shakapacker handles JavaScript transpiler configuration (babel, swc, or esbuild)
-      # - Users configure their preferred transpiler via shakapacker.yml javascript_transpiler setting
-      # - SWC is now the default and doesn't need Babel presets
-      # - For Babel users, shakapacker will install babel-loader and its dependencies
+      # Note: @babel/preset-react is handled separately in BABEL_REACT_DEPENDENCIES
+      # and is added only when SWC is not the active transpiler.
       REACT_DEPENDENCIES = %w[
         react
         react-dom
         prop-types
+      ].freeze
+
+      # Babel preset needed by the generated babel.config.js for non-SWC setups.
+      BABEL_REACT_DEPENDENCIES = %w[
+        @babel/preset-react
       ].freeze
 
       # CSS processing dependencies for webpack
@@ -140,14 +146,15 @@ module ReactOnRails
         add_react_dependencies
         add_css_dependencies
         add_rspack_dependencies if using_rspack?
-        add_swc_dependencies if using_swc?
+        add_transpiler_dependencies
         add_pro_dependencies if using_pro
         add_rsc_dependencies if using_rsc
         add_dev_dependencies
       end
 
-      def using_rspack?
-        respond_to?(:options) && options&.rspack?
+      def add_transpiler_dependencies
+        add_swc_dependencies if using_swc?
+        add_babel_react_dependencies if !using_swc? && !using_rspack?
       end
 
       def add_react_on_rails_package
@@ -179,13 +186,15 @@ module ReactOnRails
 
                                "react-on-rails@#{npm_version}"
                              else
-                               puts "WARNING: Unrecognized version format #{ReactOnRails::VERSION}. " \
-                                    "Adding the latest react-on-rails NPM module. " \
-                                    "Double check this is correct in package.json"
+                               say_status :warning,
+                                          "Unrecognized version format #{ReactOnRails::VERSION}. " \
+                                          "Adding the latest react-on-rails NPM module. " \
+                                          "Double check this is correct in package.json",
+                                          :yellow
                                "react-on-rails"
                              end
 
-        puts "Installing React on Rails package..."
+        say "Installing React on Rails package..."
         return if add_package(react_on_rails_pkg)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -204,7 +213,7 @@ module ReactOnRails
       end
 
       def add_react_dependencies
-        puts "Installing React dependencies..."
+        say "Installing React dependencies..."
 
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
         # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
@@ -232,7 +241,7 @@ module ReactOnRails
       end
 
       def add_css_dependencies
-        puts "Installing CSS handling dependencies..."
+        say "Installing CSS handling dependencies..."
         return if add_packages(CSS_DEPENDENCIES)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -251,7 +260,7 @@ module ReactOnRails
       end
 
       def add_rspack_dependencies
-        puts "Installing Rspack core dependencies..."
+        say "Installing Rspack core dependencies..."
         return if add_packages(RSPACK_DEPENDENCIES)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -270,7 +279,7 @@ module ReactOnRails
       end
 
       def add_swc_dependencies
-        puts "Installing SWC transpiler dependencies (20x faster than Babel)..."
+        say "Installing SWC transpiler dependencies (20x faster than Babel)..."
         return if add_packages(SWC_DEPENDENCIES, dev: true)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -289,8 +298,27 @@ module ReactOnRails
         MSG
       end
 
+      def add_babel_react_dependencies
+        say "Installing Babel React preset dependency..."
+        return if add_packages(BABEL_REACT_DEPENDENCIES, dev: true)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to add Babel React preset dependency.
+
+          You can install it manually by running:
+            npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
+        MSG
+      rescue StandardError => e
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Error adding Babel React preset dependency: #{e.message}
+
+          You can install it manually by running:
+            npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
+        MSG
+      end
+
       def add_typescript_dependencies
-        puts "Installing TypeScript dependencies..."
+        say "Installing TypeScript dependencies..."
         return if add_packages(TYPESCRIPT_DEPENDENCIES, dev: true)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -309,7 +337,7 @@ module ReactOnRails
       end
 
       def add_pro_dependencies
-        puts "Installing React on Rails Pro dependencies..."
+        say "Installing React on Rails Pro dependencies..."
 
         # When upgrading from base React on Rails to Pro, remove the base package first
         # Pro package includes all base functionality, so having both causes validation errors
@@ -338,19 +366,21 @@ module ReactOnRails
 
       # Returns Pro package names with version suffix matching the gem version.
       # Uses VersionSyntaxConverter to handle Ruby->npm format conversion.
-      # Falls back to unversioned package names if version can't be determined.
+      # Falls back to ReactOnRails::VERSION since Pro and base gems share the same version.
       def pro_packages_with_version
-        return PRO_DEPENDENCIES unless defined?(ReactOnRailsPro::VERSION)
-
-        npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRailsPro::VERSION)
+        # Prefer Pro gem version if loaded; fall back to base gem version (same by policy).
+        # After auto-install via bundle add, the Pro gem isn't loaded in the current process,
+        # so ReactOnRailsPro::VERSION won't be defined. The base gem version is always available.
+        gem_version = defined?(ReactOnRailsPro::VERSION) ? ReactOnRailsPro::VERSION : ReactOnRails::VERSION
+        npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
         PRO_DEPENDENCIES.map { |pkg| "#{pkg}@#{npm_version}" }
       rescue StandardError
-        puts "WARNING: Could not determine Pro package version. Installing latest."
+        say_status :warning, "Could not determine Pro package version. Installing latest.", :yellow
         PRO_DEPENDENCIES
       end
 
       def add_rsc_dependencies
-        puts "Installing React Server Components dependencies..."
+        say "Installing React Server Components dependencies..."
         return if add_packages(RSC_DEPENDENCIES)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -375,9 +405,9 @@ module ReactOnRails
         dependencies = pj.fetch("dependencies", {})
         return unless dependencies.key?("react-on-rails")
 
-        puts "Removing base 'react-on-rails' package (Pro package includes all base functionality)..."
+        say "Removing base 'react-on-rails' package (Pro package includes all base functionality)..."
         pj.manager.remove(["react-on-rails"])
-        puts "✅ Removed 'react-on-rails' package"
+        say "✅ Removed 'react-on-rails' package"
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Could not remove base 'react-on-rails' package: #{e.message}
@@ -388,14 +418,10 @@ module ReactOnRails
       end
 
       def add_dev_dependencies
-        puts "Installing development dependencies..."
+        say "Installing development dependencies..."
 
-        # Use Rspack-specific dev dependencies if --rspack flag is set
-        dev_deps = if respond_to?(:options) && options&.rspack?
-                     RSPACK_DEV_DEPENDENCIES
-                   else
-                     DEV_DEPENDENCIES
-                   end
+        # Use Rspack-specific dev dependencies if rspack is configured
+        dev_deps = using_rspack? ? RSPACK_DEV_DEPENDENCIES : DEV_DEPENDENCIES
 
         return if add_packages(dev_deps, dev: true)
 

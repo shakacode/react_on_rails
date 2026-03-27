@@ -179,4 +179,27 @@ describe('injectRSCPayload', () => {
       `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"second\\": \\"chunk\\"}")</script>`,
     );
   });
+
+  it('adds sanitized nonce attribute to injected RSC script tags', async () => {
+    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, 'abc123" onload=alert(1)');
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).not.toContain('nonce=');
+    expect(resultStr).not.toContain('onload=');
+  });
+
+  it('adds valid nonce attribute to injected RSC script tags', async () => {
+    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, 'abc123');
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('nonce="abc123"');
+  });
 });

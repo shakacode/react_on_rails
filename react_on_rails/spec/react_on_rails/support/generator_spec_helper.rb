@@ -39,21 +39,21 @@ def simulate_npm_files(options)
   return unless options.fetch(:package_json, false)
 
   package_json = "package.json"
-  package_json_data = <<-JSON.strip_heredoc
-      {
-        "name": "foo",
-        "private": true,
-        "scripts": {
-          "foo": "bar"
-        },
-        "dependencies": {
-          "foo": "^0",
-          "react-on-rails": "5.2.0",
-          "bar": "^0"
-        },
-        "devDependencies": {
-        }
+  package_json_data = <<~JSON
+    {
+      "name": "foo",
+      "private": true,
+      "scripts": {
+        "foo": "bar"
+      },
+      "dependencies": {
+        "foo": "^0",
+        "react-on-rails": "5.2.0",
+        "bar": "^0"
+      },
+      "devDependencies": {
       }
+    }
   JSON
   simulate_existing_file(package_json, package_json_data)
 end
@@ -86,6 +86,83 @@ end
 def simulate_existing_dir(dirname)
   path = File.join(destination_root, dirname)
   mkdir_p(path)
+end
+
+def simulate_existing_layout(layout_name, content)
+  simulate_existing_file("app/views/layouts/#{layout_name}.html.erb", content)
+end
+
+def simulate_layout_with_pack_tags(layout_name = "hello_world", stylesheet_tag:, javascript_tag:)
+  simulate_existing_layout(layout_name, <<~ERB)
+    <!DOCTYPE html>
+    <html>
+      <head>
+        #{stylesheet_tag}
+        #{javascript_tag}
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+  ERB
+end
+
+def simulate_canonical_pack_tag_layout(layout_name = "hello_world")
+  simulate_layout_with_pack_tags(
+    layout_name,
+    stylesheet_tag: "<%= stylesheet_pack_tag %>",
+    javascript_tag: "<%= javascript_pack_tag %>"
+  )
+end
+
+def simulate_named_pack_tag_layout(layout_name = "hello_world")
+  simulate_layout_with_pack_tags(
+    layout_name,
+    stylesheet_tag: '<%= stylesheet_pack_tag "application" %>',
+    javascript_tag: '<%= javascript_pack_tag "application" %>'
+  )
+end
+
+def simulate_mixed_pack_tag_layout(layout_name = "hello_world")
+  simulate_existing_layout(layout_name, <<~ERB)
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <%= stylesheet_pack_tag %>
+        <%= stylesheet_pack_tag "application" %>
+        <%= javascript_pack_tag %>
+        <%= javascript_pack_tag "application" %>
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+  ERB
+end
+
+def simulate_layout_missing_stylesheet_pack_tag(layout_name = "hello_world")
+  simulate_existing_layout(layout_name, <<~ERB)
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <%= javascript_pack_tag "application" %>
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+  ERB
+end
+
+def simulate_hello_world_controller(layout_name = "hello_world")
+  simulate_existing_file("app/controllers/hello_world_controller.rb", <<~RUBY)
+    class HelloWorldController < ApplicationController
+      layout "#{layout_name}"
+
+      def index
+      end
+    end
+  RUBY
 end
 
 def assert_directory_with_keep_file(dir)
@@ -121,6 +198,54 @@ def simulate_legacy_pro_webpack_files
   simulate_existing_file("config/webpack/clientWebpackConfig.js", base_client_webpack_content)
 end
 
+# Simulates base-install webpack configs for an rspack project.
+# Mirrors simulate_base_webpack_files but in config/rspack/ with rspack shakapacker.yml.
+# Used by standalone generator tests (e.g. ProGenerator) on existing rspack projects.
+def simulate_rspack_base_webpack_files
+  simulate_rspack_shakapacker_yml
+  simulate_existing_file("config/rspack/serverWebpackConfig.js", base_server_webpack_content)
+  simulate_existing_file("config/rspack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: false))
+end
+
+# Simulates Pro-transformed webpack configs for an rspack project.
+# Mirrors simulate_pro_webpack_files but in config/rspack/ with rspack shakapacker.yml.
+# Used by RSC generator tests to verify standalone upgrade transforms on rspack projects.
+def simulate_rspack_pro_webpack_files
+  simulate_rspack_shakapacker_yml
+  simulate_existing_file("config/rspack/serverWebpackConfig.js", pro_server_webpack_content)
+  simulate_existing_file("config/rspack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: true))
+  simulate_existing_file("config/rspack/clientWebpackConfig.js", base_client_webpack_content)
+end
+
+# Simulates a legacy Pro webpack setup for an rspack project.
+# Mirrors simulate_legacy_pro_webpack_files but in config/rspack/ with rspack shakapacker.yml.
+def simulate_rspack_legacy_pro_webpack_files
+  simulate_rspack_shakapacker_yml
+  simulate_existing_file("config/rspack/serverWebpackConfig.js", legacy_pro_server_webpack_content)
+  simulate_existing_file("config/rspack/ServerClientOrBoth.js",
+                         server_client_or_both_content(destructured_import: false))
+  simulate_existing_file("config/rspack/clientWebpackConfig.js", base_client_webpack_content)
+end
+
+# Simulates config/shakapacker.yml configured for rspack.
+# This makes rspack_configured_in_project? return true for standalone generators
+# that detect the bundler via YAML (RscGenerator, ProGenerator).
+def simulate_rspack_shakapacker_yml
+  simulate_existing_file("config/shakapacker.yml", <<~YAML)
+    default: &default
+      source_path: app/javascript
+      assets_bundler: rspack
+    development:
+      <<: *default
+    test:
+      <<: *default
+    production:
+      <<: *default
+  YAML
+end
+
 # -- fixture data, not logic
 def base_server_webpack_content
   <<~JS
@@ -148,10 +273,19 @@ def base_server_webpack_content
       rules.forEach((rule) => {
         if (Array.isArray(rule.use)) {
           const cssLoader = rule.use.find((item) => {
-            return item.includes('css-loader');
+            let testValue = '';
+            if (typeof item === 'string') {
+              testValue = item;
+            } else if (item && typeof item.loader === 'string') {
+              testValue = item.loader;
+            }
+            return testValue.includes('css-loader');
           });
-          if (cssLoader && cssLoader.options) {
-            cssLoader.options.modules = { exportOnlyLocals: true };
+          if (cssLoader && cssLoader.options && cssLoader.options.modules) {
+            cssLoader.options.modules = {
+              ...(typeof cssLoader.options.modules === 'object' ? cssLoader.options.modules : {}),
+              exportOnlyLocals: true,
+            };
           }
         }
       });

@@ -1,0 +1,431 @@
+# Migrating from Webpack to Rspack
+
+This guide documents the process of migrating from Webpack to Rspack using Shakapacker 9+. Rspack is a high-performance bundler written in Rust that provides significantly faster builds (~20x improvement) while maintaining Webpack API compatibility.
+
+## Prerequisites
+
+- Shakapacker 9.0+ (Rspack support was added in 9.0)
+- Node.js 20+
+- React on Rails 13+
+
+## Quick Start
+
+For new projects or simple migrations, the generator handles most of the setup:
+
+```bash
+# Generate with Rspack from scratch
+rails generate react_on_rails:install --rspack
+
+# Or switch an existing app
+bin/switch-bundler rspack
+```
+
+For complex projects with SSR, CSS Modules, or custom configurations, continue reading for important considerations.
+
+## Breaking Changes in Shakapacker 9
+
+### CSS Modules: Named vs Default Exports
+
+**This is the most critical breaking change.** Shakapacker 9 changed the default CSS Modules configuration from default exports to named exports (`namedExport: true`).
+
+**Symptoms:**
+
+- CSS modules returning `undefined`
+- SSR errors: `Cannot read properties of undefined (reading 'className')`
+- Build warnings: `export 'default' (imported as 'css') was not found`
+
+**Affected code pattern:**
+
+```javascript
+// This pattern breaks with Shakapacker 9 defaults
+import css from './Component.module.scss';
+console.log(css.myClass); // undefined!
+```
+
+**Solution:** Configure CSS loader to use default exports in your webpack configuration:
+
+```javascript
+// config/webpack/commonWebpackConfig.js
+const { generateWebpackConfig, merge } = require('shakapacker');
+
+const commonWebpackConfig = () => {
+  const baseWebpackConfig = generateWebpackConfig();
+
+  // Fix CSS modules to use default exports for backward compatibility
+  baseWebpackConfig.module.rules.forEach((rule) => {
+    if (rule.use && Array.isArray(rule.use)) {
+      const cssLoader = rule.use.find((loader) => {
+        const loaderName = typeof loader === 'string' ? loader : loader?.loader;
+        return loaderName?.includes('css-loader');
+      });
+
+      if (cssLoader?.options?.modules) {
+        cssLoader.options.modules.namedExport = false;
+        cssLoader.options.modules.exportLocalsConvention = 'camelCase';
+      }
+    }
+  });
+
+  return baseWebpackConfig;
+};
+
+module.exports = commonWebpackConfig;
+```
+
+**Key insight:** This configuration must be inside the function so it applies to a fresh config each time.
+
+## Rspack-Specific Configuration
+
+### Bundler Auto-Detection Pattern
+
+Use conditional logic to support both Webpack and Rspack in the same configuration files:
+
+```javascript
+// config/webpack/commonWebpackConfig.js
+const { config } = require('shakapacker');
+
+// Auto-detect bundler from shakapacker config
+const bundler = config.assets_bundler === 'rspack' ? require('@rspack/core') : require('webpack');
+
+// Use for plugins that need the bundler reference
+clientConfig.plugins.push(
+  new bundler.ProvidePlugin({
+    /* ... */
+  }),
+);
+serverConfig.plugins.unshift(new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
+```
+
+**Benefits:**
+
+- Single codebase for both bundlers
+- Easy to compare configurations
+- Clear visibility of bundler-specific differences
+
+### Server Bundle: CSS Extract Plugin Filtering
+
+Rspack uses a different CSS extract loader path than Webpack. Server-side rendering configs that filter out CSS extraction must handle both:
+
+```javascript
+// config/webpack/serverWebpackConfig.js
+const configureServer = (serverWebpackConfig) => {
+  serverWebpackConfig.module.rules.forEach((rule) => {
+    if (rule.use && Array.isArray(rule.use)) {
+      // Filter out CSS extraction loaders for SSR
+      rule.use = rule.use.filter((item) => {
+        let testValue;
+        if (typeof item === 'string') {
+          testValue = item;
+        } else if (typeof item.loader === 'string') {
+          testValue = item.loader;
+        }
+
+        // Handle both Webpack and Rspack CSS extract loaders
+        return !(
+          testValue?.match(/mini-css-extract-plugin/) ||
+          testValue?.includes('cssExtractLoader') || // Rspack uses this path
+          testValue === 'style-loader'
+        );
+      });
+    }
+  });
+};
+```
+
+**Why this matters:** Rspack uses `@rspack/core/dist/cssExtractLoader.js` instead of Webpack's `mini-css-extract-plugin`. Without this fix, CSS extraction remains in the server bundle, causing intermittent SSR failures.
+
+### CSS Modules with SSR: Stable Class Names
+
+**If you use `[contenthash]` in your `localIdentName` for CSS modules, class names can silently diverge between client and server builds with Rspack.** Pages load but all CSS module styles are broken. This only affects production builds — development with HMR works fine because `style-loader` injects CSS inline.
+
+The root cause is that `[contenthash]` is computed from processed CSS content, which differs between client and server builds due to different loader chains (`exportOnlyLocals: true` on server), different plugins (`CssExtractRspackPlugin` on client only), and different optimization passes.
+
+**Solution:** Replace `[contenthash]` with a custom `getLocalIdent` function that derives class names from stable inputs (file path, query string, and class name):
+
+```javascript
+// config/webpack/getLocalIdent.js
+const crypto = require('crypto');
+const path = require('path');
+
+const getLocalIdent = (context, _localIdentName, localName) => {
+  const resourcePath = context.resourcePath;
+  const resourceQuery = context.resourceQuery || ''; // needed for CSS-in-JS virtual modules; safe no-op otherwise
+  // Prefer process.cwd() so this stays correct across custom/monorepo layouts.
+  const projectRoot = process.cwd();
+  // Alternative if process.cwd() isn't reliable in your setup:
+  // const projectRoot = path.resolve(__dirname, '../..'); // adjust depth as needed
+  const relativePath = path.relative(projectRoot, resourcePath);
+
+  const hash = crypto
+    .createHash('sha256')
+    .update(relativePath + '\0' + resourceQuery + '\0' + localName)
+    .digest('base64url')
+    .slice(0, 8);
+
+  const basename = path.basename(resourcePath);
+  const name = basename
+    .replace(/\.(module\.)?(scss|sass|css|less|styl|tsx?|jsx?)$/, '')
+    .replace(/-styles$/, '');
+  return `${name}-${localName}_${hash}`;
+};
+
+module.exports = getLocalIdent;
+```
+
+For third-party CSS modules, `relativePath` may include `node_modules/` segments in the hash input. That's expected and stable; the visible class name prefix still comes from `path.basename(resourcePath)`.
+
+Then use it in your `commonWebpackConfig.js` where you configure CSS modules:
+
+```javascript
+const getLocalIdent = require('./getLocalIdent');
+
+// In the CSS modules configuration loop:
+if (cssLoader?.options?.modules) {
+  cssLoader.options.modules.namedExport = false;
+  cssLoader.options.modules.exportLocalsConvention = 'camelCase';
+  cssLoader.options.modules.getLocalIdent = getLocalIdent; // Stable class names across builds
+}
+```
+
+Because `getLocalIdent` uses stable inputs (file path, query string, and class name) rather than processed CSS content, the same class name is produced in both client and server builds regardless of bundler internals. The same function must be used in both builds so server-rendered HTML class names match client CSS selectors.
+
+> **Note — CSS-in-JS virtual modules (astroturf, etc.):** The `resourceQuery` line in `getLocalIdent` above is a no-op for regular `.module.scss` files. It exists for CSS-in-JS tools that create virtual CSS modules via webpack's `!=!` matchResource syntax. In rspack, `context.resourcePath` points to the source file rather than the virtual path, so without `resourceQuery` in the hash, all virtual modules from the same file would collide. See the [troubleshooting entry](#css-in-js-styled-components-all-share-the-same-class-name) for details.
+
+### Server Bundle: Preserve CSS Modules Configuration
+
+When configuring SSR, merge CSS modules options instead of replacing them:
+
+```javascript
+// ❌ Wrong - overwrites namedExport setting
+if (cssLoader && cssLoader.options) {
+  cssLoader.options.modules = { exportOnlyLocals: true };
+}
+
+// ✅ Correct - preserves existing settings
+if (cssLoader && cssLoader.options && cssLoader.options.modules) {
+  cssLoader.options.modules = {
+    ...cssLoader.options.modules, // Preserve namedExport: false
+    exportOnlyLocals: true,
+  };
+}
+```
+
+## React Runtime Configuration
+
+### SWC React Runtime for SSR
+
+If using SWC (common with Rspack), you may need to use the classic React runtime for SSR compatibility:
+
+```javascript
+// config/swc.config.js
+const customConfig = {
+  options: {
+    jsc: {
+      transform: {
+        react: {
+          runtime: 'classic', // Use 'classic' instead of 'automatic' for SSR
+          refresh: env.isDevelopment && env.runningWebpackDevServer,
+        },
+      },
+    },
+  },
+};
+```
+
+**Symptom:** SSR error about invalid `renderToString` call or function signature detection issues.
+
+## Additional Configuration
+
+### ReScript Support
+
+If using ReScript, add `.bs.js` to resolve extensions:
+
+```javascript
+// config/webpack/commonWebpackConfig.js
+const commonOptions = {
+  resolve: {
+    extensions: ['.css', '.ts', '.tsx', '.bs.js'],
+  },
+};
+```
+
+### Development Hot Reloading
+
+Different plugins are required for hot reloading:
+
+```javascript
+// config/webpack/development.js
+const { config } = require('shakapacker');
+
+if (config.assets_bundler === 'rspack') {
+  const ReactRefreshPlugin = require('@rspack/plugin-react-refresh');
+  clientWebpackConfig.plugins.push(new ReactRefreshPlugin());
+} else {
+  const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+  clientWebpackConfig.plugins.push(new ReactRefreshWebpackPlugin());
+}
+```
+
+## Shakapacker Configuration
+
+Enable Rspack in `config/shakapacker.yml`:
+
+```yaml
+default: &default
+  assets_bundler: 'rspack' # or 'webpack'
+  webpack_loader: 'swc' # Rspack works best with SWC
+```
+
+## Troubleshooting
+
+### CSS Modules Return `undefined`
+
+**Symptoms:**
+
+- `css.className` is `undefined`
+- SSR crashes with property access errors
+- Works in development but fails in SSR
+
+**Solutions:**
+
+1. Configure `namedExport: false` (see Breaking Changes section)
+2. Ensure server config preserves CSS modules settings
+3. Filter Rspack's `cssExtractLoader` from server bundle
+
+### CSS Module Styles Broken in Production (SSR)
+
+**Symptoms:**
+
+- All CSS module styles missing in production
+- Class names in server-rendered HTML don't match CSS selectors
+- Works in development but breaks in production builds
+- No errors — just silently broken styles
+
+**Cause:** `[contenthash]` in `localIdentName` produces different hashes in client and server builds with Rspack.
+
+**Solution:** Use a custom `getLocalIdent` function instead of `[contenthash]`. See the [CSS Modules with SSR](#css-modules-with-ssr-stable-class-names) section above.
+
+### CSS-in-JS Styled Components All Share the Same Class Name
+
+**Symptoms:**
+
+- Multiple astroturf (or similar CSS-in-JS) styled components in the same file all get identical CSS class names
+- Styles look correct in development but are broken in production
+- Only one component's styles survive; others are overwritten
+
+**Cause:** Rspack sets `context.resourcePath` to the actual source file instead of the virtual matchResource path. All virtual CSS modules from the same source file produce the same hash.
+
+**Solution:** Include `context.resourceQuery` in the `getLocalIdent` hash. See the [`getLocalIdent` implementation](#css-modules-with-ssr-stable-class-names) above, which already includes `resourceQuery` for this reason.
+
+### Intermittent SSR Failures
+
+**Cause:** Incomplete CSS extraction filtering in server config.
+
+**Solution:** Update the CSS extract loader filter to include `cssExtractLoader` for Rspack (see Server Bundle section).
+
+### Module Resolution Errors
+
+**Symptom:** `Module not found: Can't resolve './file.bs.js'`
+
+**Solution:** Add the file extension to webpack's resolve.extensions configuration.
+
+### UMD Libraries Behave Differently Under Rspack's Module Interop
+
+**Symptoms:**
+
+- `noConflict()` or other methods called on an import result return `undefined` or throw
+- Libraries that coexist via `noConflict()` (e.g., lodash + underscore) interfere with each other
+
+**Cause:** Rspack's ES module interop wraps CommonJS exports differently than Webpack, so the import result may not have the methods you expect. Switching to `window.*` access can also be wrong if loaders like `imports-loader?define=>false` prevent the library from setting globals in the first place.
+
+**Solution:** Audit any `noConflict()` calls or UMD workarounds. Check whether your loader chain already prevents the conflict, and remove the workaround if so. Verify behavior by testing in both bundlers.
+
+### Modern Entry Points Crash on Missing Globals
+
+**Symptoms:**
+
+- `Cannot use 'in' operator to search for 'X' in undefined`
+- `Could not find component registered with name ...` (ReactOnRails registration fails)
+- Works in development but crashes on specific pages in production
+
+**Cause:** Code in a modern entry point references a global (e.g., `window._`) that is only exposed via `expose-loader` in legacy bundles. The crash kills the script before `registerForRails()` executes, so ReactOnRails reports the component as missing. This bug can be latent under Webpack if legacy bundles happen to load first.
+
+**Solution:** Audit all entry points for code that assumes sitewide globals exist. Remove or guard any such references, especially orphaned polyfills for removed features.
+
+### `cache: false` Disables Rspack's In-Memory Cache
+
+**Symptoms:**
+
+- Subtle compilation issues after adding a "disable cache" environment variable
+- Slower rebuilds than expected even with in-memory caching supposedly enabled
+
+**Cause:** Rspack's top-level `cache` option is boolean-only (`true`/`false`), unlike Webpack's `cache: { type: 'filesystem', buildDependencies: ... }`. Setting `cache: false` to disable disk persistence actually disables rspack's **in-memory cache** entirely. Persistent (disk) caching is controlled separately via `experiments.cache`.
+
+**Solution:** Always set `cache: true` for rspack. Control disk persistence exclusively through `experiments.cache`:
+
+```javascript
+cache: isRspack
+  ? true // always enable in-memory cache; disk persistence via experiments.cache
+  : { type: 'filesystem', buildDependencies: { config: [__filename] } },
+
+// Persistent cache (disk) — opt-in for rspack
+...(isRspack && !process.env.DISABLE_FILESYS_CACHE && {
+  experiments: {
+    cache: { type: 'persistent', buildDependencies: [__filename] },
+  },
+}),
+```
+
+### Lazy Compilation Breaks Two-Server Dev Setup
+
+**Symptoms:**
+
+- Dynamic imports fail silently in development
+- Network tab shows 404s for `/lazy-compilation-using-__<N>` paths hitting your Rails server
+- Entry points fail to load with no obvious error
+
+**Cause:** Rspack's CLI [auto-enables lazy compilation](https://github.com/web-infra-dev/rspack/blob/main/packages/rspack-cli/src/commands/serve.ts#L130-L133) for web targets when using `rspack serve`. The lazy-compilation proxy uses relative URLs, so the browser resolves them against the page origin (your Rails server) instead of the dev server where the middleware lives. Webpack doesn't auto-enable this, so it's an invisible behavior change.
+
+**Solution:** Explicitly disable lazy compilation:
+
+```javascript
+...(isRspack && { lazyCompilation: false }),
+```
+
+Alternatively, configure `lazyCompilation.backend.listen` to match your dev server setup.
+
+### Third-Party Package Issues
+
+Some packages may not ship compiled files. Use `patch-package` to fix:
+
+```bash
+pnpm add --save-dev patch-package postinstall-postinstall
+```
+
+Add to package.json:
+
+```json
+{
+  "scripts": {
+    "postinstall": "patch-package"
+  }
+}
+```
+
+## Performance Benefits
+
+After migration, expect:
+
+- **Build times:** ~53-270ms with Rspack (vs seconds with Webpack)
+- **~20x faster transpilation** with SWC
+- **Faster CI runs** and development iteration
+
+## Reference Implementation
+
+For a complete working example, see the [react-webpack-rails-tutorial Rspack migration PR](https://github.com/shakacode/react-webpack-rails-tutorial/pull/680).
+
+## Related Documentation
+
+- [Webpack Configuration](../core-concepts/webpack-configuration.md) - Rspack vs Webpack overview
+- [Server-Side Rendering](../core-concepts/react-server-rendering.md) - SSR configuration
+- [Troubleshooting Guide](../deployment/troubleshooting.md) - General troubleshooting

@@ -1,0 +1,33 @@
+<%= react_component("NativeMetadataSyncApp",
+                    props: @app_props_server_render.merge(canonicalUrl: request.base_url + request.path),
+                    prerender: true,
+                    trace: true,
+                    id: "NativeMetadataSyncApp-react-component-0") %>
+
+<hr/>
+
+<h2>About This Example</h2>
+<p>
+  This page uses <code>react_component</code> (synchronous SSR) with React 19's native
+  <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code>, and <code>&lt;link&gt;</code> tags.
+  No <code>react-helmet</code> or <code>react_component_hash</code> needed.
+</p>
+<p>
+  <strong>How it works:</strong> React renders the component synchronously via
+  <code>renderToString</code>. The metadata tags appear inside the component's
+  <code>&lt;div&gt;</code> in <code>&lt;body&gt;</code>. On the client, React 19
+  hoists them to the document <code>&lt;head&gt;</code> during hydration.
+</p>
+<p>
+  <strong>Trade-off:</strong> The title is NOT in <code>&lt;head&gt;</code> in the initial
+  server-rendered HTML (it's in <code>&lt;body&gt;</code>) because React on Rails renders
+  component fragments, not full HTML documents. Browsers still update the tab
+  title, but SEO crawlers that don't execute JavaScript may not see it.
+</p>
+<p>
+  <strong>Compare with:</strong>
+  <%= link_to "Helmet approach (react_component_hash)", react_helmet_path %> |
+  <%= link_to "Streaming version", stream_native_metadata_path %> |
+  <%= link_to "RSC version", rsc_native_metadata_path %> |
+  <%= link_to "Hybrid approach (recommended for SEO)", hybrid_metadata_streaming_path %>
+</p>

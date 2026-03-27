@@ -4,7 +4,7 @@ require "rails/railtie"
 
 module ReactOnRailsPro
   class Engine < Rails::Engine
-    LICENSE_URL = "https://www.shakacode.com/react-on-rails-pro/"
+    LICENSE_URL = "https://pro.reactonrails.com/"
     # TODO: Remove this legacy migration warning path after 16.5.0 stable release (target: 2026-05-31).
     LEGACY_LICENSE_FILE = "config/react_on_rails_pro_license.key"
     private_constant :LICENSE_URL
@@ -18,6 +18,10 @@ module ReactOnRailsPro
     # App continues running regardless of license status
     initializer "react_on_rails_pro.check_license" do
       config.after_initialize { ReactOnRailsPro::Engine.log_license_status }
+    end
+
+    initializer "react_on_rails_pro.warn_on_problematic_compression_middleware" do
+      config.after_initialize { ReactOnRailsPro::Engine.log_problematic_compression_middleware_warnings }
     end
 
     class << self
@@ -38,6 +42,14 @@ module ReactOnRailsPro
         when :invalid
           log_license_issue("Invalid license", "Get a license at #{LICENSE_URL}")
         end
+      end
+
+      def log_problematic_compression_middleware_warnings(logger: Rails.logger,
+                                                          middlewares: Rails.application.middleware,
+                                                          root: Rails.root)
+        CompressionMiddlewareGuard.new(middlewares: middlewares, logger: logger)
+                                  .warning_messages(root: root)
+                                  .each { |message| logger.warn(message) }
       end
 
       private

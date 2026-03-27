@@ -39,7 +39,7 @@ Gem::Specification.new do |s|
   s.add_development_dependency "gem-release"
   s.post_install_message = '
 --------------------------------------------------------------------------------
-Checkout https://www.shakacode.com/react-on-rails-pro for information about
+Checkout https://pro.reactonrails.com for information about
 "React on Rails Pro" which includes a gem for better performance, via caching helpers, and our
 node rendering server, support for React 19, and much more.
 --------------------------------------------------------------------------------

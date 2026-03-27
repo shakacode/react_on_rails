@@ -172,7 +172,7 @@ Pro features include:
 - Advanced caching and optimization
 - Node-based renderer for better SSR performance
 
-[Learn more about Pro →](https://www.shakacode.com/react-on-rails-pro)
+[Learn more about Pro →](https://pro.reactonrails.com)
 
 See [LICENSE.md](LICENSE.md) for full details.
 ```

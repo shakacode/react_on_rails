@@ -132,12 +132,20 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
       Rails.logger.error "Error writing posts and comments to Redis: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
       raise e
+    ensure
+      begin
+        redis&.close
+      rescue StandardError => e
+        Rails.logger.warn "Failed to close Redis: #{e.message}"
+      end
     end
 
     stream_view_containing_react_components(template: "/pages/rsc_posts_page_over_redis")
 
     return if redis_thread.join(10)
 
+    redis_thread.kill
+    redis_thread.join(1)
     Rails.logger.error "Redis thread timed out"
     raise "Redis thread timed out"
   end
@@ -167,6 +175,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
     return if redis_thread.join(10)
 
+    redis_thread.kill
+    redis_thread.join(1)
     Rails.logger.error "Redis thread timed out"
     raise "Redis thread timed out"
   end
@@ -234,6 +244,25 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     render "/pages/pro/console_logs_in_async_server"
   end
 
+  # React 19 native metadata examples (no react-helmet)
+  def native_metadata
+    render "/pages/native_metadata"
+  end
+
+  def stream_native_metadata
+    stream_view_containing_react_components(template: "/pages/stream_native_metadata")
+  end
+
+  def hybrid_metadata_streaming
+    @page_title = "#{PROPS_NAME}'s Profile | React on Rails"
+    @page_description = "Profile page for #{PROPS_NAME} - metadata set by Rails controller for SEO"
+    stream_view_containing_react_components(template: "/pages/hybrid_metadata_streaming")
+  end
+
+  def rsc_native_metadata
+    stream_view_containing_react_components(template: "/pages/rsc_native_metadata")
+  end
+
   # Demo page showing 10 async components rendering concurrently
   # Each component delays 1 second - sequential would take ~10s, concurrent takes ~1s
   def async_components_demo
@@ -246,25 +275,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   private
 
-  def with_config_overrides
-    previous = {
-      raise_on_prerender_error: ReactOnRails.configuration.raise_on_prerender_error,
-      throw_js_errors: ReactOnRailsPro.configuration.throw_js_errors,
-      raise_non_shell_server_rendering_errors:
-        ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors
-    }
-
-    apply_config_overrides
-    yield
-  ensure
-    ReactOnRails.configuration.raise_on_prerender_error = previous[:raise_on_prerender_error]
-    ReactOnRailsPro.configuration.throw_js_errors = previous[:throw_js_errors]
-    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors =
-      previous[:raise_non_shell_server_rendering_errors]
-  end
-
   def calc_slow_app_props_server_render
-    msg = <<-MSG.strip_heredoc
+    msg = <<~MSG
       XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
       calling slow calc_slow_app_props_server_render
       XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -272,24 +284,6 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     Rails.logger.info msg
     render_to_string(template: "/pages/pro/serialize_props",
                      locals: { name: PROPS_NAME }, formats: :json)
-  end
-
-  def apply_config_overrides
-    # NOTE: This mutates global React on Rails config singletons and is not thread-safe.
-    # It is intended only for manual debugging in the dummy app.
-    bool = ActiveModel::Type::Boolean.new
-
-    if params[:raise_on_prerender_error].present?
-      ReactOnRails.configuration.raise_on_prerender_error =
-        bool.cast(params[:raise_on_prerender_error])
-    end
-    if params[:throw_js_errors].present?
-      ReactOnRailsPro.configuration.throw_js_errors = bool.cast(params[:throw_js_errors])
-    end
-    return unless params[:raise_non_shell_server_rendering_errors].present?
-
-    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors =
-      bool.cast(params[:raise_non_shell_server_rendering_errors])
   end
 
   def initialize_shared_store

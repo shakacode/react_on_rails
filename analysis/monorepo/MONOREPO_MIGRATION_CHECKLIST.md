@@ -252,7 +252,7 @@ The monorepo migration is in **Phase 2 (Git Merger) - COMPLETE**. We've successf
 ### Risk Mitigation
 
 - Keep backward compatibility during transition
-- Test extensively before merging to master
+- Test extensively before merging to main
 - Have rollback plan ready
 - Communicate changes clearly to users
 - Consider beta/canary releases first
