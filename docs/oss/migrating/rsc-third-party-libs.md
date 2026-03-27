@@ -368,6 +368,57 @@ Use `client-only` for:
 | **Auth**          | Rails auth (Devise, etc.) via controller props                    | --                                           | --                                                 |
 | **Date Utils**    | date-fns, dayjs (pure functions)                                  | --                                           | Moment.js (not tree-shakable)                      |
 
+## Common Mistakes
+
+### Mistake 1: Adding `'use client'` to a barrel file
+
+Marking a barrel file (e.g., `components/index.js`) with `'use client'` forces every export into the client bundle, even components that could be Server Components:
+
+```jsx
+// BAD: All 50 exported components become Client Components
+'use client';
+export { Header } from './Header';
+export { Footer } from './Footer';
+export { ProductCard } from './ProductCard';
+// ... 47 more
+```
+
+**Fix:** Add `'use client'` only to individual component files that actually need it. Better yet, avoid barrel files entirely and use direct imports.
+
+### Mistake 2: Not checking library RSC compatibility before migrating
+
+Starting a component migration only to discover that a deeply nested dependency uses hooks wastes significant time.
+
+**Fix:** Before removing `'use client'` from a component, audit its import tree. Run a build with the change and look for errors like _"You're importing a component that needs useState."_ The [React Working Group compatibility list](https://github.com/reactwg/server-components/discussions/6) tracks library status.
+
+### Mistake 3: Using barrel imports across `'use client'` boundaries
+
+In standard (non-RSC) builds, modern bundlers tree-shake barrel imports effectively -- `import { Button } from '@mui/material'` produces roughly the same output as the direct path import. However, **at `'use client'` boundaries**, the full transitive import graph is included in the client bundle because webpack must serialize the entire module for the RSC manifest. This makes import granularity matter specifically in RSC:
+
+```jsx
+// AVOID at 'use client' boundaries: pulls in the full import graph
+import { Button } from '@mui/material';
+
+// PREFER: direct import keeps the client boundary small
+import Button from '@mui/material/Button';
+```
+
+```jsx
+// AVOID at 'use client' boundaries
+import { debounce } from 'lodash';
+
+// PREFER: imports only what's needed
+import debounce from 'lodash-es/debounce';
+```
+
+> **Note:** Outside of `'use client'` files, barrel imports are generally fine with modern bundlers. This advice is specific to files that form RSC client boundaries.
+
+### Mistake 4: Continuing to use runtime CSS-in-JS without a plan
+
+Styled-components and Emotion work inside `'use client'` boundaries, but they prevent those components from ever becoming Server Components. If your migration goal includes reducing JavaScript bundle size, CSS-in-JS will be the bottleneck.
+
+**Fix:** For new components, use Tailwind CSS, CSS Modules, or another zero-runtime solution. For existing styled-components/Emotion code, create a migration plan or accept that those components will remain Client Components.
+
 ## Next Steps
 
 - [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) -- debugging and avoiding problems

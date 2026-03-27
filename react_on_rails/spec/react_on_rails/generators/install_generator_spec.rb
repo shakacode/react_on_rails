@@ -2500,7 +2500,7 @@ describe InstallGenerator, type: :generator do
       expect(error_text).to include("--pro")
       expect(error_text).to include("react_on_rails_pro")
       expect(error_text).to include("~> #{expected_pro_version}")
-      expect(error_text).to include("https://pro.reactonrails.com/")
+      expect(error_text).to include("https://reactonrails.com/docs/pro/upgrading-to-pro/")
     end
   end
 

@@ -50,6 +50,22 @@ RSpec.describe "release.rake helper methods" do
       expect(compute_target_gem_version(current_gem_version: "16.3.4", version_input: "major")).to eq("17.0.0")
     end
 
+    it "strips prerelease suffix on patch bumps from prerelease versions" do
+      expect(compute_target_gem_version(current_gem_version: "16.5.0.rc.0", version_input: "patch")).to eq("16.5.0")
+    end
+
+    it "increments minor from prerelease base (use 'patch' to promote RC to stable)" do
+      # 16.5.0.rc.0 + "minor" → 16.6.0, NOT 16.5.0
+      # This matches gem-release behavior. To promote 16.5.0.rc.0 → 16.5.0, use "patch".
+      expect(compute_target_gem_version(current_gem_version: "16.5.0.rc.0", version_input: "minor")).to eq("16.6.0")
+    end
+
+    it "increments major from prerelease base (use 'patch' to promote RC to stable)" do
+      # 16.5.0.rc.0 + "major" → 17.0.0, NOT 16.5.0
+      # This matches gem-release behavior. To promote 16.5.0.rc.0 → 16.5.0, use "patch".
+      expect(compute_target_gem_version(current_gem_version: "16.5.0.rc.0", version_input: "major")).to eq("17.0.0")
+    end
+
     it "passes through explicit versions unchanged" do
       expect(compute_target_gem_version(current_gem_version: "16.3.4",
                                         version_input: "16.4.0.rc.1")).to eq("16.4.0.rc.1")
@@ -138,6 +154,28 @@ RSpec.describe "release.rake helper methods" do
         expect(section).not_to include("Bug B")
       end
     end
+
+    it "returns nil when the matching section has no content" do
+      changelog = <<~CHANGELOG
+        # Change Log
+
+        ### [Unreleased]
+
+        ### [16.4.0] - 2026-03-08
+
+        ### [16.3.0] - 2026-02-01
+        #### Fixed
+        - Bug B
+      CHANGELOG
+
+      Dir.mktmpdir do |dir|
+        changelog_path = File.join(dir, "CHANGELOG.md")
+        File.write(changelog_path, changelog)
+
+        section = extract_changelog_section(changelog_path: changelog_path, version: "16.4.0")
+        expect(section).to be_nil
+      end
+    end
   end
 
   describe "#run_release_preflight_checks!" do
@@ -164,9 +202,26 @@ RSpec.describe "release.rake helper methods" do
       expect(resolve_version_input("", "/tmp/repo")).to eq("16.4.0")
     end
 
-    it "falls back to a patch bump when the changelog does not introduce a newer version" do
+    it "uses the current version when changelog version matches and is untagged" do
       allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.3.0")
       allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
+      allow(self).to receive(:version_tagged?).with("/tmp/repo", "16.3.0").and_return(false)
+
+      expect(resolve_version_input("", "/tmp/repo")).to eq("16.3.0")
+    end
+
+    it "falls back to a patch bump when changelog version matches but is already tagged" do
+      allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.3.0")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
+      allow(self).to receive(:version_tagged?).with("/tmp/repo", "16.3.0").and_return(true)
+
+      expect(resolve_version_input("", "/tmp/repo")).to eq("patch")
+    end
+
+    it "falls back to a patch bump when changelog version is older than current and untagged" do
+      allow(self).to receive(:extract_latest_changelog_version).with(monorepo_root: "/tmp/repo").and_return("16.2.9")
+      allow(self).to receive(:current_gem_version).with("/tmp/repo").and_return("16.3.0")
+      expect(self).not_to receive(:version_tagged?)
 
       expect(resolve_version_input("", "/tmp/repo")).to eq("patch")
     end

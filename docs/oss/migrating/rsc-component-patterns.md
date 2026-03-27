@@ -431,9 +431,11 @@ export default function Comments({ comments }) {
 | `window`, `document`, `localStorage`              | Client         | Browser APIs                          |
 | Custom hooks using the above                      | Client         | Transitively client                   |
 | Data fetching (database, API)                     | Server         | Direct backend access, no bundle cost |
-| Rendering static/display-only content             | Server         | No JavaScript shipped                 |
+| Rendering static/display-only content             | Server\*       | No JavaScript shipped                 |
 | Using server-only secrets (API keys)              | Server         | Never exposed to client               |
 | Heavy dependencies (Markdown parsers, formatters) | Server         | Dependencies stay off client bundle   |
+
+_\*For components repeated many times with verbose markup (e.g., Tailwind utility classes), Server Component rendering can inflate the Flight payload. In those cases, a Client Component may produce a smaller page. See [Flight Payload Optimization](rsc-flight-payload.md) for details._
 
 ## Common Mistakes
 

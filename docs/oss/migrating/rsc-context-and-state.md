@@ -411,6 +411,94 @@ export default function InteractiveFilters() {
 }
 ```
 
+## Common Mistakes
+
+### Mistake 1: Wrapping the entire tree in providers unnecessarily
+
+Wrapping the entire component tree in a `'use client'` provider works correctly -- children passed from a Server Component remain Server Components (this is the "children as props" pattern). However, wrapping more than necessary has real costs:
+
+- Every child that **consumes** the context (via `useContext`) must be a Client Component
+- Provider scope is broader than needed, making refactoring harder
+- Context value changes trigger re-renders across a wider subtree
+
+Narrow the provider scope to only the subtree that actually needs the context:
+
+```jsx
+// WIDER THAN NEEDED: Header and Footer don't use this context,
+// but they're inside the provider scope unnecessarily
+export default function ProductPage({ user, product }) {
+  return (
+    <Providers user={user}>
+      <Header />
+      <ProductDetails product={product} />
+      <Footer />
+    </Providers>
+  );
+}
+```
+
+```jsx
+// BETTER: Only wrap components that actually need context
+export default function ProductPage({ user, product }) {
+  return (
+    <div>
+      <Header /> {/* Server Component -- outside provider scope */}
+      <Providers user={user}>
+        <ProductDetails product={product} />
+      </Providers>
+      <Footer /> {/* Server Component -- outside provider scope */}
+    </div>
+  );
+}
+```
+
+### Mistake 2: Passing the entire I18n translation tree
+
+`I18n.t('.')` returns every translation key for the locale, which can be thousands of entries. Serializing this into props bloats the HTML page and the RSC payload:
+
+```ruby
+# BAD: Sends the entire translation tree (potentially hundreds of KB)
+messages: I18n.t('.').deep_stringify_keys
+
+# GOOD: Send only the subset this page needs
+messages: I18n.t('product_page').deep_stringify_keys
+```
+
+### Mistake 3: Reading Redux store in Server Components
+
+Server Components render once on the server and never re-render. They cannot subscribe to store changes:
+
+```jsx
+// BAD: useSelector is a hook -- breaks in Server Components
+export default function Dashboard({ user }) {
+  const theme = useSelector((state) => state.theme); // ERROR
+  return <div className={theme}>...</div>;
+}
+```
+
+**Fix:** Keep the component as a Client Component (add `'use client'`), or pass the value from Rails as a prop to a Server Component that doesn't need the Redux store.
+
+### Mistake 4: Creating new QueryClient on every render
+
+If the `QueryClient` is created without `useState`, React creates a new instance on every render, losing the cache:
+
+```jsx
+// BAD: New QueryClient on every render -- cache is lost
+'use client';
+export default function QueryProvider({ children }) {
+  const queryClient = new QueryClient(); // Re-created each render!
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
+// GOOD: useState ensures single instance
+'use client';
+import { useState } from 'react';
+export default function QueryProvider({ children }) {
+  const [queryClient] = useState(() => new QueryClient());
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+```
+
 ## Migration Checklist
 
 ### Phase 1: Audit

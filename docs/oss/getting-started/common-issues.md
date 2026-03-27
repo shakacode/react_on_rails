@@ -262,5 +262,5 @@ ls -la public/packs/
 1. **Check the detailed [Troubleshooting Guide](../deployment/troubleshooting.md)**
 2. **Search [GitHub Issues](https://github.com/shakacode/react_on_rails/issues)**
 3. **Ask in [GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)**
-4. **Join [React + Rails Slack](https://reactrails.slack.com)**
+4. **Join [React + Rails Slack](https://invite.reactrails.com)**
 5. **Professional support**: [react_on_rails@shakacode.com](mailto:react_on_rails@shakacode.com)

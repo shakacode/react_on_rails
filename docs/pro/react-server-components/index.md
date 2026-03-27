@@ -1,7 +1,7 @@
 # React Server Components in React on Rails Pro
 
-> **Pro Feature** — React Server Components require [React on Rails Pro](https://pro.reactonrails.com/) 4+ with the node renderer.
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — React Server Components require [React on Rails Pro](https://reactonrails.com/docs/pro/) 4+ with the node renderer.
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
 ## What Are React Server Components?
 
@@ -63,7 +63,11 @@ Start with the tutorial series, which builds from basics to advanced features:
 
 See the full [RSC tutorial](./tutorial.md) for the complete learning path.
 
-### Migrating an Existing App?
+### Upgrading an Existing Pro App?
+
+See [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md) for the generator-based runbook: prerequisites, `rails g react_on_rails:rsc` usage, legacy webpack compatibility, and a verification checklist.
+
+### Migrating Your React Components?
 
 The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to incrementally adopt RSC in an existing React on Rails application, including:
 

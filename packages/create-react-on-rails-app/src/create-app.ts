@@ -226,7 +226,12 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
   const proRequested = options.pro || options.rsc;
-  const proModeLabel = proRequested ? (options.rsc ? '--rsc' : '--pro') : null;
+  let proModeLabel: string | null = null;
+  if (options.rsc) {
+    proModeLabel = '--rsc';
+  } else if (options.pro) {
+    proModeLabel = '--pro';
+  }
   const baseSteps = 3; // rails new + add react_on_rails + run generator
   const totalSteps = baseSteps + (proRequested ? 1 : 0);
   let currentStep = 1;
