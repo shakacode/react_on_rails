@@ -127,7 +127,7 @@ module ReactOnRails
         msg = <<~MSG
           **ERROR** ReactOnRails: client specific definition for Component '#{component_name}' overrides the \
           common definition. Please delete the common definition and have separate server and client files. For more \
-          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+          information, please see https://reactonrails.com/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation/
         MSG
 
         expect { described_class.instance.generate_packs_if_stale }.to raise_error(ReactOnRails::Error, msg)
@@ -147,7 +147,7 @@ module ReactOnRails
         msg = <<~MSG
           **ERROR** ReactOnRails: server specific definition for Component '#{component_name}' overrides the \
           common definition. Please delete the common definition and have separate server and client files. For more \
-          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+          information, please see https://reactonrails.com/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation/
         MSG
 
         expect { described_class.instance.generate_packs_if_stale }.to raise_error(ReactOnRails::Error, msg)
@@ -181,7 +181,7 @@ module ReactOnRails
       it "raises missing client file error" do
         msg = <<~MSG
           **ERROR** ReactOnRails: Component '#{component_name}' is missing a client specific file. For more \
-          information, please see https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+          information, please see https://reactonrails.com/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation/
         MSG
 
         expect { described_class.instance.generate_packs_if_stale }.to raise_error(ReactOnRails::Error, msg)
@@ -531,6 +531,84 @@ module ReactOnRails
       end
     end
 
+    context "when stores_subdirectory is configured" do
+      before do
+        @old_stores_subdirectory = ReactOnRails.configuration.stores_subdirectory
+        ReactOnRails.configuration.stores_subdirectory = "ror_stores"
+      end
+
+      after do
+        ReactOnRails.configuration.stores_subdirectory = @old_stores_subdirectory
+      end
+
+      context "with store files in stores_subdirectory" do
+        before do
+          stores_fixture_path = File.expand_path("./fixtures/automated_packs_generation/stores", __dir__)
+          allow(ReactOnRails::PackerUtils).to receive(:packer_source_path)
+            .and_return("#{stores_fixture_path}/StoreWithAutoRegistration")
+          described_class.instance.generate_packs_if_stale
+        end
+
+        it "creates pack for the store" do
+          store_pack = "#{generated_directory}/commentsStore.js"
+          expect(File.exist?(store_pack)).to be(true)
+        end
+
+        it "generated store pack registers the store" do
+          store_pack = "#{generated_directory}/commentsStore.js"
+          pack_content = File.read(store_pack)
+
+          expect(pack_content).to include("import ReactOnRails from 'react-on-rails/client';")
+          expect(pack_content).to include("import commentsStore from")
+          expect(pack_content).to include("ReactOnRails.registerStore({commentsStore});")
+        end
+
+        it "includes store in the server bundle" do
+          generated_server_bundle_content = File.read(generated_server_bundle_file_path)
+
+          expect(generated_server_bundle_content).to include("ReactOnRails.registerStore")
+          expect(generated_server_bundle_content).to include("commentsStore")
+        end
+
+        it "generates packs for TypeScript store files too" do
+          ts_store_pack = "#{generated_directory}/routerStore.js"
+          expect(File.exist?(ts_store_pack)).to be(true)
+        end
+      end
+
+      context "when component and store have the same name" do
+        before do
+          stores_fixture_path = File.expand_path("./fixtures/automated_packs_generation/stores", __dir__)
+          allow(ReactOnRails::PackerUtils).to receive(:packer_source_path)
+            .and_return("#{stores_fixture_path}/StoreWithNameConflict")
+        end
+
+        it "raises an error for name conflict" do
+          expect { described_class.instance.generate_packs_if_stale }
+            .to raise_error(ReactOnRails::Error, /names are used for both components and stores/)
+        end
+      end
+    end
+
+    context "when stores_subdirectory is not set" do
+      before do
+        @old_stores_subdirectory = ReactOnRails.configuration.stores_subdirectory
+        ReactOnRails.configuration.stores_subdirectory = nil
+      end
+
+      after do
+        ReactOnRails.configuration.stores_subdirectory = @old_stores_subdirectory
+      end
+
+      it "does not attempt to generate store packs" do
+        component_name = "ComponentWithCommonOnly"
+        stub_packer_source_path(component_name: component_name, packer_source_path: packer_source_path)
+
+        # Should not raise any errors even without stores
+        expect { described_class.instance.generate_packs_if_stale }.not_to raise_error
+      end
+    end
+
     def generated_server_bundle_file_path
       described_class.instance.send(:generated_server_bundle_file_path)
     end
@@ -789,6 +867,186 @@ module ReactOnRails
         let(:file_path) { "/path/to/MyComponent.tsx" }
 
         it { is_expected.to eq "MyComponent" }
+      end
+    end
+
+    describe "#relative_path" do
+      subject(:computed_relative_path) { described_class.instance.send(:relative_path, from, to).to_s }
+
+      context "when target is one directory up from generated pack" do
+        let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
+        let(:to) { "/app/javascript/packs/components/MyComponent.jsx" }
+
+        it { is_expected.to eq "../components/MyComponent.jsx" }
+      end
+
+      context "when target is multiple directories up from generated pack" do
+        let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
+        let(:to) { "/app/javascript/src/deep/components/MyComponent.jsx" }
+
+        it { is_expected.to eq "../../src/deep/components/MyComponent.jsx" }
+      end
+
+      context "when target is deeply nested relative to generated pack" do
+        let(:from) { "/app/javascript/packs/generated/MyComponent.js" }
+        let(:to) { "/app/src/nested/deeply/components/MyComponent.jsx" }
+
+        it { is_expected.to eq "../../../src/nested/deeply/components/MyComponent.jsx" }
+      end
+
+      context "when from and to are in sibling directories" do
+        let(:from) { "/app/packs/server-bundle.js" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "../generated/server-bundle-generated.js" }
+      end
+
+      context "when from and to are in the same directory" do
+        let(:from) { "/app/generated/server-bundle.js" }
+        let(:to) { "/app/generated/server-bundle-generated.js" }
+
+        it { is_expected.to eq "server-bundle-generated.js" }
+      end
+    end
+
+    describe "CLIENT_API_PATTERN" do
+      subject { content.match?(described_class::CLIENT_API_PATTERN) }
+
+      context "with React hooks" do
+        %w[useState useEffect useReducer useCallback useMemo useRef useLayoutEffect
+           useImperativeHandle useContext useSyncExternalStore useTransition useDeferredValue].each do |hook|
+          context "with #{hook}" do
+            let(:content) { "const value = #{hook}();" }
+
+            it { is_expected.to be true }
+          end
+        end
+      end
+
+      context "with event handlers" do
+        %w[onClick onChange onSubmit onFocus onBlur onKeyDown onKeyUp onKeyPress
+           onMouseDown onMouseUp onMouseEnter onMouseLeave].each do |handler|
+          context "with #{handler} as JSX prop" do
+            let(:content) { "<button #{handler}={handleClick} />" }
+
+            it { is_expected.to be true }
+          end
+        end
+      end
+
+      context "with class components" do
+        context "with extends Component" do
+          let(:content) { "class MyComp extends Component {" }
+
+          it { is_expected.to be true }
+        end
+
+        context "with extends PureComponent" do
+          let(:content) { "class MyComp extends PureComponent {" }
+
+          it { is_expected.to be true }
+        end
+
+        context "with extends React.Component" do
+          let(:content) { "class MyComp extends React.Component {" }
+
+          it { is_expected.to be true }
+        end
+
+        context "with extends React.PureComponent" do
+          let(:content) { "class MyComp extends React.PureComponent {" }
+
+          it { is_expected.to be true }
+        end
+      end
+
+      context "with non-matching content" do
+        context "with server-only code" do
+          let(:content) { "export default function ServerComponent() { return <div />; }" }
+
+          it { is_expected.to be false }
+        end
+
+        context "with custom hook name not in the list" do
+          let(:content) { "const value = useCustomHook();" }
+
+          it { is_expected.to be false }
+        end
+
+        context "with empty content" do
+          let(:content) { "" }
+
+          it { is_expected.to be false }
+        end
+      end
+    end
+
+    describe "#warn_if_likely_client_component" do
+      let(:file_path) { "dummy_component.jsx" }
+      let(:component_name) { "DummyComponent" }
+
+      before do
+        allow(File).to receive(:read).with(file_path).and_return(content)
+      end
+
+      context "when file contains client APIs" do
+        let(:content) { "const [state, setState] = useState(false);" }
+
+        it "prints a warning to stdout" do
+          expect { described_class.instance.send(:warn_if_likely_client_component, file_path, component_name) }
+            .to output(/WARNING.*DummyComponent.*useState.*missing the 'use client' directive/).to_stdout
+        end
+      end
+
+      context "when file contains multiple client APIs" do
+        let(:content) { "useState(); useEffect(); useCallback(); useMemo(); useRef();" }
+
+        it "shows at most 3 matches with ellipsis" do
+          expect { described_class.instance.send(:warn_if_likely_client_component, file_path, component_name) }
+            .to output(/\(useState, useEffect, useCallback, \.\.\.\)/).to_stdout
+        end
+      end
+
+      context "when file has no client APIs" do
+        let(:content) { "export default function ServerComponent() { return <div />; }" }
+
+        it "does not print anything" do
+          expect { described_class.instance.send(:warn_if_likely_client_component, file_path, component_name) }
+            .not_to output.to_stdout
+        end
+      end
+    end
+
+    describe "#log_rsc_classification_summary" do
+      let(:components_directory) { "ReactServerComponents" }
+
+      before do
+        stub_packer_source_path(component_name: components_directory,
+                                packer_source_path: packer_source_path)
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        stub_const("ReactOnRailsPro::Utils", Class.new do
+          def self.rsc_support_enabled?
+            true
+          end
+        end)
+        allow(ReactOnRailsPro::Utils).to receive_messages(rsc_support_enabled?: true)
+        # Force re-computation of component maps
+        described_class.instance.generate_packs_if_stale
+      end
+
+      it "prints classification summary to stdout" do
+        expect { described_class.instance.send(:log_rsc_classification_summary) }
+          .to output(/RSC component classification/).to_stdout
+      end
+
+      it "lists server components" do
+        expect { described_class.instance.send(:log_rsc_classification_summary) }
+          .to output(/Server components.*ReactServerComponent/).to_stdout
+      end
+
+      it "lists client components" do
+        expect { described_class.instance.send(:log_rsc_classification_summary) }
+          .to output(/Client components.*ReactClientComponent/).to_stdout
       end
     end
 

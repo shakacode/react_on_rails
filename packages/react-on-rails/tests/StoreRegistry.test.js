@@ -107,6 +107,26 @@ describe('StoreRegistry', () => {
     expect(actual.size).toBe(2);
   });
 
+  it('StoreRegistry does not error when re-registering the same store generator', () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    StoreRegistry.register({ storeGenerator });
+    StoreRegistry.register({ storeGenerator }); // Re-register same store generator
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('StoreRegistry errors when registering a different store generator with the same name', () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    StoreRegistry.register({ storeGenerator });
+    StoreRegistry.register({ storeGenerator: storeGenerator2 }); // Different generator, same name
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Store "storeGenerator" was registered with a different store generator than previously',
+      ),
+    );
+    consoleSpy.mockRestore();
+  });
+
   it('StoreRegistry returns correct stores Map', () => {
     const store1 = storeGenerator({});
     const store2 = storeGenerator2({});

@@ -25,17 +25,21 @@ describe ReactOnRails::TestHelper::WebpackAssetsCompiler do
       end
 
       it "prints the correct message" do
-        expected_output = <<-MSG.strip_heredoc
-          React on Rails FATAL ERROR!
-          Error in building webpack assets!
-          cmd: cd "#{Rails.root}" && #{invalid_command}
-        MSG
+        escaped_root = Regexp.escape(Rails.root.to_s)
+        escaped_cmd = Regexp.escape(invalid_command)
+        expected_pattern = Regexp.new(
+          "React on Rails FATAL ERROR!.*" \
+          "React on Rails: Error building webpack assets!.*" \
+          "cmd: cd \"#{escaped_root}\" && #{escaped_cmd}.*" \
+          "exitstatus: 1",
+          Regexp::MULTILINE
+        )
 
         expect do
           described_class.new.compile_assets
         rescue SystemExit
           # No op
-        end.to output(/#{expected_output}/).to_stderr
+        end.to output(expected_pattern).to_stderr
       end
     end
   end

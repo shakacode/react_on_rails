@@ -14,6 +14,7 @@ module ReactOnRails
     attr_accessor generated_assets_dirs: Array[String]?
     attr_accessor generated_assets_dir: String
     attr_accessor components_subdirectory: String?
+    attr_accessor stores_subdirectory: String?
     attr_accessor webpack_generated_files: Array[String]
     attr_accessor rendering_extension: String?
     attr_accessor build_test_command: String
@@ -65,6 +66,7 @@ module ReactOnRails
       ?server_render_method: String?,
       ?rendering_props_extension: String?,
       ?components_subdirectory: String?,
+      ?stores_subdirectory: String?,
       ?auto_load_bundle: bool?,
       ?immediate_hydration: bool?,
       ?component_registry_timeout: Integer?,
@@ -79,7 +81,6 @@ module ReactOnRails
     def check_component_registry_timeout: () -> void
     def validate_generated_component_packs_loading_strategy: () -> void
     def validate_enforce_private_server_bundles: () -> void
-    def check_minimum_shakapacker_version: () -> void
     def check_autobundling_requirements: () -> void
     def adjust_precompile_task: () -> void
     def error_if_using_packer_and_generated_assets_dir_not_match_public_output_path: () -> void

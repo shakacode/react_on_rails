@@ -128,6 +128,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         # Mock file existence checks for lock files so detect_used_package_manager returns nil
         allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
         allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+        allow(File).to receive(:exist?).with("bun.lock").and_return(false)
         allow(File).to receive(:exist?).with("bun.lockb").and_return(false)
         allow(File).to receive(:exist?).with("package-lock.json").and_return(false)
       end
@@ -153,6 +154,8 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(result).to be false
         expect(checker.errors?).to be true
         expect(checker.messages.last[:content]).to include("Shakapacker is not properly configured")
+        expect(checker.messages.last[:content]).to include("config/webpack/webpack.config.{js,ts}")
+        expect(checker.messages.last[:content]).to include("config/rspack/rspack.config.{js,ts}")
       end
     end
 
@@ -304,7 +307,43 @@ RSpec.describe ReactOnRails::SystemChecker do
       it "adds a warning message" do
         checker.check_react_on_rails_npm_package
         expect(checker.warnings?).to be true
-        expect(checker.messages.last[:content]).to include("react-on-rails NPM package not found")
+        expect(checker.messages.last[:content]).to include("Neither react-on-rails nor react-on-rails-pro")
+      end
+    end
+
+    context "when package.json exists with react-on-rails-pro" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails-pro" => "^16.0.0" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds a success message for pro package" do
+        checker.check_react_on_rails_npm_package
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("react-on-rails-pro NPM package")
+        end).to be true
+      end
+    end
+
+    context "when package.json has react-on-rails-pro only in devDependencies" do
+      let(:package_json_content) do
+        { "devDependencies" => { "react-on-rails-pro" => "^16.0.0" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "finds react-on-rails-pro in devDependencies" do
+        checker.check_react_on_rails_npm_package
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("react-on-rails-pro NPM package")
+        end).to be true
       end
     end
 
@@ -317,6 +356,30 @@ RSpec.describe ReactOnRails::SystemChecker do
         messages_count_before = checker.messages.count
         checker.check_react_on_rails_npm_package
         expect(checker.messages.count).to eq(messages_count_before)
+      end
+    end
+
+    context "when node_modules_location points to a non-root JS workspace" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails-pro" => "^16.0.0" } }.to_json
+      end
+
+      before do
+        rails_root = Pathname.new("/tmp/myapp")
+        package_json_path = rails_root.join("client", "package.json").to_s
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+        allow(File).to receive(:read).with(package_json_path).and_return(package_json_content)
+      end
+
+      it "reads package metadata from the configured workspace path" do
+        checker.check_react_on_rails_npm_package
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("react-on-rails-pro NPM package")
+        end).to be true
       end
     end
   end
@@ -432,6 +495,24 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
     end
 
+    context "when package.json exists with matching versions for react-on-rails-pro" do
+      let(:package_json_content) do
+        { "dependencies" => { "react-on-rails-pro" => "16.2.0-beta.10" } }.to_json
+      end
+
+      before do
+        allow(File).to receive(:exist?).with("package.json").and_return(true)
+        allow(File).to receive(:read).with("package.json").and_return(package_json_content)
+      end
+
+      it "adds a success message" do
+        checker.send(:check_package_version_sync)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("versions match")
+        end).to be true
+      end
+    end
+
     context "when versions have minor mismatch" do
       let(:package_json_content) do
         { "dependencies" => { "react-on-rails" => "16.2.0-beta.9" } }.to_json
@@ -480,6 +561,105 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
   end
 
+  describe "#check_react_dependencies" do
+    let(:base_package_json) do
+      {
+        "dependencies" => {
+          "react" => "^19.0.0",
+          "react-dom" => "^19.0.0"
+        }
+      }
+    end
+
+    before do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("package.json").and_return(true)
+      allow(File).to receive(:read).with("package.json").and_return(base_package_json.to_json)
+    end
+
+    context "when shakapacker javascript_transpiler is swc" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+          default:
+            javascript_transpiler: swc
+        YAML
+      end
+
+      it "does not warn about missing @babel/preset-react" do
+        checker.check_react_dependencies
+        expect(checker.messages.none? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+
+    context "when shakapacker javascript_transpiler is babel" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+          default:
+            javascript_transpiler: babel
+        YAML
+      end
+
+      it "warns when @babel/preset-react is missing" do
+        checker.check_react_dependencies
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+
+    context "when shakapacker.yml does not exist" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(false)
+      end
+
+      it "defaults to requiring @babel/preset-react" do
+        checker.check_react_dependencies
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+
+    context "when shakapacker.yml has non-hash YAML content" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("- item1\n- item2")
+      end
+
+      it "does not crash and defaults to requiring @babel/preset-react" do
+        expect { checker.check_react_dependencies }.not_to raise_error
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+
+    context "when shakapacker.yml has broken ERB" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("<%= 1 + %>")
+      end
+
+      it "does not crash and adds a fallback info message" do
+        expect { checker.check_react_dependencies }.not_to raise_error
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :info && msg[:content].include?("Unable to parse")
+        end).to be true
+      end
+
+      it "defaults to requiring @babel/preset-react" do
+        checker.check_react_dependencies
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("@babel/preset-react")
+        end).to be true
+      end
+    end
+  end
+
   describe "private methods" do
     describe "#cli_exists?" do
       it "returns true when command exists" do
@@ -496,28 +676,210 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
 
     describe "#shakapacker_configured?" do
-      it "returns true when all required files exist" do
-        files = [
-          "bin/shakapacker",
-          "bin/shakapacker-dev-server",
-          "config/shakapacker.yml",
-          "config/webpack/webpack.config.js"
-        ]
+      before do
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
+        allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        # Default all config files to missing
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(false)
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
+      end
 
-        files.each do |file|
-          allow(File).to receive(:exist?).with(file).and_return(true)
-        end
-
+      it "returns true when webpack JS config exists" do
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
-      it "returns false when any required file is missing" do
-        allow(File).to receive(:exist?).with("bin/shakapacker").and_return(false)
-        allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
-        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
+      it "returns true when webpack TS config exists" do
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
 
+      it "returns true when rspack JS config exists" do
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(true)
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
+
+      it "returns true when rspack TS config exists" do
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
+
+      it "returns false when no bundler config file exists" do
         expect(checker.send(:shakapacker_configured?)).to be false
+      end
+
+      it "returns false when binaries are missing" do
+        allow(File).to receive(:exist?).with("bin/shakapacker").and_return(false)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
+        expect(checker.send(:shakapacker_configured?)).to be false
+      end
+    end
+
+    describe "#detect_bundler_config_path" do
+      before do
+        allow(File).to receive(:exist?).and_return(false)
+      end
+
+      it "returns the existing webpack TypeScript config when only webpack exists" do
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
+      end
+
+      it "prefers the bundler configured in shakapacker.yml when both bundlers exist" do
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("default:\n  assets_bundler: rspack\n")
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/rspack/rspack.config.ts")
+        expect(checker.messages.any? do |msg|
+          msg[:content].include?("Using rspack from config/shakapacker.yml")
+        end).to be true
+      end
+
+      it "warns and defaults to webpack when both bundlers exist and config is ambiguous" do
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(false)
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
+        expect(checker.messages.any? { |msg| msg[:content].include?("defaulting to webpack") }).to be true
+      end
+    end
+
+    describe "#configured_assets_bundler" do
+      before do
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+      end
+
+      it "parses ERB-backed assets_bundler values from shakapacker.yml" do
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+          default: &default
+            assets_bundler: <%= "webpack" %> # inline comment
+          development:
+            <<: *default
+        YAML
+
+        expect(checker.send(:configured_assets_bundler)).to eq("webpack")
+      end
+
+      it "prefers the current Rails environment over the default config" do
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return(<<~YAML)
+          default:
+            assets_bundler: webpack
+          test:
+            assets_bundler: rspack
+        YAML
+
+        original_rails_env = ENV.fetch("RAILS_ENV", nil)
+        ENV["RAILS_ENV"] = "test"
+
+        expect(checker.send(:configured_assets_bundler)).to eq("rspack")
+      ensure
+        ENV["RAILS_ENV"] = original_rails_env
+      end
+    end
+
+    describe "#suggest_webpack_inspection" do
+      it "adapts tips for rspack TypeScript config paths" do
+        checker.send(:suggest_webpack_inspection, "config/rspack/rspack.config.ts")
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
+
+        expect(info_messages).to include("config/rspack/rspack.config.ts")
+        expect(info_messages).to include("export default")
+        expect(info_messages).to include("rspack-stats.json")
+      end
+
+      it "uses the detected webpack TypeScript config path in analyzer instructions" do
+        checker.send(:suggest_webpack_inspection, "config/webpack/webpack.config.ts")
+
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
+
+        expect(info_messages).to include("Add to config/webpack/webpack.config.ts")
+      end
+    end
+
+    describe "#standard_shakapacker_config?" do
+      it "recognizes CommonJS webpack config" do
+        content = <<~JS
+          const { generateWebpackConfig } = require('shakapacker')
+          const webpackConfig = generateWebpackConfig()
+          module.exports = webpackConfig
+        JS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "recognizes CommonJS rspack config" do
+        content = <<~JS
+          const { generateRspackConfig } = require('shakapacker/rspack')
+          const rspackConfig = generateRspackConfig()
+          module.exports = rspackConfig
+        JS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "recognizes TypeScript ESM webpack config" do
+        content = <<~TS
+          import { generateWebpackConfig } from 'shakapacker'
+          import type { Configuration } from 'webpack'
+          const webpackConfig: Configuration = generateWebpackConfig()
+          export default webpackConfig
+        TS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "recognizes TypeScript ESM rspack config" do
+        content = <<~TS
+          import { generateRspackConfig } from 'shakapacker/rspack'
+          import type { RspackOptions } from '@rspack/core'
+          const rspackConfig: RspackOptions = generateRspackConfig()
+          export default rspackConfig
+        TS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be true
+      end
+
+      it "rejects unsupported TypeScript ESM webpackConfig named export variant" do
+        content = <<~TS
+          import { webpackConfig } from 'shakapacker'
+          export default webpackConfig
+        TS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be false
+      end
+
+      it "rejects fully custom config without standard patterns" do
+        content = <<~JS
+          const path = require('path')
+          module.exports = {
+            entry: './src/index.js',
+            output: { path: path.resolve(__dirname, 'dist') }
+          }
+        JS
+        expect(checker.send(:standard_shakapacker_config?, content)).to be false
+      end
+    end
+
+    describe "#detect_used_package_manager" do
+      it "returns bun when bun.lock exists" do
+        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
+        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+        allow(File).to receive(:exist?).with("bun.lock").and_return(true)
+
+        expect(checker.send(:detect_used_package_manager)).to eq("bun")
+      end
+
+      it "returns bun when bun.lockb exists" do
+        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
+        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+        allow(File).to receive(:exist?).with("bun.lock").and_return(false)
+        allow(File).to receive(:exist?).with("bun.lockb").and_return(true)
+
+        expect(checker.send(:detect_used_package_manager)).to eq("bun")
       end
     end
   end
@@ -538,6 +900,19 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(messages.any? do |msg|
                  msg[:type] == :success && msg[:content].include?("React ^18.2.0, React DOM ^18.2.0")
                end).to be true
+      end
+    end
+
+    context "when package.json has only devDependencies (no dependencies key)" do
+      let(:package_json) do
+        { "devDependencies" => { "react" => "^19.0.0", "react-dom" => "^19.0.0" } }
+      end
+
+      it "reports React and React DOM versions from devDependencies" do
+        checker.send(:report_dependency_versions, package_json)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :success && msg[:content].include?("React ^19.0.0, React DOM ^19.0.0")
+        end).to be true
       end
     end
 

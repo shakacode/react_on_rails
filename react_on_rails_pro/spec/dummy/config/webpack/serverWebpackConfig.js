@@ -5,12 +5,13 @@ const path = require('path');
 const commonWebpackConfig = require('./commonWebpackConfig');
 
 function extractLoader(rule, loaderName) {
+  if (!Array.isArray(rule.use)) return null;
   return rule.use.find((item) => {
-    let testValue;
+    let testValue = '';
 
     if (typeof item === 'string') {
       testValue = item;
-    } else if (typeof item.loader === 'string') {
+    } else if (item && typeof item.loader === 'string') {
       testValue = item.loader;
     }
 
@@ -43,9 +44,15 @@ const configureServer = (rscBundle = false) => {
   // replace file-loader with null-loader
   serverWebpackConfig.module.rules.forEach((loader) => {
     if (loader.use && loader.use.filter) {
-      loader.use = loader.use.filter(
-        (item) => !(typeof item === 'string' && item.match(/mini-css-extract-plugin/)),
-      );
+      loader.use = loader.use.filter((item) => {
+        let testValue = '';
+        if (typeof item === 'string') {
+          testValue = item;
+        } else if (item && typeof item.loader === 'string') {
+          testValue = item.loader;
+        }
+        return !(testValue.includes('mini-css-extract-plugin') || testValue.includes('cssExtractLoader'));
+      });
     }
   });
 
@@ -55,7 +62,15 @@ const configureServer = (rscBundle = false) => {
   };
 
   if (!rscBundle) {
-    serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+    serverWebpackConfig.plugins.push(
+      new RSCWebpackPlugin({
+        isServer: true,
+        // Limit client reference discovery to the app source directory to prevent
+        // the plugin from traversing into node_modules/ (which with pnpm workspace
+        // symlinks exposes .tsx source files that lack a configured loader)
+        clientReferences: [{ directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ }],
+      }),
+    );
   }
   serverWebpackConfig.plugins.unshift(new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));
   // Custom output for the server-bundle that matches the config in
@@ -88,17 +103,24 @@ const configureServer = (rscBundle = false) => {
     if (Array.isArray(rule.use)) {
       // remove the mini-css-extract-plugin and style-loader
       rule.use = rule.use.filter((item) => {
-        let testValue;
+        let testValue = '';
         if (typeof item === 'string') {
           testValue = item;
-        } else if (typeof item.loader === 'string') {
+        } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
-        return !(testValue.match(/mini-css-extract-plugin/) || testValue === 'style-loader');
+        return !(
+          testValue.includes('mini-css-extract-plugin') ||
+          testValue.includes('cssExtractLoader') ||
+          testValue === 'style-loader'
+        );
       });
       const cssLoader = extractLoader(rule, 'css-loader');
-      if (cssLoader && cssLoader.options) {
-        cssLoader.options.modules = { exportOnlyLocals: true };
+      if (cssLoader && cssLoader.options && cssLoader.options.modules) {
+        cssLoader.options.modules = {
+          ...(typeof cssLoader.options.modules === 'object' ? cssLoader.options.modules : {}),
+          exportOnlyLocals: true,
+        };
       }
 
       const babelLoader = extractLoader(rule, 'babel-loader');

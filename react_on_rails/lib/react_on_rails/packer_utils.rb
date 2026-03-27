@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "pathname"
 require "shakapacker"
 
 module ReactOnRails
@@ -34,10 +35,6 @@ module ReactOnRails
 
     def self.supports_async_loading?
       shakapacker_version_requirement_met?("8.2.0")
-    end
-
-    def self.supports_basic_pack_generation?
-      shakapacker_version_requirement_met?(ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION)
     end
 
     def self.supports_autobundling?
@@ -116,10 +113,10 @@ module ReactOnRails
     def self.check_manifest_not_cached
       return unless ::Shakapacker.config.cache_manifest?
 
-      msg = <<-MSG.strip_heredoc
-          ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
-          ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
-          To fix this: edit your config/shakapacker.yml file and set cache_manifest to false for test.
+      msg = <<~MSG
+        ERROR: you have enabled cache_manifest in the #{Rails.env} env when using the
+        ReactOnRails::TestHelper.configure_rspec_to_compile_assets helper
+        To fix this: edit your config/shakapacker.yml file and set cache_manifest to false for test.
       MSG
       puts wrap_message(msg)
       exit!
@@ -141,7 +138,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
         config/shakapacker.yml to enable nested entries. for more information read
-        https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md#enable-nested_entries-for-shakapacker
+        https://reactonrails.com/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation/#enable-nested_entries-for-shakapacker
       MSG
 
       raise ReactOnRails::Error, msg
@@ -149,19 +146,10 @@ module ReactOnRails
 
     def self.raise_shakapacker_version_incompatible_for_autobundling
       msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING} or \
-        above to use the automated bundle generation feature (which requires nested_entries support). \
-        The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}. \
-        Basic pack generation requires ::Shakapacker #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or above.
-      MSG
+        **ERROR** ReactOnRails: Automated bundle generation requires Shakapacker >= #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING} (for nested_entries support).
+        Installed version: #{ReactOnRails::PackerUtils.shakapacker_version}
 
-      raise ReactOnRails::Error, msg
-    end
-
-    def self.raise_shakapacker_version_incompatible_for_basic_pack_generation
-      msg = <<~MSG
-        **ERROR** ReactOnRails: Please upgrade ::Shakapacker to version #{ReactOnRails::PacksGenerator::MINIMUM_SHAKAPACKER_VERSION} or \
-        above to use basic pack generation features. The currently installed version is #{ReactOnRails::PackerUtils.shakapacker_version}.
+        To fix: Upgrade Shakapacker, or set `auto_load_bundle: false` in your ReactOnRails configuration.
       MSG
 
       raise ReactOnRails::Error, msg
@@ -192,14 +180,31 @@ module ReactOnRails
     end
 
     def self.extract_precompile_hook
-      # Access config data using private :data method since there's no public API
-      # to access the raw configuration hash needed for hook detection
+      # Prefer the public API (available in Shakapacker 9.0+)
+      return ::Shakapacker.config.precompile_hook if ::Shakapacker.config.respond_to?(:precompile_hook)
+
+      # Fallback: access config data using private :data method
       config_data = ::Shakapacker.config.send(:data)
 
       # Try symbol keys first (Shakapacker's internal format), then fall back to string keys
-      # The key is 'precompile_hook' at the top level of the config
       config_data&.[](:precompile_hook) || config_data&.[]("precompile_hook")
     end
+
+    # Regex pattern to detect pack generation in hook scripts
+    # Matches both:
+    # - The rake task: react_on_rails:generate_packs
+    # - The Ruby method: generate_packs_if_stale (used by generator template)
+    GENERATE_PACKS_PATTERN = /\b(react_on_rails:generate_packs|generate_packs_if_stale)\b/
+
+    # Pattern to detect a real self-guard statement that exits early when
+    # SHAKAPACKER_SKIP_PRECOMPILE_HOOK is true. This avoids false positives
+    # from comments or unrelated string literals.
+    SELF_GUARD_PATTERN = /
+      (?:^|\s)
+      (?:exit|return)
+      (?:\s+0)?
+      \s+if\s+ENV\[(["'])SHAKAPACKER_SKIP_PRECOMPILE_HOOK\1\]\s*==\s*(["'])true\2
+    /x
 
     def self.hook_contains_generate_packs?(hook_value)
       # The hook value can be either:
@@ -208,7 +213,7 @@ module ReactOnRails
       return false if hook_value.blank?
 
       # Check if it's a direct command first
-      return true if hook_value.to_s.match?(/\breact_on_rails:generate_packs\b/)
+      return true if hook_value.to_s.match?(GENERATE_PACKS_PATTERN)
 
       # Check if it's a script file path
       script_path = resolve_hook_script_path(hook_value)
@@ -216,18 +221,44 @@ module ReactOnRails
 
       # Read and check script contents
       script_contents = File.read(script_path)
-      script_contents.match?(/\breact_on_rails:generate_packs\b/)
+      script_contents.match?(GENERATE_PACKS_PATTERN)
     rescue StandardError
       # If we can't read the script, assume it doesn't contain generate_packs
       false
     end
 
     def self.resolve_hook_script_path(hook_value)
-      # Hook value might be a script path relative to Rails root
-      return nil unless defined?(Rails) && Rails.respond_to?(:root)
+      return nil if hook_value.blank?
 
-      potential_path = Rails.root.join(hook_value.to_s.strip)
+      potential_path = project_root.join(hook_value.to_s.strip)
       potential_path if potential_path.file?
+    end
+
+    def self.project_root
+      return Rails.root if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+
+      bundle_gemfile = ENV.fetch("BUNDLE_GEMFILE", nil)
+      if bundle_gemfile && !bundle_gemfile.strip.empty?
+        gemfile_path = Pathname.new(bundle_gemfile).expand_path
+        return gemfile_path.dirname if gemfile_path.file?
+      end
+
+      Pathname.new(Dir.pwd)
+    end
+
+    # Check if a hook script file contains the self-guard pattern that prevents
+    # duplicate execution when SHAKAPACKER_SKIP_PRECOMPILE_HOOK is set.
+    # Returns false for direct command hooks (non-script values).
+    def self.hook_script_has_self_guard?(hook_value)
+      return false if hook_value.blank?
+
+      script_path = resolve_hook_script_path(hook_value)
+      return false unless script_path
+
+      script_contents = File.read(script_path)
+      script_contents.match?(SELF_GUARD_PATTERN)
+    rescue StandardError
+      false
     end
 
     # Returns the configured precompile hook value for logging/debugging

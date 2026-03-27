@@ -3,16 +3,17 @@
 # rubocop:disable Metrics/BlockLength
 namespace :react_on_rails do
   desc <<~DESC
-    If there is a file inside any directory matching config.components_subdirectory, this command generates corresponding packs.
+    If there is a file inside any directory matching config.components_subdirectory or
+    config.stores_subdirectory, this command generates corresponding packs.
 
     This task will:
     - Clean out existing generated directories (javascript/generated and javascript/packs/generated)
     - List all files being deleted for transparency
-    - Generate new pack files for discovered React components
+    - Generate new pack files for discovered React components and Redux stores
     - Skip generation if files are already up to date
 
     Generated directories:
-    - app/javascript/packs/generated/ (client pack files)
+    - app/javascript/packs/generated/ (client pack files for components and stores)
     - app/javascript/generated/ (server bundle files)
   DESC
 
@@ -23,6 +24,9 @@ namespace :react_on_rails do
       puts Rainbow("🚀 Starting React on Rails pack generation...").bold
       puts Rainbow("📁 Auto-load bundle: #{ReactOnRails.configuration.auto_load_bundle}").cyan
       puts Rainbow("📂 Components subdirectory: #{ReactOnRails.configuration.components_subdirectory}").cyan
+      if ReactOnRails.configuration.stores_subdirectory.present?
+        puts Rainbow("📂 Stores subdirectory: #{ReactOnRails.configuration.stores_subdirectory}").cyan
+      end
       puts ""
     end
 
@@ -88,8 +92,8 @@ namespace :react_on_rails do
       puts Rainbow("   • Delete the common component file (e.g., Component.jsx)").white
       puts Rainbow("   • Keep only the client/server specific files " \
                    "(Component.client.jsx, Component.server.jsx)").white
-      puts Rainbow("   • See: https://www.shakacode.com/react-on-rails/docs/guides/" \
-                   "auto-bundling-file-system-based-automated-bundle-generation.md").cyan
+      puts Rainbow("   • See: https://reactonrails.com/docs/core-concepts/" \
+                   "auto-bundling-file-system-based-automated-bundle-generation/").cyan
 
     when /Cannot find component/
       puts Rainbow("   • Check that your component file exists in the expected location").white
@@ -123,9 +127,9 @@ namespace :react_on_rails do
   def show_documentation_links
     puts ""
     puts Rainbow("📚 DOCUMENTATION:").magenta.bold
-    puts Rainbow("   • File-system based components: https://www.shakacode.com/react-on-rails/docs/" \
+    puts Rainbow("   • File-system based components: https://reactonrails.com/docs/" \
                  "guides/auto-bundling-file-system-based-automated-bundle-generation.md").cyan
-    puts Rainbow("   • Component registration: https://www.shakacode.com/react-on-rails/docs/").cyan
+    puts Rainbow("   • Component registration: https://reactonrails.com/docs/").cyan
     puts Rainbow("=" * 80).red
   end
 

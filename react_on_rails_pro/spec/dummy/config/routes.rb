@@ -22,6 +22,8 @@ Rails.application.routes.draw do
   get "console_logs_in_async_server" => "pages#console_logs_in_async_server", as: :console_logs_in_async_server
   get "redis_receiver" => "pages#redis_receiver", as: :redis_receiver
   get "redis_receiver_for_testing" => "pages#redis_receiver_for_testing", as: :redis_receiver_for_testing
+  get "stream_error_demo" => "pages#stream_error_demo", as: :stream_error_demo
+  get "stream_shell_error_demo" => "pages#stream_shell_error_demo", as: :stream_shell_error_demo
   get "stream_async_components" => "pages#stream_async_components", as: :stream_async_components
   get "stream_async_components_for_testing" => "pages#stream_async_components_for_testing",
       as: :stream_async_components_for_testing
@@ -32,6 +34,7 @@ Rails.application.routes.draw do
       as: :stream_async_components_for_testing_client_render
   get "rsc_posts_page_over_http" => "pages#rsc_posts_page_over_http", as: :rsc_posts_page_over_http
   get "rsc_posts_page_over_redis" => "pages#rsc_posts_page_over_redis", as: :rsc_posts_page_over_redis
+  get "rsc_echo_props" => "pages#rsc_echo_props", as: :rsc_echo_props
   get "async_on_server_sync_on_client" => "pages#async_on_server_sync_on_client", as: :async_on_server_sync_on_client
   get "async_on_server_sync_on_client_client_render" => "pages#async_on_server_sync_on_client_client_render",
       as: :async_on_server_sync_on_client_client_render
@@ -39,7 +42,12 @@ Rails.application.routes.draw do
   get "server_router_client_render/(*all)" => "pages#server_router_client_render", as: :server_router_client_render
   get "async_render_function_returns_string" => "pages#async_render_function_returns_string"
   get "async_render_function_returns_component" => "pages#async_render_function_returns_component"
+  get "tanstack_router_async(/*all)" => "tanstack_router#index", as: :tanstack_router_async
   get "async_components_demo" => "pages#async_components_demo", as: :async_components_demo
+  get "native_metadata" => "pages#native_metadata", as: :native_metadata
+  get "stream_native_metadata" => "pages#stream_native_metadata", as: :stream_native_metadata
+  get "hybrid_metadata_streaming" => "pages#hybrid_metadata_streaming", as: :hybrid_metadata_streaming
+  get "rsc_native_metadata" => "pages#rsc_native_metadata", as: :rsc_native_metadata
   rsc_payload_route controller: "pages"
 
   # routes copied over from react on rails

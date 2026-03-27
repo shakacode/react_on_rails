@@ -18,7 +18,7 @@ namespace :rbs do
     # spawned shell commands via Open3.capture3() do NOT inherit bundle context
     # Wrap in Timeout to prevent hung processes in CI environments (60 second timeout)
     stdout, stderr, status = Timeout.timeout(60) do
-      Open3.capture3("bundle exec rbs -I sig validate")
+      Open3.capture3("bundle exec rbs -I sig -r pathname validate")
     end
 
     if status.success?

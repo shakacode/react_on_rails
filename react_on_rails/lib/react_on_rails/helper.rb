@@ -74,7 +74,7 @@ module ReactOnRails
       when Hash
         msg = <<~MSG
           Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
-          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
           for an example of the necessary javascript configuration.
         MSG
         raise ReactOnRails::Error, msg
@@ -88,7 +88,7 @@ module ReactOnRails
 
           If you're trying to use a Render-Function to return a Hash to your ruby view code, then use
           react_component_hash instead of react_component and see
-          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
           for an example of the JavaScript code.
         MSG
         raise ReactOnRails::Error, msg
@@ -135,7 +135,7 @@ module ReactOnRails
       else
         msg = <<~MSG
           Render-Function used by react_component_hash for #{component_name} is expected to return
-          an Object. See https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          an Object. See https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
           for an example of the JavaScript code.
           Note, your Render-Function must either take 2 params or have the property
           `.renderFunction = true` added to it to distinguish it from a React Function Component.
@@ -151,14 +151,25 @@ module ReactOnRails
     # Instead, you should use the standard react_component view helper.
     #
     # store_name: name of the store, corresponding to your call to ReactOnRails.registerStores in your
-    #             JavaScript code.
+    #             JavaScript code. When using auto-bundling, this should match the filename of your
+    #             store file (e.g., "commentsStore" for commentsStore.js).
     # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
     # Options
     #    defer: false -- pass as true if you wish to render this below your component.
     #    immediate_hydration: nil -- React on Rails Pro (licensed) feature. When nil (default), Pro users
     #                        get immediate hydration, non-Pro users don't. Can be explicitly overridden.
-    def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil)
+    #    auto_load_bundle: nil -- If true, automatically loads the generated pack for this store.
+    #                      Defaults to ReactOnRails.configuration.auto_load_bundle if not specified.
+    #                      Requires config.stores_subdirectory to be set (e.g., "ror_stores").
+    #                      Store files should be placed in directories matching this name, e.g.:
+    #                        app/javascript/bundles/ror_stores/commentsStore.js
+    #                      The store file must export default a store generator function.
+    def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil, auto_load_bundle: nil)
       immediate_hydration = ReactOnRails::Utils.normalize_immediate_hydration(immediate_hydration, store_name, "Store")
+
+      # Auto-load store pack if configured
+      should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle
+      load_pack_for_generated_store(store_name, explicit_auto_load: auto_load_bundle == true) if should_auto_load
 
       redux_store_data = { store_name: store_name,
                            props: props,
@@ -199,43 +210,56 @@ module ReactOnRails
       render_options = ReactOnRails::ReactComponent::RenderOptions
                        .new(react_component_name: "generic-js", options: options)
 
-      js_code = <<-JS.strip_heredoc
-      (function() {
-        var htmlResult = '';
-        var consoleReplayScript = '';
-        var hasErrors = false;
-        var renderingError = null;
-        var renderingErrorObject = {};
+      js_code = <<~JS
+        (function() {
+          var htmlResult = '';
+          var consoleReplayScript = '';
+          var hasErrors = false;
+          var renderingError = null;
+          var renderingErrorObject = {};
 
-        try {
-          htmlResult =
-            (function() {
-              return #{js_expression};
-            })();
-        } catch(e) {
-          renderingError = e;
-          if (#{render_options.throw_js_errors}) {
-            throw e;
+          try {
+            htmlResult =
+              (function() {
+                return #{js_expression};
+              })();
+          } catch(e) {
+            renderingError = e;
+            if (#{render_options.throw_js_errors}) {
+              throw e;
+            }
+            htmlResult = ReactOnRails.handleError({e: e, name: null,
+              jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
+            hasErrors = true;
+            var errorMessage = String(renderingError);
+            var errorStack = null;
+            // Guard against non-Error throws (e.g., throw null / throw "string").
+            // Boxed primitives (for example new Boolean(false)) are objects too.
+            if (renderingError && typeof renderingError === 'object') {
+              if ('message' in renderingError) {
+                errorMessage = String(renderingError.message);
+              }
+              // Use != (not !==) to guard both null and undefined stack values.
+              if ('stack' in renderingError && renderingError.stack != null) {
+                errorStack = String(renderingError.stack);
+              }
+            }
+            renderingErrorObject = {
+              message: errorMessage,
+              stack: errorStack,
+            };
           }
-          htmlResult = ReactOnRails.handleError({e: e, name: null,
-            jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
-          hasErrors = true;
-          renderingErrorObject = {
-            message: renderingError.message,
-            stack: renderingError.stack,
-          }
-        }
 
-        consoleReplayScript = ReactOnRails.getConsoleReplayScript();
+          consoleReplayScript = ReactOnRails.getConsoleReplayScript();
 
-        return JSON.stringify({
-            html: htmlResult,
-            consoleReplayScript: consoleReplayScript,
-            hasErrors: hasErrors,
-            renderingError: renderingErrorObject
-        });
+          return JSON.stringify({
+              html: htmlResult,
+              consoleReplayScript: consoleReplayScript,
+              hasErrors: hasErrors,
+              renderingError: renderingErrorObject
+          });
 
-      })()
+        })()
       JS
 
       result = ReactOnRails::ServerRenderingPool
@@ -281,6 +305,7 @@ module ReactOnRails
           i18nDefaultLocale: I18n.default_locale,
           rorVersion: ReactOnRails::VERSION,
           # TODO: v13 just use the version if existing
+          # Pro gem availability signal (not license-valid state).
           rorPro: ReactOnRails::Utils.react_on_rails_pro?
         }
 
@@ -292,6 +317,8 @@ module ReactOnRails
             result[:rscPayloadGenerationUrlPath] = rsc_payload_url
           end
         end
+
+        add_csp_nonce_to_context(result)
 
         if defined?(request) && request.present?
           # Check for encoding of the request's original_url and try to force-encoding the
@@ -330,6 +357,11 @@ module ReactOnRails
       @rails_context.merge(serverSide: server_side)
     end
 
+    def add_csp_nonce_to_context(result)
+      nonce = csp_nonce
+      result[:cspNonce] = nonce if nonce.present?
+    end
+
     def load_pack_for_generated_component(react_component_name, render_options)
       return unless render_options.auto_load_bundle
 
@@ -346,6 +378,34 @@ module ReactOnRails
       options[:async] = true if ReactOnRails.configuration.generated_component_packs_loading_strategy == :async
       append_javascript_pack_tag("generated/#{react_component_name}", **options)
       append_stylesheet_pack_tag("generated/#{react_component_name}")
+    end
+
+    def load_pack_for_generated_store(store_name, explicit_auto_load: false)
+      unless ReactOnRails.configuration.stores_subdirectory.present?
+        if explicit_auto_load
+          raise ReactOnRails::SmartError.new(
+            error_type: :configuration_error,
+            details: "auto_load_bundle is enabled for store " \
+                     "'#{store_name}', but " \
+                     "stores_subdirectory is not configured. " \
+                     "Set config.stores_subdirectory (e.g., " \
+                     "'ror_stores') in your ReactOnRails " \
+                     "configuration so that store packs can " \
+                     "be generated and loaded."
+          )
+        end
+        return
+      end
+
+      ReactOnRails::PackerUtils.raise_nested_entries_disabled unless ReactOnRails::PackerUtils.nested_entries?
+      if Rails.env.development?
+        is_store_pack_present = File.exist?(generated_stores_pack_path(store_name))
+        raise_missing_autoloaded_store_bundle(store_name) unless is_store_pack_present
+      end
+
+      options = { defer: ReactOnRails.configuration.generated_component_packs_loading_strategy == :defer }
+      options[:async] = true if ReactOnRails.configuration.generated_component_packs_loading_strategy == :async
+      append_javascript_pack_tag("generated/#{store_name}", **options)
     end
 
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
@@ -374,6 +434,10 @@ module ReactOnRails
 
     def generated_components_pack_path(component_name)
       "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{component_name}.js"
+    end
+
+    def generated_stores_pack_path(store_name)
+      "#{ReactOnRails::PackerUtils.packer_source_entry_path}/generated/#{store_name}.js"
     end
 
     def build_react_component_result_for_server_rendered_string(
@@ -437,23 +501,27 @@ module ReactOnRails
       )
     end
 
+    # Returns the CSP script nonce for the current request, or nil if CSP is not enabled.
+    # Rails 5.2-6.0 use content_security_policy_nonce with no arguments.
+    # Rails 6.1+ accept an optional directive argument.
+    def csp_nonce
+      return unless respond_to?(:content_security_policy_nonce)
+
+      begin
+        content_security_policy_nonce(:script)
+      rescue ArgumentError
+        # Fallback for Rails versions that don't accept arguments
+        content_security_policy_nonce
+      end
+    end
+
     # Wraps console replay JavaScript code in a script tag with CSP nonce if available.
     # The console_script_code is already sanitized by scriptSanitizedVal() in the JavaScript layer,
     # so using html_safe here is secure.
     def wrap_console_script_with_nonce(console_script_code)
       return "" if console_script_code.blank?
 
-      # Get the CSP nonce if available (Rails 5.2+)
-      # Rails 5.2-6.0 use content_security_policy_nonce with no arguments
-      # Rails 6.1+ accept an optional directive argument
-      nonce = if respond_to?(:content_security_policy_nonce)
-                begin
-                  content_security_policy_nonce(:script)
-                rescue ArgumentError
-                  # Fallback for Rails versions that don't accept arguments
-                  content_security_policy_nonce
-                end
-              end
+      nonce = csp_nonce
 
       # Build the script tag with nonce if available
       script_options = { id: "consoleReplayLog" }
@@ -515,19 +583,85 @@ module ReactOnRails
 
       render_options = create_render_options(react_component_name, options)
 
-      # Setup the page_loaded_js, which is the same regardless of prerendering or not!
-      # The reason is that React is smart about not doing extra work if the server rendering did its job.
-      component_specification_tag = generate_component_script(render_options)
-
       load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
+
+      # clientProps are only expected on successful SSR hashes. Current error hashes do not
+      # include that key, so non-SSR/error paths skip this merge entirely.
+      merge_server_rendered_client_props!(render_options, result) if result.is_a?(Hash)
+
+      # Setup the page_loaded_js, which is the same regardless of prerendering or not!
+      # The reason is that React is smart about not doing extra work if the server rendering did its job.
+      component_specification_tag = generate_component_script(render_options)
 
       {
         render_options: render_options,
         tag: component_specification_tag,
         result: result
       }
+    end
+
+    def merge_server_rendered_client_props!(render_options, result)
+      client_props = result["clientProps"]
+      return if client_props.nil?
+
+      unless client_props.is_a?(Hash)
+        raise ReactOnRails::Error, "Expected result[\"clientProps\"] to be a Hash, got #{client_props.class.name}."
+      end
+
+      return if client_props.empty?
+
+      raw_existing_props = render_options.props
+      existing_props = if raw_existing_props.nil?
+                         {}
+                       elsif raw_existing_props.is_a?(String)
+                         begin
+                           JSON.parse(raw_existing_props)
+                         rescue JSON::ParserError
+                           raise ReactOnRails::Error,
+                                 "Cannot merge result[\"clientProps\"] into props: failed to parse props JSON " \
+                                 "string. Ensure props is a Ruby Hash or a JSON string representing an object."
+                         end
+                       else
+                         raw_existing_props
+                       end
+
+      unless existing_props.is_a?(Hash)
+        class_name = existing_props.class.name
+        raise ReactOnRails::Error,
+              "Cannot merge result[\"clientProps\"] into non-Hash props. " \
+              "Pass props as a Hash, not #{class_name}."
+      end
+
+      render_options.set_option(:props, merge_client_props(existing_props, client_props))
+    end
+
+    def merge_client_props(existing_props, client_props)
+      merged_props = existing_props.dup
+      client_props.each do |key, value|
+        raise_if_duplicate_client_prop_key_types!(merged_props, key)
+        merged_props[client_prop_target_key(merged_props, key)] = value
+      end
+      merged_props
+    end
+
+    def raise_if_duplicate_client_prop_key_types!(props, key)
+      string_key = key.to_s
+      symbol_key = string_key.to_sym
+      return unless props.key?(string_key) && props.key?(symbol_key)
+
+      raise ReactOnRails::Error,
+            "Cannot merge result[\"clientProps\"] when props contains both string and symbol versions of " \
+            "#{string_key.inspect}. Normalize props keys before calling react_component."
+    end
+
+    def client_prop_target_key(props, key)
+      string_key = key.to_s
+      symbol_key = string_key.to_sym
+      # Preserve an existing symbol key when clientProps arrives from JSON with string keys,
+      # otherwise we would create duplicate entries that serialize to the same JSON key.
+      props.key?(symbol_key) && !props.key?(string_key) ? symbol_key : string_key
     end
 
     def render_redux_store_data(redux_store_data)
@@ -646,11 +780,11 @@ module ReactOnRails
       result << store_objects.each_with_object(declarations) do |redux_store_data, memo|
         store_name = redux_store_data[:store_name]
         props = props_string(redux_store_data[:props])
-        memo << <<-JS.strip_heredoc
-        reduxProps = #{props};
-        storeGenerator = ReactOnRails.getStoreGenerator('#{store_name}');
-        store = storeGenerator(reduxProps, railsContext);
-        ReactOnRails.setStore('#{store_name}', store);
+        memo << <<~JS
+          reduxProps = #{props};
+          storeGenerator = ReactOnRails.getStoreGenerator(#{store_name.to_json});
+          store = storeGenerator(reduxProps, railsContext);
+          ReactOnRails.setStore(#{store_name.to_json}, store);
         JS
       end
       result
@@ -667,18 +801,19 @@ module ReactOnRails
       controller.is_a?(ActionMailer::Base)
     end
 
-    if defined?(ScoutApm)
-      include ScoutApm::Tracer
-
-      instrument_method :react_component, type: "ReactOnRails", name: "react_component"
-      instrument_method :react_component_hash, type: "ReactOnRails", name: "react_component_hash"
-    end
-
     def raise_missing_autoloaded_bundle(react_component_name)
       raise ReactOnRails::SmartError.new(
         error_type: :missing_auto_loaded_bundle,
         component_name: react_component_name,
         expected_path: generated_components_pack_path(react_component_name)
+      )
+    end
+
+    def raise_missing_autoloaded_store_bundle(store_name)
+      raise ReactOnRails::SmartError.new(
+        error_type: :missing_auto_loaded_store_bundle,
+        component_name: store_name,
+        expected_path: generated_stores_pack_path(store_name)
       )
     end
   end

@@ -27,9 +27,6 @@ module ReactOnRails
       MINIMUM_SUPPORTED_REACT_MAJOR_VERSION = "16"
       LATEST_REACT_MAJOR_VERSION = "19"
 
-      # Minimum Shakapacker version for compatibility testing
-      MINIMUM_SHAKAPACKER_VERSION = "8.2.0"
-
       attr_reader :packer_type, :name, :generator_options, :react_version
 
       # Returns true if this example uses a pinned (non-latest) React version

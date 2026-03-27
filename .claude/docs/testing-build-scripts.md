@@ -97,7 +97,7 @@ ls -la packages/react-on-rails-pro-node-renderer/lib/ReactOnRailsProNodeRenderer
 bundle exec rubocop
 
 # JS/TS formatting
-pnpm run format.listDifferent
+pnpm start format.listDifferent
 ```
 
 ## When Directory Structure Changes

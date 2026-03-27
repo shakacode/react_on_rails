@@ -1,262 +1,290 @@
 import * as jwt from 'jsonwebtoken';
-import * as fs from 'fs';
-import * as path from 'path';
 import { PUBLIC_KEY } from './licensePublicKey.js';
+
+/**
+ * Valid license plan types.
+ * Must match VALID_PLANS in react_on_rails_pro/lib/react_on_rails_pro/license_validator.rb
+ */
+const VALID_PLANS = ['paid', 'startup', 'nonprofit', 'education', 'oss', 'partner'] as const;
+export type ValidPlan = (typeof VALID_PLANS)[number];
 
 interface LicenseData {
   // Subject (email for whom the license is issued)
   sub?: string;
   // Issued at timestamp
   iat?: number;
-  // Required: expiration timestamp
-  exp: number;
-  // Optional: license plan (e.g., "free", "paid")
+  // Expiration timestamp (should be present but may be missing in malformed tokens)
+  exp?: number;
+  // Optional: license plan. See VALID_PLANS for accepted values.
   plan?: string;
+  // Organization name (required for all licenses)
+  org?: string;
   // Issuer (who issued the license)
   iss?: string;
   // Allow additional fields
   [key: string]: unknown;
 }
 
-// Grace period: 1 month (in seconds)
-const GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60;
+/**
+ * License status values:
+ * - valid: License is present and not expired
+ * - expired: License is present but past expiration date
+ * - invalid: License is present but corrupted/invalid signature
+ * - missing: No license found
+ */
+export type LicenseStatus = 'valid' | 'expired' | 'invalid' | 'missing';
 
-// Module-level state for caching
-let cachedLicenseData: LicenseData | undefined;
-let cachedGraceDaysRemaining: number | undefined;
+// Module-level state for caching license validation results.
+//
+// Thread Safety Notes (Node.js):
+// Unlike Ruby's Mutex-based approach for concurrent access, JavaScript is single-threaded
+// for user code execution. However, when using Node.js clusters or worker threads:
+//
+// - **Cluster mode**: Each worker process has its own memory space. The cached values
+//   are computed independently per worker, which is safe and correct. No shared state
+//   issues arise because workers don't share memory for JavaScript objects.
+//
+// - **Worker threads**: Each worker thread has its own module instance and memory.
+//   Like cluster mode, there's no shared state between threads for these cached values.
+//
+// - **React on Rails Pro Node Renderer**: The node renderer spawns worker processes
+//   (not threads), so each worker maintains its own cached license state. This is
+//   intentional - license validation happens once per worker on first access, and
+//   the result is cached for the lifetime of that worker process.
+//
+// The caching here is deterministic - given the same environment variable value, every
+// worker will compute the same cached values. Redundant computation across workers
+// is acceptable since license validation is infrequent (once per worker startup).
+let cachedLicenseStatus: LicenseStatus | undefined;
+const UNINITIALIZED = Symbol('uninitialized');
+let cachedLicenseOrganization: string | undefined | typeof UNINITIALIZED = UNINITIALIZED;
+let cachedLicensePlan: ValidPlan | undefined | typeof UNINITIALIZED = UNINITIALIZED;
 
 /**
- * Handles invalid license by logging error and exiting.
+ * Loads the license string from environment variable.
+ * @returns License string or undefined if not found
  * @private
  */
-function handleInvalidLicense(message: string): never {
-  const fullMessage = `[React on Rails Pro] ${message}`;
-  console.error(fullMessage);
-  // Validation errors should prevent the application from starting
-  process.exit(1);
+function loadLicenseString(): string | undefined {
+  const envLicense = process.env.REACT_ON_RAILS_PRO_LICENSE?.trim();
+  // `|| undefined` converts an empty/whitespace-only env var to undefined,
+  // so it is reported as 'missing' rather than 'invalid'.
+  return envLicense || undefined;
 }
 
 /**
- * Checks if running in production environment.
+ * Decodes and verifies the JWT license.
+ * @returns Decoded license data or undefined if invalid
  * @private
  */
-function isProduction(): boolean {
-  return process.env.NODE_ENV === 'production';
-}
-
-/**
- * Checks if current time is within grace period after expiration.
- * @private
- */
-function isWithinGracePeriod(expTime: number): boolean {
-  return Math.floor(Date.now() / 1000) <= expTime + GRACE_PERIOD_SECONDS;
-}
-
-/**
- * Calculates remaining grace period days.
- * @private
- */
-function calculateGraceDaysRemaining(expTime: number): number {
-  const graceEnd = expTime + GRACE_PERIOD_SECONDS;
-  const secondsRemaining = graceEnd - Math.floor(Date.now() / 1000);
-  return secondsRemaining <= 0 ? 0 : Math.floor(secondsRemaining / (24 * 60 * 60));
-}
-
-/**
- * Logs license information for analytics.
- * @private
- */
-function logLicenseInfo(license: LicenseData): void {
-  const { plan, iss } = license;
-
-  if (plan) {
-    console.log(`[React on Rails Pro] License plan: ${plan}`);
-  }
-  if (iss) {
-    console.log(`[React on Rails Pro] Issued by: ${iss}`);
-  }
-}
-
-/**
- * Loads the license string from environment variable or config file.
- * @private
- */
-// eslint-disable-next-line consistent-return
-function loadLicenseString(): string {
-  // First try environment variable
-  const envLicense = process.env.REACT_ON_RAILS_PRO_LICENSE;
-  if (envLicense) {
-    return envLicense;
-  }
-
-  // Then try config file (relative to project root)
+function decodeLicense(licenseString: string): LicenseData | undefined {
   try {
-    const configPath = path.join(process.cwd(), 'config', 'react_on_rails_pro_license.key');
-    if (fs.existsSync(configPath)) {
-      return fs.readFileSync(configPath, 'utf8').trim();
-    }
-  } catch (error) {
-    console.error(`[React on Rails Pro] Error reading license file: ${(error as Error).message}`);
+    const decoded = jwt.verify(licenseString, PUBLIC_KEY, {
+      // Enforce RS256 algorithm only to prevent "alg=none" and downgrade attacks.
+      algorithms: ['RS256'],
+      // Disable automatic expiration verification so we can handle it manually
+      ignoreExpiration: true,
+    }) as LicenseData;
+
+    return decoded;
+  } catch {
+    // Invalid JWT - return undefined to indicate invalid license
+    return undefined;
   }
-
-  const errorMsg =
-    'No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable ' +
-    'or create config/react_on_rails_pro_license.key file. ' +
-    'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
-
-  handleInvalidLicense(errorMsg);
 }
 
 /**
- * Loads and decodes the license from environment or file.
+ * Checks if the license plan is valid for production use.
+ * Licenses without a plan field are considered valid (backwards compatibility with old paid licenses).
+ * Valid plans: paid, startup, nonprofit, education, oss, partner
+ * @returns 'valid' or 'invalid'
  * @private
  */
-function loadAndDecodeLicense(): LicenseData {
-  const licenseString = loadLicenseString();
+function checkPlan(decodedData: LicenseData): LicenseStatus {
+  const { plan } = decodedData;
+  if (plan == null) {
+    return 'valid'; // No plan field = valid (backwards compat with old paid licenses)
+  }
+  if (VALID_PLANS.includes(plan as ValidPlan)) {
+    return 'valid';
+  }
 
-  const decoded = jwt.verify(licenseString, PUBLIC_KEY, {
-    // Enforce RS256 algorithm only to prevent "alg=none" and downgrade attacks.
-    // Adding other algorithms to the whitelist (e.g., ['RS256', 'HS256']) can introduce vulnerabilities:
-    // If the public key is mistakenly used as a secret for HMAC algorithms (like HS256), attackers could forge tokens.
-    // Always carefully review algorithm changes to avoid signature bypass risks.
-    algorithms: ['RS256'],
-    // Disable automatic expiration verification so we can handle it manually with custom logic
-    ignoreExpiration: true,
-  }) as LicenseData;
-
-  return decoded;
+  return 'invalid';
 }
 
 /**
- * Validates the license data and throws if invalid.
- * Logs info/errors and handles grace period logic.
- *
- * @param license - The decoded license data
- * @returns Grace days remaining if in grace period, undefined otherwise
- * @throws Never returns - exits process if license is invalid
+ * Checks if the license has a valid organization name.
+ * Organization name is required for all licenses.
+ * @returns 'valid' or 'invalid'
  * @private
  */
-function validateLicenseData(license: LicenseData): number | undefined {
-  // Check that exp field exists
-  if (!license.exp) {
-    const error =
-      'License is missing required expiration field. ' +
-      'Your license may be from an older version. ' +
-      'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
-    handleInvalidLicense(error);
+function checkOrganization(decodedData: LicenseData): LicenseStatus {
+  const { org } = decodedData;
+  if (typeof org !== 'string' || org.trim() === '') {
+    return 'invalid';
   }
 
-  // Check expiry with grace period for production
+  return 'valid';
+}
+
+/**
+ * Checks if the license is expired.
+ * @returns 'valid', 'expired', or 'invalid' (if exp field missing or non-numeric)
+ * @private
+ */
+function checkExpiration(license: LicenseData): LicenseStatus {
+  if (license.exp == null) {
+    return 'invalid';
+  }
+
+  // Safely convert exp to number, handling non-numeric values
+  const expTime = typeof license.exp === 'number' ? license.exp : Number(license.exp);
+  if (Number.isNaN(expTime)) {
+    return 'invalid';
+  }
+
   const currentTime = Math.floor(Date.now() / 1000);
-  const expTime = license.exp;
-  let graceDays: number | undefined;
-
-  if (currentTime > expTime) {
-    const daysExpired = Math.floor((currentTime - expTime) / (24 * 60 * 60));
-
-    const error =
-      `License has expired ${daysExpired} day(s) ago. ` +
-      'Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro ' +
-      'or upgrade to a paid license for production use.';
-
-    // In production, allow a grace period of 1 month with error logging
-    if (isProduction() && isWithinGracePeriod(expTime)) {
-      // Calculate grace days once here
-      graceDays = calculateGraceDaysRemaining(expTime);
-      console.error(
-        `[React on Rails Pro] WARNING: ${error} ` +
-          `Grace period: ${graceDays} day(s) remaining. ` +
-          'Application will fail to start after grace period expires.',
-      );
-    } else {
-      handleInvalidLicense(error);
-    }
+  if (currentTime >= expTime) {
+    return 'expired';
   }
 
-  // Log license type if present (for analytics)
-  logLicenseInfo(license);
-
-  // Return grace days (undefined if not in grace period)
-  return graceDays;
+  return 'valid';
 }
 
 /**
- * Validates the license and returns the license data.
- * Caches the result after first validation.
- *
- * @returns The validated license data
- * @throws Exits process if license is invalid
+ * Determines the license status by loading, decoding, and validating.
+ * @returns The license status
+ * @private
  */
-// eslint-disable-next-line consistent-return
-export function getValidatedLicenseData(): LicenseData {
-  if (cachedLicenseData !== undefined) {
-    return cachedLicenseData;
+function determineLicenseStatus(): LicenseStatus {
+  // Step 1: Load license string
+  const licenseString = loadLicenseString();
+  if (!licenseString) {
+    return 'missing';
   }
 
-  try {
-    // Load and decode license (but don't cache yet)
-    const licenseData = loadAndDecodeLicense();
-
-    // Validate the license (raises if invalid, returns grace_days)
-    const graceDays = validateLicenseData(licenseData);
-
-    // Validation passed - now cache both data and grace days
-    cachedLicenseData = licenseData;
-    cachedGraceDaysRemaining = graceDays;
-
-    return cachedLicenseData;
-  } catch (error: unknown) {
-    if (error instanceof Error && error.name === 'JsonWebTokenError') {
-      const errorMsg =
-        `Invalid license signature: ${error.message}. ` +
-        'Your license file may be corrupted. ' +
-        'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
-      handleInvalidLicense(errorMsg);
-    } else if (error instanceof Error) {
-      const errorMsg =
-        `License validation error: ${error.message}. ` +
-        'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
-      handleInvalidLicense(errorMsg);
-    } else {
-      const errorMsg =
-        'License validation error: Unknown error. ' +
-        'Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro';
-      handleInvalidLicense(errorMsg);
-    }
+  // Step 2: Decode and verify JWT
+  const decodedData = decodeLicense(licenseString);
+  if (!decodedData) {
+    return 'invalid';
   }
+
+  // Step 3: Check plan validity
+  const planStatus = checkPlan(decodedData);
+  if (planStatus !== 'valid') {
+    return planStatus;
+  }
+
+  // Step 4: Check organization is present
+  const orgStatus = checkOrganization(decodedData);
+  if (orgStatus !== 'valid') {
+    return orgStatus;
+  }
+
+  // Step 5: Check expiration
+  return checkExpiration(decodedData);
 }
 
 /**
- * Checks if the current license is an evaluation/free license.
+ * Returns the current license status (never throws or exits).
  *
- * @returns true if plan is not "paid"
- * @public TODO: Remove this line when this function is actually used
+ * Note: While Node.js is single-threaded for JavaScript execution, multiple
+ * concurrent calls during event loop processing could see undefined and start
+ * redundant determinations. This is acceptable as the result is deterministic
+ * and will be the same. Unlike Ruby's Mutex-based approach, we don't need
+ * synchronization here because the worst case is redundant (but correct) work.
+ *
+ * @returns One of 'valid', 'expired', 'invalid', 'missing'
  */
-export function isEvaluation(): boolean {
-  const data = getValidatedLicenseData();
-  const plan = data.plan ?? '';
-  return plan !== 'paid' && !plan.startsWith('paid_');
+export function getLicenseStatus(): LicenseStatus {
+  if (cachedLicenseStatus !== undefined) {
+    return cachedLicenseStatus;
+  }
+
+  cachedLicenseStatus = determineLicenseStatus();
+  return cachedLicenseStatus;
 }
 
 /**
- * Returns remaining grace period days if license is expired but in grace period.
- *
- * @returns Number of days remaining, or undefined if not in grace period
- * @public TODO: Remove this line when this function is actually used
+ * Determines the organization name from the decoded JWT.
+ * @returns The organization name or undefined if not available
+ * @private
  */
-export function getGraceDaysRemaining(): number | undefined {
-  // Ensure license is validated and cached
-  getValidatedLicenseData();
+function determineLicenseOrganization(): string | undefined {
+  const licenseString = loadLicenseString();
+  if (!licenseString) {
+    return undefined;
+  }
 
-  // Return cached grace days (undefined if not in grace period)
-  return cachedGraceDaysRemaining;
+  const decodedData = decodeLicense(licenseString);
+  if (!decodedData) {
+    return undefined;
+  }
+
+  const { org } = decodedData;
+  if (typeof org !== 'string' || org.trim() === '') {
+    return undefined;
+  }
+
+  return org.trim();
+}
+
+/**
+ * Returns the organization name from the license if available.
+ * @returns The organization name or undefined if not available
+ */
+export function getLicenseOrganization(): string | undefined {
+  if (cachedLicenseOrganization !== UNINITIALIZED) {
+    return cachedLicenseOrganization;
+  }
+
+  cachedLicenseOrganization = determineLicenseOrganization();
+  return cachedLicenseOrganization;
+}
+
+/**
+ * Determines the license plan type from the decoded JWT.
+ * Returns undefined for invalid/unknown plans - validation is handled by checkPlan in getLicenseStatus.
+ * @returns The plan type or undefined if not available/invalid
+ * @private
+ */
+function determineLicensePlan(): ValidPlan | undefined {
+  const licenseString = loadLicenseString();
+  if (!licenseString) {
+    return undefined;
+  }
+
+  const decodedData = decodeLicense(licenseString);
+  if (!decodedData) {
+    return undefined;
+  }
+
+  const { plan } = decodedData;
+  if (plan == null || !VALID_PLANS.includes(plan as ValidPlan)) {
+    return undefined;
+  }
+
+  return plan as ValidPlan;
+}
+
+/**
+ * Returns the license plan type if available.
+ * @returns The plan type (e.g., "paid", "startup") or undefined if not available
+ */
+export function getLicensePlan(): ValidPlan | undefined {
+  if (cachedLicensePlan !== UNINITIALIZED) {
+    return cachedLicensePlan;
+  }
+
+  cachedLicensePlan = determineLicensePlan();
+  return cachedLicensePlan;
 }
 
 /**
  * Resets all cached validation state (primarily for testing).
- * @public TODO: Remove this line when this function is actually used
  */
 export function reset(): void {
-  cachedLicenseData = undefined;
-  cachedGraceDaysRemaining = undefined;
+  cachedLicenseStatus = undefined;
+  cachedLicenseOrganization = UNINITIALIZED;
+  cachedLicensePlan = UNINITIALIZED;
 }

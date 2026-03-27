@@ -25,6 +25,8 @@ module ReactOnRails
         component_not_registered_solution
       when :missing_auto_loaded_bundle
         missing_auto_loaded_bundle_solution
+      when :missing_auto_loaded_store_bundle
+        missing_auto_loaded_store_bundle_solution
       when :hydration_mismatch
         hydration_mismatch_solution
       when :server_rendering_error
@@ -64,6 +66,8 @@ module ReactOnRails
         "Component '#{component_name}' Not Registered"
       when :missing_auto_loaded_bundle
         "Auto-loaded Bundle Missing"
+      when :missing_auto_loaded_store_bundle
+        "Auto-loaded Store Bundle Missing"
       when :hydration_mismatch
         "Hydration Mismatch"
       when :server_rendering_error
@@ -91,6 +95,11 @@ module ReactOnRails
       when :missing_auto_loaded_bundle
         <<~DESC
           Component '#{component_name}' is configured for auto-loading but its bundle is missing.
+          Expected location: #{additional_context[:expected_path]}
+        DESC
+      when :missing_auto_loaded_store_bundle
+        <<~DESC
+          Redux store '#{component_name}' is configured for auto-loading but its bundle is missing.
           Expected location: #{additional_context[:expected_path]}
         DESC
       when :hydration_mismatch
@@ -179,6 +188,23 @@ module ReactOnRails
 
         4. Verify webpack/shakapacker is configured for nested entries:
            #{Rainbow("config.nested_entries_dir = 'components'").cyan}
+      SOLUTION
+    end
+
+    def missing_auto_loaded_store_bundle_solution
+      <<~SOLUTION
+        1. Run the pack generation task:
+           #{Rainbow('bundle exec rake react_on_rails:generate_packs').cyan}
+
+        2. Ensure your store is in a directory matching stores_subdirectory under packer_source_path:
+           #{Rainbow("#{ReactOnRails::PackerUtils.packer_source_path}/**/#{ReactOnRails.configuration.stores_subdirectory || 'ror_stores'}/#{component_name}.js").cyan}
+
+        3. Check that the store file follows naming conventions:
+           - Store file: #{Rainbow("#{component_name}.js").cyan} or #{Rainbow("#{component_name}.ts").cyan}
+           - Must export default a store generator function
+
+        4. Verify stores_subdirectory is configured:
+           #{Rainbow("config.stores_subdirectory = 'ror_stores'").cyan}
       SOLUTION
     end
 

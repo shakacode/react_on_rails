@@ -25,7 +25,10 @@ export type RailsContext = {
   i18nLocale: string;
   i18nDefaultLocale: string;
   rorVersion: string;
+  // True when React on Rails Pro is installed on the server.
+  // This does not indicate whether the current license token is valid.
   rorPro: boolean;
+  // Present when rorPro is true; contains the installed React on Rails Pro version string.
   rorProVersion?: string;
   href: string;
   location: string;
@@ -36,6 +39,7 @@ export type RailsContext = {
   search: string | null;
   httpAcceptLanguage: string;
   rscPayloadGenerationUrlPath?: string;
+  cspNonce?: string;
 } & (
   | {
       serverSide: false;
@@ -70,10 +74,11 @@ export type RailsContextWithServerStreamingCapabilities = RailsContextWithServer
 const throwRailsContextMissingEntries = (missingEntries: string) => {
   throw new Error(
     `Rails context does not have server side ${missingEntries}.\n\n` +
-      'Please ensure:\n' +
-      '1. You are using a compatible version of react_on_rails_pro\n' +
-      '2. Server components support is enabled by setting:\n' +
-      '   ReactOnRailsPro.configuration.enable_rsc_support = true',
+      'This is either a configuration issue or a bug:\n' +
+      '1. Ensure you are using a compatible version of react_on_rails_pro\n' +
+      '2. Ensure server components support is enabled:\n' +
+      '   ReactOnRailsPro.configuration.enable_rsc_support = true\n\n' +
+      'If the above are correct, please report at https://github.com/shakacode/react_on_rails/issues',
   );
 };
 
@@ -119,7 +124,8 @@ type ServerRenderHashRenderedHtml = {
 };
 
 interface ServerRenderResult {
-  renderedHtml?: string | ServerRenderHashRenderedHtml;
+  renderedHtml?: string | ServerRenderHashRenderedHtml | ReactElement;
+  clientProps?: Record<string, unknown>;
   redirectLocation?: { pathname: string; search: string };
   routeError?: Error;
   error?: Error;
@@ -127,13 +133,17 @@ interface ServerRenderResult {
 
 type CreateReactOutputSyncResult = ServerRenderResult | ReactElement;
 
-type CreateReactOutputAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactElement>;
+type CreateReactOutputAsyncResult = Promise<
+  string | ServerRenderHashRenderedHtml | ReactElement | ServerRenderResult
+>;
 
 type CreateReactOutputResult = CreateReactOutputSyncResult | CreateReactOutputAsyncResult;
 
 type RenderFunctionSyncResult = ReactComponent | ServerRenderResult;
 
-type RenderFunctionAsyncResult = Promise<string | ServerRenderHashRenderedHtml | ReactComponent>;
+type RenderFunctionAsyncResult = Promise<
+  string | ServerRenderHashRenderedHtml | ReactComponent | ServerRenderResult
+>;
 
 type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
 
@@ -260,6 +270,7 @@ export type FinalHtmlResult = string | ServerRenderHashRenderedHtml;
 
 export interface RenderResult {
   html: FinalHtmlResult | null;
+  clientProps?: Record<string, unknown>;
   consoleReplayScript: string;
   hasErrors: boolean;
   renderingError?: RenderingError;
@@ -506,10 +517,11 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   };
 }
 
-export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult>;
+export type RenderStateHtml = FinalHtmlResult | Promise<FinalHtmlResult | ServerRenderResult>;
 
 export type RenderState = {
   result: null | RenderStateHtml;
+  clientProps?: Record<string, unknown>;
   hasErrors: boolean;
   error?: RenderingError;
 };

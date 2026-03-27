@@ -14,7 +14,7 @@ _See the [CHANGELOG](./CHANGELOG.md) for release updates and **upgrade** details
 ## 📋 Table of Contents
 
 - [What is React on Rails Pro?](#-what-is-react-on-rails-pro)
-- [License & Pricing](#-license--pricing)
+- [License](#-license)
 - [Why Use Pro?](#-why-use-pro)
 - [Key Features](#-key-features)
 - [Requirements](#-requirements)
@@ -34,8 +34,8 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 - **Requires**: [React on Rails](https://github.com/shakacode/react_on_rails) (open-source) as a foundation
 - **Location**: Part of the React on Rails monorepo at `react_on_rails_pro/`
-- **Free for**: Non-commercial use, development, testing, and evaluation (with registration)
-- **Commercial license**: Required for production deployments
+- **No license required** to get started — install, evaluate, and develop freely
+- **Paid license**: Required for production deployments
 
 ### How It Relates to React on Rails
 
@@ -58,40 +58,34 @@ React on Rails Pro is a **commercial extension** to the open-source [React on Ra
 
 ---
 
-## 📜 License & Pricing
+## 📜 License
 
-### License Types
+### License-Optional Model
 
-#### 🆓 Free License (Non-Commercial)
+React on Rails Pro works **without a license** for evaluation, development, testing, and CI/CD. No registration or license key is needed to get started.
 
-- **Duration**: 3 months (renewable)
-- **Usage**: Personal projects, evaluation, development, testing, CI/CD
-- **Restrictions**: **NOT for production deployments**
-- **Cost**: FREE - just register with your email
-- **Get it**: [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
+**A paid license is required only for production deployments.**
 
-**⚠️ Important**: All environments (development, test, CI) require a valid license. The free license is perfect for these use cases!
+- **Evaluation & Development**: Works out of the box — no license needed
+- **CI/CD**: Works without a license
+- **Production**: Requires a paid license
 
-#### 💼 Commercial License (Production)
+### Paid License (Production)
 
 - **Duration**: 1 year subscription (or longer)
 - **Usage**: Production deployments and commercial applications
 - **Support**: Professional support included
 - **Contact**: [justin@shakacode.com](mailto:justin@shakacode.com) for pricing
 
-### Quick License Setup
+### License Setup
 
-**Get your FREE license in 30 seconds:**
+Once you have a paid license, set the environment variable:
 
-1. Visit [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
-2. Register with your email
-3. Receive your license token immediately
-4. Set environment variable:
-   ```bash
-   export REACT_ON_RAILS_PRO_LICENSE="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
-   ```
+```bash
+export REACT_ON_RAILS_PRO_LICENSE="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
 
-**📖 Detailed setup instructions**: See [LICENSE_SETUP.md](./LICENSE_SETUP.md) for complete configuration guide, team setup, CI/CD integration, and troubleshooting.
+**📖 Detailed setup instructions**: See [LICENSE_SETUP.md](./LICENSE_SETUP.md) for complete configuration guide, team setup, and troubleshooting.
 
 ---
 
@@ -162,7 +156,7 @@ end %>
 - Automatic cache invalidation based on props
 - Works with Rails fragment caching infrastructure
 
-**📖 Learn more**: [docs/caching.md](./docs/caching.md)
+**📖 Learn more**: [docs/oss/building-features/caching.md](../docs/oss/building-features/caching.md)
 
 ### 2. Prerender Caching
 
@@ -181,7 +175,7 @@ end
 - Caches across multiple requests
 - Complements fragment caching for maximum performance
 
-**📖 Learn more**: [docs/caching.md](./docs/caching.md)
+**📖 Learn more**: [docs/oss/building-features/caching.md](../docs/oss/building-features/caching.md)
 
 ### 3. React on Rails Pro Node Renderer
 
@@ -197,18 +191,19 @@ High-performance standalone Node.js server for server-side rendering with connec
 **Example Configuration:**
 
 ```javascript
-// react-on-rails-pro/react-on-rails-pro-node-renderer.js
-const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails-pro-node-renderer');
+// node-renderer.js
+const path = require('path');
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 reactOnRailsProNodeRenderer({
-  bundlePath: path.resolve(__dirname, '../app/assets/webpack'),
+  serverBundleCachePath: path.resolve(__dirname, '.node-renderer-bundles'),
   port: 3800,
   workersCount: 4,
   supportModules: true, // Required for loadable-components
 });
 ```
 
-**📖 Learn more**: [docs/node-renderer/basics.md](./docs/node-renderer/basics.md)
+**📖 Learn more**: [docs/oss/building-features/node-renderer/basics.md](../docs/oss/building-features/node-renderer/basics.md)
 
 ### 4. React Server Components (RSC)
 
@@ -241,7 +236,7 @@ Speed up webpack rebuilds by caching unchanged bundles.
 - **Faster development**: Hot reload only what changed
 - **Lower costs**: Reduce build server time
 
-**📖 Learn more**: [docs/bundle-caching.md](./docs/bundle-caching.md)
+**📖 Learn more**: [docs/oss/building-features/bundle-caching.md](../docs/oss/building-features/bundle-caching.md)
 
 ### 6. Global State Management
 
@@ -254,7 +249,7 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-**📖 Learn more**: [docs/configuration.md](./docs/configuration.md)
+**📖 Learn more**: [docs/oss/configuration/configuration-pro.md](../docs/oss/configuration/configuration-pro.md)
 
 ---
 
@@ -272,8 +267,10 @@ end
 
 | React on Rails Pro | React on Rails | Rails  | Ruby   | React   |
 | ------------------ | -------------- | ------ | ------ | ------- |
-| 4.x                | >= 16.0        | >= 7.0 | >= 3.2 | >= 18   |
+| 16.x               | >= 16.0        | >= 7.0 | >= 3.2 | >= 18   |
 | 3.x                | >= 13.0        | >= 6.0 | >= 3.0 | >= 16.8 |
+
+> **Note:** Pro version numbers were aligned with the core gem starting at 16.2.0. Pro 16.x is the direct successor to Pro 3.x/4.x.
 
 **📖 Check compatibility**: See [CHANGELOG.md](./CHANGELOG.md) for version-specific requirements
 
@@ -281,34 +278,17 @@ end
 
 ## 🏁 Getting Started
 
-### Quick Start (5 Minutes)
+### Quick Start
 
-**1. Get a License**
+**No license is required to get started.** React on Rails Pro runs freely for evaluation, development, and testing. A paid license is only needed for production deployments.
 
-Visit [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro) to get your FREE license (takes 30 seconds).
-
-**2. Set License Environment Variable**
-
-```bash
-# Add to .env or your shell profile
-export REACT_ON_RAILS_PRO_LICENSE="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
-```
-
-**3. Install the Gem**
+**1. Install the Gem**
 
 Since React on Rails Pro is part of the public monorepo, you can install it directly from GitHub:
 
 ```ruby
 # Gemfile
-gem 'react_on_rails_pro', '~> 4.0'
-```
-
-Or use a specific version/tag:
-
-```ruby
-gem 'react_on_rails_pro', git: 'https://github.com/shakacode/react_on_rails.git',
-                          glob: 'react_on_rails_pro/*.gemspec',
-                          tag: 'v4.0.0'
+gem 'react_on_rails_pro', '~> 16.0'
 ```
 
 Then run:
@@ -317,7 +297,7 @@ Then run:
 bundle install
 ```
 
-**4. Configure (Optional)**
+**2. Configure (Optional)**
 
 Create `config/initializers/react_on_rails_pro.rb`:
 
@@ -328,7 +308,7 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-**5. Verify Installation**
+**3. Verify Installation**
 
 ```bash
 rails console
@@ -340,9 +320,9 @@ rails console
 
 ### Next Steps
 
-- **Enable caching**: See [docs/caching.md](./docs/caching.md)
-- **Set up Node Renderer**: See [docs/node-renderer/basics.md](./docs/node-renderer/basics.md)
-- **Optimize performance**: See [docs/configuration.md](./docs/configuration.md)
+- **Enable caching**: See [docs/oss/building-features/caching.md](../docs/oss/building-features/caching.md)
+- **Set up Node Renderer**: See [docs/oss/building-features/node-renderer/basics.md](../docs/oss/building-features/node-renderer/basics.md)
+- **Optimize performance**: See [docs/oss/configuration/configuration-pro.md](../docs/oss/configuration/configuration-pro.md)
 - **Set up for your team**: See [LICENSE_SETUP.md](./LICENSE_SETUP.md#team-setup)
 
 ---
@@ -351,20 +331,21 @@ rails console
 
 ### Installation & Setup
 
-- **[Installation Guide](./docs/installation.md)** - Detailed installation instructions
+- **[Installation Guide](../docs/pro/installation.md)** - Detailed installation instructions
 - **[License Setup](./LICENSE_SETUP.md)** - Complete license configuration guide
-- **[Configuration Reference](./docs/configuration.md)** - All configuration options
+- **[Configuration Reference](../docs/oss/configuration/configuration-pro.md)** - All configuration options
 
 ### Features
 
-- **[Caching Guide](./docs/caching.md)** - Fragment and prerender caching
-- **[Bundle Caching](./docs/bundle-caching.md)** - Speed up webpack builds
-- **[Node Renderer Basics](./docs/node-renderer/basics.md)** - Standalone Node.js server
-- **[Node Renderer Configuration](./docs/node-renderer/js-configuration.md)** - JavaScript config
+- **[Caching Guide](../docs/oss/building-features/caching.md)** - Prerender and fragment caching
+- **[Bundle Caching](../docs/oss/building-features/bundle-caching.md)** - Speed up webpack builds
+- **[Node Renderer Basics](../docs/oss/building-features/node-renderer/basics.md)** - Standalone Node.js server
+- **[Node Renderer Configuration](../docs/oss/building-features/node-renderer/js-configuration.md)** - JavaScript config
+- **[Code Splitting](../docs/oss/building-features/code-splitting.md)** - Loadable components with SSR
 
 ### API Reference
 
-- **[Ruby API](./docs/ruby-api.md)** - Helper methods and utilities
+- **[Ruby API](../docs/oss/api-reference/ruby-api-pro.md)** - Helper methods and utilities
 - **[CHANGELOG](./CHANGELOG.md)** - Version history and upgrade notes
 
 ### Upgrading
@@ -422,7 +403,7 @@ Check out these production applications using React on Rails Pro:
 
 - **📧 Email Support**: [support@shakacode.com](mailto:support@shakacode.com)
 - **💼 Sales & Licensing**: [justin@shakacode.com](mailto:justin@shakacode.com)
-- **📖 Documentation**: [docs/](./docs/)
+- **📖 Documentation**: [docs/pro/](../docs/pro/)
 - **🐛 Found a Bug?**: Email [support@shakacode.com](mailto:support@shakacode.com) (for Pro customers)
 
 ### Professional Services
@@ -453,34 +434,11 @@ React on Rails Pro is developed and maintained by [ShakaCode](https://www.shakac
 
 ### Licensing Questions
 
-**Q: Is React on Rails Pro free?**
+**Q: Do I need a license to try React on Rails Pro?**
 
-A: Yes for non-commercial use! You get a FREE 3-month license (renewable) for:
+A: No! React on Rails Pro works without a license for evaluation, development, testing, and CI/CD. A paid license is only required for production deployments.
 
-- Personal projects
-- Evaluation and testing
-- Development environments
-- CI/CD
-
-Production deployments require a commercial license. [Learn more →](./LICENSE_SETUP.md)
-
-**Q: Do I need a license for development?**
-
-A: Yes, but it's FREE! Register at [shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro) to get your free 3-month license in 30 seconds (no credit card required).
-
-**Q: Can multiple developers share one license?**
-
-A: Yes! All developers in an organization can share the same license. You can use a shared license via environment variable or configuration file. [See team setup →](./LICENSE_SETUP.md#team-setup)
-
-**Q: What happens when my free license expires?**
-
-A:
-
-- **Development/Test**: Application fails to start immediately (helps catch expiration early)
-- **Production**: 1-month grace period with warnings, then fails to start
-- **Solution**: Get a new free license or purchase a commercial license
-
-**Q: How much does a commercial license cost?**
+**Q: How much does a production license cost?**
 
 A: Pricing is customized based on your needs. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a quote.
 
@@ -529,11 +487,11 @@ A: Check the [CHANGELOG](./CHANGELOG.md) for breaking changes and migration step
 
 **Q: Where do I start?**
 
-A: Follow our [Quick Start guide](#-getting-started) - you can be up and running in 5 minutes!
+A: Follow our [Quick Start guide](#-getting-started) — no license needed to get started!
 
 **Q: Can I try Pro before buying?**
 
-A: Yes! Get a FREE 3-month license to evaluate all features. No credit card required. [Get started →](https://shakacode.com/react-on-rails-pro)
+A: Yes! React on Rails Pro works without a license for evaluation and development. Just install and start using it.
 
 **Q: Is there a demo application?**
 
@@ -547,11 +505,9 @@ React on Rails Pro is commercial software. See [LICENSE](./LICENSE) for the comp
 
 **Summary**:
 
-- ✅ **Free** for non-commercial use (personal, evaluation, development, testing)
-- 💼 **Commercial license required** for production deployments
+- ✅ **No license needed** for evaluation, development, testing, and CI/CD
+- 💼 **Paid license required** for production deployments
 - 📧 **Questions?** Contact [justin@shakacode.com](mailto:justin@shakacode.com)
-
-**Get your FREE license**: [https://shakacode.com/react-on-rails-pro](https://shakacode.com/react-on-rails-pro)
 
 ---
 

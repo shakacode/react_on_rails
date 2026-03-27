@@ -26,7 +26,8 @@ module ReactOnRails
     # faster. The helper looks for these processes and will abort recompiling if it finds them
     # to be running.
     #
-    # See docs/additional-reading/rspec-configuration.md for more info
+    # See https://github.com/shakacode/react_on_rails/blob/master/docs/oss/building-features/testing-configuration.md
+    # for more info
     #
     # Params:
     # config - config for rspec
@@ -87,7 +88,7 @@ module ReactOnRails
           @printed_once = true
 
           if ReactOnRails::Utils.using_packer_source_path_is_not_defined_and_custom_node_modules?
-            msg = <<-MSG.strip_heredoc
+            msg = <<~MSG
               WARNING: Define config/shakapacker.yml to include sourcePath to configure
               the location of your JavaScript source for React on Rails.
               Default location of #{source_path} is used.

@@ -8,8 +8,10 @@ include ReactOnRailsPro::TaskHelpers
 
 namespace :dummy_app do
   task :pnpm_install do
-    pnpm_install_cmd = "pnpm install --frozen-lockfile"
-    sh_in_dir(dummy_app_dir, pnpm_install_cmd)
+    # Pro dummy apps are workspace members; install from workspace root so
+    # lockfile resolution works even though dummy-specific lockfiles were removed.
+    monorepo_root = File.expand_path("../..", __dir__)
+    sh_in_dir(monorepo_root, "pnpm install --frozen-lockfile")
   end
 
   task dummy_app: [:pnpm_install] do

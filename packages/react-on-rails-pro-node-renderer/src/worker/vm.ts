@@ -124,7 +124,13 @@ async function buildVM(filePath: string): Promise<VMContext> {
     return vmContext;
   }
 
-  // Create a new promise for this VM creation
+  // Create the VM creation promise. The IIFE runs synchronously until its first
+  // `await`, so we must store it in the map immediately after creation — before
+  // the microtask queue is drained — to prevent concurrent callers from starting
+  // a duplicate build. Cleanup uses `.finally()` on the stored promise rather
+  // than a try/finally inside the IIFE, because an IIFE's finally block can
+  // execute synchronously (before `vmCreationPromises.set`) when the code throws
+  // before the first `await`, which would leave a stale rejected promise in the map.
   const vmCreationPromise = (async () => {
     try {
       const { supportModules, stubTimers, additionalContext } = getConfig();
@@ -263,14 +269,32 @@ async function buildVM(filePath: string): Promise<VMContext> {
       log.error({ error }, 'Caught Error when creating context in buildVM');
       errorReporter.error(error as Error);
       throw error;
-    } finally {
-      // Always remove the promise from the map when done
-      vmCreationPromises.delete(filePath);
     }
   })();
 
-  // Store the promise
+  // Store the promise BEFORE any async work completes, so concurrent callers
+  // find it via the has() check above.
   vmCreationPromises.set(filePath, vmCreationPromise);
+
+  // Clean up the map entry after the promise settles (fulfills or rejects).
+  //
+  // Analogy: We write jobs on a whiteboard so nobody starts duplicates. If we
+  // told the helper "erase it when you're done" but the helper failed so fast
+  // they erased it *before we wrote it down*, the failed job would be stuck on
+  // the whiteboard forever, blocking retries. Instead, we attach a sticky note
+  // to the job saying "erase me when done." The note cannot activate until
+  // after the job is written down, so cleanup happens in the right order.
+  //
+  // The `.catch(() => {})` suppresses rejection on this internal chain so the
+  // `void`-ed tail does not surface as an unhandled rejection. The original
+  // `vmCreationPromise` returned to callers still resolves/rejects normally.
+  // Chaining this after `vmCreationPromises.set()` guarantees retries are not
+  // poisoned by stale entries, even if the async IIFE throws before first await.
+  void vmCreationPromise
+    .catch(() => {})
+    .finally(() => {
+      vmCreationPromises.delete(filePath);
+    });
 
   return vmCreationPromise;
 }
@@ -418,8 +442,8 @@ export async function buildExecutionContext(
 
 /** @internal Used in tests */
 export function resetVM() {
-  // Clear all VM contexts
   vmContexts.clear();
+  vmCreationPromises.clear();
 }
 
 // Optional: Add a method to remove a specific VM if needed
@@ -428,4 +452,5 @@ export function resetVM() {
  */
 export function removeVM(bundlePath: string) {
   vmContexts.delete(bundlePath);
+  vmCreationPromises.delete(bundlePath);
 }

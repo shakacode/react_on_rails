@@ -5,7 +5,8 @@
 
 import path from 'path';
 import cluster from 'cluster';
-import { mkdir } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { rm } from 'fs/promises';
 import fastify from 'fastify';
 import fastifyFormbody from '@fastify/formbody';
 import fastifyMultipart from '@fastify/multipart';
@@ -13,36 +14,23 @@ import log, { sharedLoggerOptions } from './shared/log.js';
 import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
-import type { FastifyInstance, FastifyReply } from './worker/types.js';
-import { performRequestPrechecks } from './worker/requestPrechecks.js';
-import { type AuthBody, authenticate } from './worker/authHandler.js';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/types.js';
+import checkProtocolVersion from './worker/checkProtocolVersionHandler.js';
+import authenticate from './worker/authHandler.js';
 import {
   handleRenderRequest,
-  type ProvidedNewBundle,
   handleNewBundlesProvided,
+  type ProvidedNewBundle,
 } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import {
-  handleIncrementalRenderRequest,
-  type IncrementalRenderInitialRequest,
-  type IncrementalRenderSink,
-} from './worker/handleIncrementalRenderRequest.js';
-import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
-import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT } from './shared/constants.js';
-import {
   errorResponseResult,
   formatExceptionMessage,
-  copyUploadedAssets,
   ResponseResult,
-  workerIdLabel,
   saveMultipartFile,
   Asset,
   getAssetPath,
-  getBundleDirectory,
-  deleteUploadedAssets,
 } from './shared/utils.js';
-import * as errorReporter from './shared/errorReporter.js';
-import { lock, unlock } from './shared/locks.js';
 import { startSsrRequestOptions, trace } from './shared/tracing.js';
 
 // Uncomment the below for testing timeouts:
@@ -56,6 +44,13 @@ declare module '@fastify/multipart' {
   interface MultipartFile {
     // We save all uploaded files and store this value
     value: Asset;
+  }
+}
+
+declare module 'fastify' {
+  // eslint-disable-next-line @typescript-eslint/no-shadow
+  interface FastifyRequest {
+    uploadDir: string;
   }
 }
 
@@ -100,6 +95,42 @@ function assertAsset(value: unknown, key: string): asserts value is Asset {
   }
 }
 
+/**
+ * Parses the multipart form body to separate bundle files from shared assets.
+ * Used by both the render and /upload-assets endpoints to avoid duplicating
+ * bundle-vs-asset classification logic.
+ *
+ * @param body  The parsed multipart request body.
+ * @param primaryBundleTimestamp  If provided, a field with key `"bundle"` is
+ *   treated as a bundle for this timestamp (render endpoint convention).
+ */
+function extractBundlesAndAssets(
+  body: Record<string, unknown>,
+  primaryBundleTimestamp?: string | number,
+): { providedNewBundles: ProvidedNewBundle[]; assetsToCopy: Asset[] } {
+  const providedNewBundles: ProvidedNewBundle[] = [];
+  const assetsToCopy: Asset[] = [];
+  Object.entries(body).forEach(([key, value]) => {
+    if (key === 'bundle' && primaryBundleTimestamp != null) {
+      assertAsset(value, key);
+      providedNewBundles.push({ timestamp: primaryBundleTimestamp, bundle: value });
+    } else if (key.startsWith('bundle_')) {
+      const timestamp = key.slice('bundle_'.length);
+      if (!timestamp) {
+        log.warn(
+          'Received form field with key "bundle_" but no hash suffix — possible bug in the Ruby client',
+        );
+      } else {
+        assertAsset(value, key);
+        providedNewBundles.push({ timestamp, bundle: value });
+      }
+    } else if (isAsset(value)) {
+      assetsToCopy.push(value);
+    }
+  });
+  return { providedNewBundles, assetsToCopy };
+}
+
 // Remove after this issue is resolved: https://github.com/fastify/light-my-request/issues/315
 let useHttp2 = true;
 
@@ -129,11 +160,11 @@ export default function run(config: Partial<Config>) {
   // getConfig():
   buildConfig(config);
 
-  const { serverBundleCachePath, logHttpLevel, port, fastifyServerOptions, workersCount } = getConfig();
+  const { serverBundleCachePath, logHttpLevel, port, host, fastifyServerOptions, workersCount } = getConfig();
 
   const app = fastify({
     http2: useHttp2 as true,
-    bodyLimit: BODY_SIZE_LIMIT,
+    bodyLimit: 104857600, // 100 MB
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
     ...fastifyServerOptions,
@@ -148,34 +179,102 @@ export default function run(config: Partial<Config>) {
     done();
   });
 
+  // Each request gets its own upload directory to prevent concurrent requests
+  // from overwriting each other's files (GitHub issue #2449).
+  // The directory path is lazily assigned in onFile (only for requests with file uploads).
+  app.decorateRequest('uploadDir', '');
+  // Clean up the per-request upload directory after the response is sent.
+  // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
+  // this is an internal service not exposed to the internet, the path is
+  // server-generated (uploads/<UUID>), and the hook only runs rm when files
+  // were actually uploaded (uploadDir is non-empty).
+  app.addHook('onResponse', async (req) => {
+    if (req.uploadDir) {
+      await rm(req.uploadDir, { recursive: true, force: true }).catch((err: unknown) => {
+        log.warn({ msg: 'Failed to clean up per-request upload directory', uploadDir: req.uploadDir, err });
+      });
+    }
+  });
+
+  // 10 MB limit for code including props
+  const fieldSizeLimit = 1024 * 1024 * 10;
+
   // Supports application/x-www-form-urlencoded
   void app.register(fastifyFormbody);
   // Supports multipart/form-data
   void app.register(fastifyMultipart, {
     attachFieldsToBody: 'keyValues',
     limits: {
-      fieldSize: FIELD_SIZE_LIMIT,
+      fieldSize: fieldSizeLimit,
       // For bundles and assets
       fileSize: Infinity,
     },
-    onFile: async (part) => {
-      const destinationPath = path.join(serverBundleCachePath, 'uploads', part.filename);
-      // TODO: inline here
+    // Use regular function (not arrow) because @fastify/multipart binds `this`
+    // to the Fastify request in attachFieldsToBody mode.
+    // Note: do NOT annotate `this` with the local Http2Server-typed FastifyRequest;
+    // the plugin types expect the default (RawServerDefault) FastifyRequest.
+    async onFile(part) {
+      if (typeof this?.uploadDir !== 'string') {
+        throw new Error('onFile: expected `this` to be bound to the Fastify request');
+      }
+      // Lazily assign a per-request upload directory on first file upload
+      if (this.uploadDir === '') {
+        this.uploadDir = path.join(serverBundleCachePath, 'uploads', randomUUID());
+      }
+      // Use path.basename to strip any directory components from the filename,
+      // preventing path traversal attacks (e.g. filename "../../etc/shadow").
+      const safeFilename = path.basename(part.filename);
+      if (!safeFilename) {
+        throw new Error(
+          `onFile: received file with empty or invalid filename: ${JSON.stringify(part.filename)}`,
+        );
+      }
+      const destinationPath = path.join(this.uploadDir, safeFilename);
       await saveMultipartFile(part, destinationPath);
       // eslint-disable-next-line no-param-reassign
       part.value = {
-        filename: part.filename,
+        filename: safeFilename,
         savedFilePath: destinationPath,
         type: 'asset',
       };
     },
   });
 
-  // Ensure NDJSON bodies are not buffered and are available as a stream immediately
-  app.addContentTypeParser('application/x-ndjson', (req, payload, done) => {
-    // Pass through the raw stream; the route will consume req.raw
-    done(null, payload);
-  });
+  const isProtocolVersionMatch = async (req: FastifyRequest, res: FastifyReply) => {
+    // Check protocol version
+    const protocolVersionCheckingResult = checkProtocolVersion(req);
+
+    if (typeof protocolVersionCheckingResult === 'object') {
+      await setResponse(protocolVersionCheckingResult, res);
+      return false;
+    }
+
+    return true;
+  };
+
+  const isAuthenticated = async (req: FastifyRequest, res: FastifyReply) => {
+    // Authenticate Ruby client
+    const authResult = authenticate(req);
+
+    if (typeof authResult === 'object') {
+      await setResponse(authResult, res);
+      return false;
+    }
+
+    return true;
+  };
+
+  const requestPrechecks = async (req: FastifyRequest, res: FastifyReply) => {
+    if (!(await isProtocolVersionMatch(req, res))) {
+      return false;
+    }
+
+    if (!(await isAuthenticated(req, res))) {
+      return false;
+    }
+
+    return true;
+  };
 
   // See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
   // the digest is part of the request URL. Yes, it's not used here, but the
@@ -190,9 +289,7 @@ export default function run(config: Partial<Config>) {
     // Can't infer from the route like Express can
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
-    const precheckResult = performRequestPrechecks(req.body);
-    if (precheckResult) {
-      await setResponse(precheckResult, res);
+    if (!(await requestPrechecks(req, res))) {
       return;
     }
 
@@ -209,19 +306,7 @@ export default function run(config: Partial<Config>) {
 
     const { renderingRequest } = req.body;
     const { bundleTimestamp } = req.params;
-    const providedNewBundles: ProvidedNewBundle[] = [];
-    const assetsToCopy: Asset[] = [];
-    Object.entries(req.body).forEach(([key, value]) => {
-      if (key === 'bundle') {
-        assertAsset(value, key);
-        providedNewBundles.push({ timestamp: bundleTimestamp, bundle: value });
-      } else if (key.startsWith('bundle_')) {
-        assertAsset(value, key);
-        providedNewBundles.push({ timestamp: key.replace('bundle_', ''), bundle: value });
-      } else if (isAsset(value)) {
-        assetsToCopy.push(value);
-      }
-    });
+    const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(req.body, bundleTimestamp);
 
     try {
       const dependencyBundleTimestamps = extractBodyArrayField(req.body, 'dependencyBundleTimestamps');
@@ -233,252 +318,68 @@ export default function run(config: Partial<Config>) {
             dependencyBundleTimestamps,
             providedNewBundles,
             assetsToCopy,
+            tracingContext: context,
           });
-          await setResponse(result.response, res);
+          await setResponse(result, res);
         } catch (err) {
           const exceptionMessage = formatExceptionMessage(
             renderingRequest,
             err,
             'UNHANDLED error in handleRenderRequest',
           );
-          errorReporter.message(exceptionMessage, context);
-          await setResponse(errorResponseResult(exceptionMessage), res);
+          await setResponse(errorResponseResult(exceptionMessage, context), res);
         }
       }, startSsrRequestOptions({ renderingRequest }));
     } catch (theErr) {
       const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
-      errorReporter.message(`Unhandled top level error: ${exceptionMessage}`);
-      await setResponse(errorResponseResult(exceptionMessage), res);
-    }
-  });
-
-  // Streaming NDJSON incremental render endpoint
-  app.post<{
-    Params: { bundleTimestamp: string; renderRequestDigest: string };
-  }>('/bundles/:bundleTimestamp/incremental-render/:renderRequestDigest', async (req, res) => {
-    const { bundleTimestamp } = req.params;
-
-    // Stream parser state
-    let incrementalSink: IncrementalRenderSink | undefined;
-
-    try {
-      // Handle the incremental render stream
-      await handleIncrementalRenderStream({
-        request: req,
-        onRenderRequestReceived: async (obj: unknown) => {
-          // Build a temporary FastifyRequest shape for protocol/auth check
-          const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
-
-          // Perform request prechecks
-          const precheckResult = performRequestPrechecks(tempReqBody);
-          if (precheckResult) {
-            return {
-              response: precheckResult,
-              shouldContinue: false,
-            };
-          }
-
-          // Extract data for incremental render request
-          const dependencyBundleTimestamps = extractBodyArrayField(
-            tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
-            'dependencyBundleTimestamps',
-          );
-
-          const initial: IncrementalRenderInitialRequest = {
-            firstRequestChunk: obj,
-            bundleTimestamp,
-            dependencyBundleTimestamps,
-          };
-
-          try {
-            const { response, sink } = await handleIncrementalRenderRequest(initial);
-            incrementalSink = sink;
-
-            return {
-              response,
-              shouldContinue: !!incrementalSink,
-            };
-          } catch (err) {
-            const errorResponse = errorResponseResult(
-              formatExceptionMessage(
-                'IncrementalRender',
-                err,
-                'Error while handling incremental render request',
-              ),
-            );
-            return {
-              response: errorResponse,
-              shouldContinue: false,
-            };
-          }
-        },
-
-        onUpdateReceived: async (obj: unknown) => {
-          if (!incrementalSink) {
-            log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
-            return;
-          }
-
-          try {
-            log.info(`Received a new update chunk ${JSON.stringify(obj)}`);
-            await incrementalSink.add(obj);
-          } catch (err) {
-            // Log error but don't stop processing
-            log.error({ err, msg: 'Error processing update chunk' });
-          }
-        },
-
-        onResponseStart: async (response: ResponseResult) => {
-          await setResponse(response, res);
-        },
-
-        onRequestEnded: () => {
-          if (!incrementalSink) {
-            return;
-          }
-
-          incrementalSink.handleRequestClosed();
-        },
-      });
-    } catch (err) {
-      // If an error occurred during stream processing, send error response
-      const errorResponse = errorResponseResult(
-        formatExceptionMessage('IncrementalRender', err, 'Error while processing incremental render stream'),
-      );
-      await setResponse(errorResponse, res);
+      await setResponse(errorResponseResult(`Unhandled top level error: ${exceptionMessage}`), res);
     }
   });
 
   // There can be additional files that might be required at the runtime.
   // Since the remote renderer doesn't contain any assets, they must be uploaded manually.
+  // Bundle files use the form key convention "bundle_<hash>" and are placed in
+  // their own directory; remaining assets are copied to every bundle directory.
   app.post<{
-    Body: WithBodyArrayField<Record<string, Asset>, 'targetBundles'>;
+    Body: Record<string, unknown>;
   }>('/upload-assets', async (req, res) => {
-    const precheckResult = performRequestPrechecks(req.body);
-    if (precheckResult) {
-      await setResponse(precheckResult, res);
+    if (!(await requestPrechecks(req, res))) {
       return;
     }
-    let lockAcquired = false;
-    let lockfileName: string | undefined;
-    const assets: Asset[] = [];
 
-    // Extract bundles that start with 'bundle_' prefix
-    const bundles: Array<{ timestamp: string; bundle: Asset }> = [];
-    Object.entries(req.body).forEach(([key, value]) => {
-      if (isAsset(value)) {
-        if (key.startsWith('bundle_')) {
-          const timestamp = key.replace('bundle_', '');
-          bundles.push({ timestamp, bundle: value });
-        } else {
-          assets.push(value);
-        }
-      }
-    });
+    const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(req.body);
 
-    // Handle targetBundles as either a string or an array
-    const targetBundles = extractBodyArrayField(req.body, 'targetBundles');
-    if (!targetBundles || targetBundles.length === 0) {
-      const errorMsg = 'No targetBundles provided. As of protocol version 2.0.0, targetBundles is required.';
+    if (providedNewBundles.length === 0) {
+      const errorMsg =
+        'No bundle_<hash> fields provided. ' +
+        'The /upload-assets endpoint requires at least one bundle file with a "bundle_<hash>" form key.';
       log.error(errorMsg);
       await setResponse(errorResponseResult(errorMsg), res);
       return;
     }
 
-    const assetsDescription = JSON.stringify(assets.map((asset) => asset.filename));
-    const bundlesDescription =
-      bundles.length > 0 ? ` and bundles ${JSON.stringify(bundles.map((b) => b.bundle.filename))}` : '';
-    const taskDescription = `Uploading files ${assetsDescription}${bundlesDescription} to bundle directories: ${targetBundles.join(', ')}`;
+    const bundleNames = providedNewBundles.map((b) => b.bundle.filename);
+    const assetNames = assetsToCopy.map((a) => a.filename);
+    const taskDescription = `Uploading bundles [${bundleNames.join(', ')}] with assets [${assetNames.join(', ')}]`;
+    log.info(taskDescription);
 
     try {
-      const { lockfileName: name, wasLockAcquired, errorMessage } = await lock('transferring-assets');
-      lockfileName = name;
-      lockAcquired = wasLockAcquired;
-
-      if (!wasLockAcquired) {
-        const msg = formatExceptionMessage(
-          taskDescription,
-          errorMessage,
-          `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
-        );
-        await setResponse(errorResponseResult(msg), res);
-      } else {
-        log.info(taskDescription);
-        try {
-          // Prepare all directories first
-          const directoryPromises = targetBundles.map(async (bundleTimestamp) => {
-            const bundleDirectory = getBundleDirectory(bundleTimestamp);
-
-            // Check if bundle directory exists, create if not
-            if (!(await fileExistsAsync(bundleDirectory))) {
-              log.info(`Creating bundle directory: ${bundleDirectory}`);
-              await mkdir(bundleDirectory, { recursive: true });
-            }
-            return bundleDirectory;
-          });
-
-          const bundleDirectories = await Promise.all(directoryPromises);
-
-          // Copy assets to each bundle directory
-          const assetCopyPromises = bundleDirectories.map(async (bundleDirectory) => {
-            await copyUploadedAssets(assets, bundleDirectory);
-            log.info(`Copied assets to bundle directory: ${bundleDirectory}`);
-          });
-
-          await Promise.all(assetCopyPromises);
-
-          // Handle bundles using the existing logic from handleRenderRequest
-          if (bundles.length > 0) {
-            const providedNewBundles = bundles.map(({ timestamp, bundle }) => ({
-              timestamp,
-              bundle,
-            }));
-
-            // Use the existing bundle handling logic
-            // Note: handleNewBundlesProvided will handle deleting the uploaded bundle files
-            // Pass null for assetsToCopy since we handle assets separately in this endpoint
-            const bundleResult = await handleNewBundlesProvided('upload-assets', providedNewBundles, null);
-            if (bundleResult) {
-              await setResponse(bundleResult, res);
-              return;
-            }
-          }
-
-          // Delete assets from uploads directory (bundles are already handled by handleNewBundlesProvided)
-          await deleteUploadedAssets(assets);
-
-          await setResponse(
-            {
-              status: 200,
-              headers: {},
-            },
-            res,
-          );
-        } catch (err) {
-          const msg = 'ERROR when trying to copy assets and bundles';
-          const message = `${msg}. ${err}. Task: ${taskDescription}`;
-          log.error({
-            msg,
-            err,
-            task: taskDescription,
-          });
-          await setResponse(errorResponseResult(message), res);
-        }
+      // Reuses the same per-bundle lock + move/copy logic as the render
+      // endpoint so that concurrent /upload-assets and render requests
+      // targeting the same bundle directory are mutually exclusive.
+      // See https://github.com/shakacode/react_on_rails/issues/2463
+      const result = await handleNewBundlesProvided(taskDescription, providedNewBundles, assetsToCopy);
+      if (result) {
+        await setResponse(result, res);
+        return;
       }
-    } finally {
-      if (lockAcquired) {
-        try {
-          if (lockfileName) {
-            await unlock(lockfileName);
-          }
-        } catch (error) {
-          log.warn({
-            msg: `Error unlocking ${lockfileName} from worker ${workerIdLabel()}`,
-            err: error,
-            task: taskDescription,
-          });
-        }
-      }
+
+      await setResponse({ status: 200, headers: {} }, res);
+    } catch (err) {
+      const msg = 'ERROR when trying to upload bundles and assets';
+      const message = `${msg}. ${err}. Task: ${taskDescription}`;
+      log.error({ msg, err, task: taskDescription });
+      await setResponse(errorResponseResult(message), res);
     }
   });
 
@@ -487,9 +388,7 @@ export default function run(config: Partial<Config>) {
     Querystring: { filename: string };
     Body: WithBodyArrayField<Record<string, unknown>, 'targetBundles'>;
   }>('/asset-exists', async (req, res) => {
-    const authResult = authenticate(req.body as AuthBody);
-    if (authResult) {
-      await setResponse(authResult, res);
+    if (!(await isAuthenticated(req, res))) {
       return;
     }
 
@@ -545,9 +444,13 @@ export default function run(config: Partial<Config>) {
   // we are extracting worker from cluster to avoid false TS error
   const { worker } = cluster;
   if (workersCount === 0 || cluster.isWorker) {
-    app.listen({ port }, () => {
+    app.listen({ port, host }, (err, address) => {
+      if (err) {
+        log.error({ err, host, port }, 'Node renderer failed to start');
+        process.exit(1);
+      }
       const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
-      log.info(`Node renderer ${workerName} listening on port ${port}!`);
+      log.info({ workerName, address }, 'Node renderer listening');
     });
   }
 

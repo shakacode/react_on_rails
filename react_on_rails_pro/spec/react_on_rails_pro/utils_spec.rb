@@ -6,7 +6,7 @@ require_relative "spec_helper"
 module ReactOnRailsPro
   RSpec.describe Utils do
     before do
-      allow(LicenseValidator).to receive(:validated_license_data!).and_return({})
+      allow(LicenseValidator).to receive(:license_status).and_return(:valid)
     end
 
     describe "cache helpers .bundle_hash and .bundle_file_name" do
@@ -437,64 +437,63 @@ module ReactOnRailsPro
     end
 
     describe ".pro_attribution_comment" do
-      context "when license is valid and not in grace period" do
+      context "when license status is :valid" do
         before do
-          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(grace_days_remaining: nil, evaluation?: false)
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_status: :valid,
+                                                                       license_organization: nil, license_plan: nil)
         end
 
-        it "returns the standard licensed attribution comment" do
+        it "returns the licensed attribution comment" do
           result = described_class.pro_attribution_comment
           expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed -->")
         end
-      end
 
-      context "when license is in grace period" do
-        before do
-          allow(ReactOnRailsPro::LicenseValidator).to receive(:grace_days_remaining).and_return(15)
-        end
+        context "with organization name" do
+          before do
+            allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_organization: "Acme Corp",
+                                                                         license_plan: "paid")
+          end
 
-        it "returns attribution comment with grace period information" do
-          result = described_class.pro_attribution_comment
-          expected = "<!-- Powered by React on Rails Pro (c) ShakaCode | " \
-                     "Licensed (Expired - Grace Period: 15 day(s) remaining) -->"
-          expect(result).to eq(expected)
-        end
-      end
-
-      context "when license is in grace period with 1 day remaining" do
-        before do
-          allow(ReactOnRailsPro::LicenseValidator).to receive(:grace_days_remaining).and_return(1)
-        end
-
-        it "returns attribution comment with singular day" do
-          result = described_class.pro_attribution_comment
-          expected = "<!-- Powered by React on Rails Pro (c) ShakaCode | " \
-                     "Licensed (Expired - Grace Period: 1 day(s) remaining) -->"
-          expect(result).to eq(expected)
+          it "includes organization name but not plan in the comment" do
+            result = described_class.pro_attribution_comment
+            expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | Licensed to Acme Corp -->")
+          end
         end
       end
 
-      context "when using evaluation license" do
+      context "when license status is :expired" do
         before do
-          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(grace_days_remaining: nil, evaluation?: true)
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_status: :expired,
+                                                                       license_organization: nil, license_plan: nil)
         end
 
-        it "returns evaluation license attribution comment" do
+        it "returns the expired license attribution comment" do
           result = described_class.pro_attribution_comment
-          expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | Evaluation License -->")
+          expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | LICENSE EXPIRED -->")
         end
       end
 
-      context "when grace_days_remaining returns 0" do
+      context "when license status is :invalid" do
         before do
-          allow(ReactOnRailsPro::LicenseValidator).to receive(:grace_days_remaining).and_return(0)
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_status: :invalid,
+                                                                       license_organization: nil, license_plan: nil)
         end
 
-        it "returns attribution comment with grace period information" do
+        it "returns the invalid license attribution comment" do
           result = described_class.pro_attribution_comment
-          expected = "<!-- Powered by React on Rails Pro (c) ShakaCode | " \
-                     "Licensed (Expired - Grace Period: 0 day(s) remaining) -->"
-          expect(result).to eq(expected)
+          expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | INVALID LICENSE -->")
+        end
+      end
+
+      context "when license status is :missing" do
+        before do
+          allow(ReactOnRailsPro::LicenseValidator).to receive_messages(license_status: :missing,
+                                                                       license_organization: nil, license_plan: nil)
+        end
+
+        it "returns the unlicensed attribution comment" do
+          result = described_class.pro_attribution_comment
+          expect(result).to eq("<!-- Powered by React on Rails Pro (c) ShakaCode | UNLICENSED -->")
         end
       end
     end

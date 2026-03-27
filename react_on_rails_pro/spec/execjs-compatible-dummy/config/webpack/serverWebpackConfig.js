@@ -31,9 +31,18 @@ const configureServer = () => {
   // replace file-loader with null-loader
   serverWebpackConfig.module.rules.forEach((loader) => {
     if (loader.use && loader.use.filter) {
-      loader.use = loader.use.filter(
-        (item) => !(typeof item === 'string' && item.match(/mini-css-extract-plugin/)),
-      );
+      loader.use = loader.use.filter((item) => {
+        let testValue = '';
+        if (typeof item === 'string') {
+          testValue = item;
+        } else if (item && typeof item.loader === 'string') {
+          testValue = item.loader;
+        }
+        return !(
+          testValue.includes('mini-css-extract-plugin') ||
+          testValue.includes('cssExtractLoader') // Rspack uses this path
+        );
+      });
     }
   });
 
@@ -73,27 +82,34 @@ const configureServer = () => {
     if (Array.isArray(rule.use)) {
       // remove the mini-css-extract-plugin and style-loader
       rule.use = rule.use.filter((item) => {
-        let testValue;
+        let testValue = '';
         if (typeof item === 'string') {
           testValue = item;
-        } else if (typeof item.loader === 'string') {
+        } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
-        return !(testValue.match(/mini-css-extract-plugin/) || testValue === 'style-loader');
+        return !(
+          testValue.includes('mini-css-extract-plugin') ||
+          testValue.includes('cssExtractLoader') || // Rspack uses this path
+          testValue === 'style-loader'
+        );
       });
       const cssLoader = rule.use.find((item) => {
-        let testValue;
+        let testValue = '';
 
         if (typeof item === 'string') {
           testValue = item;
-        } else if (typeof item.loader === 'string') {
+        } else if (item && typeof item.loader === 'string') {
           testValue = item.loader;
         }
 
         return testValue.includes('css-loader');
       });
-      if (cssLoader && cssLoader.options) {
-        cssLoader.options.modules = { exportOnlyLocals: true };
+      if (cssLoader && cssLoader.options && cssLoader.options.modules) {
+        cssLoader.options.modules = {
+          ...(typeof cssLoader.options.modules === 'object' ? cssLoader.options.modules : {}),
+          exportOnlyLocals: true,
+        };
       }
 
       // Skip writing image files during SSR by setting emitFile to false

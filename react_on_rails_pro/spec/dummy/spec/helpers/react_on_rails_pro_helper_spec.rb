@@ -310,7 +310,7 @@ describe ReactOnRailsProHelper do
     end
     let(:chunks_read) { [] }
     let(:react_component_specification_tag) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json"
           id="js-react-on-rails-component-TestingStreamableComponent-react-component-0"
           class="js-react-on-rails-component"
@@ -322,7 +322,7 @@ describe ReactOnRailsProHelper do
       SCRIPT
     end
     let(:rails_context_tag) do
-      <<-SCRIPT.strip_heredoc
+      <<~SCRIPT
         <script type="application/json" id="js-react-on-rails-context">{"componentRegistryTimeout":5000,"railsEnv":"test","inMailer":false,"i18nLocale":"en","i18nDefaultLocale":"en","rorVersion":"#{ReactOnRails::VERSION}","rorPro":true,"rorProVersion":"#{ReactOnRailsPro::VERSION}","rscPayloadGenerationUrlPath":"rsc_payload/","href":"http://foobar.com/development","location":"/development","scheme":"http","host":"foobar.com","port":null,"pathname":"/development","search":null,"httpAcceptLanguage":"en","somethingUseful":null,"serverSide":false}</script>
       SCRIPT
     end
@@ -411,7 +411,7 @@ describe ReactOnRailsProHelper do
         expect(initial_result).to include(react_component_div_with_initial_chunk)
 
         # Wait for async task to complete
-        @async_barrier.wait
+        Async::Task.current.with_timeout(5) { @async_barrier.wait }
         @main_output_queue.close
 
         # Subsequent chunks should be in the output queue
@@ -493,6 +493,81 @@ describe ReactOnRailsProHelper do
         # Should have stopped early - not all chunks processed
         # The exact count depends on timing, but should be less than 9 (all remaining)
         expect(collected_chunks.length).to be < 9
+      end
+
+      it "does not call on_complete when client disconnects mid-stream" do
+        many_chunks = Array.new(10) do |i|
+          { html: "<div>Chunk #{i}</div>", consoleReplayScript: "" }
+        end
+        mock_request_and_response(many_chunks)
+
+        # Simulate client disconnect after first chunk
+        closed_call_count = 0
+        allow(mocked_rails_stream).to receive(:closed?) do
+          closed_call_count += 1
+          closed_call_count > 1
+        end
+
+        on_complete_called = false
+        on_complete = lambda { |_chunks|
+          on_complete_called = true
+        }
+
+        stream_react_component(
+          component_name,
+          props: props,
+          on_complete: on_complete,
+          **component_options
+        )
+
+        Async::Task.current.with_timeout(5) { @async_barrier.wait }
+        @main_output_queue.close
+        while @main_output_queue.dequeue; end
+
+        expect(on_complete_called).to be false
+      end
+
+      it "propagates pre-first-chunk errors to the caller" do
+        allow(self).to receive(:internal_stream_react_component)
+          .and_raise(StandardError, "node renderer crashed before first chunk")
+
+        on_complete_called = false
+        on_complete = lambda { |_chunks|
+          on_complete_called = true
+        }
+
+        expect do
+          stream_react_component(component_name, props: props, on_complete: on_complete, **component_options)
+        end.to raise_error(StandardError, "node renderer crashed before first chunk")
+
+        Async::Task.current.with_timeout(5) { @async_barrier.wait }
+        @main_output_queue.close
+        while @main_output_queue.dequeue; end
+
+        expect(on_complete_called).to be false
+      end
+
+      it "calls on_complete when stream is fully consumed" do
+        mock_request_and_response
+
+        collected_all_chunks = nil
+        on_complete = lambda { |all_chunks|
+          collected_all_chunks = all_chunks
+        }
+
+        stream_react_component(
+          component_name,
+          props: props,
+          on_complete: on_complete,
+          **component_options
+        )
+
+        @async_barrier.wait
+        @main_output_queue.close
+        while @main_output_queue.dequeue; end
+
+        expect(collected_all_chunks).not_to be_nil
+        expect(collected_all_chunks.length).to eq(chunks.length)
       end
     end
 

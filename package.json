@@ -1,17 +1,25 @@
 {
   "name": "react-on-rails-workspace",
-  "version": "16.2.0-beta.20",
+  "version": "16.5.0",
   "description": "react-on-rails monorepo workspace manager",
   "private": true,
   "type": "module",
   "workspaces": [
     "packages/react-on-rails",
     "packages/react-on-rails-pro",
-    "packages/react-on-rails-pro-node-renderer"
+    "packages/react-on-rails-pro-node-renderer",
+    "packages/create-react-on-rails-app",
+    "react_on_rails/spec/dummy",
+    "react_on_rails_pro/spec/dummy",
+    "react_on_rails_pro/spec/execjs-compatible-dummy"
   ],
   "directories": {
     "doc": "docs"
   },
+  "// for devDependencies": [
+    "Using Sentry version over 7 here will break sentry6 integration type-check and tests.",
+    "If you need it later, you'll have to do some tricks to depend on two separate versions of @sentry/node."
+  ],
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.3",
     "@babel/core": "^7.20.12",
@@ -30,6 +38,7 @@
     "@testing-library/react": "^16.2.0",
     "@tsconfig/node14": "^14.1.2",
     "@types/jest": "^29.5.14",
+    "@types/k6": "^1.4.0",
     "@types/node": "^20.17.16",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -71,19 +80,17 @@
     "typescript-eslint": "^8.29.1"
   },
   "scripts": {
-    "test": "pnpm -r run test",
+    "test": "pnpm --filter \"./packages/*\" -r run test",
     "clean": "pnpm -r run clean",
     "start": "nps",
     "nps": "nps",
-    "build": "pnpm --filter react-on-rails run build && pnpm --filter react-on-rails-pro run build && pnpm --filter react-on-rails-pro-node-renderer run build",
+    "build": "pnpm --filter react-on-rails run build && pnpm --filter react-on-rails-pro run build && pnpm --filter react-on-rails-pro-node-renderer run build && pnpm --filter create-react-on-rails-app run build",
     "build-for-size-limit": "cp /tmp/.size-limit-with-limits.json .size-limit.json && pnpm build",
     "build-watch": "pnpm -r run build-watch",
     "lint": "nps eslint",
     "lint:scss": "stylelint \"react_on_rails/spec/dummy/app/assets/stylesheets/**/*.scss\" \"react_on_rails/spec/dummy/client/**/*.scss\"",
     "check": "pnpm run lint && pnpm -r run check",
     "type-check": "pnpm -r run type-check",
-    "yalc:publish": "pnpm -r run yalc:publish",
-    "yalc": "pnpm -r run yalc",
     "publish": "pnpm -r run publish",
     "knip": "knip",
     "eslint": "eslint",
@@ -114,6 +121,10 @@
   "packageManager": "pnpm@9.14.2",
   "pnpm": {
     "overrides": {
+      "react": "$react",
+      "react-dom": "$react-dom",
+      "app>react": "^18.3.1",
+      "app>react-dom": "^18.3.1",
       "sentry-testkit>body-parser": "npm:empty-npm-package@1.0.0",
       "sentry-testkit>express": "npm:empty-npm-package@1.0.0"
     }

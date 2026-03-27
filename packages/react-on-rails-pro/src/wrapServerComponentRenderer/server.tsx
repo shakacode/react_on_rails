@@ -38,20 +38,41 @@ import { createRSCProvider } from '../RSCProvider.tsx';
  * ReactOnRails.register({ ClientComponent: WrappedComponent });
  * ```
  */
-const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOrRenderFunction) => {
+const wrapServerComponentRenderer = (
+  componentOrRenderFunction: ReactComponentOrRenderFunction,
+  componentName: string = 'Unknown',
+) => {
   if (typeof componentOrRenderFunction !== 'function') {
-    throw new Error('wrapServerComponentRenderer: component is not a function');
+    throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
   }
 
   const wrapper: RenderFunction = async (props, railsContext) => {
-    assertRailsContextWithServerStreamingCapabilities(railsContext);
+    try {
+      assertRailsContextWithServerStreamingCapabilities(railsContext);
+    } catch (e) {
+      const originalMessage = e instanceof Error ? `\n\nOriginal error: ${e.message}` : '';
+      throw new Error(
+        `Component '${componentName}' is registered as a server component but is being rendered ` +
+          `with the react_component helper, which does not support server components.\n\n` +
+          `Most likely cause:\n` +
+          `  If '${componentName}' is a client component (uses hooks like useState/useEffect, ` +
+          `event handlers, or class components), add '"use client";' as the first line of the ` +
+          `component file. Without this directive, React on Rails auto-bundling registers it ` +
+          `as a server component.\n\n` +
+          `Other possible causes:\n` +
+          `1. If '${componentName}' is truly a server component, use stream_react_component ` +
+          `instead of react_component in your Rails view.\n` +
+          `2. If you manually called registerServerComponent for '${componentName}', ` +
+          `use ReactOnRails.register instead.${originalMessage}`,
+      );
+    }
 
     const Component = isRenderFunction(componentOrRenderFunction)
       ? await componentOrRenderFunction(props, railsContext)
       : componentOrRenderFunction;
 
     if (typeof Component !== 'function') {
-      throw new Error('wrapServerComponentRenderer: component is not a function');
+      throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
     }
 
     const RSCProvider = createRSCProvider({

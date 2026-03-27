@@ -51,12 +51,10 @@ module ReactOnRailsPro
       ReactOnRailsPro.configuration.enable_rsc_support
     end
 
-    # Validates the license and raises an exception if invalid.
-    #
-    # @return [Boolean] true if license is valid
-    # @raise [ReactOnRailsPro::Error] if license is invalid
-    def self.validated_license_data!
-      LicenseValidator.validated_license_data!
+    # Returns the current license status
+    # @return [Symbol] One of :valid, :expired, :invalid, :missing
+    def self.license_status
+      LicenseValidator.license_status
     end
 
     def self.copy_assets
@@ -203,20 +201,34 @@ module ReactOnRailsPro
 
     # Generates the Pro-specific HTML attribution comment based on license status
     # Called by React on Rails helper to generate license-specific attribution
+    # Includes organization name when available (plan is only shown in server logs for privacy)
     def self.pro_attribution_comment
       base = "Powered by React on Rails Pro (c) ShakaCode"
+      org = ReactOnRailsPro::LicenseValidator.license_organization
 
-      # Check if in grace period
-      grace_days = ReactOnRailsPro::LicenseValidator.grace_days_remaining
-      comment = if grace_days
-                  "#{base} | Licensed (Expired - Grace Period: #{grace_days} day(s) remaining)"
-                elsif ReactOnRailsPro::LicenseValidator.evaluation?
-                  "#{base} | Evaluation License"
-                else
-                  "#{base} | Licensed"
+      comment = case ReactOnRailsPro::LicenseValidator.license_status
+                when :valid
+                  if org.present?
+                    "#{base} | Licensed to #{org}"
+                  else
+                    "#{base} | Licensed"
+                  end
+                when :expired
+                  "#{base} | LICENSE EXPIRED"
+                when :invalid
+                  "#{base} | INVALID LICENSE"
+                when :missing
+                  "#{base} | UNLICENSED"
                 end
 
       "<!-- #{comment} -->"
+    end
+
+    # Returns license information for use in helpers and components
+    # Delegates to LicenseValidator.license_info
+    # @return [Hash] License info including org, plan, status, and attribution_required
+    def self.license_info
+      ReactOnRailsPro::LicenseValidator.license_info
     end
   end
 end

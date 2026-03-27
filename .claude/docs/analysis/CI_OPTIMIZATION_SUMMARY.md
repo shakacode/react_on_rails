@@ -71,7 +71,7 @@ script/ci-changes-detector origin/master
 
 ### 3. Documentation
 
-**`docs/CI_OPTIMIZATION.md`** - Comprehensive guide covering:
+**`docs/contributor-info/ci-optimization.md`** - Comprehensive guide covering:
 
 - Optimization strategies
 - Tool usage
@@ -179,7 +179,7 @@ bin/ci-local --fast
 - `script/ci-changes-detector` - Change detection script
 - `.claude/commands/run-ci.md` - Claude command
 - `.github/workflows/detect-changes.yml` - Reusable workflow
-- `docs/CI_OPTIMIZATION.md` - Documentation
+- `docs/contributor-info/ci-optimization.md` - Documentation
 
 ### Modified Files
 
@@ -207,7 +207,7 @@ bin/ci-local --fast
 
 ## 📚 Further Reading
 
-See `docs/CI_OPTIMIZATION.md` for detailed information on:
+See `docs/contributor-info/ci-optimization.md` for detailed information on:
 
 - All optimization strategies
 - Complete tool documentation

@@ -22,12 +22,10 @@ import {
   isReadableStream,
   isErrorRenderResult,
   getRequestBundleFilePath,
-  deleteUploadedAssets,
-  validateBundlesExist,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
-import * as errorReporter from '../shared/errorReporter.js';
-import { buildExecutionContext, ExecutionContext, VMContextNotFoundError } from './vm.js';
+import type { TracingContext } from '../shared/tracing.js';
+import { buildVM, hasVMContextForBundle, runInVM } from './vm.js';
 
 export type ProvidedNewBundle = {
   timestamp: string | number;
@@ -37,10 +35,9 @@ export type ProvidedNewBundle = {
 async function prepareResult(
   renderingRequest: string,
   bundleFilePathPerTimestamp: string,
-  executionContext: ExecutionContext,
 ): Promise<ResponseResult> {
   try {
-    const result = await executionContext.runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
+    const result = await runInVM(renderingRequest, bundleFilePathPerTimestamp, cluster);
 
     let exceptionMessage = null;
     if (!result) {
@@ -80,7 +77,7 @@ async function prepareResult(
  * @param assetsToCopy might be null
  */
 async function handleNewBundleProvided(
-  renderingRequest: string,
+  requestContext: string,
   providedNewBundle: ProvidedNewBundle,
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
@@ -98,7 +95,7 @@ async function handleNewBundleProvided(
 
     if (!wasLockAcquired) {
       const msg = formatExceptionMessage(
-        renderingRequest,
+        requestContext,
         errorMessage,
         `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
       );
@@ -110,10 +107,6 @@ async function handleNewBundleProvided(
         `Moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
       await moveUploadedAsset(providedNewBundle.bundle, bundleFilePathPerTimestamp);
-      if (assetsToCopy) {
-        await copyUploadedAssets(assetsToCopy, bundleDirectory);
-      }
-
       log.info(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
@@ -121,7 +114,7 @@ async function handleNewBundleProvided(
       const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
       if (!fileExists) {
         const msg = formatExceptionMessage(
-          renderingRequest,
+          requestContext,
           error,
           `Unexpected error when moving the bundle from ${providedNewBundle.bundle.savedFilePath} \
 to ${bundleFilePathPerTimestamp})`,
@@ -135,6 +128,13 @@ to ${bundleFilePathPerTimestamp})`,
       );
     }
 
+    // Always copy assets to the bundle directory — even if the bundle was
+    // already present (e.g., from a prior upload or another worker).
+    // copyUploadedAssets uses overwrite:true, so this is idempotent.
+    if (assetsToCopy) {
+      await copyUploadedAssets(assetsToCopy, bundleDirectory);
+    }
+
     return undefined;
   } finally {
     if (lockAcquired && lockfileName) {
@@ -143,7 +143,7 @@ to ${bundleFilePathPerTimestamp})`,
         await unlock(lockfileName);
       } catch (error) {
         const msg = formatExceptionMessage(
-          renderingRequest,
+          requestContext,
           error,
           `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
         );
@@ -154,23 +154,32 @@ to ${bundleFilePathPerTimestamp})`,
 }
 
 export async function handleNewBundlesProvided(
-  renderingRequest: string,
+  requestContext: string,
   providedNewBundles: ProvidedNewBundle[],
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
   log.info('Worker received new bundles: %s', providedNewBundles);
 
   const handlingPromises = providedNewBundles.map((providedNewBundle) =>
-    handleNewBundleProvided(renderingRequest, providedNewBundle, assetsToCopy),
+    handleNewBundleProvided(requestContext, providedNewBundle, assetsToCopy),
   );
-  const results = await Promise.all(handlingPromises);
-
-  if (assetsToCopy) {
-    await deleteUploadedAssets(assetsToCopy);
+  // Defensive: use allSettled so that if handleNewBundleProvided ever throws
+  // unexpectedly, all in-flight operations still complete before the handler
+  // returns and the onResponse hook deletes req.uploadDir. Currently
+  // handleNewBundleProvided catches its own errors, so Promise.all would also
+  // wait for every promise.
+  const settled = await Promise.allSettled(handlingPromises);
+  const firstFailure = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (firstFailure) {
+    throw firstFailure.reason;
   }
 
-  const errorResult = results.find((result) => result !== undefined);
-  return errorResult;
+  // handleNewBundleProvided returns undefined on success or a ResponseResult on
+  // failure (e.g., lock timeout). Find the first error response, if any.
+  const results = settled
+    .filter((r): r is PromiseFulfilledResult<ResponseResult | undefined> => r.status === 'fulfilled')
+    .map((r) => r.value);
+  return results.find((result) => result !== undefined);
 }
 
 /**
@@ -184,13 +193,15 @@ export async function handleRenderRequest({
   dependencyBundleTimestamps,
   providedNewBundles,
   assetsToCopy,
+  tracingContext,
 }: {
   renderingRequest: string;
   bundleTimestamp: string | number;
   dependencyBundleTimestamps?: string[] | number[];
   providedNewBundles?: ProvidedNewBundle[] | null;
   assetsToCopy?: Asset[] | null;
-}): Promise<{ response: ResponseResult; executionContext?: ExecutionContext }> {
+  tracingContext?: TracingContext;
+}): Promise<ResponseResult> {
   try {
     // const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
     const allBundleFilePaths = Array.from(
@@ -202,61 +213,58 @@ export async function handleRenderRequest({
 
     if (allBundleFilePaths.length > maxVMPoolSize) {
       return {
-        response: {
-          headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
-          status: 410,
-          data: `Too many bundles uploaded. The maximum allowed is ${maxVMPoolSize}. Please reduce the number of bundles or increase maxVMPoolSize in your configuration.`,
-        },
+        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+        status: 410,
+        data: `Too many bundles uploaded. The maximum allowed is ${maxVMPoolSize}. Please reduce the number of bundles or increase maxVMPoolSize in your configuration.`,
       };
     }
 
-    try {
-      const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ false);
-      return {
-        response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
-        executionContext,
-      };
-    } catch (e) {
-      // Ignore VMContextNotFoundError, it means the bundle does not exist.
-      // The following code will handle this case.
-      if (!(e instanceof VMContextNotFoundError)) {
-        throw e;
-      }
+    // If the current VM has the correct bundle and is ready
+    if (allBundleFilePaths.every((bundleFilePath) => hasVMContextForBundle(bundleFilePath))) {
+      return await prepareResult(renderingRequest, entryBundleFilePath);
     }
 
     // If gem has posted updated bundle:
     if (providedNewBundles && providedNewBundles.length > 0) {
       const result = await handleNewBundlesProvided(renderingRequest, providedNewBundles, assetsToCopy);
       if (result) {
-        return { response: result };
+        return result;
       }
     }
 
     // Check if the bundle exists:
-    const missingBundleError = await validateBundlesExist(bundleTimestamp, dependencyBundleTimestamps);
-    if (missingBundleError) {
-      return { response: missingBundleError };
+    const missingBundles = (
+      await Promise.all(
+        [...(dependencyBundleTimestamps ?? []), bundleTimestamp].map(async (timestamp) => {
+          const bundleFilePath = getRequestBundleFilePath(timestamp);
+          const fileExists = await fileExistsAsync(bundleFilePath);
+          return fileExists ? null : timestamp;
+        }),
+      )
+    ).filter((timestamp) => timestamp !== null);
+
+    if (missingBundles.length > 0) {
+      const missingBundlesText = missingBundles.length > 1 ? 'bundles' : 'bundle';
+      log.info(`No saved ${missingBundlesText}: ${missingBundles.join(', ')}`);
+      return {
+        headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+        status: 410,
+        data: 'No bundle uploaded',
+      };
     }
 
     // The bundle exists, but the VM has not yet been created.
     // Another worker must have written it or it was saved during deployment.
-    log.info(
-      'Bundle %s exists. Building ExecutionContext for worker %s.',
-      entryBundleFilePath,
-      workerIdLabel(),
-    );
-    const executionContext = await buildExecutionContext(allBundleFilePaths, /* buildVmsIfNeeded */ true);
-    return {
-      response: await prepareResult(renderingRequest, entryBundleFilePath, executionContext),
-      executionContext,
-    };
+    log.info('Bundle %s exists. Building VM for worker %s.', entryBundleFilePath, workerIdLabel());
+    await Promise.all(allBundleFilePaths.map((bundleFilePath) => buildVM(bundleFilePath)));
+
+    return await prepareResult(renderingRequest, entryBundleFilePath);
   } catch (error) {
     const msg = formatExceptionMessage(
       renderingRequest,
       error,
       'Caught top level error in handleRenderRequest',
     );
-    errorReporter.message(msg);
-    return Promise.reject(error as Error);
+    return errorResponseResult(msg, tracingContext);
   }
 }

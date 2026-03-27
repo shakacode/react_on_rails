@@ -1,8 +1,8 @@
-# Procfile for development using HMR
+# Procfile for development
 # You can run these commands in separate shells
 rails: bundle exec rails s -p 3000
-wp-client: bin/shakapacker-dev-server
-wp-server: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
+dev-server: bin/shakapacker-dev-server
+server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 
 # Bundle ReScript .res files
 rescript: pnpm build:rescript:dev

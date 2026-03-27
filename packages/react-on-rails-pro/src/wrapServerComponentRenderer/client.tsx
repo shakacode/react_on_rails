@@ -41,9 +41,12 @@ ensureReactUseAvailable();
  * ReactOnRails.register({ ClientComponent: WrappedComponent });
  * ```
  */
-const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOrRenderFunction) => {
+const wrapServerComponentRenderer = (
+  componentOrRenderFunction: ReactComponentOrRenderFunction,
+  componentName: string = 'Unknown',
+) => {
   if (typeof componentOrRenderFunction !== 'function') {
-    throw new Error('wrapServerComponentRenderer: component is not a function');
+    throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
   }
 
   const wrapper: RenderFunction = async (props, railsContext, domNodeId) => {
@@ -52,19 +55,24 @@ const wrapServerComponentRenderer = (componentOrRenderFunction: ReactComponentOr
       : componentOrRenderFunction;
 
     if (typeof Component !== 'function') {
-      throw new Error('wrapServerComponentRenderer: component is not a function');
+      throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
     }
 
     if (!domNodeId) {
-      throw new Error('RSCClientRoot: No domNodeId provided');
+      throw new Error(`RSCClientRoot: No domNodeId provided for server component '${componentName}'`);
     }
     const domNode = document.getElementById(domNodeId);
     if (!domNode) {
-      throw new Error(`RSCClientRoot: No DOM node found for id: ${domNodeId}`);
+      throw new Error(
+        `RSCClientRoot: No DOM node found for id: ${domNodeId} (server component '${componentName}')`,
+      );
     }
 
     if (!railsContext) {
-      throw new Error('RSCClientRoot: No railsContext provided');
+      throw new Error(
+        `RSCClientRoot: No railsContext provided for server component '${componentName}'.\n` +
+          `This usually means an incompatible version of react_on_rails or react_on_rails_pro.`,
+      );
     }
 
     const RSCProvider = createRSCProvider({

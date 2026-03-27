@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "16.2.0-beta.20",
+  "version": "16.5.0",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
@@ -11,9 +11,7 @@
     "test": "jest tests",
     "type-check": "tsc --noEmit --noErrorTruncation",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
-    "prepublishOnly": "pnpm run build",
-    "yalc:publish": "yalc publish",
-    "yalc": "yalc"
+    "prepublishOnly": "pnpm run build"
   },
   "repository": {
     "type": "git",
@@ -62,6 +60,7 @@
     "react-dom": ">= 16"
   },
   "files": [
+    "README.md",
     "lib/**/*.js",
     "lib/**/*.cjs",
     "lib/**/*.mjs",

@@ -362,7 +362,7 @@ The project is merging `react_on_rails` and `react_on_rails_pro` into a unified 
 ## Additional Resources
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - Comprehensive contributor guide
-- [CODING_AGENTS.md](./CODING_AGENTS.md) - AI-specific development patterns
+- [AGENTS.md](./AGENTS.md) - AI agent instructions for working on this codebase
 - [CLAUDE.md](./CLAUDE.md) - Claude Code specific guidance
 - [docs/](./docs/) - Full documentation
 - [Shakapacker](https://github.com/shakacode/shakapacker) - Webpack integration

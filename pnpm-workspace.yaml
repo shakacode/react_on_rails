@@ -1,2 +1,5 @@
 packages:
   - 'packages/*'
+  - 'react_on_rails/spec/dummy'
+  - 'react_on_rails_pro/spec/dummy'
+  - 'react_on_rails_pro/spec/execjs-compatible-dummy'

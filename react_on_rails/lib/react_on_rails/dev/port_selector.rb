@@ -1,0 +1,78 @@
+# frozen_string_literal: true
+
+require "socket"
+
+module ReactOnRails
+  module Dev
+    class PortSelector
+      DEFAULT_RAILS_PORT   = 3000
+      DEFAULT_WEBPACK_PORT = 3035
+      MAX_ATTEMPTS         = 100
+
+      class NoPortAvailable < StandardError; end
+
+      class << self
+        # Returns { rails: Integer, webpack: Integer }.
+        # Respects existing ENV['PORT'] / ENV['SHAKAPACKER_DEV_SERVER_PORT'].
+        # Probes for free ports when either or both env vars are unset.
+        def select_ports
+          rails_port   = explicit_rails_port
+          webpack_port = explicit_webpack_port
+
+          rails_auto   = rails_port.nil?
+          webpack_auto = webpack_port.nil?
+
+          rails_port   ||= find_available_port(DEFAULT_RAILS_PORT, exclude: webpack_port)
+          webpack_port ||= find_available_port(DEFAULT_WEBPACK_PORT, exclude: rails_port)
+
+          if (rails_auto && rails_port != DEFAULT_RAILS_PORT) ||
+             (webpack_auto && webpack_port != DEFAULT_WEBPACK_PORT)
+            puts "Default ports in use. Using Rails :#{rails_port}, webpack :#{webpack_port}"
+          end
+
+          { rails: rails_port, webpack: webpack_port }
+        end
+
+        # Public so it can be stubbed in tests.
+        # NOTE: Inherent TOCTOU race — another process can claim the port between
+        # server.close and the caller binding to it. This is unavoidable with the
+        # probe-then-use pattern and acceptable for the worktree port-selection use case.
+        def port_available?(port)
+          # Check both IPv4 and IPv6 loopback. Node 22+ resolves "localhost"
+          # to ::1 first, so webpack-dev-server often binds only to IPv6.
+          # A pure-IPv4 probe would miss that listener.
+          %w[127.0.0.1 ::1].all? do |host|
+            server = TCPServer.new(host, port)
+            server.close
+            true
+          rescue Errno::EADDRINUSE, Errno::EACCES
+            false
+          rescue Errno::EADDRNOTAVAIL, SocketError
+            true # address family unavailable on this system
+          end
+        end
+
+        def find_available_port(start_port, exclude: nil)
+          MAX_ATTEMPTS.times do |i|
+            port = start_port + i
+            next if port == exclude
+
+            return port if port_available?(port)
+          end
+
+          raise NoPortAvailable, "No available port found starting at #{start_port}."
+        end
+
+        private
+
+        def explicit_rails_port
+          ENV["PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
+        end
+
+        def explicit_webpack_port
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
+        end
+      end
+    end
+  end
+end
