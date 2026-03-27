@@ -12,6 +12,18 @@ It is a `pnpm` workspace app and already points at the local packages in this mo
 
 ## Debugging the Node Renderer
 
+### Quick start: debugging with the full stack running
+
+If you already have the dummy app running via `bin/dev` (which uses `Procfile.dev`), the node renderer is already listening on port 3800 with `--inspect` enabled. To debug:
+
+1. Open `chrome://inspect` in Chrome and connect to the renderer process.
+2. Use overmind to isolate renderer logs: `overmind connect node-renderer` (Ctrl-B to detach).
+3. After a code change, restart just the renderer: `overmind restart node-renderer`.
+
+### Isolated debugging: manual per-terminal startup
+
+Use this when you need full control over the renderer process — different flags, a specific bundle, or rebuilding just the renderer package.
+
 1. From the repo root, install dependencies and build the local packages:
    ```bash
    pnpm install
