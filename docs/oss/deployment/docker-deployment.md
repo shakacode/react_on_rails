@@ -356,7 +356,7 @@ cpflow deploy-image -a myapp   # deploy the pushed image to Control Plane
 
 ### Control Plane tips for React on Rails
 
-- **GVC environment variables**: Set shared environment variables at the GVC level so all workloads inherit them. See the [GVC configuration template](https://github.com/shakacode/control-plane-flow/blob/main/docs/gvc.md).
+- **GVC environment variables**: Set shared environment variables at the GVC level so all workloads inherit them. See the [Control Plane Flow guide to secrets and ENV values](https://github.com/shakacode/control-plane-flow/blob/main/docs/secrets-and-env-values.md).
 - **Secrets**: Use Control Plane's built-in secrets management (`cpln://secret/...`) instead of environment variables for sensitive values.
 - **One-off tasks**: Run migrations and other one-off commands via `cpflow run -a myapp -- bundle exec rails db:migrate`.
 - **Multiple locations**: Control Plane supports multi-region deployment. Add locations to your GVC to deploy globally.
