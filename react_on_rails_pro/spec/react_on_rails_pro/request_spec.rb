@@ -196,6 +196,39 @@ describe ReactOnRailsPro::Request do
     end
   end
 
+  describe "get_form_body_for_file" do
+    let(:url_path) { "http://localhost:3035/webpack/development/server-bundle.js" }
+
+    it "returns a pathname for file paths" do
+      result = described_class.send(:get_form_body_for_file, server_bundle_path)
+      expect(result).to be_a(FakeFS::Pathname)
+      expect(result.to_s).to eq(server_bundle_path)
+    end
+
+    it "returns response body for HTTP urls in development mode" do
+      response_body = instance_double(HTTPX::Response::Body)
+      response = instance_double(HTTPX::Response, body: response_body, error: nil)
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
+      allow(HTTPX).to receive(:get).with(url_path).and_return(response)
+
+      result = described_class.send(:get_form_body_for_file, url_path)
+      expect(result).to be(response_body)
+    end
+
+    it "raises ReactOnRailsPro::Error when HTTPX returns an error response" do
+      http_error = StandardError.new("connection refused")
+      error_response = instance_double(HTTPX::ErrorResponse, error: http_error)
+      allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
+      allow(HTTPX).to receive(:get).with(url_path).and_return(error_response)
+
+      expect do
+        described_class.send(:get_form_body_for_file, url_path)
+      end.to raise_error(ReactOnRailsPro::Error, /#{Regexp.escape(url_path)}.*connection refused/) { |error|
+        expect(error.cause).to be(http_error)
+      }
+    end
+  end
+
   describe "thread-safe connection management" do
     let(:mock_connection) { instance_double(HTTPX::Session) }
 

@@ -408,10 +408,10 @@ module ReactOnRails
       return if server_render_method.blank? ||
                 server_render_method == "ExecJS"
 
-      msg = <<-MSG.strip_heredoc
-      Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.server_render_method`.
-      If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
-      for details.
+      msg = <<~MSG
+        Error configuring /config/initializers/react_on_rails.rb: invalid value for `config.server_render_method`.
+        If you wish to use a server render method other than ExecJS, contact justin@shakacode.com
+        for details.
       MSG
       raise ReactOnRails::Error, msg
     end
@@ -463,7 +463,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: auto_load_bundle is set to true, yet components_subdirectory is not configured.\
         Please set components_subdirectory to the desired directory.  For more information, please see \
-        https://www.shakacode.com/react-on-rails/docs/guides/file-system-based-automated-bundle-generation.md
+        https://reactonrails.com/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation/
       MSG
 
       raise ReactOnRails::Error, msg

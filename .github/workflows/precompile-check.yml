@@ -3,7 +3,7 @@ name: Assets Precompile Check
 on:
   push:
     branches:
-      - 'master'
+      - 'main'
   pull_request:
     paths-ignore:
       - '**.md'
@@ -44,27 +44,27 @@ jobs:
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
-      - name: Guard docs-only master pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: ./.github/actions/ensure-master-docs-safety
+      - name: Guard docs-only main pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/ensure-main-docs-safety
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
   precompile-check:
     needs: detect-changes
-    # Skip only if: master push AND docs-only changes
-    # Otherwise run if: on master OR workflow_dispatch OR dummy tests needed
+    # Skip only if: main push AND docs-only changes
+    # Otherwise run if: on main OR workflow_dispatch OR dummy tests needed
     if: |
       !(
         github.event_name == 'push' &&
-        github.ref == 'refs/heads/master' &&
+        github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
         needs.detect-changes.outputs.run_dummy_tests == 'true'
       )

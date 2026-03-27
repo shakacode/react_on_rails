@@ -103,6 +103,34 @@ describe('serverRenderReactComponent', () => {
     expect(hasErrors).toBeFalsy();
   });
 
+  it('passes clientProps from serverRenderHash to the final render result', () => {
+    const X3ClientProps: RenderFunction = () => ({
+      renderedHtml: React.createElement('div', null, 'Hello with client props'),
+      clientProps: {
+        __tanstackRouterDehydratedState: { url: '/test' },
+      },
+    });
+    X3ClientProps.renderFunction = true;
+
+    ComponentRegistry.register({ X3ClientProps });
+
+    const renderResult = serverRenderReactComponent({
+      name: 'X3ClientProps',
+      domNodeId: 'myDomId',
+      trace: false,
+      throwJsErrors: false,
+      renderingReturnsPromises: false,
+    });
+    assertIsString(renderResult);
+    const { html, hasErrors, clientProps }: RenderResult = JSON.parse(renderResult) as RenderResult;
+
+    expect(html).toEqual('<div>Hello with client props</div>');
+    expect(clientProps).toEqual({
+      __tanstackRouterDehydratedState: { url: '/test' },
+    });
+    expect(hasErrors).toBeFalsy();
+  });
+
   it("doesn't render object without renderedHtml property", () => {
     const X4 = (): { foo: string } => ({
       foo: 'bar',
@@ -183,12 +211,7 @@ describe('serverRenderReactComponent', () => {
     await expect(renderResult.then((r) => r.hasErrors)).resolves.toBeFalsy();
   });
 
-  // When an async render function returns an object, serverRenderReactComponent will return the object as it is.
-  // It does not validate properties like renderedHtml or hasErrors; it simply returns the object.
-  // This behavior can cause issues with the ruby_on_rails gem.
-  // To avoid such issues, ensure that the returned object includes a `componentHtml` property and use the `react_component_hash` helper.
-  // This is demonstrated in the "can render async render function used with react_component_hash helper" test.
-  it('serverRenderReactComponent returns the object returned by the async render function', async () => {
+  it('serverRenderReactComponent processes async serverRenderHash renderedHtml', async () => {
     const resultObject = { renderedHtml: '<div>Hello</div>' };
     const X6 = (() => Promise.resolve(resultObject)) as RenderFunction;
     X6.renderFunction = true;
@@ -205,8 +228,34 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const html = await renderResult.then((r) => r.html);
-    expect(html).toMatchObject(resultObject);
+    const result = await renderResult;
+    expect(result.html).toEqual('<div>Hello</div>');
+    expect(result.hasErrors).toBeFalsy();
+  });
+
+  it('serverRenderReactComponent processes async serverRenderHash with clientProps', async () => {
+    const X6WithClientProps = (() =>
+      Promise.resolve({
+        renderedHtml: React.createElement('div', null, 'Hello with async hash client props'),
+        clientProps: { __tanstackRouterDehydratedState: { url: '/products?category=tools' } },
+      })) as RenderFunction;
+    X6WithClientProps.renderFunction = true;
+
+    ComponentRegistry.register({ X6WithClientProps });
+
+    const renderResult = serverRenderReactComponent({
+      name: 'X6WithClientProps',
+      domNodeId: 'myDomId',
+      trace: false,
+      throwJsErrors: false,
+      renderingReturnsPromises: true,
+    });
+    assertIsPromise(renderResult);
+    const result = await renderResult;
+    expect(result.html).toEqual('<div>Hello with async hash client props</div>');
+    expect(result.clientProps).toEqual({
+      __tanstackRouterDehydratedState: { url: '/products?category=tools' },
+    });
   });
 
   // Because the object returned by the async render function is returned as it is,

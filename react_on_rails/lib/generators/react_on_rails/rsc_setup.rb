@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "rainbow"
 require_relative "generator_messages"
 
 module ReactOnRails
@@ -23,11 +22,17 @@ module ReactOnRails
     # - detect_react_version: Detects installed React version
     #
     module RscSetup # rubocop:disable Metrics/ModuleLength
+      DEFAULT_LAYOUT_NAME = "react_on_rails_default"
+      LEGACY_LAYOUT_NAME = "hello_world"
+      RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
+      RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_(?:[2-9]|[1-9]\d+))?\z/
+      MAX_LAYOUT_NAME_ATTEMPTS = 99
+
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.
       #
       # Creates:
-      # - config/webpack/rscWebpackConfig.js
+      # - config/webpack/rscWebpackConfig.js (config/rspack/ when using rspack)
       # - Procfile.dev entry for RSC bundle watcher
       # - HelloServer component (jsx or tsx based on --typescript flag)
       # - HelloServerController
@@ -106,11 +111,11 @@ module ReactOnRails
         content = File.read(full_path)
 
         if content.include?("enable_rsc_support")
-          puts Rainbow("ℹ️  RSC config already in Pro initializer, skipping").yellow
+          say "ℹ️  RSC config already in Pro initializer, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Adding RSC config to Pro initializer...").yellow
+        say "📝 Adding RSC config to Pro initializer...", :yellow
 
         rsc_config = <<-CONFIG
 
@@ -123,35 +128,35 @@ module ReactOnRails
         # Insert before the final 'end'
         gsub_file(initializer_path, /^end\s*\z/, "#{rsc_config}end")
 
-        puts Rainbow("✅ Added RSC config to #{initializer_path}").green
+        say "✅ Added RSC config to #{initializer_path}", :green
       end
 
       def print_rsc_setup_banner
-        puts Rainbow("\n#{'=' * 80}").magenta
-        puts Rainbow("🚀 REACT SERVER COMPONENTS SETUP").magenta.bold
-        puts Rainbow("=" * 80).magenta
+        say "\n#{set_color('=' * 80, :magenta)}"
+        say set_color("🚀 REACT SERVER COMPONENTS SETUP", :magenta, :bold)
+        say set_color("=" * 80, :magenta)
       end
 
       def print_rsc_complete_banner
-        puts Rainbow("=" * 80).magenta
-        puts Rainbow("✅ React Server Components setup complete!").green
-        puts Rainbow("=" * 80).magenta
+        say set_color("=" * 80, :magenta)
+        say "✅ React Server Components setup complete!", :green
+        say set_color("=" * 80, :magenta)
       end
 
       def create_rsc_webpack_config
-        webpack_config_path = "config/webpack/rscWebpackConfig.js"
+        webpack_config_path = destination_config_path("config/webpack/rscWebpackConfig.js")
 
         if File.exist?(File.join(destination_root, webpack_config_path))
-          puts Rainbow("ℹ️  #{webpack_config_path} already exists, skipping").yellow
+          say "ℹ️  #{webpack_config_path} already exists, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Creating RSC webpack config...").yellow
+        say "📝 Creating RSC webpack config...", :yellow
 
         rsc_template_path = "templates/rsc/base/config/webpack/rscWebpackConfig.js.tt"
         template(rsc_template_path, webpack_config_path)
 
-        puts Rainbow("✅ Created #{webpack_config_path}").green
+        say "✅ Created #{webpack_config_path}", :green
       end
 
       def add_rsc_to_procfile
@@ -168,11 +173,11 @@ module ReactOnRails
         end
 
         if File.read(procfile_path).include?("RSC_BUNDLE_ONLY")
-          puts Rainbow("ℹ️  RSC bundle watcher already in Procfile.dev, skipping").yellow
+          say "ℹ️  RSC bundle watcher already in Procfile.dev, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Adding RSC bundle watcher to Procfile.dev...").yellow
+        say "📝 Adding RSC bundle watcher to Procfile.dev...", :yellow
 
         rsc_watcher_line = <<~PROCFILE
 
@@ -182,7 +187,7 @@ module ReactOnRails
 
         append_to_file("Procfile.dev", rsc_watcher_line)
 
-        puts Rainbow("✅ Added RSC bundle watcher to Procfile.dev").green
+        say "✅ Added RSC bundle watcher to Procfile.dev", :green
       end
 
       def create_hello_server_component
@@ -194,11 +199,11 @@ module ReactOnRails
         # Check if HelloServer already exists (check both jsx and tsx)
         if File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.jsx")) ||
            File.exist?(File.join(destination_root, "#{ror_components_dir}/HelloServer.tsx"))
-          puts Rainbow("ℹ️  HelloServer component already exists, skipping").yellow
+          say "ℹ️  HelloServer component already exists, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Creating HelloServer component...").yellow
+        say "📝 Creating HelloServer component...", :yellow
 
         # Create directories
         empty_directory(ror_components_dir)
@@ -212,40 +217,43 @@ module ReactOnRails
         copy_file("templates/rsc/base/app/javascript/src/HelloServer/components/LikeButton.#{ext}",
                   "#{components_dir}/LikeButton.#{ext}")
 
-        puts Rainbow("✅ Created HelloServer component").green
+        say "✅ Created HelloServer component", :green
       end
 
       def create_hello_server_controller
         controller_path = "app/controllers/hello_server_controller.rb"
 
         if File.exist?(File.join(destination_root, controller_path))
-          puts Rainbow("ℹ️  HelloServerController already exists, skipping").yellow
+          say "ℹ️  HelloServerController already exists, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Creating HelloServerController...").yellow
+        say "📝 Creating HelloServerController...", :yellow
 
-        copy_file("templates/rsc/base/app/controllers/hello_server_controller.rb", controller_path)
+        layout_name = resolve_hello_server_layout_name
+        template("templates/rsc/base/app/controllers/hello_server_controller.rb.tt",
+                 controller_path,
+                 layout_name: layout_name)
 
-        puts Rainbow("✅ Created #{controller_path}").green
+        say "✅ Created #{controller_path}", :green
       end
 
       def create_hello_server_view
         view_path = "app/views/hello_server/index.html.erb"
 
         if File.exist?(File.join(destination_root, view_path))
-          puts Rainbow("ℹ️  HelloServer view already exists, skipping").yellow
+          say "ℹ️  HelloServer view already exists, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Creating HelloServer view...").yellow
+        say "📝 Creating HelloServer view...", :yellow
 
         # Create views directory if needed
         empty_directory("app/views/hello_server")
 
         copy_file("templates/rsc/base/app/views/hello_server/index.html.erb", view_path)
 
-        puts Rainbow("✅ Created #{view_path}").green
+        say "✅ Created #{view_path}", :green
       end
 
       def add_rsc_routes
@@ -265,11 +273,11 @@ module ReactOnRails
         routes_content = File.read(routes_file)
 
         if routes_content.include?("rsc_payload_route")
-          puts Rainbow("ℹ️  RSC routes already exist, skipping").yellow
+          say "ℹ️  RSC routes already exist, skipping", :yellow
           return
         end
 
-        puts Rainbow("📝 Adding RSC routes...").yellow
+        say "📝 Adding RSC routes...", :yellow
 
         # Add rsc_payload_route (required for RSC payload requests)
         route "rsc_payload_route"
@@ -277,7 +285,7 @@ module ReactOnRails
         # Add HelloServer route (RSC counterpart to hello_world)
         route "get 'hello_server', to: 'hello_server#index'"
 
-        puts Rainbow("✅ Added RSC routes to config/routes.rb").green
+        say "✅ Added RSC routes to config/routes.rb", :green
       end
 
       # Update webpack configs to enable RSC support.
@@ -289,14 +297,14 @@ module ReactOnRails
       # - serverWebpackConfig.js: RSCWebpackPlugin import, rscBundle param, plugin
       # - clientWebpackConfig.js: RSCWebpackPlugin import, plugin
       def update_webpack_configs_for_rsc
-        puts Rainbow("📝 Updating webpack configs for RSC...").yellow
+        say "📝 Updating webpack configs for RSC...", :yellow
 
         update_server_client_or_both_for_rsc
         update_server_webpack_config_for_rsc
         update_client_webpack_config_for_rsc
 
         verify_rsc_webpack_transforms
-        puts Rainbow("✅ Updated webpack configs for RSC").green
+        say "✅ Updated webpack configs for RSC", :green
       end
 
       def update_server_client_or_both_for_rsc
@@ -356,7 +364,7 @@ module ReactOnRails
       end
 
       def update_server_webpack_config_for_rsc
-        config_path = "config/webpack/serverWebpackConfig.js"
+        config_path = destination_config_path("config/webpack/serverWebpackConfig.js")
         full_path = File.join(destination_root, config_path)
 
         return unless File.exist?(full_path)
@@ -395,7 +403,7 @@ module ReactOnRails
       end
 
       def update_client_webpack_config_for_rsc
-        config_path = "config/webpack/clientWebpackConfig.js"
+        config_path = destination_config_path("config/webpack/clientWebpackConfig.js")
         full_path = File.join(destination_root, config_path)
 
         return unless File.exist?(full_path)
@@ -441,7 +449,7 @@ module ReactOnRails
       end
 
       def check_rsc_server_config
-        path = File.join(destination_root, "config/webpack/serverWebpackConfig.js")
+        path = File.join(destination_root, destination_config_path("config/webpack/serverWebpackConfig.js"))
         return [] unless File.exist?(path)
 
         content = File.read(path)
@@ -452,7 +460,7 @@ module ReactOnRails
       end
 
       def check_rsc_client_config
-        path = File.join(destination_root, "config/webpack/clientWebpackConfig.js")
+        path = File.join(destination_root, destination_config_path("config/webpack/clientWebpackConfig.js"))
         return [] unless File.exist?(path)
 
         content = File.read(path)
@@ -465,6 +473,224 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, scob_path))
         content.include?("rscWebpackConfig") ? [] : ["rscWebpackConfig in ServerClientOrBoth.js"]
+      end
+
+      def resolve_hello_server_layout_name
+        classification_by_layout = candidate_layout_names.to_h do |layout_name|
+          [layout_name, classify_hello_server_layout(layout_name)]
+        end
+
+        reusable_layout_name = find_reusable_hello_server_layout_name(classification_by_layout)
+        return reusable_layout_name if reusable_layout_name
+
+        create_new_hello_server_layout(
+          skipped_layout_paths: skipped_existing_layout_paths(classification_by_layout)
+        )
+      end
+
+      def find_reusable_hello_server_layout_name(classification_by_layout)
+        declared_layout_name = hello_world_controller_layout_name
+
+        if reusable_layout_classification?(classification_by_layout[declared_layout_name])
+          announce_reused_hello_server_layout(declared_layout_name, classification_by_layout[declared_layout_name])
+          return declared_layout_name
+        end
+
+        preferred_layout_name = first_layout_name_with_classification(
+          classification_by_layout,
+          :canonical,
+          excluding: declared_layout_name
+        )
+        return preferred_layout_name if preferred_layout_name
+
+        first_layout_name_with_reusable_classification(
+          classification_by_layout,
+          excluding: declared_layout_name
+        )
+      end
+
+      def first_layout_name_with_classification(classification_by_layout, expected_classification, excluding: nil)
+        classification_by_layout.each do |layout_name, classification|
+          next if layout_name == excluding
+          next unless classification == expected_classification
+
+          announce_reused_hello_server_layout(layout_name, classification)
+          return layout_name
+        end
+
+        nil
+      end
+
+      def first_layout_name_with_reusable_classification(classification_by_layout, excluding: nil)
+        classification_by_layout.each do |layout_name, classification|
+          next if layout_name == excluding
+          next unless reusable_layout_classification?(classification)
+
+          announce_reused_hello_server_layout(layout_name, classification)
+          return layout_name
+        end
+
+        nil
+      end
+
+      def announce_reused_hello_server_layout(layout_name, classification)
+        message = +"ℹ️  Reusing existing #{layout_name} layout for HelloServerController"
+        message << " (new generated layouts use empty pack tags by default)" if classification == :reusable
+        say message, :yellow
+      end
+
+      def candidate_layout_names
+        [
+          hello_world_controller_layout_name,
+          DEFAULT_LAYOUT_NAME,
+          LEGACY_LAYOUT_NAME,
+          *existing_rsc_layout_names
+        ].compact.uniq
+      end
+
+      def hello_world_controller_layout_name
+        return @hello_world_controller_layout_name if defined?(@hello_world_controller_layout_name)
+
+        controller_path = File.join(destination_root, "app/controllers/hello_world_controller.rb")
+        @hello_world_controller_layout_name = if File.exist?(controller_path)
+                                                extract_declared_layout_name(File.read(controller_path))
+                                              end
+      end
+
+      def extract_declared_layout_name(controller_content)
+        match = controller_content.match(/^\s*layout(?:\s+|\s*\(\s*)(?:"([^"]+)"|'([^']+)')(?=\s*(?:\)|,|#|$))/)
+        match&.captures&.compact&.first
+      end
+
+      def existing_rsc_layout_names
+        Dir.glob(File.join(destination_root, "app/views/layouts/react_on_rails_rsc*.html.erb"))
+           .map { |path| File.basename(path, ".html.erb") }
+           .select { |layout_name| generated_rsc_layout_name?(layout_name) }
+      end
+
+      def generated_rsc_layout_name?(layout_name)
+        layout_name.match?(RSC_GENERATED_LAYOUT_NAME_PATTERN)
+      end
+
+      def classify_hello_server_layout(layout_name)
+        layout_path = layout_destination_path(layout_name)
+        full_path = File.join(destination_root, layout_path)
+        return :missing unless File.exist?(full_path)
+
+        layout_content = File.read(full_path)
+        return :missing_pack_tags unless layout_has_required_pack_tags?(layout_content)
+
+        return :canonical if layout_uses_canonical_pack_tags?(layout_content)
+
+        :reusable
+      end
+
+      def skipped_existing_layout_paths(classification_by_layout)
+        classification_by_layout.filter_map do |layout_name, classification|
+          layout_path = layout_destination_path(layout_name)
+          full_path = File.join(destination_root, layout_path)
+
+          next unless File.exist?(full_path)
+          next if reusable_layout_classification?(classification)
+
+          layout_path
+        end
+      end
+
+      def layout_destination_path(layout_name)
+        "app/views/layouts/#{layout_name}.html.erb"
+      end
+
+      def layout_has_required_pack_tags?(layout_content)
+        pack_tag_present?(layout_content, "javascript_pack_tag") &&
+          pack_tag_present?(layout_content, "stylesheet_pack_tag")
+      end
+
+      def layout_uses_canonical_pack_tags?(layout_content)
+        pack_tag_without_names?(layout_content, "javascript_pack_tag") &&
+          pack_tag_without_names?(layout_content, "stylesheet_pack_tag")
+      end
+
+      def reusable_layout_classification?(classification)
+        %i[canonical reusable].include?(classification)
+      end
+
+      def pack_tag_present?(layout_content, helper_name)
+        pack_tag_arguments(layout_content, helper_name).any?
+      end
+
+      def pack_tag_without_names?(layout_content, helper_name)
+        arguments = pack_tag_arguments(layout_content, helper_name)
+        arguments.any? && arguments.all? do |pack_tag_arguments|
+          pack_tag_arguments_without_names?(pack_tag_arguments)
+        end
+      end
+
+      def pack_tag_arguments(layout_content, helper_name)
+        arguments_pattern = '\s*(?:\((?:(?!%>).)*?\)|(?:(?!%>).)*?)'
+        pattern = /<%=\s*#{Regexp.escape(helper_name)}(?=\s|\(|%>)(?<arguments>#{arguments_pattern})?\s*%>/m
+
+        arguments = []
+        layout_content.scan(pattern) do
+          arguments << Regexp.last_match[:arguments]
+        end
+
+        arguments
+      end
+
+      def pack_tag_arguments_without_names?(arguments)
+        normalized_arguments = strip_wrapping_parentheses(arguments.to_s.strip)
+        return true if normalized_arguments.empty?
+
+        normalized_arguments.match?(/\A(?:\*\*[A-Za-z_]\w*|[a-z_]\w*\s*:.*)\z/m)
+      end
+
+      def strip_wrapping_parentheses(arguments)
+        return arguments unless arguments.start_with?("(") && arguments.end_with?(")")
+
+        arguments[1...-1].strip
+      end
+
+      def create_new_hello_server_layout(skipped_layout_paths: [])
+        layout_name = next_available_hello_server_layout_name
+        layout_path = layout_destination_path(layout_name)
+
+        announce_skipped_layout_fallback(skipped_layout_paths, layout_path) if skipped_layout_paths.any?
+
+        say "📝 Creating #{layout_path} for HelloServerController...", :yellow
+        empty_directory("app/views/layouts")
+        copy_file("templates/base/base/app/views/layouts/react_on_rails_default.html.erb", layout_path)
+        say "✅ Created #{layout_path}", :green
+
+        layout_name
+      end
+
+      def announce_skipped_layout_fallback(skipped_layout_paths, new_layout_path)
+        skipped_paths = skipped_layout_paths.map { |path| "  - #{path}" }.join("\n")
+
+        say <<~MSG, :yellow
+          ℹ️  Found existing layout file(s) in your app that were not reused for HelloServerController:
+          #{skipped_paths}
+
+          Those file(s) do not include both `stylesheet_pack_tag` and `javascript_pack_tag`, so the generator
+          will create #{new_layout_path} instead of overwriting them.
+          New generated layouts use empty pack tags by default.
+        MSG
+      end
+
+      def next_available_hello_server_layout_name
+        default_layout_path = File.join(destination_root, layout_destination_path(DEFAULT_LAYOUT_NAME))
+        return DEFAULT_LAYOUT_NAME unless File.exist?(default_layout_path)
+
+        fallback_layout_path = File.join(destination_root, layout_destination_path(RSC_FALLBACK_LAYOUT_NAME))
+        return RSC_FALLBACK_LAYOUT_NAME unless File.exist?(fallback_layout_path)
+
+        (2..MAX_LAYOUT_NAME_ATTEMPTS).each do |suffix|
+          layout_name = "#{RSC_FALLBACK_LAYOUT_NAME}_#{suffix}"
+          return layout_name unless File.exist?(File.join(destination_root, layout_destination_path(layout_name)))
+        end
+
+        raise "Could not find an available RSC layout name after #{MAX_LAYOUT_NAME_ATTEMPTS} attempts."
       end
     end
   end

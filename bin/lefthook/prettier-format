@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Format JS/TS/JSON/MD files with Prettier
 set -euo pipefail
+source "$(dirname "$0")/ensure-mise"
 
 CONTEXT="${1:-staged}"
 files="$(bin/lefthook/get-changed-files "$CONTEXT" '\.(js|jsx|ts|tsx|json|md|yml|yaml)$')"

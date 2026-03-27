@@ -211,6 +211,27 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       end
     end
 
+    context "when plan is empty string" do
+      let(:empty_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "",
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(empty_plan_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid (empty string is not a valid plan)" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
     context "when plan field is absent" do
       let(:no_plan_payload) do
         {

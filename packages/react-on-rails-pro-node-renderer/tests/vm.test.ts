@@ -1,4 +1,5 @@
 import path from 'path';
+import vm from 'vm';
 import {
   uploadedBundlePath,
   createUploadedBundle,
@@ -540,6 +541,36 @@ describe('buildVM and runInVM', () => {
 
       const [vmContext1, vmContext2] = await Promise.all([buildAndGetVmContext(), buildAndGetVmContext()]);
       expect(vmContext1).toBe(vmContext2);
+    });
+
+    test('buildVM recovers after synchronous throw before first await', async () => {
+      // Clear any cached VM for serverBundlePath from prior tests
+      resetVM();
+
+      const config = getConfig();
+      config.supportModules = true;
+      config.stubTimers = false;
+
+      // Mock vm.createContext to throw synchronously. This simulates a
+      // failure BEFORE the first `await` in the buildVM IIFE — the exact
+      // scenario the .finally() cleanup ordering was designed to handle.
+      // With the old code (try/finally inside the IIFE), a synchronous
+      // throw would run cleanup before vmCreationPromises.set(), leaving
+      // a stale rejected promise that permanently blocks retries.
+      const createContextSpy = jest.spyOn(vm, 'createContext').mockImplementationOnce(() => {
+        throw new Error('sync context creation failure');
+      });
+
+      // First call fails synchronously during vm.createContext()
+      await expect(buildVM(serverBundlePath)).rejects.toThrow('sync context creation failure');
+
+      // Restore vm.createContext before retrying
+      createContextSpy.mockRestore();
+
+      // Retry the SAME path — if vmCreationPromises wasn't cleaned up,
+      // this would return the stale rejected promise and fail
+      await buildVM(serverBundlePath);
+      expect(hasVMContextForBundle(serverBundlePath)).toBeTruthy();
     });
 
     test('running runInVM before buildVM', async () => {

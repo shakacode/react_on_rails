@@ -2,7 +2,7 @@ name: Check Markdown Links
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - '**.md'
       - '.github/workflows/check-markdown-links.yml'
@@ -34,5 +34,5 @@ jobs:
       - name: Check markdown links
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --config .lychee.toml docs/ *.md react_on_rails_pro/docs/ react_on_rails_pro/*.md
+          args: --config .lychee.toml docs/ *.md react_on_rails_pro/*.md
           fail: true

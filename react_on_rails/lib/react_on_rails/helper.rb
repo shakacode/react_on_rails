@@ -74,7 +74,7 @@ module ReactOnRails
       when Hash
         msg = <<~MSG
           Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
-          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
           for an example of the necessary javascript configuration.
         MSG
         raise ReactOnRails::Error, msg
@@ -88,7 +88,7 @@ module ReactOnRails
 
           If you're trying to use a Render-Function to return a Hash to your ruby view code, then use
           react_component_hash instead of react_component and see
-          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
           for an example of the JavaScript code.
         MSG
         raise ReactOnRails::Error, msg
@@ -135,7 +135,7 @@ module ReactOnRails
       else
         msg = <<~MSG
           Render-Function used by react_component_hash for #{component_name} is expected to return
-          an Object. See https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          an Object. See https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
           for an example of the JavaScript code.
           Note, your Render-Function must either take 2 params or have the property
           `.renderFunction = true` added to it to distinguish it from a React Function Component.
@@ -210,43 +210,56 @@ module ReactOnRails
       render_options = ReactOnRails::ReactComponent::RenderOptions
                        .new(react_component_name: "generic-js", options: options)
 
-      js_code = <<-JS.strip_heredoc
-      (function() {
-        var htmlResult = '';
-        var consoleReplayScript = '';
-        var hasErrors = false;
-        var renderingError = null;
-        var renderingErrorObject = {};
+      js_code = <<~JS
+        (function() {
+          var htmlResult = '';
+          var consoleReplayScript = '';
+          var hasErrors = false;
+          var renderingError = null;
+          var renderingErrorObject = {};
 
-        try {
-          htmlResult =
-            (function() {
-              return #{js_expression};
-            })();
-        } catch(e) {
-          renderingError = e;
-          if (#{render_options.throw_js_errors}) {
-            throw e;
+          try {
+            htmlResult =
+              (function() {
+                return #{js_expression};
+              })();
+          } catch(e) {
+            renderingError = e;
+            if (#{render_options.throw_js_errors}) {
+              throw e;
+            }
+            htmlResult = ReactOnRails.handleError({e: e, name: null,
+              jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
+            hasErrors = true;
+            var errorMessage = String(renderingError);
+            var errorStack = null;
+            // Guard against non-Error throws (e.g., throw null / throw "string").
+            // Boxed primitives (for example new Boolean(false)) are objects too.
+            if (renderingError && typeof renderingError === 'object') {
+              if ('message' in renderingError) {
+                errorMessage = String(renderingError.message);
+              }
+              // Use != (not !==) to guard both null and undefined stack values.
+              if ('stack' in renderingError && renderingError.stack != null) {
+                errorStack = String(renderingError.stack);
+              }
+            }
+            renderingErrorObject = {
+              message: errorMessage,
+              stack: errorStack,
+            };
           }
-          htmlResult = ReactOnRails.handleError({e: e, name: null,
-            jsCode: '#{escape_javascript(js_expression)}', serverSide: true});
-          hasErrors = true;
-          renderingErrorObject = {
-            message: renderingError.message,
-            stack: renderingError.stack,
-          }
-        }
 
-        consoleReplayScript = ReactOnRails.getConsoleReplayScript();
+          consoleReplayScript = ReactOnRails.getConsoleReplayScript();
 
-        return JSON.stringify({
-            html: htmlResult,
-            consoleReplayScript: consoleReplayScript,
-            hasErrors: hasErrors,
-            renderingError: renderingErrorObject
-        });
+          return JSON.stringify({
+              html: htmlResult,
+              consoleReplayScript: consoleReplayScript,
+              hasErrors: hasErrors,
+              renderingError: renderingErrorObject
+          });
 
-      })()
+        })()
       JS
 
       result = ReactOnRails::ServerRenderingPool
@@ -292,6 +305,7 @@ module ReactOnRails
           i18nDefaultLocale: I18n.default_locale,
           rorVersion: ReactOnRails::VERSION,
           # TODO: v13 just use the version if existing
+          # Pro gem availability signal (not license-valid state).
           rorPro: ReactOnRails::Utils.react_on_rails_pro?
         }
 
@@ -303,6 +317,8 @@ module ReactOnRails
             result[:rscPayloadGenerationUrlPath] = rsc_payload_url
           end
         end
+
+        add_csp_nonce_to_context(result)
 
         if defined?(request) && request.present?
           # Check for encoding of the request's original_url and try to force-encoding the
@@ -339,6 +355,11 @@ module ReactOnRails
       end
 
       @rails_context.merge(serverSide: server_side)
+    end
+
+    def add_csp_nonce_to_context(result)
+      nonce = csp_nonce
+      result[:cspNonce] = nonce if nonce.present?
     end
 
     def load_pack_for_generated_component(react_component_name, render_options)
@@ -562,19 +583,85 @@ module ReactOnRails
 
       render_options = create_render_options(react_component_name, options)
 
-      # Setup the page_loaded_js, which is the same regardless of prerendering or not!
-      # The reason is that React is smart about not doing extra work if the server rendering did its job.
-      component_specification_tag = generate_component_script(render_options)
-
       load_pack_for_generated_component(react_component_name, render_options)
       # Create the HTML rendering part
       result = server_rendered_react_component(render_options)
+
+      # clientProps are only expected on successful SSR hashes. Current error hashes do not
+      # include that key, so non-SSR/error paths skip this merge entirely.
+      merge_server_rendered_client_props!(render_options, result) if result.is_a?(Hash)
+
+      # Setup the page_loaded_js, which is the same regardless of prerendering or not!
+      # The reason is that React is smart about not doing extra work if the server rendering did its job.
+      component_specification_tag = generate_component_script(render_options)
 
       {
         render_options: render_options,
         tag: component_specification_tag,
         result: result
       }
+    end
+
+    def merge_server_rendered_client_props!(render_options, result)
+      client_props = result["clientProps"]
+      return if client_props.nil?
+
+      unless client_props.is_a?(Hash)
+        raise ReactOnRails::Error, "Expected result[\"clientProps\"] to be a Hash, got #{client_props.class.name}."
+      end
+
+      return if client_props.empty?
+
+      raw_existing_props = render_options.props
+      existing_props = if raw_existing_props.nil?
+                         {}
+                       elsif raw_existing_props.is_a?(String)
+                         begin
+                           JSON.parse(raw_existing_props)
+                         rescue JSON::ParserError
+                           raise ReactOnRails::Error,
+                                 "Cannot merge result[\"clientProps\"] into props: failed to parse props JSON " \
+                                 "string. Ensure props is a Ruby Hash or a JSON string representing an object."
+                         end
+                       else
+                         raw_existing_props
+                       end
+
+      unless existing_props.is_a?(Hash)
+        class_name = existing_props.class.name
+        raise ReactOnRails::Error,
+              "Cannot merge result[\"clientProps\"] into non-Hash props. " \
+              "Pass props as a Hash, not #{class_name}."
+      end
+
+      render_options.set_option(:props, merge_client_props(existing_props, client_props))
+    end
+
+    def merge_client_props(existing_props, client_props)
+      merged_props = existing_props.dup
+      client_props.each do |key, value|
+        raise_if_duplicate_client_prop_key_types!(merged_props, key)
+        merged_props[client_prop_target_key(merged_props, key)] = value
+      end
+      merged_props
+    end
+
+    def raise_if_duplicate_client_prop_key_types!(props, key)
+      string_key = key.to_s
+      symbol_key = string_key.to_sym
+      return unless props.key?(string_key) && props.key?(symbol_key)
+
+      raise ReactOnRails::Error,
+            "Cannot merge result[\"clientProps\"] when props contains both string and symbol versions of " \
+            "#{string_key.inspect}. Normalize props keys before calling react_component."
+    end
+
+    def client_prop_target_key(props, key)
+      string_key = key.to_s
+      symbol_key = string_key.to_sym
+      # Preserve an existing symbol key when clientProps arrives from JSON with string keys,
+      # otherwise we would create duplicate entries that serialize to the same JSON key.
+      props.key?(symbol_key) && !props.key?(string_key) ? symbol_key : string_key
     end
 
     def render_redux_store_data(redux_store_data)
@@ -693,11 +780,11 @@ module ReactOnRails
       result << store_objects.each_with_object(declarations) do |redux_store_data, memo|
         store_name = redux_store_data[:store_name]
         props = props_string(redux_store_data[:props])
-        memo << <<-JS.strip_heredoc
-        reduxProps = #{props};
-        storeGenerator = ReactOnRails.getStoreGenerator(#{store_name.to_json});
-        store = storeGenerator(reduxProps, railsContext);
-        ReactOnRails.setStore(#{store_name.to_json}, store);
+        memo << <<~JS
+          reduxProps = #{props};
+          storeGenerator = ReactOnRails.getStoreGenerator(#{store_name.to_json});
+          store = storeGenerator(reduxProps, railsContext);
+          ReactOnRails.setStore(#{store_name.to_json}, store);
         JS
       end
       result

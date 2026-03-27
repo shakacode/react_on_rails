@@ -70,9 +70,9 @@ module ReactOnRails
       end
 
       def add_pro_npm_dependencies
-        puts Rainbow("📝 Adding Pro npm dependencies...").yellow
+        say "📝 Adding Pro npm dependencies...", :yellow
         add_pro_dependencies
-        puts Rainbow("✅ Pro npm dependencies added").green
+        say "✅ Pro npm dependencies added", :green
       end
 
       def print_success_message
@@ -89,7 +89,7 @@ module ReactOnRails
           3. Visit http://localhost:3000/#{route}
           4. The Node Renderer will start on port 3800
 
-          Documentation: https://www.shakacode.com/react-on-rails-pro/docs/
+          Documentation: https://reactonrails.com/docs/pro/
         MSG
       end
     end

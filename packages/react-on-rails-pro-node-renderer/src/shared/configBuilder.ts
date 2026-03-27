@@ -27,6 +27,10 @@ export interface Config {
   // https://devcenter.heroku.com/articles/dyno-startup-behavior#port-binding-of-web-dynos
   // Similarly on ControlPlane: https://docs.controlplane.com/reference/workload/containers#port-variable
   port: number;
+  // The host/IP address the renderer should bind to.
+  // Defaults to 'localhost' (127.0.0.1). Set to '0.0.0.0' for containerized environments
+  // where external health checks need to reach the server (e.g. Docker, ECS with ALB).
+  host: string;
   // The renderer log level
   logLevel: LevelWithSilent;
   // The HTTP server log level
@@ -66,13 +70,13 @@ export interface Config {
   gracefulWorkerRestartTimeout: number | undefined;
   // If the rendering request is longer than this, it will be truncated in exception and logging messages
   maxDebugSnippetLength: number;
-  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  // @deprecated See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.
   honeybadgerApiKey?: string | null;
-  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  // @deprecated See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.
   sentryDsn?: string | null;
-  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  // @deprecated See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.
   sentryTracing?: boolean;
-  // @deprecated See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.
+  // @deprecated See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.
   sentryTracesSampleRate?: string | number;
   // If true, `{set/clear}{Timeout/Interval/Immediate}` and `queueMicrotask` are stubbed out to do nothing.
   stubTimers: boolean;
@@ -143,6 +147,8 @@ const defaultConfig: Config = {
   // Use env port if we run on Heroku
   port: Number(env.RENDERER_PORT) || DEFAULT_PORT,
 
+  host: env.RENDERER_HOST || 'localhost',
+
   // Show only important messages by default
   logLevel: logLevel(env.RENDERER_LOG_LEVEL || DEFAULT_LOG_LEVEL),
 
@@ -194,6 +200,7 @@ const defaultConfig: Config = {
 function envValuesUsed() {
   return {
     RENDERER_PORT: !userConfig.port && env.RENDERER_PORT,
+    RENDERER_HOST: !('host' in userConfig) && env.RENDERER_HOST,
     RENDERER_LOG_LEVEL: !userConfig.logLevel && env.RENDERER_LOG_LEVEL,
     RENDERER_LOG_HTTP_LEVEL: !userConfig.logHttpLevel && env.RENDERER_LOG_HTTP_LEVEL,
     RENDERER_SERVER_BUNDLE_CACHE_PATH:
@@ -298,7 +305,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   ) {
     log.error(
       'honeybadgerApiKey, sentryDsn, sentryTracing, and sentryTracesSampleRate are not used since RoRP 4.0. ' +
-        'See https://www.shakacode.com/react-on-rails-pro/docs/node-renderer/error-reporting-and-tracing.',
+        'See https://reactonrails.com/docs/building-features/node-renderer/error-reporting-and-tracing.',
     );
     process.exit(1);
   }

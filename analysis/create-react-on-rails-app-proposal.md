@@ -20,7 +20,7 @@ npx create-react-on-rails-app my-app [options]
 - `--tailwind` - Add Tailwind CSS
 - `--pro` - Install React on Rails Pro with RSC demo (future enhancement)
 - `--skip-install` - Skip dependency installation
-- `--interactive` - Interactive mode with prompts (default: true)
+- `--interactive` - Interactive mode with prompts (future enhancement; not in Phase 1)
 
 ### Example Usage
 
@@ -36,9 +36,6 @@ npx create-react-on-rails-app my-app --template=redux-typescript --package-manag
 
 # Using Rspack bundler
 npx create-react-on-rails-app my-app --template=typescript --bundler=rspack
-
-# Interactive mode (prompts for all options)
-npx create-react-on-rails-app my-app --interactive
 
 # Future: React on Rails Pro with RSC
 npx create-react-on-rails-app my-app --pro
@@ -124,10 +121,8 @@ packages/create-react-on-rails-app/
 ```json
 {
   "dependencies": {
-    "commander": "^11.0.0",
-    "chalk": "^5.0.0",
-    "ora": "^6.0.0",
-    "prompts": "^2.4.0"
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0"
   }
 }
 ```
@@ -309,7 +304,7 @@ rails generate react_on_rails:install [--typescript] [--redux] [--rspack]
 - `--typescript` if template includes TypeScript
 - `--redux` if template is redux or redux-typescript
 - `--rspack` if bundler is rspack
-- `--ignore-warnings` for non-interactive mode
+- `--ignore-warnings` to bypass generator warnings in scripted runs
 
 ### Step 5: Apply Additional Templates
 
@@ -352,7 +347,7 @@ Next steps:
 
 Visit http://localhost:3000/hello_world
 
-Documentation: https://www.shakacode.com/react-on-rails/docs/
+Documentation: https://reactonrails.com/docs/
 ```
 
 ## React on Rails Pro Support (Future Enhancement)

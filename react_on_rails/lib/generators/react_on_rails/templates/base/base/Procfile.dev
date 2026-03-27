@@ -1,5 +1,9 @@
 # Procfile for development
 # You can run these commands in separate shells
-rails: bundle exec rails s -p 3000
+#
+# To run multiple worktrees simultaneously, set different ports in each worktree's .env:
+#   PORT=3001
+#   SHAKAPACKER_DEV_SERVER_PORT=3036
+rails: bundle exec rails s -p ${PORT:-3000}
 dev-server: bin/shakapacker-dev-server
 server-bundle: SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch

@@ -2,11 +2,12 @@ import cluster from 'cluster';
 import path from 'path';
 import { MultipartFile } from '@fastify/multipart';
 import { createWriteStream, ensureDir, move, MoveOptions, copy, CopyOptions } from 'fs-extra';
-import { Readable, pipeline, PassThrough } from 'stream';
+import { Readable, Writable, pipeline, PassThrough } from 'stream';
 import { promisify } from 'util';
 import * as errorReporter from './errorReporter.js';
 import { getConfig } from './configBuilder.js';
 import log from './log.js';
+import type { TracingContext } from './tracing.js';
 import type { RenderResult } from '../worker/vm.js';
 
 export const TRUNCATION_FILLER = '\n... TRUNCATED ...\n';
@@ -48,8 +49,8 @@ export interface ResponseResult {
   stream?: Readable;
 }
 
-export function errorResponseResult(msg: string): ResponseResult {
-  errorReporter.message(msg);
+export function errorResponseResult(msg: string, tracingContext?: TracingContext): ResponseResult {
+  errorReporter.message(msg, tracingContext);
   return {
     headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
     status: 400,
@@ -128,12 +129,42 @@ export const isReadableStream = (stream: unknown): stream is Readable =>
   typeof (stream as Readable).pipe === 'function' &&
   typeof (stream as Readable).read === 'function';
 
-export const handleStreamError = (stream: Readable, onError: (error: Error) => void) => {
-  stream.on('error', onError);
-  const newStreamAfterHandlingError = new PassThrough();
-  stream.pipe(newStreamAfterHandlingError);
-  return newStreamAfterHandlingError;
+/**
+ * Pipes source to destination with proper 'close' event handling.
+ *
+ * Node.js `pipe()` does NOT end the destination when the source is destroyed —
+ * it silently unpipes, leaving the destination open forever. This function fills
+ * that gap by listening for the 'close' event (which fires after both normal
+ * 'end' and `destroy()`) and ending the destination if needed.
+ *
+ * An optional `onError` callback provides observability for source stream errors
+ * without forwarding them to the destination (which would break the pipe).
+ */
+export const safePipe = <T extends Writable>(
+  source: Readable,
+  destination: T,
+  onError?: (err: Error) => void,
+): T => {
+  if (onError) {
+    // Propagate errors for logging/reporting, but don't terminate — error is not the
+    // end of the stream. Non-fatal errors (e.g., emitError for throwJsErrors) emit
+    // 'error' without destroying the stream, and React may continue rendering.
+    source.on('error', onError);
+  }
+  // 'close' fires after both normal 'end' and destroy().
+  // On normal end, pipe() already forwards 'end' to the destination — this is a no-op.
+  // On destroy, pipe() unpipes but does NOT end the destination — we do it here.
+  source.once('close', () => {
+    if (!destination.writableEnded) {
+      destination.end();
+    }
+  });
+  source.pipe(destination);
+  return destination;
 };
+
+export const handleStreamError = (stream: Readable, onError: (error: Error) => void) =>
+  safePipe(stream, new PassThrough(), onError);
 
 export const isErrorRenderResult = (result: RenderResult): result is { exceptionMessage: string } =>
   typeof result === 'object' && !isReadableStream(result) && 'exceptionMessage' in result;

@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro-node-renderer",
-  "version": "16.4.0-rc.5",
+  "version": "16.5.0",
   "protocolVersion": "2.0.0",
   "description": "React on Rails Pro Node Renderer for server-side rendering",
   "main": "lib/ReactOnRailsProNodeRenderer.js",
@@ -29,7 +29,7 @@
   "dependencies": {
     "@fastify/formbody": "^7.4.0 || ^8.0.2",
     "@fastify/multipart": "^8.3.1 || ^9.0.3",
-    "fastify": "^4.29.0 || ^5.2.1",
+    "fastify": "^5.8.1",
     "fs-extra": "^11.2.0",
     "jsonwebtoken": "^9.0.3",
     "lockfile": "^1.0.4",
@@ -106,7 +106,7 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails/tree/master/packages/react-on-rails-pro-node-renderer#readme",
+  "homepage": "https://github.com/shakacode/react_on_rails/tree/main/packages/react-on-rails-pro-node-renderer#readme",
   "jest": {
     "clearMocks": true,
     "moduleNameMapper": {

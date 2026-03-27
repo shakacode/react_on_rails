@@ -11,11 +11,35 @@ module ReactOnRailsPro
 
     def rsc_payload
       @rsc_payload_component_name = rsc_payload_component_name
-      @rsc_payload_component_props = rsc_payload_component_props
+      @rsc_payload_component_props =
+        begin
+          rsc_payload_component_props
+        rescue JSON::ParserError => e
+          Rails.logger.warn(
+            "[React on Rails Pro] Invalid JSON passed to the RSC payload endpoint " \
+            "for component '#{@rsc_payload_component_name}': #{e.message}"
+          )
+          return render plain: "Invalid props JSON", status: :bad_request
+        end
 
       stream_view_containing_react_components(
         template: custom_rsc_payload_template,
-        layout: false
+        layout: false,
+        # Render as text so Rails does not inject HTML view annotation comments
+        # into the NDJSON stream. Custom template overrides must resolve to a
+        # text or format-neutral template, not `.html.erb`.
+        formats: [:text],
+        content_type: "application/x-ndjson"
+      )
+    rescue ActionView::MissingTemplate => e
+      raise e.exception(
+        "[React on Rails Pro] RSC payload templates are now rendered with format :text. " \
+        "If you override `custom_rsc_payload_template`, make sure the override resolves to " \
+        "a text or format-neutral template (for example `rsc_payload.text.erb`) instead of " \
+        "only `.html.erb`. See " \
+        "https://github.com/shakacode/react_on_rails/blob/master/docs/pro/updating.md " \
+        "for upgrade notes.\n\n" \
+        "Original error: #{e.message}"
       )
     end
 

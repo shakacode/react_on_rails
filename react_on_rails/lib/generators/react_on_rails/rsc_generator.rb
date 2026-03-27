@@ -80,9 +80,9 @@ module ReactOnRails
       end
 
       def add_rsc_npm_dependencies
-        puts Rainbow("📝 Adding RSC npm dependencies...").yellow
+        say "📝 Adding RSC npm dependencies...", :yellow
         add_rsc_dependencies
-        puts Rainbow("✅ RSC npm dependencies added").green
+        say "✅ RSC npm dependencies added", :green
       end
 
       def print_success_message
@@ -92,7 +92,7 @@ module ReactOnRails
           2. Visit http://localhost:3000/hello_server to see RSC in action
           3. The RSC bundle watcher will compile server components
 
-          Documentation: https://www.shakacode.com/react-on-rails-pro/docs/rsc/
+          Documentation: https://reactonrails.com/docs/pro/react-server-components/
         MSG
       end
     end

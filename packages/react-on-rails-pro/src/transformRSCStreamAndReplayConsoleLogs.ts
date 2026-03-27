@@ -13,6 +13,7 @@
  */
 
 import { RSCPayloadChunk } from 'react-on-rails/types';
+import { sanitizeNonce } from './utils.ts';
 
 /**
  * Transforms an RSC stream and replays console logs on the client.
@@ -28,7 +29,12 @@ import { RSCPayloadChunk } from 'react-on-rails/types';
  * @param stream - The RSC payload stream to transform
  * @returns A transformed stream with console logs extracted and replayed
  */
-export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableStream<Uint8Array | string>) {
+
+export default function transformRSCStreamAndReplayConsoleLogs(
+  stream: ReadableStream<Uint8Array | string>,
+  cspNonce?: string,
+) {
+  const sanitizedNonce = sanitizeNonce(cspNonce);
   return new ReadableStream({
     async start(controller) {
       const reader = stream.getReader();
@@ -44,10 +50,13 @@ export default function transformRSCStreamAndReplayConsoleLogs(stream: ReadableS
 
         const replayConsoleCode = consoleReplayScript
           .trim()
-          .replace(/^<script.*>/, '')
-          .replace(/<\/script>$/, '');
+          .replace(/^<script[^>]*>/i, '')
+          .replace(/<\/script>$/i, '');
         if (replayConsoleCode?.trim() !== '') {
           const scriptElement = document.createElement('script');
+          if (sanitizedNonce) {
+            scriptElement.nonce = sanitizedNonce;
+          }
           scriptElement.textContent = replayConsoleCode;
           document.body.appendChild(scriptElement);
         }

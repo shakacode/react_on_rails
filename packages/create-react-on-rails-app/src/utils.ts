@@ -1,10 +1,18 @@
 import { execFileSync, spawnSync } from 'child_process';
 import chalk from 'chalk';
 
-export function execLiveArgs(command: string, args: string[], cwd?: string): void {
+/**
+ * Execute a command and stream output to the current terminal.
+ *
+ * Security contract:
+ * - This uses `spawnSync` with `shell: false`, so command and args are passed as literal tokens.
+ * - Callers must still ensure `command` and `args` come from trusted/validated values.
+ */
+export function execLiveArgs(command: string, args: string[], cwd?: string, env?: NodeJS.ProcessEnv): void {
   const result = spawnSync(command, args, {
     stdio: 'inherit',
     cwd,
+    ...(env ? { env } : {}),
   });
   if (result.error) {
     throw result.error;

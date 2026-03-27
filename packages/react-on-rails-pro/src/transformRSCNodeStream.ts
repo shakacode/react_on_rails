@@ -12,7 +12,8 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { Transform } from 'stream';
+import { Readable, Transform } from 'stream';
+import safePipe from './safePipe.ts';
 
 /**
  * Transforms an RSC Node.js stream for server-side processing.
@@ -55,5 +56,5 @@ export default function transformRSCStream(stream: NodeJS.ReadableStream): NodeJ
     },
   });
 
-  return stream.pipe(htmlExtractor);
+  return safePipe(stream as Readable, htmlExtractor);
 }

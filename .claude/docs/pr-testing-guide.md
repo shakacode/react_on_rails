@@ -689,4 +689,4 @@ gh pr view --json statusCheckRollup
 - CI debugging: [CLAUDE.md](../../CLAUDE.md) "Replicating CI Failures Locally"
 - Config switching: [SWITCHING_CI_CONFIGS.md](../../SWITCHING_CI_CONFIGS.md)
 - Local testing issues: [react_on_rails/spec/dummy/TESTING_LOCALLY.md](../../react_on_rails/spec/dummy/TESTING_LOCALLY.md)
-- Master health: [master-health-monitoring.md](master-health-monitoring.md)
+- Main health: [main-health-monitoring.md](main-health-monitoring.md)

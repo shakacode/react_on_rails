@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "jwt"
+require "rack/deflater"
 require_relative "spec_helper"
 
 RSpec.describe ReactOnRailsPro::Engine do
@@ -45,7 +46,7 @@ RSpec.describe ReactOnRailsPro::Engine do
         end
 
         it "includes the license URL" do
-          expect(mock_logger).to receive(:warn).with(%r{shakacode\.com/react-on-rails-pro})
+          expect(mock_logger).to receive(:warn).with(/pro\.reactonrails\.com/)
           described_class.log_license_status
         end
 
@@ -289,6 +290,43 @@ RSpec.describe ReactOnRailsPro::Engine do
           described_class.log_license_status
         end
       end
+    end
+  end
+
+  describe ".log_problematic_compression_middleware_warnings" do
+    let(:middleware_entry_class) { Struct.new(:klass, :args) }
+
+    it "logs a warning for body-draining Rack::Deflater callbacks" do
+      condition = lambda { |*, body|
+        chunks = 0
+        body.each { |_chunk| chunks += 1 }
+        chunks.positive?
+      }
+
+      described_class.log_problematic_compression_middleware_warnings(
+        logger: mock_logger,
+        middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: condition }])],
+        root: File.expand_path("../..", __dir__)
+      )
+
+      expect(mock_logger).to have_received(:warn).with(/Rack::Deflater has a custom `:if` callback/)
+      expect(mock_logger).to have_received(:warn).with(/ActionController::Live/)
+    end
+
+    it "does not log for safe callbacks" do
+      condition = lambda { |*, body|
+        return true unless body.respond_to?(:to_ary)
+
+        body.to_ary.sum(&:bytesize) > 512
+      }
+
+      described_class.log_problematic_compression_middleware_warnings(
+        logger: mock_logger,
+        middlewares: [middleware_entry_class.new(Rack::Deflater, [{ if: condition }])],
+        root: File.expand_path("../..", __dir__)
+      )
+
+      expect(mock_logger).not_to have_received(:warn)
     end
   end
 end

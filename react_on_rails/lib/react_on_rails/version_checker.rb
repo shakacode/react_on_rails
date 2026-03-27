@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
+require_relative "version_syntax_converter"
+
 module ReactOnRails
   # Responsible for checking versions of rubygem versus yarn node package
   # against each other at runtime.
-  class VersionChecker
+  class VersionChecker # rubocop:disable Metrics/ClassLength
     attr_reader :node_package_version
 
     # Semver uses - to separate pre-release, but RubyGems use .
@@ -37,8 +39,12 @@ module ReactOnRails
     def validate_package_json_exists!
       return if File.exist?(node_package_version.package_json)
 
-      base_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails", gem_version)
-      pro_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
+      base_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+        "react-on-rails", npm_version_for_package("react-on-rails")
+      )
+      pro_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+        "react-on-rails-pro", npm_version_for_package("react-on-rails-pro")
+      )
 
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: package.json file not found.
@@ -71,8 +77,12 @@ module ReactOnRails
     def validate_packages_installed!(has_base_package, has_pro_package)
       return if has_base_package || has_pro_package
 
-      base_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails", gem_version)
-      pro_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
+      base_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+        "react-on-rails", npm_version_for_package("react-on-rails")
+      )
+      pro_install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+        "react-on-rails-pro", npm_version_for_package("react-on-rails-pro")
+      )
 
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: No React on Rails npm package is installed.
@@ -114,7 +124,9 @@ module ReactOnRails
       return unless is_pro_gem && !has_pro_package
 
       remove_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails")
-      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails-pro", gem_version)
+      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+        "react-on-rails-pro", npm_version_for_package("react-on-rails-pro")
+      )
 
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: You have the Pro gem installed but are using the base 'react-on-rails' package.
@@ -138,7 +150,9 @@ module ReactOnRails
       return unless !is_pro_gem && has_pro_package
 
       remove_pro_cmd = ReactOnRails::Utils.package_manager_remove_command("react-on-rails-pro")
-      install_base_cmd = ReactOnRails::Utils.package_manager_install_exact_command("react-on-rails", gem_version)
+      install_base_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+        "react-on-rails", npm_version_for_package("react-on-rails")
+      )
 
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: You have the 'react-on-rails-pro' package installed but the Pro gem is not installed.
@@ -165,7 +179,9 @@ module ReactOnRails
       return unless node_package_version.semver_wildcard?
 
       package_name = node_package_version.package_name
-      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(package_name, gem_version)
+      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+        package_name, npm_version_for_package(package_name)
+      )
 
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: The '#{package_name}' package version is not an exact version.
@@ -190,7 +206,9 @@ module ReactOnRails
       return if node_package_version.parts == gem_version_parts
 
       package_name = node_package_version.package_name
-      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(package_name, gem_version)
+      install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+        package_name, npm_version_for_package(package_name)
+      )
 
       raise ReactOnRails::Error, <<~MSG.strip
         **ERROR** ReactOnRails: The '#{package_name}' package version does not match the gem version.
@@ -209,6 +227,18 @@ module ReactOnRails
 
     def gem_version
       ReactOnRails::VERSION
+    end
+
+    # Returns the npm-formatted version for install commands.
+    # For Pro packages, prefers ReactOnRailsPro::VERSION when available.
+    def npm_version_for_package(package_name)
+      version = if package_name == "react-on-rails-pro"
+                  pro_version = ReactOnRails::Utils.react_on_rails_pro_version
+                  pro_version.empty? ? gem_version : pro_version
+                else
+                  gem_version
+                end
+      ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(version)
     end
 
     def gem_version_parts

@@ -5,6 +5,8 @@ import { createReadStream } from 'fs-extra';
 // eslint-disable-next-line import/no-relative-packages
 import packageJson from '../package.json';
 import worker, { disableHttp2 } from '../src/worker';
+import * as vm from '../src/worker/vm';
+import * as errorReporter from '../src/shared/errorReporter';
 import {
   BUNDLE_TIMESTAMP,
   SECONDARY_BUNDLE_TIMESTAMP,
@@ -97,6 +99,43 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, String(BUNDLE_TIMESTAMP)))).toBe(true);
     expect(fs.existsSync(assetPath(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest reports unexpected handleRenderRequest failures once', async () => {
+    const buildVMSpy = jest.spyOn(vm, 'buildVM').mockRejectedValueOnce(new Error('Injected buildVM failure'));
+    const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
+
+    try {
+      const app = worker({
+        serverBundleCachePath: serverBundleCachePathForTest(),
+      });
+
+      const form = formAutoContent({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: 'ReactOnRails.dummy',
+        bundle: createReadStream(getFixtureBundle()),
+      });
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload(form.payload)
+        .headers(form.headers)
+        .end();
+
+      expect(res.statusCode).toBe(400);
+      expect(reportMessageSpy).toHaveBeenCalledTimes(1);
+      expect(reportMessageSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Caught top level error in handleRenderRequest'),
+        undefined,
+      );
+      expect(res.payload).toContain('Caught top level error in handleRenderRequest');
+    } finally {
+      buildVMSpy.mockRestore();
+      reportMessageSpy.mockRestore();
+    }
   });
 
   test(
@@ -293,7 +332,7 @@ describe('worker', () => {
       protocolVersion,
       railsEnv,
       password: 'my_password',
-      targetBundles: [bundleHash],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
       asset1: createReadStream(getFixtureAsset()),
       asset2: createReadStream(getOtherFixtureAsset()),
     });
@@ -301,6 +340,30 @@ describe('worker', () => {
     expect(res.statusCode).toBe(200);
     expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
+  });
+
+  test('post /upload-assets ignores targetBundles when bundle_<hash> fields are present (backward compat)', async () => {
+    const bundleHash = 'compat-bundle-hash';
+
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+      password: 'my_password',
+    });
+
+    // Simulates the Ruby client sending both bundle_<hash> (new) and targetBundles (legacy).
+    // The endpoint should derive targets from bundle_<hash> and ignore targetBundles.
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      password: 'my_password',
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
+      targetBundles: [bundleHash],
+      asset1: createReadStream(getFixtureAsset()),
+    });
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+    expect(res.statusCode).toBe(200);
+    expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
   });
 
   test('post /upload-assets with multiple bundles and assets', async () => {
@@ -317,7 +380,8 @@ describe('worker', () => {
       protocolVersion,
       railsEnv,
       password: 'my_password',
-      targetBundles: [bundleHash, bundleHashOther],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
+      [`bundle_${bundleHashOther}`]: createReadStream(getFixtureSecondaryBundle()),
       asset1: createReadStream(getFixtureAsset()),
       asset2: createReadStream(getOtherFixtureAsset()),
     });

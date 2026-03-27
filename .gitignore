@@ -87,6 +87,7 @@ ssr-generated
 
 # Claude Code local settings
 .claude/settings.local.json
+.claude/napkin.md
 
 # Workspace package build outputs (but track source code)
 packages/*/lib/

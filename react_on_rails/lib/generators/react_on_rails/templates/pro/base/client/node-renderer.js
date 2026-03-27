@@ -1,7 +1,9 @@
 const path = require('path');
-const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+const { reactOnRailsProNodeRenderer, parseWorkersCount } = require('react-on-rails-pro-node-renderer');
 
 const { env } = process;
+const configuredWorkersCount =
+  parseWorkersCount(env.RENDERER_WORKERS_COUNT) ?? parseWorkersCount(env.NODE_RENDERER_CONCURRENCY);
 
 const config = {
   serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
@@ -12,8 +14,10 @@ const config = {
   password: env.RENDERER_PASSWORD || 'devPassword',
 
   // Number of Node.js worker threads for SSR rendering
-  // Set NODE_RENDERER_CONCURRENCY env var to override (e.g., for production tuning)
-  workersCount: env.NODE_RENDERER_CONCURRENCY != null ? Number(env.NODE_RENDERER_CONCURRENCY) : 3,
+  // Set RENDERER_WORKERS_COUNT env var to override (e.g., for production tuning)
+  // Set to 0 for single-process mode (useful for debugging).
+  // Legacy fallback: NODE_RENDERER_CONCURRENCY
+  workersCount: configuredWorkersCount ?? 3,
 
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS modules
   // that get added to the VM context: { Buffer, process, setTimeout, setInterval, clearTimeout, clearInterval }.
@@ -34,7 +38,7 @@ const config = {
 // Renderer detects a total number of CPUs on virtual hostings like Heroku or CircleCI instead
 // of CPUs number allocated for current container. This results in spawning many workers while
 // only 1-2 of them really needed.
-if (env.CI) {
+if (env.CI && configuredWorkersCount == null) {
   config.workersCount = 2;
 }
 

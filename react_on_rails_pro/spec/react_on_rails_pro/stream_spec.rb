@@ -2,7 +2,7 @@
 
 require "async"
 require "async/queue"
-require "async/variable"
+require "async/promise"
 require_relative "spec_helper"
 
 class StreamController
@@ -376,9 +376,11 @@ RSpec.describe "Streaming API" do
   end
 
   describe "Component streaming concurrency" do
-    def run_stream(controller, template: "ignored")
+    def run_stream(controller, template: "ignored", **options)
       Sync do |parent|
-        parent.async { controller.stream_view_containing_react_components(template: template) }
+        parent.async do
+          controller.stream_view_containing_react_components(template: template, **options)
+        end
         yield(parent)
       end
     end
@@ -390,6 +392,7 @@ RSpec.describe "Streaming API" do
       mocked_response = instance_double(ActionController::Live::Response)
       mocked_stream = instance_double(ActionController::Live::Buffer)
       allow(mocked_response).to receive(:stream).and_return(mocked_stream)
+      allow(mocked_response).to receive(:content_type=)
       allow(mocked_stream).to receive(:write)
       allow(mocked_stream).to receive(:close)
       allow(mocked_stream).to receive(:closed?).and_return(false)
@@ -491,7 +494,81 @@ RSpec.describe "Streaming API" do
       expect(gaps.all? { |gap| gap >= 0.04 }).to be true
     end
 
+    it "warns when non-HTML formats are streamed without an explicit content type" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+      mock_logger = instance_double(Logger, warn: nil)
+      allow(Rails).to receive(:logger).and_return(mock_logger)
+
+      expect(mock_logger).to receive(:warn).with(/non-HTML formats \[:text\].*without `content_type:`/)
+
+      run_stream(controller, formats: [:text]) do |_parent|
+        sleep 0.1
+      end
+    end
+
+    it "does not warn when non-HTML formats provide an explicit content type" do
+      _queues, controller, _stream = setup_stream_test(component_count: 0)
+      mock_logger = instance_double(Logger, warn: nil)
+      allow(Rails).to receive(:logger).and_return(mock_logger)
+
+      expect(mock_logger).not_to receive(:warn)
+
+      run_stream(controller, formats: [:text], content_type: "application/x-ndjson") do |_parent|
+        sleep 0.1
+      end
+    end
+
     describe "client disconnect handling" do
+      it "does not deadlock when client disconnects with full bounded queue" do
+        original_buffer = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = 1
+
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        write_count = 0
+        allow(stream).to receive(:write) do |_chunk|
+          write_count += 1
+          raise IOError, "client disconnected" if write_count == 2
+        end
+
+        expect do
+          Timeout.timeout(5) do
+            run_stream(controller) do |_parent|
+              10.times { |i| queues[0].enqueue("Chunk#{i}") }
+              queues[0].close
+              sleep 0.5
+            end
+          end
+        end.not_to raise_error
+      ensure
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = original_buffer
+      end
+
+      it "does not deadlock when client disconnects with Errno::EPIPE and full bounded queue" do
+        original_buffer = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = 1
+
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        write_count = 0
+        allow(stream).to receive(:write) do |_chunk|
+          write_count += 1
+          raise Errno::EPIPE, "broken pipe" if write_count == 2
+        end
+
+        expect do
+          Timeout.timeout(5) do
+            run_stream(controller) do |_parent|
+              10.times { |i| queues[0].enqueue("Chunk#{i}") }
+              queues[0].close
+              sleep 0.5
+            end
+          end
+        end.not_to raise_error
+      ensure
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = original_buffer
+      end
+
       it "stops writing on IOError" do
         queues, controller, stream = setup_stream_test(component_count: 1)
 
@@ -545,6 +622,55 @@ RSpec.describe "Streaming API" do
         end
 
         expect(written_chunks).to eq(%w[TEMPLATE Chunk1])
+      end
+    end
+
+    describe "exception handling" do
+      it "does not commit the response when render_to_string raises" do
+        _queues, controller, stream = setup_stream_test(component_count: 0)
+
+        # Simulate a renderer/shell error during render_to_string, before any
+        # chunk has been produced. This exercises the pre-commit error path where
+        # the response has NOT been written to yet, enabling a proper HTTP redirect.
+        allow(controller).to receive(:render_to_string).and_raise(
+          RuntimeError, "node renderer crashed"
+        )
+
+        expect do
+          Timeout.timeout(5) do
+            controller.stream_view_containing_react_components(template: "ignored")
+          end
+        end.to raise_error(RuntimeError, "node renderer crashed")
+
+        # Response stream should NOT have been written to (response not committed)
+        expect(stream).not_to have_received(:write)
+      end
+
+      it "does not deadlock when writer raises unexpected exception with full queue" do
+        original_buffer = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = 1
+
+        queues, controller, stream = setup_stream_test(component_count: 1)
+
+        write_count = 0
+        allow(stream).to receive(:write) do |_chunk|
+          write_count += 1
+          raise ArgumentError, "unexpected encoding error" if write_count == 2
+        end
+
+        # The key assertion: completes within timeout (no deadlock).
+        # The ArgumentError is handled by Async's task machinery.
+        expect do
+          Timeout.timeout(5) do
+            run_stream(controller) do |_parent|
+              10.times { |i| queues[0].enqueue("Chunk#{i}") }
+              queues[0].close
+              sleep 0.5
+            end
+          end
+        end.not_to raise_error
+      ensure
+        ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = original_buffer
       end
     end
   end

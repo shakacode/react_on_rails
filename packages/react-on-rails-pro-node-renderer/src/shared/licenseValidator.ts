@@ -102,7 +102,7 @@ function decodeLicense(licenseString: string): LicenseData | undefined {
  */
 function checkPlan(decodedData: LicenseData): LicenseStatus {
   const { plan } = decodedData;
-  if (!plan) {
+  if (plan == null) {
     return 'valid'; // No plan field = valid (backwards compat with old paid licenses)
   }
   if (VALID_PLANS.includes(plan as ValidPlan)) {
@@ -260,7 +260,7 @@ function determineLicensePlan(): ValidPlan | undefined {
   }
 
   const { plan } = decodedData;
-  if (!plan || !VALID_PLANS.includes(plan as ValidPlan)) {
+  if (plan == null || !VALID_PLANS.includes(plan as ValidPlan)) {
     return undefined;
   }
 

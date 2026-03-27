@@ -3,8 +3,8 @@ name: Generator tests # TODO needs to be duplicated for RoR Pro
 on:
   push:
     branches:
-      - 'master'
-    # Always trigger on master; docs-only detection handles skipping heavy jobs
+      - 'main'
+    # Always trigger on main; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -54,12 +54,12 @@ jobs:
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
-      - name: Guard docs-only master pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: ./.github/actions/ensure-master-docs-safety
+      - name: Guard docs-only main pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/ensure-main-docs-safety
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
@@ -72,8 +72,8 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          # Determine if we should run full matrix (master, workflow_dispatch, force_run, or full-ci label)
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]] || \
+          # Determine if we should run full matrix (main, workflow_dispatch, force_run, or full-ci label)
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
              [[ "${{ inputs.force_run }}" == "true" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
@@ -86,14 +86,14 @@ jobs:
 
   examples:
     needs: [detect-changes, setup-matrix]
-    # Run on master, workflow_dispatch, OR when generators needed
+    # Run on main, workflow_dispatch, OR when generators needed
     if: |
       !(
         github.event_name == 'push' &&
-        github.ref == 'refs/heads/master' &&
+        github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/main' ||
         github.event_name == 'workflow_dispatch' ||
         needs.detect-changes.outputs.run_generators == 'true'
       )

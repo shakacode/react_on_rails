@@ -181,13 +181,13 @@ module ReactOnRails
       end
 
       def template_translations
-        <<-JS.strip_heredoc
+        <<~JS
           export const translations = #{@translations};
         JS
       end
 
       def template_default
-        <<-JS.strip_heredoc
+        <<~JS
           import { defineMessages } from 'react-intl';
 
           const defaultLocale = '#{default_locale}';

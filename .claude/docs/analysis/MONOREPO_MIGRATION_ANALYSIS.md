@@ -240,7 +240,7 @@ task node_package: "node_package:build"
 ```
 .conductor/surabaya-v1/.claude/docs/
 ├── testing-build-scripts.md      # Critical for path verification
-├── master-health-monitoring.md   # CI status checks
+├── main-health-monitoring.md     # CI status checks
 ├── managing-file-paths.md        # Path validation after refactors
 └── analysis/                     # Analysis documents
 ```
