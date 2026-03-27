@@ -4,15 +4,15 @@ React on Rails Pro packages are published publicly on npmjs.org and RubyGems.org
 
 **Upgrading from GitHub Packages?** See the [Upgrading Guide](./updating.md) for migration instructions.
 
-Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) to see what version you want.
+Check the [CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) to see what version you want.
 
 ## Version Format
 
-For the commands below, choose versions from the CHANGELOG and replace placeholders like
+For the commands below, choose versions 16.4.0 or greater from the CHANGELOG and replace placeholders like
 `<gem_version>` and `<npm_version>`. Note that for pre-release versions:
 
-- Gems use all periods: `16.2.0.beta.1`
-- NPM packages use dashes: `16.2.0-beta.1`
+- Gems use all periods: `16.4.0.beta.1`
+- NPM packages use dashes: `16.4.0-beta.1`
 
 # Generator Installation (Recommended)
 
@@ -98,7 +98,7 @@ The sections below describe manual installation steps. Use these if you need fin
 
 ## Prerequisites
 
-Ensure your **Rails** app is using the **react_on_rails** gem, version 16.0.0 or higher.
+Ensure your **Rails** app is using the **react_on_rails** gem, version 16.4.0 or higher.
 
 ## Install react_on_rails_pro Gem
 
@@ -132,7 +132,7 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 ⚠️ **Security Warning**: Never commit your license token to version control. For production, use environment variables or secure secret management systems (Rails credentials, Heroku config vars, AWS Secrets Manager, etc.).
 
-For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md).
+For complete license setup instructions, see [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md).
 
 ## Rails Configuration
 

@@ -457,7 +457,7 @@ module ReactOnRails
           puts Rainbow("   1. Upgrade to Shakapacker 9.4.0 or later:").cyan
           puts Rainbow("      bundle update shakapacker").cyan.bold
           puts Rainbow("   2. Or switch to a script-based hook with a self-guard.").cyan
-          puts Rainbow("      See: https://www.shakacode.com/react-on-rails/docs/building-features/process-managers").cyan
+          puts Rainbow("      See: https://reactonrails.com/docs/building-features/process-managers").cyan
           puts ""
         end
         # rubocop:enable Metrics/AbcSize
@@ -889,7 +889,7 @@ module ReactOnRails
             #{Rainbow('📖 DOCUMENTATION:').cyan.bold}
             #{Rainbow('•').yellow} #{Rainbow('Testing & dev server guide:').white} #{Rainbow('docs/oss/building-features/dev-server-and-testing.md').green}
             #{Rainbow('•').yellow} #{Rainbow('Testing configuration:').white} #{Rainbow('docs/oss/building-features/testing-configuration.md').green}
-            #{Rainbow('•').yellow} #{Rainbow('Full docs:').white} #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Full docs:').white} #{Rainbow('https://reactonrails.com/docs/').cyan.underline}
           TROUBLESHOOTING
         end
         # rubocop:enable Metrics/AbcSize

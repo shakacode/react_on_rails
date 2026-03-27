@@ -6,7 +6,7 @@ require "timeout"
 module ReactOnRailsPro
   class CompressionMiddlewareGuard
     COMPATIBILITY_GUIDE_PATH =
-      "https://www.shakacode.com/react-on-rails/docs/building-features/" \
+      "https://reactonrails.com/docs/building-features/" \
       "streaming-server-rendering/#compression-middleware-compatibility"
     PROBLEMATIC_MIDDLEWARES = %w[Rack::Deflater Rack::Brotli].freeze
     PROBE_TIMEOUT_SECONDS = 1

@@ -15,7 +15,7 @@ These gems provide advanced integration of React with [shakacode/shakapacker](ht
 | [react-rails](https://github.com/reactjs/react-rails)                   | ✅              | ✅                          |              |                       |                         |          |
 | [webpacker-react](https://github.com/renchap/webpacker-react)           | ✅              |                             |              |                       |                         |          |
 
-Note, Node SSR for React on Rails requires [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/).
+Note, Node SSR for React on Rails requires [React on Rails Pro](https://reactonrails.com/docs/pro/).
 
 ---
 
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 You may see a warning like this when building a Webpack bundle using any version of React below 18:
 
-```
+```text
 Module not found: Error: Can't resolve 'react-dom/client' in ....
 ```
 

@@ -91,6 +91,13 @@ export default function Providers({ children, user }) {
 }
 ```
 
+```erb
+<%# ERB view — Rails passes the data as props %>
+<%= stream_react_component("ProductPage",
+      props: { user: current_user.as_json(only: [:id, :name]),
+               product: @product.as_json(include: [:specs, :reviews]) }) %>
+```
+
 ```jsx
 // ProductPage.jsx -- Server Component (registered with registerServerComponent)
 import Providers from './providers';
@@ -113,49 +120,36 @@ export default function ProductPage({ user, product }) {
 
 **Key insight:** Components that don't need context (static header, footer) stay **outside** the provider wrapper, keeping them as Server Components with zero JavaScript cost.
 
-## Pattern 3: Streaming Slow Data with Async Props
+## Pattern 3: Streaming Slow Data
 
-> **Note:** This section covers a cross-cutting concern (data fetching via async props) that affects how you structure context and state. For the full treatment of data fetching patterns, see [Data Fetching Migration](rsc-data-fetching.md).
+> **Note:** This section covers a cross-cutting concern (data fetching via `stream_react_component`) that affects how you structure context and state. For the full treatment of data fetching patterns, see [Data Fetching Migration](rsc-data-fetching.md).
 
-In React on Rails, data comes from Rails as props. Some data is available immediately (user session, page title), but other data requires expensive queries (analytics, recommendations, external APIs). With **async props**, you send the fast data as regular props so the shell renders immediately, and stream the slow data in the background as it becomes ready.
+In React on Rails, data comes from Rails as props. Rails fetches all data in the controller and passes it to `stream_react_component`, which uses React's streaming SSR to deliver the rendered HTML progressively.
 
 ```erb
-<%= stream_react_component_with_async_props("ProductPage",
-      props: { name: product.name, price: product.price }) do |emit|
-  # These run in the background while the shell renders
-  emit.call("reviews", product.reviews.includes(:author).as_json)
-  emit.call("recommendations", RecommendationService.for(product).as_json)
-end %>
+<%= stream_react_component("ProductPage",
+      props: { name: product.name, price: product.price,
+               reviews: product.reviews.includes(:author).as_json,
+               recommendations: RecommendationService.for(product).as_json }) %>
 ```
 
-The component renders its shell (`name`, `price`) instantly. Each async prop streams in when Rails finishes computing it, filling in Suspense boundaries progressively:
+The component renders with all data available as props. `stream_react_component` uses React's streaming SSR to deliver the HTML progressively:
 
 ```jsx
 // ProductPage.jsx -- Server Component
-import { Suspense } from 'react';
-
-export default function ProductPage({ name, price, getReactOnRailsAsyncProp }) {
-  const reviewsPromise = getReactOnRailsAsyncProp('reviews');
-  const recommendationsPromise = getReactOnRailsAsyncProp('recommendations');
-
+export default function ProductPage({ name, price, reviews, recommendations }) {
   return (
     <div>
       <h1>{name}</h1>
       <p>${price}</p>
 
-      <Suspense fallback={<p>Loading reviews...</p>}>
-        <Reviews reviewsPromise={reviewsPromise} />
-      </Suspense>
-      <Suspense fallback={<p>Loading recommendations...</p>}>
-        <Recommendations itemsPromise={recommendationsPromise} />
-      </Suspense>
+      <ReviewList reviews={reviews} />
+      <RecommendationList items={recommendations} />
     </div>
   );
 }
 
-// Server Component -- awaits the streamed prop
-async function Reviews({ reviewsPromise }) {
-  const reviews = await reviewsPromise;
+function ReviewList({ reviews }) {
   return (
     <ul>
       {reviews.map((r) => (
@@ -166,11 +160,11 @@ async function Reviews({ reviewsPromise }) {
 }
 ```
 
-`getReactOnRailsAsyncProp(key)` returns a cached Promise (same object on repeated calls), so you can pass it to multiple children -- Server Components `await` it, Client Components resolve it with `use()`. No `React.cache()` or Context wiring needed.
+All props are available immediately in the component. `stream_react_component` handles progressive HTML delivery via React's `renderToPipeableStream`.
 
 > **Note:** `React.cache()` is only available in React Server Component environments. It is not available in client components or non-RSC server rendering (e.g., `renderToString`).
 
-> For the full async props API, TypeScript typing, and more examples, see [Data Fetching in React on Rails Pro](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
+> For more streaming patterns and examples, see [Data Fetching in React on Rails Pro](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro).
 
 ## Migrating Global State Libraries
 
@@ -220,7 +214,7 @@ export default function ReduxProvider({ children }) {
 ```
 
 ```jsx
-// ProductPage.jsx -- Server Component (migrated)
+// ProductPage.jsx -- Server Component (migrated, receives product as Rails prop)
 import ReduxProvider from './ReduxProvider';
 import ProductSpecs from './ProductSpecs';
 import AddToCartButton from './AddToCartButton';
@@ -274,13 +268,13 @@ Zustand and Jotai follow the same pattern as Redux: keep all store access in Cli
 
 RSC reduces the need for global state libraries because data fetching moves to the server:
 
-| Use Case                                                        | Recommended Approach                                                                             |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Server data (read-only display)                                 | Rails controller props → Server Component renders directly                                       |
-| Server data (slow, shouldn't block the shell)                   | [Async props](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with Suspense boundaries |
-| Server data (with client cache/revalidation)                    | TanStack Query with prefetch + hydrate                                                           |
-| Client UI state (modals, forms, selections)                     | `useState` / Context in Client Components                                                        |
-| Complex client state (undo/redo, shared across many components) | Redux Toolkit in Client Components                                                               |
+| Use Case                                                        | Recommended Approach                                                                                |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Server data (read-only display)                                 | Rails controller props → Server Component renders directly                                          |
+| Server data (slow, shouldn't block the shell)                   | [Streaming](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) with `stream_react_component` |
+| Server data (with client cache/revalidation)                    | TanStack Query with prefetch + hydrate                                                              |
+| Client UI state (modals, forms, selections)                     | `useState` / Context in Client Components                                                           |
+| Complex client state (undo/redo, shared across many components) | Redux Toolkit in Client Components                                                                  |
 
 ## Specific Provider Patterns
 
@@ -417,6 +411,94 @@ export default function InteractiveFilters() {
 }
 ```
 
+## Common Mistakes
+
+### Mistake 1: Wrapping the entire tree in providers unnecessarily
+
+Wrapping the entire component tree in a `'use client'` provider works correctly -- children passed from a Server Component remain Server Components (this is the "children as props" pattern). However, wrapping more than necessary has real costs:
+
+- Every child that **consumes** the context (via `useContext`) must be a Client Component
+- Provider scope is broader than needed, making refactoring harder
+- Context value changes trigger re-renders across a wider subtree
+
+Narrow the provider scope to only the subtree that actually needs the context:
+
+```jsx
+// WIDER THAN NEEDED: Header and Footer don't use this context,
+// but they're inside the provider scope unnecessarily
+export default function ProductPage({ user, product }) {
+  return (
+    <Providers user={user}>
+      <Header />
+      <ProductDetails product={product} />
+      <Footer />
+    </Providers>
+  );
+}
+```
+
+```jsx
+// BETTER: Only wrap components that actually need context
+export default function ProductPage({ user, product }) {
+  return (
+    <div>
+      <Header /> {/* Server Component -- outside provider scope */}
+      <Providers user={user}>
+        <ProductDetails product={product} />
+      </Providers>
+      <Footer /> {/* Server Component -- outside provider scope */}
+    </div>
+  );
+}
+```
+
+### Mistake 2: Passing the entire I18n translation tree
+
+`I18n.t('.')` returns every translation key for the locale, which can be thousands of entries. Serializing this into props bloats the HTML page and the RSC payload:
+
+```ruby
+# BAD: Sends the entire translation tree (potentially hundreds of KB)
+messages: I18n.t('.').deep_stringify_keys
+
+# GOOD: Send only the subset this page needs
+messages: I18n.t('product_page').deep_stringify_keys
+```
+
+### Mistake 3: Reading Redux store in Server Components
+
+Server Components render once on the server and never re-render. They cannot subscribe to store changes:
+
+```jsx
+// BAD: useSelector is a hook -- breaks in Server Components
+export default function Dashboard({ user }) {
+  const theme = useSelector((state) => state.theme); // ERROR
+  return <div className={theme}>...</div>;
+}
+```
+
+**Fix:** Keep the component as a Client Component (add `'use client'`), or pass the value from Rails as a prop to a Server Component that doesn't need the Redux store.
+
+### Mistake 4: Creating new QueryClient on every render
+
+If the `QueryClient` is created without `useState`, React creates a new instance on every render, losing the cache:
+
+```jsx
+// BAD: New QueryClient on every render -- cache is lost
+'use client';
+export default function QueryProvider({ children }) {
+  const queryClient = new QueryClient(); // Re-created each render!
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+
+// GOOD: useState ensures single instance
+'use client';
+import { useState } from 'react';
+export default function QueryProvider({ children }) {
+  const [queryClient] = useState(() => new QueryClient());
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
+```
+
 ## Migration Checklist
 
 ### Phase 1: Audit
@@ -436,8 +518,8 @@ export default function InteractiveFilters() {
 
 ### Phase 3: Replace Server-Side Context Usage
 
-7. Replace `useContext` in data-fetching components with Rails controller props or async props
-8. For data shared between Server and Client Components, pass async prop promises directly as props (no Context needed)
+7. Replace `useContext` in data-fetching components with Rails controller props
+8. For data shared between Server and Client Components, pass data directly as props (no Context needed)
 9. Remove Context providers that only existed to pass server data down the tree
 
 ### Phase 4: State Management Libraries

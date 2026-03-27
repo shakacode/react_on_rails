@@ -75,24 +75,43 @@ if [ -n "$CONDUCTOR_ROOT_PATH" ]; then
     fi
 fi
 
-# Install Ruby dependencies
+# Install the bundler version each lockfile expects so that `bundle install`
+# does not re-resolve platform gems (e.g., sqlite3 native vs source).
+# Lockfiles record BUNDLED WITH <version>; a different major (4.x vs 2.x)
+# can silently rewrite platform resolution.
+install_matching_bundler() {
+    local lockfile="$1"
+    if [[ -f "$lockfile" ]]; then
+        local v
+        v=$(grep -A1 "BUNDLED WITH" "$lockfile" | tail -1 | tr -d ' ')
+        if [[ -n "$v" ]]; then
+            if ! run_cmd gem list bundler -i -v "$v" > /dev/null 2>&1; then
+                echo "   Installing bundler $v (expected by $lockfile)..."
+                run_cmd gem install bundler -v "$v" --no-document
+            fi
+        fi
+    fi
+}
+
+LOCKFILE_DIRS=(
+    "."
+    "react_on_rails/spec/dummy"
+    "react_on_rails_pro"
+    "react_on_rails_pro/spec/dummy"
+)
+
+echo "💎 Ensuring matching bundler versions..."
+for dir in "${LOCKFILE_DIRS[@]}"; do
+    install_matching_bundler "$dir/Gemfile.lock"
+done
+
 echo "💎 Installing Ruby dependencies..."
-run_cmd bundle install
-
-echo "💎 Installing Ruby dependencies for spec/dummy..."
-pushd react_on_rails/spec/dummy > /dev/null
-run_cmd bundle install
-popd > /dev/null
-
-echo "💎 Installing Ruby dependencies for react_on_rails_pro..."
-pushd react_on_rails_pro > /dev/null
-run_cmd bundle install
-popd > /dev/null
-
-echo "💎 Installing Ruby dependencies for react_on_rails_pro/spec/dummy..."
-pushd react_on_rails_pro/spec/dummy > /dev/null
-run_cmd bundle install
-popd > /dev/null
+for dir in "${LOCKFILE_DIRS[@]}"; do
+    echo "   $dir ..."
+    pushd "$dir" > /dev/null
+    run_cmd bundle install
+    popd > /dev/null
+done
 
 # Enable corepack for pnpm (this project uses pnpm, not yarn)
 echo "📦 Enabling corepack for pnpm..."

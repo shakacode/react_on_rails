@@ -1,10 +1,10 @@
-# Master Branch Health Monitoring
+# Main Branch Health Monitoring
 
-**CRITICAL: Master staying broken affects the entire team. Don't let it persist.**
+**CRITICAL: Main staying broken affects the entire team. Don't let it persist.**
 
 ## Immediate Actions After Your PR Merges
 
-Within 30 minutes of your PR merging to master:
+Within 30 minutes of your PR merging to main:
 
 1. **Check CI status:**
 
@@ -12,14 +12,14 @@ Within 30 minutes of your PR merging to master:
    # View the merged PR's CI status
    gh pr view <your-pr-number> --json statusCheckRollup
 
-   # Or check recent master runs
-   gh run list --branch master --limit 5
+   # Or check recent main runs
+   gh run list --branch main --limit 5
    ```
 
 2. **If you see failures:**
    - Investigate IMMEDIATELY
    - Don't assume "someone else will fix it"
-   - You are responsible for ensuring your PR doesn't break master
+   - You are responsible for ensuring your PR doesn't break main
 
 ## Polling CI Status While Waiting
 
@@ -46,18 +46,18 @@ bin/ci-rerun-failures  # Automatically waits for in-progress CI, polling every 3
 - 180 seconds (3 minutes) is too slow—you waste time waiting unnecessarily
 - GitHub API rate limits are 5000 requests/hour, so 30-second polls are fine
 
-## When You Discover Master is Broken
+## When You Discover Main is Broken
 
 1. **Determine if it's from your PR:**
 
    ```bash
-   gh run list --branch master --limit 10
+   gh run list --branch main --limit 10
    ```
 
 2. **Take immediate action:**
    - If your PR broke it: Submit a fix PR within the hour, OR revert and resubmit
    - If unsure: Investigate and communicate with team
-   - Never leave master broken overnight
+   - Never leave main broken overnight
 
 ## Silent Failures are Most Dangerous
 
@@ -84,6 +84,6 @@ Some failures don't show up in standard CI:
 
 **What this means:**
 
-- If master workflows fail, reruns alone won't fix the circular dependency
+- If main workflows fail, reruns alone won't fix the circular dependency
 - You need a new commit that passes to establish a clean baseline
 - See [PR #2065](https://github.com/shakacode/react_on_rails/pull/2065) for an example of breaking the cycle

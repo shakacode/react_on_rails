@@ -314,7 +314,7 @@ RSpec.describe "update_changelog.rake helper methods" do
         #### Fixed
         - Older fix
 
-        [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.1...master
+        [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.1...main
         [16.4.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.0...16.4.0.rc.1
         [16.4.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0.rc.0
         [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
@@ -322,7 +322,7 @@ RSpec.describe "update_changelog.rake helper methods" do
 
       result = cleanup_collapsed_prerelease_links(changelog, "16.4.0")
 
-      expect(result).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master")
+      expect(result).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...main")
       expect(result).not_to include("[16.4.0.rc.1]:")
       expect(result).not_to include("[16.4.0.rc.0]:")
       expect(result).to include("[16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0")
@@ -332,14 +332,14 @@ RSpec.describe "update_changelog.rake helper methods" do
       changelog = <<~CHANGELOG
         ### [Unreleased]
 
-        [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.8...master
+        [unreleased]: https://github.com/shakacode/react_on_rails/compare/16.4.0.rc.8...main
         [16.4.0.rc.8]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...16.4.0.rc.8
         [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
       CHANGELOG
 
       result = cleanup_collapsed_prerelease_links(changelog, "16.4.0")
 
-      expect(result).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master")
+      expect(result).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...main")
       expect(result).not_to include("[16.4.0.rc.8]:")
       expect(result).to include("[16.3.0]:")
     end
@@ -348,7 +348,7 @@ RSpec.describe "update_changelog.rake helper methods" do
       changelog = <<~CHANGELOG
         ### [Unreleased]
 
-        [unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.1...master
+        [unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.1...main
         [16.4.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.4.0.rc.0...v16.4.0.rc.1
         [16.4.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0.rc.0
         [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
@@ -356,7 +356,7 @@ RSpec.describe "update_changelog.rake helper methods" do
 
       result = cleanup_collapsed_prerelease_links(changelog, "16.4.0")
 
-      expect(result).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master")
+      expect(result).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...main")
       expect(result).not_to include("[16.4.0.rc.1]:")
       expect(result).not_to include("[16.4.0.rc.0]:")
       expect(result).to include("[16.3.0]:")
@@ -366,7 +366,7 @@ RSpec.describe "update_changelog.rake helper methods" do
       changelog = <<~CHANGELOG
         ### [Unreleased]
 
-        [unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master
+        [unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...main
         [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
       CHANGELOG
 
@@ -378,12 +378,12 @@ RSpec.describe "update_changelog.rake helper methods" do
 
   describe "#update_changelog_links" do
     it "updates [unreleased] and adds a new version compare link" do
-      changelog = +"[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...master\n" \
+      changelog = +"[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...main\n" \
                    "[16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0\n"
 
       update_changelog_links(changelog, "16.4.0", "[16.4.0]")
 
-      expect(changelog).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...master")
+      expect(changelog).to include("[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...main")
       expect(changelog).to include("[16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0")
     end
 

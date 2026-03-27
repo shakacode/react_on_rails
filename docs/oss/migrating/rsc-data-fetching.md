@@ -61,70 +61,59 @@ Rails prepares the data in the controller and passes it as props. The component 
 - No loading spinner needed in the component itself
 - No JavaScript ships to the client for this component
 
-For pages with multiple data sources that should stream progressively, use [async props](#data-fetching-in-react-on-rails-pro) to receive data incrementally with Suspense.
+For pages with multiple data sources, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro) to stream the rendered HTML progressively.
 
 ## Data Fetching in React on Rails Pro
 
-In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **async props** -- a streaming mechanism where Rails sends props incrementally through its normal controller/view layers.
+In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to deliver HTML progressively.
 
 This is the recommended data fetching pattern for React on Rails because:
 
 - It preserves Rails' controller/model/view architecture
 - It leverages Rails' existing data access layers (ActiveRecord, authorization, caching)
-- It supports streaming for progressive rendering with Suspense
-- Sync props render immediately; async props stream in as they become available
+- It supports streaming SSR for progressive HTML delivery
+- All data passes as props -- no client-side fetching or loading states needed
 
-### How Async Props Work
+### How Streaming Works
 
 **Rails view (ERB):**
 
 ```erb
-<%= stream_react_component_with_async_props("ProductPage",
-      props: { name: product.name, price: product.price }) do |emit|
-  # Sync props (name, price) are sent immediately and render right away.
-  # Async props stream in when ready:
-  emit.call("reviews", product.reviews.as_json)
-  emit.call("recommendations", product.recommended_products.as_json)
-end %>
+<%= stream_react_component("ProductPage",
+      props: { name: product.name,
+               price: product.price,
+               reviews: product.reviews.includes(:author).as_json,
+               recommendations: product.recommended_products.as_json }) %>
 ```
 
-> **See also:** [`stream_react_component_with_async_props` RSC tutorial](../../pro/react-server-components/tutorial.md) for setup instructions and configuration options.
+> **See also:** [React on Rails Pro streaming SSR](../../pro/streaming-ssr.md) for setup instructions and configuration options.
 
 **React component (Server Component):**
 
 ```tsx
-import { Suspense } from 'react';
-import type { WithAsyncProps } from 'react-on-rails-pro';
+type Props = {
+  name: string;
+  price: number;
+  reviews: Review[];
+  recommendations: Product[];
+};
 
-type SyncProps = { name: string; price: number };
-type AsyncProps = { reviews: Review[]; recommendations: Product[] };
-type Props = WithAsyncProps<AsyncProps, SyncProps>;
-
-export default function ProductPage({ name, price, getReactOnRailsAsyncProp }: Props) {
-  const reviewsPromise = getReactOnRailsAsyncProp('reviews');
-  const recommendationsPromise = getReactOnRailsAsyncProp('recommendations');
-
+export default function ProductPage({ name, price, reviews, recommendations }: Props) {
   return (
     <div>
       <h1>{name}</h1>
       <p>${price}</p>
 
-      <Suspense fallback={<p>Loading reviews...</p>}>
-        <Reviews reviews={reviewsPromise} />
-      </Suspense>
-      <Suspense fallback={<p>Loading recommendations...</p>}>
-        <Recommendations items={recommendationsPromise} />
-      </Suspense>
+      <ReviewList reviews={reviews} />
+      <RecommendationList items={recommendations} />
     </div>
   );
 }
 
-// Async Server Component -- awaits the streamed prop
-async function Reviews({ reviews }: { reviews: Promise<Review[]> }) {
-  const resolved = await reviews;
+function ReviewList({ reviews }: { reviews: Review[] }) {
   return (
     <ul>
-      {resolved.map((r) => (
+      {reviews.map((r) => (
         <li key={r.id}>{r.text}</li>
       ))}
     </ul>
@@ -134,54 +123,13 @@ async function Reviews({ reviews }: { reviews: Promise<Review[]> }) {
 
 **How it works:**
 
-1. Sync props (`name`, `price`) render immediately -- the component shows content right away
-2. `getReactOnRailsAsyncProp('reviews')` returns a promise that resolves when Rails calls `emit.call("reviews", ...)`
-3. Each `<Suspense>` boundary shows its fallback until the corresponding async prop arrives
-4. Rails can perform expensive operations (database queries, external API calls) between `emit.call` invocations
-5. Content streams progressively to the browser as each async prop resolves
+1. Rails passes all data as props to `stream_react_component`
+2. `stream_react_component` uses React's `renderToPipeableStream` for streaming SSR
+3. The HTML streams progressively to the browser as React renders the component tree
+4. No client-side fetching, loading states, or error handling needed
+5. The component renders with zero JavaScript cost as a Server Component
 
-### Simulating Delayed Data
-
-In development, you can add `sleep` calls to simulate slow data sources and see how streaming behaves:
-
-```erb
-<%= stream_react_component_with_async_props("Dashboard",
-      props: { title: "My Dashboard" }) do |emit|
-  sleep 1  # Simulate slow database query
-  emit.call("stats", DashboardStats.compute.as_json)
-
-  sleep 2  # Simulate external API call
-  emit.call("notifications", Notification.recent.as_json)
-end %>
-```
-
-The `title` prop renders instantly. After 1 second, stats stream in. After another 2 seconds, notifications appear. Each section fills in independently thanks to Suspense boundaries.
-
-### TypeScript Typing
-
-The `WithAsyncProps` type ensures type safety for both sync and async props:
-
-```tsx
-import type { WithAsyncProps } from 'react-on-rails-pro';
-
-// Define sync and async prop shapes separately
-type SyncProps = { title: string };
-type AsyncProps = {
-  users: User[];
-  posts: Post[];
-};
-
-// WithAsyncProps<AsyncProps, SyncProps> produces:
-// {
-//   title: string;
-//   getReactOnRailsAsyncProp: <K extends 'users' | 'posts'>(key: K) => Promise<AsyncProps[K]>;
-// }
-type Props = WithAsyncProps<AsyncProps, SyncProps>;
-```
-
-`getReactOnRailsAsyncProp` is fully typed -- calling `getReactOnRailsAsyncProp('users')` returns `Promise<User[]>`, and passing an invalid key is a compile-time error.
-
-> **More details:** For setup instructions, configuration options, and the RSC payload variant (`rsc_payload_react_component_with_async_props`), see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
+> **More details:** For setup instructions and configuration options, see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
 
 ## Migrating from React Query / TanStack Query
 
@@ -217,7 +165,7 @@ function ProductList() {
 ```
 
 ```jsx
-// After: Server Component -- receives data from Rails controller props
+// After: Server Component -- receives data as Rails props
 function ProductList({ products }) {
   return (
     <ul>
@@ -229,11 +177,17 @@ function ProductList({ products }) {
 }
 ```
 
-> **React on Rails note:** In React on Rails, the controller prepares the data and passes it as props -- no `async/await` in the component, no direct data layer calls. For data that's slow to compute, use [async props](#data-fetching-in-react-on-rails-pro) to stream it in progressively with Suspense. The generic `async function` + `await` pattern shown in other RSC frameworks bypasses Rails' authorization and caching layers and is not recommended.
+```erb
+<%# ERB view — Rails passes the data as props %>
+<%= stream_react_component("ProductList",
+      props: { products: Product.limit(50).as_json }) %>
+```
 
-### Pattern 2: Rails Props as Initial Data (Keep React Query for Client Features)
+> **React on Rails note:** The controller prepares the data and passes it as props. The component simply renders it: no `async/await`, no direct data layer calls, and no loading state on first render. For data that's slow to compute, use [async props](#data-fetching-in-react-on-rails-pro) to stream it progressively with Suspense.
 
-When you need React Query's client features (background refetching, mutations, optimistic updates), pass Rails controller props as `initialData` so the component renders instantly with server data, then React Query takes over for client-side updates:
+### Pattern 2: Rails Props as `initialData` (Keep React Query for Client Features)
+
+When you need React Query's client features (background refetching, mutations, optimistic updates), pass Rails props as `initialData` so the component renders immediately and React Query takes over for subsequent updates:
 
 ```jsx
 // ReactQueryProvider.jsx -- Client Component (provides QueryClient)
@@ -244,16 +198,12 @@ import { useState } from 'react';
 
 export default function ReactQueryProvider({ children }) {
   const [queryClient] = useState(() => new QueryClient());
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 ```
 
 ```jsx
-// ProductsPage.jsx -- Server Component (receives data from Rails controller props)
+// ProductsPage.jsx -- Server Component (receives data from Rails props)
 import ReactQueryProvider from './ReactQueryProvider';
 import ProductList from './ProductList';
 
@@ -276,7 +226,9 @@ export default function ProductList({ initialProducts }) {
   const { data: products } = useQuery({
     queryKey: ['products'],
     queryFn: () => fetch('/api/products').then((res) => res.json()),
-    initialData: initialProducts, // Rails data renders instantly, React Query refetches in background
+    initialData: initialProducts, // Rails data renders instantly on first render
+    initialDataUpdatedAt: Date.now(), // Marks the data as fresh as of client render time
+    staleTime: 5 * 60 * 1000, // Treat Rails-fetched data as fresh for 5 min
   });
 
   return (
@@ -291,26 +243,40 @@ export default function ProductList({ initialProducts }) {
 }
 ```
 
+```erb
+<%# ERB view — Rails passes the data as props %>
+<%= stream_react_component("ProductsPage",
+      props: { products: Product.limit(50).as_json }) %>
+```
+
 **How it works:**
 
-1. Rails controller prepares the data and passes `products` as props
-2. Server Component passes the data to `ProductList` as `initialData`
-3. `useQuery` renders immediately with the Rails data -- no loading state on first render
-4. React Query handles background refetching, stale-while-revalidate, and cache management
+1. Rails controller fetches products and passes them as props
+2. Server Component passes the data to the Client Component as `initialProducts`
+3. React Query uses `initialData` to populate the cache with no loading state on first render
+4. Subsequent refetches happen client-side as usual
+
+> **Note:** `initialDataUpdatedAt: Date.now()` uses the client render timestamp, not the actual Rails fetch time. This is close enough for most apps. For precise control, pass a timestamp from your Rails controller (e.g., `(Time.now.to_f * 1000).to_i`) as a prop and use that instead. If you don't need timed refetching at all, use `staleTime: Infinity` to prevent automatic refetches entirely.
 
 > **Alternative:** For complex cases with many queries, you can use TanStack Query's `dehydrate`/`HydrationBoundary` pattern to prefetch and seed the entire QueryClient cache on the server. See the [TanStack Query SSR docs](https://tanstack.com/query/latest/docs/framework/react/guides/ssr) for details.
 
 ## Migrating from SWR
 
-SWR follows a similar pattern -- pass Rails controller props as `fallbackData` so the component renders instantly with server data:
+SWR follows a similar pattern -- pass Rails props as `fallbackData` so the component renders immediately and SWR takes over for revalidation:
 
 ```jsx
-// DashboardPage.jsx -- Server Component (receives data from Rails controller props)
+// DashboardPage.jsx -- Server Component
 import DashboardStats from './DashboardStats';
 
 export default function DashboardPage({ stats }) {
   return <DashboardStats fallbackData={stats} />;
 }
+```
+
+```erb
+<%# ERB view — Rails passes the data as props %>
+<%= stream_react_component("DashboardPage",
+      props: { stats: DashboardStats.compute.as_json }) %>
 ```
 
 ```jsx
@@ -337,209 +303,149 @@ export default function DashboardStats({ fallbackData }) {
 
 ## Avoiding Server-Side Waterfalls
 
-> **React on Rails note:** In React on Rails, the primary way to handle parallel data loading is [async props](#data-fetching-in-react-on-rails-pro) -- Rails emits each prop independently, and Suspense boundaries stream them to the browser as they resolve. The patterns below apply when you have async Server Components that fetch data directly (outside the async props flow).
+> **React on Rails note:** The primary React on Rails solutions are controller props and [async props](#data-fetching-in-react-on-rails-pro). The most common waterfall is sequential data fetching in the Rails controller, where each query delays the entire render.
 
-The most critical performance pitfall with Server Components is sequential data fetching. When one `await` blocks the next, you create a waterfall on the server:
+### The Problem: Sequential Queries
 
-### The Problem: Sequential Fetching
+```ruby
+# BAD: Each query blocks the next (750ms total)
+def show
+  @user = User.find(params[:user_id])          # 200ms
+  @stats = DashboardStats.for(@user)           # 300ms (waits for user)
+  @posts = @user.posts.recent                  # 250ms (sequential)
+  stream_view_containing_react_components(template: "dashboard/show")
+end
+```
+
+### Solution 1: Parallelize Independent Queries
+
+When data sources are independent, use Ruby threads to fetch in parallel:
+
+```ruby
+# GOOD: Fetch in parallel (300ms -- limited by slowest)
+def show
+  user_id = params[:user_id]
+  results = {}
+  threads = []
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      results[:user] = User.find(user_id).as_json
+    end
+  end
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      results[:stats] = DashboardStats.compute.as_json
+    end
+  end
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      results[:posts] = Post.recent.as_json
+    end
+  end
+  threads.each(&:join)
+  @dashboard_props = { title: "My Dashboard" }.merge(results)
+  stream_view_containing_react_components(template: "dashboard/show")
+end
+```
+
+```erb
+<%# All data fetched in parallel, rendered with streaming SSR %>
+<%= stream_react_component("Dashboard", props: @dashboard_props) %>
+```
+
+> **Note:** In production, wrap each thread body in a `rescue` to avoid incomplete results if a query fails. An unhandled exception in any thread will be re-raised by `join`.
+
+### Solution 2: Separate Components for Independent Data
+
+For data that is truly independent, render multiple `stream_react_component` calls. Each component renders as its data becomes available:
+
+```erb
+<%# Each component renders independently %>
+<%= stream_react_component("DashboardHeader",
+      props: { title: "My Dashboard" }) %>
+<%= stream_react_component("UserProfile",
+      props: { user: User.find(params[:user_id]).as_json(only: [:id, :name, :avatar_url]) }) %>
+<%= stream_react_component("StatsPanel",
+      props: { stats: DashboardStats.compute.as_json }) %>
+<%= stream_react_component("PostFeed",
+      props: { posts: Post.recent.as_json }) %>
+```
 
 ```jsx
-// BAD: Each await blocks the next
-async function Dashboard() {
-  const user = await getUser(); // 200ms
-  const stats = await getStats(user.id); // 300ms
-  const posts = await getPosts(user.id); // 250ms (also waits for user)
-  // Total: 750ms (sequential)
+// Each component is a simple Server Component
+function UserProfile({ user }) {
+  return <div>{user.name}</div>;
+}
 
+function StatsPanel({ stats }) {
   return (
     <div>
-      <UserProfile user={user} />
-      <StatsPanel stats={stats} />
-      <PostFeed posts={posts} />
+      <span>Revenue: {stats.revenue}</span>
+      <span>Users: {stats.users}</span>
     </div>
   );
 }
-```
-
-### Solution 1: `Promise.all` for Independent Fetches
-
-```jsx
-// GOOD: Independent fetches run in parallel
-async function Dashboard({ userId }) {
-  const [user, stats, posts] = await Promise.all([
-    getUser(userId), // 200ms
-    getStats(userId), // 300ms ── all start simultaneously
-    getPosts(userId), // 250ms
-  ]);
-  // Total: 300ms (limited by slowest)
-
-  return (
-    <div>
-      <UserProfile user={user} />
-      <StatsPanel stats={stats} />
-      <PostFeed posts={posts} />
-    </div>
-  );
-}
-```
-
-**Trade-off:** The page waits for the slowest fetch before rendering anything.
-
-### Solution 2: Suspense Boundaries for Streaming
-
-```jsx
-// BEST: Each section renders independently as data arrives
-async function Dashboard() {
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <Suspense fallback={<UserSkeleton />}>
-        <UserProfile /> {/* Fetches its own data */}
-      </Suspense>
-      <Suspense fallback={<StatsSkeleton />}>
-        <StatsPanel /> {/* Fetches its own data */}
-      </Suspense>
-      <Suspense fallback={<FeedSkeleton />}>
-        <PostFeed /> {/* Fetches its own data */}
-      </Suspense>
-    </div>
-  );
-}
-```
-
-Each `<Suspense>` boundary lets React stream content progressively. The user sees each section as its data completes, rather than waiting for everything.
-
-### Solution 3: Preload Pattern with `React.cache()`
-
-Start a fetch early without awaiting, then consume the result in a child component:
-
-```jsx
-import { cache } from 'react';
-
-const getComments = cache(async (postId) => {
-  return await fetchComments(postId);
-});
-
-// Export a preload function for parent components
-export const preloadComments = (id) => {
-  void getComments(id); // Start fetch, don't await
-};
-```
-
-```jsx
-// Post.jsx -- Server Component
-import { Suspense } from 'react';
-import { preloadComments, getComments, getPost } from '../lib/data';
-
-async function Post({ postId }) {
-  preloadComments(postId); // Fire and forget
-
-  const post = await getPost(postId); // This await doesn't block comments
-
-  return (
-    <>
-      <PostContent post={post} />
-      <Suspense fallback={<CommentsSkeleton />}>
-        <Comments postId={postId} />
-      </Suspense>
-    </>
-  );
-}
-
-async function Comments({ postId }) {
-  const comments = await getComments(postId); // Uses preloaded/cached result
-  return <CommentList comments={comments} />;
-}
-```
-
-### Solution 4: Mixed Strategy (Await Critical, Stream Secondary)
-
-```jsx
-async function ProductPage({ productId }) {
-  // Start secondary fetches immediately without awaiting
-  const reviewsPromise = getReviews(productId);
-  const relatedPromise = getRelatedProducts(productId);
-
-  // Only await the critical data
-  const product = await getProduct(productId);
-
-  return (
-    <div>
-      <ProductDetail product={product} />
-      <Suspense fallback={<ReviewsSkeleton />}>
-        <ReviewsSection promise={reviewsPromise} />
-      </Suspense>
-      <Suspense fallback={<RelatedSkeleton />}>
-        <RelatedSection promise={relatedPromise} />
-      </Suspense>
-    </div>
-  );
-}
-
-// ReviewsSection.jsx -- Async Server Component
-async function ReviewsSection({ promise }) {
-  const reviews = await promise;
-  return <ReviewList reviews={reviews} />;
-}
-
-async function RelatedSection({ promise }) {
-  const related = await promise;
-  return <RelatedProducts products={related} />;
-}
-```
-
-## Streaming with the `use()` Hook
-
-> **React on Rails note:** If you're using [async props](#data-fetching-in-react-on-rails-pro), `getReactOnRailsAsyncProp` already provides this promise-based pattern -- you can pass the promise to a Client Component and resolve it with `use()`. The patterns below show the general RSC mechanism.
-
-The `use()` hook lets Client Components resolve promises that were started on the server. This enables the "server-to-client promise handoff" pattern:
-
-```jsx
-// Page.jsx -- Server Component
-import { Suspense } from 'react';
-import { getPost, getComments } from '../lib/data';
-import Comments from './Comments';
-
-export default async function Page({ id }) {
-  const post = await getPost(id); // Await critical data
-  const commentsPromise = getComments(id); // Start but DON'T await
-
-  return (
-    <article>
-      <h1>{post.title}</h1>
-      <p>{post.body}</p>
-      <Suspense fallback={<p>Loading comments...</p>}>
-        <Comments commentsPromise={commentsPromise} />
-      </Suspense>
-    </article>
-  );
-}
-```
-
-```jsx
-// Comments.jsx -- Client Component
-'use client';
-
-import { use } from 'react';
-
-export default function Comments({ commentsPromise }) {
-  const comments = use(commentsPromise); // Resolves the promise
+function PostFeed({ posts }) {
   return (
     <ul>
-      {comments.map((c) => (
-        <li key={c.id}>{c.text}</li>
+      {posts.map((p) => (
+        <li key={p.id}>{p.title}</li>
       ))}
     </ul>
   );
 }
 ```
 
-**Benefits:**
+### Solution 3: Pass All Data as Props
 
-- The post renders immediately without waiting for comments
-- The promise starts on the server (close to the data source), but resolves on the client
-- `<Suspense>` shows the fallback until the promise resolves
-- The Client Component receives the data without needing its own fetch logic
+Fetch all data in the controller and pass it as props. `stream_react_component` handles progressive HTML delivery via React's streaming SSR:
+
+```erb
+<%= stream_react_component("ProductPage",
+      props: { name: product.name,
+               price: product.price,
+               reviews: product.reviews.includes(:author).as_json,
+               related: product.recommended_products.as_json }) %>
+```
+
+```jsx
+export default function ProductPage({ name, price, reviews, related }) {
+  return (
+    <div>
+      <h1>{name}</h1>
+      <p>${price}</p>
+      <ReviewList reviews={reviews} />
+      <RelatedProducts products={related} />
+    </div>
+  );
+}
+
+function ReviewList({ reviews }) {
+  return (
+    <ul>
+      {reviews.map((r) => (
+        <li key={r.id}>{r.text}</li>
+      ))}
+    </ul>
+  );
+}
+
+function RelatedProducts({ products }) {
+  return (
+    <ul>
+      {products.map((p) => (
+        <li key={p.id}>{p.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+All data is available immediately as props. `stream_react_component` streams the rendered HTML progressively to the browser.
+
+## The `use()` Hook for Client Components
+
+The `use()` hook lets Client Components resolve promises. In React on Rails, data typically arrives as resolved props from Rails, so `use()` is most relevant when combining Server Components with client-side data fetching libraries.
 
 ### Common `use()` Mistakes in Client Components
 
@@ -600,31 +506,7 @@ function Comments({ postId }) {
 }
 ```
 
-**The two safe approaches:**
-
-```jsx
-// CORRECT: Promise created in a Server Component, passed as a prop
-// Page.jsx -- Server Component
-import { Suspense } from 'react';
-
-export default async function Page({ id }) {
-  const commentsPromise = getComments(id); // Created once on the server
-  return (
-    <Suspense fallback={<p>Loading...</p>}>
-      <Comments commentsPromise={commentsPromise} />
-    </Suspense>
-  );
-}
-
-// Comments.jsx -- Client Component
-'use client';
-import { use } from 'react';
-
-export default function Comments({ commentsPromise }) {
-  const comments = use(commentsPromise); // Safe: stable reference from props
-  return <ul>{comments.map(c => <li key={c.id}>{c.text}</li>)}</ul>;
-}
-```
+**The safe approach -- use a Suspense-compatible library:**
 
 ```jsx
 // CORRECT: Suspense-compatible library (TanStack Query)
@@ -634,7 +516,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 function Comments({ postId }) {
   const { data: comments } = useSuspenseQuery({
     queryKey: ['comments', postId],
-    queryFn: () => getComments(postId), // client-side fetch wrapper — not the server-side function above
+    queryFn: () => getComments(postId), // client-side fetch wrapper
   });
   // The library manages promise identity internally —
   // same cache key returns the same promise reference.
@@ -648,13 +530,13 @@ function Comments({ postId }) {
 }
 ```
 
-> **Rule:** Never create a raw promise for `use()` inside a Client Component. Either receive it from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query or SWR.
+> **Rule:** Never create a raw promise for `use()` inside a Client Component. Use a Suspense-compatible library like TanStack Query or SWR that manages promise identity internally.
 
 ## Request Deduplication with `React.cache()`
 
-> **React on Rails note:** When using [async props](#data-fetching-in-react-on-rails-pro), `getReactOnRailsAsyncProp(key)` already returns the same cached Promise on repeated calls -- no `React.cache()` needed. The pattern below is useful when async Server Components fetch data directly outside the async props flow.
+> **React on Rails note:** In most React on Rails applications, data flows through controller props or async props, so `React.cache()` is unnecessary. This section applies when Server Components call data-fetching functions directly (for example, from the Node renderer). If you are using async props, `getReactOnRailsAsyncProp(key)` already returns the same cached Promise on repeated calls.
 
-When multiple Server Components need the same data, `React.cache()` ensures the fetch happens only once per request:
+`React.cache()` ensures a function is called only once per request, even when multiple Server Components invoke it:
 
 ```jsx
 // lib/data.js -- Define at module level
@@ -666,22 +548,11 @@ export const getUser = cache(async (id) => {
 ```
 
 ```jsx
-// Navbar.jsx -- Server Component
-import { getUser } from '../lib/data';
-
+// Navbar.jsx and Sidebar.jsx both import getUser.
+// The first call fetches; the second returns the cached result.
 async function Navbar({ userId }) {
-  const user = await getUser(userId); // Fetches once
+  const user = await getUser(userId);
   return <nav>Welcome, {user.name}</nav>;
-}
-```
-
-```jsx
-// Sidebar.jsx -- Server Component
-import { getUser } from '../lib/data';
-
-async function Sidebar({ userId }) {
-  const user = await getUser(userId); // Returns cached result, no duplicate fetch
-  return <aside>Role: {user.role}</aside>;
 }
 ```
 
@@ -692,103 +563,58 @@ async function Sidebar({ userId }) {
 - Must be defined at **module level**, not inside components
 - Only works in Server Components
 
-### Common `React.cache()` Mistakes
+> **Note:** `React.cache()` is only available in React Server Component environments. It is not available in Client Components or non-RSC server rendering (e.g., `renderToString`).
+
+For most React on Rails applications, you won't need `React.cache()` because data flows through Rails controller props.
+
+## Mutations: Rails Controllers, Not Server Actions
+
+> **Important:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which is a rendering server -- it has no access to Rails models, sessions, cookies, or CSRF protection. Do not use `'use server'` in React on Rails applications.
+
+All mutations in React on Rails should go through Rails controllers via standard forms or API endpoints:
 
 ```jsx
-// WRONG: Each file creates its own cache
-// file-a.js
-const getUser = cache(fetchUser);
-// file-b.js
-const getUser = cache(fetchUser); // Different cache instance!
+// CommentForm.jsx -- Client Component
+'use client';
 
-// CORRECT: Export from a shared module
-// lib/data.js
-export const getUser = cache(fetchUser);
-// Both files import from lib/data.js
-```
-
-```jsx
-// WRONG: Creating cache inside a component
-async function Profile({ userId }) {
-  const getUser = cache(fetchUser); // New cache every render!
-  const user = await getUser(userId);
-}
-
-// CORRECT: Define at module level
-const getUser = cache(fetchUser);
-async function Profile({ userId }) {
-  const user = await getUser(userId);
-}
-```
-
-```jsx
-// WRONG: Passing objects as arguments
-const result = cachedFn({ x: 1, y: 2 }); // Cache miss every time!
-
-// CORRECT: Pass primitives
-const result = cachedFn(1, 2);
-```
-
-## Server Actions for Mutations
-
-Server Actions let you define server-side functions that can be called directly from forms and event handlers. In React on Rails, mutations are typically handled through Rails controllers, but Server Actions can be useful for lightweight operations:
-
-```jsx
-// actions.js
-'use server';
-
-export async function createComment(formData) {
-  // Server Actions are public HTTP endpoints -- always authenticate and validate
-  const session = await getSession();
-  if (!session?.userId) throw new Error('Unauthorized');
-
-  // Validate all input -- formData can contain arbitrary values from any client
-  const content = String(formData.get('content') || '').trim();
-  const postId = Number(formData.get('postId'));
-  if (!content || content.length > 10000) throw new Error('Invalid content');
-  if (!Number.isFinite(postId) || postId <= 0) throw new Error('Invalid postId');
-
-  // In React on Rails, Server Actions run in Node.js and cannot access
-  // Rails models directly. Call your Rails API endpoint instead.
-  // Use an absolute URL and an API-only route or another non-session auth
-  // boundary, because this server-side fetch does not have the browser's
-  // CSRF token. Point RAILS_BASE_URL at Rails' internal URL (for example
-  // http://127.0.0.1:3000 in development), not the public-facing domain.
-  // If you use `protect_from_forgery with: :null_session`, add another trust
-  // check (for example signed tokens, API keys, or same-origin validation)
-  // because `null_session` avoids the CSRF failure but does not authenticate
-  // the request.
-  const railsBaseUrl = process.env.RAILS_BASE_URL;
-  if (!railsBaseUrl) {
-    throw new Error('RAILS_BASE_URL environment variable is required for Server Actions');
-  }
-  const response = await fetch(new URL('/api/comments', railsBaseUrl), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content, postId, userId: session.userId }),
-  });
-  if (!response.ok) throw new Error('Failed to create comment');
-}
-```
-
-```jsx
-// CommentForm.jsx -- works without JavaScript (progressive enhancement)
-import { createComment } from './actions';
+import { useState } from 'react';
+import ReactOnRails from 'react-on-rails';
 
 export default function CommentForm({ postId }) {
+  const [content, setContent] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const response = await fetch('/api/comments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': ReactOnRails.authenticityToken(),
+      },
+      body: JSON.stringify({ comment: { content, postId } }),
+    });
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+    setContent('');
+  }
+
   return (
-    <form action={createComment}>
-      <input type="hidden" name="postId" value={postId} />
-      <textarea name="content" />
+    <form onSubmit={handleSubmit}>
+      <textarea value={content} onChange={(e) => setContent(e.target.value)} />
       <button type="submit">Post Comment</button>
     </form>
   );
 }
 ```
 
-**Security:** Server Actions are exposed as public POST endpoints that anyone can call -- they are not restricted to your own UI. Always verify authentication and authorization before performing mutations, and validate all input. See the [runtime validation example](#runtime-validation-for-server-actions) in the Troubleshooting guide.
+```erb
+<%# ERB view %>
+<%= stream_react_component("CommentForm",
+      props: { postId: @post.id }) %>
+```
 
-**Note:** In React on Rails, most mutations flow through Rails controllers via standard forms or API endpoints. Server Actions are a React concept that can complement this when you need a direct server-side function call from the client.
+> **Note:** `ReactOnRails.authenticityToken()` reads the CSRF token from the `<meta name="csrf-token">` tag, which is the standard Rails approach. This avoids duplicating the token in component props.
+
+This preserves Rails' full controller/model layer -- authentication, authorization, CSRF protection, and validations all work as expected.
 
 ## When to Keep Client-Side Fetching
 
@@ -803,18 +629,22 @@ Not everything should move to the server. In React on Rails, most read-only data
 | User-triggered searches         | Response to client interactions            | `useState` + `fetch` or React Query |
 | Offline-first features          | Must work without server                   | Local state + sync                  |
 
-### Hybrid Pattern: Server Fetch + Client Updates
+### Hybrid Pattern: Rails Props + Client Updates
 
 For features that need server-fetched initial data with client-side updates:
 
+```erb
+<%# ERB view — Rails passes initial data as props %>
+<%= stream_react_component("ChatPage",
+      props: { channelId: @channel.id,
+               initialMessages: @channel.messages.recent.as_json }) %>
+```
+
 ```jsx
 // ChatPage.jsx -- Server Component
-import { getMessages } from '../lib/data';
 import ChatWindow from './ChatWindow';
 
-export default async function ChatPage({ channelId }) {
-  const initialMessages = await getMessages(channelId);
-
+export default function ChatPage({ channelId, initialMessages }) {
   return (
     <div>
       <ChannelHeader channelId={channelId} />
@@ -849,33 +679,31 @@ export default function ChatWindow({ channelId, initialMessages }) {
 
 ### Progressive Streaming Architecture
 
-Structure your page so critical content appears first and secondary content streams in:
+Structure your page so critical content renders alongside secondary content, with `stream_react_component` handling progressive HTML delivery:
+
+```erb
+<%# ERB view — Rails passes all data as props %>
+<%= stream_react_component("Page",
+      props: { title: @page.title,
+               main_content: @page.main_content.as_json,
+               recommendations: RecommendationService.for(@page).as_json,
+               comments: @page.comments.recent.as_json }) %>
+```
 
 ```jsx
-export default function Page() {
+export default function Page({ title, main_content, recommendations, comments }) {
   return (
     <div>
-      {/* Static shell renders immediately */}
       <Header />
+      <h1>{title}</h1>
       <nav>
         <SideNav />
       </nav>
 
       <main>
-        {/* Critical content streams first */}
-        <Suspense fallback={<MainContentSkeleton />}>
-          <MainContent />
-        </Suspense>
-
-        {/* Secondary content streams as available */}
-        <Suspense fallback={<RecommendationsSkeleton />}>
-          <Recommendations />
-        </Suspense>
-
-        {/* Lowest priority streams last */}
-        <Suspense fallback={<CommentsSkeleton />}>
-          <Comments />
-        </Suspense>
+        <MainContent content={main_content} />
+        <Recommendations items={recommendations} />
+        <Comments comments={comments} />
       </main>
     </div>
   );
@@ -916,13 +744,118 @@ function StatsSkeleton() {
 }
 ```
 
+## Common Mistakes
+
+### Mistake 1: Sequential queries in the Rails controller
+
+The most common performance regression after migrating to RSC. Since data now comes from the Rails controller (instead of parallel client-side fetches), sequential ActiveRecord queries block the entire page render:
+
+```ruby
+# BAD: 750ms total -- each query waits for the previous one
+def show
+  @user = User.find(params[:id])              # 200ms
+  @stats = Stats.for_user(@user.id)          # 300ms
+  @posts = Post.where(user_id: @user.id)     # 250ms
+  stream_view_containing_react_components(template: "show")
+end
+```
+
+**Fix:** Use Ruby threads for independent queries (see [Avoiding Server-Side Waterfalls](#avoiding-server-side-waterfalls)), or split into multiple `stream_react_component` calls in the ERB view so each component renders as its data becomes available.
+
+### Mistake 2: Using Server Actions (`'use server'`)
+
+Server Actions are **not supported** in React on Rails in any environment. The Node renderer is a rendering server -- it has no access to Rails models, sessions, cookies, or CSRF protection.
+
+```jsx
+// BAD: Server Actions don't have access to Rails
+'use server';
+export async function createUser(name) {
+  // The Node renderer is a render-only environment -- it has no database
+  // connection, no ORM, and no access to Rails models or sessions.
+  // This code will fail at runtime.
+}
+```
+
+```jsx
+// GOOD: Use a Client Component that submits to a Rails controller endpoint
+'use client';
+
+import { useState } from 'react';
+import ReactOnRails from 'react-on-rails';
+
+export default function CreateUserForm() {
+  const [name, setName] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    await fetch('/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': ReactOnRails.authenticityToken(),
+      },
+      body: JSON.stringify({ user: { name } }),
+    });
+    setName('');
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={name} onChange={(e) => setName(e.target.value)} />
+      <button type="submit">Create</button>
+    </form>
+  );
+}
+```
+
+### Mistake 3: Forgetting CSRF tokens in fetch requests
+
+Rails rejects POST/PUT/PATCH/DELETE requests without a valid CSRF token. This is easy to miss when migrating from forms that included the token automatically:
+
+```jsx
+// BAD: Missing CSRF token -- Rails returns 422 Unprocessable Entity
+await fetch('/api/items', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(data),
+});
+
+// GOOD: Include the CSRF token
+await fetch('/api/items', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': ReactOnRails.authenticityToken(),
+  },
+  body: JSON.stringify(data),
+});
+```
+
+### Mistake 4: Removing loading states before adding streaming
+
+If you remove `useEffect` + loading state but haven't set up `stream_react_component` with Suspense boundaries, the page appears blank until all server data is ready:
+
+**Fix:** Complete the streaming setup ([Preparing Your App](rsc-preparing-app.md#step-6-switch-to-streaming-rendering)) before converting data-fetching components. Add Suspense boundaries around sections that should stream independently.
+
+### Mistake 5: Over-serializing ActiveRecord objects
+
+Calling `.as_json` without specifying `only:` or `include:` can serialize the entire object graph, including associations, timestamps, and internal fields. This bloats the RSC payload and can leak sensitive data:
+
+```ruby
+# BAD: Serializes everything, including potentially sensitive fields
+props: { user: @user.as_json }
+
+# GOOD: Whitelist exactly what the component needs
+props: { user: @user.as_json(only: [:id, :name, :email]) }
+```
+
 ## Migration Checklist
 
 ### Step 1: Identify Candidates
 
 For each component that fetches data:
 
-- Does it only display data? → Convert to Server Component (or use [async props](#data-fetching-in-react-on-rails-pro) in React on Rails)
+- Does it only display data? → Convert to Server Component (pass data as props via `stream_react_component`)
 - Does it need polling/optimistic updates? → Keep React Query/SWR, add server prefetch
 - Does it need real-time updates? → Keep client-side, pass initial data from server
 
@@ -931,8 +864,9 @@ For each component that fetches data:
 1. Remove the `'use client'` directive
 2. Remove `useState` for data, loading, and error
 3. Remove the `useEffect` data fetch
-4. Accept data as props from Rails (or use [async props](#data-fetching-in-react-on-rails-pro) for slow data)
-5. Remove the API route if it was only used by this component
+4. Receive data as props from Rails (controller and/or ERB view helper props), or use [async props](#data-fetching-in-react-on-rails-pro) for slow data
+5. Use `stream_react_component` in the ERB view to enable streaming SSR
+6. Remove API routes that were only used for client-side fetching by this component
 
 ### Step 3: Add Suspense Boundaries
 
@@ -942,9 +876,9 @@ For each component that fetches data:
 
 ### Step 4: Optimize
 
-10. Use `React.cache()` to deduplicate shared data fetches
-11. Use `Promise.all()` or the preload pattern to avoid waterfalls
-12. Pass promises to Client Components with `use()` for non-critical data
+10. Use `stream_react_component` for streaming SSR with progressive HTML delivery
+11. Parallelize independent Ruby queries with threads to avoid server-side waterfalls
+12. For client-side updates after initial render, use React Query or SWR with `initialData`/`fallbackData`
 
 ## Next Steps
 

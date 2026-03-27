@@ -1,7 +1,7 @@
 # Ruby API (Pro)
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
-> Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
+> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
 ## View Helpers
 
@@ -119,5 +119,5 @@ Combines async rendering with fragment caching. Cache lookup is synchronous — 
 
 ## Source
 
-- [View Helpers](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/app/helpers/react_on_rails_pro_helper.rb)
-- [Utils](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/lib/react_on_rails_pro/utils.rb)
+- [View Helpers](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/app/helpers/react_on_rails_pro_helper.rb)
+- [Utils](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/lib/react_on_rails_pro/utils.rb)

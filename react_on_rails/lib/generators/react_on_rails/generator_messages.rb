@@ -3,6 +3,9 @@
 require "rainbow"
 
 module GeneratorMessages
+  PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
+                     "\n       #{Rainbow('https://reactonrails.com/docs/pro/upgrading-to-pro/').cyan.underline}".freeze
+
   class << self
     def output
       @output ||= []
@@ -40,14 +43,16 @@ module GeneratorMessages
       @output = []
     end
 
-    def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", rsc: false,
-                                           shakapacker_just_installed: false)
+    def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", pro: false,
+                                           rsc: false, shakapacker_just_installed: false)
       process_manager_section = build_process_manager_section
       testing_section = build_testing_section
       package_manager = detect_package_manager
       shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed)
       render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
       render_label = build_render_label(route: route, rsc: rsc)
+      # rsc guard is defensive; callers via install_generator already pass pro: true when rsc is set
+      pro_hint = pro || rsc ? "" : PRO_UPGRADE_HINT
 
       <<~MSG
 
@@ -61,13 +66,16 @@ module GeneratorMessages
         1. Install dependencies:
            #{Rainbow("bundle && #{package_manager} install").cyan}
 
-        2. Start the app:
+        2. Prepare database:
+           #{Rainbow('bin/rails db:prepare').cyan}
+
+        3. Start the app:
            ./bin/dev              # HMR (Hot Module Replacement) mode
            ./bin/dev static       # Static bundles (no HMR, faster initial load)
            ./bin/dev prod         # Production-like mode for testing
            ./bin/dev help         # See all available options
 
-        3. Visit: #{Rainbow(route ? "http://localhost:3000/#{route}" : 'http://localhost:3000').cyan.underline}
+        4. Visit: #{Rainbow(route ? "http://localhost:3000/#{route}" : 'http://localhost:3000').cyan.underline}
         ✨ KEY FEATURES:
         ─────────────────────────────────────────────────────────────────────────
         • Auto-registration enabled - Your layout only needs:
@@ -79,16 +87,19 @@ module GeneratorMessages
 
         📚 LEARN MORE:
         ─────────────────────────────────────────────────────────────────────────
-        • Documentation: #{Rainbow('https://www.shakacode.com/react-on-rails/docs/').cyan.underline}
+        • Documentation: #{Rainbow('https://reactonrails.com/docs/').cyan.underline}
         • Webpack customization: #{Rainbow('https://github.com/shakacode/shakapacker#webpack-configuration').cyan.underline}
 
-        💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}
+        💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}#{pro_hint}
       MSG
     end
 
     # Uses relative lockfile paths resolved against Dir.pwd, so callers must invoke
     # this while the current working directory is the target Rails app root.
     def detect_package_manager
+      env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
+      return env_package_manager if %w[npm pnpm yarn bun].include?(env_package_manager)
+
       # Check for lock files to determine package manager
       return "yarn" if File.exist?("yarn.lock")
       return "pnpm" if File.exist?("pnpm-lock.yaml")
@@ -133,10 +144,7 @@ module GeneratorMessages
     end
 
     def build_testing_section
-      # Check if we have any spec files to determine if testing setup is needed
-      has_spec_files = File.exist?("spec/rails_helper.rb") || File.exist?("spec/spec_helper.rb")
-
-      return "" if has_spec_files
+      return "" if File.exist?("spec/rails_helper.rb") || File.exist?("spec/spec_helper.rb")
 
       <<~TESTING
 
@@ -160,7 +168,6 @@ module GeneratorMessages
 
     def build_shakapacker_status_section(shakapacker_just_installed: false)
       version_warning = check_shakapacker_version_warning
-
       if shakapacker_just_installed
         base = <<~SHAKAPACKER
 
@@ -179,18 +186,13 @@ module GeneratorMessages
     end
 
     def check_shakapacker_version_warning
-      # Try to detect Shakapacker version from Gemfile.lock
       return "" unless File.exist?("Gemfile.lock")
 
-      gemfile_lock_content = File.read("Gemfile.lock")
-      shakapacker_match = gemfile_lock_content.match(/shakapacker \((\d+\.\d+\.\d+)\)/)
-
+      shakapacker_match = File.read("Gemfile.lock").match(/shakapacker \((\d+\.\d+\.\d+)\)/)
       return "" unless shakapacker_match
 
       version = shakapacker_match[1]
-      major_version = version.split(".").first.to_i
-
-      if major_version < 8
+      if version.split(".").first.to_i < 8
         <<~WARNING
 
           ⚠️  #{Rainbow('IMPORTANT: Upgrade Recommended').yellow.bold}

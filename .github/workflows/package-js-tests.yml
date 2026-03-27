@@ -3,8 +3,8 @@ name: JS unit tests for Renderer package
 on:
   push:
     branches:
-      - 'master'
-    # Always trigger on master; docs-only detection handles skipping heavy jobs
+      - 'main'
+    # Always trigger on main; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -57,26 +57,26 @@ jobs:
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
-      - name: Guard docs-only master pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: ./.github/actions/ensure-master-docs-safety
+      - name: Guard docs-only main pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/ensure-main-docs-safety
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
   build:
     needs: detect-changes
-    # Run on master OR when JS tests needed on PR
+    # Run on main OR when JS tests needed on PR
     if: |
       !(
         github.event_name == 'push' &&
-        github.ref == 'refs/heads/master' &&
+        github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/main' ||
         needs.detect-changes.outputs.run_js_tests == 'true'
       )
     strategy:
@@ -84,11 +84,11 @@ jobs:
         node-version:
           # Always run: Latest Node version (fast feedback on PRs)
           - '22'
-          # Master and full-ci label: Minimum supported Node version (full coverage)
+          # Main and full-ci label: Minimum supported Node version (full coverage)
           - '20'
         exclude:
-          # Skip minimum dependency matrix on regular PRs (run only on master or with full-ci label)
-          - node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/master' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
+          # Skip minimum dependency matrix on regular PRs (run only on main or with full-ci label)
+          - node-version: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/main' && needs.detect-changes.outputs.has_full_ci_label != 'true' && '20' || '' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

@@ -1,7 +1,8 @@
 # SSR Caching: Prerender Caching and Fragment Caching
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
-> Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
+:::tip Pro Feature
+Available with [React on Rails Pro](https://reactonrails.com/docs/pro/). Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
+:::
 
 Server-side rendering (SSR) is expensive. Every render evaluates JavaScript, assembles props from the database, serializes them to JSON, and produces HTML. React on Rails Pro provides two levels of caching that avoid repeating this work on every request. Both solve the same core problem — **eliminating redundant SSR** — but they operate at different layers and offer different tradeoffs.
 
@@ -94,7 +95,7 @@ It can be useful to log these to the rendered HTML page to debug caching issues.
 
 ## Level 2: Fragment Caching
 
-Fragment caching is the advanced option that delivers the biggest performance gains. It caches the entire rendered output — including the cost of assembling props from the database — so that on a cache hit, no database queries, no JSON serialization, and no JavaScript evaluation occur.
+Fragment caching is the advanced option that delivers the biggest performance gains. It caches the entire rendered output — including the cost of assembling props from the database — so that on a cache hit, no database queries, no JSON serialization, and no JavaScript evaluation occur. See also the [Fragment Caching overview](../../pro/fragment-caching.md).
 
 This is very similar to [Rails fragment caching](http://guides.rubyonrails.org/caching_with_rails.html#fragment-caching):
 
@@ -266,7 +267,7 @@ At Popmenu (a ShakaCode client running React on Rails Pro), cache warming across
 - Server CPU during peak hours dropped 45%
 - Database connections dropped 35% (fewer concurrent renders)
 
-For more details on the full cache warming architecture including stampede prevention, event-driven warming, and monitoring, contact [ShakaCode](https://www.shakacode.com/react-on-rails-pro/) for consulting on production cache warming strategies.
+For more details on the full cache warming architecture including stampede prevention, event-driven warming, and monitoring, contact [justin@shakacode.com](mailto:justin@shakacode.com) for consulting on production cache warming strategies.
 
 ---
 

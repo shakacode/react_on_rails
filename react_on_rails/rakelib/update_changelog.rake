@@ -213,7 +213,7 @@ def cleanup_collapsed_prerelease_links(changelog, base_version)
   if stable_from
     # Update [unreleased] link to compare from the stable version instead of the old prerelease
     changelog = changelog.sub(
-      /^(\[unreleased\]:\s*#{compare_prefix})\S+(\.\.\.master)/i,
+      /^(\[unreleased\]:\s*#{compare_prefix})\S+(\.\.\.main)/i,
       "\\1#{stable_from}\\2"
     )
   end
@@ -426,11 +426,11 @@ end
 # anchor: markdown anchor (e.g., "[16.2.0.beta.20]")
 def update_changelog_links(changelog, version, anchor)
   compare_link_prefix = "https://github.com/shakacode/react_on_rails/compare"
-  match_data = %r{#{compare_link_prefix}/(?<prev_version>.*)\.\.\.master}.match(changelog)
+  match_data = %r{#{compare_link_prefix}/(?<prev_version>.*)\.\.\.main}.match(changelog)
   return unless match_data
 
   prev_version = match_data[:prev_version]
-  new_unreleased_link = "#{compare_link_prefix}/v#{version}...master"
+  new_unreleased_link = "#{compare_link_prefix}/v#{version}...main"
   new_version_link = "#{anchor}: #{compare_link_prefix}/#{prev_version}...v#{version}"
   changelog.sub!(match_data[0], "#{new_unreleased_link}\n#{new_version_link}")
 end

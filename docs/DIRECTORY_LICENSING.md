@@ -8,7 +8,7 @@ This document outlines the current and post-merger directory licensing structure
 
 All directories in the `react_on_rails` repository are MIT licensed:
 
-```
+```text
 react_on_rails/
 ├── lib/react_on_rails/           # Core Ruby code (MIT)
 ├── node_package/src/             # Core JS/TS code (MIT)
@@ -31,7 +31,7 @@ react_on_rails/
 
 All directories in the `react_on_rails_pro` repository are Pro licensed:
 
-```
+```text
 react_on_rails_pro/
 ├── lib/react_on_rails_pro/       # Pro Ruby code
 ├── packages/node-renderer/       # Pro Node.js renderer
@@ -46,7 +46,7 @@ After the monorepo merger, the unified repository will have clear directory-base
 
 ### MIT Licensed Directories
 
-```
+```text
 react_on_rails/ (monorepo root)
 ├── lib/react_on_rails/           # Core Ruby code (including specs)
 ├── packages/react-on-rails/      # Core NPM package (including tests)
@@ -60,7 +60,7 @@ react_on_rails/ (monorepo root)
 
 ### Pro Licensed Directories
 
-```
+```text
 react_on_rails/ (monorepo root)
 ├── lib/react_on_rails_pro/       # Pro Ruby code (including specs)
 ├── packages/react-on-rails-pro/  # Pro NPM package (including tests)

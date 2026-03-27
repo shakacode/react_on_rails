@@ -1,7 +1,7 @@
 # React on Rails Pro Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactrails.com).
-> Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
+> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
 For general React on Rails configuration options, see [Configuration](README.md).
 
@@ -13,7 +13,7 @@ For general React on Rails configuration options, see [Configuration](README.md)
 
 ## Example of Configuration
 
-Also see [spec/dummy/config/initializers/react_on_rails_pro.rb](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails_pro.rb) for how the testing app is setup.
+Also see [spec/dummy/config/initializers/react_on_rails_pro.rb](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails_pro.rb) for how the testing app is setup.
 
 The below example is a typical production setup, using the separate `NodeRenderer`, where development takes the defaults when the ENV values are not specified.
 
@@ -171,5 +171,5 @@ end
 
 ## Need Help?
 
-- **Pro Features:** [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)
+- **Pro Features:** [React on Rails Pro](https://reactonrails.com/docs/pro/)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)

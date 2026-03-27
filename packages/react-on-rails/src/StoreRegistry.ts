@@ -126,7 +126,7 @@ This can happen if you are server rendering and either:
     throw new Error(
       `getOrWaitForStore('${name}') is only available with React on Rails Pro. ` +
         'Please upgrade to React on Rails Pro or use the synchronous getStore() method instead. ' +
-        'See https://www.shakacode.com/react-on-rails-pro/ for more information.',
+        'See https://pro.reactonrails.com/ for more information.',
     );
   },
 
@@ -140,7 +140,7 @@ This can happen if you are server rendering and either:
     throw new Error(
       `getOrWaitForStoreGenerator('${name}') is only available with React on Rails Pro. ` +
         'Please upgrade to React on Rails Pro or use the synchronous getStoreGenerator() method instead. ' +
-        'See https://www.shakacode.com/react-on-rails-pro/ for more information.',
+        'See https://pro.reactonrails.com/ for more information.',
     );
   },
 };

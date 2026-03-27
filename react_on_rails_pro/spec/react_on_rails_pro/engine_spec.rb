@@ -46,7 +46,7 @@ RSpec.describe ReactOnRailsPro::Engine do
         end
 
         it "includes the license URL" do
-          expect(mock_logger).to receive(:warn).with(%r{shakacode\.com/react-on-rails-pro})
+          expect(mock_logger).to receive(:warn).with(/pro\.reactonrails\.com/)
           described_class.log_license_status
         end
 
