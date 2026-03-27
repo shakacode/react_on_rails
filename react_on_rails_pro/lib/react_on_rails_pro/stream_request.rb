@@ -120,6 +120,11 @@ module ReactOnRailsPro
       end
     end
 
+    # Method to start the decoration
+    def self.create(&request_block)
+      StreamDecorator.new(new(&request_block))
+    end
+
     private
 
     def process_response_chunks(stream_response, error_body)
@@ -162,11 +167,6 @@ module ReactOnRailsPro
       else
         raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
       end
-    end
-
-    # Method to start the decoration
-    def self.create(&request_block)
-      StreamDecorator.new(new(&request_block))
     end
 
     # Reads streaming response chunks using the length-prefixed protocol.

@@ -122,7 +122,7 @@ export const makeRequest = (app: ReturnType<typeof buildApp>, options: Partial<R
     ':path': `/bundles/${usedBundleTimestamp}/render/454a82526211afdb215352755d36032c`,
     'content-type': `multipart/form-data; boundary=${form.getBoundary()}`,
   });
-  const buffer: string[] = [];
+  const buffer: Buffer[] = [];
 
   const statusPromise = new Promise<number | undefined>((resolve) => {
     request.on('response', (headers) => {
@@ -140,7 +140,7 @@ export const makeRequest = (app: ReturnType<typeof buildApp>, options: Partial<R
     }
 
     resolveChunkPromiseTimeout = setTimeout(() => {
-      resolveChunksPromise?.(buffer.join(''));
+      resolveChunksPromise?.(Buffer.concat(buffer).toString('utf8'));
       resolveChunksPromise = undefined;
       rejectChunksPromise = undefined;
       buffer.length = 0;
@@ -148,7 +148,7 @@ export const makeRequest = (app: ReturnType<typeof buildApp>, options: Partial<R
   };
 
   request.on('data', (data: Buffer | string) => {
-    buffer.push(typeof data === 'string' ? data : data.toString('utf8'));
+    buffer.push(Buffer.isBuffer(data) ? data : Buffer.from(data, 'utf8'));
     if (resolveChunksPromise) {
       scheduleResolveChunkPromise();
     }

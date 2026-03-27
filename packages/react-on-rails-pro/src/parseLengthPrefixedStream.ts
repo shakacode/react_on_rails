@@ -49,11 +49,19 @@ export default class LengthPrefixedStreamParser {
     while (progressed) {
       progressed = false;
       if (this.state === 'header') {
+        while (this.buf[0] === 0x0a) {
+          this.buf = this.buf.subarray(1);
+          progressed = true;
+        }
+
         const idx = this.buf.indexOf(0x0a); // \n
         if (idx >= 0) {
           const header = this.buf.subarray(0, idx);
           this.buf = this.buf.subarray(idx + 1);
           const tabIdx = header.indexOf(0x09); // \t
+          if (tabIdx < 0) {
+            throw new Error(`Invalid stream header: ${JSON.stringify(decoder.decode(header))}`);
+          }
           this.metadata = JSON.parse(decoder.decode(header.subarray(0, tabIdx)));
           const lenHex = decoder.decode(header.subarray(tabIdx + 1));
           this.contentLen = parseInt(lenHex, 16);
