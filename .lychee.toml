@@ -65,6 +65,7 @@ exclude = [
   '^https://frigade\.com/blog/bundle-size-reduction-with-rsc-and-frigade/?$', # Connection failed from CI
   '^https://tanstack\.com/router',           # Connection failed from CI
   '^https://lodash\.com',                    # Connection reset from CI
+  '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE
