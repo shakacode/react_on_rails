@@ -120,4 +120,5 @@ Pro-only features (fragment caching, Node renderer, RSC) will stop working, but 
 - [Installation reference](./installation.md) - Detailed manual installation steps
 - [Configuration](../oss/configuration/configuration-pro.md) - All Pro configuration options
 - [Upgrading Pro versions](./updating.md) - Upgrading between Pro versions
-- [React Server Components](./react-server-components/tutorial.md) - Get started with RSC
+- [Add RSC to Your Pro App](./react-server-components/upgrading-existing-pro-app.md) - Add RSC support to an existing Pro installation
+- [React Server Components Tutorial](./react-server-components/tutorial.md) - Learn RSC concepts step by step

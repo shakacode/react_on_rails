@@ -6,6 +6,8 @@ For the best SSR performance, React on Rails Pro provides a [dedicated Node.js r
 
 ## General Tips
 
+- **Module-level state persists across requests in the Node Renderer.** Any `Map`, `Set`, object cache, or `_.memoize` call at module scope will accumulate entries across all SSR requests and never be cleared. This is the most common cause of OOM in Node Renderer production deployments. See the [Memory Leaks guide](../../pro/js-memory-leaks.md) for patterns to avoid.
+- **Set `NODE_OPTIONS=--max-old-space-size=<MB>` in production.** Without this, V8 defers garbage collection in containers, amplifying any memory leaks. Size it based on your container memory divided by worker count.
 - Your code can't reference `document`. Server-side JS execution does not have access to `document`,
   so jQuery and some other libraries won't work in this environment. You can debug this by putting in
   `console.log` statements in your code.
@@ -14,7 +16,7 @@ For the best SSR performance, React on Rails Pro provides a [dedicated Node.js r
   in your top-level React component. Since the Hash passed in `props` from the view helper applies to
   both client- and server-side code, the best way to do this is to use a Render-Function.
 - If you're serious about server-side rendering, it's worth the effort to have different entry points for client-side and server-side rendering. It's worth the extra complexity. The point is that you have separate files for top-level client and server side, and you pass some extra option indicating that rendering is happening server-side.
-- You can enable Node.js server rendering via [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
+- You can enable Node.js server rendering via [React on Rails Pro](https://reactonrails.com/docs/pro/).
 
 ## Troubleshooting Server Rendering
 

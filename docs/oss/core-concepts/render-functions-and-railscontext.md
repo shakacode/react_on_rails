@@ -113,6 +113,8 @@ The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https:
 
 Plus, you can add your customizations to this. See "rendering extension" below.
 
+> **RSC Note:** When using React on Rails Pro with RSC, `railsContext` also includes functions like `addPostSSRHook` and `getRSCPayloadStream`. These **cannot** be passed from Server Components to Client Components across the RSC boundary. Strip them before passing: `const { addPostSSRHook, getRSCPayloadStream, ...serializableContext } = railsContext;`. See [RSC Troubleshooting](../migrating/rsc-troubleshooting.md#common-error-railscontext-contains-functions).
+
 ## Rails Context
 
 The `railsContext` is a second param passed to your render-functions for React components. This is in addition to the props that are passed from the `react_component` Rails helper. For example:

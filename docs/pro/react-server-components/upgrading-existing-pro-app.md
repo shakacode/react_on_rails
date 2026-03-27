@@ -8,17 +8,18 @@ This guide walks you through adding React Server Components to an existing React
 
 Before running the generator, verify your environment:
 
-| Requirement              | Check command                                                        | Expected                          |
-| ------------------------ | -------------------------------------------------------------------- | --------------------------------- |
-| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                     | v16.4.0+                          |
-| React on Rails Pro npm   | `pnpm list react-on-rails-pro`                                       | Matches gem version               |
-| React version            | `pnpm list react`                                                    | 19.0.x (19.1.x not yet supported) |
-| React DOM version        | `pnpm list react-dom`                                                | Must match `react` version        |
-| Node.js                  | `node --version`                                                     | 20+                               |
-| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                       | File exists                       |
-| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"` | NodeRenderer enabled              |
+| Requirement              | Check command                                                                                | Expected                                                                                                |
+| ------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| React on Rails Pro gem   | `bundle show react_on_rails_pro`                                                             | v16.4.0+                                                                                                |
+| React on Rails gem       | `bundle show react_on_rails`                                                                 | v16.4.0+                                                                                                |
+| React on Rails Pro npm   | `npm ls react-on-rails-pro` / `yarn why react-on-rails-pro` / `pnpm list react-on-rails-pro` | Matches gem version                                                                                     |
+| React version            | `npm ls react` / `yarn why react` / `pnpm list react`                                        | 19.0.4+ (see [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for security context) |
+| React DOM version        | `npm ls react-dom` / `yarn why react-dom` / `pnpm list react-dom`                            | Must match `react` version                                                                              |
+| Node.js                  | `node --version`                                                                             | 20+                                                                                                     |
+| Pro initializer exists   | `ls config/initializers/react_on_rails_pro.rb`                                               | File exists                                                                                             |
+| Node renderer configured | Check `react_on_rails_pro.rb` for `server_renderer = "NodeRenderer"`                         | NodeRenderer enabled                                                                                    |
 
-If React is below 19.0.x, upgrade it first:
+If React is below 19.0.4, upgrade it first:
 
 ```bash
 pnpm add react@~19.0.4 react-dom@~19.0.4
@@ -34,7 +35,7 @@ rails generate react_on_rails:rsc
 rails generate react_on_rails:rsc --typescript
 ```
 
-The generator is idempotent -- safe to run multiple times.
+The generator is safe to re-run -- new files are skipped and existing-file patches are applied only when the target pattern is not already present. If a transform cannot be applied (e.g. because your config has been customized), the generator reports a warning but continues.
 
 ### What the Generator Creates
 
@@ -65,7 +66,7 @@ The generator automatically handles both webpack export shapes used across Pro a
 
 ### Current Export Shape (v16.4.0+)
 
-Apps generated with React on Rails Pro v16.4.0+ export an object from `serverWebpackConfig.js`:
+Recent versions of the React on Rails Pro generator export an object from `serverWebpackConfig.js` (introduced via [PR 2424](https://github.com/shakacode/react_on_rails/pull/2424)):
 
 ```js
 // config/webpack/serverWebpackConfig.js
@@ -81,9 +82,11 @@ And `ServerClientOrBoth.js` destructures the import:
 const { default: serverWebpackConfig } = require('./serverWebpackConfig');
 ```
 
-### Legacy Export Shape (pre-v16.4.0)
+### Legacy Export Shape
 
-Older Pro apps or apps upgraded from OSS export a plain function. These apps must upgrade to v16.4.0+ before adding RSC (see [Prerequisites](#prerequisites)):
+Older Pro apps or apps upgraded from OSS export a plain function. These apps must be on
+`react_on_rails_pro` v16.4.0+ before adding RSC (see [Prerequisites](#prerequisites)); once upgraded, no
+manual export-shape rewrite is required:
 
 ```js
 // config/webpack/serverWebpackConfig.js
@@ -139,11 +142,11 @@ All three builds should succeed without errors.
 
 ### Generated Files Check
 
-Verify these files exist in your webpack output directory (typically `public/webpack/production/` or `public/webpack/development/`):
+Verify these files exist in the expected locations:
 
-- [ ] `rsc-bundle.js` -- the RSC bundle
-- [ ] `react-client-manifest.json` -- maps client component references to browser chunks
-- [ ] `react-server-client-manifest.json` -- maps client component references for SSR
+- [ ] `react-client-manifest.json` -- in your webpack output directory (typically `public/webpack/development/` or `public/webpack/production/`)
+- [ ] `react-server-client-manifest.json` -- in the same webpack output directory
+- [ ] `rsc-bundle.js` -- in your `server_bundle_output_path` directory (default: `ssr-generated/`)
 
 ### Route Check
 

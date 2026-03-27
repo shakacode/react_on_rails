@@ -2,7 +2,7 @@
 
 require "async"
 require "async/queue"
-require "async/variable"
+require "async/promise"
 require_relative "spec_helper"
 
 class StreamController
@@ -626,6 +626,26 @@ RSpec.describe "Streaming API" do
     end
 
     describe "exception handling" do
+      it "does not commit the response when render_to_string raises" do
+        _queues, controller, stream = setup_stream_test(component_count: 0)
+
+        # Simulate a renderer/shell error during render_to_string, before any
+        # chunk has been produced. This exercises the pre-commit error path where
+        # the response has NOT been written to yet, enabling a proper HTTP redirect.
+        allow(controller).to receive(:render_to_string).and_raise(
+          RuntimeError, "node renderer crashed"
+        )
+
+        expect do
+          Timeout.timeout(5) do
+            controller.stream_view_containing_react_components(template: "ignored")
+          end
+        end.to raise_error(RuntimeError, "node renderer crashed")
+
+        # Response stream should NOT have been written to (response not committed)
+        expect(stream).not_to have_received(:write)
+      end
+
       it "does not deadlock when writer raises unexpected exception with full queue" do
         original_buffer = ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size
         ReactOnRailsPro.configuration.concurrent_component_streaming_buffer_size = 1

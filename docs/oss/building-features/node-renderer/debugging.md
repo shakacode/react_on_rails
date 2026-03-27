@@ -1,7 +1,7 @@
 # Node Renderer Debugging
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
 Because the renderer communicates over a port to the server, you can start a renderer instance locally in your application and debug it.
 
@@ -22,6 +22,20 @@ directory.
 1. Be sure to restart the rails server if you change any ruby code in loaded gems.
 1. Note, the default setup for spec/dummy to reference the pro renderer is to use yalc, which may or may not be using a link, which means that you have to re-run yarn to get the files updated when changing the renderer.
 1. Check out the top level nps task `nps renderer.debug` and `spec/dummy/package.json` which has script `"node-renderer-debug"`.
+
+## Debugging Memory Leaks
+
+If worker memory grows over time, use heap snapshots to find the source:
+
+1. Start the renderer with `--expose-gc` to enable forced GC before snapshots:
+   ```bash
+   node --expose-gc node-renderer.js
+   ```
+2. Take heap snapshots at different times using `v8.writeHeapSnapshot()` (triggered via `SIGUSR2` signal or a custom endpoint).
+3. Load both snapshots in Chrome DevTools (Memory tab → Load) and use the **Comparison** view to see which objects accumulated between snapshots.
+4. Look for growing `string`, `Object`, and `Array` counts — these typically point to module-level caches.
+
+See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common patterns and fixes.
 
 ## Debugging using the Node debugger
 

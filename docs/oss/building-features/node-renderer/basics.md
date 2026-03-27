@@ -1,6 +1,6 @@
 # Node Renderer Basics
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
+> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
 > Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
 
 ## Requirements
@@ -10,6 +10,18 @@
 ## Install the Gem and the Node Module
 
 See [Installation](../../../pro/installation.md).
+
+## Memory Management
+
+The Node Renderer reuses V8 VM contexts across requests for performance. This means **module-level state in your server bundle persists across all SSR requests**. Any unbounded caches, `_.memoize` calls, or growing data structures at module scope will leak memory until the worker restarts.
+
+**Essential for production:**
+
+- Set `NODE_OPTIONS=--max-old-space-size=<MB>` to prevent V8 from deferring garbage collection
+- Enable worker rolling restarts via `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts`
+- Audit your server bundle for module-level mutable state
+
+See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak patterns and how to fix them.
 
 ## Setup Node Renderer Server
 
@@ -86,7 +98,7 @@ end
 
 ## Troubleshooting
 
-- See [JS Memory Leaks](../../../pro/js-memory-leaks.md).
+- See [Memory Leaks guide](../../../pro/js-memory-leaks.md).
 
 ## Upgrading
 

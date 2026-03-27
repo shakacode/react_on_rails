@@ -479,7 +479,7 @@ console.log(ReactOnRails.registeredComponents());
 
 - **[GitHub Issues](https://github.com/shakacode/react_on_rails/issues)** - Bug reports and feature requests
 - **[GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)** - Questions and help
-- **[React + Rails Slack](https://reactrails.slack.com)** - Real-time community support
+- **[React + Rails Slack](https://invite.reactrails.com)** - Real-time community support
 
 ### Professional support
 

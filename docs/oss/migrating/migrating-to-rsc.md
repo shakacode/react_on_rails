@@ -2,7 +2,7 @@
 
 This guide covers the React-side challenges of migrating an existing React on Rails application to React Server Components (RSC). It focuses on how to restructure your component tree, handle Context and state management, migrate data fetching patterns, deal with third-party library compatibility, and avoid common pitfalls.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](https://pro.reactonrails.com/) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `rsc_payload_react_component`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
+> **React on Rails Pro required:** RSC support requires [React on Rails Pro](https://reactonrails.com/docs/pro/) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `rsc_payload_react_component`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
 
 ## Why Migrate?
 
@@ -84,6 +84,17 @@ How to debug and avoid common problems. Covers:
 - Performance monitoring and bundle analysis tools
 - Common error messages and their solutions
 
+### 7. [Flight Payload Optimization](rsc-flight-payload.md)
+
+How to optimize RSC Flight payload size for better performance. Covers:
+
+- What's in the Flight payload and why it can be surprisingly large
+- Why "all display-only = server" is an oversimplification
+- The counterintuitive pattern: when presentational Client Components outperform Server Components
+- How to measure and analyze your Flight payload
+- Compression effectiveness and the LCP tradeoff
+- React on Rails double JSON.stringify overhead
+
 ## How RSC Maps to React on Rails
 
 Before diving into the React patterns, understand how RSC maps to React on Rails' architecture.
@@ -158,7 +169,7 @@ These mistakes account for the majority of setup failures:
 ## Prerequisites
 
 - React 19+
-- [React on Rails Pro](https://pro.reactonrails.com/) 4+ with React on Rails 15+
+- [React on Rails Pro](https://reactonrails.com/docs/pro/) 4+ with React on Rails 15+
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20+
