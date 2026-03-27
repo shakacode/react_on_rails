@@ -7,7 +7,7 @@ This document explains the CI optimization strategy implemented for React on Rai
 The CI pipeline has been optimized to:
 
 1. **Skip unnecessary workflows** for documentation-only changes
-2. **Run reduced test matrices on PRs** (full matrix only on master)
+2. **Run reduced test matrices on PRs** (full matrix only on main)
 3. **Provide local CI tooling** to run appropriate tests before pushing
 
 ## Optimization Strategies
@@ -55,7 +55,7 @@ jobs:
 
 On PRs, we run a reduced test matrix for faster feedback:
 
-| Environment   | Master Branch   | Pull Requests |
+| Environment   | Main Branch     | Pull Requests |
 | ------------- | --------------- | ------------- |
 | Ruby versions | 3.2, 3.4        | 3.4 only      |
 | Node versions | 20, 22          | 22 only       |
@@ -65,14 +65,14 @@ On PRs, we run a reduced test matrix for faster feedback:
 
 - ~75% reduction in CI time for PRs
 - Faster feedback for developers
-- Full coverage still runs on master before release
+- Full coverage still runs on main before release
 
 **Implementation:**
 
 ```yaml
 matrix:
-  ruby-version: ${{ github.ref == 'refs/heads/master' && fromJSON('["3.2", "3.4"]') || fromJSON('["3.4"]') }}
-  node-version: ${{ github.ref == 'refs/heads/master' && fromJSON('["20", "22"]') || fromJSON('["22"]') }}
+  ruby-version: ${{ github.ref == 'refs/heads/main' && fromJSON('["3.2", "3.4"]') || fromJSON('["3.4"]') }}
+  node-version: ${{ github.ref == 'refs/heads/main' && fromJSON('["20", "22"]') || fromJSON('["22"]') }}
 ```
 
 ### 4. Smart Path Filtering per Workflow
@@ -93,7 +93,7 @@ Runs appropriate CI checks based on your changes:
 # Auto-detect what to test based on changes
 bin/ci-local
 
-# Run all CI checks (same as master)
+# Run all CI checks (same as main)
 bin/ci-local --all
 
 # Run only fast checks
@@ -115,8 +115,8 @@ bin/ci-local origin/develop
 Analyzes which files changed and recommends CI jobs:
 
 ```bash
-# Check changes since master
-script/ci-changes-detector origin/master
+# Check changes since main
+script/ci-changes-detector origin/main
 
 # Check changes between any refs
 script/ci-changes-detector origin/develop HEAD
@@ -177,7 +177,7 @@ Claude will:
 
 - PR with code changes: ~12 minutes (reduced matrix)
 - PR with docs changes: 0 minutes (skipped)
-- Master merge: ~45 minutes (full matrix)
+- Main merge: ~45 minutes (full matrix)
 - Total CI time saved: ~70%
 
 ## Best Practices
@@ -202,7 +202,7 @@ Claude will:
 
 4. **Trust the PR CI:**
    - Reduced matrix is sufficient for most changes
-   - Master branch validates full matrix before release
+   - Main branch validates full matrix before release
 
 ### For Maintainers
 
@@ -215,8 +215,8 @@ Claude will:
    - Add new file patterns as project evolves
    - Keep filters accurate
 
-3. **Review master CI failures:**
-   - Master runs full matrix
+3. **Review main CI failures:**
+   - Main runs full matrix
    - Catches edge cases not found in PR CI
 
 ## Troubleshooting
@@ -231,7 +231,7 @@ Check if:
 
 ### CI taking too long on PRs
 
-- Ensure you're not on master branch
+- Ensure you're not on main branch
 - Check if matrix reduction is working
 - Use `bin/ci-local --fast` for local testing
 

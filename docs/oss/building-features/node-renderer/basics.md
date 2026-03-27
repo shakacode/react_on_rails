@@ -1,7 +1,7 @@
 # Node Renderer Basics
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
+> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
 
 ## Requirements
 
@@ -10,6 +10,18 @@
 ## Install the Gem and the Node Module
 
 See [Installation](../../../pro/installation.md).
+
+## Memory Management
+
+The Node Renderer reuses V8 VM contexts across requests for performance. This means **module-level state in your server bundle persists across all SSR requests**. Any unbounded caches, `_.memoize` calls, or growing data structures at module scope will leak memory until the worker restarts.
+
+**Essential for production:**
+
+- Set `NODE_OPTIONS=--max-old-space-size=<MB>` to prevent V8 from deferring garbage collection
+- Enable worker rolling restarts via `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts`
+- Audit your server bundle for module-level mutable state
+
+See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak patterns and how to fix them.
 
 ## Setup Node Renderer Server
 
@@ -29,7 +41,7 @@ See [Installation](../../../pro/installation.md).
    - `RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`
    - `RENDERER_SUPPORT_MODULES`
 2. Configure ENV values and run the command. Note, you can set port with args `-p <PORT>`. For example, assuming node-renderer is in your path:
-   ```
+   ```bash
    RENDERER_BUNDLE_PATH=/app/.node-renderer-bundles node-renderer
    ```
 3. You can use a command line argument of `-p SOME_PORT` to override any ENV value for the PORT.
@@ -86,7 +98,7 @@ end
 
 ## Troubleshooting
 
-- See [JS Memory Leaks](../../../pro/js-memory-leaks.md).
+- See [Memory Leaks guide](../../../pro/js-memory-leaks.md).
 
 ## Upgrading
 

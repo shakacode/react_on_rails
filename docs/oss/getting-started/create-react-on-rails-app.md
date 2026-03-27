@@ -1,6 +1,6 @@
-# create-react-on-rails-app
+# Quick Start: `npx create-react-on-rails-app`
 
-The fastest way to start a new React on Rails project. One command creates a fully configured Rails + React application with TypeScript, server-side rendering, and hot module replacement.
+The fastest way to start a new React on Rails project. One command creates a fully configured Rails + React application with TypeScript, server-side rendering, hot module replacement, and, optionally, React Server Components (RSC).
 
 ## Quick Start
 
@@ -76,8 +76,9 @@ The CLI checks for these before starting:
 - **Rails 7.0+** (`gem install rails`)
 - **PostgreSQL** running locally
 - **npm or pnpm**
+- **PostgreSQL** running locally (needed at `bin/rails db:prepare`, not validated by the CLI)
 
-If any are missing, you'll get a clear error message with installation instructions.
+If any of the first four are missing, you'll get a clear error message with installation instructions.
 
 ## Adding to an Existing Rails App
 
@@ -97,5 +98,5 @@ Now that you have React on Rails running, here are ways to level up:
 
 - **Add server-side rendering** — [SSR guide](../core-concepts/react-server-rendering.md)
 - **See the feature comparison** — [OSS vs Pro](./oss-vs-pro.md)
-- **Upgrade to Pro** for React Server Components, streaming SSR, and 10-100x faster SSR — [3-step upgrade guide](../../pro/upgrading-to-pro.md)
+- **Upgrade to Pro** for React Server Components, streaming SSR, and 3-10x faster SSR — [3-step upgrade guide](../../pro/upgrading-to-pro.md)
 - **Explore the full docs** — [Documentation index](../../README.md)

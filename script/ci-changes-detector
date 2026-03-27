@@ -5,12 +5,12 @@
 
 set -euo pipefail
 
-BASE_REF="${1:-origin/master}"
+BASE_REF="${1:-origin/main}"
 CURRENT_REF="${2:-HEAD}"
 
 # Handle initial commits where before SHA is all zeros
 if [[ "$BASE_REF" =~ ^0+$ ]]; then
-  BASE_REF="origin/master"
+  BASE_REF="origin/main"
 fi
 
 # Colors for output
@@ -21,7 +21,8 @@ NC='\033[0m' # No Color
 
 # Fetch the base ref if it's a remote ref
 if [[ "$BASE_REF" == origin/* ]]; then
-  if ! git fetch origin master --depth=50 2>/dev/null; then
+  BASE_BRANCH="${BASE_REF#origin/}"
+  if ! git fetch origin "$BASE_BRANCH" --depth=50 2>/dev/null; then
     echo "${RED}Error: Failed to fetch $BASE_REF${NC}"
     echo "Please check your network connection and try again."
     exit 1

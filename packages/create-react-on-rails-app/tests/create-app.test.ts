@@ -27,6 +27,7 @@ const baseOptions: CliOptions = {
   template: 'javascript',
   packageManager: 'npm',
   rspack: false,
+  pro: false,
   rsc: false,
 };
 
@@ -152,6 +153,14 @@ describe('buildGeneratorArgs', () => {
     ]);
   });
 
+  it('adds pro flag when enabled', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, pro: true })).toEqual([
+      '--pro',
+      '--force',
+      '--ignore-warnings',
+    ]);
+  });
+
   it('combines all enabled flags in order', () => {
     expect(
       buildGeneratorArgs({
@@ -166,6 +175,23 @@ describe('buildGeneratorArgs', () => {
   it('combines rspack and rsc flags without typescript', () => {
     expect(buildGeneratorArgs({ ...baseOptions, rspack: true, rsc: true })).toEqual([
       '--rspack',
+      '--rsc',
+      '--force',
+      '--ignore-warnings',
+    ]);
+  });
+
+  it('combines rspack and pro flags without typescript', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, rspack: true, pro: true })).toEqual([
+      '--rspack',
+      '--pro',
+      '--force',
+      '--ignore-warnings',
+    ]);
+  });
+
+  it('prefers --rsc over --pro when both are set', () => {
+    expect(buildGeneratorArgs({ ...baseOptions, pro: true, rsc: true })).toEqual([
       '--rsc',
       '--force',
       '--ignore-warnings',
@@ -235,6 +261,63 @@ describe('createApp', () => {
     expect(mockedExecLiveArgs).toHaveBeenCalledTimes(4);
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
+    expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_server');
+    expect(processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('installs react_on_rails_pro and keeps hello_world route for --pro', () => {
+    const options = { ...baseOptions, pro: true };
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    createApp('my-app', options);
+
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(1, 'rails', [
+      'new',
+      'my-app',
+      '--database=postgresql',
+      '--skip-javascript',
+    ]);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      2,
+      'bundle',
+      ['add', 'react_on_rails', '--strict'],
+      appPath,
+    );
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(3, 'bundle', ['add', 'react_on_rails_pro'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      4,
+      'bundle',
+      ['exec', 'rails', 'generate', 'react_on_rails:install', '--pro', '--force', '--ignore-warnings'],
+      appPath,
+      expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
+    );
+    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(4);
+    expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
+    expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
+    expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_world');
+    expect(processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses --rsc generator mode when both --pro and --rsc are set', () => {
+    const options = { ...baseOptions, pro: true, rsc: true };
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    createApp('my-app', options);
+
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(3, 'bundle', ['add', 'react_on_rails_pro'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      4,
+      'bundle',
+      ['exec', 'rails', 'generate', 'react_on_rails:install', '--rsc', '--force', '--ignore-warnings'],
+      appPath,
+      expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
+    );
+    expect(mockedExecLiveArgs).not.toHaveBeenCalledWith(
+      'bundle',
+      ['exec', 'rails', 'generate', 'react_on_rails:install', '--pro', '--force', '--ignore-warnings'],
+      appPath,
+      expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
+    );
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000/hello_server');
     expect(processExitSpy).not.toHaveBeenCalled();
   });
@@ -315,7 +398,7 @@ describe('createApp', () => {
     );
   });
 
-  it('skips pnpm import and install when no package-lock.json exists', () => {
+  it('skips pnpm import when no package-lock.json exists but still runs pnpm install', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
     const packageJsonPath = path.join(appPath, 'package.json');
     const setupPath = path.join(appPath, 'bin', 'setup');
@@ -336,8 +419,41 @@ describe('createApp', () => {
     createApp('my-app', { ...baseOptions, packageManager: 'pnpm' });
 
     expect(mockedExecLiveArgs).not.toHaveBeenCalledWith('pnpm', ['import'], appPath);
-    expect(mockedExecLiveArgs).not.toHaveBeenCalledWith('pnpm', ['install'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('pnpm', ['install'], appPath);
     expect(mockedFs.rmSync).not.toHaveBeenCalledWith(packageLockPath, { force: true });
+  });
+
+  it('exits without printing success when pnpm normalization fails', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+    const packageJsonPath = path.join(appPath, 'package.json');
+    const packageLockPath = path.join(appPath, 'package-lock.json');
+
+    mockedFs.existsSync.mockReturnValue(true);
+    mockedFs.readFileSync.mockImplementation((targetPath) => {
+      if (targetPath === packageJsonPath) {
+        return JSON.stringify({ packageManager: 'npm@11.6.2', name: 'app' });
+      }
+      return '';
+    });
+
+    mockedExecLiveArgs
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('pnpm import failed');
+      });
+
+    expect(() => createApp('my-app', { ...baseOptions, packageManager: 'pnpm' })).toThrow('process.exit');
+
+    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(mockedLogError).toHaveBeenCalledWith(
+      'Failed to finish pnpm setup. The app was created, but package manager normalization did not complete.',
+    );
+    expect(mockedLogStepDone).not.toHaveBeenCalledWith('Done!');
+    expect(mockedLogInfo).not.toHaveBeenCalledWith('Then visit http://localhost:3000/hello_world');
+    expect(consoleLogSpy).not.toHaveBeenCalledWith('  bin/dev');
+    expect(mockedFs.rmSync).not.toHaveBeenCalledWith(appPath, { recursive: true, force: true });
   });
 
   it('cleans up app directory when react_on_rails add fails', () => {
@@ -396,6 +512,23 @@ describe('createApp', () => {
     expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
     expect(mockedLogInfo).toHaveBeenCalledWith(
       'Directory removed. Ensure react_on_rails_pro is installable in your Bundler/RubyGems setup, then rerun with --rsc.',
+    );
+  });
+
+  it('cleans up app directory when react_on_rails_pro add fails for --pro', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+    mockedExecLiveArgs
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => {
+        throw new Error('pro gem install failed');
+      });
+
+    expect(() => createApp('my-app', { ...baseOptions, pro: true })).toThrow('process.exit');
+    expect(mockedLogError).toHaveBeenCalledWith('Failed to add react_on_rails_pro gem required by --pro.');
+    expect(mockedFs.rmSync).toHaveBeenCalledWith(appPath, { recursive: true, force: true });
+    expect(mockedLogInfo).toHaveBeenCalledWith(
+      'Directory removed. Ensure react_on_rails_pro is installable in your Bundler/RubyGems setup, then rerun with --pro.',
     );
   });
 
@@ -463,6 +596,21 @@ describe('createApp', () => {
     );
   });
 
+  it('uses local pro path when REACT_ON_RAILS_PRO_GEM_PATH is set for --pro', () => {
+    const localProGemPath = '/tmp/fake-react_on_rails_pro';
+    process.env.REACT_ON_RAILS_PRO_GEM_PATH = localProGemPath;
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    createApp('my-app', { ...baseOptions, pro: true });
+
+    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
+      3,
+      'bundle',
+      ['add', 'react_on_rails_pro', '--path', localProGemPath],
+      appPath,
+    );
+  });
+
   it('exits early when local react_on_rails path does not exist', () => {
     const missingLocalGemPath = '/tmp/missing-react_on_rails';
     process.env.REACT_ON_RAILS_GEM_PATH = missingLocalGemPath;
@@ -481,6 +629,18 @@ describe('createApp', () => {
     mockedFs.existsSync.mockImplementation((targetPath) => targetPath !== missingProGemPath);
 
     expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
+    expect(mockedLogError).toHaveBeenCalledWith(
+      `Local gem path from REACT_ON_RAILS_PRO_GEM_PATH does not exist: ${missingProGemPath}`,
+    );
+    expect(mockedExecLiveArgs).not.toHaveBeenCalled();
+  });
+
+  it('exits early when local react_on_rails_pro path does not exist for --pro', () => {
+    const missingProGemPath = '/tmp/missing-react_on_rails_pro';
+    process.env.REACT_ON_RAILS_PRO_GEM_PATH = missingProGemPath;
+    mockedFs.existsSync.mockImplementation((targetPath) => targetPath !== missingProGemPath);
+
+    expect(() => createApp('my-app', { ...baseOptions, pro: true })).toThrow('process.exit');
     expect(mockedLogError).toHaveBeenCalledWith(
       `Local gem path from REACT_ON_RAILS_PRO_GEM_PATH does not exist: ${missingProGemPath}`,
     );

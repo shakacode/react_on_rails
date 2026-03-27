@@ -84,6 +84,7 @@ React on Rails + Shakapacker layouts use pack tags instead:
 ```
 
 If you use React on Rails auto-bundling, keep those empty pack-tag placeholders in the layout and let React on Rails load component-specific bundles per page.
+If you use a manual entrypoint instead (non-auto-bundling), pass the pack name explicitly, e.g. `javascript_pack_tag "application"`.
 
 ## 5. Move frontend code into the React on Rails structure
 
@@ -140,9 +141,9 @@ If your ERB templates use `vite_asset_path`, convert those assets to one of thes
 
 Vite-specific `import.meta.env` usage needs to be replaced. In a React on Rails app, prefer:
 
-- standard `process.env` access in bundled JavaScript
 - Rails-passed props
 - `railsContext` for request-aware values
+- `process.env` in server-rendered bundles (available natively in Node); for client bundles, values must be injected via webpack's `DefinePlugin` or `EnvironmentPlugin`
 
 ## 8. Replace the development workflow
 

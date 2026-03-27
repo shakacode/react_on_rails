@@ -3,12 +3,15 @@
 require "erb"
 require "open3"
 require "yaml"
+require_relative "config_path_resolver"
 
 module ReactOnRails
   # SystemChecker provides validation methods for React on Rails setup
   # Used by install generator and doctor rake task
   # rubocop:disable Metrics/ClassLength
   class SystemChecker
+    include ConfigPathResolver
+
     attr_reader :messages
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
@@ -187,7 +190,7 @@ module ReactOnRails
     end
 
     def check_react_on_rails_npm_package
-      package_json_path = "package.json"
+      package_json_path = resolved_package_json_path
       return unless File.exist?(package_json_path)
 
       package_json = JSON.parse(File.read(package_json_path))
@@ -208,10 +211,11 @@ module ReactOnRails
     end
 
     def check_package_version_sync
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         package_name, npm_version = react_on_rails_npm_package_details(package_json)
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
@@ -259,7 +263,7 @@ module ReactOnRails
 
     # React dependencies validation
     def check_react_dependencies
-      return unless File.exist?("package.json")
+      return unless File.exist?(resolved_package_json_path)
 
       package_json = parse_package_json
       return unless package_json
@@ -327,6 +331,9 @@ module ReactOnRails
         return paths_by_bundler[configured_bundler].first
       end
 
+      # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
+      # Webpack is the longer-established default; rspack users typically set
+      # assets_bundler explicitly in shakapacker.yml.
       add_warning(
         "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
       )
@@ -372,10 +379,11 @@ module ReactOnRails
     end
 
     def bundle_analyzer_available?
-      return false unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return false unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
         all_deps["webpack-bundle-analyzer"]
       rescue StandardError
@@ -636,8 +644,8 @@ module ReactOnRails
     # rubocop:enable Metrics/CyclomaticComplexity
 
     def parse_package_json
-      JSON.parse(File.read("package.json"))
-    rescue JSON::ParserError
+      JSON.parse(File.read(resolved_package_json_path))
+    rescue Errno::ENOENT, JSON::ParserError
       add_warning("⚠️  Could not parse package.json to check React dependencies")
       nil
     end
@@ -776,10 +784,11 @@ module ReactOnRails
     end
 
     def report_webpack_version
-      return unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
 
       begin
-        package_json = JSON.parse(File.read("package.json"))
+        package_json = JSON.parse(File.read(package_json_path))
         all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
 
         webpack_version = all_deps["webpack"]

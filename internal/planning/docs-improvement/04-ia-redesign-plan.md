@@ -928,7 +928,7 @@ rm -rf docs/testimonials
 git checkout -b archive/outdated-docs
 git mv docs/outdated /
 git commit -m "Archive outdated docs"
-git checkout master
+git checkout main
 rm -rf docs/outdated
 ```
 

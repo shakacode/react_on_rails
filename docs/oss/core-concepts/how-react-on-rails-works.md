@@ -14,7 +14,7 @@ Optionally, you can also initialize a Redux store with the view or controller he
 
 In most cases, you should use the `prerender: false` (default behavior) with the provided `react_component` helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
 
-Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki).
+Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://reactonrails.com/docs/pro/).
 
 ## HTML Source Code
 
@@ -30,7 +30,7 @@ You can see all this on the source for [reactrails.com](https://reactrails.com/)
 
 Each time you change your client code, you will need to re-generate the bundles (the Webpack-created JavaScript files included in `application.js`). The included example Foreman `Procfile.dev` files will take care of this for you by starting a Webpack process with the watch flag. This will watch your JavaScript code files for changes. Alternatively, the `shakapacker` library also can ensure that your bundles are built.
 
-For example, you might create a [Procfile.dev](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/Procfile.dev).
+For example, you might create a [Procfile.dev](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy/Procfile.dev).
 
 On production deployments that use asset precompilation, such as Heroku deployments, `shakapacker`, by default, will automatically run Webpack to build your JavaScript bundles, running the command `bin/shakapacker` in your app.
 

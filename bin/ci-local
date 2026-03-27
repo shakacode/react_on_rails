@@ -8,7 +8,7 @@ set -euo pipefail
 # Parse arguments
 RUN_ALL=false
 FAST_MODE=false
-BASE_REF="origin/master"
+BASE_REF="origin/main"
 
 while [[ $# -gt 0 ]]; do
   case $1 in

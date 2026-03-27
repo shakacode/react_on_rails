@@ -2,7 +2,24 @@
 
 This guide covers the most common problems you'll encounter when migrating to React Server Components, with concrete solutions for each. Use it as a reference when you hit errors or unexpected behavior.
 
-> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md)
+> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md) | Next: [Flight Payload Optimization](rsc-flight-payload.md)
+
+## Diagnostic Quick-Reference
+
+When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
+
+| Symptom                                                          | Most Likely Cause                                                            | Section                                                                          |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_  | Passing functions or class instances across the server-client boundary       | [Serialization Boundary Issues](#serialization-boundary-issues)                  |
+| Build error: _"needs useState/useEffect"_                        | Using hooks in a Server Component file                                       | [Error Message Catalog](#error-message-catalog)                                  |
+| RSC page downloads unexpectedly large JS chunks                  | Chunk contamination from shared `'use client'` modules                       | [Chunk Contamination](#chunk-contamination)                                      |
+| Component stays a Client Component after removing `'use client'` | Imported by another `'use client'` file, or RSC bundle not rebuilding        | [Accidental Client Components](#accidental-client-components)                    |
+| Hydration mismatch warnings in console                           | Server/client render output differs (timestamps, browser APIs, invalid HTML) | [Hydration Mismatches](#hydration-mismatches)                                    |
+| `ReferenceError: performance is not defined`                     | Node renderer VM context missing globals                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)         |
+| SSR hangs or times out on large pages                            | Stream backpressure deadlock                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                    |
+| Rails boot error about version mismatch                          | Gem and npm package at different versions                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)    |
+| 422 Unprocessable Entity on form submission                      | Missing CSRF token in fetch request                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions) |
+| Page is blank until all data loads                               | Missing `stream_react_component` or Suspense boundaries                      | [Performance Pitfalls](#performance-pitfalls)                                    |
 
 ## Serialization Boundary Issues
 
@@ -10,15 +27,14 @@ Everything passed from a Server Component to a Client Component must be serializ
 
 ### What Can Cross the Server-to-Client Boundary
 
-| Allowed                                         | Not Allowed                       |
-| ----------------------------------------------- | --------------------------------- |
-| Strings, numbers, booleans, `null`, `undefined` | Functions (except Server Actions) |
-| Plain objects and arrays                        | Class instances                   |
-| `Date` objects                                  | `WeakMap`, `WeakSet`              |
-| `Map`, `Set`, typed arrays (React 19+)          | Symbols                           |
-| `Promise` (resolved by `use()`)                 | DOM nodes                         |
-| React elements (`<Component />`)                | Closures                          |
-| Server Action references (`'use server'`)       |                                   |
+| Allowed                                         | Not Allowed          |
+| ----------------------------------------------- | -------------------- |
+| Strings, numbers, booleans, `null`, `undefined` | Functions            |
+| Plain objects and arrays                        | Class instances      |
+| `Date` objects                                  | `WeakMap`, `WeakSet` |
+| `Map`, `Set`, typed arrays (React 19+)          | Symbols              |
+| `Promise` (resolved by `use()`)                 | DOM nodes            |
+| React elements (`<Component />`)                | Closures             |
 
 ### Common Error: Passing Functions
 
@@ -46,37 +62,66 @@ export default function ClientButton() {
 }
 ```
 
-**Fix 2:** Use a Server Action for server-side logic:
+**Fix 2:** Move the logic to a Client Component that calls a Rails endpoint:
 
 ```jsx
-// Page.jsx -- Server Component
-async function Page() {
-  async function handleSubmit(formData) {
-    'use server';
-    // In React on Rails, Server Actions run in Node.js and cannot access
-    // Rails models directly. Call your Rails API endpoint instead:
-    // Server-side fetch needs an absolute URL. Point RAILS_BASE_URL at your
-    // internal Rails URL (for example http://127.0.0.1:3000 in development),
-    // not the public-facing domain.
-    // This server-side fetch will not include the browser's CSRF token, so
-    // use an API-only route or another non-session auth boundary. If you use
-    // `protect_from_forgery with: :null_session`, add another trust check
-    // (for example signed tokens, API keys, or same-origin validation)
-    // because `null_session` avoids the CSRF failure but does not
-    // authenticate the request.
-    const railsBaseUrl = process.env.RAILS_BASE_URL;
-    if (!railsBaseUrl) {
-      throw new Error('RAILS_BASE_URL environment variable is required for Server Actions');
-    }
-    await fetch(new URL('/api/items', railsBaseUrl), {
+// ClientForm.jsx -- Client Component
+'use client';
+
+import { useState } from 'react';
+import ReactOnRails from 'react-on-rails';
+
+export default function ClientForm() {
+  const [name, setName] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const response = await fetch('/api/items', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: formData.get('name') }),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': ReactOnRails.authenticityToken(),
+      },
+      body: JSON.stringify({ name }),
     });
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+    setName('');
   }
-  return <ClientForm action={handleSubmit} />;
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+      <button type="submit">Submit</button>
+    </form>
+  );
 }
 ```
+
+```erb
+<%# ERB view %>
+<%= stream_react_component("ClientForm") %>
+```
+
+### Common Error: railsContext Contains Functions
+
+When using React on Rails Pro with RSC, the `railsContext` object includes non-serializable functions (`addPostSSRHook`, `getRSCPayloadStream`). Passing the entire `railsContext` to a Client Component causes:
+
+```
+Functions cannot be passed directly to Client Components
+unless you explicitly expose it by marking it with "use server".
+```
+
+**Fix:** Strip non-serializable properties before passing to Client Components:
+
+```jsx
+// Server Component (render function)
+const MyPage = (props, railsContext) => {
+  const { addPostSSRHook, getRSCPayloadStream, ...serializableContext } = railsContext;
+  return () => <ClientComponent {...props} railsContext={serializableContext} />;
+};
+```
+
+> **Note:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controller endpoints for all mutations.
 
 ### Common Error: Passing Class Instances
 
@@ -104,7 +149,7 @@ The `'use client'` directive operates at the **module level**. Once a file is ma
 
 ### The Problem
 
-```
+```text
 ClientComponent.jsx ('use client')
 ├── imports utils.js          → becomes client code
 │   └── imports heavy-lib.js  → becomes client code (100KB wasted)
@@ -135,7 +180,7 @@ If someone imports `db-utils.js` from a Client Component (directly or transitive
 
 ## Chunk Contamination
 
-When a component with `'use client'` is also statically imported by a heavy Client Component, the RSC page may end up downloading much larger chunks than necessary. This doesn't always happen -- it depends on webpack's internal chunk group ordering -- but when it does, the impact can be severe (e.g., 382 KB instead of 8 KB).
+When a component with `'use client'` is statically imported by both a small RSC path and a heavier client path, the RSC page can inherit chunks from both paths. The impact can be severe (for example, 382 KB instead of 8 KB).
 
 ### How to Detect It
 
@@ -151,19 +196,17 @@ After building, inspect your `react-client-manifest.json`. Each `'use client'` m
 }
 ```
 
-In this example, `HelloWorldHooks` (a tiny component) is mapped to PostsPage's chunk group, which includes a 375 KB vendor chunk containing lodash and moment. The browser downloads all of it.
+In this example, `HelloWorldHooks` (a tiny component) picks up PostsPage chunks, including a 375 KB vendor chunk containing lodash and moment. The browser downloads all of it.
 
 You can also check the browser DevTools **Network** tab: load your RSC page, filter to JS files, and look for unexpectedly large downloads that contain unrelated libraries. Tools like **webpack-bundle-analyzer** can help visualize which modules ended up in which chunks.
 
 ### Why It Happens
 
-The RSC webpack plugin builds the client manifest by iterating through all webpack chunk groups and recording which chunks contain each `'use client'` module. If a module appears in multiple chunk groups, the **last one processed overwrites** previous mappings.
+The RSC client manifest maps each `'use client'` module to the JS chunks the browser needs to download. When a `'use client'` module is imported by multiple entry points (for example, both an RSC page and a heavy SSR/client page), its mapping can include chunks that originate from both paths.
 
-When `PostsPage.jsx` (`'use client'`) statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment), `HelloWorldHooks.jsx` appears in PostsPage's chunk group. Depending on iteration order, the manifest may map `HelloWorldHooks` to PostsPage's chunks -- including the vendor chunk with lodash and moment.
+When `PostsPage.jsx` (`'use client'`) statically imports `HelloWorldHooks.jsx` along with heavy dependencies (lodash, moment), `HelloWorldHooks.jsx` can inherit chunks from that heavier path. The result is chunk contamination: one small component ends up carrying unrelated chunks because it appears in multiple chunk groups.
 
-This behavior is **deterministic for a given build** (not random), but the specific chunk group order depends on webpack internals that are hard to predict and can change when you add or remove components.
-
-Redundant `'use client'` directives increase the risk: the RSC webpack plugin creates a separate async chunk for **every** file with `'use client'`. Adding the directive to components that are already client code (because they're imported by a `'use client'` parent) creates unnecessary chunks and manifest entries -- each one subject to the same last-write-wins overwrite.
+Redundant `'use client'` directives increase the risk. If a component is already imported by a `'use client'` parent, adding `'use client'` to it too creates extra manifest entries and extra opportunities to accumulate unrelated chunks. Keep `'use client'` only on files that must be server/client boundaries.
 
 ### How to Fix It
 
@@ -195,9 +238,79 @@ export default function RSCPage() {
 }
 ```
 
-The wrapper file doesn't appear in PostsPage's import tree, so the RSC plugin always maps it to its own small async chunk (~8 KB), regardless of chunk group ordering.
+The wrapper file doesn't appear in PostsPage's import tree, so it avoids inheriting PostsPage's heavier chunk groups and usually stays mapped to a much smaller chunk footprint.
 
-> **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, trace which `'use client'` module causes it and introduce a wrapper. For shared components used by both RSC pages and heavy Client Component trees, the wrapper is a safe preventive measure.
+### When the Wrapper Isn't Enough: Prop Injection
+
+If a shared component is used by both RSC and SSR/client paths, the wrapper alone may not fully isolate imports. In that case, remove the import edge by passing client elements as props.
+
+```jsx
+// InteractiveWidgetsClient.jsx -- thin wrapper used by the RSC path
+'use client';
+export { AddToCartButton } from './InteractiveWidgets';
+```
+
+```jsx
+// ProductCard.jsx BEFORE -- direct client import in a shared component
+import { AddToCartButton } from './InteractiveWidgets';
+
+export function ProductCard({ product }) {
+  return (
+    <div>
+      <h3>{product.name}</h3>
+      <AddToCartButton productId={product.id} />
+    </div>
+  );
+}
+```
+
+```jsx
+// ProductCard.jsx AFTER -- no direct 'use client' imports
+export function ProductCard({ product, addToCartButton }) {
+  return (
+    <div>
+      <h3>{product.name}</h3>
+      {addToCartButton}
+    </div>
+  );
+}
+```
+
+```jsx
+// RSCPage.jsx -- Server Component (prop injection via thin wrapper)
+import { AddToCartButton } from './InteractiveWidgetsClient';
+import { ProductCard } from './ProductCard';
+
+export default function RSCPage({ products }) {
+  return products.map((product) => (
+    <ProductCard
+      key={product.id}
+      product={product}
+      addToCartButton={<AddToCartButton productId={product.id} />}
+    />
+  ));
+}
+```
+
+```jsx
+// SSRPage.jsx -- client/SSR path can import the heavier module directly
+import { AddToCartButton } from './InteractiveWidgets';
+import { ProductCard } from './ProductCard';
+
+export default function SSRPage({ products }) {
+  return products.map((product) => (
+    <ProductCard
+      key={product.id}
+      product={product}
+      addToCartButton={<AddToCartButton productId={product.id} />}
+    />
+  ));
+}
+```
+
+The RSC path uses `InteractiveWidgetsClient` (thin wrapper) to keep ProductCard's import edge clean, while the SSR path can import the full `InteractiveWidgets` module without affecting the RSC manifest for ProductCard.
+
+> **When to apply this:** Check the manifest or Network tab after building. If an RSC page downloads chunks larger than expected, start with a thin wrapper. If contamination persists because the component is shared across RSC and non-RSC entry points, use prop injection to remove the shared import edge.
 
 ## Accidental Client Components
 
@@ -406,46 +519,69 @@ import { useState } from 'react';
 - `'use server'` marks **Server Actions** (functions callable from the client) -- NOT Server Components
 - Server Components are the **default** and need no directive
 
+> **React on Rails note:** Server Actions (`'use server'`) are **not supported** in React on Rails. The Node renderer has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controller endpoints for all mutations.
+
 ## Performance Pitfalls
 
 ### Server Waterfalls
 
-The most common performance regression. Sequential `await` calls create waterfalls on the server:
+The most common performance regression. Sequential queries in the Rails controller block rendering:
 
-```jsx
-// BAD: Sequential fetching (750ms total)
-async function Page() {
-  const user = await getUser(); // 200ms
-  const stats = await getStats(user.id); // 300ms (waits for user)
-  const posts = await getPosts(user.id); // 250ms (waits for user AND stats)
-  // Total: 750ms (sequential)
-}
+```ruby
+# BAD: Each query blocks the next (750ms total)
+def show
+  @user = User.find(params[:user_id])        # 200ms
+  @stats = Stats.for_user(@user.id)          # 300ms (waits for user)
+  @posts = Post.where(user_id: @user.id).limit(10)  # 250ms (sequential)
+  stream_view_containing_react_components(template: "pages/show")
+end
 ```
 
-**Fix 1:** If the user ID is available from props or route params, all three fetches can run in parallel:
+**Fix 1:** Use Ruby threads for independent data sources:
 
-```jsx
-// GOOD: Parallel fetching when userId is available upfront (300ms total)
-async function Page({ userId }) {
-  const [user, stats, posts] = await Promise.all([getUser(userId), getStats(userId), getPosts(userId)]);
-}
+```ruby
+# GOOD: Fetch independent data in parallel
+def show
+  user_id = params[:user_id]
+  results = {}
+  threads = []
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      results[:user] = User.find(user_id).as_json
+    end
+  end
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      results[:stats] = Stats.for_user(user_id).as_json
+    end
+  end
+  threads << Thread.new do
+    ActiveRecord::Base.connection_pool.with_connection do
+      results[:posts] = Post.where(user_id: user_id).limit(10).as_json
+    end
+  end
+  threads.each(&:join)
+  @page_props = { title: "Page" }.merge(results)
+  stream_view_containing_react_components(template: "pages/show")
+end
 ```
 
-**Fix 2:** If you must fetch the user first (e.g., stats and posts depend on user data), fetch the user first, then parallelize the dependent calls:
-
-```jsx
-// GOOD: Fetch user first, then parallelize dependent calls (500ms total)
-async function Page() {
-  const user = await getUser(); // 200ms
-  const [stats, posts] = await Promise.all([
-    getStats(user.id), // 300ms ── start simultaneously
-    getPosts(user.id), // 250ms
-  ]);
-  // Total: 200 + 300 = 500ms (instead of 750ms)
-}
+```erb
+<%# GOOD: All data fetched in parallel, rendered with streaming SSR %>
+<%= stream_react_component("Page", props: @page_props) %>
 ```
 
-See [Data Fetching Migration](rsc-data-fetching.md) for detailed patterns.
+**Fix 2:** Prefetch critical data in the controller and pass all data as props:
+
+```erb
+<%# All data is passed as props — stream_react_component handles progressive HTML delivery %>
+<%= stream_react_component("Page",
+      props: { user: current_user.as_json(only: [:id, :name]),
+               stats: Stats.for_user(current_user.id).as_json,
+               posts: Post.where(user_id: current_user.id).limit(10).as_json }) %>
+```
+
+See [Data Fetching Migration](rsc-data-fetching.md#avoiding-server-side-waterfalls) for detailed patterns.
 
 ### Missing Suspense Boundaries
 
@@ -453,7 +589,11 @@ Without Suspense, Server Components perform similarly to traditional SSR. Benchm
 
 ### RSC Payload Duplication
 
-The RSC payload (a serialized representation of the component tree) is embedded in `<script>` tags alongside the server-rendered HTML. This payload is used by React on the client to reconcile the component tree without re-rendering from scratch. The HTML and the RSC payload are not exact duplicates -- the payload contains component structure and props, not rendered markup -- but they do represent overlapping information, which increases document size. Monitor RSC payload size to ensure it stays reasonable.
+The RSC payload (a serialized representation of the component tree) is embedded in `<script>` tags alongside the server-rendered HTML. This payload is used by React on the client to reconcile the component tree without re-rendering from scratch. The HTML and the RSC payload are not exact duplicates -- the payload contains component structure and props, not rendered markup -- but they do represent overlapping information, which increases document size.
+
+Payload size can grow rapidly when Server Components produce verbose element trees -- particularly with utility-first CSS frameworks like Tailwind, where className strings alone can account for nearly half the payload. Components repeated many times on a page (product cards, review lists, tag grids) amplify this effect. In one benchmark, moving four presentational subtrees from server to client components reduced the raw Flight payload by 42% with only a 2.2 KB client JS increase.
+
+For a detailed analysis, measurement techniques, and the decision flowchart for when to apply this optimization, see [Flight Payload Optimization](rsc-flight-payload.md).
 
 ## Testing Strategies
 
@@ -463,11 +603,10 @@ Async Server Components introduce new testing challenges. Vitest and Jest can te
 
 ### Recommended Testing Approach
 
-```
+```text
 Unit Tests (Vitest/Jest)
 ├── Client Components -- full support with hooks mocking
 ├── Synchronous Server Components -- basic rendering tests
-├── Server Actions -- test as regular async functions
 └── Utility/helper functions -- standard unit tests
 
 Integration Tests
@@ -481,28 +620,32 @@ E2E Tests (Playwright)
 └── Full page flows -- navigation, forms, etc.
 ```
 
-### Testing Server Actions
+### Testing Mutations
 
-Server Actions can be tested as regular async functions:
+In React on Rails, mutations go through Rails controller endpoints rather than Server Actions. Test mutation logic in your Rails controller specs (RSpec request specs) and test the Client Component's form submission behavior with component tests:
 
 ```jsx
-// actions.test.js
-import { createUser } from './actions';
+// UserForm.test.jsx
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import ReactOnRails from 'react-on-rails';
+import UserForm from './UserForm';
 
-it('rejects invalid input', async () => {
-  const formData = new FormData();
-  formData.set('name', 'Alice');
-  // email is missing -- expect validation error
-  const result = await createUser(formData);
-  expect(result.error).toBeDefined();
-});
+it('submits to the Rails endpoint', async () => {
+  global.fetch = jest.fn(() => Promise.resolve({ ok: true }));
+  jest.spyOn(ReactOnRails, 'authenticityToken').mockReturnValue('test-token');
 
-it('accepts valid input', async () => {
-  const formData = new FormData();
-  formData.set('name', 'Alice');
-  formData.set('email', 'alice@example.com');
-  const result = await createUser(formData);
-  expect(result).toBeUndefined(); // createUser returns no value on success
+  render(<UserForm />);
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Alice' } });
+  fireEvent.click(screen.getByText('Submit'));
+
+  await waitFor(() =>
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/users',
+      expect.objectContaining({
+        method: 'POST',
+      }),
+    ),
+  );
 });
 ```
 
@@ -530,31 +673,28 @@ async function Page() {
 }
 ```
 
-### Runtime Validation for Server Actions
+### Runtime Validation for API Endpoints
 
-TypeScript only provides compile-time checking. Server Actions are public endpoints that can receive arbitrary data. Use runtime validation:
+TypeScript only provides compile-time checking. Rails API endpoints that receive data from React forms should validate input on the server side. Use Rails' built-in model validations and strong parameters in your controllers:
 
-```tsx
-'use server';
-import { z } from 'zod';
+```ruby
+# app/controllers/api/users_controller.rb
+class Api::UsersController < ApplicationController
+  def create
+    user = User.new(user_params)
+    if user.save
+      render json: user, status: :created
+    else
+      render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
+    end
+  end
 
-const CreateUserSchema = z.object({
-  name: z.string().min(1).max(100),
-  email: z.string().email(),
-});
+  private
 
-export async function createUser(formData: FormData) {
-  const parsed = CreateUserSchema.safeParse({
-    name: formData.get('name'),
-    email: formData.get('email'),
-  });
-
-  if (!parsed.success) {
-    return { error: parsed.error.flatten() };
-  }
-
-  await db.users.create({ data: parsed.data });
-}
+  def user_params
+    params.require(:user).permit(:name, :email)
+  end
+end
 ```
 
 ## Bundle Analysis Tools
@@ -577,24 +717,26 @@ export async function createUser(formData: FormData) {
 
 ## Error Message Catalog
 
-| Error Message                                                                                                                | Cause                                                                                                                                                                                                    | Solution                                                                                                                                                                                                                                    |
-| ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"Functions cannot be passed directly to Client Components unless you explicitly expose it by marking it with 'use server'"` | Passing a function prop from Server to Client Component                                                                                                                                                  | Use Server Actions, or define the function in the Client Component                                                                                                                                                                          |
-| `"You're importing a component that needs useState/useEffect..."`                                                            | Using hooks in a Server Component                                                                                                                                                                        | Add `'use client'` to the component file                                                                                                                                                                                                    |
-| `"Only plain objects, and a few built-ins, can be passed to Client Components..."`                                           | Passing class instances or non-serializable values                                                                                                                                                       | Convert to plain objects with `.toJSON()` or manual serialization                                                                                                                                                                           |
-| `"async/await is not yet supported in Client Components"`                                                                    | Making a Client Component async. This is an intentional design constraint, not a temporary limitation -- Client Components re-render on state changes, which is incompatible with async rendering.       | Move async logic to a Server Component, or use `useEffect`/`use()`                                                                                                                                                                          |
-| `"A component was suspended by an uncached promise..."`                                                                      | Creating a promise inside a Client Component and passing it to `use()`                                                                                                                                   | Pass the promise from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components)                                  |
-| `"createContext is not supported in Server Components"`                                                                      | Using `createContext` or `useContext` in a Server Component                                                                                                                                              | Move context to a `'use client'` provider wrapper                                                                                                                                                                                           |
-| `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type"`          | TypeScript doesn't recognize async components                                                                                                                                                            | Upgrade to TS 5.1.2+ and `@types/react@19` (or `@types/react` 18.2.8+ for React 18), or omit return type                                                                                                                                    |
-| RSC page downloads unexpectedly large chunks                                                                                 | A shared component with `'use client'` appears in multiple chunk groups; webpack's manifest may map it to a heavy chunk group containing unrelated dependencies (depends on chunk group iteration order) | Inspect `react-client-manifest.json` for oversized chunk mappings. If found, create a thin `'use client'` wrapper file for the RSC import. See [Chunk Contamination](#chunk-contamination) above                                            |
-| `"Text content does not match server-rendered HTML"`                                                                         | Hydration mismatch                                                                                                                                                                                       | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences                                                                                                                                 |
-| `"Refs cannot be used in Server Components, nor passed to Client Components"`                                                | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type.                   | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element. |
-| `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"`                                                    | Both packages installed as separate top-level dependencies, often due to yalc link issues                                                                                                                | Ensure only `react-on-rails-pro` is in your `package.json`; the base package is installed automatically as a dependency. See [Duplicate Package Detection](#duplicate-package-detection)                                                    |
-| `ReferenceError: performance is not defined`                                                                                 | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode                                                                                                       | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                                                                   |
-| `"global object mismatch"`                                                                                                   | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc)                                                                                                            | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch)                                                                                                |
-| SSR hangs indefinitely / request timeout on large RSC payloads                                                               | Stream backpressure deadlock when RSC payload exceeds 16 KB                                                                                                                                              | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                                                                                                                      |
-| `"The 'react-on-rails' package version does not match the gem version"`                                                      | Gem and npm package installed at different versions                                                                                                                                                      | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                        |
-| `"The 'react-on-rails' package version is not an exact version"`                                                             | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json                                                                                                                          | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                         |
+| Error Message                                                                                                                | Cause                                                                                                                                                                                              | Solution                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"Functions cannot be passed directly to Client Components unless you explicitly expose it by marking it with 'use server'"` | Passing a function prop from Server to Client Component                                                                                                                                            | Define the function in the Client Component, or submit to a Rails controller endpoint. Note: React on Rails does not support Server Actions (`'use server'`).                                                                                                          |
+| `"You're importing a component that needs useState/useEffect..."`                                                            | Using hooks in a Server Component                                                                                                                                                                  | Add `'use client'` to the component file                                                                                                                                                                                                                               |
+| `"Only plain objects, and a few built-ins, can be passed to Client Components..."`                                           | Passing class instances or non-serializable values                                                                                                                                                 | Convert to plain objects with `.toJSON()` or manual serialization                                                                                                                                                                                                      |
+| `"async/await is not yet supported in Client Components"`                                                                    | Making a Client Component async. This is an intentional design constraint, not a temporary limitation -- Client Components re-render on state changes, which is incompatible with async rendering. | Move async logic to a Server Component, or use `useEffect`/`use()`                                                                                                                                                                                                     |
+| `"A component was suspended by an uncached promise..."`                                                                      | Creating a promise inside a Client Component and passing it to `use()`                                                                                                                             | Pass the promise from a Server Component as a prop, or use a Suspense-compatible library like TanStack Query. See [Common `use()` Mistakes](rsc-data-fetching.md#common-use-mistakes-in-client-components)                                                             |
+| `"createContext is not supported in Server Components"`                                                                      | Using `createContext` or `useContext` in a Server Component                                                                                                                                        | Move context to a `'use client'` provider wrapper                                                                                                                                                                                                                      |
+| `"'App' cannot be used as a JSX component. Its return type 'Promise<JSX.Element>' is not a valid JSX element type"`          | TypeScript doesn't recognize async components                                                                                                                                                      | Upgrade to TS 5.1.2+ and `@types/react@19` (or `@types/react` 18.2.8+ for React 18), or omit return type                                                                                                                                                               |
+| RSC page downloads unexpectedly large chunks                                                                                 | A shared `'use client'` module appears in multiple entry paths, so its manifest entry accumulates unrelated chunks                                                                                 | Inspect `react-client-manifest.json` for oversized mappings. Start with a thin `'use client'` wrapper; if the component is shared by both RSC and SSR/client paths, use prop injection to remove shared import edges. See [Chunk Contamination](#chunk-contamination). |
+| `"Text content does not match server-rendered HTML"`                                                                         | Hydration mismatch                                                                                                                                                                                 | Ensure identical rendering on server and client; use `suppressHydrationWarning` for intentional differences                                                                                                                                                            |
+| `"Refs cannot be used in Server Components, nor passed to Client Components"`                                                | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type.             | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element.                            |
+| `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"`                                                    | Both packages installed as separate top-level dependencies, often due to yalc link issues                                                                                                          | Ensure only `react-on-rails-pro` is in your `package.json`; the base package is installed automatically as a dependency. See [Duplicate Package Detection](#duplicate-package-detection)                                                                               |
+| `ReferenceError: performance is not defined`                                                                                 | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode                                                                                                 | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                                                                                              |
+| `"global object mismatch"`                                                                                                   | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc)                                                                                                      | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch)                                                                                                                           |
+| SSR hangs indefinitely / request timeout on large RSC payloads                                                               | Stream backpressure deadlock when RSC payload exceeds 16 KB                                                                                                                                        | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                                                                                                                                                 |
+| `"The 'react-on-rails' package version does not match the gem version"`                                                      | Gem and npm package installed at different versions                                                                                                                                                | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                   |
+| `"The 'react-on-rails' package version is not an exact version"`                                                             | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json                                                                                                                    | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                    |
+| RSC payload returns `ServerComponentFetchError: Error parsing JSON` or `SyntaxError` in development                          | Rails' `annotate_rendered_view_with_filenames` wraps the RSC payload JSON in `<!-- BEGIN -->` / `<!-- END -->` HTML comments                                                                       | Upgrade to React on Rails Pro 16.4.0+ which renders RSC templates with `formats: [:text]`. For older versions, disable `config.action_view.annotate_rendered_view_with_filenames` for the RSC controller.                                                              |
+| `railsContext` causes "Functions cannot be passed directly to Client Components"                                             | `railsContext` includes non-serializable functions (`addPostSSRHook`, `getRSCPayloadStream`) added by Pro                                                                                          | Destructure and exclude function properties before passing to Client Components. See [railsContext Contains Functions](#common-error-railscontext-contains-functions)                                                                                                  |
 
 ## Environment Variable Access
 
@@ -619,11 +761,16 @@ async function DBComponent() {
 Client Components only have access to environment variables that are explicitly injected into the webpack bundle. In Shakapacker, you control this via `webpack.EnvironmentPlugin` or `webpack.DefinePlugin`:
 
 ```js
-// config/webpack/environment.js (Shakapacker)
-const { environment } = require('@rails/webpacker');
+// config/webpack/webpack.config.js (Shakapacker)
+const { generateWebpackConfig } = require('shakapacker');
+const webpack = require('webpack');
+
+const webpackConfig = generateWebpackConfig();
 
 // Only these variables are available in Client Components
-environment.plugins.prepend('Environment', new webpack.EnvironmentPlugin(['RAILS_ENV', 'PUBLIC_API_URL']));
+webpackConfig.plugins.push(new webpack.EnvironmentPlugin(['RAILS_ENV', 'PUBLIC_API_URL']));
+
+module.exports = webpackConfig;
 ```
 
 ```jsx
@@ -649,7 +796,7 @@ The sections above cover generic RSC pitfalls. The following issues are specific
 **Fix:** Upgrade to a release that includes this patch (`react-on-rails-pro`
 16.4.0.rc.3+ was the first patched line). If a newer stable release is
 available, prefer that and check the
-[CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md)
+[CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
 for the current recommendation. See also
 [PR #2444](https://github.com/shakacode/react_on_rails/pull/2444).
 
@@ -753,7 +900,7 @@ React on Rails requires the gem and npm package versions to match exactly. The v
 
 **Symptom 1 -- Version mismatch:**
 
-```
+```text
 **ERROR** ReactOnRails: The 'react-on-rails' package version does not match the gem version.
 
 Package: 16.3.0
@@ -778,7 +925,7 @@ npm install react-on-rails@16.4.0 --save-exact
 
 **Symptom 2 -- Non-exact version:**
 
-```
+```text
 **ERROR** ReactOnRails: The 'react-on-rails' package version is not an exact version.
 
 Detected: ^16.4.0
@@ -799,7 +946,7 @@ React on Rails does not allow semver ranges (`^`, `~`, `>`, `<`, `*`) or special
 
 **Symptom 3 -- Pro gem with base package:**
 
-```
+```text
 **ERROR** ReactOnRails: You have the Pro gem installed but are using the base 'react-on-rails' package.
 ```
 
@@ -813,7 +960,7 @@ yarn remove react-on-rails && yarn add react-on-rails-pro@16.4.0 --exact
 
 **Symptom 4 -- Pro package without Pro gem:**
 
-```
+```text
 **ERROR** ReactOnRails: You have the 'react-on-rails-pro' package installed but the Pro gem is not installed.
 ```
 

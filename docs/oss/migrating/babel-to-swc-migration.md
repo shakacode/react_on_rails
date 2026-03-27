@@ -241,7 +241,7 @@ jsc: {
 
 All 305 RSpec tests pass successfully with SWC configuration:
 
-```
+```text
 305 examples, 0 failures
 ```
 

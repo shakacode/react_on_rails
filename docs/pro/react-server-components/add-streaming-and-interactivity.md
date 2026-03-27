@@ -84,7 +84,7 @@ bin/dev
 
 Navigate to the React Server Component Page:
 
-```
+```text
 http://localhost:3000/react_server_component_without_ssr
 ```
 

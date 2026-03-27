@@ -3,8 +3,8 @@ name: Lint JS and Ruby
 on:
   push:
     branches:
-      - 'master'
-    # Always trigger on master; docs-only detection handles skipping heavy jobs
+      - 'main'
+    # Always trigger on main; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -54,28 +54,28 @@ jobs:
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
-      - name: Guard docs-only master pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: ./.github/actions/ensure-master-docs-safety
+      - name: Guard docs-only main pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/ensure-main-docs-safety
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
   build:
     needs: detect-changes
-    # Skip only if: master push AND docs-only changes
-    # Otherwise run if: on master OR lint needed
-    # This allows docs-only commits to skip linting while ensuring full CI on master for code changes
+    # Skip only if: main push AND docs-only changes
+    # Otherwise run if: on main OR lint needed
+    # This allows docs-only commits to skip linting while ensuring full CI on main for code changes
     if: |
       !(
         github.event_name == 'push' &&
-        github.ref == 'refs/heads/master' &&
+        github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/main' ||
         needs.detect-changes.outputs.run_lint == 'true'
       )
     env:

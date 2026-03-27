@@ -438,6 +438,8 @@ console.log('Client render time:', new Date());
 
 ## 🛠️ Advanced Debugging
 
+For a comprehensive debugging guide covering SSR issues, hydration mismatches, and log analysis, see the [Debugging Guide](../building-features/debugging.md).
+
 ### Enable verbose logging
 
 ```ruby
@@ -459,7 +461,7 @@ bin/webpack --config-dump
 
 ```javascript
 // In browser console
-console.log(ReactOnRails.getComponents());
+console.log(ReactOnRails.registeredComponents());
 ```
 
 ## 🆘 Still Stuck?
@@ -477,12 +479,12 @@ console.log(ReactOnRails.getComponents());
 
 - **[GitHub Issues](https://github.com/shakacode/react_on_rails/issues)** - Bug reports and feature requests
 - **[GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)** - Questions and help
-- **[React + Rails Slack](https://reactrails.slack.com)** - Real-time community support
+- **[React + Rails Slack](https://invite.reactrails.com)** - Real-time community support
 
 ### Professional support
 
 - **[ShakaCode](https://www.shakacode.com)** offers consulting and support services
-- **[React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)** includes priority support
+- **[React on Rails Pro](https://pro.reactonrails.com/)** includes priority support
 
 ---
 

@@ -70,12 +70,17 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
     args.push('--rspack');
   }
 
+  // --rsc supersedes --pro because RSC mode already requires Pro and the generator accepts a single mode flag.
+  if (options.pro && !options.rsc) {
+    args.push('--pro');
+  }
+
   if (options.rsc) {
     args.push('--rsc');
   }
 
-  // Fresh-app scaffolding should keep going past non-fatal generator warnings and
-  // surface them in command output instead of aborting the entire setup.
+  // --force makes the generator overwrite conflicting files without prompting,
+  // which is safe for a freshly scaffolded app with no custom content yet.
   args.push('--force');
   // The newly created app directory is not a git repo yet, so the generator's
   // uncommitted-changes check would always warn. --ignore-warnings bypasses all
@@ -88,6 +93,11 @@ export function buildGeneratorArgs(options: CliOptions): string[] {
 
 function packageManagerFieldValue(packageManager: CliOptions['packageManager']): string {
   const version = getCommandVersion(packageManager)?.replace(/^v/, '');
+  if (!version) {
+    logInfo(
+      `Could not detect ${packageManager} version; package.json "packageManager" field will omit the version.`,
+    );
+  }
   return version ? `${packageManager}@${version}` : packageManager;
 }
 
@@ -143,13 +153,17 @@ function normalizeGeneratedPackageManager(
 
   if (fs.existsSync(packageLockPath)) {
     execLiveArgs('pnpm', ['import'], appPath);
+    execLiveArgs('pnpm', ['install'], appPath);
     fs.rmSync(packageLockPath, { force: true });
+  } else {
     execLiveArgs('pnpm', ['install'], appPath);
   }
 
   rewriteFileIfPresent(setupPath, (contents) => {
-    const updated = contents.replace(/system!\((["'])npm install\1\)/g, 'system!("pnpm install")');
-    if (updated === contents && contents.includes('npm install')) {
+    // Match both system!("npm install") and system("npm install") in bin/setup,
+    // preserving the bang (!) if present.
+    const updated = contents.replace(/system(!?)\((["'])npm install\2\)/g, 'system$1($2pnpm install$2)');
+    if (updated === contents && /(?<![p])npm install/.test(contents)) {
       logInfo(
         'Could not auto-update bin/setup for pnpm. Replace "npm install" with "pnpm install" manually.',
       );
@@ -169,7 +183,9 @@ function printSuccessMessage(appName: string, route: string): void {
   console.log('  bin/rails db:prepare');
   console.log('  bin/dev');
   console.log('');
-  logInfo('If PostgreSQL is not running locally, start it before running bin/rails db:prepare.');
+  logInfo(
+    'Note: The generated app uses PostgreSQL by default. Start PostgreSQL before running bin/rails db:prepare.',
+  );
   console.log('');
   logInfo(`Then visit http://localhost:3000/${route}`);
   console.log('');
@@ -209,11 +225,18 @@ export function validateAppName(name: string): { success: boolean; error?: strin
 
 export function createApp(appName: string, options: CliOptions): void {
   const appPath = path.resolve(process.cwd(), appName);
+  const proRequested = options.pro || options.rsc;
+  let proModeLabel: string | null = null;
+  if (options.rsc) {
+    proModeLabel = '--rsc';
+  } else if (options.pro) {
+    proModeLabel = '--pro';
+  }
   const baseSteps = 3; // rails new + add react_on_rails + run generator
-  const totalSteps = baseSteps + (options.rsc ? 1 : 0);
+  const totalSteps = baseSteps + (proRequested ? 1 : 0);
   let currentStep = 1;
   const reactOnRailsGemPath = localGemPath('REACT_ON_RAILS_GEM_PATH');
-  const reactOnRailsProGemPath = options.rsc ? localGemPath('REACT_ON_RAILS_PRO_GEM_PATH') : null;
+  const reactOnRailsProGemPath = proRequested ? localGemPath('REACT_ON_RAILS_PRO_GEM_PATH') : null;
 
   // Step 1: Create Rails application
   // appName is validated by validateAppName() to be ^[a-zA-Z][a-zA-Z0-9]*([_-][a-zA-Z0-9]+)*$ only,
@@ -260,9 +283,9 @@ export function createApp(appName: string, options: CliOptions): void {
     process.exit(1);
   }
 
-  if (options.rsc) {
+  if (proRequested) {
     currentStep += 1;
-    logStep(currentStep, totalSteps, 'Adding react_on_rails_pro gem (--rsc)...');
+    logStep(currentStep, totalSteps, `Adding react_on_rails_pro gem (${proModeLabel})...`);
     try {
       const reactOnRailsProArgs = bundleAddArgs('react_on_rails_pro', reactOnRailsProGemPath, false);
       if (reactOnRailsProGemPath) {
@@ -271,15 +294,15 @@ export function createApp(appName: string, options: CliOptions): void {
       execLiveArgs('bundle', reactOnRailsProArgs, appPath);
       logStepDone('react_on_rails_pro gem added');
     } catch (error) {
-      logError('Failed to add react_on_rails_pro gem required by --rsc.');
+      logError(`Failed to add react_on_rails_pro gem required by ${proModeLabel}.`);
       if (error instanceof Error && error.message) {
         console.error(`Debug info: ${error.message}`);
       }
       cleanupAppDirectory(
         appPath,
         appName,
-        'Directory removed. Ensure react_on_rails_pro is installable in your Bundler/RubyGems setup, then rerun with --rsc.',
-        `Ensure react_on_rails_pro is installable, then delete the created "${appName}" directory and rerun with --rsc.`,
+        `Directory removed. Ensure react_on_rails_pro is installable in your Bundler/RubyGems setup, then rerun with ${proModeLabel}.`,
+        `Ensure react_on_rails_pro is installable, then delete the created "${appName}" directory and rerun with ${proModeLabel}.`,
       );
       process.exit(1);
     }
@@ -330,6 +353,7 @@ export function createApp(appName: string, options: CliOptions): void {
       console.log('  rm -f package-lock.json');
       console.log('  pnpm install');
     }
+    process.exit(1);
   }
 
   // Final success

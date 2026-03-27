@@ -1,6 +1,6 @@
 # Node Renderer Troubleshooting
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
+> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
 For node renderer troubleshooting (connection refused, memory issues, worker restarts), see the [Node Renderer section in the main troubleshooting guide](../../../pro/troubleshooting.md#node-renderer).

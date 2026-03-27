@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# See https://www.shakacode.com/react-on-rails-pro/docs/configuration/
+# See https://reactonrails.com/docs/configuration/configuration-pro
 # License: Set REACT_ON_RAILS_PRO_LICENSE environment variable
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"

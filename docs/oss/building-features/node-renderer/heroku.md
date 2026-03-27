@@ -1,7 +1,7 @@
 # Node Renderer: Heroku Deployment
 
-> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
-> Free for evaluation and startups. [Get a license →](mailto:justin@shakacode.com)
+> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
 Most React on Rails Pro installations of the Node SSR Renderer will deploy the Rails and Renderer
 instances on the same server. This technique results in better performance since it avoids network
@@ -17,7 +17,7 @@ Scroll down if you want to have different servers.
 
 `/Procfile`
 
-```
+```text
 web: bin/runsvdir-dyno
 ```
 
@@ -25,14 +25,14 @@ web: bin/runsvdir-dyno
 
 `/Procfile.web`
 
-```
+```text
 puma: bundle exec puma -C config/puma.rb
 renderer: bin/node-renderer
 ```
 
 ### bin/node-renderer
 
-```
+```bash
 #!/bin/bash
 cd client
 yarn run node-renderer
@@ -51,7 +51,7 @@ _Not necessary if you are using [bundle caching](../bundle-caching.md) as doing 
 
 To avoid the initial round trip to get a bundle on the renderer, you can do something like this to copy the file during precompile.
 
-See [lib/tasks/assets.rake](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/lib/tasks/assets.rake) for a couple tasks that you can use.
+See [lib/tasks/assets.rake](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/lib/tasks/assets.rake) for a couple tasks that you can use.
 
 If you're using the default tmp/bundles subdirectory for the node-renderer, you don't need to set the
 ENV value for `RENDERER_BUNDLE_PATH`. Otherwise, please set this ENV value so the files get copied
@@ -75,7 +75,7 @@ end
 If you get this sort of error, then you're forgetting to configure the PORT on the node-renderer and
 setting the config.renderer_url on the Rails App.
 
-```
+```text
 bundler: failed to load command: puma (/app/vendor/bundle/ruby/2.6.0/bin/puma)
 Errno::EADDRINUSE: Address already in use - bind(2) for "0.0.0.0" port 21752
   /app/vendor/bundle/ruby/2.6.0/gems/puma-4.3.3/lib/puma/binder.rb:229:in `initialize'

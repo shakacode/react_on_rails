@@ -9,7 +9,7 @@
 // 4. Streaming — wrapped in <Suspense>, this component streams HTML as it resolves
 //
 // For more information, see:
-// https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/
+// https://reactonrails.com/docs/pro/react-server-components/
 
 import React from 'react';
 import LikeButton from './LikeButton';

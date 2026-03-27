@@ -80,7 +80,7 @@ reduxStore = MyReduxStore(props, railsContext);
 > [!NOTE]
 > See [Redux Store](../api-reference/redux-store-api.md#multiple-react-components-on-a-page-with-one-store) on how to set up Redux stores that allow multiple components to talk to the same store.
 
-The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
+The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/lib/react_on_rails/helper.rb), method `rails_context` for the definitive list).
 
 ```ruby
   {
@@ -112,6 +112,8 @@ The `railsContext` has: (see the implementation in [ReactOnRails::Helper](https:
 ```
 
 Plus, you can add your customizations to this. See "rendering extension" below.
+
+> **RSC Note:** When using React on Rails Pro with RSC, `railsContext` also includes functions like `addPostSSRHook` and `getRSCPayloadStream`. These **cannot** be passed from Server Components to Client Components across the RSC boundary. Strip them before passing: `const { addPostSSRHook, getRSCPayloadStream, ...serializableContext } = railsContext;`. See [RSC Troubleshooting](../migrating/rsc-troubleshooting.md#common-error-railscontext-contains-functions).
 
 ## Rails Context
 
@@ -189,7 +191,7 @@ Set the config value for the `rendering_extension`:
 
 Implement it like this above in the same file. Create a class method on the module called `custom_context` that takes the `view_context` for a param.
 
-See [spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/config/initializers/react_on_rails.rb) for a detailed example.
+See [spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy/config/initializers/react_on_rails.rb) for a detailed example.
 
 ```ruby
 module RenderingExtension
