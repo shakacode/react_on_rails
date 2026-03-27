@@ -92,8 +92,8 @@ namespace :react_on_rails do
       puts Rainbow("   • Delete the common component file (e.g., Component.jsx)").white
       puts Rainbow("   • Keep only the client/server specific files " \
                    "(Component.client.jsx, Component.server.jsx)").white
-      puts Rainbow("   • See: https://reactonrails.com/docs/guides/" \
-                   "auto-bundling-file-system-based-automated-bundle-generation.md").cyan
+      puts Rainbow("   • See: https://reactonrails.com/docs/core-concepts/" \
+                   "auto-bundling-file-system-based-automated-bundle-generation/").cyan
 
     when /Cannot find component/
       puts Rainbow("   • Check that your component file exists in the expected location").white

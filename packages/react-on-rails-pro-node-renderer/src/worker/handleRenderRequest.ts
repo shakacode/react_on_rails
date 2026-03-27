@@ -195,7 +195,7 @@ to ${bundleFilePathPerTimestamp}`,
   }
 }
 
-async function handleNewBundlesProvided(
+export async function handleNewBundlesProvided(
   renderingRequest: string,
   providedNewBundles: ProvidedNewBundle[],
   assetsToCopy: Asset[] | null | undefined,

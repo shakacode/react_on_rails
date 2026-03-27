@@ -4,10 +4,50 @@ require "react_on_rails/utils"
 
 module ReactOnRails
   module ReactComponent
+    # rubocop:disable Metrics/ClassLength
     class RenderOptions
       include Utils::Required
 
       attr_accessor :request_digest
+
+      PRERENDER_OVERRIDE_ENV_KEY = "REACT_ON_RAILS_PRERENDER_OVERRIDE"
+      PRERENDER_OVERRIDE_VALUES = { "true" => true, "false" => false }.freeze
+      PRERENDER_OVERRIDE_CACHE_MUTEX = Mutex.new
+      class << self
+        def prerender_env_override
+          PRERENDER_OVERRIDE_CACHE_MUTEX.synchronize do
+            raw_value = ENV.fetch(PRERENDER_OVERRIDE_ENV_KEY, nil)
+            cached_override = @prerender_env_override_cache
+            return cached_override[:value] if cached_override && cached_override[:raw_value] == raw_value
+
+            parsed_value = parse_prerender_env_override(raw_value)
+            @prerender_env_override_cache = { raw_value: raw_value, value: parsed_value }
+            parsed_value
+          end
+        end
+
+        def reset_prerender_env_override_cache!
+          PRERENDER_OVERRIDE_CACHE_MUTEX.synchronize do
+            @prerender_env_override_cache = nil
+          end
+        end
+
+        private
+
+        def parse_prerender_env_override(raw_value)
+          return nil if raw_value.nil?
+
+          normalized_value = raw_value.strip.downcase
+          return PRERENDER_OVERRIDE_VALUES[normalized_value] if PRERENDER_OVERRIDE_VALUES.key?(normalized_value)
+
+          Rails.logger.warn(
+            "[REACT ON RAILS] Ignoring #{PRERENDER_OVERRIDE_ENV_KEY}=#{raw_value.inspect}. " \
+            "Expected 'true' or 'false'."
+          )
+          # Cache invalid values too so we warn once per unique raw env value.
+          nil
+        end
+      end
 
       NO_PROPS = {}.freeze
 
@@ -68,6 +108,9 @@ module ReactOnRails
       end
 
       def prerender
+        env_override = prerender_env_override
+        return env_override unless env_override.nil?
+
         retrieve_configuration_value_for(:prerender)
       end
 
@@ -172,6 +215,11 @@ module ReactOnRails
           ReactOnRailsPro.configuration.public_send(key)
         end
       end
+
+      def prerender_env_override
+        self.class.prerender_env_override
+      end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

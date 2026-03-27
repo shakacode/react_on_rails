@@ -448,6 +448,28 @@ import { Provider } from 'react-redux';
 >
 > For more on this distinction, see [File Suffixes vs. RSC Directive](https://github.com/shakacode/react_on_rails/pull/2406).
 
+### Transpiled languages (ReScript, Reason, etc.)
+
+If you use ReScript or other transpiled languages, the compiled `.bs.js` files don't preserve directives. Add `'use client'` to the **wrapper `.jsx` files** in `ror_components/`, not to the `.res` source files.
+
+For example, with `.client.jsx` / `.server.jsx` pairs:
+
+```jsx
+// ListingsShow.client.jsx — add 'use client' here
+'use client';
+import ListingsShow from '../ListingsShow';
+export default ListingsShow;
+```
+
+```jsx
+// ListingsShow.server.jsx — add 'use client' here too
+'use client';
+import ListingsShow from '../ListingsShow';
+export default ListingsShow;
+```
+
+> **Common mistake:** Developers often add `'use client'` to JS/JSX entry points but forget the ReScript ones. The pack generator will **silently** register components without `'use client'` as server components via `registerServerComponent`. There is no warning — the component just breaks at runtime. After adding the directive, verify with `bin/rails react_on_rails:generate_packs` and check that the output shows all components as "Client components."
+
 ### What about the bundle entry files?
 
 Adding `'use client'` to `client-bundle.js` or `server-bundle.js` would technically work -- it would make all imported components Client Components, achieving the same immediate effect. However, we recommend placing the directive on **individual component files** instead. The reason is forward-looking: when you later want to convert a specific component to a Server Component (by removing `'use client'`), you need granular control per component. If the directive is only on the bundle entry file, you'd have to move it to every individual component file at that point anyway.
@@ -459,6 +481,8 @@ After adding `'use client'` to all entry points, rebuild all three bundles and v
 ## Step 6: Switch to Streaming Rendering
 
 Replace synchronous view helpers and controller rendering with their streaming equivalents.
+
+> **Warning: Compression middleware.** If your app uses `Rack::Deflater`, `Rack::Brotli`, or similar compression middleware, streaming responses will deadlock. The middleware calls `body.each` to check the response size, which blocks on `ActionController::Live::Buffer`. See [Compression Middleware Compatibility](../building-features/streaming-server-rendering.md#compression-middleware-compatibility) for the fix.
 
 ### 6a. Update controllers
 
@@ -531,6 +555,56 @@ For streaming to deliver its full performance benefit, script tags should use `a
 The `async: true` attribute enables React 18's Selective Hydration -- each component becomes interactive as soon as its code loads, without waiting for the entire page to finish streaming.
 
 If you use `auto_load_bundle` with Shakapacker >= 8.2.0 and React on Rails Pro, the `generated_component_packs_loading_strategy` already defaults to `:async`, so auto-generated pack tags are already configured correctly.
+
+## Common Setup Mistakes
+
+These are the most frequent mistakes encountered during RSC infrastructure setup. Check this section if something isn't working after completing the steps above.
+
+### Mistake 1: Wrong `react-on-rails-rsc` version
+
+Versions 19.0.0 through 19.0.3 vendored older builds of `react-server-dom-webpack` that are incompatible with React 19. Symptoms include cryptic rendering errors or RSC payloads that fail to deserialize on the client.
+
+**Fix:** Upgrade to `react-on-rails-rsc` 19.0.4 or later:
+
+```bash
+yarn add react-on-rails-rsc@latest
+```
+
+### Mistake 2: Forgetting the RSC bundle watcher in development
+
+After adding the RSC webpack config, you must also add a watcher process in `Procfile.dev`. Without it, the RSC bundle won't rebuild on file changes, and you'll see stale component output or errors about missing modules.
+
+**Symptom:** Changes to Server Components don't appear until you manually rebuild. Or, after removing `'use client'` from a component, it still behaves as a Client Component.
+
+**Fix:** Add the watcher line to `Procfile.dev`:
+
+```text
+rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+```
+
+### Mistake 3: Confusing `.server.jsx` with Server Components
+
+The `.server.jsx` file suffix is a **React on Rails auto-bundling convention** -- it means "include this file in the server bundle." It has nothing to do with React Server Components.
+
+**Symptom:** After enabling RSC, auto-bundled components with `.server.jsx` files break because the RSC infrastructure treats them as Server Components (they lack `'use client'`).
+
+**Fix:** Add `'use client'` to both `.client.jsx` and `.server.jsx` files during the initial setup (Step 5). Only remove it when you're ready to actually migrate that component to a Server Component.
+
+### Mistake 4: Mutating shared webpack config objects
+
+If your `serverWebpackConfig()` function returns the same object reference on repeated calls, `configureRsc()` will mutate the server config when modifying rules and resolve settings.
+
+**Symptom:** The server bundle behaves unexpectedly after adding the RSC bundle -- for example, it starts resolving `react-server` conditions or has the RSC loader in its chain.
+
+**Fix:** Ensure `serverWebpackConfig()` returns a fresh config object per call. If it doesn't, clone `module.rules` and `resolve` before mutating them in `configureRsc`.
+
+### Mistake 5: Missing `react-server` condition in RSC bundle
+
+If you're writing a custom RSC webpack config (not following Step 4a exactly), forgetting to add `react-server` to `resolve.conditionNames` means React will use its standard server entry points instead of the RSC-specific ones.
+
+**Symptom:** Runtime errors in the RSC bundle, or Server Components that behave like Client Components.
+
+**Fix:** Add `conditionNames: ['react-server', '...']` to the RSC bundle's `resolve` config.
 
 ## Verification Checklist
 

@@ -60,7 +60,7 @@ Then use React in any Rails view:
 - **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
 - **Performance improvements**: New async loading strategies and optimized bundle generation
 - **Webpacker removal**: Streamlined for Shakapacker-only support (>= 6.0)
-- **[Pro features](https://reactonrails.com/pro)** are available for advanced use cases including [React Server Components](https://react.dev/reference/rsc/server-components), [streaming SSR](https://react.dev/reference/react-dom/server/renderToPipeableStream), and a dedicated Node renderer for 10–100x faster SSR.
+- **[Pro features](https://reactonrails.com/docs/pro/)** are available for advanced use cases including [React Server Components](https://react.dev/reference/rsc/server-components), [streaming SSR](https://react.dev/reference/react-dom/server/renderToPipeableStream), and a dedicated Node renderer for 10–100x faster SSR.
 - ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
 
 ---
@@ -150,7 +150,7 @@ That's it — Pro layers on top of your existing setup. See the [Pro installatio
 
 Popmenu achieved a [73% decrease in average response times and 20-25% lower Heroku costs](https://www.shakacode.com/recent-work/popmenu/) with React on Rails Pro, now serving tens of millions of SSR requests daily.
 
-Ready to try Pro? Visit [pro.reactonrails.com](https://pro.reactonrails.com) or email [justin@shakacode.com](mailto:justin@shakacode.com).
+Ready to try Pro? Visit [React on Rails Pro docs](https://reactonrails.com/docs/pro/) or email [justin@shakacode.com](mailto:justin@shakacode.com).
 
 # 📚 Quick Start
 
@@ -253,7 +253,7 @@ ShakaCode is **[hiring passionate software engineers](https://www.shakacode.com/
 
 The gem is available as open source under the terms of the [MIT License](https://github.com/shakacode/react_on_rails/tree/main/LICENSE.md).
 
-Note, some features are available only with a React on Rails Pro subscription. See [React on Rails Pro](https://pro.reactonrails.com/) for more information.
+Note, some features are available only with a React on Rails Pro subscription. See [React on Rails Pro](https://reactonrails.com/docs/pro/) for more information.
 
 # Supporters
 

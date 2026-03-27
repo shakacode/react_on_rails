@@ -5,8 +5,7 @@
 module ReactOnRails
   module TestHelper
     class WebpackAssetsCompiler
-      TESTING_DOCS_URL = "https://github.com/shakacode/react_on_rails/blob/master/" \
-                         "docs/oss/building-features/dev-server-and-testing.md"
+      TESTING_DOCS_URL = "https://reactonrails.com/docs/building-features/dev-server-and-testing/"
 
       def compile_assets
         if ReactOnRails.configuration.build_test_command.blank?

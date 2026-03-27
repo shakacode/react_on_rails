@@ -363,7 +363,7 @@ describe('worker', () => {
       protocolVersion,
       railsEnv,
       password: 'my_password',
-      targetBundles: [bundleHash],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
       asset1: createReadStream(getFixtureAsset()),
       asset2: createReadStream(getOtherFixtureAsset()),
     });
@@ -371,6 +371,30 @@ describe('worker', () => {
     expect(res.statusCode).toBe(200);
     expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
+  });
+
+  test('post /upload-assets ignores targetBundles when bundle_<hash> fields are present (backward compat)', async () => {
+    const bundleHash = 'compat-bundle-hash';
+
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+      password: 'my_password',
+    });
+
+    // Simulates the Ruby client sending both bundle_<hash> (new) and targetBundles (legacy).
+    // The endpoint should derive targets from bundle_<hash> and ignore targetBundles.
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      password: 'my_password',
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
+      targetBundles: [bundleHash],
+      asset1: createReadStream(getFixtureAsset()),
+    });
+    const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
+    expect(res.statusCode).toBe(200);
+    expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
   });
 
   test('post /upload-assets with multiple bundles and assets', async () => {
@@ -387,7 +411,8 @@ describe('worker', () => {
       protocolVersion,
       railsEnv,
       password: 'my_password',
-      targetBundles: [bundleHash, bundleHashOther],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
+      [`bundle_${bundleHashOther}`]: createReadStream(getFixtureSecondaryBundle()),
       asset1: createReadStream(getFixtureAsset()),
       asset2: createReadStream(getOtherFixtureAsset()),
     });
@@ -417,8 +442,7 @@ describe('worker', () => {
         protocolVersion,
         railsEnv,
         password: 'my_password',
-        targetBundles: [bundleHash],
-        bundle: createReadStream(tempBundlePath),
+        [`bundle_${bundleHash}`]: createReadStream(tempBundlePath),
         asset1: createReadStream(getFixtureAsset()),
       });
 
@@ -431,7 +455,7 @@ describe('worker', () => {
     }
   });
 
-  test('post /upload-assets clears stale files for incomplete directories when bundle file is not present', async () => {
+  test('post /upload-assets clears stale files for incomplete directories before writing a new bundle', async () => {
     const bundleHash = 'some-bundle-hash';
     const bundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
     const staleAssetPath = assetPath(testName, bundleHash);
@@ -452,7 +476,7 @@ describe('worker', () => {
       protocolVersion,
       railsEnv,
       password: 'my_password',
-      targetBundles: [bundleHash],
+      [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
       asset1: createReadStream(getFixtureAsset()),
     });
 
@@ -465,10 +489,10 @@ describe('worker', () => {
     expect(fs.readFileSync(assetPath(testName, bundleHash), 'utf8')).toBe(
       fs.readFileSync(getFixtureAsset(), 'utf8'),
     );
-    expect(fs.existsSync(bundleCompleteMarkerPath(testName, bundleHash))).toBe(false);
+    expect(fs.existsSync(bundleCompleteMarkerPath(testName, bundleHash))).toBe(true);
   });
 
-  test('post /upload-assets rejects targetBundles path traversal outside cache root', async () => {
+  test('post /upload-assets rejects bundle_<hash> path traversal outside cache root', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
       password: 'my_password',
@@ -479,7 +503,7 @@ describe('worker', () => {
       protocolVersion,
       railsEnv,
       password: 'my_password',
-      targetBundles: ['../../outside-cache-root'],
+      'bundle_../../outside-cache-root': createReadStream(getFixtureBundle()),
       asset1: createReadStream(getFixtureAsset()),
     });
 
@@ -510,15 +534,16 @@ describe('worker', () => {
         protocolVersion,
         railsEnv,
         password: 'my_password',
-        targetBundles: [bundleHash],
+        [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()),
         asset1: createReadStream(markerAssetPath),
       });
 
       const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
 
       expect(res.statusCode).toBe(200);
-      // The marker file should NOT have been copied into the bundle directory
-      expect(fs.existsSync(path.join(bundleDir, BUNDLE_COMPLETE_MARKER_FILE))).toBe(false);
+      // The reserved upload filename should be ignored; the only marker present
+      // should be the renderer-written completion marker.
+      expect(fs.readFileSync(path.join(bundleDir, BUNDLE_COMPLETE_MARKER_FILE), 'utf8')).toBe('');
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
