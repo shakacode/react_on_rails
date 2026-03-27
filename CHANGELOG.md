@@ -56,6 +56,15 @@ Stable release — no changes from 16.5.0.rc.0.
 - **Fix doctor prerender check and ExecJS display for Pro/RSC apps**: `uses_prerender_in_views?` now detects Pro streaming helpers (`stream_react_component`, `cached_stream_react_component`, `rsc_payload_react_component`) that implicitly enable prerender. Server rendering engine display now correctly detects NodeRenderer configuration from the Pro initializer. [PR 2773](https://github.com/shakacode/react_on_rails/pull/2773) by [ihabadham](https://github.com/ihabadham).
 - **Fix doctor false positives for custom layouts**: `react_on_rails:doctor` now resolves `package.json` from `node_modules_location` config (instead of assuming repo root) and discovers webpack/rspack configs across common custom locations. Missing bundler config downgraded from error to contextual warning. [PR 2612](https://github.com/shakacode/react_on_rails/pull/2612) by [justin808](https://github.com/justin808).
 
+#### Breaking Changes
+
+- **[Pro]** **Minimum `async` gem version bumped to 2.29**: The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. If your Gemfile pins the `async` gem below 2.29, you will need to update it before upgrading React on Rails Pro. Run `bundle update async` to pick up the new minimum.
+  [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808).
+
+#### Changed
+
+- **[Pro]** **Migrated from `Async::Variable` to `Async::Promise`**: The streaming helper internals now use `Async::Promise` for async v2.29+ compatibility while preserving pre-first-chunk error propagation behavior. [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808). Fixes [Issue 2563](https://github.com/shakacode/react_on_rails/issues/2563).
+
 ### [16.4.0] - 2026-03-16
 
 #### Fixed
