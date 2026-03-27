@@ -84,6 +84,17 @@ How to debug and avoid common problems. Covers:
 - Performance monitoring and bundle analysis tools
 - Common error messages and their solutions
 
+### 7. [Flight Payload Optimization](rsc-flight-payload.md)
+
+How to optimize RSC Flight payload size for better performance. Covers:
+
+- What's in the Flight payload and why it can be surprisingly large
+- Why "all display-only = server" is an oversimplification
+- The counterintuitive pattern: when presentational Client Components outperform Server Components
+- How to measure and analyze your Flight payload
+- Compression effectiveness and the LCP tradeoff
+- React on Rails double JSON.stringify overhead
+
 ## How RSC Maps to React on Rails
 
 Before diving into the React patterns, understand how RSC maps to React on Rails' architecture.
