@@ -55,11 +55,14 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    mkdir renderer-app
    cd renderer-app
    ```
-2. Make sure you have **Node.js** version **14** or higher and **Yarn** installed.
-3. Init node application and install the `react-on-rails-pro-node-renderer` package.
+2. Make sure you have **Node.js 18+** and a JavaScript package manager such as **npm**, **pnpm**, **Yarn**, or **bun**.
+3. Initialize a Node application and install the `react-on-rails-pro-node-renderer` package.
    ```sh
-   yarn init
-   yarn add react-on-rails-pro-node-renderer
+   npm init -y
+   npm install react-on-rails-pro-node-renderer
+   # or: pnpm add react-on-rails-pro-node-renderer
+   # or: yarn add react-on-rails-pro-node-renderer
+   # or: bun add react-on-rails-pro-node-renderer
    ```
 4. Configure a JavaScript file that will launch the rendering server per the docs in [Node Renderer JavaScript Configuration](./js-configuration.md). For example, create a file `node-renderer.js`. Here is a simple example that uses all the defaults except for serverBundleCachePath:
 
@@ -82,7 +85,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
 Create `config/initializers/react_on_rails_pro.rb` and configure the **renderer server**. See configuration values in [Configuration](../../configuration/configuration-pro.md). Pay attention to:
 
 1. Set `config.server_renderer = "NodeRenderer"`
-2. Leave the default of `config.prerender_caching = true` and ensure your Rails cache is properly configured to handle the additional cache load.
+2. Decide whether to enable `config.prerender_caching = true`. The default is `false`; turn it on only if you want Rails cache-backed SSR result caching and your cache is configured for the additional load.
 3. Configure values beginning with `renderer_`
 4. Use ENV values for values like `renderer_url` so that your deployed server is properly configured. If the ENV value is unset, the default for the renderer_url is `localhost:3800`.
 5. Here's a tiny example using mostly defaults:

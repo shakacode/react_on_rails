@@ -32,15 +32,15 @@ bin/rails generate react_on_rails:install
 
 **Why:** The generator needs clean git state to show you exactly what it changed.
 
-### "Node/Yarn not found"
+### "Node or package manager not found"
 
-**Error:** `Yarn executable was not detected` or `Node.js not found`
+**Error:** `Node.js not found`, `npm executable was not detected`, or `Yarn executable was not detected`
 
 **Solution:**
 
-- Install Node.js 20+ from [nodejs.org](https://nodejs.org)
-- Install Yarn: `npm install -g yarn`
-- Or use system package manager: `brew install node yarn`
+- Install Node.js 18+ from [nodejs.org](https://nodejs.org)
+- Use the bundled `npm`, or install another package manager such as `pnpm`, `yarn`, or `bun`
+- On macOS, for example: `brew install node pnpm`
 
 ## 🔧 Build Issues
 
@@ -51,8 +51,10 @@ bin/rails generate react_on_rails:install
 **Solution:**
 
 ```bash
-# Make sure the NPM package is installed
-yarn add react-on-rails
+# Make sure the npm package is installed
+pnpm add react-on-rails
+# or: npm install react-on-rails --save
+# or: yarn add react-on-rails
 
 # If using local development with yalc
 cd react_on_rails/
