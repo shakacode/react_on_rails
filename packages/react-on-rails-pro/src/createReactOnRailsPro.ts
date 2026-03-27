@@ -46,6 +46,7 @@ type ReactOnRailsProSpecificFunctions = Pick<
   | 'streamServerRenderedReactComponent'
   | 'serverRenderRSCReactComponent'
   | 'addAsyncPropsCapabilityToComponentProps'
+  | 'getOrCreateAsyncPropsManager'
 >;
 
 // Pro client startup with immediate hydration support
@@ -138,6 +139,10 @@ export default function createReactOnRailsPro(
     addAsyncPropsCapabilityToComponentProps() {
       throw new Error('addAsyncPropsCapabilityToComponentProps is supported in RSC bundle only');
     },
+
+    getOrCreateAsyncPropsManager() {
+      throw new Error('getOrCreateAsyncPropsManager is supported in RSC bundle only');
+    },
   };
 
   // Type assertion is safe here because:
@@ -163,6 +168,10 @@ export default function createReactOnRailsPro(
       reactOnRailsPro.addAsyncPropsCapabilityToComponentProps;
   }
 
+  if (reactOnRailsPro.getOrCreateAsyncPropsManager) {
+    reactOnRailsProSpecificFunctions.getOrCreateAsyncPropsManager =
+      reactOnRailsPro.getOrCreateAsyncPropsManager;
+  }
   // Assign Pro-specific functions to the ReactOnRailsPro object using Object.assign
   // This pattern ensures we add exactly what's defined in the type, nothing more, nothing less
   Object.assign(reactOnRailsPro, reactOnRailsProSpecificFunctions);

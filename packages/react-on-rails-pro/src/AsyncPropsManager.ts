@@ -137,4 +137,30 @@ class AsyncPropsManager {
   }
 }
 
+const ASYNC_PROPS_MANAGER_KEY = 'asyncPropsManager';
+
+/**
+ * Gets or creates an AsyncPropsManager from the shared execution context.
+ *
+ * This function implements lazy initialization to handle race conditions between
+ * the initial render request and update chunks. Whichever executes first will
+ * create the manager, and subsequent calls will reuse the same instance.
+ *
+ * @param sharedExecutionContext - Map scoped to the current HTTP request
+ * @returns The AsyncPropsManager instance (existing or newly created)
+ */
+export function getOrCreateAsyncPropsManager(
+  sharedExecutionContext: Map<string, unknown>,
+): AsyncPropsManager {
+  let manager = sharedExecutionContext.get(ASYNC_PROPS_MANAGER_KEY) as AsyncPropsManager | undefined;
+
+  if (manager) {
+    return manager;
+  }
+
+  manager = new AsyncPropsManager();
+  sharedExecutionContext.set(ASYNC_PROPS_MANAGER_KEY, manager);
+  return manager;
+}
+
 export default AsyncPropsManager;

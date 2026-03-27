@@ -14,15 +14,22 @@ import log, { sharedLoggerOptions } from './shared/log.js';
 import packageJson from './shared/packageJson.js';
 import { buildConfig, Config, getConfig } from './shared/configBuilder.js';
 import fileExistsAsync from './shared/fileExistsAsync.js';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from './worker/types.js';
-import checkProtocolVersion from './worker/checkProtocolVersionHandler.js';
-import authenticate from './worker/authHandler.js';
+import type { FastifyInstance, FastifyReply } from './worker/types.js';
+import { performRequestPrechecks } from './worker/requestPrechecks.js';
+import { type AuthBody, authenticate } from './worker/authHandler.js';
 import {
   handleRenderRequest,
-  handleNewBundlesProvided,
   type ProvidedNewBundle,
+  handleNewBundlesProvided,
 } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
+import {
+  handleIncrementalRenderRequest,
+  type IncrementalRenderInitialRequest,
+  type IncrementalRenderSink,
+} from './worker/handleIncrementalRenderRequest.js';
+import { handleIncrementalRenderStream } from './worker/handleIncrementalRenderStream.js';
+import { BODY_SIZE_LIMIT, FIELD_SIZE_LIMIT } from './shared/constants.js';
 import {
   errorResponseResult,
   formatExceptionMessage,
@@ -80,6 +87,7 @@ const setResponse = async (result: ResponseResult, res: FastifyReply) => {
   }
   setHeaders(headers, res);
   res.status(status);
+
   if (stream) {
     await res.send(stream);
   } else {
@@ -164,7 +172,7 @@ export default function run(config: Partial<Config>) {
 
   const app = fastify({
     http2: useHttp2 as true,
-    bodyLimit: 104857600, // 100 MB
+    bodyLimit: BODY_SIZE_LIMIT,
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
     ...fastifyServerOptions,
@@ -196,16 +204,13 @@ export default function run(config: Partial<Config>) {
     }
   });
 
-  // 10 MB limit for code including props
-  const fieldSizeLimit = 1024 * 1024 * 10;
-
   // Supports application/x-www-form-urlencoded
   void app.register(fastifyFormbody);
   // Supports multipart/form-data
   void app.register(fastifyMultipart, {
     attachFieldsToBody: 'keyValues',
     limits: {
-      fieldSize: fieldSizeLimit,
+      fieldSize: FIELD_SIZE_LIMIT,
       // For bundles and assets
       fileSize: Infinity,
     },
@@ -240,41 +245,11 @@ export default function run(config: Partial<Config>) {
     },
   });
 
-  const isProtocolVersionMatch = async (req: FastifyRequest, res: FastifyReply) => {
-    // Check protocol version
-    const protocolVersionCheckingResult = checkProtocolVersion(req);
-
-    if (typeof protocolVersionCheckingResult === 'object') {
-      await setResponse(protocolVersionCheckingResult, res);
-      return false;
-    }
-
-    return true;
-  };
-
-  const isAuthenticated = async (req: FastifyRequest, res: FastifyReply) => {
-    // Authenticate Ruby client
-    const authResult = authenticate(req);
-
-    if (typeof authResult === 'object') {
-      await setResponse(authResult, res);
-      return false;
-    }
-
-    return true;
-  };
-
-  const requestPrechecks = async (req: FastifyRequest, res: FastifyReply) => {
-    if (!(await isProtocolVersionMatch(req, res))) {
-      return false;
-    }
-
-    if (!(await isAuthenticated(req, res))) {
-      return false;
-    }
-
-    return true;
-  };
+  // Ensure NDJSON bodies are not buffered and are available as a stream immediately
+  app.addContentTypeParser('application/x-ndjson', (req, payload, done) => {
+    // Pass through the raw stream; the route will consume req.raw
+    done(null, payload);
+  });
 
   // See https://github.com/shakacode/react_on_rails_pro/issues/119 for why
   // the digest is part of the request URL. Yes, it's not used here, but the
@@ -289,7 +264,9 @@ export default function run(config: Partial<Config>) {
     // Can't infer from the route like Express can
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
-    if (!(await requestPrechecks(req, res))) {
+    const precheckResult = performRequestPrechecks(req.body);
+    if (precheckResult) {
+      await setResponse(precheckResult, res);
       return;
     }
 
@@ -320,7 +297,7 @@ export default function run(config: Partial<Config>) {
             assetsToCopy,
             tracingContext: context,
           });
-          await setResponse(result, res);
+          await setResponse(result.response, res);
         } catch (err) {
           const exceptionMessage = formatExceptionMessage(
             renderingRequest,
@@ -336,6 +313,138 @@ export default function run(config: Partial<Config>) {
     }
   });
 
+  // Streaming NDJSON incremental render endpoint
+  app.post<{
+    Params: { bundleTimestamp: string; renderRequestDigest: string };
+  }>('/bundles/:bundleTimestamp/incremental-render/:renderRequestDigest', async (req, res) => {
+    const { bundleTimestamp } = req.params;
+
+    // Stream parser state
+    let incrementalSink: IncrementalRenderSink | undefined;
+    // Track whether we've already started sending a response (streaming or otherwise)
+    // If true, we can't send an error response on failure - headers are already sent
+    let responseStarted = false;
+
+    try {
+      // Handle the incremental render stream
+      await handleIncrementalRenderStream({
+        request: req,
+        onRenderRequestReceived: async (obj: unknown) => {
+          // Build a temporary FastifyRequest shape for protocol/auth check
+          const tempReqBody = typeof obj === 'object' && obj !== null ? (obj as Record<string, unknown>) : {};
+
+          // Perform request prechecks
+          const precheckResult = performRequestPrechecks(tempReqBody);
+          if (precheckResult) {
+            return {
+              response: precheckResult,
+              shouldContinue: false,
+            };
+          }
+
+          // Extract data for incremental render request
+          const dependencyBundleTimestamps = extractBodyArrayField(
+            tempReqBody as WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>,
+            'dependencyBundleTimestamps',
+          );
+
+          const initial: IncrementalRenderInitialRequest = {
+            firstRequestChunk: obj,
+            bundleTimestamp,
+            dependencyBundleTimestamps,
+          };
+
+          try {
+            const { response, sink } = await handleIncrementalRenderRequest(initial);
+            incrementalSink = sink;
+
+            return {
+              response,
+              shouldContinue: !!incrementalSink,
+            };
+          } catch (err) {
+            const errorResponse = errorResponseResult(
+              formatExceptionMessage(
+                'IncrementalRender',
+                err,
+                'Error while handling incremental render request',
+              ),
+            );
+            return {
+              response: errorResponse,
+              shouldContinue: false,
+            };
+          }
+        },
+
+        onUpdateReceived: async (obj: unknown) => {
+          if (!incrementalSink) {
+            log.error({ msg: 'Unexpected update chunk received after rendering was aborted', obj });
+            return;
+          }
+
+          try {
+            log.info(`Received a new update chunk ${JSON.stringify(obj)}`);
+            await incrementalSink.add(obj);
+          } catch (err) {
+            // Log error but don't stop processing
+            log.error({ err, msg: 'Error processing update chunk' });
+          }
+        },
+
+        onResponseStart: async (response: ResponseResult) => {
+          responseStarted = true;
+          await setResponse(response, res);
+        },
+
+        onRequestEnded: () => {
+          if (!incrementalSink) {
+            return;
+          }
+
+          incrementalSink.handleRequestClosed();
+        },
+      });
+    } catch (err) {
+      // If an error occurred during stream processing, send error response
+      const errorMessage = formatExceptionMessage(
+        'IncrementalRender',
+        err,
+        'Error while processing incremental render stream',
+      );
+
+      if (responseStarted) {
+        // Response was already started (streaming), we can't send an error response.
+        // This happens when the stream times out or errors after we've already started
+        // sending the streaming response. Just log the error.
+        log.error({
+          msg: 'Error occurred after response started, cannot send error response',
+          error: errorMessage,
+        });
+
+        // CRITICAL: We must call handleRequestClosed() to end the React stream.
+        // The React stream is waiting for async props (e.g., asyncPropsManager.getProp("researches")).
+        // If we don't call endStream(), the stream will hang forever waiting for props that will never arrive.
+        // This causes onResponse to never fire, leaving activeRequestsCount stuck and preventing worker shutdown.
+        if (incrementalSink) {
+          incrementalSink.handleRequestClosed();
+        }
+
+        // CRITICAL: Destroy the response connection to immediately close it.
+        // Without this, the response stream stays open waiting for the client (httpx) to timeout,
+        // which can take 30+ seconds. This delays worker shutdown during graceful termination.
+        // Destroying the raw response immediately closes the connection and triggers onResponse.
+        if (!res.raw.destroyed) {
+          res.raw.destroy();
+        }
+      } else {
+        // Response hasn't started yet, we can send an error response
+        const errorResponse = errorResponseResult(errorMessage);
+        await setResponse(errorResponse, res);
+      }
+    }
+  });
+
   // There can be additional files that might be required at the runtime.
   // Since the remote renderer doesn't contain any assets, they must be uploaded manually.
   // Bundle files use the form key convention "bundle_<hash>" and are placed in
@@ -343,10 +452,11 @@ export default function run(config: Partial<Config>) {
   app.post<{
     Body: Record<string, unknown>;
   }>('/upload-assets', async (req, res) => {
-    if (!(await requestPrechecks(req, res))) {
+    const precheckResult = performRequestPrechecks(req.body);
+    if (precheckResult) {
+      await setResponse(precheckResult, res);
       return;
     }
-
     const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(req.body);
 
     if (providedNewBundles.length === 0) {
@@ -388,7 +498,9 @@ export default function run(config: Partial<Config>) {
     Querystring: { filename: string };
     Body: WithBodyArrayField<Record<string, unknown>, 'targetBundles'>;
   }>('/asset-exists', async (req, res) => {
-    if (!(await isAuthenticated(req, res))) {
+    const authResult = authenticate(req.body as AuthBody);
+    if (authResult) {
+      await setResponse(authResult, res);
       return;
     }
 
