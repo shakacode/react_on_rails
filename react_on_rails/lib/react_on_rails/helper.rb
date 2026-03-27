@@ -74,7 +74,7 @@ module ReactOnRails
       when Hash
         msg = <<~MSG
           Use react_component_hash (not react_component) to return a Hash to your ruby view code. See
-          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
           for an example of the necessary javascript configuration.
         MSG
         raise ReactOnRails::Error, msg
@@ -88,7 +88,7 @@ module ReactOnRails
 
           If you're trying to use a Render-Function to return a Hash to your ruby view code, then use
           react_component_hash instead of react_component and see
-          https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
           for an example of the JavaScript code.
         MSG
         raise ReactOnRails::Error, msg
@@ -135,7 +135,7 @@ module ReactOnRails
       else
         msg = <<~MSG
           Render-Function used by react_component_hash for #{component_name} is expected to return
-          an Object. See https://github.com/shakacode/react_on_rails/blob/master/spec/dummy/client/app/startup/ReactHelmetServerApp.jsx
+          an Object. See https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReactHelmetApp.server.jsx
           for an example of the JavaScript code.
           Note, your Render-Function must either take 2 params or have the property
           `.renderFunction = true` added to it to distinguish it from a React Function Component.
