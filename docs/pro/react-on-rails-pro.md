@@ -7,7 +7,7 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 - [Pro docs home](./home-pro.md) - Canonical landing page for Pro feature docs
 - [Upgrade from OSS to Pro](./upgrading-to-pro.md) - Three-step upgrade path
 - [Installation](./installation.md) - Fresh install or manual setup
-- [Configuration](./configuration.md) - Pro-specific runtime settings
+- [Configuration](../oss/configuration/configuration-pro.md) - Pro-specific runtime settings
 
 ## What Pro Adds
 
@@ -15,7 +15,7 @@ React on Rails Pro is the advanced rendering and performance tier for React on R
 - [Streaming SSR](./streaming-ssr.md)
 - [Fragment caching](./fragment-caching.md)
 - [Node renderer](./node-renderer.md)
-- [Code splitting and bundle caching](./code-splitting-loadable-components.md)
+- [Code splitting and bundle caching](../oss/building-features/code-splitting.md)
 
 ## Evaluation and Licensing
 
