@@ -10,15 +10,21 @@ export default {
    */
   register(storeGenerators: Record<string, StoreGenerator>): void {
     Object.keys(storeGenerators).forEach((name) => {
-      if (registeredStoreGenerators.has(name)) {
-        console.warn('Called registerStore for store that is already registered', name);
-      }
-
       const store = storeGenerators[name];
       if (!store) {
         throw new Error(
           'Called ReactOnRails.registerStores with a null or undefined as a value ' +
             `for the store generator with key ${name}.`,
+        );
+      }
+
+      // Reference comparison lets HMR re-register the same store silently
+      // while still catching bugs where different stores share a name.
+      const existing = registeredStoreGenerators.get(name);
+      if (existing && existing !== store) {
+        console.error(
+          `ReactOnRails: Store "${name}" was registered with a different store generator than previously. ` +
+            'This is likely a bug — ensure each store has a unique registration name.',
         );
       }
 
@@ -120,7 +126,7 @@ This can happen if you are server rendering and either:
     throw new Error(
       `getOrWaitForStore('${name}') is only available with React on Rails Pro. ` +
         'Please upgrade to React on Rails Pro or use the synchronous getStore() method instead. ' +
-        'See https://www.shakacode.com/react-on-rails-pro/ for more information.',
+        'See https://pro.reactonrails.com/ for more information.',
     );
   },
 
@@ -134,7 +140,7 @@ This can happen if you are server rendering and either:
     throw new Error(
       `getOrWaitForStoreGenerator('${name}') is only available with React on Rails Pro. ` +
         'Please upgrade to React on Rails Pro or use the synchronous getStoreGenerator() method instead. ' +
-        'See https://www.shakacode.com/react-on-rails-pro/ for more information.',
+        'See https://pro.reactonrails.com/ for more information.',
     );
   },
 };

@@ -138,9 +138,16 @@ development:
 
 test:
   <<: *default
-  compile: true
+  # React on Rails defaults to build_test_command + TestHelper for test compilation.
+  # If you prefer Shakapacker-only test compilation, set this to true and remove
+  # build_test_command/TestHelper configuration.
+  compile: false
 
-  # Compile test packs to a separate directory
+  # Default (recommended): compile test packs to a separate directory from development output.
+  # This avoids test/dev manifest collisions and mixing HMR artifacts into tests.
+  # Advanced static-only workflow: you may set this equal to development output
+  # when running `bin/dev static` and tests against the same assets.
+  # Do not share output paths when running `bin/dev` (HMR).
   public_output_path: packs-test
 
 production:

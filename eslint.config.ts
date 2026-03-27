@@ -282,6 +282,14 @@ const config = defineConfig([
     },
   },
   {
+    files: ['packages/create-react-on-rails-app/**/*'],
+    rules: {
+      // Disable import rules for CLI package - CJS output with .js extensions in imports
+      // can't be resolved by ESLint. TypeScript compiler validates these imports
+      'import/no-unresolved': 'off',
+    },
+  },
+  {
     files: ['**/app-react16/**/*'],
     rules: {
       'react/no-deprecated': 'off',

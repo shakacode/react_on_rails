@@ -7,9 +7,17 @@ require_relative "stream_request"
 module ReactOnRailsPro
   class Request # rubocop:disable Metrics/ClassLength
     class << self
+      # Mutex for thread-safe connection management.
+      # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
+      CONNECTION_MUTEX = Mutex.new
+
       def reset_connection
-        @connection&.close
-        @connection = create_connection
+        CONNECTION_MUTEX.synchronize do
+          new_conn = create_connection
+          old_conn = @connection
+          @connection = new_conn
+          old_conn&.close
+        end
       end
 
       def render_code(path, js_code, send_bundle)
@@ -36,7 +44,8 @@ module ReactOnRailsPro
       def upload_assets
         Rails.logger.info { "[ReactOnRailsPro] Uploading assets" }
 
-        # Check if server bundle exists before trying to upload assets
+        # Early checks with descriptive messages. add_bundle_to_form(check_bundle: true) also
+        # validates existence, but these provide clearer context for the rake task user.
         server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
         unless File.exist?(server_bundle_path)
           raise ReactOnRailsPro::Error, "Server bundle not found at #{server_bundle_path}. " \
@@ -58,6 +67,12 @@ module ReactOnRailsPro
         end
 
         form = form_with_assets_and_bundle
+        # TODO: targetBundles is only kept for backward compatibility with older node renderers
+        # (protocol 2.0.0) that require it. The new node renderer derives target directories from
+        # the bundle_<hash> form keys and ignores this field. Remove at the next breaking version.
+        # Note: it's not mandatory to keep this until then — users are expected to upgrade the
+        # node renderer and react_on_rails gem to the same version together — but it's an easy
+        # backward compatibility safeguard.
         form["targetBundles"] = target_bundles
 
         perform_request("/upload-assets", form: form)
@@ -83,7 +98,14 @@ module ReactOnRailsPro
       private
 
       def connection
-        @connection ||= create_connection
+        # Fast path: return existing connection without locking (lock-free for 99.99% of calls)
+        conn = @connection
+        return conn if conn
+
+        # Slow path: initialize with lock (only happens once per process)
+        CONNECTION_MUTEX.synchronize do
+          @connection ||= create_connection
+        end
       end
 
       def perform_request(path, **post_options) # rubocop:disable Metrics/AbcSize,Metrics/CyclomaticComplexity
@@ -304,6 +326,16 @@ module ReactOnRailsPro
           end
 
           response = HTTPX.get(path)
+          error = response.error
+          if error
+            # Re-raise via rescue so Ruby sets error.cause for exception chaining.
+            begin
+              raise error
+            rescue StandardError
+              raise ReactOnRailsPro::Error, "Failed to fetch dev-server asset from #{path}: #{error}"
+            end
+          end
+
           response.body
         else
           Pathname.new(path)

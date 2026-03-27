@@ -22,9 +22,9 @@ See the example apps under `/spec`
 
 For non-doc fixes:
 
-- Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails_pro/blob/master/CHANGELOG.md#unreleased).
+- Provide changelog entry in the [unreleased section of the CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/CHANGELOG.md#unreleased).
 - Ensure CI passes and that you added a test that passes with the fix and fails without the fix.
-- Squash all commits down to one with a nice commit message _ONLY_ once final review is given. Make sure this single commit is rebased on top of master.
+- Squash all commits down to one with a nice commit message _ONLY_ once final review is given. Make sure this single commit is rebased on top of main.
 - Please address all code review comments.
 - Ensure that docs are updated accordingly if a feature is added.
 
@@ -46,16 +46,16 @@ From [How to Write a Git Commit Message](http://chris.beams.io/posts/git-commit/
 
 ## Doc Changes
 
-When making doc changes, we want the change to work on both [the ShakaCode docs site](https://www.shakacode.com/react-on-rails-pro/docs/) and when browsing the GitHub repo.
-The issue is that the Shakacode site is generated only from files in [`docs`](./docs), so any references from them to non-doc files must use the full GitHub URL.
+When making doc changes, we want the change to work on both [the React on Rails docs site](https://reactonrails.com/docs/pro) and when browsing the GitHub repo.
+For links from docs pages to non-doc files, use full GitHub URLs so links resolve correctly in both contexts.
 
 ### Links to other docs:
 
 - When making references to doc files, use a relative URL path like:
-  `[Installation Overview](docs/basics/installation-overview.md)`
+  `[Installation Guide](../docs/pro/installation.md)`
 
 - When making references to source code files, use a full url path like:
-  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails_pro/tree/master/spec/dummy/config/initializers/react_on_rails.rb)`
+  `[spec/dummy/config/initializers/react_on_rails.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro/spec/dummy/config/initializers/react_on_rails.rb)`
 
 ## To run tests:
 
@@ -70,7 +70,7 @@ React on Rails Pro shares the optimized CI pipeline with the main gem. The CI sy
 ### CI Behavior
 
 - **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback
-- **On Master**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
+- **On Main**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
 - **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
 
 ### Local CI Tools
@@ -88,7 +88,7 @@ cd ..
 # Auto-detect what to test (includes Pro tests if Pro files changed)
 bin/ci-local
 
-# Run all CI checks (same as master branch)
+# Run all CI checks (same as main branch)
 bin/ci-local --all
 
 # Quick check - only fast tests
@@ -103,7 +103,7 @@ Analyzes changes to both main gem and Pro:
 
 ```bash
 # From repository root
-script/ci-changes-detector origin/master
+script/ci-changes-detector origin/main
 ```
 
 ### CI Best Practices for Pro
@@ -119,7 +119,7 @@ script/ci-changes-detector origin/master
 - Push Pro changes without testing locally first
 - Modify both Pro and main gem without running full tests
 
-For comprehensive CI documentation, see [`../docs/CI_OPTIMIZATION.md`](../docs/CI_OPTIMIZATION.md) in the repository root.
+For comprehensive CI documentation, see [`../internal/contributor-info/ci-optimization.md`](../internal/contributor-info/ci-optimization.md) in the repository root.
 
 # IDE/Editor Setup
 
@@ -137,14 +137,16 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 # Configuring your test app to use your local fork
 
 You can test the `react_on_rails_pro` gem using your own external test_app or the gem's internal `spec/dummy` app. The `spec/dummy` app is an example of the various setup techniques you can use with the gem.
-As of 2018-04-28, this directory mirrors the test app spec/dummy on https://github.com/shakacode/react_on_rails plus a few additional tests.
+
+In the monorepo, the Pro directory is at `react_on_rails_pro/` alongside the open-source `react_on_rails/` directory:
 
 ```
-├── test_app
-|    └── client
-└── react_on_rails_pro
-    └── spec
-        └── dummy
+react_on_rails/          # Open-source gem
+react_on_rails_pro/      # Pro gem
+├── spec/
+│   └── dummy/           # Pro dummy app for testing
+└── ...
+packages/                # NPM workspace packages
 ```
 
 ## Testing the Ruby Gem
@@ -174,7 +176,7 @@ To do this, follow the instructions in the
 
 ### Example: Testing NPM changes with the dummy app
 
-1. Add `console.log('Hello!')` [here](https://github.com/shakacode/react_on_rails_pro/blob/master/packages/node-renderer/src/ReactOnRailsProNodeRenderer.ts#L6) in `packages/node-renderer/src/ReactOnRailsProNodeRenderer.ts` to confirm we're getting an update to the node package.
+1. Add `console.log('Hello!')` in `packages/node-renderer/src/ReactOnRailsProNodeRenderer.ts` to confirm we're getting an update to the node package.
 2. The `preinstall` script of `spec/dummy` builds the NPM package and sets up `yalc` to use it for the renderer.
    It's run automatically when you run `pnpm install`.
 3. Refresh the browser if the server is already running or start the server using `foreman start -f Procfile.dev` from `spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console.
@@ -197,7 +199,7 @@ To do this, follow the instructions in the
 
 ### Prereqs
 
-After checking out the repo, making sure you have rvm and nvm setup (setup ruby and node), cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+After checking out the repo, ensure you have [mise](https://mise.jdx.dev/) installed for managing Ruby and Node versions (see `.tool-versions`). Then cd to `spec/dummy` and run `bin/setup` to install ruby dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
 ### Building the Node Package for Development
 
@@ -277,7 +279,7 @@ Hit F8 and then a debugger statement within the test will get hit.
 ### Async issues with Jest
 
 Beware that Jest runs multiple test files synchronously, so you can't use the same temporary directory
-between tests. See the file [`packages/node-renderer/tests/helper.ts`](https://github.com/shakacode/react_on_rails_pro/blob/master/packages/node-renderer/tests/helper.ts) for how we handle this.
+between tests. See the file `packages/node-renderer/tests/helper.ts` for how we handle this.
 
 ### Run most tests and linting
 
@@ -393,5 +395,5 @@ rake release[17.0.0,false,verdaccio]
 
 For complete documentation, see:
 
-- [Root Release Documentation](../docs/contributor-info/releasing.md)
+- [Root Release Documentation](../internal/contributor-info/releasing.md)
 - Run `rake -D release` for inline help

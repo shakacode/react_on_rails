@@ -1,6 +1,11 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# Self-guard: skip if bin/dev already ran precompile tasks.
+# This prevents duplicate execution in HMR mode (two webpack processes)
+# regardless of Shakapacker version.
+exit 0 if ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] == "true"
+
 # Shakapacker precompile hook for React on Rails Pro test dummy app
 #
 # This script loads the shared test helper implementation.
@@ -15,5 +20,9 @@ unless File.exist?(shared_hook)
   exit 1
 end
 
-# Load and execute the shared hook
+# Load shared implementation (defines run_precompile_tasks)
 load shared_hook
+
+# Explicitly invoke run_precompile_tasks. The shared file's
+# `if __FILE__ == $PROGRAM_NAME` block does not run when loaded via `load`.
+run_precompile_tasks

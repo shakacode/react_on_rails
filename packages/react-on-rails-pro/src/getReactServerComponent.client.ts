@@ -30,13 +30,13 @@ export type ClientGetReactServerComponentProps = {
   enforceRefetch?: boolean;
 };
 
-const createFromFetch = async (fetchPromise: Promise<Response>) => {
+const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: string) => {
   const response = await fetchPromise;
   const stream = response.body;
   if (!stream) {
     throw new Error('No stream found in response');
   }
-  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
+  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream, cspNonce);
   const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
   return wrapInNewPromise(renderPromise);
 };
@@ -78,7 +78,7 @@ const fetchRSC = ({
     const encodedParams = new URLSearchParams({ props: propsString }).toString();
     const fetchUrl = `/${strippedUrlPath}/${componentName}?${encodedParams}`;
 
-    return createFromFetch(fetch(fetchUrl)).catch((error: unknown) => {
+    return createFromFetch(fetch(fetchUrl), railsContext.cspNonce).catch((error: unknown) => {
       throw new Error(
         `Failed to fetch RSC payload for component "${componentName}" from "${fetchUrl}": ${extractErrorMessage(error)}`,
       );
@@ -137,9 +137,9 @@ const createRSCStreamFromArray = (payloads: string[]) => {
  * @param payloads - Array of RSC payload chunks from the global array
  * @returns A Promise resolving to the rendered React element
  */
-const createFromPreloadedPayloads = (payloads: string[]) => {
+const createFromPreloadedPayloads = (payloads: string[], cspNonce?: string) => {
   const stream = createRSCStreamFromArray(payloads);
-  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream);
+  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream, cspNonce);
   const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
   return wrapInNewPromise(renderPromise);
 };
@@ -183,7 +183,7 @@ const getReactServerComponent =
       const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
       const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey];
       if (payloads) {
-        return createFromPreloadedPayloads(payloads);
+        return createFromPreloadedPayloads(payloads, railsContext.cspNonce);
       }
     }
     return fetchRSC({ componentName, componentProps, railsContext });

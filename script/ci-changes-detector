@@ -5,12 +5,12 @@
 
 set -euo pipefail
 
-BASE_REF="${1:-origin/master}"
+BASE_REF="${1:-origin/main}"
 CURRENT_REF="${2:-HEAD}"
 
 # Handle initial commits where before SHA is all zeros
 if [[ "$BASE_REF" =~ ^0+$ ]]; then
-  BASE_REF="origin/master"
+  BASE_REF="origin/main"
 fi
 
 # Colors for output
@@ -21,7 +21,8 @@ NC='\033[0m' # No Color
 
 # Fetch the base ref if it's a remote ref
 if [[ "$BASE_REF" == origin/* ]]; then
-  if ! git fetch origin master --depth=50 2>/dev/null; then
+  BASE_BRANCH="${BASE_REF#origin/}"
+  if ! git fetch origin "$BASE_BRANCH" --depth=50 2>/dev/null; then
     echo "${RED}Error: Failed to fetch $BASE_REF${NC}"
     echo "Please check your network connection and try again."
     exit 1
@@ -71,7 +72,7 @@ UNCATEGORIZED_CHANGED=false
 while IFS= read -r file; do
   case "$file" in
     # Documentation files
-    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*|react_on_rails_pro/docs/*|react_on_rails_pro/docs/**/*|SUMMARY.md|book.json)
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 
@@ -158,6 +159,7 @@ while IFS= read -r file; do
       PRO_RUBY_CORE_CHANGED=true
       PRO_JS_CHANGED=true
       PRO_DUMMY_CHANGED=true
+      PRO_NODE_RENDERER_CHANGED=true
       ;;
 
     # Catch-all: any file not explicitly categorized above
@@ -188,6 +190,7 @@ if [ "$DOCS_ONLY" = true ]; then
     "run_pro_lint:false"
     "run_pro_tests:false"
     "run_pro_dummy_tests:false"
+    "run_pro_node_renderer_tests:false"
   )
 
   # Output to GITHUB_OUTPUT if in GitHub Actions
@@ -273,15 +276,15 @@ if [ "$GENERATORS_CHANGED" = true ] || [ "$JS_CHANGED" = true ]; then
   RUN_GENERATORS=true
 fi
 
-if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
+if [ "$PRO_LINT_CONFIG_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_DUMMY_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ]; then
   RUN_PRO_LINT=true
 fi
 
-if [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
+if [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_RSPEC_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ]; then
   RUN_PRO_TESTS=true
 fi
 
-if [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
+if [ "$PRO_DUMMY_CHANGED" = true ] || [ "$PRO_RUBY_CORE_CHANGED" = true ] || [ "$PRO_JS_CHANGED" = true ] || [ "$PRO_NODE_RENDERER_CHANGED" = true ] || [ "$RUBY_CORE_CHANGED" = true ]; then
   RUN_PRO_DUMMY_TESTS=true
 fi
 

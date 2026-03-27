@@ -6,10 +6,10 @@ namespace :node_package do
   include ReactOnRails::TaskHelpers
 
   task :build do
-    puts "Building Node Package and running 'yalc publish'"
-    sh "pnpm run build && pnpm yalc:publish"
+    puts "Building Node Package"
+    sh "pnpm run build"
   end
 end
 
-desc "Prepares node_package by building and symlinking any example/dummy apps present"
+desc "Prepares node_package by building the TypeScript to JavaScript"
 task node_package: "node_package:build"

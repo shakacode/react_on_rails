@@ -1,0 +1,48 @@
+<h1>RSC Echo Props — Special Characters in Props</h1>
+<p>This page tests that props containing special characters are serialized safely without causing errors.</p>
+
+<h2>Test 1: Safe props (baseline)</h2>
+<%= stream_react_component("RscEchoProps",
+    props: { test: "safe_props", name: "World", count: 42 },
+    prerender: true,
+    id: "rsc-echo-safe") %>
+
+<hr/>
+
+<h2>Test 2: Props with backticks (markdown code)</h2>
+<%= stream_react_component("RscEchoProps",
+    props: { test: "backticks", content: "Check this: `const x = 1`" },
+    prerender: true,
+    id: "rsc-echo-backticks") %>
+
+<hr/>
+
+<h2>Test 3: Props with ${} template syntax</h2>
+<%= stream_react_component("RscEchoProps",
+    props: { test: "template_syntax", content: "Value is ${process.env.SECRET}" },
+    prerender: true,
+    id: "rsc-echo-template") %>
+
+<hr/>
+
+<h2>Test 4: Props with $` (dollar-backtick)</h2>
+<%= stream_react_component("RscEchoProps",
+    props: { test: "dollar_backtick", content: "Price is $`100" },
+    prerender: true,
+    id: "rsc-echo-dollar-backtick") %>
+
+<hr/>
+
+<h2>Test 5: Realistic markdown — bash variable in inline code</h2>
+<%= stream_react_component("RscEchoProps",
+    props: { test: "bash_variable", content: "Run `echo $`HOME to see your home directory" },
+    prerender: true,
+    id: "rsc-echo-bash") %>
+
+<hr/>
+
+<h2>Test 6: Backticks + ${} combined</h2>
+<%= stream_react_component("RscEchoProps",
+    props: { test: "combined", content: "Check this code: `const x = ${y}`" },
+    prerender: true,
+    id: "rsc-echo-combined") %>

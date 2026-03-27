@@ -13,7 +13,15 @@ const configureClient = () => {
   // client config is going to try to load chunks.
   delete clientConfig.entry['server-bundle'];
 
-  clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+  clientConfig.plugins.push(
+    new RSCWebpackPlugin({
+      isServer: false,
+      // Limit client reference discovery to the app source directory to prevent
+      // the plugin from traversing into node_modules/ (which with pnpm workspace
+      // symlinks exposes .tsx source files that lack a configured loader)
+      clientReferences: [{ directory: './client/app', recursive: true, include: /\.(js|ts|jsx|tsx)$/ }],
+    }),
+  );
 
   if (!isHMR) {
     clientConfig.plugins.unshift(new LoadablePlugin({ filename: 'loadable-stats.json', writeToDisk: true }));

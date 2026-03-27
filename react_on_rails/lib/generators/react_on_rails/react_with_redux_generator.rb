@@ -18,6 +18,11 @@ module ReactOnRails
                    desc: "Generate TypeScript files",
                    aliases: "-T"
 
+      class_option :invoked_by_install,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       def create_redux_directories
         # Create auto-bundling directory structure for Redux
         empty_directory("app/javascript/src/HelloWorldApp/ror_components")
@@ -90,9 +95,12 @@ module ReactOnRails
       end
 
       def add_redux_specific_messages
+        return if options.invoked_by_install?
+
         # Append Redux-specific post-install instructions
         GeneratorMessages.add_info(
-          GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world")
+          GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world",
+                                                               pro: Gem.loaded_specs.key?("react_on_rails_pro"))
         )
       end
 

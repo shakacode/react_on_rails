@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "react-on-rails": "workspace:^"
+  }
+}

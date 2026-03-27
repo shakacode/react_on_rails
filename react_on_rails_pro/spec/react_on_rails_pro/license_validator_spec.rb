@@ -16,7 +16,9 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     {
       sub: "test@example.com",
       iat: Time.now.to_i,
-      exp: Time.now.to_i + 3600 # Valid for 1 hour
+      exp: Time.now.to_i + 3600, # Valid for 1 hour
+      plan: "paid",
+      org: "Acme Corp"
     }
   end
 
@@ -24,24 +26,17 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     {
       sub: "test@example.com",
       iat: Time.now.to_i - 7200,
-      exp: Time.now.to_i - 3600 # Expired 1 hour ago
+      exp: Time.now.to_i - 3600, # Expired 1 hour ago
+      org: "Acme Corp"
     }
   end
 
-  let(:mock_logger) { instance_double(Logger, error: nil, info: nil) }
-  let(:mock_root) { instance_double(Pathname, join: config_file_path) }
-  let(:config_file_path) { instance_double(Pathname, exist?: false) }
-
+  # NOTE: REACT_ON_RAILS_PRO_LICENSE does not exist in test environments,
+  # so there's no pre-existing value to preserve/restore.
   before do
     described_class.reset!
-    # Stub the public key constant to use our test key
     stub_const("ReactOnRailsPro::LicensePublicKey::KEY", test_public_key)
-    # Clear ENV variable
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-
-    # Stub Rails.logger to avoid nil errors in unit tests
-    # Stub Rails.root for config file path tests
-    allow(Rails).to receive_messages(logger: mock_logger, root: mock_root)
   end
 
   after do
@@ -49,23 +44,43 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
     ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
   end
 
-  describe ".validated_license_data!" do
+  describe ".license_status" do
     context "with valid license in ENV" do
       before do
         valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
       end
 
-      it "returns license data hash" do
-        data = described_class.validated_license_data!
-        expect(data).to be_a(Hash)
-        expect(data["exp"]).to be_a(Integer)
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
       end
 
       it "caches the result" do
-        expect(described_class).to receive(:load_and_decode_license).once.and_call_original
-        described_class.validated_license_data!
-        described_class.validated_license_data! # Second call should use cache
+        described_class.license_status
+        expect(described_class).not_to receive(:determine_license_status)
+        described_class.license_status
+      end
+    end
+
+    context "with valid license in ENV with surrounding whitespace" do
+      before do
+        valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = "  #{valid_token}  "
+      end
+
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+
+    context "with valid license in ENV with trailing newline" do
+      before do
+        valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = "#{valid_token}\n"
+      end
+
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
       end
     end
 
@@ -75,85 +90,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = expired_token
       end
 
-      context "when in development/test environment" do
-        before do
-          allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("development"))
-        end
-
-        it "raises error immediately" do
-          expect do
-            described_class.validated_license_data!
-          end.to raise_error(ReactOnRailsPro::Error, /License has expired/)
-        end
-
-        it "includes FREE license information in error message" do
-          expect do
-            described_class.validated_license_data!
-          end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
-        end
-      end
-
-      context "when in production environment" do
-        before do
-          allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new("production"))
-        end
-
-        context "with grace period (expired < 1 month ago)" do
-          let(:expired_within_grace) do
-            {
-              sub: "test@example.com",
-              iat: Time.now.to_i - (15 * 24 * 60 * 60), # Issued 15 days ago
-              exp: Time.now.to_i - (10 * 24 * 60 * 60)  # Expired 10 days ago (within 1 month grace)
-            }
-          end
-
-          before do
-            token = JWT.encode(expired_within_grace, test_private_key, "RS256")
-            ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
-          end
-
-          it "does not raise error" do
-            expect { described_class.validated_license_data! }.not_to raise_error
-          end
-
-          it "logs warning with grace period remaining" do
-            expect(mock_logger).to receive(:error)
-              .with(/WARNING:.*License has expired.*Grace period:.*day\(s\) remaining/)
-            described_class.validated_license_data!
-          end
-
-          it "returns license data" do
-            data = described_class.validated_license_data!
-            expect(data).to be_a(Hash)
-          end
-        end
-
-        context "when outside grace period (expired > 1 month ago)" do
-          let(:expired_outside_grace) do
-            {
-              sub: "test@example.com",
-              iat: Time.now.to_i - (60 * 24 * 60 * 60), # Issued 60 days ago
-              exp: Time.now.to_i - (35 * 24 * 60 * 60)  # Expired 35 days ago (outside 1 month grace)
-            }
-          end
-
-          before do
-            token = JWT.encode(expired_outside_grace, test_private_key, "RS256")
-            ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
-          end
-
-          it "raises error" do
-            expect do
-              described_class.validated_license_data!
-            end.to raise_error(ReactOnRailsPro::Error, /License has expired/)
-          end
-
-          it "includes FREE license information in error message" do
-            expect do
-              described_class.validated_license_data!
-            end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
-          end
-        end
+      it "returns :expired" do
+        expect(described_class.license_status).to eq(:expired)
       end
     end
 
@@ -161,8 +99,8 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
       let(:payload_without_exp) do
         {
           sub: "test@example.com",
-          iat: Time.now.to_i
-          # exp field is missing
+          iat: Time.now.to_i,
+          org: "Acme Corp"
         }
       end
 
@@ -171,17 +109,16 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = token_without_exp
       end
 
-      it "raises error" do
-        expect { described_class.validated_license_data! }
-          .to raise_error(ReactOnRailsPro::Error, /License is missing required expiration field/)
-      end
-
-      it "includes FREE license information in error message" do
-        expect do
-          described_class.validated_license_data!
-        end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
       end
     end
+
+    # NOTE: Test for non-numeric exp field is not included because the JWT gem
+    # validates that exp must be numeric at encode time. Any hand-crafted token
+    # with non-numeric exp would fail signature verification in decode_license
+    # before check_expiration is reached. The defensive code in check_expiration
+    # is kept as defense-in-depth but is unreachable with valid signed JWTs.
 
     context "with invalid signature" do
       before do
@@ -190,68 +127,722 @@ RSpec.describe ReactOnRailsPro::LicenseValidator do
         ENV["REACT_ON_RAILS_PRO_LICENSE"] = invalid_token
       end
 
-      it "raises error" do
-        expect do
-          described_class.validated_license_data!
-        end.to raise_error(ReactOnRailsPro::Error, /Invalid license signature/)
-      end
-
-      it "includes FREE license information in error message" do
-        expect do
-          described_class.validated_license_data!
-        end.to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
       end
     end
 
     context "with missing license" do
       before do
         ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-        # config_file_path is already set to exist?: false in the let block
       end
 
-      it "raises error" do
-        expect { described_class.validated_license_data! }.to raise_error(ReactOnRailsPro::Error, /No license found/)
-      end
-
-      it "includes FREE license information in error message" do
-        expect { described_class.validated_license_data! }
-          .to raise_error(ReactOnRailsPro::Error, /FREE evaluation license/)
-      end
-    end
-
-    context "with license in config file" do
-      let(:valid_token) { JWT.encode(valid_payload, test_private_key, "RS256") }
-      let(:file_config_path) { instance_double(Pathname, exist?: true) }
-
-      before do
-        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
-        allow(mock_root).to receive(:join)
-          .with("config", "react_on_rails_pro_license.key")
-          .and_return(file_config_path)
-        allow(File).to receive(:read).with(file_config_path).and_return(valid_token)
-      end
-
-      it "returns license data" do
-        data = described_class.validated_license_data!
-        expect(data).to be_a(Hash)
+      it "returns :missing" do
+        expect(described_class.license_status).to eq(:missing)
       end
     end
   end
 
-  # Removed .license_data and .validation_error as they're no longer part of the public API
-  # Use validated_license_data! instead
+  describe ".license_status with plan field" do
+    # Dynamically generate tests for all valid plan types from VALID_PLANS constant.
+    # This ensures tests stay in sync when new plan types are added.
+    described_class::VALID_PLANS.each do |plan_type|
+      context "when plan is '#{plan_type}'" do
+        let(:plan_payload) do
+          {
+            sub: "test@example.com",
+            iat: Time.now.to_i,
+            exp: Time.now.to_i + 3600,
+            plan: plan_type,
+            org: "Acme Corp"
+          }
+        end
+
+        before do
+          token = JWT.encode(plan_payload, test_private_key, "RS256")
+          ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+        end
+
+        it "returns :valid" do
+          expect(described_class.license_status).to eq(:valid)
+        end
+      end
+    end
+
+    context "when plan is 'free'" do
+      let(:free_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "free",
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(free_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    context "when plan is 'unknown'" do
+      let(:unknown_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "unknown",
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(unknown_plan_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    context "when plan is empty string" do
+      let(:empty_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "",
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(empty_plan_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid (empty string is not a valid plan)" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    context "when plan field is absent" do
+      let(:no_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(no_plan_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :valid (backwards compatibility)" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+  end
+
+  describe ".license_status with org field" do
+    context "when org is present" do
+      let(:payload_with_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid",
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_with_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :valid" do
+        expect(described_class.license_status).to eq(:valid)
+      end
+    end
+
+    context "when org field is absent" do
+      let(:payload_without_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid"
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_without_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    context "when org is empty string" do
+      let(:payload_empty_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid",
+          org: ""
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_empty_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+
+    context "when org is whitespace only" do
+      let(:payload_whitespace_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid",
+          org: "   "
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_whitespace_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns :invalid" do
+        expect(described_class.license_status).to eq(:invalid)
+      end
+    end
+  end
+
+  describe ".license_expiration" do
+    context "with valid license" do
+      let(:exp_time) { Time.now.to_i + 3600 }
+
+      before do
+        payload = valid_payload.merge(exp: exp_time)
+        token = JWT.encode(payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns the expiration time" do
+        result = described_class.license_expiration
+        expect(result).to be_a(Time)
+        expect(result.to_i).to eq(exp_time)
+      end
+
+      it "caches the result" do
+        described_class.license_expiration
+        expect(described_class).not_to receive(:determine_license_expiration)
+        described_class.license_expiration
+      end
+    end
+
+    context "with expired license" do
+      let(:exp_time) { Time.now.to_i - 3600 }
+
+      before do
+        payload = expired_payload.merge(exp: exp_time)
+        token = JWT.encode(payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns the expiration time even when expired" do
+        result = described_class.license_expiration
+        expect(result).to be_a(Time)
+        expect(result.to_i).to eq(exp_time)
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns nil" do
+        expect(described_class.license_expiration).to be_nil
+      end
+    end
+
+    context "with invalid license signature" do
+      before do
+        wrong_key = OpenSSL::PKey::RSA.new(2048)
+        token = JWT.encode(valid_payload, wrong_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_expiration).to be_nil
+      end
+    end
+
+    context "with license missing exp field" do
+      let(:payload_without_exp) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_without_exp, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_expiration).to be_nil
+      end
+    end
+  end
+
+  describe ".license_organization" do
+    context "with valid license" do
+      before do
+        token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns the organization name" do
+        expect(described_class.license_organization).to eq("Acme Corp")
+      end
+
+      it "caches the result" do
+        described_class.license_organization
+        expect(described_class).not_to receive(:determine_license_organization)
+        described_class.license_organization
+      end
+    end
+
+    context "with organization containing leading/trailing whitespace" do
+      let(:payload_with_whitespace_org) do
+        valid_payload.merge(org: "  Acme Corp  ")
+      end
+
+      before do
+        token = JWT.encode(payload_with_whitespace_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns trimmed organization name" do
+        expect(described_class.license_organization).to eq("Acme Corp")
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns nil" do
+        expect(described_class.license_organization).to be_nil
+      end
+    end
+
+    context "with invalid license signature" do
+      before do
+        wrong_key = OpenSSL::PKey::RSA.new(2048)
+        token = JWT.encode(valid_payload, wrong_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_organization).to be_nil
+      end
+    end
+
+    context "with license missing org field" do
+      let(:payload_without_org) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "paid"
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_without_org, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_organization).to be_nil
+      end
+    end
+  end
+
+  describe ".license_plan" do
+    context "with valid license and 'paid' plan" do
+      before do
+        token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns 'paid'" do
+        expect(described_class.license_plan).to eq("paid")
+      end
+
+      it "caches the result" do
+        described_class.license_plan
+        expect(described_class).not_to receive(:determine_license_plan)
+        described_class.license_plan
+      end
+    end
+
+    context "with valid license and 'startup' plan" do
+      let(:startup_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "startup",
+          org: "Startup Inc"
+        }
+      end
+
+      before do
+        token = JWT.encode(startup_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns 'startup'" do
+        expect(described_class.license_plan).to eq("startup")
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+
+    context "with invalid license signature" do
+      before do
+        wrong_key = OpenSSL::PKey::RSA.new(2048)
+        token = JWT.encode(valid_payload, wrong_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+
+    context "with license missing plan field" do
+      let(:payload_without_plan) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(payload_without_plan, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+
+    context "with invalid plan type" do
+      let(:invalid_plan_payload) do
+        {
+          sub: "test@example.com",
+          iat: Time.now.to_i,
+          exp: Time.now.to_i + 3600,
+          plan: "free",
+          org: "Acme Corp"
+        }
+      end
+
+      before do
+        token = JWT.encode(invalid_plan_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns nil" do
+        expect(described_class.license_plan).to be_nil
+      end
+    end
+  end
+
+  describe ".attribution_required?" do
+    context "with paid plan (no attribution required)" do
+      before do
+        token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false" do
+        expect(described_class.attribution_required?).to be false
+      end
+
+      it "caches the result" do
+        described_class.attribution_required?
+        expect(described_class).not_to receive(:determine_attribution_required)
+        described_class.attribution_required?
+      end
+    end
+
+    context "with partner plan (no attribution required)" do
+      let(:partner_payload) do
+        valid_payload.merge(plan: "partner")
+      end
+
+      before do
+        token = JWT.encode(partner_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+
+    context "with startup plan (attribution required)" do
+      let(:startup_payload) do
+        valid_payload.merge(plan: "startup")
+      end
+
+      before do
+        token = JWT.encode(startup_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns true" do
+        expect(described_class.attribution_required?).to be true
+      end
+    end
+
+    context "with oss plan (attribution required)" do
+      let(:oss_payload) do
+        valid_payload.merge(plan: "oss")
+      end
+
+      before do
+        token = JWT.encode(oss_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns true" do
+        expect(described_class.attribution_required?).to be true
+      end
+    end
+
+    context "with nonprofit plan (attribution optional, default no)" do
+      let(:nonprofit_payload) do
+        valid_payload.merge(plan: "nonprofit")
+      end
+
+      before do
+        token = JWT.encode(nonprofit_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false by default" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+
+    context "with education plan (attribution optional, default no)" do
+      let(:education_payload) do
+        valid_payload.merge(plan: "education")
+      end
+
+      before do
+        token = JWT.encode(education_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false by default" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+
+    context "with explicit attribution=true override" do
+      let(:nonprofit_with_attribution) do
+        valid_payload.merge(plan: "nonprofit", attribution: true)
+      end
+
+      before do
+        token = JWT.encode(nonprofit_with_attribution, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns true when explicitly set" do
+        expect(described_class.attribution_required?).to be true
+      end
+    end
+
+    context "with explicit attribution=false override" do
+      let(:startup_without_attribution) do
+        valid_payload.merge(plan: "startup", attribution: false)
+      end
+
+      before do
+        token = JWT.encode(startup_without_attribution, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns false when explicitly disabled" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns false" do
+        expect(described_class.attribution_required?).to be false
+      end
+    end
+  end
+
+  describe ".license_info" do
+    context "with valid paid license" do
+      before do
+        token = JWT.encode(valid_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns a hash with all license information" do
+        info = described_class.license_info
+
+        expect(info[:org]).to eq("Acme Corp")
+        expect(info[:plan]).to eq("paid")
+        expect(info[:status]).to eq(:valid)
+        expect(info[:attribution_required]).to be false
+        expect(info[:expiration]).to be_a(Time)
+      end
+    end
+
+    context "with startup license" do
+      let(:startup_payload) do
+        valid_payload.merge(plan: "startup")
+      end
+
+      before do
+        token = JWT.encode(startup_payload, test_private_key, "RS256")
+        ENV["REACT_ON_RAILS_PRO_LICENSE"] = token
+      end
+
+      it "returns attribution_required as true" do
+        info = described_class.license_info
+
+        expect(info[:plan]).to eq("startup")
+        expect(info[:attribution_required]).to be true
+      end
+    end
+
+    context "with missing license" do
+      before do
+        ENV.delete("REACT_ON_RAILS_PRO_LICENSE")
+      end
+
+      it "returns appropriate defaults" do
+        info = described_class.license_info
+
+        expect(info[:org]).to be_nil
+        expect(info[:plan]).to be_nil
+        expect(info[:status]).to eq(:missing)
+        expect(info[:attribution_required]).to be false
+        expect(info[:expiration]).to be_nil
+      end
+    end
+  end
 
   describe ".reset!" do
     before do
       valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
       ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
-      described_class.validated_license_data! # Cache the result
+      described_class.license_status # Cache the result
+      described_class.license_expiration # Cache the expiration
+      described_class.license_organization # Cache the organization
+      described_class.license_plan # Cache the plan
+      described_class.attribution_required? # Cache attribution_required
     end
 
-    it "clears the cached validation result" do
-      expect(described_class.instance_variable_get(:@license_data)).not_to be_nil
+    it "clears the cached license status" do
+      expect(described_class.instance_variable_defined?(:@license_status)).to be true
       described_class.reset!
-      expect(described_class.instance_variable_defined?(:@license_data)).to be false
+      expect(described_class.instance_variable_defined?(:@license_status)).to be false
+    end
+
+    it "clears the cached license expiration" do
+      expect(described_class.instance_variable_defined?(:@license_expiration)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@license_expiration)).to be false
+    end
+
+    it "clears the cached license organization" do
+      expect(described_class.instance_variable_defined?(:@license_organization)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@license_organization)).to be false
+    end
+
+    it "clears the cached license plan" do
+      expect(described_class.instance_variable_defined?(:@license_plan)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@license_plan)).to be false
+    end
+
+    it "clears the cached attribution_required" do
+      expect(described_class.instance_variable_defined?(:@attribution_required)).to be true
+      described_class.reset!
+      expect(described_class.instance_variable_defined?(:@attribution_required)).to be false
+    end
+  end
+
+  describe "thread safety" do
+    it "handles concurrent first-time access without errors" do
+      valid_token = JWT.encode(valid_payload, test_private_key, "RS256")
+      ENV["REACT_ON_RAILS_PRO_LICENSE"] = valid_token
+
+      # Reset ONCE before spawning threads to test concurrent initialization
+      described_class.reset!
+
+      # Use more threads for better race condition detection
+      threads = Array.new(100) do
+        Thread.new do
+          described_class.license_status
+        end
+      end
+
+      results = threads.map(&:value)
+      expect(results).to all(eq(:valid))
     end
   end
 

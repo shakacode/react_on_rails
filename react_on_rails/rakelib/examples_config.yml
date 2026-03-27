@@ -5,7 +5,7 @@
 # - Latest CI (all PRs): Runs shakapacker_examples_latest (React 19, Shakapacker 9.x)
 #                        Examples: basic, basic-server-rendering, redux, redux-server-rendering
 #
-# - Pinned CI (master):  Runs shakapacker_examples_pinned (React 16, 17, 18 with Shakapacker 8.2.0)
+# - Pinned CI (main):   Runs shakapacker_examples_pinned (React 16, 17, 18 with Shakapacker 8.2.0)
 #                        Examples: basic-react16, basic-server-rendering-react16,
 #                                  basic-react17, basic-server-rendering-react17,
 #                                  basic-react18, basic-server-rendering-react18

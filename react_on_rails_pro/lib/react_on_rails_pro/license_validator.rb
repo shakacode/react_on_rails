@@ -3,199 +3,335 @@
 require "jwt"
 
 module ReactOnRailsPro
+  # Validates React on Rails Pro licenses.
+  # This class only determines license status - it does NOT log.
+  # All logging is handled by Engine.log_license_status for environment-aware messaging.
+  # rubocop:disable Metrics/ClassLength
   class LicenseValidator
-    # Grace period: 1 month (in seconds)
-    GRACE_PERIOD_SECONDS = 30 * 24 * 60 * 60
+    # Valid license plan types.
+    # Must match VALID_PLANS in packages/react-on-rails-pro-node-renderer/src/shared/licenseValidator.ts
+    # - paid: Standard commercial license
+    # - startup: Complimentary for qualifying startups
+    # - nonprofit: Complimentary for non-profits
+    # - education: For educational institutions
+    # - oss: For open source projects
+    # - partner: Strategic partners
+    VALID_PLANS = %w[paid startup nonprofit education oss partner].freeze
+
+    # Plans that require attribution by default (complimentary licenses)
+    #
+    # Attribution defaults by plan:
+    #   Plan       | Attribution Required?
+    #   -----------|----------------------
+    #   paid       | No
+    #   partner    | No
+    #   startup    | Yes
+    #   oss        | Yes
+    #   nonprofit  | No (default)
+    #   education  | No (default)
+    #
+    # These defaults can be overridden by explicit "attribution" field in the license JWT.
+    ATTRIBUTION_REQUIRED_PLANS = %w[startup oss].freeze
+
+    # Mutex for thread-safe license status initialization.
+    # Using a constant eliminates the race condition that would exist with @mutex ||= Mutex.new
+    # See: https://bugs.ruby-lang.org/issues/20875
+    LICENSE_MUTEX = Mutex.new
 
     class << self
-      # Validates the license and returns the license data
-      # Caches the result after first validation
-      # @return [Hash] The license data
-      # @raise [ReactOnRailsPro::Error] if license is invalid
-      def validated_license_data!
-        return @license_data if defined?(@license_data)
+      # Returns the current license status (never raises, never logs)
+      # Thread-safe: uses Mutex to prevent race conditions during initialization
+      # @return [Symbol] One of :valid, :expired, :invalid, :missing
+      def license_status
+        return @license_status if defined?(@license_status)
 
-        begin
-          # Load and decode license (but don't cache yet)
-          license_data = load_and_decode_license
+        LICENSE_MUTEX.synchronize do
+          # Double-check pattern: another thread may have set it while we waited
+          return @license_status if defined?(@license_status)
 
-          # Validate the license (raises if invalid, returns grace_days)
-          grace_days = validate_license_data(license_data)
-
-          # Validation passed - now cache both data and grace days
-          @license_data = license_data
-          @grace_days_remaining = grace_days
-
-          # Seed the license cache on first boot if auto-refresh is enabled
-          # This populates the cache with expiry info so refresh logic works on subsequent boots
-          LicenseRefreshChecker.seed_cache_if_needed(license_data)
-
-          @license_data
-        rescue JWT::DecodeError => e
-          error = "Invalid license signature: #{e.message}. " \
-                  "Your license file may be corrupted. " \
-                  "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
-          handle_invalid_license(error)
-        rescue StandardError => e
-          error = "License validation error: #{e.message}. " \
-                  "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
-          handle_invalid_license(error)
+          @license_status = determine_license_status
         end
       end
 
+      # Returns the license expiration time if available
+      # @return [Time, nil] The expiration time or nil if not available
+      def license_expiration
+        return @license_expiration if defined?(@license_expiration)
+
+        LICENSE_MUTEX.synchronize do
+          return @license_expiration if defined?(@license_expiration)
+
+          @license_expiration = determine_license_expiration
+        end
+      end
+
+      # Returns the organization name from the license if available
+      # @return [String, nil] The organization name or nil if not available
+      def license_organization
+        return @license_organization if defined?(@license_organization)
+
+        LICENSE_MUTEX.synchronize do
+          return @license_organization if defined?(@license_organization)
+
+          @license_organization = determine_license_organization
+        end
+      end
+
+      # Returns the license plan type if available
+      # @return [String, nil] The plan type (e.g., "paid", "startup") or nil if not available
+      def license_plan
+        return @license_plan if defined?(@license_plan)
+
+        LICENSE_MUTEX.synchronize do
+          return @license_plan if defined?(@license_plan)
+
+          @license_plan = determine_license_plan
+        end
+      end
+
+      # Returns whether attribution is required for this license
+      # Checks explicit attribution field first, then infers from plan type:
+      # - paid, partner: No attribution required
+      # - startup, oss: Attribution required
+      # - nonprofit, education: Attribution optional (default: no)
+      # @return [Boolean] True if attribution is required
+      def attribution_required?
+        return @attribution_required if defined?(@attribution_required)
+
+        LICENSE_MUTEX.synchronize do
+          return @attribution_required if defined?(@attribution_required)
+
+          @attribution_required = determine_attribution_required
+        end
+      end
+
+      # Returns license information for use in helpers and components
+      # @return [Hash] License info including org, plan, status, and attribution_required
+      def license_info
+        {
+          org: license_organization,
+          plan: license_plan,
+          status: license_status,
+          attribution_required: attribution_required?,
+          expiration: license_expiration
+        }
+      end
+
+      # Returns decoded license data for valid licenses.
+      # Primarily used by auto-refresh internals and tests.
+      # @return [Hash, nil] Decoded license data when the current license is valid
+      def validated_license_data!
+        return @validated_license_data if defined?(@validated_license_data)
+
+        LICENSE_MUTEX.synchronize do
+          return @validated_license_data if defined?(@validated_license_data)
+
+          license_string = load_license_string
+          return unless license_string
+
+          decoded_data = decode_license(license_string)
+          return unless decoded_data
+          return unless check_plan(decoded_data) == :valid
+          return unless check_organization(decoded_data) == :valid
+          return unless check_expiration(decoded_data) == :valid
+
+          LicenseRefreshChecker.seed_cache_if_needed(decoded_data)
+          @validated_license_data = decoded_data
+        end
+      end
+
+      # Resets all cached state (primarily for testing)
       def reset!
-        remove_instance_variable(:@license_data) if defined?(@license_data)
-        remove_instance_variable(:@grace_days_remaining) if defined?(@grace_days_remaining)
-      end
-
-      # Checks if the current license is an evaluation/free license
-      # @return [Boolean] true if plan is not "paid"
-      def evaluation?
-        data = validated_license_data!
-        plan = data["plan"].to_s
-        plan != "paid" && !plan.start_with?("paid_")
-      end
-
-      # Returns remaining grace period days if license is expired but in grace period
-      # @return [Integer, nil] Number of days remaining, or nil if not in grace period
-      def grace_days_remaining
-        # Ensure license is validated and cached
-        validated_license_data!
-
-        # Return cached grace days (nil if not in grace period)
-        @grace_days_remaining
+        LICENSE_MUTEX.synchronize do
+          remove_instance_variable(:@license_status) if defined?(@license_status)
+          remove_instance_variable(:@license_expiration) if defined?(@license_expiration)
+          remove_instance_variable(:@license_organization) if defined?(@license_organization)
+          remove_instance_variable(:@license_plan) if defined?(@license_plan)
+          remove_instance_variable(:@attribution_required) if defined?(@attribution_required)
+          remove_instance_variable(:@validated_license_data) if defined?(@validated_license_data)
+        end
       end
 
       private
 
-      # Validates the license data and raises if invalid
-      # Logs info/errors and handles grace period logic
-      # @param license [Hash] The decoded license data
-      # @return [Integer, nil] Grace days remaining if in grace period, nil otherwise
-      # @raise [ReactOnRailsPro::Error] if license is invalid
-      def validate_license_data(license)
-        # Check that exp field exists
-        unless license["exp"]
-          error = "License is missing required expiration field. " \
-                  "Your license may be from an older version. " \
-                  "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
-          handle_invalid_license(error)
-        end
-
-        # Check expiry with grace period for production
-        current_time = Time.now.to_i
-        exp_time = license["exp"]
-        grace_days = nil
-
-        if current_time > exp_time
-          days_expired = ((current_time - exp_time) / (24 * 60 * 60)).to_i
-
-          error = "License has expired #{days_expired} day(s) ago. " \
-                  "Get a FREE evaluation license (3 months) at https://shakacode.com/react-on-rails-pro " \
-                  "or upgrade to a paid license for production use."
-
-          # In production, allow a grace period of 1 month with error logging
-          if production? && within_grace_period?(exp_time)
-            # Calculate grace days once here
-            grace_days = calculate_grace_days_remaining(exp_time)
-            Rails.logger.error(
-              "[React on Rails Pro] WARNING: #{error} " \
-              "Grace period: #{grace_days} day(s) remaining. " \
-              "Application will fail to start after grace period expires."
-            )
-          else
-            handle_invalid_license(error)
-          end
-        end
-
-        # Log license type if present (for analytics)
-        log_license_info(license)
-
-        # Return grace days (nil if not in grace period)
-        grace_days
-      end
-
-      def production?
-        Rails.env.production?
-      end
-
-      def within_grace_period?(exp_time)
-        Time.now.to_i <= exp_time + GRACE_PERIOD_SECONDS
-      end
-
-      # Calculates remaining grace period days
-      # @param exp_time [Integer] Expiration timestamp
-      # @return [Integer] Days remaining (0 or more)
-      def calculate_grace_days_remaining(exp_time)
-        grace_end = exp_time + GRACE_PERIOD_SECONDS
-        seconds_remaining = grace_end - Time.now.to_i
-        return 0 if seconds_remaining <= 0
-
-        (seconds_remaining / (24 * 60 * 60)).to_i
-      end
-
-      def load_and_decode_license
+      # Determines the license status by loading, decoding, and validating
+      # @return [Symbol] The license status
+      def determine_license_status
+        # Step 1: Load license string
         license_string = load_license_string
+        return :missing unless license_string
 
-        JWT.decode(
-          # The JWT token containing the license data
-          license_string,
-          # RSA public key used to verify the JWT signature
-          public_key,
-          # verify_signature: NEVER set to false! When false, signature verification is skipped,
-          # allowing anyone to forge licenses. Must always be true for security.
-          true,
-          # NOTE: Never remove the 'algorithm' parameter from JWT.decode to prevent algorithm bypassing vulnerabilities.
-          # Ensure to hardcode the expected algorithm.
-          # See: https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/
-          algorithm: "RS256",
-          # Disable automatic expiration verification so we can handle it manually with custom logic
-          verify_expiration: false
-          # JWT.decode returns an array [data, header]; we use `.first` to get the data (payload).
-        ).first
+        # Step 2: Decode and verify JWT
+        decoded_data = decode_license(license_string)
+        return :invalid unless decoded_data
+
+        # Step 3: Check plan validity
+        plan_status = check_plan(decoded_data)
+        return plan_status unless plan_status == :valid
+
+        # Step 4: Check organization is present
+        org_status = check_organization(decoded_data)
+        return org_status unless org_status == :valid
+
+        # Step 5: Check expiration
+        check_expiration(decoded_data)
       end
 
-      def load_license_string
-        # Try auto-refresh if enabled and near expiry
-        LicenseRefreshChecker.maybe_refresh_license
+      # Determines the license expiration time from the decoded JWT
+      # @return [Time, nil] The expiration time or nil if not available
+      def determine_license_expiration
+        with_decoded_license do |decoded_data|
+          exp = decoded_data["exp"]
+          return nil unless exp
 
-        # Priority: cache (if auto-refresh enabled) → ENV → config file
+          exp_time = if exp.is_a?(Numeric)
+                       exp.to_i
+                     else
+                       Integer(exp)
+                     end
+          Time.at(exp_time)
+        end
+      rescue ArgumentError, TypeError
+        nil
+      end
+
+      # Determines the organization name from the decoded JWT
+      # @return [String, nil] The organization name or nil if not available
+      def determine_license_organization
+        license_string = load_license_string
+        return nil unless license_string
+
+        decoded_data = decode_license(license_string)
+        return nil unless decoded_data
+
+        org = decoded_data["org"]
+        return nil unless org.is_a?(String) && !org.strip.empty?
+
+        org.strip
+      end
+
+      # Determines the license plan type from the decoded JWT
+      # Returns nil for invalid/unknown plans - validation is handled by check_plan in license_status
+      # @return [String, nil] The plan type or nil if not available/invalid
+      def determine_license_plan
+        with_decoded_license do |decoded_data|
+          plan = decoded_data["plan"]
+          return nil unless plan && VALID_PLANS.include?(plan)
+
+          plan
+        end
+      end
+
+      # Helper to load and decode license, yielding decoded data if successful
+      # @yield [Hash] The decoded license data
+      # @return [Object, nil] The block's return value or nil if license unavailable
+      def with_decoded_license
+        license_string = load_license_string
+        return nil unless license_string
+
+        decoded_data = decode_license(license_string)
+        return nil unless decoded_data
+
+        yield decoded_data
+      end
+
+      # Determines if attribution is required based on license data
+      # Checks explicit attribution field first, then infers from plan type
+      # @return [Boolean] True if attribution is required
+      def determine_attribution_required
+        license_string = load_license_string
+        return false unless license_string
+
+        decoded_data = decode_license(license_string)
+        return false unless decoded_data
+
+        # Check explicit attribution field first
+        attribution = decoded_data["attribution"]
+        return attribution if [true, false].include?(attribution)
+
+        # Infer from plan type
+        plan = decoded_data["plan"]
+        return false unless plan.is_a?(String)
+
+        ATTRIBUTION_REQUIRED_PLANS.include?(plan.strip)
+      end
+
+      # Loads license string from environment variable
+      # @return [String, nil] License string or nil if not found
+      def load_license_string
+        LicenseRefreshChecker.maybe_refresh_license if ReactOnRailsPro.configuration.auto_refresh_enabled?
+
         if ReactOnRailsPro.configuration.auto_refresh_enabled?
           cached_token = LicenseCache.token
           return cached_token if cached_token.present?
         end
 
-        # Environment variable
-        license = ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)
-        return license if license.present?
+        ENV.fetch("REACT_ON_RAILS_PRO_LICENSE", nil)&.strip.presence
+      end
 
-        # Config file
-        config_path = Rails.root.join("config", "react_on_rails_pro_license.key")
-        return File.read(config_path).strip if config_path.exist?
+      # Decodes and verifies the JWT license
+      # @return [Hash, nil] Decoded license data or nil if invalid
+      def decode_license(license_string)
+        JWT.decode(
+          license_string,
+          public_key,
+          true, # verify signature - NEVER set to false!
+          # Enforce RS256 algorithm only to prevent "alg=none" and downgrade attacks
+          algorithm: "RS256",
+          verify_expiration: false # we handle expiration manually
+        ).first
+      rescue StandardError
+        nil
+      end
 
-        error_msg = "No license found. Please set REACT_ON_RAILS_PRO_LICENSE environment variable " \
-                    "or create #{config_path} file. " \
-                    "Get a FREE evaluation license at https://shakacode.com/react-on-rails-pro"
-        handle_invalid_license(error_msg)
+      # Checks if the license plan is valid for production use
+      # Licenses without a plan field are considered valid (backwards compatibility with old paid licenses)
+      # Plans in VALID_PLANS are valid; all other plans (e.g., "free") are invalid
+      # Note: Unknown plan types result in :invalid status, and license_plan returns nil
+      # @return [Symbol] :valid or :invalid
+      def check_plan(decoded_data)
+        plan = decoded_data["plan"]
+        return :valid unless plan # No plan field = valid (backwards compat with old paid licenses)
+        return :valid if VALID_PLANS.include?(plan)
+
+        :invalid
+      end
+
+      # Checks if the license has a valid organization name
+      # Organization name is required for all licenses
+      # @return [Symbol] :valid or :invalid
+      def check_organization(decoded_data)
+        org = decoded_data["org"]
+        return :invalid unless org.is_a?(String) && !org.strip.empty?
+
+        :valid
+      end
+
+      # Checks if the license is expired
+      # @return [Symbol] :valid, :expired, or :invalid (if exp field missing or non-numeric)
+      def check_expiration(license)
+        return :invalid unless license["exp"]
+
+        # Safely convert exp to Integer, handling non-numeric values
+        exp_time = if license["exp"].is_a?(Numeric)
+                     license["exp"].to_i
+                   else
+                     Integer(license["exp"])
+                   end
+
+        current_time = Time.now.to_i
+        return :expired if current_time >= exp_time
+
+        :valid
+      rescue ArgumentError, TypeError
+        # Non-numeric or unconvertible exp value
+        :invalid
       end
 
       def public_key
         ReactOnRailsPro::LicensePublicKey::KEY
       end
-
-      def handle_invalid_license(message)
-        full_message = "[React on Rails Pro] #{message}"
-        Rails.logger.error(full_message)
-        raise ReactOnRailsPro::Error, full_message
-      end
-
-      def log_license_info(license)
-        plan = license["plan"]
-        iss = license["iss"]
-
-        Rails.logger.info("[React on Rails Pro] License plan: #{plan}") if plan
-        Rails.logger.info("[React on Rails Pro] Issued by: #{iss}") if iss
-      end
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

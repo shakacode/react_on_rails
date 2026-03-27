@@ -9,7 +9,7 @@ GIT
 PATH
   remote: ..
   specs:
-    react_on_rails (16.2.0.beta.20)
+    react_on_rails (16.5.0)
       addressable
       connection_pool
       execjs (~> 2.5)
@@ -20,16 +20,16 @@ PATH
 PATH
   remote: .
   specs:
-    react_on_rails_pro (16.2.0.beta.20)
+    react_on_rails_pro (16.5.0)
       addressable
-      async (>= 2.6)
+      async (>= 2.29)
       connection_pool
       execjs (~> 2.9)
       http-2 (>= 1.1.1)
       httpx (~> 1.5)
       jwt (~> 2.7)
       rainbow
-      react_on_rails (= 16.2.0.beta.20)
+      react_on_rails (= 16.5.0)
 
 GEM
   remote: https://rubygems.org/
@@ -119,7 +119,7 @@ GEM
       traces (~> 0.18)
     base64 (0.3.0)
     benchmark (0.5.0)
-    bigdecimal (3.3.1)
+    bigdecimal (4.0.1)
     bindex (0.8.1)
     bootsnap (1.18.3)
       msgpack (~> 1.2)
@@ -137,13 +137,13 @@ GEM
     capybara-screenshot (1.0.26)
       capybara (>= 1.0, < 4)
       launchy
-    cgi (0.5.0)
+    cgi (0.5.1)
     childprocess (5.0.0)
     coderay (1.1.3)
-    commonmarker (1.1.4-arm64-darwin)
-    commonmarker (1.1.4-x86_64-darwin)
-    commonmarker (1.1.4-x86_64-linux)
-    concurrent-ruby (1.3.5)
+    commonmarker (2.7.0-arm64-darwin)
+    commonmarker (2.7.0-x86_64-darwin)
+    commonmarker (2.7.0-x86_64-linux)
+    concurrent-ruby (1.3.6)
     connection_pool (3.0.2)
     console (1.34.2)
       fiber-annotation
@@ -159,21 +159,21 @@ GEM
       bigdecimal
       rexml
     crass (1.0.6)
-    date (3.5.0)
+    date (3.5.1)
     diff-lcs (1.5.1)
     docile (1.4.0)
     drb (2.2.3)
     equivalent-xml (0.6.0)
       nokogiri (>= 1.4.3)
-    erb (6.0.0)
+    erb (6.0.2)
     erubi (1.13.1)
     execjs (2.10.0)
     fakefs (2.8.0)
     faker (3.4.1)
       i18n (>= 1.8.11, < 2)
-    ffi (1.17.0-arm64-darwin)
-    ffi (1.17.0-x86_64-darwin)
-    ffi (1.17.0-x86_64-linux-gnu)
+    ffi (1.17.3-arm64-darwin)
+    ffi (1.17.3-x86_64-darwin)
+    ffi (1.17.3-x86_64-linux-gnu)
     fiber-annotation (0.2.0)
     fiber-local (1.1.0)
       fiber-storage
@@ -190,12 +190,13 @@ GEM
     http-2 (1.1.1)
     httpx (1.6.3)
       http-2 (>= 1.0.0)
-    i18n (1.14.7)
+    i18n (1.14.8)
       concurrent-ruby (~> 1.0)
-    io-console (0.8.1)
+    io-console (0.8.2)
     io-event (1.14.2)
-    irb (1.15.3)
+    irb (1.17.0)
       pp (>= 0.6.0)
+      prism (>= 1.3.0)
       rdoc (>= 4.0.0)
       reline (>= 0.4.2)
     jbuilder (2.12.0)
@@ -216,7 +217,7 @@ GEM
       rb-fsevent (~> 0.10, >= 0.10.3)
       rb-inotify (~> 0.9, >= 0.9.10)
     logger (1.7.0)
-    loofah (2.24.1)
+    loofah (2.25.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
     mail (2.9.0)
@@ -230,7 +231,9 @@ GEM
     method_source (1.1.0)
     metrics (0.15.0)
     mini_mime (1.1.5)
-    minitest (5.26.2)
+    minitest (6.0.2)
+      drb (~> 2.0)
+      prism (~> 1.5)
     mize (0.4.1)
       protocol (~> 2.0)
     msgpack (1.7.2)
@@ -246,11 +249,11 @@ GEM
     net-smtp (0.5.1)
       net-protocol
     nio4r (2.7.5)
-    nokogiri (1.18.10-arm64-darwin)
+    nokogiri (1.19.1-arm64-darwin)
       racc (~> 1.4)
-    nokogiri (1.18.10-x86_64-darwin)
+    nokogiri (1.19.1-x86_64-darwin)
       racc (~> 1.4)
-    nokogiri (1.18.10-x86_64-linux-gnu)
+    nokogiri (1.19.1-x86_64-linux-gnu)
       racc (~> 1.4)
     package_json (0.2.0)
     parallel (1.27.0)
@@ -261,7 +264,7 @@ GEM
     pp (0.6.3)
       prettyprint
     prettyprint (0.2.0)
-    prism (1.6.0)
+    prism (1.9.0)
     protocol (2.0.0)
       ruby_parser (~> 3.0)
     pry (0.14.2)
@@ -274,14 +277,14 @@ GEM
       pry (>= 0.13.0)
     pry-theme (1.3.1)
       coderay (~> 1.1)
-    psych (5.2.6)
+    psych (5.3.1)
       date
       stringio
     public_suffix (7.0.0)
     puma (6.5.0)
       nio4r (~> 2.0)
     racc (1.8.1)
-    rack (3.2.4)
+    rack (3.2.5)
     rack-proxy (0.7.7)
       rack
     rack-session (2.1.1)
@@ -309,8 +312,8 @@ GEM
       activesupport (>= 5.0.0)
       minitest
       nokogiri (>= 1.6)
-    rails-html-sanitizer (1.6.2)
-      loofah (~> 2.21)
+    rails-html-sanitizer (1.7.0)
+      loofah (~> 2.25)
       nokogiri (>= 1.15.7, != 1.16.7, != 1.16.6, != 1.16.5, != 1.16.4, != 1.16.3, != 1.16.2, != 1.16.1, != 1.16.0.rc1, != 1.16.0)
     railties (7.2.3)
       actionpack (= 7.2.3)
@@ -329,14 +332,14 @@ GEM
       ffi (~> 1.0)
     rbs (3.9.5)
       logger
-    rdoc (6.16.1)
+    rdoc (7.2.0)
       erb
       psych (>= 4.0.0)
       tsort
     regexp_parser (2.9.2)
     reline (0.6.3)
       io-console (~> 0.5)
-    rexml (3.3.9)
+    rexml (3.4.4)
     rspec-core (3.13.0)
       rspec-support (~> 3.13.0)
     rspec-expectations (3.13.1)
@@ -413,9 +416,9 @@ GEM
       rexml (~> 3.2, >= 3.2.5)
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
-    semantic_range (3.1.0)
+    semantic_range (3.1.1)
     sexp_processor (4.17.1)
-    shakapacker (9.4.0)
+    shakapacker (9.6.1)
       activesupport (>= 5.2)
       package_json
       rack-proxy (>= 0.6.1)
@@ -437,15 +440,15 @@ GEM
       actionpack (>= 6.1)
       activesupport (>= 6.1)
       sprockets (>= 3.0.0)
-    sqlite3 (1.7.3-arm64-darwin)
-    sqlite3 (1.7.3-x86_64-darwin)
-    sqlite3 (1.7.3-x86_64-linux)
-    stringio (3.1.9)
+    sqlite3 (2.9.2-arm64-darwin)
+    sqlite3 (2.9.2-x86_64-darwin)
+    sqlite3 (2.9.2-x86_64-linux-gnu)
+    stringio (3.2.0)
     sync (0.5.0)
     term-ansicolor (1.10.2)
       mize
       tins (~> 1.0)
-    thor (1.4.0)
+    thor (1.5.0)
     tilt (2.4.0)
     timeout (0.4.4)
     tins (1.33.0)
@@ -458,8 +461,6 @@ GEM
     turbolinks-source (5.2.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
-    uglifier (4.2.0)
-      execjs (>= 0.3.0, < 3)
     unicode-display_width (2.6.0)
     uri (1.0.3)
     useragent (0.16.11)
@@ -484,10 +485,11 @@ GEM
     xpath (3.2.0)
       nokogiri (~> 1.8)
     yard (0.9.36)
-    zeitwerk (2.7.3)
+    zeitwerk (2.7.5)
 
 PLATFORMS
   arm64-darwin-24
+  arm64-darwin-25
   x86_64-darwin-24
   x86_64-linux
 
@@ -532,20 +534,16 @@ DEPENDENCIES
   sass-rails
   scss_lint
   selenium-webdriver (= 4.9.0)
-  shakapacker (= 9.4.0)
+  shakapacker (= 9.6.1)
   spring
   spring-watcher-listen
   sprockets
-  sqlite3 (~> 1.4)
+  sqlite3 (~> 2.0)
   turbolinks
-  uglifier
   web-console
   webdrivers (= 5.3.0)
   webmock
   yard
-
-RUBY VERSION
-   ruby 3.3.7p123
 
 BUNDLED WITH
    2.5.4

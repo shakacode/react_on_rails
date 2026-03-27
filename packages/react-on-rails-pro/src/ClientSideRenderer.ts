@@ -29,8 +29,8 @@ import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 const IMMEDIATE_HYDRATION_PRO_WARNING =
-  "[REACT ON RAILS] The 'immediate_hydration' feature requires a React on Rails Pro license. " +
-  'Please visit https://shakacode.com/react-on-rails-pro to get a license.';
+  "[REACT ON RAILS] The 'immediate_hydration' feature requires the React on Rails Pro gem to be installed on the server. " +
+  'Please visit https://pro.reactonrails.com/ for installation details.';
 
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
@@ -99,10 +99,11 @@ class ComponentRenderer {
    */
   private async render(el: Element, railsContext: RailsContext): Promise<void> {
     const isImmediateHydrationRequested = el.getAttribute('data-immediate-hydration') === 'true';
-    const hasProLicense = railsContext.rorPro;
+    // rorPro signals gem presence on the server, not license validity.
+    const hasProGemInstalled = railsContext.rorPro;
 
-    // Handle immediate_hydration feature usage without Pro license
-    if (isImmediateHydrationRequested && !hasProLicense) {
+    // Handle immediate_hydration feature usage without Pro gem installed
+    if (isImmediateHydrationRequested && !hasProGemInstalled) {
       console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
 
       // Fallback to standard behavior: wait for page load before hydrating
@@ -272,8 +273,35 @@ async function forAllElementsAsync(
   await Promise.all(Array.from(els).map(callback));
 }
 
+/**
+ * Filters elements to only include those with a nextSibling.
+ *
+ * This is used to prevent a race condition during HTML streaming where
+ * the props script element exists in the DOM but its content is incomplete.
+ *
+ * Why checking for ANY nextSibling works:
+ * - During HTML streaming, the browser parses incrementally
+ * - A script element's content is everything between <script> and </script>
+ * - The browser cannot parse ANY content after a script until </script> is found
+ * - Therefore, if nextSibling exists (even whitespace or comments), the closing
+ *   tag was parsed and the content is guaranteed to be complete
+ *
+ * Elements without a nextSibling will be hydrated later when their
+ * immediate hydration script executes and calls reactOnRailsComponentLoaded().
+ *
+ * See: https://github.com/shakacode/react_on_rails/issues/2283
+ */
+async function forAllCompleteElementsAsync(
+  selector: string,
+  callback: (el: Element) => Promise<void>,
+): Promise<void> {
+  const els = document.querySelectorAll(selector);
+  const completeEls = Array.from(els).filter((el) => el.nextSibling !== null);
+  await Promise.all(completeEls.map(callback));
+}
+
 export const renderOrHydrateImmediateHydratedComponents = () =>
-  forAllElementsAsync(
+  forAllCompleteElementsAsync(
     '.js-react-on-rails-component[data-immediate-hydration="true"]',
     renderOrHydrateComponent,
   );
@@ -311,7 +339,10 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
 }
 
 export const hydrateImmediateHydratedStores = () =>
-  forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`, hydrateStore);
+  forAllCompleteElementsAsync(
+    `[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`,
+    hydrateStore,
+  );
 
 export const hydrateAllStores = () =>
   forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);

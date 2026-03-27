@@ -24,15 +24,38 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     allow_any_instance_of(Kernel).to receive(:exit)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
+    allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
+    allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+      .and_return({ rails: 3000, webpack: 3035 })
   end
 
   describe ".start" do
     before { mock_system_calls }
 
+    around do |example|
+      original_port = ENV.fetch("PORT", nil)
+      ENV.delete("PORT")
+      example.run
+    ensure
+      if original_port.nil?
+        ENV.delete("PORT")
+      else
+        ENV["PORT"] = original_port
+      end
+    end
+
     it "starts development mode by default" do
       expect(ReactOnRails::Dev::PackGenerator).to receive(:generate)
       expect(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile).with("Procfile.dev")
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev")
+
+      described_class.start(:development)
+    end
+
+    it "sets default PORT=3000 for development mode" do
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev") do
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
 
       described_class.start(:development)
     end
@@ -64,6 +87,48 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.start(:production_like)
     end
 
+    it "passes procfile_port to print_server_info in production-like mode" do
+      ENV["PORT"] = "4000"
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+
+      port_at_server_info_time = nil
+      allow(described_class).to receive(:print_server_info).and_wrap_original do |m, *args, **kwargs|
+        port_at_server_info_time = args[2]
+        m.call(*args, **kwargs)
+      end
+
+      described_class.start(:production_like)
+
+      expect(port_at_server_info_time).to eq(4000)
+    ensure
+      ENV.delete("PORT")
+    end
+
+    it "sets default PORT=3001 for production-like mode" do
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: true)
+      expect(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+      expect(ReactOnRails::Dev::ProcessManager)
+        .to receive(:run_with_process_manager).with("Procfile.dev-prod-assets") do
+          expect(ENV.fetch("PORT", nil)).to eq("3001")
+        end
+
+      described_class.start(:production_like)
+    end
+
+    it "does not override an existing PORT value" do
+      ENV["PORT"] = "4242"
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev") do
+        expect(ENV.fetch("PORT", nil)).to eq("4242")
+      end
+
+      described_class.start(:development)
+    end
+
     it "starts production-like mode with custom rails_env" do
       env = { "NODE_ENV" => "production", "RAILS_ENV" => "staging" }
       argv = ["bundle", "exec", "rails", "assets:precompile"]
@@ -86,6 +151,101 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "raises error for unknown mode" do
       expect { described_class.start(:unknown) }.to raise_error(ArgumentError, "Unknown mode: unknown")
+    end
+
+    context "when configuring ports" do
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3000, webpack: 3035 })
+      end
+
+      around do |example|
+        old_port = ENV.fetch("PORT", nil)
+        old_webpack_port = ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)
+        ENV.delete("PORT")
+        ENV.delete("SHAKAPACKER_DEV_SERVER_PORT")
+        example.run
+      ensure
+        ENV["PORT"] = old_port
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = old_webpack_port
+      end
+
+      it "sets PORT env var before starting development mode" do
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "sets SHAKAPACKER_DEV_SERVER_PORT env var before starting development mode" do
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3035")
+      end
+
+      it "sets PORT env var before starting static mode" do
+        described_class.start(:static)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "uses auto-detected ports when defaults are occupied" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3001")
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3036")
+      end
+
+      it "has PORT set when print_procfile_info is called in development mode" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+
+        port_at_print_time = nil
+        allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|
+          port_at_print_time = ENV.fetch("PORT", nil)
+          m.call(*args, **kwargs)
+        end
+
+        described_class.start(:development)
+
+        expect(port_at_print_time).to eq("3001")
+      end
+
+      it "passes the auto-detected port to print_server_info in static mode" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+
+        port_at_server_info_time = nil
+        allow(described_class).to receive(:print_server_info).and_wrap_original do |m, *args, **kwargs|
+          port_at_server_info_time = args[2]
+          m.call(*args, **kwargs)
+        end
+
+        described_class.start(:static)
+
+        expect(port_at_server_info_time).to eq(3001)
+      end
+
+      it "has PORT set when print_procfile_info is called in static mode" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3001, webpack: 3036 })
+
+        port_at_print_time = nil
+        allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|
+          port_at_print_time = ENV.fetch("PORT", nil)
+          m.call(*args, **kwargs)
+        end
+
+        described_class.start(:static)
+
+        expect(port_at_print_time).to eq("3001")
+      end
+
+      it "exits cleanly when no port pair is available" do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_raise(ReactOnRails::Dev::PortSelector::NoPortAvailable, "No available port pair found")
+
+        expect_any_instance_of(Kernel).to receive(:exit).with(1)
+        expect { described_class.start(:development) }.not_to raise_error
+      end
     end
   end
 
@@ -263,9 +423,157 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
   end
 
+  describe ".procfile_port" do
+    around do |example|
+      old_port = ENV.fetch("PORT", nil)
+      ENV.delete("PORT")
+      example.run
+    ensure
+      ENV["PORT"] = old_port
+    end
+
+    it "returns 3000 for Procfile.dev when PORT is unset" do
+      expect(described_class.send(:procfile_port, "Procfile.dev")).to eq(3000)
+    end
+
+    it "returns 3001 for Procfile.dev-prod-assets when PORT is unset" do
+      expect(described_class.send(:procfile_port, "Procfile.dev-prod-assets")).to eq(3001)
+    end
+
+    it "returns the auto-detected port for Procfile.dev when PORT is set" do
+      ENV["PORT"] = "3001"
+      expect(described_class.send(:procfile_port, "Procfile.dev")).to eq(3001)
+    end
+
+    it "returns the PORT value for Procfile.dev-prod-assets when PORT is set" do
+      ENV["PORT"] = "4000"
+      expect(described_class.send(:procfile_port, "Procfile.dev-prod-assets")).to eq(4000)
+    end
+  end
+
   describe ".show_help" do
     it "displays help information" do
       expect { described_class.show_help }.to output(%r{Usage: bin/dev \[command\]}).to_stdout_from_any_process
+    end
+
+    it "documents test asset workflows" do
+      expect { described_class.show_help }.to output(/TEST ASSET WORKFLOWS/).to_stdout_from_any_process
+      expect { described_class.show_help }.to output(%r{bin/dev test-watch}).to_stdout_from_any_process
+      expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
+    end
+  end
+
+  describe ".run_test_watch" do
+    before do
+      allow(described_class).to receive(:puts)
+    end
+
+    it "uses full mode in auto mode when no watcher is running" do
+      allow(described_class).to receive(:find_process_pids).and_return([])
+
+      expect(described_class).to receive(:exec).with({ "RAILS_ENV" => "test" }, "bin/shakapacker", "--watch")
+
+      described_class.send(:run_test_watch, test_watch_mode: "auto")
+    end
+
+    it "uses client-only mode in auto mode when watcher is already running" do
+      allow(described_class).to receive(:find_process_pids)
+        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .and_return([12_345])
+      allow(described_class).to receive(:shared_private_output_paths?).and_return(true)
+
+      expect(described_class).to receive(:exec).with(
+        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "yes" },
+        "bin/shakapacker",
+        "--watch"
+      )
+
+      described_class.send(:run_test_watch, test_watch_mode: "auto")
+    end
+
+    it "uses full mode when only a server-bundle watcher is running but private paths differ" do
+      allow(described_class).to receive(:find_process_pids)
+        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .and_return([12_345])
+      allow(described_class).to receive(:shared_private_output_paths?).and_return(false)
+
+      expect(described_class).to receive(:exec).with({ "RAILS_ENV" => "test" }, "bin/shakapacker", "--watch")
+
+      described_class.send(:run_test_watch, test_watch_mode: "auto")
+    end
+
+    it "uses client-only mode when full watcher is running and private paths are shared" do
+      allow(described_class).to receive(:find_process_pids)
+        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .and_return([])
+      allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker-dev-server")
+        .and_return([])
+      allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker --watch")
+        .and_return([12_345])
+      allow(described_class).to receive(:shared_private_output_paths?).and_return(true)
+
+      expect(described_class).to receive(:exec).with(
+        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "yes" },
+        "bin/shakapacker",
+        "--watch"
+      )
+
+      described_class.send(:run_test_watch, test_watch_mode: "auto")
+    end
+
+    it "uses full mode when full watcher is running but sharing is unclear" do
+      allow(described_class).to receive(:find_process_pids)
+        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .and_return([])
+      allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker-dev-server")
+        .and_return([])
+      allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker --watch")
+        .and_return([12_345])
+      allow(described_class).to receive(:shared_private_output_paths?).and_return(false)
+
+      expect(described_class).to receive(:exec).with({ "RAILS_ENV" => "test" }, "bin/shakapacker", "--watch")
+
+      described_class.send(:run_test_watch, test_watch_mode: "auto")
+    end
+
+    it "uses client-only mode when a dev-server/watcher pair is running" do
+      allow(described_class).to receive(:find_process_pids)
+        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .and_return([])
+      allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker-dev-server")
+        .and_return([54_321])
+      allow(described_class).to receive(:find_process_pids)
+        .with("bin/shakapacker --watch")
+        .and_return([12_345])
+      allow(described_class).to receive(:shared_private_output_paths?).and_return(true)
+
+      expect(described_class).to receive(:exec).with(
+        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "yes" },
+        "bin/shakapacker",
+        "--watch"
+      )
+
+      described_class.send(:run_test_watch, test_watch_mode: "auto")
+    end
+
+    it "accepts explicit full mode" do
+      allow(described_class).to receive(:find_process_pids).and_return([12_345])
+
+      expect(described_class).to receive(:exec).with({ "RAILS_ENV" => "test" }, "bin/shakapacker", "--watch")
+
+      described_class.send(:run_test_watch, test_watch_mode: "full")
+    end
+  end
+
+  describe ".extract_command_from_args" do
+    it "treats --test-watch-mode value as a flag value, not a command" do
+      command = described_class.send(:extract_command_from_args, ["--test-watch-mode", "client-only", "test-watch"])
+      expect(command).to eq("test-watch")
     end
   end
 
@@ -382,7 +690,11 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
             .with("9.4.0").and_return(false)
         end
 
-        it "displays warning about unsupported SHAKAPACKER_SKIP_PRECOMPILE_HOOK" do
+        it "displays version warning for direct command hooks" do
+          # Direct command hooks can't self-guard, so the version warning is shown
+          allow(ReactOnRails::PackerUtils).to receive_messages(hook_script_has_self_guard?: false,
+                                                               resolve_hook_script_path: nil)
+
           status_double = instance_double(Process::Status, success?: true)
           expect(Open3).to receive(:capture3)
             .with("bundle", "exec", "rake", "react_on_rails:locale")
@@ -393,6 +705,36 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           end.to output(/Warning: Shakapacker 9\.3\.0 detected/).to_stdout_from_any_process
 
           expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to eq("true")
+        end
+
+        it "displays self-guard warning for script hooks missing the guard" do
+          hook_path = Pathname.new("/app/bin/shakapacker-precompile-hook")
+          allow(ReactOnRails::PackerUtils).to receive_messages(
+            hook_script_has_self_guard?: false,
+            resolve_hook_script_path: hook_path
+          )
+
+          status_double = instance_double(Process::Status, success?: true)
+          expect(Open3).to receive(:capture3)
+            .with("bundle", "exec", "rake", "react_on_rails:locale")
+            .and_return(["", "", status_double])
+
+          expect do
+            described_class.run_from_command_line([])
+          end.to output(/missing the self-guard line/).to_stdout_from_any_process
+        end
+
+        it "does not display warning for script hooks with self-guard" do
+          allow(ReactOnRails::PackerUtils).to receive(:hook_script_has_self_guard?).and_return(true)
+
+          status_double = instance_double(Process::Status, success?: true)
+          expect(Open3).to receive(:capture3)
+            .with("bundle", "exec", "rake", "react_on_rails:locale")
+            .and_return(["", "", status_double])
+
+          expect do
+            described_class.run_from_command_line([])
+          end.not_to output(/Warning/).to_stdout_from_any_process
         end
       end
 
@@ -437,6 +779,162 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         described_class.run_from_command_line(["kill"])
 
         expect(ENV.fetch("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil)).to be_nil
+      end
+    end
+  end
+
+  # These tests verify argument parsing works correctly, following Rails' CLI testing pattern
+  # See: https://github.com/rails/rails/blob/main/railties/test/commands/server_test.rb
+  describe ".run_from_command_line argument parsing" do
+    before do
+      mock_system_calls
+      allow(ReactOnRails::PackerUtils).to receive(:shakapacker_precompile_hook_value).and_return(nil)
+      allow(ReactOnRails::Dev::ServiceChecker).to receive(:check_services).and_return(true)
+    end
+
+    context "with --route flag" do
+      # This test would have caught the bug fixed in PR #2273
+      # The generator creates bin/dev with: argv_with_defaults.push("--route", DEFAULT_ROUTE)
+      # which passes ["--route", "hello_world"] to run_from_command_line
+      it "correctly parses --route with value as separate argument (generator default)" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(route: "hello_world", verbose: false)
+        )
+
+        described_class.run_from_command_line(["--route", "hello_world"])
+      end
+
+      it "correctly parses --route=value syntax" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(route: "hello_world")
+        )
+
+        described_class.run_from_command_line(["--route=hello_world"])
+      end
+
+      it "correctly parses command before --route flag" do
+        expect(described_class).to receive(:start).with(
+          :static,
+          "Procfile.dev-static-assets",
+          hash_including(route: "myroute")
+        )
+
+        described_class.run_from_command_line(["static", "--route", "myroute"])
+      end
+
+      it "correctly parses command after --route flag" do
+        expect(described_class).to receive(:start).with(
+          :static,
+          "Procfile.dev-static-assets",
+          hash_including(route: "myroute")
+        )
+
+        described_class.run_from_command_line(["--route", "myroute", "static"])
+      end
+
+      it "does not treat route value as a command" do
+        # This is the core bug test - "hello_world" should NOT be treated as a command
+        expect(described_class).not_to receive(:start).with(:unknown, anything, anything)
+
+        # Should start development mode (default), not fail with "Unknown argument: hello_world"
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(route: "hello_world")
+        )
+
+        described_class.run_from_command_line(["--route", "hello_world"])
+      end
+    end
+
+    context "with --rails-env flag" do
+      it "correctly parses --rails-env with value as separate argument" do
+        env = { "NODE_ENV" => "production", "RAILS_ENV" => "staging" }
+        argv = ["bundle", "exec", "rails", "assets:precompile"]
+        status_double = instance_double(Process::Status, success?: true)
+        expect(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+
+        described_class.run_from_command_line(["prod", "--rails-env", "staging"])
+      end
+
+      it "does not treat rails-env value as a command" do
+        env = { "NODE_ENV" => "production", "RAILS_ENV" => "production" }
+        argv = ["bundle", "exec", "rails", "assets:precompile"]
+        status_double = instance_double(Process::Status, success?: true)
+        expect(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+
+        # "production" after --rails-env should not be treated as a command
+        described_class.run_from_command_line(["--rails-env", "production", "prod"])
+      end
+    end
+
+    context "with --verbose flag" do
+      it "correctly parses --verbose flag" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(verbose: true)
+        )
+
+        described_class.run_from_command_line(["--verbose"])
+      end
+
+      it "correctly parses -v short flag" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(verbose: true)
+        )
+
+        described_class.run_from_command_line(["-v"])
+      end
+    end
+
+    context "with multiple flags" do
+      it "correctly parses command with multiple flags" do
+        expect(described_class).to receive(:start).with(
+          :static,
+          "Procfile.dev-static-assets",
+          hash_including(route: "dashboard", verbose: true)
+        )
+
+        described_class.run_from_command_line(["static", "--route", "dashboard", "--verbose"])
+      end
+
+      it "correctly parses flags in any order" do
+        expect(described_class).to receive(:start).with(
+          :static,
+          "Procfile.dev-static-assets",
+          hash_including(route: "dashboard", verbose: true)
+        )
+
+        described_class.run_from_command_line(["--verbose", "--route", "dashboard", "static"])
+      end
+    end
+
+    context "with no arguments (default mode)" do
+      it "starts development mode with no route" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(route: nil, verbose: false)
+        )
+
+        described_class.run_from_command_line([])
+      end
+    end
+
+    context "with unknown command" do
+      it "rejects and shows error message" do
+        expect_any_instance_of(Kernel).to receive(:puts).with("Unknown argument: invalid_command")
+        expect_any_instance_of(Kernel).to receive(:puts).with("Run 'dev help' for usage information")
+        expect_any_instance_of(Kernel).to receive(:exit).with(1)
+
+        described_class.run_from_command_line(["invalid_command"])
       end
     end
   end

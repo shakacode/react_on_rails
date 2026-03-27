@@ -113,7 +113,7 @@ module ReactOnRailsPro
 
     def process_response_chunks(stream_response, error_body)
       loop_response_lines(stream_response) do |chunk|
-        if stream_response.is_a?(HTTPX::ErrorResponse) || stream_response.status >= 400
+        if response_has_error_status?(stream_response)
           error_body << chunk
           next
         end
@@ -121,6 +121,15 @@ module ReactOnRailsPro
         processed_chunk = chunk.strip
         yield processed_chunk unless processed_chunk.empty?
       end
+    end
+
+    def response_has_error_status?(response)
+      return true if response.is_a?(HTTPX::ErrorResponse)
+
+      response.status >= 400
+    rescue NoMethodError
+      # HTTPX::StreamResponse can fail to delegate #status for non-streaming errors.
+      true
     end
 
     def handle_http_error(error, error_body, send_bundle)

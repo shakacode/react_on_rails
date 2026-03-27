@@ -139,4 +139,67 @@ describe('injectRSCPayload', () => {
         '<div>Third chunk</div>',
     );
   });
+
+  it('should include RSC payload that arrives after HTML stream finishes', async () => {
+    const mockRSC = createMockStream({
+      300: '{"late": "rsc_data"}',
+    });
+    const mockHTML = createMockStream({
+      0: '<html><body>Hello</body></html>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<html><body>Hello</body></html>');
+    expect(resultStr).toContain(
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"late\\": \\"rsc_data\\"}")</script>`,
+    );
+  });
+
+  it('should include all RSC payloads arriving at different times after HTML stream finishes', async () => {
+    const mockRSC = createMockStream({
+      200: '{"first": "chunk"}',
+      400: '{"second": "chunk"}',
+    });
+    const mockHTML = createMockStream({
+      0: '<div>content</div>',
+    });
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('<div>content</div>');
+    expect(resultStr).toContain(
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"first\\": \\"chunk\\"}")</script>`,
+    );
+    expect(resultStr).toContain(
+      `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push("{\\"second\\": \\"chunk\\"}")</script>`,
+    );
+  });
+
+  it('adds sanitized nonce attribute to injected RSC script tags', async () => {
+    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, 'abc123" onload=alert(1)');
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).not.toContain('nonce=');
+    expect(resultStr).not.toContain('onload=');
+  });
+
+  it('adds valid nonce attribute to injected RSC script tags', async () => {
+    const mockRSC = createMockStream(['{"test": "data"}']);
+    const mockHTML = createMockStream(['<html><body><div>Hello, world!</div></body></html>']);
+    const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
+
+    const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId, 'abc123');
+    const resultStr = await collectStreamData(result);
+
+    expect(resultStr).toContain('nonce="abc123"');
+  });
 });

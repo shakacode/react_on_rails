@@ -3,8 +3,8 @@ name: React on Rails Pro - Lint
 on:
   push:
     branches:
-      - 'master'
-    # Always trigger on master; docs-only detection handles skipping heavy jobs
+      - 'main'
+    # Always trigger on main; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -26,6 +26,9 @@ defaults:
 
 jobs:
   detect-changes:
+    # Skip Dependabot PRs — they can't access the Pro license secret.
+    # Scoped to pull_request so push-to-main after merge still runs Pro CI.
+    if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
     permissions:
       contents: read
       actions: read
@@ -55,12 +58,12 @@ jobs:
             exit 0
           fi
 
-          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/master' }}"
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
-      - name: Guard docs-only master pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: ./.github/actions/ensure-master-docs-safety
+      - name: Guard docs-only main pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/ensure-main-docs-safety
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
@@ -70,10 +73,10 @@ jobs:
     if: |
       !(
         github.event_name == 'push' &&
-        github.ref == 'refs/heads/master' &&
+        github.ref == 'refs/heads/main' &&
         needs.detect-changes.outputs.docs_only == 'true'
       ) && (
-        github.ref == 'refs/heads/master' ||
+        github.ref == 'refs/heads/main' ||
         needs.detect-changes.outputs.run_pro_lint == 'true'
       )
     runs-on: ubuntu-22.04
@@ -142,22 +145,18 @@ jobs:
           bundle config set --local disable_checksum_validation true
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
 
-      - name: Install Node modules with pnpm for Pro package
-        run: |
-          pnpm add -g yalc
-          pnpm install --frozen-lockfile
+      - name: Install Node modules with pnpm
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+      - name: Verify React 18 resolution for ExecJS-compatible dummy
+        working-directory: .
+        run: node script/check-react-major-version.mjs react_on_rails_pro/spec/execjs-compatible-dummy 18
 
       - name: Install Ruby Gems for Pro dummy app
         run: |
           cd spec/dummy
           bundle lock --add-platform 'x86_64-linux'
           bundle _2.5.4_ check || bundle _2.5.4_ install --jobs=4 --retry=3
-
-      - name: Install Node modules with pnpm for Pro dummy app
-        run: cd spec/dummy && pnpm install
-
-      - name: Install Node modules with pnpm for ExecJS dummy app
-        run: cd spec/execjs-compatible-dummy && pnpm install
 
       - name: Generate file-system based entrypoints
         run: cd spec/dummy && bundle exec rake react_on_rails:generate_packs
@@ -181,4 +180,3 @@ jobs:
       - name: Check TypeScript
         working-directory: .
         run: pnpm run nps check-typescript
-

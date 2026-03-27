@@ -4,6 +4,21 @@ require "erb"
 
 module ReactOnRails
   module Locales
+    # Compiles locale YAML files into JavaScript or JSON for use with React on Rails i18n.
+    #
+    # Reads YAML locale files from +config.i18n_yml_dir+ (or Rails i18n load path),
+    # generates output files in +config.i18n_dir+, and skips generation when output
+    # files are already up-to-date (unless +force+ is true).
+    #
+    # @param force [Boolean] when true, regenerate even if output files are current
+    # @return [ReactOnRails::Locales::ToJs, ReactOnRails::Locales::ToJson] the converter instance
+    # @raise [ReactOnRails::Error] if configured directories do not exist
+    #
+    # @example Basic usage (skips if up-to-date)
+    #   ReactOnRails::Locales.compile
+    #
+    # @example Force regeneration
+    #   ReactOnRails::Locales.compile(force: true)
     def self.compile(force: false)
       config = ReactOnRails.configuration
       check_config_directory_exists(
@@ -166,13 +181,13 @@ module ReactOnRails
       end
 
       def template_translations
-        <<-JS.strip_heredoc
+        <<~JS
           export const translations = #{@translations};
         JS
       end
 
       def template_default
-        <<-JS.strip_heredoc
+        <<~JS
           import { defineMessages } from 'react-intl';
 
           const defaultLocale = '#{default_locale}';

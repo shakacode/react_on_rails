@@ -1,0 +1,147 @@
+import { Command } from 'commander';
+import chalk from 'chalk';
+import { CliOptions } from './types.js';
+import { validateAll } from './validators.js';
+import { createApp, validateAppName } from './create-app.js';
+import { detectPackageManager, logError, logInfo } from './utils.js';
+
+// Use require() for CJS compatibility - avoids __dirname + fs.readFileSync
+// eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
+const packageJson = require('../package.json') as { version: string };
+
+function run(appName: string, rawOpts: Record<string, unknown>): void {
+  const { template } = rawOpts;
+  if (typeof template !== 'string' || (template !== 'javascript' && template !== 'typescript')) {
+    logError(`Invalid template "${String(template)}". Must be "javascript" or "typescript".`);
+    process.exit(1);
+  }
+
+  let packageManager = rawOpts.packageManager as string | undefined;
+  if (packageManager) {
+    if (packageManager !== 'npm' && packageManager !== 'pnpm') {
+      logError(`Invalid package manager "${packageManager}". Must be "npm" or "pnpm".`);
+      process.exit(1);
+    }
+  } else {
+    packageManager = detectPackageManager() ?? 'npm';
+  }
+
+  const options: CliOptions = {
+    template,
+    packageManager: packageManager as 'npm' | 'pnpm',
+    rspack: Boolean(rawOpts.rspack),
+    pro: Boolean(rawOpts.pro),
+    rsc: Boolean(rawOpts.rsc),
+  };
+
+  console.log('');
+  console.log(`${chalk.bold('create-react-on-rails-app')} v${packageJson.version}`);
+  console.log('');
+
+  const nameValidation = validateAppName(appName);
+  if (!nameValidation.success) {
+    logError(nameValidation.error ?? 'Invalid app name');
+    process.exit(1);
+  }
+
+  if (options.rsc && options.pro) {
+    logInfo('Note: --rsc takes precedence over --pro; --pro will be ignored.');
+  }
+
+  if (options.rsc || options.pro) {
+    const modeFlag = options.rsc ? '--rsc' : '--pro';
+    logInfo(`Note: ${modeFlag} installs react_on_rails_pro and requires that gem to be installable.`);
+    logInfo(
+      `If installation fails, verify your Bundler/RubyGems setup for react_on_rails_pro, then rerun with ${modeFlag}.`,
+    );
+    logInfo('Pro setup docs: https://reactonrails.com/docs/pro/installation/');
+    console.log('');
+  }
+
+  logInfo('Checking prerequisites...');
+  const { allValid, results } = validateAll(options.packageManager);
+
+  for (const { name, result } of results) {
+    if (result.valid) {
+      console.log(chalk.green(`  ✓ ${name}: ${result.message}`));
+    } else {
+      console.log(chalk.red(`  ✗ ${name}`));
+    }
+  }
+
+  if (!allValid) {
+    console.log('');
+    for (const { result } of results) {
+      if (!result.valid) {
+        logError(result.message);
+      }
+    }
+    process.exit(1);
+  }
+
+  console.log('');
+  let modeLabel = '';
+  if (options.rsc) {
+    modeLabel = ', mode: rsc';
+  } else if (options.pro) {
+    modeLabel = ', mode: pro';
+  }
+  logInfo(
+    `Creating "${appName}" with template: ${options.template}, package manager: ${options.packageManager}${options.rspack ? ', bundler: rspack' : ''}${modeLabel}`,
+  );
+
+  createApp(appName, options);
+}
+
+const program = new Command();
+
+program
+  .name('create-react-on-rails-app')
+  .description(
+    'Create a new React on Rails application with a single command.\n\n' +
+      'Sets up a Rails app with React, Webpack/Rspack, server-side rendering,\n' +
+      'and hot module replacement - ready to develop in minutes.',
+  )
+  .version(packageJson.version)
+  .argument('<app-name>', 'Name of the application to create')
+  .option('-t, --template <type>', 'javascript or typescript', 'typescript')
+  .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
+  .option('--rspack', 'Use Rspack instead of Webpack (~20x faster builds)', false)
+  .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)', false)
+  .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)', false)
+  .addHelpText(
+    'after',
+    `
+Examples:
+  $ npx create-react-on-rails-app my-app
+  $ npx create-react-on-rails-app my-app --template javascript
+  $ npx create-react-on-rails-app my-app --rspack
+  $ npx create-react-on-rails-app my-app --pro
+  $ npx create-react-on-rails-app my-app --rsc
+  $ npx create-react-on-rails-app my-app --rspack --pro
+  $ npx create-react-on-rails-app my-app --rspack --rsc
+  $ npx create-react-on-rails-app my-app --package-manager pnpm
+
+What it does:
+  1. Creates a new Rails app with PostgreSQL
+  2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for --pro/--rsc)
+  3. Runs the React on Rails generator (Shakapacker, components, webpack config)
+
+After setup, run bin/dev and visit:
+  - http://localhost:3000/hello_world (default and --pro)
+  - http://localhost:3000/hello_server (--rsc)
+
+--pro and --rsc support both JavaScript and TypeScript templates.
+
+Documentation: https://reactonrails.com/docs/`,
+  )
+  .action((appName: string, opts: Record<string, unknown>) => {
+    try {
+      run(appName, opts);
+    } catch (error) {
+      logError(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  });
+
+program.parse();

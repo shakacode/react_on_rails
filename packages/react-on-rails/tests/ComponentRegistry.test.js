@@ -122,12 +122,24 @@ describe('ComponentRegistry', () => {
     expect(() => ComponentRegistry.register({ C9 })).toThrow(/Called register with null component named C9/);
   });
 
-  it('warns when registering component that is already registered', () => {
+  it('does not error when re-registering the same component', () => {
     const C1 = () => <div>HELLO</div>;
-    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     ComponentRegistry.register({ C1 });
-    ComponentRegistry.register({ C1 }); // Register again
-    expect(consoleSpy).toHaveBeenCalledWith('Called register for component that is already registered', 'C1');
+    ComponentRegistry.register({ C1 }); // Re-register same component
+    expect(consoleSpy).not.toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('errors when registering a different component with the same name', () => {
+    const C1 = () => <div>HELLO</div>;
+    const C1Different = () => <div>DIFFERENT</div>;
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    ComponentRegistry.register({ C1 });
+    ComponentRegistry.register({ C1: C1Different });
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Component "C1" was registered with a different component than previously'),
+    );
     consoleSpy.mockRestore();
   });
 

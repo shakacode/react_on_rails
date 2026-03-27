@@ -27,6 +27,35 @@ shared_examples "React Component" do |dom_selector|
   end
 end
 
+describe "Critical styles for FOUC prevention", :rack_test do
+  before { visit root_path }
+
+  it "renders critical inline styles in the head" do
+    html = page.html
+    critical_pos = html.index("data-critical-styles")
+    expect(critical_pos).not_to be_nil, "Expected critical styles <style> tag in the HTML"
+
+    # Verify critical styles appear in <head> (before <body>)
+    body_pos = html.index("<body")
+    expect(body_pos).not_to be_nil, "Expected <body> tag in the HTML"
+    expect(critical_pos).to be < body_pos,
+                            "Critical styles must appear in <head> before <body>"
+  end
+
+  it "renders critical inline styles before the stylesheet bundle" do
+    html = page.html
+    critical_pos = html.index("data-critical-styles")
+    expect(critical_pos).not_to be_nil, "Expected critical styles <style> tag in the HTML"
+
+    # stylesheet_pack_tag may not emit a link when CSS is inlined via webpack style-loader
+    stylesheet_pos = html.index("client-bundle.css")
+    skip "client-bundle.css not found in HTML (CSS may be inlined via style-loader)" unless stylesheet_pos
+
+    expect(critical_pos).to be < stylesheet_pos,
+                            "Critical styles must appear before the stylesheet bundle to prevent FOUC"
+  end
+end
+
 # Basic ReactOnRails specs
 describe "Pages/Index", :js do
   subject { page }
@@ -190,6 +219,28 @@ describe "React Router", :js do
       expect(page).to have_current_path("/react_router/second_page")
       second_page_header_text = page.find(:css, "h2#second-page").text
       expect(second_page_header_text).to eq("React Router Second Page")
+    end
+  end
+end
+
+describe "TanStack Router Async", :js do
+  subject(:current_page) { page }
+
+  before { visit "/tanstack_router_async" }
+
+  context "when rendering /tanstack_router_async" do
+    it { is_expected.to have_text("Woohoo, we can use tanstack-router asynchronously here!") }
+
+    it "clicking links correctly renders other pages" do
+      click_on "TanStack Router Async Second Page"
+      expect(page).to have_current_path("/tanstack_router_async/second_page")
+      second_page_header_text = page.find(:css, "h2#tanstack-async-second-page").text
+      expect(second_page_header_text).to eq("TanStack Router Async Second Page")
+
+      click_on "TanStack Router Async Layout Only"
+      expect(page).to have_current_path("/tanstack_router_async")
+      home_page_header_text = page.find(:css, "h2#tanstack-async-home-page").text
+      expect(home_page_header_text).to eq("TanStack Router Async Home Page")
     end
   end
 end
@@ -430,10 +481,4 @@ end
 describe "React Router Sixth Page", :js do
   it_behaves_like "streamed component tests", "/server_router/streaming-server-component",
                   "#ServerComponentRouter-react-component-0"
-
-  # Skip the test that fails without JavaScript - being addressed in another PR
-  it "renders the page completely on server and displays content on client even without JavaScript",
-     skip: "Being addressed in another PR" do
-    # This test is overridden to skip it
-  end
 end

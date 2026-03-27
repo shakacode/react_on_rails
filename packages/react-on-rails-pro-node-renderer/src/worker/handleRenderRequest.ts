@@ -22,10 +22,9 @@ import {
   isReadableStream,
   isErrorRenderResult,
   getRequestBundleFilePath,
-  deleteUploadedAssets,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
-import * as errorReporter from '../shared/errorReporter.js';
+import type { TracingContext } from '../shared/tracing.js';
 import { buildVM, hasVMContextForBundle, runInVM } from './vm.js';
 
 export type ProvidedNewBundle = {
@@ -78,7 +77,7 @@ async function prepareResult(
  * @param assetsToCopy might be null
  */
 async function handleNewBundleProvided(
-  renderingRequest: string,
+  requestContext: string,
   providedNewBundle: ProvidedNewBundle,
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
@@ -96,7 +95,7 @@ async function handleNewBundleProvided(
 
     if (!wasLockAcquired) {
       const msg = formatExceptionMessage(
-        renderingRequest,
+        requestContext,
         errorMessage,
         `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
       );
@@ -108,10 +107,6 @@ async function handleNewBundleProvided(
         `Moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
       await moveUploadedAsset(providedNewBundle.bundle, bundleFilePathPerTimestamp);
-      if (assetsToCopy) {
-        await copyUploadedAssets(assetsToCopy, bundleDirectory);
-      }
-
       log.info(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
@@ -119,7 +114,7 @@ async function handleNewBundleProvided(
       const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
       if (!fileExists) {
         const msg = formatExceptionMessage(
-          renderingRequest,
+          requestContext,
           error,
           `Unexpected error when moving the bundle from ${providedNewBundle.bundle.savedFilePath} \
 to ${bundleFilePathPerTimestamp})`,
@@ -133,6 +128,13 @@ to ${bundleFilePathPerTimestamp})`,
       );
     }
 
+    // Always copy assets to the bundle directory — even if the bundle was
+    // already present (e.g., from a prior upload or another worker).
+    // copyUploadedAssets uses overwrite:true, so this is idempotent.
+    if (assetsToCopy) {
+      await copyUploadedAssets(assetsToCopy, bundleDirectory);
+    }
+
     return undefined;
   } finally {
     if (lockAcquired && lockfileName) {
@@ -141,7 +143,7 @@ to ${bundleFilePathPerTimestamp})`,
         await unlock(lockfileName);
       } catch (error) {
         const msg = formatExceptionMessage(
-          renderingRequest,
+          requestContext,
           error,
           `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
         );
@@ -151,24 +153,33 @@ to ${bundleFilePathPerTimestamp})`,
   }
 }
 
-async function handleNewBundlesProvided(
-  renderingRequest: string,
+export async function handleNewBundlesProvided(
+  requestContext: string,
   providedNewBundles: ProvidedNewBundle[],
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
   log.info('Worker received new bundles: %s', providedNewBundles);
 
   const handlingPromises = providedNewBundles.map((providedNewBundle) =>
-    handleNewBundleProvided(renderingRequest, providedNewBundle, assetsToCopy),
+    handleNewBundleProvided(requestContext, providedNewBundle, assetsToCopy),
   );
-  const results = await Promise.all(handlingPromises);
-
-  if (assetsToCopy) {
-    await deleteUploadedAssets(assetsToCopy);
+  // Defensive: use allSettled so that if handleNewBundleProvided ever throws
+  // unexpectedly, all in-flight operations still complete before the handler
+  // returns and the onResponse hook deletes req.uploadDir. Currently
+  // handleNewBundleProvided catches its own errors, so Promise.all would also
+  // wait for every promise.
+  const settled = await Promise.allSettled(handlingPromises);
+  const firstFailure = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+  if (firstFailure) {
+    throw firstFailure.reason;
   }
 
-  const errorResult = results.find((result) => result !== undefined);
-  return errorResult;
+  // handleNewBundleProvided returns undefined on success or a ResponseResult on
+  // failure (e.g., lock timeout). Find the first error response, if any.
+  const results = settled
+    .filter((r): r is PromiseFulfilledResult<ResponseResult | undefined> => r.status === 'fulfilled')
+    .map((r) => r.value);
+  return results.find((result) => result !== undefined);
 }
 
 /**
@@ -182,12 +193,14 @@ export async function handleRenderRequest({
   dependencyBundleTimestamps,
   providedNewBundles,
   assetsToCopy,
+  tracingContext,
 }: {
   renderingRequest: string;
   bundleTimestamp: string | number;
   dependencyBundleTimestamps?: string[] | number[];
   providedNewBundles?: ProvidedNewBundle[] | null;
   assetsToCopy?: Asset[] | null;
+  tracingContext?: TracingContext;
 }): Promise<ResponseResult> {
   try {
     // const bundleFilePathPerTimestamp = getRequestBundleFilePath(bundleTimestamp);
@@ -252,7 +265,6 @@ export async function handleRenderRequest({
       error,
       'Caught top level error in handleRenderRequest',
     );
-    errorReporter.message(msg);
-    return Promise.reject(error as Error);
+    return errorResponseResult(msg, tracingContext);
   }
 }

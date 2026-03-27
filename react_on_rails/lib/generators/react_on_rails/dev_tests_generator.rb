@@ -17,6 +17,12 @@ module ReactOnRails
                    default: false,
                    desc: "Setup prerender true for server rendered examples"
 
+      # --rsc
+      class_option :rsc,
+                   type: :boolean,
+                   default: false,
+                   desc: "Include React Server Components test (hello_server_spec.rb)"
+
       def copy_rspec_files
         %w[.eslintrc
            spec/spec_helper.rb
@@ -26,7 +32,9 @@ module ReactOnRails
       end
 
       def copy_tests
-        %w[spec/system/hello_world_spec.rb].each { |file| copy_file(file) }
+        files = %w[spec/system/hello_world_spec.rb]
+        files << "spec/system/hello_server_spec.rb" if options.rsc
+        files.each { |file| copy_file(file) }
       end
 
       def add_test_related_gems_to_gemfile
@@ -47,11 +55,18 @@ module ReactOnRails
         File.open(hello_world_index, "w+") { |f| f.puts new_hello_world_contents }
       end
 
-      def add_yarn_relative_install_script_in_package_json
+      def add_react_on_rails_as_file_dependency
+        # Add react-on-rails as a file dependency pointing to the local package
+        # This allows testing with the local npm package without needing yalc
         package_json = File.join(destination_root, "package.json")
         contents = JSON.parse(File.read(package_json))
-        contents["scripts"] ||= {}
-        contents["scripts"]["postinstall"] = "yalc link react-on-rails"
+        contents["dependencies"] ||= {}
+
+        # Calculate relative path from the generated example to the npm package
+        # Generated examples are in gen-examples/examples/<name>/
+        # The npm package is in packages/react-on-rails/
+        contents["dependencies"]["react-on-rails"] = "file:../../../packages/react-on-rails"
+
         File.open(package_json, "w+") { |f| f.puts JSON.pretty_generate(contents) }
       end
     end

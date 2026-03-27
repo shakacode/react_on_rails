@@ -1,7 +1,8 @@
 {
   "name": "react-on-rails-pro",
-  "version": "16.2.0-beta.20",
+  "version": "16.5.0",
   "description": "React on Rails Pro package with React Server Components support",
+  "main": "lib/ReactOnRails.full.js",
   "type": "module",
   "scripts": {
     "build": "pnpm run clean && tsc",
@@ -12,9 +13,7 @@
     "test:rsc": "node scripts/check-react-version.cjs || NODE_CONDITIONS=react-server jest tests/*.rsc.test.*",
     "type-check": "tsc --noEmit --noErrorTruncation",
     "prepare": "[ -f lib/ReactOnRails.full.js ] || (rm -rf ./lib && tsc)",
-    "prepublishOnly": "pnpm run build",
-    "yalc:publish": "yalc publish",
-    "yalc": "yalc"
+    "prepublishOnly": "pnpm run build"
   },
   "repository": {
     "type": "git",
@@ -40,6 +39,10 @@
     "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./ReactOnRails.node": "./lib/ReactOnRails.node.js",
+    "./tanstack-router": {
+      "types": "./lib/tanstack-router.d.ts",
+      "default": "./lib/tanstack-router.js"
+    },
     "./registerServerComponent/client": "./lib/registerServerComponent/client.js",
     "./registerServerComponent/server": {
       "react-server": "./lib/registerServerComponent/server.rsc.js",
@@ -60,14 +63,19 @@
   "peerDependencies": {
     "react": ">= 16",
     "react-dom": ">= 16",
-    "react-on-rails-rsc": ">= 19.0.2 <= 19.2.3"
+    "react-on-rails-rsc": ">= 19.0.2 <= 19.2.3",
+    "@tanstack/react-router": ">=1.139.0 <2.0.0"
   },
   "peerDependenciesMeta": {
+    "@tanstack/react-router": {
+      "optional": true
+    },
     "react-on-rails-rsc": {
       "optional": true
     }
   },
   "files": [
+    "README.md",
     "lib/**/*.js",
     "lib/**/*.d.ts"
   ],

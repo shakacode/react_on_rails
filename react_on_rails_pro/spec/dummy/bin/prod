@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# Run only after ./prod-assets
+
+# Check if assets are precompiled
+MANIFEST="public/webpack/production/manifest.json"
+
+if [ ! -d "public/assets" ]; then
+  echo "ERROR: public/assets not found. Run ./bin/prod-assets first"
+  exit 1
+fi
+
+if [ ! -f "$MANIFEST" ]; then
+  echo "ERROR: $MANIFEST not found. Run ./bin/prod-assets first"
+  exit 1
+fi
+
+# Simple up-to-date check: warn if source files are newer than manifest.json
+if find client config -type f \( -name "*.[jt]s" -o -name "*.[jt]sx" \) -newer "$MANIFEST" 2>/dev/null | grep -q .; then
+  echo "WARNING: client or config has changes newer than compiled assets"
+  echo "Consider running ./bin/prod-assets to rebuild"
+fi
+
+if [ -f "pnpm-lock.yaml" ] && [ "pnpm-lock.yaml" -nt "$MANIFEST" ]; then
+  echo "WARNING: pnpm-lock.yaml is newer than compiled assets"
+  echo "Consider running ./bin/prod-assets to rebuild"
+fi
+
+export NODE_ENV=production
+export RAILS_ENV=production
+
+if command -v overmind &> /dev/null; then
+  overmind start -f Procfile.prod
+elif command -v foreman &> /dev/null; then
+  foreman start -f Procfile.prod
+else
+  echo "Installing foreman..."
+  gem install foreman
+  foreman start -f Procfile.prod
+fi

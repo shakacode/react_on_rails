@@ -2,7 +2,7 @@
 
 **🏗️ Important: Monorepo Merger in Progress**
 
-We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [docs/MONOREPO_MERGER_PLAN_REF.md](./docs/MONOREPO_MERGER_PLAN_REF.md) for details.
+We are currently working on merging the `react_on_rails` and `react_on_rails_pro` repositories into a unified monorepo. This will provide better development experience while maintaining separate package identities and licensing. See [internal/planning/MONOREPO_MERGER_PLAN_REF.md](./internal/planning/MONOREPO_MERGER_PLAN_REF.md) for details.
 
 During this transition:
 
@@ -12,16 +12,15 @@ During this transition:
 
 ---
 
-- [docs/contributor-info/Releasing](./docs/contributor-info/releasing.md) for instructions on releasing.
-- [docs/contributor-info/pull-requests](./docs/contributor-info/pull-requests.md)
-- [docs/contributor-info/rbs-type-signatures](./docs/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
-- See other docs in [docs/contributor-info](./docs/contributor-info)
+- [internal/contributor-info/Releasing](./internal/contributor-info/releasing.md) for instructions on releasing. Key workflow: update CHANGELOG.md **before** releasing (run `/update-changelog release`), then `rake release` reads the version and auto-creates the GitHub release.
+- [internal/contributor-info/pull-requests](./internal/contributor-info/pull-requests.md)
+- [internal/contributor-info/rbs-type-signatures](./internal/contributor-info/rbs-type-signatures.md) for information on RBS type signatures
+- See other docs in [internal/contributor-info](./internal/contributor-info)
 
 ## Prerequisites
 
 **Note for users**: End users of react_on_rails can continue using their preferred package manager (npm, yarn, pnpm, or bun). The generators automatically detect your package manager. The pnpm commands below are for contributors working on the react_on_rails codebase itself.
 
-- [Yalc](https://github.com/whitecolor/yalc) must be installed globally for most local development.
 - **Git hooks setup** (automatic during normal setup):
 
 Git hooks are installed automatically when you run the standard setup commands. They will run automatic linting on **all changed files (staged + unstaged + untracked)** - making commits fast while preventing CI failures.
@@ -55,9 +54,9 @@ It's critical to configure your IDE/editor to ignore certain directories. Otherw
 
 # Example apps
 
-The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
+The [`react_on_rails/spec/dummy` app](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy) is an example of the various setup techniques you can use with the gem.
 
-There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/spec/execjs-compatible-dummy).
+There are also two such apps for React on Rails Pro: [one using the Node renderer](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy) and [one using ExecJS](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/execjs-compatible-dummy).
 
 When you add a new feature, consider adding an example demonstrating it to the example apps.
 
@@ -86,60 +85,64 @@ Note that you will need to run `bundle install` after making this change, but al
 
 ### JS
 
-First, be **sure** to build the NPM package:
+For testing with **external applications** (your own Rails apps), you have several options:
+
+#### Option 1: pnpm pack (Recommended)
+
+This creates a tarball that mimics the published package:
 
 ```sh
 cd <React on Rails root>
 pnpm install
-
-# Update the lib directory with babel compiled files
-pnpm run build-watch
+pnpm run build
+cd packages/react-on-rails
+pnpm pack  # Creates react-on-rails-<version>.tgz
 ```
 
-You need to do this once to make sure your app depends on our package:
+Then in your external app:
+
+```sh
+pnpm add <path-to-react_on_rails>/packages/react-on-rails/react-on-rails-*.tgz
+```
+
+This is the most reliable approach as it exactly mimics what `pnpm install react-on-rails` would install.
+
+#### Option 2: yalc (for rapid iteration)
+
+If you need to iterate quickly, [yalc](https://github.com/whitecolor/yalc) provides a local publish/link workflow:
 
 ```shell
-cd <React on Rails root>/packages/react-on-rails
+# Install yalc globally
+pnpm add -g yalc
+
+# In React on Rails root
+cd <React on Rails root>
+pnpm install
+pnpm run build
+
+# Publish to local yalc store
+cd packages/react-on-rails
 yalc publish
+
+# In your external app
 cd <your project root>
 yalc add react-on-rails
-```
-
-The workflow is:
-
-1. Make changes to the node package.
-2. **CRITICAL**: Run `yalc push` to send updates to all linked apps:
-
-```shell
-cd <React on Rails root>/packages/react-on-rails
-# Will send the updates to other folders - MUST DO THIS AFTER ANY CHANGES
-yalc push
-cd <your project root>
-
-# Will update from yalc
 pnpm install
 ```
 
-**⚠️ Common Mistake**: Forgetting to run `yalc push` after making changes to React on Rails source code will result in test apps not receiving updates, making it appear that your changes have no effect.
+After making changes, run `yalc push` from the package directory to update all linked apps.
 
-When you run `yalc push`, you'll get an informative message
-
-```terminaloutput
-$ yalc push
-react-on-rails@12.0.0-12070fd1 published in store.
-Pushing react-on-rails@12.0.0 in /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy
-Package react-on-rails@12.0.0-12070fd1 added ==> /Users/justin/shakacode/react-on-rails/react_on_rails/spec/dummy/node_modules/react-on-rails.
-Don't forget you may need to run pnpm install after adding packages with yalc to install/update dependencies/bin scripts.
-```
-
-Of course, you can do the same with `react-on-rails-pro` and `react-on-rails-pro-node-renderer` packages.
-
-This is the approach `react_on_rails/spec/dummy` apps use, so you can also look at their implementation.
+**Note**: The internal dummy apps (`react_on_rails/spec/dummy`, etc.) use pnpm workspaces with `workspace:*` protocol. They no longer require yalc.
 
 ### Example: Testing NPM changes with the dummy app
 
-1. Add `console.log('Hello!')` to [clientStartup.ts, function render](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/clientStartup.ts) in `/packages/react-on-rails/src/clientStartup.ts` to confirm we're getting an update to the node package client-side. Do the same for function `serverRenderReactComponent` in [/packages/react-on-rails/src/serverRenderReactComponent.ts](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails/src/serverRenderReactComponent.ts).
-2. Refresh the browser if the server is already running or start the server using `foreman start` from `react_on_rails/spec/dummy` and navigate to `http://localhost:3000/`. You will now see the `Hello!` message printed in the browser's console. If you did not see that message, then review the steps above for the workflow of making changes and pushing them via yalc.
+The dummy apps are part of the pnpm workspace, so changes are automatically linked.
+
+1. Build the package: `pnpm run build` (from root)
+2. Add `console.log('Hello!')` to [clientStartup.ts](https://github.com/shakacode/react_on_rails/blob/main/packages/react-on-rails/src/clientStartup.ts)
+3. Rebuild: `pnpm run build`
+4. Start the dummy server: `cd react_on_rails/spec/dummy && foreman start`
+5. Navigate to `http://localhost:3000/` - you'll see the message in the browser console
 
 ## Git dependencies
 
@@ -152,24 +155,24 @@ Adjust depending on the repo you pushed to and commit/branch you want to use, se
 ```ruby
 gem 'react_on_rails',
   git: 'https://github.com/shakacode/react_on_rails',
-  branch: 'master'
+  branch: 'main'
 gem 'react_on_rails_pro',
   git: 'https://github.com/shakacode/react_on_rails',
   glob: 'react_on_rails_pro/react_on_rails_pro.gemspec',
-  branch: 'master'
+  branch: 'main'
 ```
 
 ### JS
 
 Unfortunately, not all package managers allow depending on a single subfolder of a Git repo.
-The examples below are for the `master` branch of `react-on-rails` package.
+The examples below are for the `main` branch of `react-on-rails` package.
 
 #### PNPM (recommended, v9+)
 
 See [this issue](https://github.com/pnpm/pnpm/issues/4765).
 
 ```shell
-pnpm add "github:shakacode/react_on_rails/repo#master&path:packages/react-on-rails"
+pnpm add "github:shakacode/react_on_rails/repo#main&path:packages/react-on-rails"
 ```
 
 #### Yarn Berry
@@ -177,7 +180,7 @@ pnpm add "github:shakacode/react_on_rails/repo#master&path:packages/react-on-rai
 See [Yarn Git protocol documentation](https://yarnpkg.com/protocol/git#workspaces-support).
 
 ```shell
-yarn add "git@github.com:shakacode/react_on_rails.git#workspace=react-on-rails&head=master"
+yarn add "git@github.com:shakacode/react_on_rails.git#workspace=react-on-rails&head=main"
 ```
 
 #### NPM
@@ -325,13 +328,13 @@ pnpm run check
 To format JavaScript/TypeScript files with Prettier:
 
 ```sh
-pnpm run format
+pnpm start format
 ```
 
 To check formatting without fixing:
 
 ```sh
-pnpm run format.listDifferent
+pnpm start format.listDifferent
 ```
 
 ### Linting
@@ -381,14 +384,14 @@ bin/compare-bundle-sizes
 This script automatically:
 
 1. Stashes any uncommitted changes
-2. Checks out and builds the base branch (default: `master`)
+2. Checks out and builds the base branch (default: `main`)
 3. Checks out and builds your current branch
 4. Compares the size and total execution time (loading + running) and shows a detailed report
 
 Options:
 
 ```sh
-bin/compare-bundle-sizes main        # Compare against 'main' instead of 'master'
+bin/compare-bundle-sizes main        # Compare against 'main'
 bin/compare-bundle-sizes --hierarchical  # Group results by package
 ```
 
@@ -437,14 +440,39 @@ Run `rake -T` or `rake -D` to see testing options.
 
 See below for verifying changes to the generators.
 
+## Updating the Shakapacker Version for Testing
+
+When a new version of Shakapacker is released, the pinned version used across the test suite needs to be updated. The version is specified in several places:
+
+**Source files (update manually):**
+
+1. `react_on_rails/Gemfile.development_dependencies` — gem version pin
+2. `react_on_rails/spec/dummy/package.json` — npm version pin
+3. `react_on_rails_pro/Gemfile.development_dependencies` — gem version pin (Pro)
+4. `react_on_rails_pro/spec/dummy/package.json` — npm version pin (Pro)
+5. `react_on_rails_pro/spec/execjs-compatible-dummy/Gemfile` — gem version pin (Pro)
+6. `react_on_rails_pro/spec/execjs-compatible-dummy/package.json` — npm version pin (Pro)
+
+**Lock files (regenerated automatically):**
+
+After updating the source files above, regenerate lock files by running `bundle install` and `pnpm install` in the relevant directories:
+
+- `react_on_rails/` and `react_on_rails/spec/dummy/` (OSS)
+- `react_on_rails_pro/` and `react_on_rails_pro/spec/dummy/` and `react_on_rails_pro/spec/execjs-compatible-dummy/` (Pro)
+- Root `Gemfile.lock` and `pnpm-lock.yaml`
+
+**Example apps (handled automatically):**
+
+The CI-generated example apps (under `gen-examples/`) automatically resolve the shakapacker version via the gem dependency. The `pin_shakapacker_npm_version` helper in `react_on_rails/rakelib/shakapacker_examples.rake` ensures the npm version matches the gem.
+
 ## CI Testing and Optimization
 
-React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `master`. Contributors have access to local CI tools to validate changes before pushing.
+React on Rails uses an optimized CI pipeline that runs faster on branches while maintaining full coverage on `main`. Contributors have access to local CI tools to validate changes before pushing.
 
 ### CI Behavior
 
 - **On PRs/Branches**: Runs reduced test matrix (latest Ruby/Node versions only) for faster feedback (~12 min vs ~45 min)
-- **On Master**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
+- **On Main**: Runs full test matrix (all Ruby/Node/dependency combinations) for complete coverage
 - **Docs-only changes**: CI skips entirely when only `.md` files or `docs/` directory change
 
 ### Local CI Tools
@@ -457,7 +485,7 @@ Analyzes your changes and runs appropriate tests locally before pushing:
 # Auto-detect what to test based on changed files
 bin/ci-local
 
-# Run all CI checks (same as master branch)
+# Run all CI checks (same as main branch)
 bin/ci-local --all
 
 # Quick check - only fast tests, skip slow integration tests
@@ -478,11 +506,11 @@ bin/ci-local origin/develop
 Analyzes git changes and recommends which CI jobs to run:
 
 ```bash
-# Check what changed since master
-script/ci-changes-detector origin/master
+# Check what changed since main
+script/ci-changes-detector origin/main
 
 # JSON output for scripting (requires jq)
-CI_JSON_OUTPUT=1 script/ci-changes-detector origin/master
+CI_JSON_OUTPUT=1 script/ci-changes-detector origin/main
 ```
 
 **Output example:**
@@ -514,7 +542,7 @@ If using Claude Code, run `/run-ci` for interactive CI execution that:
 
 - Run `bin/ci-local` before pushing to catch issues early
 - Use `bin/ci-local --fast` during rapid iteration
-- Trust the reduced matrix on PRs - master validates everything
+- Trust the reduced matrix on PRs - main validates everything
 - Separate docs-only changes into dedicated commits/PRs when possible
 
 ❌ **DON'T:**
@@ -534,7 +562,7 @@ The CI system intelligently skips unnecessary work:
 | JS code only               | Skips Ruby-only tests | ~30%       |
 | Workflow changes           | Runs lint only        | ~75%       |
 
-For more details, see [`docs/CI_OPTIMIZATION.md`](./docs/CI_OPTIMIZATION.md).
+For more details, see [`internal/contributor-info/ci-optimization.md`](./internal/contributor-info/ci-optimization.md).
 
 ### CI Control Commands
 
@@ -590,6 +618,75 @@ Removes the `full-ci` label and returns to standard CI behavior:
 - **Force-pushes:** The `/run-skipped-ci` command adds the `full-ci` label to your PR. If you force-push after commenting, the initial workflow run will test the old commit, but subsequent pushes will automatically run full CI because the label persists.
 - **Branch operations:** Avoid deleting or force-pushing branches while workflows are running, as this may cause failures.
 
+### Benchmarking
+
+React on Rails includes a performance benchmark workflow that measures RPS (requests per second) and latency for both Core and Pro versions.
+
+#### When Benchmarks Run
+
+- **Automatically on main**: Benchmarks run on every push to main
+- **On PRs with labels**: Add the `benchmark` label to your PR to run benchmarks
+- **Manual trigger**: Use `gh workflow run` to run benchmarks with custom parameters (see [https://github.com/cli/cli#installation](https://github.com/cli/cli#installation) if you don't have `gh`):
+
+  ```bash
+  # Run with default parameters
+  gh workflow run benchmark.yml
+
+  # Run with custom parameters
+  gh workflow run benchmark.yml \
+    -f rate=100 \
+    -f duration=60s \
+    -f connections=20 \
+    -f app_version=core_only
+  ```
+
+#### Regression Detection
+
+When benchmarks run, the [github-action-benchmark](https://github.com/benchmark-action/github-action-benchmark) action compares results against historical data. If performance regresses by more than 50%, the workflow will:
+
+1. **Fail the CI check** with `fail-on-alert: true`
+2. **Post a comment on the PR** explaining the regression
+3. **Tag reviewers** for attention
+
+This helps catch performance regressions before they reach production.
+
+#### Running Benchmarks Locally
+
+**Prerequisites:** Install [k6](https://k6.io/docs/get-started/installation/) and [Vegeta](https://github.com/tsenart/vegeta#install).
+
+You can also run the server in a separate terminal instead of backgrounding it.
+
+**Core benchmarks:**
+
+```bash
+cd react_on_rails/spec/dummy
+bin/prod-assets  # Build production assets
+bin/prod &       # Start production server on port 3001
+SERVER_PID=$!
+cd ../..
+ruby benchmarks/bench.rb
+kill $SERVER_PID
+```
+
+**Pro benchmarks:**
+
+```bash
+cd react_on_rails_pro/spec/dummy
+bin/prod-assets
+bin/prod &       # Starts Rails server and node renderer
+SERVER_PID=$!
+cd ../..
+PRO=true ruby benchmarks/bench.rb         # Rails benchmarks
+ruby benchmarks/bench-node-renderer.rb    # Node renderer benchmarks
+kill $SERVER_PID
+```
+
+**Configuration:** Both scripts support environment variables for customization (rate, duration, connections, etc.). See the script headers in [`benchmarks/bench.rb`](benchmarks/bench.rb) and [`benchmarks/bench-node-renderer.rb`](benchmarks/bench-node-renderer.rb) for available options. For debugging, you may want lower `DURATION` and/or specific `ROUTES`:
+
+```bash
+DURATION=5s ROUTES=/ ruby benchmarks/bench.rb
+```
+
 ### Install Generator
 
 In your Rails app add this gem with a path to your fork.
@@ -602,23 +699,36 @@ Then run `bundle`.
 
 The main installer can be run with `./bin/rails generate react_on_rails:install`
 
-Then use yalc to add the npm module.
+Then add the npm package using one of these methods:
 
-Be sure that your ran this first at the top level of React on Rails
+**Option 1: pnpm pack (recommended)**
 
+```sh
+# In React on Rails root
+cd packages/react-on-rails
+pnpm pack
+
+# In your test app
+pnpm add <path-to-react_on_rails>/packages/react-on-rails/react-on-rails-*.tgz
 ```
+
+**Option 2: yalc (for rapid iteration)**
+
+```sh
+# Install yalc globally if needed
+pnpm add -g yalc
+
+# In React on Rails root
+cd packages/react-on-rails
 yalc publish
-```
 
-Then add the node package to your test app:
-
-```
+# In your test app
 yalc add react-on-rails
 ```
 
 ### Testing the Generator
 
-The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator-testing.md](docs/contributor-info/generator-testing.md) for a script on how to run the generator on a fresh project.
+The generators are covered by generator tests using Rails's generator testing helpers, but it never hurts to do a sanity check and explore the API. See [generator-testing.md](internal/contributor-info/generator-testing.md) for a script on how to run the generator on a fresh project.
 
 `rake run_rspec:shakapacker_examples_basic` is a great way to run tests on one generator. Once that works, you should run `rake run_rspec:shakapacker_examples`. Be aware that this will create a huge number of files under a `/gen-examples` directory. You should be sure to exclude this directory from your IDE and delete it once your testing is done.
 
@@ -814,7 +924,7 @@ This approach:
 cd react_on_rails/
 
 # Run Prettier for JavaScript/TypeScript formatting
-pnpm run format
+pnpm start format
 
 # Run ESLint for JavaScript/TypeScript linting
 pnpm run lint

@@ -69,14 +69,35 @@ module ReactOnRails
 
     # Check if we're running a Rails generator
     # @return [Boolean] true if running a generator
+    #
+    # Heuristic: Rails::Generators is typically only defined during generator
+    # commands. It could be defined by test helpers or gems that require
+    # "rails/generators", but this is a fallback behind the ENV check above.
     def self.running_generator?
-      !ARGV.empty? && ARGV.first&.in?(%w[generate g])
+      defined?(Rails::Generators)
     end
 
     # Check if package.json doesn't exist yet
     # @return [Boolean] true if package.json is missing
     def self.package_json_missing?
       !File.exist?(VersionChecker::NodePackageVersion.package_json_path)
+    end
+
+    # Install ScoutApm instrumentation after ScoutApm is configured via "scout_apm.start" initializer.
+    # https://github.com/scoutapp/scout_apm_ruby/blob/v6.1.0/lib/scout_apm.rb#L221
+    initializer "react_on_rails.scout_apm_instrumentation", after: "scout_apm.start" do
+      next unless defined?(ScoutApm)
+
+      ReactOnRails::Helper.class_eval do
+        include ScoutApm::Tracer
+        instrument_method :react_component, type: "ReactOnRails", name: "react_component"
+        instrument_method :react_component_hash, type: "ReactOnRails", name: "react_component_hash"
+      end
+
+      ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript.singleton_class.class_eval do
+        include ScoutApm::Tracer
+        instrument_method :exec_server_render_js, type: "ReactOnRails", name: "ExecJs React Server Rendering"
+      end
     end
 
     config.to_prepare do

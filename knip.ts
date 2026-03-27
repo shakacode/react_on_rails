@@ -5,7 +5,7 @@ const config: KnipConfig = {
   workspaces: {
     // Root workspace - manages the monorepo and global tooling
     '.': {
-      entry: ['eslint.config.ts', 'jest.config.base.js'],
+      entry: ['eslint.config.ts', 'jest.config.base.js', 'benchmarks/k6.ts'],
       project: ['*.{js,mjs,ts}'],
       ignoreBinaries: [
         // Has to be installed globally
@@ -13,6 +13,8 @@ const config: KnipConfig = {
         // Pro package binaries used in Pro workflows
         'playwright',
         'e2e-test',
+        // Local binaries
+        'bin/.*',
       ],
       ignore: ['react_on_rails_pro/**', 'react_on_rails/vendor/**'],
       ignoreDependencies: [
@@ -61,6 +63,7 @@ const config: KnipConfig = {
         // Build output directories that should be ignored
         'lib/**',
       ],
+      ignoreDependencies: [],
     },
 
     // React on Rails Pro Node Renderer package workspace
@@ -71,6 +74,8 @@ const config: KnipConfig = {
         'src/integrations/*.ts!',
         // Export disableHttp2 for test utilities
         'src/worker.ts!',
+        // License validator: reset() is used in tests, getLicenseStatus/LicenseStatus imported by master.ts
+        'src/shared/licenseValidator.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
@@ -107,6 +112,7 @@ const config: KnipConfig = {
         'src/ServerComponentFetchError.ts!',
         'src/getReactServerComponent.server.ts!',
         'src/transformRSCNodeStream.ts!',
+        'src/tanstack-router.ts!',
       ],
       project: ['src/**/*.[jt]s{x,}!', 'tests/**/*.[jt]s{x,}', '!lib/**'],
       ignore: [
@@ -180,6 +186,8 @@ const config: KnipConfig = {
         '@babel/runtime',
         // Used in webpack server config for CSS extraction
         'mini-css-extract-plugin',
+        // Webpack config merge helper is used in the dummy app config, but not detected reliably by Knip.
+        'webpack-merge',
         // This one is weird. It's long-deprecated and shouldn't be necessary.
         // Probably need to update the Webpack config.
         'node-libs-browser',

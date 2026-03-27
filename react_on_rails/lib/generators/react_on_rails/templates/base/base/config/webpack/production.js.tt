@@ -1,9 +1,9 @@
 <%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/production.js") %>
 
-const generateWebpackConfigs = require('./generateWebpackConfigs');
+const serverClientOrBoth = require('./ServerClientOrBoth');
 
 const productionEnvOnly = (_clientWebpackConfig, _serverWebpackConfig) => {
   // place any code here that is for production only
 };
 
-module.exports = generateWebpackConfigs(productionEnvOnly);
+module.exports = serverClientOrBoth(productionEnvOnly);

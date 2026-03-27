@@ -5,6 +5,7 @@
 # 2. Keep all #{some_var} fully to the left so that all indentation is done evenly in that var
 
 require "react_on_rails/helper"
+require "async/promise"
 
 # rubocop:disable Metrics/ModuleLength
 module ReactOnRailsProHelper
@@ -183,7 +184,7 @@ module ReactOnRailsProHelper
   # `rsc_payload_route` helper function. The returned data from this function is used internally by
   # components registered using the `registerServerComponent` function. Don't use it unless you need
   # more control over the RSC payload generation. To know more about RSC payload, see the following link:
-  # @see https://www.shakacode.com/react-on-rails-pro/docs/how-react-server-components-works.md
+  # @see https://reactonrails.com/docs/pro/react-server-components/how-react-server-components-work
   #   for technical details about the RSC payload format
   def rsc_payload_react_component(component_name, options = {})
     # rsc_payload_react_component doesn't have the prerender option
@@ -314,7 +315,13 @@ module ReactOnRailsProHelper
 
     # Enqueue remaining chunks asynchronously
     @async_barrier.async do
-      rest_chunks.each { |chunk| @main_output_queue.enqueue(chunk) }
+      rest_chunks.each do |chunk|
+        break if response.stream.closed?
+
+        @main_output_queue.enqueue(chunk)
+      end
+    rescue Async::Queue::ClosedError
+      # Queue closed due to error/disconnect in another component — stop enqueuing
     end
 
     # Return first chunk directly
@@ -422,41 +429,63 @@ module ReactOnRailsProHelper
   end
 
   def consumer_stream_async(on_complete:)
-    require "async/variable"
-
     if @async_barrier.nil?
       raise ReactOnRails::Error,
             "You must call stream_view_containing_react_components to render the view containing the react component"
     end
 
-    # Create a variable to hold the first chunk for synchronous return
-    first_chunk_var = Async::Variable.new
+    # Create a promise to hold the first chunk for synchronous return.
+    # Async::Promise replaces Async::Variable (deprecated in async v2.29.0).
+    first_chunk_promise = Async::Promise.new
     all_chunks = [] if on_complete # Only collect if callback provided
 
     # Start an async task on the barrier to stream all chunks
     @async_barrier.async do
       stream = yield
-      process_stream_chunks(stream, first_chunk_var, all_chunks)
-      on_complete&.call(all_chunks)
+      fully_consumed = process_stream_chunks(stream, first_chunk_promise, all_chunks)
+      on_complete&.call(all_chunks) if fully_consumed
+    rescue StandardError => e
+      # Propagate the error to the calling fiber via the promise.
+      # A promise can only be resolved/rejected once — check before acting.
+      # resolved? returns true for both fulfilled and rejected states ("settled").
+      # Safe without a lock: only this task can reject here, and Async uses
+      # cooperative scheduling so no fiber switch can occur between resolved?
+      # and reject/raise below.
+      # If already settled, the first chunk was returned successfully.
+      # This is a post-first-chunk error. Re-raise so barrier.wait propagates it
+      # (the response is already committed at that point, so only JS redirect is possible).
+      raise if first_chunk_promise.resolved?
+
+      # Promise not yet resolved — this is a pre-first-chunk failure (e.g., shell error).
+      # Reject the promise so .wait auto-raises in the caller,
+      # BEFORE the response is committed, enabling a proper HTTP redirect.
+      # Do NOT re-raise here: the caller owns the error now.
+      first_chunk_promise.reject(e)
     end
 
-    # Wait for and return the first chunk (blocking)
-    first_chunk_var.wait
-    first_chunk_var.value
+    # Wait for and return the first chunk (blocking).
+    # Async::Promise#wait blocks until resolved, then returns the stored value.
+    # If the promise was rejected, .wait automatically re-raises the exception.
+    first_chunk_promise.wait
   end
 
-  def process_stream_chunks(stream, first_chunk_var, all_chunks)
+  # Returns true if the stream was fully consumed, false if aborted (client disconnect).
+  # When false, callers must NOT invoke on_complete to avoid caching partial data.
+  def process_stream_chunks(stream, first_chunk_promise, all_chunks)
     is_first = true
 
     stream.each_chunk do |chunk|
-      # Check if client disconnected before processing chunk
-      break if response.stream.closed?
+      # Client disconnected — abort without caching partial results
+      if response.stream.closed?
+        first_chunk_promise.resolve(nil) if is_first
+        return false
+      end
 
       all_chunks&.push(chunk)
 
       if is_first
-        # Store first chunk in variable for synchronous return
-        first_chunk_var.value = chunk
+        # Store first chunk in promise for synchronous return
+        first_chunk_promise.resolve(chunk)
         is_first = false
       else
         # Enqueue remaining chunks to main output queue
@@ -465,7 +494,8 @@ module ReactOnRailsProHelper
     end
 
     # Handle case where stream has no chunks
-    first_chunk_var.value = nil if is_first
+    first_chunk_promise.resolve(nil) if is_first
+    true
   end
 
   def internal_stream_react_component(component_name, options = {})
