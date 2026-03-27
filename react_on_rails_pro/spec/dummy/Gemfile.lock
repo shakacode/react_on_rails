@@ -22,7 +22,7 @@ PATH
   specs:
     react_on_rails_pro (16.5.0)
       addressable
-      async (>= 2.6)
+      async (>= 2.29)
       connection_pool
       execjs (~> 2.9)
       http-2 (>= 1.1.1)
