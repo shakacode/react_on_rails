@@ -1,6 +1,6 @@
 # React Server Components in React on Rails Pro
 
-> **Pro Feature** — React Server Components require [React on Rails Pro](https://reactonrails.com/docs/pro/) 4+ with the node renderer.
+> **Pro Feature** — React Server Components require [React on Rails Pro](https://reactonrails.com/docs/pro/) with the node renderer.
 > Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
 
 ## What Are React Server Components?
@@ -34,7 +34,7 @@ Server components can access databases, file systems, and internal APIs directly
 
 ## Current Support Status
 
-React on Rails Pro 4+ provides full RSC support with:
+Current React on Rails Pro releases provide full RSC support with:
 
 - RSC webpack loader (`react-on-rails-rsc/WebpackLoader`) for server/client component separation
 - RSC webpack plugin (`react-on-rails-rsc/WebpackPlugin`) for client manifest generation
@@ -44,9 +44,9 @@ React on Rails Pro 4+ provides full RSC support with:
 
 ### Requirements
 
-- React on Rails Pro v4.0.0 or higher
-- React 19.0.x (19.1.x and later are not yet supported)
-- React on Rails v16.0.0 or higher
+- React on Rails Pro v16.4.0 or higher
+- React on Rails v16.4.0 or higher
+- React 19 with a compatible `react-on-rails-rsc` version
 - Node renderer — installed separately via `react-on-rails-pro-node-renderer` npm package (see [Pro Installation](../installation.md#install-react-on-rails-pro-node-renderer))
 - Shakapacker or Rspack for bundling
 

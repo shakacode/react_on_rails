@@ -95,7 +95,7 @@ bundle exec rails shakapacker:install
 Commit all the changes so far to avoid getting errors in the next step.
 
 ```bash
-git commit -am "Initial commit"
+git add . && git commit -m "Initial commit"
 ```
 
 Alternatively, you can use `--ignore-warnings` in the next step.
