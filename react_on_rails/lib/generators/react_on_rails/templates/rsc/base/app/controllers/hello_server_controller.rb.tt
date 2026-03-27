@@ -10,7 +10,7 @@
 # - Automatic hydration on the client
 #
 # For more information, see:
-# https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/
+# https://reactonrails.com/docs/pro/react-server-components/
 
 class HelloServerController < ApplicationController
   layout "<%= config[:layout_name] %>"

@@ -8,7 +8,7 @@ This guide will have you rendering React components in your Rails app as quickly
 
 Before starting, make sure you have:
 
-- **🚨 React on Rails 16.0+** (this guide)
+- **🚨 React on Rails 16.4.0+** (this guide)
 - **🚨 Shakapacker 6+** (7+ recommended for React on Rails 16)
 - **Rails 7+** application (Rails 5.2+ supported)
 - **Ruby 3.0+** (required)
@@ -70,7 +70,7 @@ This starts both:
 
 Open your browser and navigate to:
 
-```
+```text
 http://localhost:3000/hello_world
 ```
 
@@ -189,8 +189,12 @@ Now that you have React on Rails working, here's what to explore next:
 
 ### Go Pro
 
+:::tip Pro Upgrade
+React on Rails Pro adds [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and a [Node renderer](../../pro/node-renderer.md) for 10-100x faster SSR. Free to evaluate — no license needed for development. [Upgrade guide →](../../pro/upgrading-to-pro.md)
+:::
+
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
-- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - React Server Components, streaming SSR, and 10-100x faster SSR
+- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - React Server Components, streaming SSR, and 3-10x faster SSR
 
 ## 🆘 Need Help?
 

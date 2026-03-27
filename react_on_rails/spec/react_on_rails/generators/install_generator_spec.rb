@@ -2500,7 +2500,7 @@ describe InstallGenerator, type: :generator do
       expect(error_text).to include("--pro")
       expect(error_text).to include("react_on_rails_pro")
       expect(error_text).to include("~> #{expected_pro_version}")
-      expect(error_text).to include("justin@shakacode.com")
+      expect(error_text).to include("https://reactonrails.com/docs/pro/upgrading-to-pro/")
     end
   end
 
@@ -2611,6 +2611,62 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when --pro flag used on a dirty worktree without pro gem" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
+      allow(install_generator).to receive(:cli_exists?).with("git").and_return(true)
+      allow(install_generator).to receive_messages(missing_node?: false, missing_package_manager?: false)
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+    end
+
+    specify "installation_prerequisites_met? returns false with clear error" do
+      expect(install_generator.send(:installation_prerequisites_met?)).to be false
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("react_on_rails_pro")
+      expect(error_text).to include("uncommitted changes")
+      expect(error_text).to include("--pro")
+    end
+  end
+
+  context "when --rsc flag used on a dirty worktree without pro gem" do
+    let(:install_generator) { described_class.new([], { rsc: true }) }
+
+    before do
+      allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
+      allow(install_generator).to receive(:cli_exists?).with("git").and_return(true)
+      allow(install_generator).to receive_messages(missing_node?: false, missing_package_manager?: false)
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+    end
+
+    specify "installation_prerequisites_met? returns false with clear error" do
+      expect(install_generator.send(:installation_prerequisites_met?)).to be false
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("react_on_rails_pro")
+      expect(error_text).to include("uncommitted changes")
+      expect(error_text).to include("--rsc")
+    end
+  end
+
+  context "when --pro flag used on a dirty worktree with pro gem installed" do
+    let(:install_generator) { described_class.new([], { pro: true }) }
+
+    before do
+      allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
+      allow(install_generator).to receive(:cli_exists?).with("git").and_return(true)
+      allow(install_generator).to receive_messages(missing_node?: false, missing_package_manager?: false)
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+    end
+
+    specify "installation_prerequisites_met? returns true (no error)" do
+      expect(install_generator.send(:installation_prerequisites_met?)).to be true
+      expect(GeneratorMessages.messages.join("\n")).not_to include("react_on_rails_pro")
+    end
+  end
+
   # React version detection tests
 
   context "when package.json has standard React version" do
@@ -2712,6 +2768,105 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_about_react_version_for_rsc)
       expect(GeneratorMessages.messages.join("\n")).not_to include("RSC")
+    end
+  end
+
+  describe "#add_bin_scripts" do
+    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+
+    before do
+      prepare_destination
+      simulate_existing_file("bin/dev", described_class::STOCK_RAILS_BIN_DEV)
+    end
+
+    it "replaces the stock Rails bin/dev without prompting" do
+      Dir.chdir(destination_root) do
+        install_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "hello_world"')
+        expect(content).to include("ReactOnRails::Dev::ServerManager")
+      end
+    end
+
+    it "detects custom bin/dev files" do
+      simulate_existing_file("bin/dev", "#!/usr/bin/env ruby\nputs 'custom'\n")
+
+      Dir.chdir(destination_root) do
+        expect(install_generator.send(:stock_rails_bin_dev?)).to be(false)
+      end
+    end
+
+    it "detects the legacy Rails foreman bin/dev template" do
+      simulate_existing_file("bin/dev", <<~BASH)
+        #!/usr/bin/env bash
+        if ! gem list foreman -i --silent; then
+          gem install foreman
+        fi
+
+        exec foreman start -f Procfile.dev "$@"
+      BASH
+
+      Dir.chdir(destination_root) do
+        expect(install_generator.send(:stock_rails_bin_dev?)).to be(true)
+      end
+    end
+
+    it "detects the unquoted legacy Rails foreman bin/dev template" do
+      simulate_existing_file("bin/dev", <<~BASH)
+        #!/usr/bin/env sh
+        if ! gem list foreman -i --silent; then
+          gem install foreman
+        fi
+
+        exec foreman start -f Procfile.dev $@
+      BASH
+
+      Dir.chdir(destination_root) do
+        expect(install_generator.send(:stock_rails_bin_dev?)).to be(true)
+      end
+    end
+
+    it "keeps customized legacy foreman bin/dev files" do
+      simulate_existing_file("bin/dev", <<~BASH)
+        #!/usr/bin/env bash
+        if ! gem list foreman -i --silent; then
+          gem install foreman
+        fi
+
+        echo "Custom startup logic"
+        exec foreman start -f Procfile.dev "$@"
+      BASH
+
+      Dir.chdir(destination_root) do
+        expect(install_generator.send(:stock_rails_bin_dev?)).to be(false)
+      end
+    end
+
+    it "keeps stock bin/dev when run with --skip" do
+      skip_generator = described_class.new([], { skip: true }, destination_root: destination_root)
+
+      Dir.chdir(destination_root) do
+        skip_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/dev", described_class::STOCK_RAILS_BIN_DEV
+    end
+
+    it "keeps custom bin/dev when run with --force" do
+      custom_bin_dev = "#!/usr/bin/env ruby\nputs 'custom'\n"
+      force_generator = described_class.new([], { force: true }, destination_root: destination_root)
+
+      simulate_existing_file("bin/dev", custom_bin_dev)
+
+      Dir.chdir(destination_root) do
+        force_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/dev", custom_bin_dev
+      assert_file "bin/switch-bundler"
+      assert_file "bin/shakapacker-precompile-hook"
     end
   end
 end

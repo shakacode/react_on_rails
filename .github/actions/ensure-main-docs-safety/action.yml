@@ -1,11 +1,11 @@
-name: Ensure master docs-only skips are safe
-description: Prevents docs-only commits from skipping CI when previous master commit has unresolved test failures
+name: Ensure main docs-only skips are safe
+description: Prevents docs-only commits from skipping CI when previous main commit has unresolved test failures
 inputs:
   docs-only:
     description: 'String output from ci-changes-detector ("true" or "false")'
     required: true
   previous-sha:
-    description: 'SHA of the previous commit on master (github.event.before)'
+    description: 'SHA of the previous commit on main (github.event.before)'
     required: true
   exclude-workflows:
     description: 'Comma-separated workflow names to exclude from failure checks (e.g., "Benchmark Workflow")'
@@ -14,7 +14,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Check previous master commit status
+    - name: Check previous main commit status
       if: ${{ inputs.docs-only == 'true' && inputs.previous-sha != '' && inputs.previous-sha != '0000000000000000000000000000000000000000' }}
       uses: actions/github-script@v7
       env:
@@ -35,14 +35,16 @@ runs:
 
           // Query workflow runs from the last 7 days to avoid excessive API calls.
           // Why 7 days? This balances API efficiency with practical needs:
-          // - Most master commits trigger CI within hours, not days
+          // - Most main commits trigger CI within hours, not days
           // - Commits older than 7 days are likely stale; better to allow the docs-only skip anyway
           // - Reduces pagination load on high-velocity repos
           // - GitHub API rate limits (1000 req/hr for Actions) make unbounded searches risky
           // For commits outside this window, we skip the check and allow the docs-only skip.
           const createdAfter = new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString();
 
-          // Optimize pagination: use lower per_page and collect only what we need
+          // Optimize pagination: use lower per_page and collect only what we need.
+          // Do not filter by branch here: during master->main cutover, workflow runs
+          // for previousSha may still be recorded under master.
           const workflowRuns = [];
           let foundAllRelevant = false;
 
@@ -51,7 +53,6 @@ runs:
             {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              branch: 'master',
               event: 'push',
               per_page: 30,
               created: `>${createdAfter}`,
@@ -123,7 +124,7 @@ runs:
               .join('\n');
             core.info(
               [
-                `Previous master commit ${previousSha} still has running workflows:`,
+                `Previous main commit ${previousSha} still has running workflows:`,
                 details,
                 '',
                 'Allowing docs-only skip because running workflows have not failed yet.'
@@ -183,9 +184,9 @@ runs:
 
           if (failingRuns.length === 0) {
             if (incompleteRuns.length > 0) {
-              core.info(`Previous master commit ${previousSha} has ${incompleteRuns.length} running workflow(s) but no completed failures. Docs-only skip allowed.`);
+              core.info(`Previous main commit ${previousSha} has ${incompleteRuns.length} running workflow(s) but no completed failures. Docs-only skip allowed.`);
             } else {
-              core.info(`Previous master commit ${previousSha} completed without failures. Docs-only skip allowed.`);
+              core.info(`Previous main commit ${previousSha} completed without failures. Docs-only skip allowed.`);
             }
             return;
           }
@@ -196,7 +197,7 @@ runs:
 
           core.setFailed(
             [
-              `Cannot skip CI for docs-only commit because previous master commit ${previousSha} still has failing workflows:`,
+              `Cannot skip CI for docs-only commit because previous main commit ${previousSha} still has failing workflows:`,
               details,
               '',
               'Fix these failures before pushing docs-only changes, or push non-docs changes to trigger full CI.'

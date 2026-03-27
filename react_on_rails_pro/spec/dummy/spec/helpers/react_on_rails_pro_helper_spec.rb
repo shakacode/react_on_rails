@@ -411,7 +411,7 @@ describe ReactOnRailsProHelper do
         expect(initial_result).to include(react_component_div_with_initial_chunk)
 
         # Wait for async task to complete
-        @async_barrier.wait
+        Async::Task.current.with_timeout(5) { @async_barrier.wait }
         @main_output_queue.close
 
         # Subsequent chunks should be in the output queue
@@ -520,7 +520,27 @@ describe ReactOnRailsProHelper do
           **component_options
         )
 
-        @async_barrier.wait
+        Async::Task.current.with_timeout(5) { @async_barrier.wait }
+        @main_output_queue.close
+        while @main_output_queue.dequeue; end
+
+        expect(on_complete_called).to be false
+      end
+
+      it "propagates pre-first-chunk errors to the caller" do
+        allow(self).to receive(:internal_stream_react_component)
+          .and_raise(StandardError, "node renderer crashed before first chunk")
+
+        on_complete_called = false
+        on_complete = lambda { |_chunks|
+          on_complete_called = true
+        }
+
+        expect do
+          stream_react_component(component_name, props: props, on_complete: on_complete, **component_options)
+        end.to raise_error(StandardError, "node renderer crashed before first chunk")
+
+        Async::Task.current.with_timeout(5) { @async_barrier.wait }
         @main_output_queue.close
         while @main_output_queue.dequeue; end
 

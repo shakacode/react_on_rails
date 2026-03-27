@@ -35,7 +35,7 @@ By default, PRs run a subset of CI jobs to provide fast feedback:
 - Skips example generator tests
 - Skips some Pro package tests
 
-This is intentional to keep PR feedback loops fast. However, before merging, you should verify compatibility across all supported versions. The `/run-skipped-ci` (or `/run-skipped-tests`) command makes this easy without waiting for the PR to be merged to master.
+This is intentional to keep PR feedback loops fast. However, before merging, you should verify compatibility across all supported versions. The `/run-skipped-ci` (or `/run-skipped-tests`) command makes this easy without waiting for the PR to be merged to main.
 
 ### Security & Access Control
 
@@ -53,13 +53,13 @@ Multiple `/run-skipped-ci` or `/run-skipped-tests` comments on the same PR will 
 
 ## Testing Comment-Triggered Workflows
 
-**Important**: Comment-triggered workflows (`issue_comment` event) only execute from the **default branch** (master). This creates a chicken-and-egg problem when developing workflow changes.
+**Important**: Comment-triggered workflows (`issue_comment` event) only execute from the **default branch** (main). This creates a chicken-and-egg problem when developing workflow changes.
 
 ### Recommended Testing Approach
 
 1. **Develop the workflow**: Create/modify the workflow in your feature branch
 2. **Test locally**: Validate YAML syntax and logic as much as possible
-3. **Merge to master**: The workflow must be in master to be triggered by comments
+3. **Merge to main**: The workflow must be in main to be triggered by comments
 4. **Test on a PR**: Create a test PR and use the comment command to verify
 
 ### Why This Limitation Exists
@@ -109,7 +109,7 @@ Most workflows use minimal permissions. The comment-triggered workflows require:
 
 Many workflows use change detection to skip unnecessary jobs:
 
-- Runs all jobs on pushes to `master`
+- Runs all jobs on pushes to `main`
 - Runs only relevant jobs on PRs based on changed files
 - Can be overridden with `workflow_dispatch` or `/run-skipped-ci` (or `/run-skipped-tests`) command
 

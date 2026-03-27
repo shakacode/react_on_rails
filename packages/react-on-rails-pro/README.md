@@ -83,14 +83,14 @@ Or use the generator for automated setup:
 rails generate react_on_rails:install --pro
 ```
 
-See the [full installation guide](https://www.shakacode.com/react-on-rails-pro/docs/installation/).
+See the [full installation guide](https://reactonrails.com/docs/pro/installation).
 
 ## Documentation
 
-- [Installation Guide](https://www.shakacode.com/react-on-rails-pro/docs/installation/)
-- [Configuration Reference](https://www.shakacode.com/react-on-rails-pro/docs/configuration/)
-- [React Server Components Tutorial](https://www.shakacode.com/react-on-rails-pro/docs/react-server-components/tutorial/)
-- [React on Rails Pro Overview](https://www.shakacode.com/react-on-rails-pro/)
+- [Installation Guide](https://reactonrails.com/docs/pro/installation)
+- [Configuration Reference](https://reactonrails.com/docs/configuration/configuration-pro)
+- [React Server Components Tutorial](https://reactonrails.com/docs/pro/react-server-components/tutorial)
+- [React on Rails Pro Overview](https://pro.reactonrails.com/)
 
 ## License
 

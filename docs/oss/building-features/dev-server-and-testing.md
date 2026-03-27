@@ -235,7 +235,7 @@ Each error includes a link to this documentation and suggests `bin/dev --help`.
 
 ### `React on Rails: build_test_command is not configured.`
 
-```
+```text
 React on Rails: build_test_command is not configured.
 
 You are using the React on Rails test helper (configure_rspec_to_compile_assets
@@ -246,7 +246,7 @@ or ensure_assets_compiled), but config.build_test_command is not set.
 
 ### `React on Rails: Stale test assets detected`
 
-```
+```text
 React on Rails: Stale test assets detected:
   public/webpack/test/manifest.json
 
@@ -257,7 +257,7 @@ This is informational — compilation starts automatically. To skip the wait, ru
 
 ### `React on Rails: Development assets use HMR`
 
-```
+```text
 React on Rails: Development assets use HMR (manifest contains http:// URLs).
 HMR assets cannot be reused for tests — they exist in webpack-dev-server memory, not on disk.
 ```
@@ -266,7 +266,7 @@ HMR assets cannot be reused for tests — they exist in webpack-dev-server memor
 
 ### `React on Rails: Error building webpack assets!`
 
-```
+```text
 React on Rails: Error building webpack assets!
 
 The build_test_command failed. This means test assets could not be compiled.
@@ -282,7 +282,7 @@ This happens when HMR manifest URLs end up in the test asset path. The manifest 
 
 ### `Shakapacker::Manifest::MissingEntryError`
 
-```
+```text
 Shakapacker::Manifest::MissingEntryError: Shakapacker can't find application.js in
 /path/to/public/webpack/test/manifest.json
 ```

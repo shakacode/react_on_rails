@@ -3,13 +3,12 @@
 <p align="center">
  <a href="https://shakacode.com/"><img src="https://user-images.githubusercontent.com/10421828/79436256-517d0500-7fd9-11ea-9300-dfbc7c293f26.png"></a>
  <a href="https://forum.shakacode.com/"><img src="https://user-images.githubusercontent.com/10421828/79436266-53df5f00-7fd9-11ea-94b3-b985e1b05bdc.png"></a>
- <a href="https://www.shakacode.com/react-on-rails-pro"><img src="https://user-images.githubusercontent.com/10421828/79436265-53df5f00-7fd9-11ea-8220-fc474f6a856c.png"></a>
  <a href="https://github.com/sponsors/shakacode"><img src="https://user-images.githubusercontent.com/10421828/79466109-cdd90d80-8004-11ea-88e5-25f9a9ddcf44.png"></a>
 </p>
 
 ---
 
-[![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md)[![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=master&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=master) [![Gem Downloads](https://img.shields.io/gem/dt/react_on_rails)](https://rubygems.org/gems/react_on_rails)
+[![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md)[![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=main&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=main) [![Gem Downloads](https://img.shields.io/gem/dt/react_on_rails)](https://rubygems.org/gems/react_on_rails)
 
 [![Integration Tests](https://github.com/shakacode/react_on_rails/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/integration-tests.yml)
 [![Gem Tests](https://github.com/shakacode/react_on_rails/actions/workflows/gem-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/gem-tests.yml)
@@ -30,10 +29,11 @@
 ```bash
 npx create-react-on-rails-app my-app
 cd my-app
+bin/rails db:prepare
 bin/dev
 ```
 
-Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) - done! TypeScript? Add `--template typescript`. [Full CLI docs →](./docs/oss/getting-started/create-react-on-rails-app.md)
+Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) - done! JavaScript? Add `--template javascript`. [Full CLI docs →](./docs/oss/getting-started/create-react-on-rails-app.md)
 
 **Or add to an existing Rails app:**
 
@@ -60,7 +60,7 @@ Then use React in any Rails view:
 - **React Server Components**: Improved rendering flow and new `RSCRoute` component for seamless SSR
 - **Performance improvements**: New async loading strategies and optimized bundle generation
 - **Webpacker removal**: Streamlined for Shakapacker-only support (>= 6.0)
-- [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) supports the latest features of React 19, including [React Server Components](https://react.dev/reference/rsc/server-components) and [streaming](https://react.dev/reference/react-dom/server/renderToPipeableStream). Contact [Justin Gordon](mailto:justin@shakacode.com) for more information.
+- **[Pro features](https://reactonrails.com/docs/pro/)** are available for advanced use cases including [React Server Components](https://react.dev/reference/rsc/server-components), [streaming SSR](https://react.dev/reference/react-dom/server/renderToPipeableStream), and a dedicated Node renderer for 10–100x faster SSR.
 - ShakaCode now maintains the official successor to `rails/webpacker`, [`shakapacker`](https://github.com/shakacode/shakapacker).
 
 ---
@@ -114,7 +114,7 @@ For detailed upgrade instructions, see [upgrade guide documentation](docs/oss/up
 
 ## React on Rails Pro
 
-React on Rails Pro adds advanced rendering and performance features on top of the open-source gem. Pro is **free or very low cost for startups and small companies**. Contact [justin@shakacode.com](mailto:justin@shakacode.com) for pricing. Your subscription supports continued open-source development.
+React on Rails Pro adds advanced rendering and performance features on top of the open-source gem. A **paid license is required for production use**. Startup-friendly pricing is available — contact [justin@shakacode.com](mailto:justin@shakacode.com). Your subscription supports continued open-source development.
 
 | Feature                              |    OSS     |        Pro        |
 | ------------------------------------ | :--------: | :---------------: |
@@ -150,7 +150,7 @@ That's it — Pro layers on top of your existing setup. See the [Pro installatio
 
 Popmenu achieved a [73% decrease in average response times and 20-25% lower Heroku costs](https://www.shakacode.com/recent-work/popmenu/) with React on Rails Pro, now serving tens of millions of SSR requests daily.
 
-Ready to try Pro? Visit [pro.reactonrails.com](https://pro.reactonrails.com) or email [justin@shakacode.com](mailto:justin@shakacode.com).
+Ready to try Pro? Visit [React on Rails Pro docs](https://reactonrails.com/docs/pro/) or email [justin@shakacode.com](mailto:justin@shakacode.com).
 
 # 📚 Quick Start
 
@@ -218,7 +218,7 @@ _Requires creating a free account._
 - [**Subscribe**](https://app.mailerlite.com/webforms/landing/l1d9x5) for announcements of new releases and tutorials
 - **[forum.shakacode.com](https://forum.shakacode.com)** - Development discussions
 - **[@railsonmaui on Twitter](https://twitter.com/railsonmaui)** - Updates and tips
-- [Projects using React on Rails](https://github.com/shakacode/react_on_rails/tree/master/PROJECTS.md) - Submit yours!
+- [Projects using React on Rails](https://github.com/shakacode/react_on_rails/tree/main/PROJECTS.md) - Submit yours!
 
 ## For AI Coding Assistants
 
@@ -243,7 +243,7 @@ See [React on Rails Pro documentation](docs/pro/home-pro.md) for advanced featur
 
 ## Contributing
 
-Bug reports and pull requests are welcome. To get started, see [Contributing](https://github.com/shakacode/react_on_rails/tree/master/CONTRIBUTING.md) and the [list of help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
+Bug reports and pull requests are welcome. To get started, see [Contributing](https://github.com/shakacode/react_on_rails/tree/main/CONTRIBUTING.md) and the [list of help wanted issues](https://github.com/shakacode/react_on_rails/labels/contributions%3A%20up%20for%20grabs%21).
 
 # Work with Us
 
@@ -251,9 +251,9 @@ ShakaCode is **[hiring passionate software engineers](https://www.shakacode.com/
 
 # License
 
-The gem is available as open source under the terms of the [MIT License](https://github.com/shakacode/react_on_rails/tree/master/LICENSE.md).
+The gem is available as open source under the terms of the [MIT License](https://github.com/shakacode/react_on_rails/tree/main/LICENSE.md).
 
-Note, some features are available only with a React on Rails Pro subscription. See [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) for more information.
+Note, some features are available only with a React on Rails Pro subscription. See [React on Rails Pro](https://reactonrails.com/docs/pro/) for more information.
 
 # Supporters
 

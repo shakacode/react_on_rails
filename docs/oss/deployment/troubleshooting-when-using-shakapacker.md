@@ -13,11 +13,11 @@
 
 Configuring Webpack to embed the runtime in each chunk and calling `react_component` twice in a Rails view/partial causes the client render to crash with the following error:
 
-```
+```text
 Could not find component registered with name XXX. Registered component names include [ YYY ]. Maybe you forgot to register the component?
 ```
 
-```
+```text
 VM4859 clientStartup.js:132 Uncaught Error: ReactOnRails encountered an error while rendering component: XXX. See above error message.
     at Object.get (ComponentRegistry.js:40:15)
     at Object.getComponent (ReactOnRails.js:211:44)

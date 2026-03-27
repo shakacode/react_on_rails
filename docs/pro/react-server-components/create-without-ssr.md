@@ -10,11 +10,15 @@ To use Server Components in your React on Rails Pro project, you need to follow 
 
 1. Install the latest version of React on Rails and React on Rails Pro:
 
-Note: These versions are not released yet, they are still in development. But they will have these versions when released.
-
 ```bash
-yarn add react-on-rails@15.0.0-alpha.2 react-on-rails-pro@4.0.0
-bundle add react_on_rails@15.0.0.alpha.2 react_on_rails_pro@4.0.0
+# Pick one JS package manager command (Pro includes all base package functionality):
+yarn add --exact react-on-rails-pro@16.4.0
+# npm install --save-exact react-on-rails-pro@16.4.0
+# pnpm add --save-exact react-on-rails-pro@16.4.0
+
+# Then add the Ruby gems:
+bundle add react_on_rails --version "16.4.0" --strict
+bundle add react_on_rails_pro --version "16.4.0" --strict
 ```
 
 Also, install version 19 of React, React DOM, and `react-on-rails-rsc`:
@@ -149,7 +153,7 @@ const webpackConfig = (envSpecific) => {
 
 Finally, update `Procfile.dev` to generate the RSC bundle when running the development server:
 
-```
+```text
 # Procfile.dev
 # existing code...
 
@@ -398,7 +402,7 @@ bin/dev
 
 Navigate to the React Server Component Page:
 
-```
+```text
 http://localhost:3000/react_server_component_without_ssr
 ```
 
@@ -414,7 +418,7 @@ Looking at the network tab in your browser's developer tools, you'll notice that
 
 Also, by looking at the console, we can see the log
 
-```
+```text
 [SERVER] Hello from ReactServerComponent
 ```
 

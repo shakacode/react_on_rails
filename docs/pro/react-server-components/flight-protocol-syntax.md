@@ -113,7 +113,7 @@ Each typed array type have its own tag: `A` for ArrayBuffer, `O` for Int8Array, 
 
 React elements are serialized as JSON arrays in the following format:
 
-```
+```text
 ["$", type, key, props]
 ```
 
@@ -285,7 +285,7 @@ Text rows are terminated by newline:
 
 Binary rows are terminated by byte count:
 
-```
+```text
 <hex id>:<tag><hex length>,<raw bytes>
 ```
 

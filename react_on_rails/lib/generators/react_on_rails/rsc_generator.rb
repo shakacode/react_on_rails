@@ -92,7 +92,7 @@ module ReactOnRails
           2. Visit http://localhost:3000/hello_server to see RSC in action
           3. The RSC bundle watcher will compile server components
 
-          Documentation: https://www.shakacode.com/react-on-rails-pro/docs/rsc/
+          Documentation: https://reactonrails.com/docs/pro/react-server-components/
         MSG
       end
     end

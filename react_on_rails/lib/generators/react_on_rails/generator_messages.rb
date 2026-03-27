@@ -66,13 +66,16 @@ module GeneratorMessages
         1. Install dependencies:
            #{Rainbow("bundle && #{package_manager} install").cyan}
 
-        2. Start the app:
+        2. Prepare database:
+           #{Rainbow('bin/rails db:prepare').cyan}
+
+        3. Start the app:
            ./bin/dev              # HMR (Hot Module Replacement) mode
            ./bin/dev static       # Static bundles (no HMR, faster initial load)
            ./bin/dev prod         # Production-like mode for testing
            ./bin/dev help         # See all available options
 
-        3. Visit: #{Rainbow(route ? "http://localhost:3000/#{route}" : 'http://localhost:3000').cyan.underline}
+        4. Visit: #{Rainbow(route ? "http://localhost:3000/#{route}" : 'http://localhost:3000').cyan.underline}
         ✨ KEY FEATURES:
         ─────────────────────────────────────────────────────────────────────────
         • Auto-registration enabled - Your layout only needs:
@@ -94,6 +97,9 @@ module GeneratorMessages
     # Uses relative lockfile paths resolved against Dir.pwd, so callers must invoke
     # this while the current working directory is the target Rails app root.
     def detect_package_manager
+      env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
+      return env_package_manager if %w[npm pnpm yarn bun].include?(env_package_manager)
+
       # Check for lock files to determine package manager
       return "yarn" if File.exist?("yarn.lock")
       return "pnpm" if File.exist?("pnpm-lock.yaml")

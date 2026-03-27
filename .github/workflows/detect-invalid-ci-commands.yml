@@ -160,7 +160,7 @@ jobs:
 
             ---
 
-            📖 For more details, see the [Contributing Guide](https://github.com/shakacode/react_on_rails/blob/master/CONTRIBUTING.md#using-comment-commands-to-trigger-ci)\`;
+            📖 For more details, see the [Contributing Guide](https://github.com/shakacode/react_on_rails/blob/main/CONTRIBUTING.md#using-comment-commands-to-trigger-ci)\`;
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,

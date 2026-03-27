@@ -4,6 +4,13 @@ Instructions for AI coding agents working on the React on Rails codebase.
 
 React on Rails is a Ruby gem + npm package that integrates React with Ruby on Rails, providing server-side rendering (SSR) via Node.js or ExecJS. This is a monorepo: the open-source gem lives at `react_on_rails/`, the npm package at `packages/react-on-rails/`, and the Pro package at `react_on_rails_pro/`.
 
+## Reusable Workflows
+
+- `AGENTS.md`: canonical entry point for agent instructions and workflow discovery
+- `.claude/commands/`: Claude Code slash commands
+- `.agents/workflows/`: shared prompt templates and reusable workflows for Codex, GPT, and other non-Claude tools
+- When the user asks to address PR review comments outside Claude slash commands, follow `.agents/workflows/address-review.md`
+
 ## Canonical Agent Policy
 
 `AGENTS.md` is the canonical source for repository-wide agent rules:
@@ -158,7 +165,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Treat as blocking only: correctness bugs, failing tests, regressions, and clear inconsistencies with adjacent code. Nits and style suggestions are optional unless a maintainer asks for them.
 - Verify language, runtime, and library claims locally before changing code in response to AI review comments.
 - Deduplicate repeated bot comments before acting on them. Fix the underlying issue once, then resolve the duplicates.
-- Rebase or merge `master` once, near the end of the review cycle. For `CHANGELOG.md` conflicts, prefer resolving them as the final step before merge.
+- Rebase or merge `main` once, near the end of the review cycle. For `CHANGELOG.md` conflicts, prefer resolving them as the final step before merge.
 - When asking an agent to address review comments, instruct it to classify comments into `blocking`, `optional`, and `noise`, then apply only the `blocking` items plus any explicitly selected optional items.
 
 ## Boundaries

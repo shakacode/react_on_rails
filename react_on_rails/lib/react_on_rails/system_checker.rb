@@ -14,6 +14,8 @@ module ReactOnRails
 
     attr_reader :messages
 
+    SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
+
     def initialize
       @messages = []
     end
@@ -137,7 +139,8 @@ module ReactOnRails
           • bin/shakapacker
           • bin/shakapacker-dev-server
           • config/shakapacker.yml
-          • config/{webpack,rspack}/{webpack,rspack}.config.{js,ts}
+          • config/webpack/webpack.config.{js,ts}
+          • config/rspack/rspack.config.{js,ts}
 
           Run: bundle exec rails shakapacker:install
         MSG
@@ -328,10 +331,13 @@ module ReactOnRails
         return paths_by_bundler[configured_bundler].first
       end
 
+      # Default to webpack when shakapacker.yml doesn't declare assets_bundler.
+      # Webpack is the longer-established default; rspack users typically set
+      # assets_bundler explicitly in shakapacker.yml.
       add_warning(
-        "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to rspack."
+        "⚠️  Found both webpack and rspack configs. Could not determine active bundler; defaulting to webpack."
       )
-      paths_by_bundler["rspack"].first || paths_by_bundler["webpack"].first
+      paths_by_bundler["webpack"].first || paths_by_bundler["rspack"].first
     end
 
     def suggest_webpack_inspection(config_path)
@@ -524,14 +530,25 @@ module ReactOnRails
     end
 
     def configured_assets_bundler
-      shakapacker_config_path = "config/shakapacker.yml"
-      return nil unless File.exist?(shakapacker_config_path)
+      config = parsed_shakapacker_config
+      return nil unless config
 
-      config_content = File.read(shakapacker_config_path)
-      match = config_content.match(/^\s*assets_bundler:\s*["']?(webpack|rspack)["']?\s*$/)
-      match&.captures&.first
-    rescue StandardError
+      rails_env = ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
+      bundler_from_shakapacker_section(config, rails_env) || bundler_from_shakapacker_section(config, "default")
+    rescue StandardError, ScriptError
       nil
+    end
+
+    def bundler_from_shakapacker_section(config, section_name)
+      section = config[section_name] || config[section_name.to_sym]
+      return nil unless section.is_a?(Hash)
+
+      normalize_assets_bundler(section["assets_bundler"] || section[:assets_bundler])
+    end
+
+    def normalize_assets_bundler(value)
+      normalized = value.to_s.strip.downcase
+      SUPPORTED_ASSETS_BUNDLERS.include?(normalized) ? normalized : nil
     end
 
     def required_react_dependencies

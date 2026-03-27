@@ -11,7 +11,7 @@ Choosing a React integration strategy for Rails? This guide compares React on Ra
 | Streaming SSR           |        —         |          —          |        —         |        —        |          —           |          ✓          |
 | Code splitting with SSR |        —         |          —          |       N/A        |        —        |          —           |          ✓          |
 | Auto-bundling           |        —         |          —          |        —         |        —        |          ✓           |          ✓          |
-| Bundler support         |   Import maps    |  ✓ (Vite default)   |   Import maps    | ✓ (Vite/Rollup) |      ✓ (Rspack)      |     ✓ (Rspack)      |
+| Bundler support         |   Import maps    |  ✓ (Vite default)   |   Import maps    | ✓ (Vite/Rollup) |  ✓ (Webpack/Rspack)  | ✓ (Webpack/Rspack)  |
 | Hot module replacement  |        —         |          ✓          |  Turbo morphing  |        ✓        |          ✓           |          ✓          |
 | Type-safe routing       |        —         |          —          |        —         |     ✓ (BYO)     |          —           | ✓ (TanStack Router) |
 | Props from controller   |        —         |          ✓          |       N/A        |        —        |          ✓           |          ✓          |
@@ -161,18 +161,18 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 ### React on Rails Pro
 
-[React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/) extends the OSS gem with production-grade rendering performance and modern React features.
+[React on Rails Pro](https://reactonrails.com/docs/pro/) extends the OSS gem with production-grade rendering performance and modern React features.
 
 **Key additions over OSS:**
 
 - **React Server Components** — full RSC support with Rails integration
 - **Streaming SSR** — progressive rendering with React 18's `renderToPipeableStream`
-- **Node renderer** — dedicated Node.js server for 10–100x faster SSR (replaces ExecJS)
+- **Node renderer** — dedicated Node.js server for 3-10x faster SSR (replaces ExecJS)
 - **Fragment caching** — cache rendered components with `cached_react_component`
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Pro is free or very low cost for startups and small companies. See the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+Available for free or with startup-friendly pricing — see [React on Rails Pro docs](https://reactonrails.com/docs/pro/) for details and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
 

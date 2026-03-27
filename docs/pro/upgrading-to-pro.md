@@ -18,7 +18,7 @@ Pro includes core React on Rails as a dependency — just swap the packages and 
 
 ## Three Steps to Upgrade
 
-> **Version note:** The examples below use `16.4.0` for illustration. Before you begin, check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md) to find the latest version and substitute it in the commands below. Always use an exact version pin (`=`) for the gem and `--save-exact`/`--exact` for the npm package.
+> **Version note:** The examples below use `16.4.0` for illustration. Before you begin, check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) to find the latest version and substitute it in the commands below. Always use an exact version pin (`=`) for the gem and `--save-exact`/`--exact` for the npm package.
 >
 > **RC versions:** RubyGems and npm use different pre-release separators. For example, release candidate 9 of version 16.4.0 is `16.4.0.rc.9` on RubyGems (dots) but `16.4.0-rc.9` on npm (hyphen). Make sure to use the correct format for each package manager.
 
@@ -95,7 +95,7 @@ bundle exec rails generate react_on_rails:install --pro
 
 React on Rails Pro is **free to try** — no license token is needed for local development, testing, CI/CD, or staging environments. Install it, experiment with the features, and see the performance difference in your own app before making any purchasing decisions.
 
-Pro is **free or very low cost for startups and small companies**. Visit [pro.reactonrails.com](https://pro.reactonrails.com/) for pricing and to get started. When you're ready, set the token as an environment variable:
+A **paid license is required for all production deployments**. Startups and small companies should contact [justin@shakacode.com](mailto:justin@shakacode.com) for discounted pricing. Visit [pro.reactonrails.com](https://pro.reactonrails.com/) for details. When you're ready, set the token as an environment variable:
 
 ```bash
 export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
@@ -103,7 +103,7 @@ export REACT_ON_RAILS_PRO_LICENSE="your-license-token-here"
 
 If you're a startup or team with limited budget, don't let cost be a barrier — email [justin@shakacode.com](mailto:justin@shakacode.com) and we'll work something out. For larger companies, your license supports continued development of the open-source project.
 
-See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md) for complete license configuration.
+See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md) for complete license configuration.
 
 ## Reversibility
 
@@ -120,4 +120,5 @@ Pro-only features (fragment caching, Node renderer, RSC) will stop working, but 
 - [Installation reference](./installation.md) - Detailed manual installation steps
 - [Configuration](../oss/configuration/configuration-pro.md) - All Pro configuration options
 - [Upgrading Pro versions](./updating.md) - Upgrading between Pro versions
-- [React Server Components](./react-server-components/tutorial.md) - Get started with RSC
+- [Add RSC to Your Pro App](./react-server-components/upgrading-existing-pro-app.md) - Add RSC support to an existing Pro installation
+- [React Server Components Tutorial](./react-server-components/tutorial.md) - Learn RSC concepts step by step

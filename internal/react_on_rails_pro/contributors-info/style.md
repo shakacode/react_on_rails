@@ -36,6 +36,6 @@ Follow these style guidelines per the linter configuration. Basically, lint your
 
 # Git Usage
 
-- Follow a github-flow model where you branch off of master for features.
-- Before merging a branch to master, rebase it on top of master, by using command like `git fetch; git checkout my-branch; git rebase -i origin/master`. Clean up your commit message at this point. Be super careful to communicate with anybody else working on this branch and do not do this when others have uncommitted changes. Ideally, your merge of your feature back to master should be one nice commit.
+- Follow a github-flow model where you branch off of main for features.
+- Before merging a branch to main, rebase it on top of main, by using command like `git fetch; git checkout my-branch; git rebase -i origin/main`. Clean up your commit message at this point. Be super careful to communicate with anybody else working on this branch and do not do this when others have uncommitted changes. Ideally, your merge of your feature back to main should be one nice commit.
 - Run hosted CI and code coverage.

@@ -57,7 +57,7 @@ sig/
 │   └── ...                         # And more
 ```
 
-For more details, see [sig/README.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails/sig/README.md).
+For more details, see [sig/README.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/sig/README.md).
 
 ## Contributing
 

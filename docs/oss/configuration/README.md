@@ -2,7 +2,11 @@
 
 This document describes all configuration options for React on Rails. Configuration is done in `/config/initializers/react_on_rails.rb`.
 
-> **💡 Good News!** Most applications only need 2-3 configuration options. React on Rails provides sensible defaults for everything else.
+> **Good News!** Most applications only need 2-3 configuration options. React on Rails provides sensible defaults for everything else.
+
+:::tip Pro Configuration
+React on Rails Pro adds additional configuration options for the Node renderer, fragment caching, prerender caching, and streaming SSR. See [Pro configuration options](./configuration-pro.md) for the full reference.
+:::
 
 ## Quick Start
 
@@ -291,7 +295,7 @@ ReactOnRails.configure do |config|
   # DEPRECATED: Use `generated_component_packs_loading_strategy` instead.
   # Migration: `defer_generated_component_packs: true` → `generated_component_packs_loading_strategy: :defer`
   # Migration: `defer_generated_component_packs: false` → `generated_component_packs_loading_strategy: :sync`
-  # See [16.0.0 Release Notes](docs/release-notes/16.0.0.md) for more details.
+  # See [16.0.0 Release Notes](../upgrading/release-notes/16.0.0.md) for more details.
   # config.defer_generated_component_packs = false
 
   ################################################################################
@@ -989,7 +993,7 @@ Access methods:
 ## Need Help?
 
 - **Documentation:** [React on Rails Guides](https://reactonrails.com/docs/)
-- **Pro Features:** [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro/)
+- **Pro Features:** [React on Rails Pro](https://pro.reactonrails.com/)
 - **Support:** [ShakaCode Forum](https://forum.shakacode.com/)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)
 

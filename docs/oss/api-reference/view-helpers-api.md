@@ -17,7 +17,7 @@ react_component(component_name,
 
 Uncommonly used options:
 
-```
+```ruby
   trace: nil,
   replay_console: nil,
   raise_on_prerender_error: nil,
@@ -29,6 +29,8 @@ Uncommonly used options:
 - **general options:**
   - **props:** Ruby Hash which contains the properties to pass to the React object, or a JSON string. If you pass a string, we'll escape it for you.
   - **prerender:** enable server-side rendering of a component. Set to false when debugging!
+    - **Environment override:** set `REACT_ON_RAILS_PRERENDER_OVERRIDE=true|false` to force prerendering on or off globally.
+      Precedence is: `REACT_ON_RAILS_PRERENDER_OVERRIDE` > component option (`prerender:`) > initializer default (`config.prerender`).
   - **auto_load_bundle:** will automatically load the bundle for component by calling `append_javascript_pack_tag` and `append_stylesheet_pack_tag` under the hood.
   - **id:** Id for the div, will be used to attach the React component. This will get assigned automatically if you do not provide an id. Must be unique.
   - **html_options:** Any other HTML options get placed on the added div for the component. For example, you can set a class (or inline style) on the outer div so that it behaves like a span, with the styling of `display:inline-block`. You may also use an option of `tag: "span"` to replace the use of the default DIV tag to be a SPAN tag.
@@ -106,7 +108,7 @@ Renderer functions are not meant to be used on the server since there's no DOM o
 [React Router](https://reactrouter.com/) is supported via manual integration, including server-side rendering. See:
 
 1. [React on Rails docs for React Router](../building-features/react-router.md)
-2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/RouterApp.server.jsx](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
+2. Examples in [spec/dummy/app/views/react_router](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy/app/views/react_router) and follow to the JavaScript code in the [spec/dummy/client/app/startup/RouterApp.server.jsx](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
 3. [React on Rails Pro loadable-components guide](../building-features/code-splitting.md) for modern code splitting with server-side rendering.
 
 ### TanStack Router
@@ -128,7 +130,7 @@ This is a helper method that takes any JavaScript expression and returns the out
 
 ## Pro-Only View Helpers
 
-The following view helpers are available exclusively with [React on Rails Pro](https://www.shakacode.com/react-on-rails-pro). These require a valid React on Rails Pro license and will not be available if the Pro gem is not installed or properly licensed.
+The following view helpers are available exclusively with [React on Rails Pro](https://reactonrails.com/docs/pro/). These require a valid React on Rails Pro license and will not be available if the Pro gem is not installed or properly licensed.
 
 ### cached_react_component and cached_react_component_hash
 
@@ -169,4 +171,4 @@ See the [React on Rails Pro Configuration](../configuration/configuration-pro.md
 
 ## More details
 
-See the [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/master/react_on_rails/lib/react_on_rails/helper.rb) source.
+See the [lib/react_on_rails/helper.rb](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/lib/react_on_rails/helper.rb) source.

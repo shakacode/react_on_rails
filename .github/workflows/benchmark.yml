@@ -50,7 +50,7 @@ on:
           - 'pro_node_renderer_only'
   push:
     branches:
-      - master
+      - main
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -60,7 +60,7 @@ on:
       - '**.md'
       - 'docs/**'
 # Cancel stale PR benchmark runs when new commits are pushed.
-# Master runs are never cancelled so every merge is measured.
+# Main runs are never cancelled so every merge is measured.
 concurrency:
   group: ${{ github.event.pull_request.number && format('benchmark-pr-{0}', github.event.pull_request.number) || format('benchmark-{0}', github.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -89,7 +89,7 @@ env:
 
 jobs:
   benchmark:
-    # Run on: push to master, workflow_dispatch, or PRs with 'benchmark' label.
+    # Run on: push to main, workflow_dispatch, or PRs with 'benchmark' label.
     # The 'full-ci' label is intentionally excluded — it controls test workflows,
     # not benchmarks. Use the dedicated 'benchmark' label to trigger perf runs on PRs.
     # See https://bencher.dev/docs/how-to/github-actions/#pull-requests for the extra pull_request condition
@@ -520,8 +520,8 @@ jobs:
 
           # Set branch and start-point based on event type
           if [ "${{ github.event_name }}" = "push" ]; then
-            BRANCH="master"
-            START_POINT="master"
+            BRANCH="main"
+            START_POINT="main"
             START_POINT_HASH="${{ github.event.before }}"
             EXTRA_ARGS=""
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -533,13 +533,13 @@ jobs:
             # Get merge-base from GitHub API (avoids needing deep fetch)
             # See: https://stackoverflow.com/a/74710919
             BRANCH="${{ github.ref_name }}"
-            START_POINT="master"
-            START_POINT_HASH=$(gh api "repos/${{ github.repository }}/compare/master...$BRANCH" --jq '.merge_base_commit.sha' || true)
+            START_POINT="main"
+            START_POINT_HASH=$(gh api "repos/${{ github.repository }}/compare/main...$BRANCH" --jq '.merge_base_commit.sha' || true)
 
             if [ -n "$START_POINT_HASH" ]; then
               echo "Found merge-base via API: $START_POINT_HASH"
             else
-              echo "⚠️ Could not find merge-base with master via GitHub API, continuing without it"
+              echo "⚠️ Could not find merge-base with main via GitHub API, continuing without it"
             fi
             EXTRA_ARGS=""
           else
@@ -665,10 +665,10 @@ jobs:
           fi
 
       # ============================================
-      # STEP 7b: ALERT ON MASTER REGRESSION
+      # STEP 7b: ALERT ON MAIN REGRESSION
       # ============================================
-      - name: Create GitHub Issue for master regression
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && env.BENCHER_EXIT_CODE != '0'
+      - name: Create GitHub Issue for main regression
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -682,7 +682,7 @@ jobs:
 
           # Ensure the label exists (idempotent)
           gh label create "$LABEL" \
-            --description "Automated: benchmark regression detected on master" \
+            --description "Automated: benchmark regression detected on main" \
             --color "D93F0B" \
             --force 2>/dev/null || true
 
@@ -720,10 +720,10 @@ jobs:
             echo "No open regression issue found — creating one"
 
             if ! gh issue create \
-              --title "Performance Regression Detected on master (${COMMIT_SHORT})" \
+              --title "Performance Regression Detected on main (${COMMIT_SHORT})" \
               --label "$LABEL" \
               --body "$(cat <<EOF
-          ## Performance Regression Detected on master
+          ## Performance Regression Detected on main
 
           A statistically significant performance regression was detected by
           [Bencher](${BENCHER_URL}) using a Student's t-test (95% confidence
@@ -754,12 +754,12 @@ jobs:
           fi
 
       # ============================================
-      # STEP 7c: FAIL WORKFLOW ON MASTER REGRESSION
+      # STEP 7c: FAIL WORKFLOW ON MAIN REGRESSION
       # ============================================
-      # Only fail on master — PR benchmarks are informational (triggered by 'benchmark' label).
+      # Only fail on main — PR benchmarks are informational (triggered by 'benchmark' label).
       # Regressions on PRs are surfaced via Bencher report comments, not workflow failures.
-      - name: Fail workflow if Bencher detected regression on master
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && env.BENCHER_EXIT_CODE != '0'
+      - name: Fail workflow if Bencher detected regression on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0'
         run: |
           echo "Bencher detected a regression (exit code: ${BENCHER_EXIT_CODE:-1})"
           exit "${BENCHER_EXIT_CODE:-1}"

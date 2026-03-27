@@ -14,7 +14,7 @@ description: Validates PR testing before merge. Use when creating PRs, investiga
 When you need more details, use the Read tool to examine:
 
 - `.claude/docs/testing-build-scripts.md` - Build/package testing requirements
-- `.claude/docs/master-health-monitoring.md` - Post-merge CI monitoring
+- `.claude/docs/main-health-monitoring.md` - Post-merge CI monitoring
 - `SWITCHING_CI_CONFIGS.md` - CI config switching guide
 - `react_on_rails/spec/dummy/TESTING_LOCALLY.md` - Environment-specific testing issues
 

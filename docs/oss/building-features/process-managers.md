@@ -167,7 +167,7 @@ If `.dev-services.yml` doesn't exist, `bin/dev` works exactly as before (zero im
 
 **When services are running:**
 
-```
+```text
 🔍 Checking required services (.dev-services.yml)...
 
    ✓ redis - Redis (for caching and background jobs)
@@ -178,7 +178,7 @@ If `.dev-services.yml` doesn't exist, `bin/dev` works exactly as before (zero im
 
 **When services are missing:**
 
-```
+```text
 🔍 Checking required services (.dev-services.yml)...
 
    ✗ redis - Redis (for caching and background jobs)

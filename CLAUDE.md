@@ -40,7 +40,7 @@ Use these docs for Claude-oriented operational guidance:
 - `.claude/docs/rbs-type-checking.md`
 - `.claude/docs/conductor-compatibility.md`
 - `.claude/docs/testing-build-scripts.md`
-- `.claude/docs/master-health-monitoring.md`
+- `.claude/docs/main-health-monitoring.md`
 - `.claude/docs/managing-file-paths.md`
 
 For Pro-package specifics, also read `react_on_rails_pro/CLAUDE.md`.

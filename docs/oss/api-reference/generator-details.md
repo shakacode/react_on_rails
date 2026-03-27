@@ -4,7 +4,7 @@ The `react_on_rails:install` generator combined with the example pull requests o
 
 Run `rails generate react_on_rails:install --help` for descriptions of all available options:
 
-```
+```text
 Usage:
   rails generate react_on_rails:install [options]
 
@@ -78,7 +78,7 @@ The React on Rails generator creates different directory structures depending on
 
 The basic generator creates a simple, flat structure optimized for auto-bundling:
 
-```
+```text
 app/javascript/
 └── src/
     └── HelloWorld/
@@ -98,7 +98,7 @@ For components that need different client vs. server implementations, use `.clie
 
 The Redux generator creates a more structured organization with familiar Redux patterns:
 
-```
+```text
 app/javascript/
 └── src/
     └── HelloWorldApp/
@@ -209,7 +209,7 @@ rails generate react_on_rails:install --pro
 
 **Prerequisites:**
 
-- Add `gem 'react_on_rails_pro', '>= 16.3.0'` to your Gemfile and run `bundle install`
+- Add `gem 'react_on_rails_pro', '16.4.0'` (or later — pin to the exact version you want) to your Gemfile and run `bundle install`
 - Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license
 
 **What gets created:**
@@ -221,7 +221,7 @@ rails generate react_on_rails:install --pro
 
 **After installation:**
 
-Configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/master/react_on_rails_pro/LICENSE_SETUP.md) for all options.
+Configure your license token: `export REACT_ON_RAILS_PRO_LICENSE="your-token"`. See [LICENSE_SETUP.md](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/LICENSE_SETUP.md) for all options.
 
 **Combining with other options:**
 
@@ -246,7 +246,7 @@ For existing apps, use the standalone Pro generator to avoid re-processing base 
 rails generate react_on_rails:pro
 ```
 
-See the [React on Rails Pro overview](../../pro/react-on-rails-pro.md) for feature details.
+See the [React on Rails Pro overview](../../pro/home-pro.md) for feature details.
 
 ### React Server Components Support
 
