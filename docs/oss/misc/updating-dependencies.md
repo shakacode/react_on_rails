@@ -23,8 +23,13 @@ Check for outdated versions of packages:
 pnpm outdated
 ```
 
-Use the equivalent `npm outdated` or `yarn outdated` command if your app uses a different package
-manager. Read CHANGELOGs of major updated packages before you update. You might not be ready for
+Equivalents for other package managers:
+
+- npm: `npm outdated`
+- yarn: `yarn outdated`
+- bun: `bun outdated`
+
+Read CHANGELOGs of major updated packages before you update. You might not be ready for
 some updates.
 
 ### Updating All Dependencies
@@ -38,33 +43,48 @@ pnpm dlx npm-check-updates -u -a
 pnpm install
 ```
 
-Some combinations that I often run:
+To also remove old `node_modules` so you only get what corresponds to `package.json`:
 
-- Remove old installed `node_modules` so you only get what corresponds to `package.json`:
+```bash
+pnpm dlx npm-check-updates -u -a && rm -rf node_modules && pnpm install
+```
 
-  ```bash
-  pnpm dlx npm-check-updates -u -a && rm -rf node_modules && pnpm install
-  ```
+Equivalents for other package managers:
 
-Use the equivalent `npx npm-check-updates -u -a && npm install` or `npx npm-check-updates -u -a && yarn install` flow if your app does not use `pnpm`.
+- npm: `npx npm-check-updates -u -a && npm install`
+- yarn: `npx npm-check-updates -u -a && yarn install`
+- bun: `bunx npm-check-updates -u -a && bun install`
 
 **Option 2: Using your package manager's upgrade command**
 
-To update all dependencies:
+To update all dependencies within their existing semver ranges:
+
+```bash
+pnpm up
+```
+
+To ignore ranges and update everything to the absolute latest versions:
 
 ```bash
 pnpm up --latest
 ```
 
-To upgrade a specific package:
+To upgrade a specific package to its latest version:
 
 ```bash
 pnpm up [package] --latest
 ```
 
-Equivalent commands for other package managers are `npm install <package>@latest` and `yarn add <package>@latest`.
-Note that `npm update` is not the same as `pnpm up --latest` because it respects existing semver
-ranges instead of updating package.json to the latest available versions.
+Equivalents for other package managers:
+
+| Action                     | npm                        | yarn (v1)               | bun                    |
+| -------------------------- | -------------------------- | ----------------------- | ---------------------- |
+| Update within ranges       | `npm update`               | `yarn upgrade`          | `bun update`           |
+| Update to latest           | _(use ncu from Option 1)_  | `yarn upgrade --latest` | `bun update --latest`  |
+| Specific package to latest | `npm install <pkg>@latest` | `yarn add <pkg>@latest` | `bun add <pkg>@latest` |
+
+Note that `npm update` does not modify `package.json` by default (only the lockfile). Add `--save`
+if you want it to update version ranges. The other package managers update `package.json` by default.
 
 ### Adding New Dependencies
 
@@ -76,8 +96,11 @@ pnpm add module_name@version
 pnpm add -D module_name@version
 ```
 
-If your app uses `npm` or `yarn`, use the corresponding `npm install` or `yarn add` command in the
-same directory as `package.json`.
+Equivalents for other package managers:
+
+- npm: `npm install module_name@version` / `npm install -D module_name@version`
+- yarn: `yarn add module_name@version` / `yarn add --dev module_name@version`
+- bun: `bun add module_name@version` / `bun add -D module_name@version`
 
 ### Verify After Updates
 
