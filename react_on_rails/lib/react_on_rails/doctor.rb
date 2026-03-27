@@ -760,7 +760,7 @@ module ReactOnRails
         content = File.read(config_path)
 
         checker.add_info("📋 React on Rails Configuration:")
-        checker.add_info("📍 Documentation: https://reactonrails.com/docs/guides/configuration/")
+        checker.add_info("📍 Documentation: https://reactonrails.com/docs/configuration/")
 
         # Analyze configuration settings
         analyze_server_rendering_config(content)
@@ -957,7 +957,7 @@ module ReactOnRails
       if /config\.rendering_extension\s*=\s*([^\s\n,]+)/.match?(content)
         checker.add_info("\n🔌 Custom Extensions:")
         checker.add_info("  rendering_extension: Custom rendering logic detected")
-        checker.add_info("    ℹ️  See: https://reactonrails.com/docs/guides/rendering-extensions")
+        checker.add_info("    ℹ️  See: https://reactonrails.com/docs/configuration/#rendering_extension")
       end
 
       # Check for rendering props extension
@@ -995,7 +995,7 @@ module ReactOnRails
       deprecated_settings.each do |setting|
         checker.add_warning("  #{setting}")
       end
-      checker.add_info("📖 Migration guide: https://reactonrails.com/docs/guides/upgrading-react-on-rails")
+      checker.add_info("📖 Migration guide: https://reactonrails.com/docs/upgrading/upgrading-react-on-rails")
     end
 
     def check_breaking_changes_warnings
@@ -1063,7 +1063,7 @@ module ReactOnRails
 
       checker.add_info("\n🚨 React on Rails v16+ Breaking Changes Detected:")
       issues_found.each { |issue| checker.add_warning("  #{issue}") }
-      checker.add_info("📖 Full migration guide: https://reactonrails.com/docs/guides/upgrading-react-on-rails#upgrading-to-version-16")
+      checker.add_info("📖 Full migration guide: https://reactonrails.com/docs/upgrading/upgrading-react-on-rails#upgrading-to-version-16")
     end
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
@@ -1244,7 +1244,7 @@ module ReactOnRails
         if (prerender_set || uses_prerender) && !server_bundle_set
           checker.add_warning("  ⚠️  Server rendering is enabled but server_bundle_js_file is not configured")
           checker.add_info("  💡 Set config.server_bundle_js_file = 'server-bundle.js' to enable SSR")
-          checker.add_info("  💡 See: https://reactonrails.com/docs/guides/server-rendering")
+          checker.add_info("  💡 See: https://reactonrails.com/docs/core-concepts/react-server-rendering/")
         elsif server_bundle_set && !prerender_set && !uses_prerender
           checker.add_info("  ℹ️  server_bundle_js_file is configured but prerender doesn't appear to be used")
           checker.add_info("  💡 Either use prerender: true in react_component calls or remove server_bundle_js_file")
@@ -2029,7 +2029,7 @@ module ReactOnRails
       checker.add_info("  💡 :async can cause race conditions. Options:")
       checker.add_info("    1. Upgrade to React on Rails Pro (recommended for :async support)")
       checker.add_info("    2. Change to :defer or :sync loading strategy")
-      checker.add_info("  📖 https://reactonrails.com/docs/guides/configuration/")
+      checker.add_info("  📖 https://reactonrails.com/docs/configuration/")
     end
 
     def scan_view_files_for_async_pack_tag

@@ -2,7 +2,24 @@
 
 This guide covers the most common problems you'll encounter when migrating to React Server Components, with concrete solutions for each. Use it as a reference when you hit errors or unexpected behavior.
 
-> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md)
+> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md) | Next: [Flight Payload Optimization](rsc-flight-payload.md)
+
+## Diagnostic Quick-Reference
+
+When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
+
+| Symptom                                                          | Most Likely Cause                                                            | Section                                                                          |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_  | Passing functions or class instances across the server-client boundary       | [Serialization Boundary Issues](#serialization-boundary-issues)                  |
+| Build error: _"needs useState/useEffect"_                        | Using hooks in a Server Component file                                       | [Error Message Catalog](#error-message-catalog)                                  |
+| RSC page downloads unexpectedly large JS chunks                  | Chunk contamination from shared `'use client'` modules                       | [Chunk Contamination](#chunk-contamination)                                      |
+| Component stays a Client Component after removing `'use client'` | Imported by another `'use client'` file, or RSC bundle not rebuilding        | [Accidental Client Components](#accidental-client-components)                    |
+| Hydration mismatch warnings in console                           | Server/client render output differs (timestamps, browser APIs, invalid HTML) | [Hydration Mismatches](#hydration-mismatches)                                    |
+| `ReferenceError: performance is not defined`                     | Node renderer VM context missing globals                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)         |
+| SSR hangs or times out on large pages                            | Stream backpressure deadlock                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                    |
+| Rails boot error about version mismatch                          | Gem and npm package at different versions                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)    |
+| 422 Unprocessable Entity on form submission                      | Missing CSRF token in fetch request                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions) |
+| Page is blank until all data loads                               | Missing `stream_react_component` or Suspense boundaries                      | [Performance Pitfalls](#performance-pitfalls)                                    |
 
 ## Serialization Boundary Issues
 
@@ -83,6 +100,25 @@ export default function ClientForm() {
 ```erb
 <%# ERB view %>
 <%= stream_react_component("ClientForm") %>
+```
+
+### Common Error: railsContext Contains Functions
+
+When using React on Rails Pro with RSC, the `railsContext` object includes non-serializable functions (`addPostSSRHook`, `getRSCPayloadStream`). Passing the entire `railsContext` to a Client Component causes:
+
+```
+Functions cannot be passed directly to Client Components
+unless you explicitly expose it by marking it with "use server".
+```
+
+**Fix:** Strip non-serializable properties before passing to Client Components:
+
+```jsx
+// Server Component (render function)
+const MyPage = (props, railsContext) => {
+  const { addPostSSRHook, getRSCPayloadStream, ...serializableContext } = railsContext;
+  return () => <ClientComponent {...props} railsContext={serializableContext} />;
+};
 ```
 
 > **Note:** React on Rails does **not** support Server Actions (`'use server'`). Server Actions run on the Node renderer, which has no access to Rails models, sessions, cookies, or CSRF protection. Use Rails controller endpoints for all mutations.
@@ -553,7 +589,11 @@ Without Suspense, Server Components perform similarly to traditional SSR. Benchm
 
 ### RSC Payload Duplication
 
-The RSC payload (a serialized representation of the component tree) is embedded in `<script>` tags alongside the server-rendered HTML. This payload is used by React on the client to reconcile the component tree without re-rendering from scratch. The HTML and the RSC payload are not exact duplicates -- the payload contains component structure and props, not rendered markup -- but they do represent overlapping information, which increases document size. Monitor RSC payload size to ensure it stays reasonable.
+The RSC payload (a serialized representation of the component tree) is embedded in `<script>` tags alongside the server-rendered HTML. This payload is used by React on the client to reconcile the component tree without re-rendering from scratch. The HTML and the RSC payload are not exact duplicates -- the payload contains component structure and props, not rendered markup -- but they do represent overlapping information, which increases document size.
+
+Payload size can grow rapidly when Server Components produce verbose element trees -- particularly with utility-first CSS frameworks like Tailwind, where className strings alone can account for nearly half the payload. Components repeated many times on a page (product cards, review lists, tag grids) amplify this effect. In one benchmark, moving four presentational subtrees from server to client components reduced the raw Flight payload by 42% with only a 2.2 KB client JS increase.
+
+For a detailed analysis, measurement techniques, and the decision flowchart for when to apply this optimization, see [Flight Payload Optimization](rsc-flight-payload.md).
 
 ## Testing Strategies
 
@@ -695,6 +735,8 @@ end
 | SSR hangs indefinitely / request timeout on large RSC payloads                                                               | Stream backpressure deadlock when RSC payload exceeds 16 KB                                                                                                                                        | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                                                                                                                                                 |
 | `"The 'react-on-rails' package version does not match the gem version"`                                                      | Gem and npm package installed at different versions                                                                                                                                                | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                   |
 | `"The 'react-on-rails' package version is not an exact version"`                                                             | Using semver ranges (`^`, `~`, `*`) instead of an exact version in package.json                                                                                                                    | Pin to the exact version without range operators. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                    |
+| RSC payload returns `ServerComponentFetchError: Error parsing JSON` or `SyntaxError` in development                          | Rails' `annotate_rendered_view_with_filenames` wraps the RSC payload JSON in `<!-- BEGIN -->` / `<!-- END -->` HTML comments                                                                       | Upgrade to React on Rails Pro 16.4.0+ which renders RSC templates with `formats: [:text]`. For older versions, disable `config.action_view.annotate_rendered_view_with_filenames` for the RSC controller.                                                              |
+| `railsContext` causes "Functions cannot be passed directly to Client Components"                                             | `railsContext` includes non-serializable functions (`addPostSSRHook`, `getRSCPayloadStream`) added by Pro                                                                                          | Destructure and exclude function properties before passing to Client Components. See [railsContext Contains Functions](#common-error-railscontext-contains-functions)                                                                                                  |
 
 ## Environment Variable Access
 

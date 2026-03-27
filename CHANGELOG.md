@@ -24,15 +24,46 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **[Pro] Fixed bundle duplication in remote node renderer asset uploads**: When RSC support is enabled, running `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` no longer duplicates bundle JS files across bundle directories. Previously, both the server bundle and RSC bundle were copied into every target directory; now each bundle is placed only in its own directory while shared assets (manifests, stats) are correctly distributed to all. [PR 2768](https://github.com/shakacode/react_on_rails/pull/2768) by [AbanoubGhadban](https://github.com/AbanoubGhadban). Fixes [Issue 2766](https://github.com/shakacode/react_on_rails/issues/2766).
+
+### [16.5.0] - 2026-03-25
+
+Stable release — no changes from 16.5.0.rc.0.
+
+### [16.5.0.rc.0] - 2026-03-25
+
 #### Added
 
-- **`create-react-on-rails-app --pro` support**: Added explicit `--pro` mode to the CLI, including
-  `react_on_rails_pro` gem installation and generator wiring for Pro-only setup (without requiring `--rsc`).
-  [PR 2818](https://github.com/shakacode/react_on_rails/pull/2818) by
-- **Global prerender env override**: Added `REACT_ON_RAILS_PRERENDER_OVERRIDE=true|false` to force prerender behavior
-  globally (env > component option > initializer default), useful for CI/test environments without an SSR server.
-  [PR 2816](https://github.com/shakacode/react_on_rails/pull/2816) by
-  [justin808](https://github.com/justin808).
+- **`create-react-on-rails-app --pro` support**: Added explicit `--pro` mode to the CLI, including `react_on_rails_pro` gem installation and generator wiring for Pro-only setup (without requiring `--rsc`). [PR 2818](https://github.com/shakacode/react_on_rails/pull/2818) by [justin808](https://github.com/justin808).
+- **Global prerender env override**: Added `REACT_ON_RAILS_PRERENDER_OVERRIDE=true|false` to force prerender behavior globally (env > component option > initializer default), useful for CI/test environments without an SSR server. [PR 2816](https://github.com/shakacode/react_on_rails/pull/2816) by [justin808](https://github.com/justin808).
+- **`react_on_rails:sync_versions` rake task**: Added a version synchronizer that aligns npm package versions (`react-on-rails`, `react-on-rails-pro`, `react-on-rails-pro-node-renderer`) with loaded gem versions. Runs in dry-run mode by default; use `WRITE=true` to apply changes. [PR 2797](https://github.com/shakacode/react_on_rails/pull/2797) by [justin808](https://github.com/justin808).
+- **Pro/RSC setup checks in `react_on_rails:doctor`**: Extended doctor diagnostics with Pro Setup (initializer, renderer mode, base-package import scanning) and RSC checks (renderer mode, payload route, bundler config, React version, Procfile RSC watcher). Sections are skipped for OSS-only installs. [PR 2674](https://github.com/shakacode/react_on_rails/pull/2674) by [ihabadham](https://github.com/ihabadham).
+
+#### Changed
+
+- **[Pro]** **Canonical env var for worker count is now `RENDERER_WORKERS_COUNT`**. The previous `NODE_RENDERER_CONCURRENCY` is still supported as a fallback. Worker count validation now accepts explicit `0` for single-process mode and warns on invalid values. [PR 2611](https://github.com/shakacode/react_on_rails/pull/2611) by [justin808](https://github.com/justin808).
+
+#### Improved
+
+- **Smoother `create-react-on-rails-app` and install generator flows**: Fresh app scaffolding now runs non-interactively with `--force`, preserves the selected package manager, normalizes pnpm projects, auto-replaces stock `bin/dev`, and warns (instead of failing) on dirty worktrees. Post-install output updated with `db:prepare` step and current docs URL. [PR 2650](https://github.com/shakacode/react_on_rails/pull/2650) by [justin808](https://github.com/justin808).
+- **Pro upgrade hint after install**: Running `rails g react_on_rails:install` now prints a Pro upgrade hint with docs link. Suppressed when `--pro` or `--rsc` flags are used. [PR 2642](https://github.com/shakacode/react_on_rails/pull/2642) by [justin808](https://github.com/justin808).
+
+#### Fixed
+
+- **Preserve runtime env vars across `Bundler.with_unbundled_env`**: Fixed `PORT` and `SHAKAPACKER_DEV_SERVER_PORT` being lost when `ProcessManager` runs foreman/overmind inside `Bundler.with_unbundled_env`, breaking auto-detected ports from `PortSelector`. Env vars are now captured before the unbundled block and passed explicitly to `system()`. [PR 2836](https://github.com/shakacode/react_on_rails/pull/2836) by [ihabadham](https://github.com/ihabadham).
+- **Fix doctor prerender check and ExecJS display for Pro/RSC apps**: `uses_prerender_in_views?` now detects Pro streaming helpers (`stream_react_component`, `cached_stream_react_component`, `rsc_payload_react_component`) that implicitly enable prerender. Server rendering engine display now correctly detects NodeRenderer configuration from the Pro initializer. [PR 2773](https://github.com/shakacode/react_on_rails/pull/2773) by [ihabadham](https://github.com/ihabadham).
+- **Fix doctor false positives for custom layouts**: `react_on_rails:doctor` now resolves `package.json` from `node_modules_location` config (instead of assuming repo root) and discovers webpack/rspack configs across common custom locations. Missing bundler config downgraded from error to contextual warning. [PR 2612](https://github.com/shakacode/react_on_rails/pull/2612) by [justin808](https://github.com/justin808).
+
+#### Breaking Changes
+
+- **[Pro]** **Minimum `async` gem version bumped to 2.29**: The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. If your Gemfile pins the `async` gem below 2.29, you will need to update it before upgrading React on Rails Pro. Run `bundle update async` to pick up the new minimum.
+  [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808).
+
+#### Changed
+
+- **[Pro]** **Migrated from `Async::Variable` to `Async::Promise`**: The streaming helper internals now use `Async::Promise` for async v2.29+ compatibility while preserving pre-first-chunk error propagation behavior. [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808). Fixes [Issue 2563](https://github.com/shakacode/react_on_rails/issues/2563).
 
 #### Changed
 
@@ -2032,7 +2063,9 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...main
+[16.5.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.0.rc.0...v16.5.0
+[16.5.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0.rc.0
 [16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1

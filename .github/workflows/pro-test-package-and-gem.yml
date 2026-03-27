@@ -26,6 +26,9 @@ defaults:
 
 jobs:
   detect-changes:
+    # Skip Dependabot PRs — they can't access the Pro license secret.
+    # Scoped to pull_request so push-to-main after merge still runs Pro CI.
+    if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
     permissions:
       contents: read
       actions: read

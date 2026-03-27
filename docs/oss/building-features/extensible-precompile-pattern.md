@@ -230,7 +230,7 @@ The extensible pattern adds configuration overhead that isn't justified for simp
 
 ## Compatibility
 
-This pattern requires **React on Rails 16.2+** and works with any version of Shakapacker. The `ReactOnRails::Locales.compile` API has been available since React on Rails introduced i18n support and is the same method used internally by the `react_on_rails:locale` rake task.
+This pattern requires **React on Rails 16.4.0+** and works with any version of Shakapacker. The `ReactOnRails::Locales.compile` API has been available since React on Rails introduced i18n support and is the same method used internally by the `react_on_rails:locale` rake task.
 
 ## See Also
 

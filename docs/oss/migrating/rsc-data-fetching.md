@@ -743,6 +743,111 @@ function StatsSkeleton() {
 }
 ```
 
+## Common Mistakes
+
+### Mistake 1: Sequential queries in the Rails controller
+
+The most common performance regression after migrating to RSC. Since data now comes from the Rails controller (instead of parallel client-side fetches), sequential ActiveRecord queries block the entire page render:
+
+```ruby
+# BAD: 750ms total -- each query waits for the previous one
+def show
+  @user = User.find(params[:id])              # 200ms
+  @stats = Stats.for_user(@user.id)          # 300ms
+  @posts = Post.where(user_id: @user.id)     # 250ms
+  stream_view_containing_react_components(template: "show")
+end
+```
+
+**Fix:** Use Ruby threads for independent queries (see [Avoiding Server-Side Waterfalls](#avoiding-server-side-waterfalls)), or split into multiple `stream_react_component` calls in the ERB view so each component renders as its data becomes available.
+
+### Mistake 2: Using Server Actions (`'use server'`)
+
+Server Actions are **not supported** in React on Rails in any environment. The Node renderer is a rendering server -- it has no access to Rails models, sessions, cookies, or CSRF protection.
+
+```jsx
+// BAD: Server Actions don't have access to Rails
+'use server';
+export async function createUser(name) {
+  // The Node renderer is a render-only environment -- it has no database
+  // connection, no ORM, and no access to Rails models or sessions.
+  // This code will fail at runtime.
+}
+```
+
+```jsx
+// GOOD: Use a Client Component that submits to a Rails controller endpoint
+'use client';
+
+import { useState } from 'react';
+import ReactOnRails from 'react-on-rails';
+
+export default function CreateUserForm() {
+  const [name, setName] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    await fetch('/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': ReactOnRails.authenticityToken(),
+      },
+      body: JSON.stringify({ user: { name } }),
+    });
+    setName('');
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input value={name} onChange={(e) => setName(e.target.value)} />
+      <button type="submit">Create</button>
+    </form>
+  );
+}
+```
+
+### Mistake 3: Forgetting CSRF tokens in fetch requests
+
+Rails rejects POST/PUT/PATCH/DELETE requests without a valid CSRF token. This is easy to miss when migrating from forms that included the token automatically:
+
+```jsx
+// BAD: Missing CSRF token -- Rails returns 422 Unprocessable Entity
+await fetch('/api/items', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(data),
+});
+
+// GOOD: Include the CSRF token
+await fetch('/api/items', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-CSRF-Token': ReactOnRails.authenticityToken(),
+  },
+  body: JSON.stringify(data),
+});
+```
+
+### Mistake 4: Removing loading states before adding streaming
+
+If you remove `useEffect` + loading state but haven't set up `stream_react_component` with Suspense boundaries, the page appears blank until all server data is ready:
+
+**Fix:** Complete the streaming setup ([Preparing Your App](rsc-preparing-app.md#step-6-switch-to-streaming-rendering)) before converting data-fetching components. Add Suspense boundaries around sections that should stream independently.
+
+### Mistake 5: Over-serializing ActiveRecord objects
+
+Calling `.as_json` without specifying `only:` or `include:` can serialize the entire object graph, including associations, timestamps, and internal fields. This bloats the RSC payload and can leak sensitive data:
+
+```ruby
+# BAD: Serializes everything, including potentially sensitive fields
+props: { user: @user.as_json }
+
+# GOOD: Whitelist exactly what the component needs
+props: { user: @user.as_json(only: [:id, :name, :email]) }
+```
+
 ## Migration Checklist
 
 ### Step 1: Identify Candidates
