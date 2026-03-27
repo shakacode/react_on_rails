@@ -22,6 +22,7 @@ Node SSR: worker starts → JS context created → request 1, 2, 3, ... 10,000 �
 Any module-level `Map`, `Set`, plain object, or array used as a cache will grow unboundedly because the module is loaded once and reused across all requests.
 
 **Leaks:**
+
 ```javascript
 // cache lives forever — entries are never removed
 const cache = new Map();
@@ -37,6 +38,7 @@ export function buildSignedUrl(imageUrl, width, height) {
 ```
 
 **Fix:** Add a max size with LRU eviction, clear the cache periodically, or remove it if the computation is cheap:
+
 ```javascript
 import { LRUCache } from 'lru-cache';
 
@@ -48,6 +50,7 @@ const cache = new LRUCache({ max: 1000 }); // bounded — evicts oldest entries
 Lodash's `_.memoize` uses an unbounded `Map` internally. At module scope, it accumulates entries across all SSR requests forever.
 
 **Leaks:**
+
 ```javascript
 import _ from 'lodash';
 
@@ -62,6 +65,7 @@ export const formatLocation = _.memoize((city, state) => {
 ### 3. Module-level Sets or arrays that accumulate
 
 **Leaks:**
+
 ```javascript
 const SENT_EVENTS = new Set(); // grows with every unique event
 
@@ -73,6 +77,7 @@ export function trackEvent(event) {
 ```
 
 **Fix:** Don't track client-side-only state (like analytics) during SSR. Guard with a server-side check:
+
 ```javascript
 export function trackEvent(event, railsContext) {
   if (railsContext.serverSide) return; // skip during SSR
@@ -83,6 +88,7 @@ export function trackEvent(event, railsContext) {
 ### 4. Third-party libraries with internal caches
 
 Some libraries maintain internal caches or singletons that grow in SSR:
+
 - **Styled-components / Emotion**: CSS-in-JS libraries can accumulate style sheets. Use `ServerStyleSheet` (styled-components) or `extractCritical` (Emotion) and reset between renders
 - **Apollo Client**: GraphQL cache grows if not reset between renders
 - **MobX**: Observer components can leak if `useStaticRendering` is not enabled (mobx-react < v7)
@@ -96,6 +102,7 @@ Some libraries maintain internal caches or singletons that grow in SSR:
 If code registers event listeners at module scope during SSR, they accumulate across requests:
 
 **Leaks:**
+
 ```javascript
 // Every SSR render adds another listener — they're never removed
 process.on('unhandledRejection', (err) => {
@@ -104,6 +111,7 @@ process.on('unhandledRejection', (err) => {
 ```
 
 **Fix:** Register listeners once (outside the render path), or guard with a flag:
+
 ```javascript
 let listenerRegistered = false;
 if (!listenerRegistered) {
@@ -160,6 +168,7 @@ Open `chrome://inspect` in Chrome, take heap snapshots, and use the "Comparison"
 Without this flag, V8 reads the container's memory limit and sets a very large heap ceiling. This causes V8 to defer garbage collection, amplifying any existing leaks.
 
 **Always set this for production:**
+
 ```bash
 NODE_OPTIONS=--max-old-space-size=1536 node node-renderer.js
 ```
@@ -195,14 +204,14 @@ The restart interval should be short enough that leaked memory doesn't fill the 
 
 When writing code that runs during SSR, always ask: **"If this module-level variable is never reset, will it grow with each request?"**
 
-| Pattern | Browser | Node Renderer |
-|---------|---------|---------------|
-| `const cache = {}` at module scope | Cleared on navigation | Persists forever |
-| `new Set()` at module scope | Cleared on navigation | Persists forever |
-| `_.memoize(fn)` at module scope | Cleared on navigation | Persists forever |
-| React component state (`useState`) | Per-component lifecycle | Created and collected per render (OK) |
-| `useEffect` callbacks | Runs on client | Skipped during SSR (OK) |
-| `useMemo` inside components | Per-component lifecycle | Runs during SSR but result is per-render (OK) |
+| Pattern                            | Browser                 | Node Renderer                                 |
+| ---------------------------------- | ----------------------- | --------------------------------------------- |
+| `const cache = {}` at module scope | Cleared on navigation   | Persists forever                              |
+| `new Set()` at module scope        | Cleared on navigation   | Persists forever                              |
+| `_.memoize(fn)` at module scope    | Cleared on navigation   | Persists forever                              |
+| React component state (`useState`) | Per-component lifecycle | Created and collected per render (OK)         |
+| `useEffect` callbacks              | Runs on client          | Skipped during SSR (OK)                       |
+| `useMemo` inside components        | Per-component lifecycle | Runs during SSR but result is per-render (OK) |
 
 The rule of thumb: **module-level mutable state is the danger zone.** React component-level state and hooks are fine because React creates and discards them per render.
 

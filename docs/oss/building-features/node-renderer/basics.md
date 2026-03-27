@@ -16,6 +16,7 @@ See [Installation](../../../pro/installation.md).
 The Node Renderer reuses V8 VM contexts across requests for performance. This means **module-level state in your server bundle persists across all SSR requests**. Any unbounded caches, `_.memoize` calls, or growing data structures at module scope will leak memory until the worker restarts.
 
 **Essential for production:**
+
 - Set `NODE_OPTIONS=--max-old-space-size=<MB>` to prevent V8 from deferring garbage collection
 - Enable worker rolling restarts via `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts`
 - Audit your server bundle for module-level mutable state

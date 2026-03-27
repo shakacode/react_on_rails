@@ -7,6 +7,8 @@ on:
 jobs:
   claude-review:
     runs-on: ubuntu-latest
+    env:
+      HAS_CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
     permissions:
       contents: read
       pull-requests: write
@@ -21,6 +23,7 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
+        if: env.HAS_CLAUDE_CODE_OAUTH_TOKEN == 'true'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -43,3 +46,8 @@ jobs:
 
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+
+      - name: Skip Claude review when token is unavailable
+        if: env.HAS_CLAUDE_CODE_OAUTH_TOKEN != 'true'
+        run: |
+          echo "Skipping Claude Code Review because CLAUDE_CODE_OAUTH_TOKEN is not available for this workflow context."
