@@ -16,7 +16,7 @@ declare global {
  * @internal Exported for tests and for Ruby helper to wrap with nonce
  */
 export function consoleReplay(
-  customConsoleHistory: (typeof console)['history'] = undefined,
+  customConsoleHistory?: (typeof console)['history'],
   numberOfMessagesToSkip = 0,
 ): string {
   // console.history is a global polyfill used in server rendering.
@@ -55,7 +55,7 @@ export function consoleReplay(
 }
 
 export default function buildConsoleReplay(
-  customConsoleHistory: (typeof console)['history'] = undefined,
+  customConsoleHistory?: (typeof console)['history'],
   numberOfMessagesToSkip = 0,
   nonce?: string,
 ): string {

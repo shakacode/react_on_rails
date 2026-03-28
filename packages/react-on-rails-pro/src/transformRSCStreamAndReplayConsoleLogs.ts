@@ -45,10 +45,10 @@ export default function transformRSCStreamAndReplayConsoleLogs(
       let { value, done } = await reader.read();
 
       const handleJsonChunk = (chunk: RSCPayloadChunk) => {
-        const { html, consoleReplayScript = '' } = chunk;
+        const { html, consoleReplayScript } = chunk;
         controller.enqueue(encoder.encode(html ?? ''));
 
-        const replayConsoleCode = consoleReplayScript
+        const replayConsoleCode = (consoleReplayScript ?? '')
           .trim()
           .replace(/^<script[^>]*>/i, '')
           .replace(/<\/script>$/i, '');
