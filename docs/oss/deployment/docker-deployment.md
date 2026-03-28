@@ -49,7 +49,7 @@ RUN bundle install && \
 
 # Install JS dependencies
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile  # Yarn Classic (v1); for Yarn Berry (v2+), use --immutable
 
 # Copy the full application
 COPY . .
@@ -95,7 +95,7 @@ CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]
 - If you use `config.build_production_command`, it runs during `assets:precompile`. See [Configuration](../configuration/README.md#build_production_command).
 - **Add a `.dockerignore` file** to prevent host-specific files from being copied into the build. Without it, `COPY . .` can overwrite the freshly installed `node_modules/` with modules built for a different OS/architecture. A minimal `.dockerignore`:
 
-  ```
+  ```text
   node_modules
   .git
   log
@@ -107,7 +107,7 @@ CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]
 Replace the Yarn lines with:
 
 ```dockerfile
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9 --activate  # pin to your project's major version
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -246,7 +246,7 @@ spec:
             httpGet:
               path: /up
               port: 3000
-            initialDelaySeconds: 15
+            initialDelaySeconds: 60
             periodSeconds: 20
           resources:
             requests:
@@ -273,6 +273,8 @@ spec:
 
 - **Secrets**: Use Kubernetes Secrets with `secretKeyRef` (as shown above) rather than hardcoding values directly in the `env` section. Never commit secret values to your manifest files.
 - **Migrations**: Run migrations as a Kubernetes Job or init container before the Deployment rolls out:
+
+  > **Warning:** With `replicas > 1`, each pod's init container runs concurrently. Prefer a Kubernetes Job for migrations unless every migration is idempotent.
 
   ```yaml
   initContainers:
