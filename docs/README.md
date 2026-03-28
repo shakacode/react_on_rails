@@ -44,6 +44,7 @@ Start at [React on Rails Pro](./pro/home-pro.md) for the canonical Pro route map
 - [Node Renderer](./pro/node-renderer.md) - Dedicated Node.js rendering server
 - [Fragment Caching](./pro/fragment-caching.md) - Cache rendered components
 - [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
+- [Node Renderer: Container Deployment](./oss/building-features/node-renderer/container-deployment.md) - Sidecar vs. separate workloads, memory tuning, troubleshooting
 
 ## Friendly evaluation policy
 

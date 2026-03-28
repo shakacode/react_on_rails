@@ -112,3 +112,4 @@ The NodeRenderer has a protocol version on both the Rails and Node sides. If the
 - [Installation](../../../pro/installation.md)
 - [Rails Options for node-renderer](../../configuration/configuration-pro.md)
 - [JS Options for node-renderer](./js-configuration.md)
+- [Container Deployment](./container-deployment.md) — Sidecar vs. separate workloads, memory tuning, autoscaling, and troubleshooting
