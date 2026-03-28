@@ -63,14 +63,25 @@ render_component(component_name, props:, options = {})
 | `:streaming` | Boolean | `true` | Enable streaming SSR (requires prerender) |
 | `:trace` | Boolean | `false` | Enable performance tracing |
 
-## React Hooks
+## React Component Props
 
-### `useAsyncProp`
+### `getReactOnRailsAsyncProp`
 
-Hook to access async props in your React components.
+Async prop accessor injected into Server Components by `addAsyncPropsCapabilityToComponentProps()`.
+The function returns the same Promise on repeated calls for the same prop name.
 
 ```tsx
-const value = useAsyncProp<T>(propName: string): T
+async function UsersList({ getReactOnRailsAsyncProp }) {
+  const users = await getReactOnRailsAsyncProp<User[]>('users');
+
+  return (
+    <ul>
+      {users.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  );
+}
 ```
 
 #### Parameters
@@ -81,38 +92,7 @@ const value = useAsyncProp<T>(propName: string): T
 
 #### Returns
 
-The resolved value of the async prop. Throws a promise if not yet resolved (for Suspense).
-
-#### Example
-
-```tsx
-function UsersList() {
-  const users = useAsyncProp<User[]>('users');
-
-  return (
-    <ul>
-      {users.map(user => <li key={user.id}>{user.name}</li>)}
-    </ul>
-  );
-}
-
-// Usage with Suspense
-<Suspense fallback={<Skeleton />}>
-  <UsersList />
-</Suspense>
-```
-
-### `useAsyncPropsReady`
-
-Hook to check if all async props have resolved.
-
-```tsx
-const isReady = useAsyncPropsReady(): boolean
-```
-
-#### Returns
-
-`true` when all async props for the current component have resolved.
+The resolved value of the async prop. The promise is shared across repeated calls so React can suspend and resume consistently.
 
 ## Configuration
 

@@ -411,6 +411,13 @@ def confirm_release!(version:, monorepo_root:)
     puts "             Run /update-changelog to add entries before releasing."
   end
   puts "################################################################################"
+  if ENV["RELEASE_CONFIRM"] == "y"
+    puts "  Confirmation: RELEASE_CONFIRM=y"
+    return
+  end
+
+  abort "Release confirmation requires an interactive terminal or RELEASE_CONFIRM=y." unless $stdin.tty?
+
   print "Proceed with release? [y/N] "
   $stdout.flush
   answer = $stdin.gets&.strip&.downcase
