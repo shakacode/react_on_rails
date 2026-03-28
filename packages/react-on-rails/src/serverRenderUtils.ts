@@ -1,29 +1,4 @@
-import type {
-  RegisteredComponent,
-  RenderResult,
-  RenderState,
-  RenderingError,
-  StreamRenderState,
-  FinalHtmlResult,
-} from './types/index.ts';
-
-export function createResultObject(
-  html: FinalHtmlResult | null,
-  consoleReplayScript: string,
-  renderState: RenderState | StreamRenderState,
-): RenderResult {
-  return {
-    html,
-    clientProps: renderState.clientProps,
-    consoleReplayScript,
-    hasErrors: renderState.hasErrors,
-    renderingError: renderState.error && {
-      message: renderState.error.message,
-      stack: renderState.error.stack,
-    },
-    isShellReady: 'isShellReady' in renderState ? renderState.isShellReady : undefined,
-  };
-}
+import type { RegisteredComponent, RenderingError, FinalHtmlResult } from './types/index.ts';
 
 /**
  * Builds the metadata object for the length-prefixed streaming protocol.
