@@ -272,7 +272,18 @@ spec:
       image: your-registry/myapp:latest
       command: ['bundle', 'exec', 'rails', 'db:migrate']
       env:
-        # same env vars as the main container
+        - name: RAILS_ENV
+          value: production
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: myapp-secrets
+              key: database-url
+        - name: SECRET_KEY_BASE
+          valueFrom:
+            secretKeyRef:
+              name: myapp-secrets
+              key: secret-key-base
   ```
 
 - **Horizontal Pod Autoscaler**: Scale based on CPU or custom metrics. React on Rails apps doing SSR are CPU-bound, so CPU-based scaling is a good starting point.
@@ -367,7 +378,7 @@ If you use [React on Rails Pro's Node Renderer](../building-features/node-render
 
 ### Multi-container setup
 
-Run the Node Renderer as a separate container/sidecar alongside the Rails container:
+Run the Node Renderer as a separate container/sidecar alongside the Rails container. The node-renderer container needs a separate image that includes Node.js — the main runtime image from the [Dockerfile above](#dockerfile-for-react-on-rails) does not include Node.
 
 ```yaml
 # Kubernetes example — two containers in one Pod
@@ -381,7 +392,7 @@ containers:
         value: 'http://localhost:3800'
 
   - name: node-renderer
-    image: your-registry/myapp:latest
+    image: your-registry/myapp-node-renderer:latest # must include Node.js
     command: ['node', 'node-renderer.js']
     ports:
       - containerPort: 3800
@@ -395,6 +406,13 @@ containers:
         path: /health
         port: 3800
 ```
+
+> **Note:** `REACT_RENDERER_URL` must be read in your initializer for it to take effect:
+>
+> ```ruby
+> # config/initializers/react_on_rails_pro.rb
+> config.renderer_url = ENV["REACT_RENDERER_URL"]
+> ```
 
 ### Configuration for containers
 

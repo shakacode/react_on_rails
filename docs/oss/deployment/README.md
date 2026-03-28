@@ -12,6 +12,8 @@ Shakapacker puts the necessary precompile steps automatically in the rake precom
 - [Server Rendering Tips](./server-rendering-tips.md) — SSR debugging and optimization
 - [Troubleshooting Build Errors](./troubleshooting-build-errors.md) — Webpack build issues
 - [Troubleshooting](./troubleshooting.md) — General deployment troubleshooting
+- [Troubleshooting Shakapacker](./troubleshooting-when-using-shakapacker.md) — Shakapacker-specific issues
+- [Troubleshooting Webpacker](./troubleshooting-when-using-webpacker.md) — Webpacker-specific issues
 
 ## Archived guides
 
