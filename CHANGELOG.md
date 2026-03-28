@@ -59,6 +59,7 @@ Stable release — no changes from 16.5.0.rc.0.
 
 #### Breaking Changes
 
+- **[Pro]** **`RENDERER_PASSWORD` now required in production-like environments**: Existing staging/production deployments using NodeRenderer without a password will fail to start after upgrading. Set `RENDERER_PASSWORD` in the environment and configure `config.renderer_password = ENV.fetch("RENDERER_PASSWORD")` in your Rails initializer before upgrading. [PR 2829](https://github.com/shakacode/react_on_rails/pull/2829) by [justin808](https://github.com/justin808).
 - **[Pro]** **Minimum `async` gem version bumped to 2.29**: The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. If your Gemfile pins the `async` gem below 2.29, you will need to update it before upgrading React on Rails Pro. Run `bundle update async` to pick up the new minimum.
   [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808).
 
