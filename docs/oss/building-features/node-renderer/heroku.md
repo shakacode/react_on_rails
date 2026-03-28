@@ -1,7 +1,7 @@
 # Node Renderer: Heroku Deployment
 
 > **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
+> Free or very low cost for startups and small companies. [Get a license →](https://reactonrails.com/docs/pro/)
 
 Most React on Rails Pro installations of the Node SSR Renderer will deploy the Rails and Renderer
 instances on the same server. This technique results in better performance since it avoids network
@@ -25,25 +25,39 @@ web: bin/runsvdir-dyno
 
 `/Procfile.web`
 
+Your `/Procfile.web` should keep the `puma` line and use the `renderer` line that matches your
+package manager:
+
+| Package manager | `renderer` line                    |
+| --------------- | ---------------------------------- |
+| npm             | `renderer: npm run node-renderer`  |
+| yarn            | `renderer: yarn run node-renderer` |
+| pnpm            | `renderer: pnpm run node-renderer` |
+
+For example, a complete `/Procfile.web` using pnpm:
+
 ```text
 puma: bundle exec puma -C config/puma.rb
-renderer: bin/node-renderer
+renderer: pnpm run node-renderer
 ```
 
-### bin/node-renderer
+Define the script in your root `package.json` so Heroku can run it from the app root:
 
-```bash
-#!/bin/bash
-cd client
-yarn run node-renderer
+```json
+{
+  "scripts": {
+    "node-renderer": "node client/node-renderer.js"
+  }
+}
 ```
 
-Be sure your script to run the node-renderer sets some port, like 3800 which is also set as the
-config.renderer_url for your Rails server.
+> **Note:** The script above relies on the default
+> `port: process.env.RENDERER_PORT || 3800` in the JS configuration example. That default is fine
+> for the same-dyno deployment above. If you deploy the renderer as a separate Heroku app, switch
+> the renderer config to `process.env.PORT` instead of `RENDERER_PORT`.
 
-### node-renderer
-
-Any task in client/package.json that starts the node-renderer
+Be sure your node-renderer script listens on the same port as the Rails `config.renderer_url`
+value, for example `http://localhost:3800`.
 
 ### Modifying Precompile Task
 
