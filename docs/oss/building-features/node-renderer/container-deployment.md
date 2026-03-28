@@ -25,6 +25,7 @@ Rails and the Node Renderer run together in a **single container**. This is the 
 ```
 
 **Advantages:**
+
 - **Simplest setup** — One container, one image, one deploy.
 - **No networking config** — Rails connects to the renderer via `localhost` out of the box.
 - **Guaranteed version alignment** — Both processes always run from the same image.
@@ -33,6 +34,7 @@ Rails and the Node Renderer run together in a **single container**. This is the 
 **When to move on:** If you're experiencing OOM restarts and need to determine whether Rails or the Node Renderer is the culprit, move to sidecar containers for visibility.
 
 **Configuration:**
+
 ```ruby
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
@@ -56,20 +58,23 @@ Rails and the Node Renderer run as separate containers within the **same pod/wor
 │  └──────┬───────┘ └─────┬─────┘ │
 │         │   localhost    │       │
 │         └───────┬────────┘       │
-└─────────────────┘────────────────┘
+└─────────────────┴────────────────┘
 ```
 
 **Advantages:**
+
 - **Per-process visibility** — See exactly which process is consuming memory and causing OOM kills.
 - **Independent resource limits** — Set separate CPU/memory limits for Rails and the Node Renderer.
 - **Guaranteed version alignment** — Both containers use the same image on deploy.
 - **Simpler networking** — Rails still connects via `localhost`.
 
 **Tradeoffs:**
+
 - Slightly more complex deployment config than a single container.
 - Autoscaling logic may need adjustment (see [Autoscaling Considerations](#autoscaling-considerations)).
 
 **Configuration:**
+
 ```ruby
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
@@ -83,15 +88,18 @@ end
 Rails and the Node Renderer run as independent workloads with their own scaling. This is the most complex option and is rarely needed.
 
 **Advantages:**
+
 - **Independent scaling** — Scale the renderer independently of Rails.
 
 **Disadvantages:**
+
 - **Version drift risk** — During rolling deploys, Rails and the Node Renderer may briefly run different versions. While protocol changes are rare, this is a risk to monitor.
 - **Race conditions** — Pods restart independently, which can cause transient connection errors.
 - **Network dependency** — Renderer must be reachable via internal service DNS.
 - **Overkill for most setups** — If you're running 2–4 replicas, independent scaling adds complexity without real benefit.
 
 **Configuration:**
+
 ```ruby
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
@@ -108,7 +116,7 @@ By default, the Node Renderer binds to `localhost`. For **sidecar containers** i
 
 ```javascript
 // node-renderer.js
-import reactOnRailsProNodeRenderer from 'react-on-rails-pro-node-renderer';
+import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
 
 const config = {
   host: '0.0.0.0',
@@ -119,6 +127,7 @@ reactOnRailsProNodeRenderer(config);
 ```
 
 Or via environment variable:
+
 ```bash
 RENDERER_HOST=0.0.0.0
 ```
@@ -132,6 +141,7 @@ RENDERER_HOST=0.0.0.0
 The Node Renderer's memory grows over time as it handles SSR requests. This is **expected behavior** — V8's garbage collector doesn't always return memory to the OS, even after objects are freed. In containerized environments with cgroup memory limits, this can trigger OOM kills.
 
 Typical memory profile:
+
 - **Startup:** ~500–600 MB for the renderer process with workers
 - **After hours of traffic:** 2–3 GB+ depending on component complexity and traffic volume
 - **Rails container:** Usually stabilizes at 2–4 GB depending on `WEB_CONCURRENCY` and `RAILS_MAX_THREADS`
@@ -146,11 +156,11 @@ NODE_OPTIONS="--max-old-space-size=512"
 
 This tells V8 to trigger garbage collection more aggressively and limits each worker's heap. Adjust the value based on your component complexity:
 
-| Component Complexity | Recommended `max-old-space-size` |
-|---------------------|----------------------------------|
-| Simple components | 256–512 MB |
-| Medium (Redux, large props) | 512–768 MB |
-| Complex (large data, many components) | 768–1024 MB |
+| Component Complexity                  | Recommended `max-old-space-size` |
+| ------------------------------------- | -------------------------------- |
+| Simple components                     | 256–512 MB                       |
+| Medium (Redux, large props)           | 512–768 MB                       |
+| Complex (large data, many components) | 768–1024 MB                      |
 
 > **Note:** This setting applies per worker. Total renderer memory ≈ `max-old-space-size × workersCount + overhead`. If V8 hits the limit, the worker process exits and is automatically restarted by the cluster manager.
 
@@ -167,6 +177,7 @@ const config = {
 **Sizing guideline:** Match worker count to expected concurrent SSR requests.
 
 A rough formula:
+
 ```text
 renderer_workers ≥ (WEB_CONCURRENCY × RAILS_MAX_THREADS × ssr_request_ratio) / 2
 ```
@@ -174,6 +185,7 @@ renderer_workers ≥ (WEB_CONCURRENCY × RAILS_MAX_THREADS × ssr_request_ratio)
 Where `ssr_request_ratio` is the fraction of requests that need server rendering (often 30–60% for hybrid apps).
 
 Example: With `WEB_CONCURRENCY=4` and `RAILS_MAX_THREADS=8` (32 total Rails threads), and ~50% of requests needing SSR:
+
 ```text
 renderer_workers ≥ (4 × 8 × 0.5) / 2 = 8 workers
 ```
@@ -186,9 +198,9 @@ To mitigate memory growth, enable periodic worker restarts:
 
 ```javascript
 const config = {
-  allWorkersRestartInterval: 360,                    // Restart all workers every 6 hours
-  delayBetweenIndividualWorkerRestarts: 2,           // 2 minutes between each worker restart
-  gracefulWorkerRestartTimeout: 30,                  // Kill stuck workers after 30 seconds
+  allWorkersRestartInterval: 360, // Restart all workers every 6 hours
+  delayBetweenIndividualWorkerRestarts: 2, // 2 minutes between each worker restart
+  gracefulWorkerRestartTimeout: 30, // Kill stuck workers after 30 seconds
 };
 ```
 
@@ -198,10 +210,10 @@ This drains requests from each worker before restarting, so there's no downtime.
 
 Recommended starting points for sidecar configuration:
 
-| Container | CPU Request | CPU Limit | Memory Request | Memory Limit |
-|-----------|-------------|-----------|----------------|--------------|
-| Rails | 1–2 cores | 2–4 cores | 2 GB | 4 GB |
-| Node Renderer | 1–2 cores | 2–4 cores | 2 GB | 4 GB |
+| Container     | CPU Request | CPU Limit | Memory Request | Memory Limit |
+| ------------- | ----------- | --------- | -------------- | ------------ |
+| Rails         | 1–2 cores   | 2–4 cores | 2 GB           | 4 GB         |
+| Node Renderer | 1–2 cores   | 2–4 cores | 2 GB           | 4 GB         |
 
 > **Important:** Set memory **requests** equal to **limits** for the renderer container so its memory budget is explicit. Kubernetes QoS is determined at the pod level, so you only get `Guaranteed` QoS when **every** container in the pod has matching requests and limits. If using `--max-old-space-size`, set the container memory limit to `max-old-space-size × workersCount × 1.5` to account for overhead.
 
@@ -236,6 +248,7 @@ If you previously scaled on CPU at 75%, you may need to adjust:
 ### Scaling with Separate Workloads
 
 With separate workloads, scale each independently:
+
 - **Rails**: Scale on CPU utilization or request queue depth.
 - **Node Renderer**: Scale on CPU utilization per worker.
 
@@ -246,6 +259,7 @@ With separate workloads, scale each independently:
 During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from Fastify. This occurs when Rails sends render requests before all Node Renderer workers are ready.
 
 **Mitigation:**
+
 1. **Health check endpoint** — Add a `/health` route (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)) and configure your container orchestrator to wait for it before routing traffic.
 2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
    ```yaml
@@ -286,8 +300,8 @@ Set log levels to capture useful information without noise:
 
 ```javascript
 const config = {
-  logLevel: 'info',       // General renderer logs
-  logHttpLevel: 'error',  // Only log HTTP errors (not every request)
+  logLevel: 'info', // General renderer logs
+  logHttpLevel: 'error', // Only log HTTP errors (not every request)
 };
 ```
 
@@ -312,6 +326,7 @@ In production, `logLevel: 'warn'` is sufficient unless actively debugging.
 ### Different versions after deploy (separate workloads)
 
 The React on Rails gem and Node Renderer package have a protocol version. If they mismatch, render requests return an error. To avoid this:
+
 - **Sidecars**: Both containers use the same image, so versions are always aligned.
 - **Separate workloads**: Deploy both workloads simultaneously. If your orchestrator doesn't support atomic multi-workload deploys, consider switching to sidecars.
 
