@@ -16,7 +16,7 @@ import type { RailsContext } from 'react-on-rails/types';
  * Flow:
  * 1. Create router with browser history
  * 2. Hydrate from dehydrated state provided by serverRenderTanStackAppAsync
- * 3. Set router.ssr = true to skip auto-load on mount (Transitioner behavior)
+ * 3. Set router.ssr to skip auto-load on mount (Transitioner behavior, legacy path only)
  * 4. After hydration, trigger router.load() to enable client-side navigation
  * 5. Return a React component that renders RouterProvider
  */
@@ -95,6 +95,7 @@ function TanStackHydrationApp({
   // A full remount creates a fresh router and may legitimately issue another load.
   const didTriggerPostHydrationLoadRef = useRef(false);
   const didInitializeSsrGlobalRef = useRef(false);
+  const didSetLegacySsrFlagRef = useRef(false);
 
   if (routerRef.current === null) {
     const router = options.createRouter();
@@ -116,10 +117,15 @@ function TanStackHydrationApp({
       );
     }
 
-    // Keep SSR mode enabled on hydration paths so Transitioner does not run
-    // a client-only initial load before hydration settles.
-    if (!hasSsrRouter && hasSsrPayload && router.ssr !== true) {
-      router.ssr = true;
+    // Legacy hydration path only: signal SSR mode so the Transitioner skips its
+    // initial router.load() call, preventing a hydration mismatch.  The object
+    // shape matches TanStack Router's internal $_TSR hydration contract (the
+    // Transitioner only checks truthiness).  The new ssrRouter/RouterClient path
+    // does not need this — RouterClient sets router.ssr internally via its own
+    // hydrate() function.
+    if (!hasSsrRouter && hasSsrPayload && !router.ssr) {
+      router.ssr = { manifest: undefined };
+      didSetLegacySsrFlagRef.current = true;
     }
 
     routerRef.current = router;
@@ -157,11 +163,23 @@ function TanStackHydrationApp({
     let cancelled = false;
     // `cancelled` only suppresses logging for a discarded mount. The in-flight load still
     // completes unless the router exposes a best-effort cancelLoad() hook.
-    router.load().catch((err: unknown) => {
-      if (!cancelled) {
-        console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);
-      }
-    });
+    router
+      .load()
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);
+        }
+      })
+      .finally(() => {
+        // Legacy hydration only: clear the temporary SSR hint after the first
+        // client load has completed so it cannot influence later navigations.
+        // Only clear when this module set it, so pre-existing router.ssr state
+        // from user code or upstream router internals is preserved.
+        if (didSetLegacySsrFlagRef.current) {
+          router.ssr = undefined;
+          didSetLegacySsrFlagRef.current = false;
+        }
+      });
 
     return () => {
       cancelled = true;
