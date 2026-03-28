@@ -17,7 +17,14 @@ module ReactOnRailsPro
         return nil unless ReactOnRailsPro.configuration.auto_refresh_enabled?
 
         response = HTTPX
-                   .plugin(:retries, max_retries: MAX_RETRIES, retry_after: RETRY_DELAY_SECONDS)
+                   .plugin(
+                     :retries,
+                     max_retries: MAX_RETRIES,
+                     retry_after: RETRY_DELAY_SECONDS,
+                     retry_on: lambda { |response|
+                       response.respond_to?(:status) && response.status >= 500
+                     }
+                   )
                    .with(timeout: { request_timeout: REQUEST_TIMEOUT_SECONDS })
                    .with(headers: {
                            "Authorization" => "Bearer #{license_key}",
