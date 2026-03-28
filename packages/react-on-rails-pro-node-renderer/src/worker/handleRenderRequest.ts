@@ -115,6 +115,9 @@ async function handleNewBundleProvided(
           'Bundle %s already exists and is complete. Skipping duplicate upload.',
           bundleFilePathPerTimestamp,
         );
+        if (assetsToCopy) {
+          await copyUploadedAssets(assetsToCopy, bundleDirectory);
+        }
         return undefined;
       }
 
