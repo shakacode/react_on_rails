@@ -23,6 +23,7 @@ import {
   type ProvidedNewBundle,
 } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
+import { WORKER_STARTUP_FAILURE, type WorkerStartupFailureMessage } from './shared/workerMessages.js';
 import {
   badRequestResponseResult,
   errorResponseResult,
@@ -511,6 +512,24 @@ export default function run(config: Partial<Config>) {
     app.listen({ port, host }, (err, address) => {
       if (err) {
         log.error({ err, host, port }, 'Node renderer failed to start');
+
+        if (cluster.isWorker && process.send) {
+          const startupFailure: WorkerStartupFailureMessage = {
+            type: WORKER_STARTUP_FAILURE,
+            stage: 'listen',
+            code: (err as NodeJS.ErrnoException).code,
+            errno: (err as NodeJS.ErrnoException).errno,
+            syscall: (err as NodeJS.ErrnoException).syscall,
+            host,
+            port,
+            message: err.message,
+          };
+          process.send(startupFailure, undefined, undefined, () => {
+            process.exit(1);
+          });
+          return;
+        }
+
         process.exit(1);
       }
       const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';

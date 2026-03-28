@@ -10,6 +10,7 @@ import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder.
 import restartWorkers from './master/restartWorkers.js';
 import * as errorReporter from './shared/errorReporter.js';
 import { getLicenseStatus } from './shared/licenseValidator.js';
+import { isWorkerStartupFailureMessage, type WorkerStartupFailureMessage } from './shared/workerMessages.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 // How often to scan for orphaned upload directories.
@@ -77,21 +78,44 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     })();
   }, ORPHAN_CLEANUP_INTERVAL_MS);
 
+  let isAbortingForStartupFailure = false;
+  let fatalStartupFailure: { workerId: number; failure: WorkerStartupFailureMessage } | null = null;
+
   for (let i = 0; i < workersCount; i += 1) {
     cluster.fork();
   }
+
+  cluster.on('message', (worker, message) => {
+    if (!isWorkerStartupFailureMessage(message) || isAbortingForStartupFailure) return;
+
+    isAbortingForStartupFailure = true;
+    fatalStartupFailure = { workerId: worker.id, failure: message };
+  });
 
   // Listen for dying workers:
   cluster.on('exit', (worker) => {
     if (worker.isScheduledRestart) {
       log.info('Restarting worker #%d on schedule', worker.id);
-    } else {
-      // TODO: Track last rendering request per worker.id
-      // TODO: Consider blocking a given rendering request if it kills a worker more than X times
-      const msg = `Worker ${worker.id} died UNEXPECTEDLY :(, restarting`;
-      errorReporter.message(msg);
+      cluster.fork();
+      return;
     }
-    // Replace the dead worker:
+
+    if (isAbortingForStartupFailure) {
+      const failure = fatalStartupFailure?.failure;
+      const msg =
+        failure?.code === 'EADDRINUSE'
+          ? `Node renderer startup failed: port ${failure.port} is already in use`
+          : `Node renderer startup failed in worker ${worker.id}: ${failure?.message || `exit code ${worker.process.exitCode}`}`;
+
+      errorReporter.message(msg);
+      process.exit(1);
+      return;
+    }
+
+    // TODO: Track last rendering request per worker.id
+    // TODO: Consider blocking a given rendering request if it kills a worker more than X times
+    const msg = `Worker ${worker.id} died UNEXPECTEDLY :(, restarting`;
+    errorReporter.message(msg);
     cluster.fork();
   });
 
