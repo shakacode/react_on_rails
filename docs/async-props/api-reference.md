@@ -19,25 +19,7 @@ async_prop(options) { expression }
 |-----------|------|-------------|
 | `block` | Block | The code to evaluate asynchronously |
 
-#### Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `:timeout` | Integer | `30` | Timeout in seconds for the async operation |
-| `:on_error` | Proc | `nil` | Error handler called if the block raises |
-
-#### Examples
-
-```ruby
-# Basic usage
-users: async_prop { User.active.limit(10) }
-
-# With timeout
-users: async_prop(timeout: 5) { SlowAPI.fetch_users }
-
-# With error handling
-users: async_prop(on_error: ->(e) { [] }) { ExternalService.users }
-```
+> **Status:** Per-prop `:timeout` and `:on_error` are not implemented in the current release. Use this page as the contract for the async prop flow, not as a promise that those helper options already exist.
 
 ### `render_component`
 

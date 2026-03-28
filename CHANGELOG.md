@@ -60,6 +60,7 @@ Stable release — no changes from 16.5.0.rc.0.
 
 - **[Pro]** **Minimum `async` gem version bumped to 2.29**: The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. If your Gemfile pins the `async` gem below 2.29, you will need to update it before upgrading React on Rails Pro. Run `bundle update async` to pick up the new minimum.
   [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808).
+- **[Pro]** **Node renderer upload protocol now requires `bundle_<hash>` form keys**: The `/upload-assets` endpoint now derives bundle destinations from `bundle_<hash>` fields and no longer accepts `targetBundles`-only payloads from older clients. Upgrade the React on Rails Pro gem and node renderer together so both sides speak the same upload protocol.
 
 #### Changed
 
