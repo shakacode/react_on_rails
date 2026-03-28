@@ -58,8 +58,8 @@ Every Inertia page navigation — even between client-side pages — requires a 
 
 - **Server round-trip on every navigation.** Perceived performance depends on Rails response time for every page transition, not just the initial load.
 - **Full page props serialized by default.** Inertia v2 adds [partial reloads](https://inertia-rails.dev/guide/partial-reloads) to request a subset of props, but the server round-trip is still required for every navigation and large prop sets still add serialization overhead.
-- **Code splitting limited to route-level lazy loading.** Inertia supports lazy-loaded page bundles via dynamic imports, but there is no component-level code splitting with SSR. React on Rails Pro supports granular code splitting via Loadable Components, so individual components within a page can be split and SSR'd independently.
-- **No streaming SSR.** Inertia's opt-in SSR renders the complete page before sending any HTML to the browser. React on Rails Pro streams progressively with `renderToPipeableStream`, so users see content faster on complex pages.
+- **Code splitting limited to route-level lazy loading.** Inertia supports lazy-loaded page bundles via dynamic imports, but there is no component-level code splitting with SSR. React on Rails **Pro** supports granular code splitting via Loadable Components, so individual components within a page can be split and SSR'd independently. (This is a Pro feature, not available in the OSS gem.)
+- **No streaming SSR.** Inertia's opt-in SSR renders the complete page before sending any HTML to the browser. React on Rails **Pro** streams progressively with `renderToPipeableStream`, so users see content faster on complex pages. (This is a Pro feature, not available in the OSS gem.)
 
 With React on Rails and a client-side router (for example TanStack Router in Pro), after the initial server-rendered page load, subsequent navigations can be handled entirely in JavaScript — fetching only the data each component needs and loading route-specific bundles on demand.
 

@@ -85,7 +85,7 @@ You should see a page with a React component saying "Hello World"!
 
 Let's make a quick change to see hot reloading in action:
 
-1. Open `app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx`
+1. Open the generated HelloWorld component (typically `client/app/bundles/HelloWorld/components/HelloWorld.tsx`)
 2. Change the text from "Hello World" to "Hello from React!"
 3. Save the file
 4. Watch your browser automatically refresh
@@ -214,7 +214,7 @@ Start at [React on Rails Pro](../../pro/home-pro.md) for the canonical route map
 # Start development servers
 ./bin/dev
 
-# Generate React on Rails files (TypeScript by default)
+# Generate React on Rails files with TypeScript support
 bin/rails generate react_on_rails:install --typescript
 
 # Create a new component
