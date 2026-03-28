@@ -113,4 +113,16 @@ describe('command helpers', () => {
       }),
     );
   });
+
+  it('raises a signal-specific error when execLiveArgs command is terminated', () => {
+    mockedSpawnSync.mockReturnValue({ status: null, signal: 'SIGTERM' } as ReturnType<typeof spawnSync>);
+
+    expect(() => execLiveArgs('git', ['status'])).toThrow('Command "git" was terminated by SIGTERM');
+  });
+
+  it('raises a signal-specific error when execCaptureArgs command is terminated', () => {
+    mockedSpawnSync.mockReturnValue({ status: null, signal: 'SIGKILL' } as ReturnType<typeof spawnSync>);
+
+    expect(() => execCaptureArgs('git', ['status'])).toThrow('Command "git" was terminated by SIGKILL');
+  });
 });

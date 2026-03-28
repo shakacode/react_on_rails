@@ -21,6 +21,9 @@ export function execLiveArgs(command: string, args: string[], cwd?: string, env?
   if (result.error) {
     throw result.error;
   }
+  if (result.status === null) {
+    throw new Error(`Command "${command}" was terminated by ${result.signal ?? 'unknown signal'}`);
+  }
   if (result.status !== 0) {
     throw new Error(`Command "${command}" exited with code ${result.status}`);
   }
@@ -40,6 +43,9 @@ export function execCaptureArgs(
   });
   if (result.error) {
     throw result.error;
+  }
+  if (result.status === null) {
+    throw new Error(`Command "${command}" was terminated by ${result.signal ?? 'unknown signal'}`);
   }
   if (result.status !== 0) {
     const stderr = result.stderr?.trim();
