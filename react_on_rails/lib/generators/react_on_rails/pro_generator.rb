@@ -396,9 +396,23 @@ module ReactOnRails
 
           if in_multiline_template_literal || line_contains_unescaped_backtick
             line_for_state_update = in_multiline_template_literal ? line : line_for_template_literal_state
-            in_multiline_template_literal =
+            updated_template_literal_state =
               update_multiline_template_literal_state(in_multiline_template_literal, line_for_state_update)
-            line
+
+            if in_multiline_template_literal && !updated_template_literal_state
+              rewritten_line, pending_multiline_module_call_depth, pending_multiline_static_import_specifier =
+                rewrite_line_after_template_literal_close(
+                  line,
+                  pending_multiline_module_call_depth,
+                  pending_multiline_static_import_specifier
+                ) { |line_fragment| yield line_fragment }
+              in_multiline_template_literal = updated_template_literal_state
+              in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
+              rewritten_line
+            else
+              in_multiline_template_literal = updated_template_literal_state
+              line
+            end
           elsif in_block_comment
             if stripped.include?("*/")
               in_block_comment = false
@@ -579,6 +593,28 @@ module ReactOnRails
         ["#{comment_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
+      def rewrite_line_after_template_literal_close(line, pending_depth, pending_multiline_static_import_specifier)
+        closing_index = first_unescaped_backtick_index(line)
+        return [line, pending_depth, pending_multiline_static_import_specifier] unless closing_index
+        return [line, pending_depth, pending_multiline_static_import_specifier] if closing_index >= line.length - 1
+
+        template_literal_prefix = line[0, closing_index + 1]
+        line_fragment = line[(closing_index + 1)..]
+        rewritten_fragment = yield line_fragment
+        rewritten_fragment, pending_multiline_static_import_specifier =
+          update_pending_multiline_static_import_tracking(rewritten_fragment, pending_multiline_static_import_specifier)
+        rewritten_fragment, pending_depth =
+          update_pending_multiline_module_call_tracking(rewritten_fragment, pending_depth)
+        ["#{template_literal_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
+      end
+
+      def first_unescaped_backtick_index(line)
+        line.each_char.with_index do |char, index|
+          return index if char == "`" && (index.zero? || line[index - 1] != "\\")
+        end
+        nil
+      end
+
       # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
       def match_multiline_parenthesized_base_gem(lines, start_index)
         start_line = lines[start_index]
@@ -640,7 +676,7 @@ module ReactOnRails
         normalized_suffix = normalized_suffix.sub(/\)(\s*(?:#.*)?\n)\z/, '\1') if parenthesized_gem_call
 
         "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
-          "#{quote}~> #{recommended_pro_gem_version}#{quote}#{normalized_suffix}"
+          "#{quote}#{ReactOnRails::VERSION}#{quote}#{normalized_suffix}"
       end
 
       def print_success_message
