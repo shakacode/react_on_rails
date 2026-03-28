@@ -134,13 +134,16 @@ end
 A minimal Dockerfile that bundles Rails and the Node Renderer in a single image:
 
 ```dockerfile
+FROM node:22-slim AS node
 FROM ruby:3.3
 
-# Install Node.js 22 (LTS)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs libjemalloc2
+# Copy Node.js from the official image (avoids curl-pipe-bash)
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 # jemalloc for Rails memory (adjust path for arm64: aarch64-linux-gnu)
+RUN apt-get update && apt-get install -y libjemalloc2 && rm -rf /var/lib/apt/lists/*
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 ENV MALLOC_CONF="dirty_decay_ms:1000,muzzy_decay_ms:1000"
 
@@ -161,8 +164,17 @@ RUN bundle exec rake assets:precompile
 # Expose Rails and Node Renderer ports
 EXPOSE 3000 3800
 
-# Start both processes (use a process manager like overmind or foreman in production)
-CMD ["bin/start"]
+# Start both processes with a process manager (overmind, foreman, etc.)
+# See the Procfile example below
+CMD ["overmind", "start", "-f", "Procfile"]
+```
+
+For the single-container pattern, use a process manager like [overmind](https://github.com/DarthSim/overmind) or [foreman](https://github.com/ddollar/foreman) with a `Procfile`:
+
+```text
+# Procfile
+rails: bundle exec rails server -b 0.0.0.0 -p 3000
+renderer: node client/node-renderer.js
 ```
 
 > **Tip:** For sidecar containers, use the same image but override the `CMD` — one container runs `bundle exec rails server`, the other runs `node client/node-renderer.js` (or your Node Renderer entry point).
@@ -262,7 +274,7 @@ The default `workersCount` is CPU count minus 1, which may over-allocate in cont
 
 ```javascript
 const config = {
-  workersCount: parseInt(process.env.RENDERER_WORKERS_COUNT || '8', 10),
+  workersCount: parseInt(process.env.RENDERER_WORKERS_COUNT, 10), // Required — derive from the sizing formula below
 };
 ```
 
@@ -496,7 +508,7 @@ spec:
             failureThreshold: 6
           readinessProbe:
             httpGet:
-              path: /info
+              path: /info # or /health for worker-readiness semantics (see configureFastify)
               port: 3800
             periodSeconds: 5
             failureThreshold: 3
