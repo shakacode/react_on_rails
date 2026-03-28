@@ -151,7 +151,7 @@ COPY Gemfile Gemfile.lock ./
 RUN bundle install
 
 COPY package.json package-lock.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 
@@ -165,7 +165,7 @@ EXPOSE 3000 3800
 CMD ["bin/start"]
 ```
 
-> **Tip:** For sidecar containers, use the same image but override the `CMD` — one container runs `bundle exec rails server`, the other runs `node server-bundle.js` (or your Node Renderer entry point).
+> **Tip:** For sidecar containers, use the same image but override the `CMD` — one container runs `bundle exec rails server`, the other runs `node client/node-renderer.js` (or your Node Renderer entry point).
 
 ## Docker Compose Example
 
@@ -186,7 +186,7 @@ services:
 
   renderer:
     build: .
-    command: node server-bundle.js
+    command: node client/node-renderer.js
     ports:
       - '3800:3800'
     environment:
@@ -304,8 +304,8 @@ Recommended starting points for sidecar configuration:
 
 | Container     | CPU Request | CPU Limit | Memory Request | Memory Limit |
 | ------------- | ----------- | --------- | -------------- | ------------ |
-| Rails         | 1–2 cores   | 2–4 cores | 2 GB           | 4 GB         |
-| Node Renderer | 1–2 cores   | 2–4 cores | 2 GB           | 4 GB         |
+| Rails         | 1–2 cores   | 2–4 cores | 4 GB           | 4 GB         |
+| Node Renderer | 1–2 cores   | 2–4 cores | 4 GB           | 4 GB         |
 
 > **Important:** Set memory **requests** equal to **limits** for the renderer container so its memory budget is explicit. Kubernetes QoS is determined at the pod level, so you only get `Guaranteed` QoS when **every** container in the pod has matching requests and limits. If using `--max-old-space-size`, set the container memory limit to `max-old-space-size × workersCount × 1.5` to account for overhead.
 
@@ -384,11 +384,11 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      periodSeconds: 5
      failureThreshold: 6
    ```
-3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests:
+3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. The built-in `/info` endpoint confirms the process is up; for worker-level readiness, use a custom `/health` route via `configureFastify()`:
    ```yaml
    readinessProbe:
      httpGet:
-       path: /info
+       path: /info # or /health for worker-readiness semantics
        port: 3800
      periodSeconds: 5
      failureThreshold: 3
@@ -407,7 +407,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 Distinguish between Rails and Node Renderer OOM kills by checking container-level exit codes:
 
-- **Exit code 137**: Killed by OOM (SIGKILL from cgroup limit).
+- **Exit code 137**: Process received SIGKILL — commonly OOM from cgroup limit, but can also be forced termination (grace-period expiry, liveness probe failure). Check `kubectl describe pod` for `Reason: OOMKilled` to confirm OOM.
 - **Exit code 1**: Application crash (check logs for stack trace).
 
 With sidecar containers, your orchestrator should report which container was OOM-killed. Use this to tune resource limits for the specific container rather than increasing the entire pod.
@@ -465,14 +465,14 @@ spec:
           resources:
             requests:
               cpu: '1'
-              memory: '2Gi'
+              memory: '4Gi'
             limits:
               cpu: '2'
               memory: '4Gi'
 
         - name: node-renderer
           image: your-app:latest # Same image as Rails
-          command: ['node', 'server-bundle.js']
+          command: ['node', 'client/node-renderer.js']
           ports:
             - containerPort: 3800
           env:
