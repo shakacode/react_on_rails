@@ -251,6 +251,8 @@ export default function ProductList({ initialProducts }) {
       props: { products: Product.limit(50).as_json }) %>
 ```
 
+> **Note:** `initialDataUpdatedAt` and `staleTime` are intentional here. Together they tell React Query that the Rails data is fresh for the next five minutes instead of treating it as stale immediately on mount.
+
 **How it works:**
 
 1. Rails controller fetches products and passes them as props
@@ -259,6 +261,8 @@ export default function ProductList({ initialProducts }) {
 4. Subsequent refetches happen client-side as usual
 
 > **Note:** `initialDataUpdatedAt` and `staleTime` work together to prevent React Query from treating the Rails data as immediately stale on mount. `Date.now()` uses the client render timestamp, not the actual Rails fetch time — this is close enough for most apps. For precise control, pass a timestamp from your Rails controller (e.g., `(Time.now.to_f * 1000).to_i`) as a prop and use that instead. If you don't need timed refetching at all, use `staleTime: Infinity` to prevent automatic refetches entirely.
+
+> **Alternative:** For complex cases with many queries, you can use TanStack Query's `dehydrate`/`HydrationBoundary` pattern to prefetch and seed the entire QueryClient cache on the server. See the [TanStack Query SSR docs](https://tanstack.com/query/latest/docs/framework/react/guides/ssr) for details.
 
 > **Alternative:** For complex cases with many queries, you can use TanStack Query's `dehydrate`/`HydrationBoundary` pattern to prefetch and seed the entire QueryClient cache on the server. See the [TanStack Query SSR docs](https://tanstack.com/query/latest/docs/framework/react/guides/ssr) for details.
 
@@ -389,7 +393,6 @@ function StatsPanel({ stats }) {
     </div>
   );
 }
-
 function PostFeed({ posts }) {
   return (
     <ul>
