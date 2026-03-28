@@ -34,6 +34,13 @@ package manager:
 | yarn            | `renderer: yarn run node-renderer` |
 | pnpm            | `renderer: pnpm run node-renderer` |
 
+For example, a complete `/Procfile.web` using pnpm:
+
+```text
+puma: bundle exec puma -C config/puma.rb
+renderer: pnpm run node-renderer
+```
+
 Define the script in your root `package.json` so Heroku can run it from the app root:
 
 ```json
