@@ -306,6 +306,11 @@ describe('createApp', () => {
       'utf8',
     );
     expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
+      path.join(appPath, '.gitignore'),
+      expect.stringContaining('/node_modules'),
+      'utf8',
+    );
+    expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
       path.join(appPath, '.gitattributes'),
       expect.stringContaining('db/schema.rb linguist-generated'),
       'utf8',

@@ -33,6 +33,9 @@ const RAILS_GITIGNORE = `# See https://help.github.com/articles/ignoring-files f
 !/log/.keep
 !/tmp/.keep
 
+# Ignore node modules.
+/node_modules
+
 # Ignore pidfiles, but keep the directory.
 /tmp/pids/*
 !/tmp/pids/
