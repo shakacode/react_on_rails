@@ -2,6 +2,8 @@
 
 React on Rails Pro supports streaming server rendering using React 18/19's `renderToPipeableStream` API. Instead of waiting for the entire page to render before sending any HTML, streaming SSR sends HTML to the browser progressively as each part of the page becomes ready.
 
+> **Route map**: Start at [React on Rails Pro](./home-pro.md) if you're choosing a path. This page is the canonical streaming SSR overview; for the technical implementation guide, see [Streaming Server Rendering](../oss/building-features/streaming-server-rendering.md).
+
 ## Why Streaming SSR?
 
 Traditional SSR renders the full page on the server, then sends the complete HTML in one response. This means the user sees nothing until the slowest component finishes rendering. Streaming SSR changes this:
