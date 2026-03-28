@@ -174,7 +174,7 @@ These options solve different problems. If you want to keep Rails as your main a
 | **Next.js + Rails API**   | React-first teams that want Next.js conventions and are willing to split frontend/backend concerns           | Next.js frontend talking to Rails as an API or backend service            | Strong App Router / RSC / streaming story                                                    | Usually means giving up the one-Rails-app model                           |
 | **Hotwire / Turbo**       | Rails-first teams that want minimal custom JavaScript                                                        | HTML-over-the-wire with Stimulus/Turbo instead of React                   | Not a React SSR/RSC stack                                                                    | Different programming model and not the React ecosystem                   |
 
-**Recommended default:** Start with React on Rails if you want React inside a Rails app. Upgrade to React on Rails Pro when you want Node-based SSR, streaming SSR, React Server Components, or advanced SSR performance features. For more detail, see [Comparison with Alternatives](./docs/oss/getting-started/comparison-with-alternatives.md) and the [OSS vs Pro feature matrix](./docs/oss/getting-started/oss-vs-pro.md).
+**Recommended default:** Start with React on Rails if you want React inside a Rails app. Upgrade to React on Rails Pro when you want Node-based SSR, streaming SSR, React Server Components, or advanced SSR performance features. For more detail, see [Comparison with Alternatives](https://reactonrails.com/docs/getting-started/comparison-with-alternatives/) and the [OSS vs Pro feature matrix](https://reactonrails.com/docs/getting-started/oss-vs-pro/).
 
 ## Project Objective
 
