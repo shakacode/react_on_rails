@@ -26,7 +26,7 @@ describe('LicenseCache', () => {
     jest.mocked(fs.readFileSync).mockReturnValue('');
     jest.mocked(fs.writeFileSync).mockImplementation(() => {});
     jest.mocked(fs.mkdirSync).mockImplementation(() => undefined);
-    jest.mocked(fs.chmodSync).mockImplementation(() => {});
+    jest.mocked(fs.renameSync).mockImplementation(() => undefined);
 
     // Suppress console output
     jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -124,7 +124,7 @@ describe('LicenseCache', () => {
       expect(writtenData.license_key_hash).toBeDefined();
     });
 
-    it('sets file permissions to 0600', () => {
+    it('writes atomically with 0600 permissions', () => {
       process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
       jest.mocked(fs.existsSync).mockReturnValue(true);
 
@@ -133,9 +133,14 @@ describe('LicenseCache', () => {
         expires_at: '2026-12-09T00:00:00Z',
       });
 
-      expect(fs.chmodSync).toHaveBeenCalledWith(
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        expect.stringMatching(/react_on_rails_pro_license\.cache\.[a-f0-9]{16}\.tmp$/),
+        expect.any(String),
+        expect.objectContaining({ mode: 0o600 }),
+      );
+      expect(fs.renameSync).toHaveBeenCalledWith(
+        expect.stringMatching(/react_on_rails_pro_license\.cache\.[a-f0-9]{16}\.tmp$/),
         expect.stringContaining('react_on_rails_pro_license.cache'),
-        0o600,
       );
     });
 
@@ -216,6 +221,25 @@ describe('LicenseCache', () => {
       expect(result?.toISOString()).toBe('2025-12-24T12:00:00.000Z');
     });
 
+    it('returns null for invalid fetched_at strings', () => {
+      process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
+
+      const crypto = require('crypto');
+      const expectedHash = crypto.createHash('sha256').update('lic_test123').digest('hex').substring(0, 16);
+
+      const cachedData = {
+        token: 'test-token',
+        expires_at: '2026-12-09T00:00:00Z',
+        fetched_at: 'not-a-valid-date',
+        license_key_hash: expectedHash,
+      };
+
+      jest.mocked(fs.existsSync).mockReturnValue(true);
+      jest.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(cachedData));
+
+      expect(getFetchedAt()).toBeNull();
+    });
+
     it('returns null when cache is invalid', () => {
       jest.mocked(fs.existsSync).mockReturnValue(false);
 
@@ -243,6 +267,25 @@ describe('LicenseCache', () => {
       const result = getExpiresAt();
       expect(result).toBeInstanceOf(Date);
       expect(result?.toISOString()).toBe('2026-12-09T00:00:00.000Z');
+    });
+
+    it('returns null for invalid expires_at strings', () => {
+      process.env.REACT_ON_RAILS_PRO_LICENSE_KEY = 'lic_test123';
+
+      const crypto = require('crypto');
+      const expectedHash = crypto.createHash('sha256').update('lic_test123').digest('hex').substring(0, 16);
+
+      const cachedData = {
+        token: 'test-token',
+        expires_at: 'not-a-valid-date',
+        fetched_at: '2025-12-24T12:00:00Z',
+        license_key_hash: expectedHash,
+      };
+
+      jest.mocked(fs.existsSync).mockReturnValue(true);
+      jest.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(cachedData));
+
+      expect(getExpiresAt()).toBeNull();
     });
 
     it('returns null when cache is invalid', () => {

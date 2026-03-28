@@ -125,10 +125,9 @@ export function writeCache(data: { token: string; expires_at: string }): void {
       license_key_hash: currentKeyHash,
     };
 
-    fs.writeFileSync(cachePath, JSON.stringify(cacheData, null, 2));
-
-    // Set file permissions to 0600 (owner read/write only)
-    fs.chmodSync(cachePath, 0o600);
+    const tempPath = `${cachePath}.${crypto.randomBytes(8).toString('hex')}.tmp`;
+    fs.writeFileSync(tempPath, JSON.stringify(cacheData, null, 2), { mode: 0o600 });
+    fs.renameSync(tempPath, cachePath);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.warn(`[React on Rails Pro] Failed to write license cache: ${errorMessage}`);
@@ -153,11 +152,8 @@ export function getFetchedAt(): Date | null {
     return null;
   }
 
-  try {
-    return new Date(data.fetched_at);
-  } catch {
-    return null;
-  }
+  const parsedDate = new Date(data.fetched_at);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 }
 
 /**
@@ -170,9 +166,6 @@ export function getExpiresAt(): Date | null {
     return null;
   }
 
-  try {
-    return new Date(data.expires_at);
-  } catch {
-    return null;
-  }
+  const parsedDate = new Date(data.expires_at);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 }

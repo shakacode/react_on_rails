@@ -4,6 +4,7 @@ require "json"
 require "digest"
 require "fileutils"
 require "time"
+require "securerandom"
 
 module ReactOnRailsPro
   # Caches fetched license tokens to disk.
@@ -33,9 +34,14 @@ module ReactOnRailsPro
           "fetched_at" => Time.now.iso8601
         )
 
-        File.write(cache_path, JSON.pretty_generate(cache_data))
-        File.chmod(0o600, cache_path)
+        temp_path = cache_dir.join("#{cache_path.basename}.#{SecureRandom.hex(8)}.tmp")
+        File.open(temp_path, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
+          file.write(JSON.pretty_generate(cache_data))
+        end
+
+        FileUtils.mv(temp_path, cache_path)
       rescue StandardError => e
+        FileUtils.rm_f(temp_path) if defined?(temp_path) && temp_path
         Rails.logger.warn { "[ReactOnRailsPro] Failed to write license cache: #{e.message}" }
       end
 
