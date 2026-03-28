@@ -42,5 +42,7 @@ Use these docs for Claude-oriented operational guidance:
 - `.claude/docs/testing-build-scripts.md`
 - `.claude/docs/main-health-monitoring.md`
 - `.claude/docs/managing-file-paths.md`
+- `.claude/docs/docs-competitive-landscape.md`
+- `.claude/docs/docs-templates.md`
 
 For Pro-package specifics, also read `react_on_rails_pro/CLAUDE.md`.
