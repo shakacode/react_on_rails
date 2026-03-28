@@ -44,9 +44,9 @@ The [Evil Martians Inertia Rails React Starter Kit](https://evilmartians.com/ope
 
 **Trade-offs:**
 
-- **Every page navigation is a server round-trip.** Even client-side transitions hit a Rails controller to serialize the next page's full props as JSON. There is no mechanism to fetch only the data a specific component needs, and perceived performance depends on Rails response time for every transition.
+- **Every page navigation is a server round-trip.** Even client-side transitions hit a Rails controller to serialize page props as JSON. Inertia v2 adds [partial reloads](https://inertia-rails.dev/guide/partial-reloads) to narrow which props are refreshed, but a controller round-trip is still required for every transition and perceived performance depends on Rails response time.
 - **All-or-nothing page model.** A route is either fully Inertia or fully traditional Rails — you cannot embed a React component into part of an existing ERB template. This makes incremental adoption in existing Rails apps significantly harder compared to React on Rails' `react_component` helper.
-- **SSR is opt-in and limited.** SSR requires a separate Node.js server process. There is no support for streaming SSR or code splitting with SSR, which are available in React on Rails Pro.
+- **SSR is opt-in and limited.** SSR requires a separate Node.js server process. Route-level code splitting via dynamic imports works with SSR, but there is no component-level code splitting with SSR or streaming SSR, which are available in React on Rails Pro.
 - **Controller coupling.** Controllers become tied to the Inertia response protocol. Switching to a different frontend approach later requires rewriting controller actions.
 - **No path to React Server Components or fragment caching.**
 

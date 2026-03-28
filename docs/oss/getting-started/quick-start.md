@@ -26,7 +26,7 @@ Add the React on Rails gem and run its installer:
 # Add the gem
 bundle add react_on_rails --strict
 
-# Optional but recommended: commit or stash first for easier diff review
+# Optional but recommended: commit or stash first so generated files show as a clean diff
 # git add . && git commit -m "Prepare for React on Rails install"
 
 # Run the installer for TypeScript
@@ -214,8 +214,8 @@ Start at [React on Rails Pro](../../pro/home-pro.md) for the canonical route map
 # Start development servers
 ./bin/dev
 
-# Generate React on Rails files
-bin/rails generate react_on_rails:install
+# Generate React on Rails files (TypeScript by default)
+bin/rails generate react_on_rails:install --typescript
 
 # Create a new component
 bin/rails generate react_on_rails:component MyComponent

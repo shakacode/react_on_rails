@@ -2,7 +2,7 @@
 
 If you are evaluating frontend approaches for a Rails application, the right choice depends on how much of your UI should live in React, how much Rails should keep rendering, and whether server rendering is a requirement from day one.
 
-This page is intentionally practical. It focuses on the tradeoffs teams usually care about when choosing between React on Rails, Hotwire/Turbo, Inertia Rails, a Next.js frontend with a separate Rails backend API, and react-rails.
+This page is intentionally practical. It focuses on the tradeoffs teams usually care about when choosing between React on Rails, Hotwire/Turbo, Inertia Rails, a Next.js frontend with a separate Rails backend API, react-rails, and Vite as a build tool.
 
 ## Short Version
 
@@ -57,7 +57,7 @@ Inertia replaces the Rails view layer on a per-route basis. A controller action 
 Every Inertia page navigation — even between client-side pages — requires a round-trip to a Rails controller action that serializes the full set of page props as JSON. This means:
 
 - **Server round-trip on every navigation.** Perceived performance depends on Rails response time for every page transition, not just the initial load.
-- **Full page props serialized every time.** There is no mechanism to fetch only the data a specific component needs. Large or complex prop sets add serialization overhead on every transition.
+- **Full page props serialized by default.** Inertia v2 adds [partial reloads](https://inertia-rails.dev/guide/partial-reloads) to request a subset of props, but the server round-trip is still required for every navigation and large prop sets still add serialization overhead.
 - **Code splitting limited to route-level lazy loading.** Inertia supports lazy-loaded page bundles via dynamic imports, but there is no component-level code splitting with SSR. React on Rails Pro supports granular code splitting via Loadable Components, so individual components within a page can be split and SSR'd independently.
 - **No streaming SSR.** Inertia's opt-in SSR renders the complete page before sending any HTML to the browser. React on Rails Pro streams progressively with `renderToPipeableStream`, so users see content faster on complex pages.
 
