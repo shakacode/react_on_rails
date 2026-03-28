@@ -34,7 +34,7 @@ describe DevTestsGenerator, type: :generator do
     it "copies tests" do
       assert_file("spec/system/hello_world_spec.rb") do |contents|
         expect(contents).to include('describe "React SSR Demo", :js do')
-        expect(contents).to include('expect(heading).to have_text("React SSR Demo")')
+        expect(contents).to include('expect(heading).to have_text(/(React|Redux) SSR Demo/)')
       end
     end
 
