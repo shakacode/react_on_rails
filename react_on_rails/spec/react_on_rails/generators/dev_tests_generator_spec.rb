@@ -32,7 +32,10 @@ describe DevTestsGenerator, type: :generator do
     end
 
     it "copies tests" do
-      %w[spec/system/hello_world_spec.rb].each { |file| assert_file(file) }
+      assert_file("spec/system/hello_world_spec.rb") do |contents|
+        expect(contents).to include('describe "React SSR Demo", :js do')
+        expect(contents).to include('expect(heading).to have_text("React SSR Demo")')
+      end
     end
 
     it "changes package.json to use local react-on-rails version of module" do
