@@ -61,10 +61,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **[Pro]** **Minimum `async` gem version bumped to 2.29**: The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. If your Gemfile pins the `async` gem below 2.29, you will need to update it before upgrading React on Rails Pro. Run `bundle update async` to pick up the new minimum.
   [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808).
 
-#### Changed
-
-- **[Pro]** **Migrated from `Async::Variable` to `Async::Promise`**: The streaming helper internals now use `Async::Promise` for async v2.29+ compatibility while preserving pre-first-chunk error propagation behavior. [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808). Fixes [Issue 2563](https://github.com/shakacode/react_on_rails/issues/2563).
-
 ### [16.4.0] - 2026-03-16
 
 #### Fixed
