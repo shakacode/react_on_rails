@@ -343,7 +343,18 @@ export async function isEvaluation(): Promise<boolean> {
 }
 
 export function getGraceDaysRemaining(): number | undefined {
-  return undefined;
+  const decodedData = determineDecodedLicenseData();
+  if (!decodedData || decodedData.exp == null) {
+    return undefined;
+  }
+
+  const expTime = typeof decodedData.exp === 'number' ? decodedData.exp : Number(decodedData.exp);
+  if (Number.isNaN(expTime)) {
+    return undefined;
+  }
+
+  const secondsRemaining = expTime - Math.floor(Date.now() / 1000);
+  return Math.max(0, Math.ceil(secondsRemaining / 86400));
 }
 
 /**

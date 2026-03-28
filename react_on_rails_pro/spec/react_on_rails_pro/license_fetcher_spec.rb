@@ -89,6 +89,19 @@ RSpec.describe ReactOnRailsPro::LicenseFetcher do
         end
       end
 
+      context "when request returns 200 but the payload is missing required fields" do
+        before do
+          stub_request(:get, api_endpoint)
+            .with(headers: { "Authorization" => "Bearer #{license_key}" })
+            .to_return(status: 200, body: { "token" => "eyJhbGciOiJSUzI1NiJ9.test_token" }.to_json)
+        end
+
+        it "returns nil" do
+          result = described_class.fetch
+          expect(result).to be_nil
+        end
+      end
+
       context "when request returns 401 Unauthorized" do
         before do
           stub_request(:get, api_endpoint)

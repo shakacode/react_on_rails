@@ -226,6 +226,16 @@ module ReactOnRailsPro
     # @param value [String] The license API URL
     attr_writer :license_api_url
 
+    # Returns whether automatic license refresh is enabled.
+    # Environment variable REACT_ON_RAILS_PRO_AUTO_REFRESH_LICENSE takes precedence.
+    # @return [Boolean] true if auto-refresh is enabled
+    def auto_refresh_license
+      env_value = ENV.fetch("REACT_ON_RAILS_PRO_AUTO_REFRESH_LICENSE", nil)
+      return @auto_refresh_license if env_value.blank?
+
+      ActiveModel::Type::Boolean.new.cast(env_value)
+    end
+
     # Checks if automatic license refresh is enabled and properly configured.
     # Auto-refresh requires both:
     # 1. auto_refresh_license to be true (default)

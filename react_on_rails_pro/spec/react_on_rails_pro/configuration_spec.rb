@@ -301,6 +301,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
     describe "license auto-refresh configuration" do
       after do
         ENV.delete("REACT_ON_RAILS_PRO_LICENSE_KEY")
+        ENV.delete("REACT_ON_RAILS_PRO_AUTO_REFRESH_LICENSE")
       end
 
       describe ".auto_refresh_license" do
@@ -313,6 +314,16 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         it "can be set to false" do
           ReactOnRailsPro.configure do |config|
             config.auto_refresh_license = false
+          end
+
+          expect(ReactOnRailsPro.configuration.auto_refresh_license).to be(false)
+        end
+
+        it "honors the ENV override" do
+          ENV["REACT_ON_RAILS_PRO_AUTO_REFRESH_LICENSE"] = "false"
+
+          ReactOnRailsPro.configure do |config|
+            config.auto_refresh_license = true
           end
 
           expect(ReactOnRailsPro.configuration.auto_refresh_license).to be(false)

@@ -45,11 +45,11 @@ module ReactOnRailsPro
         expires_at = LicenseCache.expires_at
         return false if expires_at.nil?
 
-        days_until_expiry = ((expires_at - Time.now) / 1.day).to_i
+        time_until_expiry = expires_at - Time.now
 
-        if days_until_expiry <= 7
+        if time_until_expiry <= 7.days
           last_fetch_older_than?(1.day)
-        elsif days_until_expiry <= 30
+        elsif time_until_expiry <= 30.days
           last_fetch_older_than?(7.days)
         else
           false

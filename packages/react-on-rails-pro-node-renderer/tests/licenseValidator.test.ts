@@ -12,6 +12,7 @@ interface LicenseValidatorModule {
   getLicenseStatus: () => LicenseStatus;
   getLicenseOrganization: () => string | undefined;
   getLicensePlan: () => ValidPlan | undefined;
+  getGraceDaysRemaining: () => number | undefined;
   reset: () => void;
 }
 
@@ -291,6 +292,30 @@ describe('LicenseValidator', () => {
 
       const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
       expect(module.getLicenseStatus()).toBe('valid');
+    });
+  });
+
+  describe('getGraceDaysRemaining', () => {
+    it('returns the remaining days until expiry', () => {
+      const payload = {
+        sub: 'test@example.com',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + (3 * 24 * 60 * 60),
+        org: 'Acme Corp',
+      };
+
+      const token = jwt.sign(payload, testPrivateKey, { algorithm: 'RS256' });
+      process.env.REACT_ON_RAILS_PRO_LICENSE = token;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getGraceDaysRemaining()).toBe(3);
+    });
+
+    it('returns undefined when no license is available', () => {
+      delete process.env.REACT_ON_RAILS_PRO_LICENSE;
+
+      const module = jest.requireActual<LicenseValidatorModule>('../src/shared/licenseValidator');
+      expect(module.getGraceDaysRemaining()).toBeUndefined();
     });
   });
 

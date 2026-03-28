@@ -28,8 +28,11 @@ module ReactOnRailsPro
         return nil if response.is_a?(HTTPX::ErrorResponse)
         return nil unless response.status == 200
 
+        parsed_response = JSON.parse(response.body.to_s)
+        return nil unless valid_license_response?(parsed_response)
+
         Rails.logger.debug { "[ReactOnRailsPro] License fetched successfully" }
-        JSON.parse(response.body.to_s)
+        parsed_response
       rescue StandardError => e
         Rails.logger.warn { "[ReactOnRailsPro] License fetch failed: #{e.message}" }
         nil
@@ -43,6 +46,14 @@ module ReactOnRailsPro
 
       def api_url
         ReactOnRailsPro.configuration.license_api_url
+      end
+
+      def valid_license_response?(response_body)
+        return false unless response_body.is_a?(Hash)
+
+        token = response_body["token"]
+        expires_at = response_body["expires_at"]
+        token.is_a?(String) && token.present? && expires_at.present?
       end
     end
   end
