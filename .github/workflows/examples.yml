@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - '.lychee.toml'
   workflow_dispatch:
     inputs:
       force_run:

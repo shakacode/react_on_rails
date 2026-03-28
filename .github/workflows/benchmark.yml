@@ -54,11 +54,13 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - '.lychee.toml'
   pull_request:
     types: [opened, synchronize, reopened, labeled]
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - '.lychee.toml'
 # Cancel stale PR benchmark runs when new commits are pushed.
 # Main runs are never cancelled so every merge is measured.
 concurrency:

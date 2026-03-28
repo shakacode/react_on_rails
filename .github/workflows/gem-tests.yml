@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - '.lychee.toml'
       - 'packages/**'
       - 'react_on_rails_pro/**'
   workflow_dispatch:

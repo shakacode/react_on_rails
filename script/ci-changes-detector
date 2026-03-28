@@ -72,7 +72,7 @@ UNCATEGORIZED_CHANGED=false
 while IFS= read -r file; do
   case "$file" in
     # Documentation files
-    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*)
+    *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*|.lychee.toml)
       # Don't change DOCS_ONLY flag, just continue
       ;;
 
