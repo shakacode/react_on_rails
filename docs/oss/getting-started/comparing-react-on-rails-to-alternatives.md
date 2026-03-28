@@ -6,7 +6,7 @@ This page is intentionally practical. It focuses on the tradeoffs teams usually 
 
 ## Short Version
 
-Choose **React on Rails** when you want Rails and React tightly integrated, you expect a meaningful amount of React UI, and you want server rendering or a path to React on Rails Pro features such as React Server Components and streaming SSR.
+Choose **React on Rails** when you want Rails and React tightly integrated, you expect a meaningful amount of React UI, and you want server rendering and fast builds provided by Rspack, or a path to React on Rails Pro features such as React Server Components and streaming SSR.
 
 Choose **Hotwire/Turbo** when Rails-rendered HTML is still your preferred model and you only need modest JavaScript sprinkles or progressive enhancement.
 
@@ -54,7 +54,7 @@ Inertia replaces the Rails view layer on a per-route basis. A controller action 
 
 ### Performance tradeoffs
 
-Every Inertia page navigation — even between client-side pages — requires a round-trip to a Rails controller action that serializes the full set of page props as JSON. This means:
+Every standard Inertia page navigation requires a round-trip to a Rails controller action that serializes the page props as JSON. (Back/forward browser navigation may use cached page state, but all forward navigations — link clicks, `router.visit()` calls — hit the server.) This means:
 
 - **Server round-trip on every navigation.** Perceived performance depends on Rails response time for every page transition, not just the initial load.
 - **Full page props serialized by default.** Inertia v2 adds [partial reloads](https://inertia-rails.dev/guide/partial-reloads) to request a subset of props, but the server round-trip is still required for every navigation and large prop sets still add serialization overhead.

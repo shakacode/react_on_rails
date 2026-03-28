@@ -85,7 +85,7 @@ You should see a page with a React component saying "Hello World"!
 
 Let's make a quick change to see hot reloading in action:
 
-1. Open the generated HelloWorld component (typically `client/app/bundles/HelloWorld/components/HelloWorld.tsx`)
+1. Open the generated HelloWorld component (`app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx`)
 2. Change the text from "Hello World" to "Hello from React!"
 3. Save the file
 4. Watch your browser automatically refresh
@@ -226,11 +226,9 @@ pnpm run build  # or: yarn run build, npm run build
 
 ### Key File Locations
 
-- **Components**: `client/app/bundles/[ComponentName]/components/`
-- **Registration**: `client/app/bundles/[ComponentName]/startup/registration.js`
-- **Packs**: `app/javascript/packs/`
+- **Components (auto-bundling)**: `app/javascript/src/[ComponentName]/ror_components/`
 - **Config**: `config/initializers/react_on_rails.rb`
-- **Webpack**: `config/shakapacker.yml`
+- **Bundler config**: `config/shakapacker.yml`
 
 ---
 
