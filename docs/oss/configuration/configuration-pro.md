@@ -171,5 +171,5 @@ end
 
 ## Need Help?
 
-- **Pro Features:** [React on Rails Pro](https://reactonrails.com/docs/pro/)
+- **Pro Features:** [React on Rails Pro](../../pro/home-pro.md)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)
