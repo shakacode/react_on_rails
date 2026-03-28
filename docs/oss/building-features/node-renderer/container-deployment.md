@@ -104,11 +104,11 @@ end
 
 ## Host Binding for Container Environments
 
-By default, the Node Renderer binds to `localhost`, which rejects connections from other containers. In both sidecar and separate-workload configurations, you need to bind to `0.0.0.0`:
+By default, the Node Renderer binds to `localhost`. For **sidecar containers** in the same Kubernetes pod, that works because the containers share a network namespace. For **separate workloads** or Docker Compose setups without shared networking, bind to `0.0.0.0`:
 
 ```javascript
 // node-renderer.js
-import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
+import reactOnRailsProNodeRenderer from 'react-on-rails-pro-node-renderer';
 
 const config = {
   host: '0.0.0.0',
@@ -123,7 +123,7 @@ Or via environment variable:
 RENDERER_HOST=0.0.0.0
 ```
 
-> **Security note:** Binding to `0.0.0.0` exposes the renderer on all network interfaces. This is safe behind private networking (e.g., within a Kubernetes pod or behind a firewall). If the renderer is exposed to untrusted networks, enable the `password` authentication option. See [JS Configuration](./js-configuration.md) for details.
+> **Security note:** Binding to `0.0.0.0` exposes the renderer on all network interfaces. Use it only when the renderer needs to be reachable across a network namespace. If the renderer is exposed to untrusted networks, enable the `password` authentication option. See [JS Configuration](./js-configuration.md) for details.
 
 ## Optimizing Performance per Cost
 
@@ -203,7 +203,7 @@ Recommended starting points for sidecar configuration:
 | Rails | 1–2 cores | 2–4 cores | 2 GB | 4 GB |
 | Node Renderer | 1–2 cores | 2–4 cores | 2 GB | 4 GB |
 
-> **Important:** Set memory **requests** equal to **limits** for the renderer container. This prevents the container from being evicted under memory pressure (OOM priority). If using `--max-old-space-size`, set the container memory limit to `max-old-space-size × workersCount × 1.5` to account for overhead.
+> **Important:** Set memory **requests** equal to **limits** for the renderer container. This reduces eviction risk under memory pressure by giving the container a higher QoS class. If using `--max-old-space-size`, set the container memory limit to `max-old-space-size × workersCount × 1.5` to account for overhead.
 
 ### jemalloc for Rails Memory
 
@@ -211,6 +211,9 @@ Consider using [jemalloc](https://github.com/jemalloc/jemalloc) as Ruby's memory
 
 ```dockerfile
 RUN apt-get install -y libjemalloc2
+## Adjust the preload path for your image architecture:
+##   amd64: /usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+##   arm64: /usr/lib/aarch64-linux-gnu/libjemalloc.so.2
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 ENV MALLOC_CONF="dirty_decay_ms:1000,muzzy_decay_ms:1000"
 ```
