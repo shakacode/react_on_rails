@@ -101,6 +101,27 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when --new-app routes.rb is in an unexpected format" do
+    let(:generator) { base_generator_fixture(new_app: true) }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(gitignore: false, spec: false)
+      simulate_existing_file("config/routes.rb", "draw_routes do\nend\n")
+      allow(generator).to receive(:say_status)
+    end
+
+    it "warns instead of silently skipping the root route injection" do
+      Dir.chdir(destination_root) do
+        generator.send(:add_root_route)
+      end
+
+      expect(generator)
+        .to have_received(:say_status)
+        .with(:warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow)
+    end
+  end
+
   context "with --redux" do
     before(:all) { run_generator_test_with_args(%w[--redux], package_json: true) }
 

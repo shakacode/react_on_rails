@@ -113,10 +113,17 @@ module ReactOnRails
           return
         end
 
-        inserted_root_route = inject_into_file "config/routes.rb",
-                                               %(  root to: "home#index"\n),
-                                               after: "Rails.application.routes.draw do\n"
-        return if inserted_root_route
+        routes_path = "config/routes.rb"
+        routes_draw_declaration = "Rails.application.routes.draw do\n"
+        unless File.read(routes_path).include?(routes_draw_declaration)
+          say_status :warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow
+          return
+        end
+
+        inject_into_file routes_path,
+                         %(  root to: "home#index"\n),
+                         after: routes_draw_declaration
+        return if File.read("config/routes.rb").include?('root to: "home#index"')
 
         say_status :warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow
       end
