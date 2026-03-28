@@ -253,6 +253,8 @@ export default function ProductList({ initialProducts }) {
       props: { products: Product.limit(50).as_json }) %>
 ```
 
+> **Note:** `initialDataUpdatedAt` and `staleTime` are intentional here. Together they tell React Query that the Rails data is fresh for the next five minutes instead of treating it as stale immediately on mount.
+
 **How it works:**
 
 1. Rails controller fetches products and passes them as props
@@ -540,7 +542,7 @@ function Comments({ postId }) {
 
 ## Request Deduplication with `React.cache()`
 
-> **React on Rails note:** In most React on Rails applications, data flows through controller props or async props, so `React.cache()` is unnecessary. This section applies when Server Components call data-fetching functions directly (for example, from the Node renderer). If you are using async props, `getReactOnRailsAsyncProp(key)` already returns the same cached Promise on repeated calls.
+> **React on Rails note:** In most React on Rails applications, data flows through controller props or async props, so `React.cache()` is unnecessary. This section applies when Server Components call data-fetching functions directly (for example, from the Node renderer). If you are using async props, the `getReactOnRailsAsyncProp` prop injected by `addAsyncPropsCapabilityToComponentProps()` already returns the same cached Promise on repeated calls.
 
 `React.cache()` ensures a function is called only once per request, even when multiple Server Components invoke it:
 
