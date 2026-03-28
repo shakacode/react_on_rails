@@ -348,7 +348,7 @@ function pnpmCommitMessage(): {
   };
 }
 
-function printSuccessMessage(appName: string, route: string, educationalCommitsEnabled: boolean): void {
+function printSuccessMessage(appName: string, educationalCommitsEnabled: boolean): void {
   console.log('');
   logSuccess(`Created ${appName} with React on Rails!`);
   console.log('');
@@ -361,10 +361,11 @@ function printSuccessMessage(appName: string, route: string, educationalCommitsE
     'Note: The generated app uses PostgreSQL by default. Start PostgreSQL before running bin/rails db:prepare.',
   );
   console.log('');
-  logInfo(`Then visit http://localhost:3000${route}`);
+  logInfo('Then visit http://localhost:3000');
   logInfo('bin/dev will try to open the generated home page on first successful boot.');
   console.log('');
   if (educationalCommitsEnabled) {
+    logInfo('Educational commits skip GPG signing so scaffold automation does not block on local signer prompts.');
     logInfo('Educational git history: git log --oneline --reverse');
   } else {
     logInfo(
@@ -580,5 +581,5 @@ export function createApp(appName: string, options: CliOptions): void {
 
   // Final success
   logStepDone('Done!');
-  printSuccessMessage(appName, '', educationalCommitsEnabled);
+  printSuccessMessage(appName, educationalCommitsEnabled);
 }
