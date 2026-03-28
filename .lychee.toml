@@ -81,7 +81,7 @@ exclude = [
   '^https://(www\.)?estately\.com', # Returns 403
   '^https://hiring\.careerbuilder\.com',  # Returns 403
   '^https://(www\.)?yourmechanic\.com',  # Returns 403/503
-  '^https://hvmn\.com',  # Returns 503 from CI
+  '^https?://(www\.)?hvmn\.com',  # Returns 503 from CI
 
   # ============================================================================
   # EXTERNAL SITES THAT TIMEOUT DURING CI CHECKS
