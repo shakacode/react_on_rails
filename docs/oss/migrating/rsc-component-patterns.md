@@ -171,7 +171,9 @@ export default function ProductPage({ productId }) {
 ```erb
 <%# ERB view — Rails passes the data as props %>
 <%= stream_react_component("ProductPage",
-      props: { product: @product.as_json(include: [:specs, :reviews]) }) %>
+      props: { product: @product.as_json(
+                 include: { specs: { only: [:id, :label, :value] },
+                            reviews: { only: [:id, :text, :rating] } }) }) %>
 ```
 
 ```jsx
@@ -335,7 +337,7 @@ export default function Homepage() {
 
 ## Pattern 4: Streaming with `stream_react_component`
 
-In React on Rails, `stream_react_component` uses React's streaming SSR (`renderToPipeableStream`) to deliver HTML progressively. Rails passes all data as props, and the streaming infrastructure delivers the rendered output efficiently:
+In React on Rails, `stream_react_component` uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree. Rails loads all data synchronously and passes it as props:
 
 ```erb
 <%# ERB view — Rails passes all data as props %>
@@ -370,7 +372,7 @@ export default function Stats({ stats }) {
 }
 ```
 
-`stream_react_component` streams the rendered HTML progressively to the browser. All data is available as props -- no client-side fetching or loading states needed.
+Rails loads all data as props before rendering begins. `stream_react_component` then streams the rendered HTML to the browser as React processes the component tree — no client-side fetching or loading states needed.
 
 ## Pattern 5: Server Data to Interactive Client Components
 
