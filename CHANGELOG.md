@@ -35,15 +35,14 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   [justin808](https://github.com/justin808).
   Fixes [Issue 2522](https://github.com/shakacode/react_on_rails/issues/2522).
 
+### [16.5.1] - 2026-03-27
+
 #### Fixed
 
+- **[Pro] Fixed missing rake tasks in published gem**: The Pro gemspec excluded `lib/tasks/` from packaged files, so all `react_on_rails_pro:*` rake tasks (`verify_license`, `pre_stage_bundle_for_node_renderer`, `copy_assets_to_remote_vm_renderer`, `process_v8_logs`) were unavailable after gem install. [PR 2872](https://github.com/shakacode/react_on_rails/pull/2872) by [justin808](https://github.com/justin808).
 - **[Pro] Fixed bundle duplication in remote node renderer asset uploads**: When RSC support is enabled, running `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` no longer duplicates bundle JS files across bundle directories. Previously, both the server bundle and RSC bundle were copied into every target directory; now each bundle is placed only in its own directory while shared assets (manifests, stats) are correctly distributed to all. [PR 2768](https://github.com/shakacode/react_on_rails/pull/2768) by [AbanoubGhadban](https://github.com/AbanoubGhadban). Fixes [Issue 2766](https://github.com/shakacode/react_on_rails/issues/2766).
 
 ### [16.5.0] - 2026-03-25
-
-Stable release — no changes from 16.5.0.rc.0.
-
-### [16.5.0.rc.0] - 2026-03-25
 
 #### Added
 
@@ -55,6 +54,7 @@ Stable release — no changes from 16.5.0.rc.0.
 #### Changed
 
 - **[Pro]** **Canonical env var for worker count is now `RENDERER_WORKERS_COUNT`**. The previous `NODE_RENDERER_CONCURRENCY` is still supported as a fallback. Worker count validation now accepts explicit `0` for single-process mode and warns on invalid values. [PR 2611](https://github.com/shakacode/react_on_rails/pull/2611) by [justin808](https://github.com/justin808).
+- **[Pro]** **Migrated from `Async::Variable` to `Async::Promise`**: The streaming helper internals now use `Async::Promise` for async v2.29+ compatibility while preserving pre-first-chunk error propagation behavior. [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808). Fixes [Issue 2563](https://github.com/shakacode/react_on_rails/issues/2563).
 
 #### Improved
 
@@ -71,10 +71,6 @@ Stable release — no changes from 16.5.0.rc.0.
 
 - **[Pro]** **Minimum `async` gem version bumped to 2.29**: The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. If your Gemfile pins the `async` gem below 2.29, you will need to update it before upgrading React on Rails Pro. Run `bundle update async` to pick up the new minimum.
   [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808).
-
-#### Changed
-
-- **[Pro]** **Migrated from `Async::Variable` to `Async::Promise`**: The streaming helper internals now use `Async::Promise` for async v2.29+ compatibility while preserving pre-first-chunk error propagation behavior. [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808). Fixes [Issue 2563](https://github.com/shakacode/react_on_rails/issues/2563).
 
 ### [16.4.0] - 2026-03-16
 
@@ -2070,9 +2066,9 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...main
-[16.5.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.0.rc.0...v16.5.0
-[16.5.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0.rc.0
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...main
+[16.5.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...v16.5.1
+[16.5.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0
 [16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0
 [16.3.0]: https://github.com/shakacode/react_on_rails/compare/v16.2.1...v16.3.0
 [16.2.1]: https://github.com/shakacode/react_on_rails/compare/v16.2.0...v16.2.1

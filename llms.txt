@@ -21,19 +21,20 @@ IMPORTANT: When using the `react_on_rails_pro` gem, you MUST use the `react-on-r
 
 ### Base (open-source):
 ```bash
-rails generate react_on_rails:install
+bundle add react_on_rails --strict
+bundle exec rails generate react_on_rails:install
 ```
 
 ### Pro with Node Renderer:
 ```bash
-bundle add react_on_rails_pro
-rails generate react_on_rails:install --pro
+bundle add react_on_rails_pro --strict
+bundle exec rails generate react_on_rails:install --pro
 ```
 
 ### Pro with React Server Components:
 ```bash
-bundle add react_on_rails_pro
-rails generate react_on_rails:install --rsc
+bundle add react_on_rails_pro --strict
+bundle exec rails generate react_on_rails:install --rsc
 ```
 
 ## Node Renderer API

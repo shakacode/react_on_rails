@@ -135,44 +135,16 @@ For a deeper dive into selective hydration, see our [Selective Hydration in Stre
 
 ## Migration Guide
 
-### 1. Enable RSC Support
+Before following the component migration patterns below, complete the infrastructure setup with the
+current generator-based runbook:
 
-Add to your Rails initializer, it makes the magic happen 🪄:
+1. Install and configure the Node Renderer. See [Pro Installation](../installation.md#install-react-on-rails-pro-node-renderer) and [Node Renderer basics](../../oss/building-features/node-renderer/basics.md).
+2. Run `bundle exec rails generate react_on_rails:rsc` (or `--typescript`) to enable `config.enable_rsc_support`, add the RSC webpack bundle, and generate the example files.
+3. Use [Upgrading an Existing Pro App to RSC](./upgrading-existing-pro-app.md) for the full checklist, legacy webpack compatibility notes, and verification steps.
 
-```ruby
-# config/initializers/react_on_rails_pro.rb
-ReactOnRailsPro.configure do |config|
-  config.enable_rsc_support = true
-end
-```
+Once that infrastructure is in place, migrate components incrementally.
 
-### 2. Update Webpack Configuration
-
-Create RSC bundle and make it use the RSC loader:
-
-```javascript
-// config/webpack/rscWebpackConfig.mjs
-const rscConfig = serverWebpackConfig();
-
-// Configure RSC entry point
-rscConfig.entry = {
-  'rsc-bundle': rscConfig.entry['server-bundle'],
-};
-
-// Add RSC loader
-rules.forEach((rule) => {
-  if (Array.isArray(rule.use)) {
-    const babelLoader = extractLoader(rule, 'babel-loader');
-    if (babelLoader) {
-      rule.use.push({
-        loader: 'react-on-rails-rsc/WebpackLoader',
-      });
-    }
-  }
-});
-```
-
-### 3. Gradual Component Migration
+### Gradual Component Migration
 
 #### 1. Mark Entry Points as Client Components
 

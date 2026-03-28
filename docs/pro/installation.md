@@ -76,7 +76,7 @@ See [License Configuration](#license-configuration-production-only) below for ot
 
 ## Adding React Server Components
 
-RSC requires React on Rails Pro and React 19.0.x. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
+RSC requires React on Rails Pro and React 19 with a compatible `react-on-rails-rsc` version. To add RSC support, use `--rsc` (fresh install) or the RSC generator (existing app):
 
 ```bash
 # Fresh install with RSC
