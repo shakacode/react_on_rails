@@ -10,7 +10,7 @@ Choose **React on Rails** when you want Rails and React tightly integrated, you 
 
 Choose **Hotwire/Turbo** when Rails-rendered HTML is still your preferred model and you only need modest JavaScript sprinkles or progressive enhancement.
 
-Choose **Inertia Rails** when you want its controller-to-page-props protocol and a frontend shell as the main rendering model. Be aware that every page navigation requires a server round-trip, there is no code splitting with SSR, and adopting Inertia replaces your Rails views at the per-route level rather than letting you integrate React incrementally into existing templates.
+Choose **Inertia Rails** when you want its controller-to-page-props protocol and a frontend shell as the main rendering model. Be aware that every page navigation requires a server round-trip, code splitting is limited to route-level lazy loading (no component-level splitting with SSR), and adopting Inertia replaces your Rails views at the per-route level rather than letting you integrate React incrementally into existing templates.
 
 Choose **Next.js + separate Rails backend** when you want a hard frontend/backend boundary and are prepared to run two apps with an explicit API contract between them.
 
@@ -58,7 +58,7 @@ Every Inertia page navigation — even between client-side pages — requires a 
 
 - **Server round-trip on every navigation.** Perceived performance depends on Rails response time for every page transition, not just the initial load.
 - **Full page props serialized every time.** There is no mechanism to fetch only the data a specific component needs. Large or complex prop sets add serialization overhead on every transition.
-- **No code splitting with SSR.** Each Inertia page loads as one monolithic component. React on Rails Pro supports route-based code splitting via Loadable Components, so users download only the JavaScript needed for the current page.
+- **Code splitting limited to route-level lazy loading.** Inertia supports lazy-loaded page bundles via dynamic imports, but there is no component-level code splitting with SSR. React on Rails Pro supports granular code splitting via Loadable Components, so individual components within a page can be split and SSR'd independently.
 - **No streaming SSR.** Inertia's opt-in SSR renders the complete page before sending any HTML to the browser. React on Rails Pro streams progressively with `renderToPipeableStream`, so users see content faster on complex pages.
 
 With React on Rails and a client-side router (for example TanStack Router in Pro), after the initial server-rendered page load, subsequent navigations can be handled entirely in JavaScript — fetching only the data each component needs and loading route-specific bundles on demand.
