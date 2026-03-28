@@ -318,7 +318,10 @@ function validatePasswordForProduction(aConfig: Config): string | null {
  */
 export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   userConfig = providedUserConfig || {};
-  if (Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined) {
+  const explicitUndefinedPassword =
+    Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined;
+
+  if (explicitUndefinedPassword) {
     log.warn(
       'buildConfig({ password: undefined }) preserves the env/default password rather than clearing it. ' +
         'To explicitly clear the password, pass an empty string; note that an empty string is treated as ' +
@@ -332,7 +335,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
   };
   config = { ...runtimeDefaultConfig, ...userConfig };
-  if (Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined) {
+  if (explicitUndefinedPassword) {
     config.password = runtimeDefaultConfig.password;
   }
 
