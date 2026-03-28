@@ -93,6 +93,14 @@ CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]
 - **`SECRET_KEY_BASE_DUMMY=1`** lets `assets:precompile` run without a real secret. Rails 7.1+ supports this natively.
 - **Server bundles** land in `ssr-generated/` (private, never served to browsers) while client bundles land in `public/webpack/production/`. Both are copied into the runtime image.
 - If you use `config.build_production_command`, it runs during `assets:precompile`. See [Configuration](../configuration/README.md#build_production_command).
+- **Add a `.dockerignore` file** to prevent host-specific files from being copied into the build. Without it, `COPY . .` can overwrite the freshly installed `node_modules/` with modules built for a different OS/architecture. A minimal `.dockerignore`:
+
+  ```
+  node_modules
+  .git
+  log
+  tmp
+  ```
 
 ### Using pnpm instead of Yarn
 
@@ -411,7 +419,9 @@ containers:
 >
 > ```ruby
 > # config/initializers/react_on_rails_pro.rb
-> config.renderer_url = ENV["REACT_RENDERER_URL"]
+> ReactOnRailsPro.configure do |config|
+>   config.renderer_url = ENV["REACT_RENDERER_URL"]
+> end
 > ```
 
 ### Configuration for containers
