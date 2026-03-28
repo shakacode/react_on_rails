@@ -19,21 +19,6 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     session[:something_useful] = "REALLY USEFUL"
   end
 
-  around_action :with_config_overrides, only: %i[
-    error_scenarios_hub
-    server_side_log_throw
-    server_router
-    ssr_shell_error
-    ssr_async_error
-    ssr_sync_error
-    ssr_async_prop_error
-    rsc_component_error
-    non_existing_react_component
-    non_existing_stream_react_component
-    non_existing_rsc_payload
-    stream_error_demo
-    stream_shell_error_demo
-  ]
   before_action :data
 
   before_action :initialize_shared_store, only: %i[client_side_hello_world_shared_store_controller
@@ -271,7 +256,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   # See files in spec/dummy/app/views/pages
 
-  helper_method :calc_slow_app_props_server_render
+  helper_method :calc_slow_app_props_server_render, :error_hub_config_value
 
   private
 
@@ -284,6 +269,15 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     Rails.logger.info msg
     render_to_string(template: "/pages/pro/serialize_props",
                      locals: { name: PROPS_NAME }, formats: :json)
+  end
+
+  # Returns a request-local override when the error hub query string includes one.
+  # This keeps the demo pages accurate without mutating the shared config singleton.
+  def error_hub_config_value(key, default)
+    value = params[key]
+    return default if value.blank?
+
+    ActiveModel::Type::Boolean.new.cast(value)
   end
 
   def initialize_shared_store

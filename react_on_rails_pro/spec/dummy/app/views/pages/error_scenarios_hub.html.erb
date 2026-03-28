@@ -1,8 +1,11 @@
 <%
   # Read current config values at render time
-  throw_js_errors = ReactOnRailsPro.configuration.throw_js_errors
-  raise_on_prerender_error = ReactOnRails.configuration.raise_on_prerender_error
-  raise_non_shell = ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors
+  throw_js_errors = error_hub_config_value(:throw_js_errors, ReactOnRailsPro.configuration.throw_js_errors)
+  raise_on_prerender_error = error_hub_config_value(:raise_on_prerender_error, ReactOnRails.configuration.raise_on_prerender_error)
+  raise_non_shell = error_hub_config_value(
+    :raise_non_shell_server_rendering_errors,
+    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors
+  )
 
   # Query params to forward to linked test pages so overrides persist across navigation
   config_params = {
