@@ -1,5 +1,8 @@
 name: Rspec test for gem
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:

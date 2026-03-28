@@ -1,5 +1,8 @@
 name: Generator tests # TODO needs to be duplicated for RoR Pro
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:

@@ -1,5 +1,8 @@
 name: React on Rails Pro - Lint
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:

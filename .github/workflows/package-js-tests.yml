@@ -1,5 +1,8 @@
 name: JS unit tests for Renderer package
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
