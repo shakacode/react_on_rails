@@ -152,21 +152,20 @@ enableFetchMocks();
   });
 
   describe('preloaded RSC payloads', () => {
-    let chunk1Obj;
-    let chunk2Obj;
+    let chunk1;
+    let chunk2;
     let railsContext;
 
     beforeEach(() => {
-      // Setup test fixtures — preloaded payloads are objects (not strings)
-      // because injectRSCPayload embeds JSON directly as JS expressions
+      // Setup test fixtures
       const chunksDirectory = path.join(
         __dirname,
         'fixtures',
         'rsc-payloads',
         'simple-shell-with-async-component',
       );
-      chunk1Obj = JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk1.json'), 'utf8'));
-      chunk2Obj = JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk2.json'), 'utf8'));
+      chunk1 = JSON.stringify(JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk1.json'), 'utf8')));
+      chunk2 = JSON.stringify(JSON.parse(fs.readFileSync(path.join(chunksDirectory, 'chunk2.json'), 'utf8')));
 
       registerServerComponent('TestComponent');
       railsContext = {
@@ -183,9 +182,9 @@ enableFetchMocks();
     });
 
     it('uses preloaded RSC payloads without making a fetch request', async () => {
-      // Mock the global window.REACT_ON_RAILS_RSC_PAYLOADS with objects
+      // Mock the global window.REACT_ON_RAILS_RSC_PAYLOADS
       window.REACT_ON_RAILS_RSC_PAYLOADS = {
-        'TestComponent-{}-test-container': [chunk1Obj, chunk2Obj],
+        'TestComponent-{}-test-container': [`${chunk1}\n`, `${chunk2}\n`],
       };
 
       await act(async () => {
@@ -209,7 +208,7 @@ enableFetchMocks();
 
       // Mock the global window.REACT_ON_RAILS_RSC_PAYLOADS with only the first chunk initially
       window.REACT_ON_RAILS_RSC_PAYLOADS = {
-        'TestComponent-{}-test-container': [chunk1Obj],
+        'TestComponent-{}-test-container': [`${chunk1}\n`],
       };
 
       await act(async () => {
@@ -225,9 +224,9 @@ enableFetchMocks();
       expect(screen.getByText('Loading AsyncComponent...')).toBeInTheDocument();
       expect(screen.queryByText('AsyncComponent')).not.toBeInTheDocument();
 
-      // Now push the second chunk object to the preloaded array and set document to complete
+      // Now push the second chunk to the preloaded array and set document to complete
       await act(async () => {
-        window.REACT_ON_RAILS_RSC_PAYLOADS['TestComponent-{}-test-container'].push(chunk2Obj);
+        window.REACT_ON_RAILS_RSC_PAYLOADS['TestComponent-{}-test-container'].push(`${chunk2}\n`);
 
         // Set document.readyState to 'complete' and dispatch readystatechange event
         Object.defineProperty(document, 'readyState', { value: 'complete', writable: true });

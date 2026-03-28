@@ -46,17 +46,8 @@ function createRSCPayloadInitializationScript(cacheKey: string, sanitizedNonce?:
   return createScriptTag(cacheKeyJSArray(cacheKey), sanitizedNonce);
 }
 
-function createRSCPayloadChunk(jsonLine: string, cacheKey: string, sanitizedNonce?: string) {
-  // Embed the JSON line directly as a JavaScript expression instead of re-stringifying it.
-  // Valid JSON is a strict subset of JavaScript expressions, so parseable JSON is safe to embed.
-  // createScriptTag's escapeScript() handles HTML-unsafe sequences (</script>, <!--)
-  // using JS-compatible escape sequences that preserve the parsed value.
-  try {
-    JSON.parse(jsonLine);
-  } catch {
-    throw new Error(`Malformed NDJSON line in RSC stream: ${jsonLine.slice(0, 100)}`);
-  }
-  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${jsonLine})`, sanitizedNonce);
+function createRSCPayloadChunk(chunk: string, cacheKey: string, sanitizedNonce?: string) {
+  return createScriptTag(`(${cacheKeyJSArray(cacheKey)}).push(${JSON.stringify(chunk)})`, sanitizedNonce);
 }
 
 /**
@@ -97,6 +88,7 @@ export default function injectRSCPayload(
   safePipe(pipeableHtmlStream, htmlStream, (err) => {
     resultStream.emit('error', err);
   });
+  const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
 
   // ========================================
@@ -259,37 +251,12 @@ export default function injectRSCPayload(
         const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
         rscInitializationBuffers.push(Buffer.from(initializationScript));
 
-        // Process RSC payload stream asynchronously.
-        // Chunks may not align with JSON object boundaries, so we buffer
-        // incomplete lines (same approach as transformRSCStream).
+        // Process RSC payload stream asynchronously
         rscPromises.push(
           (async () => {
-            let lastIncompleteLine = '';
-            const decoder = new TextDecoder();
             for await (const chunk of stream ?? []) {
-              const decodedChunk =
-                lastIncompleteLine +
-                (typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true }));
-              const lines = decodedChunk.split('\n');
-              lastIncompleteLine = lines.pop() ?? '';
-
-              // Contract: upstream stream emits NDJSON (one payload object per line).
-              let bufferedPayloadInThisChunk = false;
-              for (const line of lines) {
-                const normalizedLine = line.trim();
-                if (normalizedLine !== '') {
-                  const payloadScript = createRSCPayloadChunk(normalizedLine, rscPayloadKey, sanitizedNonce);
-                  rscPayloadBuffers.push(Buffer.from(payloadScript));
-                  bufferedPayloadInThisChunk = true;
-                }
-              }
-              if (bufferedPayloadInThisChunk) {
-                scheduleFlush();
-              }
-            }
-            const finalChunk = (lastIncompleteLine + decoder.decode()).trim();
-            if (finalChunk !== '') {
-              const payloadScript = createRSCPayloadChunk(finalChunk, rscPayloadKey, sanitizedNonce);
+              const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
+              const payloadScript = createRSCPayloadChunk(decodedChunk, rscPayloadKey, sanitizedNonce);
               rscPayloadBuffers.push(Buffer.from(payloadScript));
               scheduleFlush();
             }

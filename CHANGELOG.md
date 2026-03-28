@@ -24,17 +24,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-#### Performance
-
-- **[Pro]** **Reduce RSC payload overhead by eliminating double JSON.stringify**: RSC Flight data embedded in
-  HTML stream script tags was being JSON.stringified twice — once when wrapping in the result object envelope,
-  and again when embedding in the `<script>` tag's `.push()` call. The second stringify is now eliminated by
-  embedding JSON directly as a JavaScript expression (JSON is a strict subset of JS). This saves ~38KB (~24%
-  of raw Flight data) on a typical product search page with 36 results.
-  [PR 2835](https://github.com/shakacode/react_on_rails/pull/2835) by
-  [justin808](https://github.com/justin808).
-  Fixes [Issue 2522](https://github.com/shakacode/react_on_rails/issues/2522).
-
 ### [16.5.1] - 2026-03-27
 
 #### Fixed
