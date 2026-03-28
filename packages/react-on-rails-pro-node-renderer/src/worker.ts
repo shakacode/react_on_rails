@@ -55,7 +55,6 @@ declare module '@fastify/multipart' {
 }
 
 declare module 'fastify' {
-  // eslint-disable-next-line @typescript-eslint/no-shadow
   interface FastifyRequest {
     uploadDir: string;
   }

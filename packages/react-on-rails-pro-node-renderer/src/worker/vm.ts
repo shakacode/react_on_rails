@@ -109,7 +109,7 @@ export class VMContextNotFoundError extends Error {
   }
 }
 
-async function buildVM(filePath: string): Promise<VMContext> {
+export async function buildVM(filePath: string): Promise<VMContext> {
   // Return existing promise if VM is already being created
   const existingVmCreationPromise = vmCreationPromises.get(filePath);
   if (existingVmCreationPromise) {

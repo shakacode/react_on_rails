@@ -133,8 +133,8 @@ ReactOnRails.serverRenderRSCReactComponent = (options: RSCRenderParams) => {
  *   const posts = await getReactOnRailsAsyncProp('posts');  // Promise<Post[]>
  *   // ...
  * }
-* ```
-*
+ * ```
+ *
  * @param props - The component props to enhance
  * @param sharedExecutionContext - Map scoped to the current HTTP request for sharing state
  * @returns props - Original props plus getReactOnRailsAsyncProp function

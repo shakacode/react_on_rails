@@ -108,7 +108,9 @@ describe('worker', () => {
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest reports unexpected handleRenderRequest failures once', async () => {
-    const buildVMSpy = jest.spyOn(vm, 'buildVM').mockRejectedValueOnce(new Error('Injected buildVM failure'));
+    const buildExecutionContextSpy = jest
+      .spyOn(vm, 'buildExecutionContext')
+      .mockRejectedValueOnce(new Error('Injected buildExecutionContext failure'));
     const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
     try {
@@ -139,7 +141,7 @@ describe('worker', () => {
       );
       expect(res.payload).toContain('Caught top level error in handleRenderRequest');
     } finally {
-      buildVMSpy.mockRestore();
+      buildExecutionContextSpy.mockRestore();
       reportMessageSpy.mockRestore();
     }
   });
@@ -628,15 +630,11 @@ describe('worker', () => {
     });
 
     const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(400);
 
-    // Verify bundle directory is created
+    // Verify bundle directory is not created when the request is rejected
     const bundleDirectory = path.join(serverBundleCachePathForTest(), bundleHash);
-    expect(fs.existsSync(bundleDirectory)).toBe(true);
-
-    // Verify no files were copied (since none were uploaded)
-    const files = fs.readdirSync(bundleDirectory);
-    expect(files).toHaveLength(0);
+    expect(fs.existsSync(bundleDirectory)).toBe(false);
   });
 
   test('post /upload-assets with duplicate bundle hash silently skips overwrite and returns 200', async () => {
@@ -749,8 +747,8 @@ describe('worker', () => {
     const bundleFilePath = path.join(actualBundleDir, `${bundleHash}.js`);
     expect(fs.existsSync(bundleFilePath)).toBe(true);
 
-    // Target bundle directory should also exist (created for assets)
-    expect(fs.existsSync(targetBundleDir)).toBe(true);
+    // No assets were uploaded, so targetBundles should not create an extra directory
+    expect(fs.existsSync(targetBundleDir)).toBe(false);
 
     // But the bundle file should NOT be in the target bundle directory
     const targetBundleFilePath = path.join(targetBundleDir, `${bundleHash}.js`);
@@ -761,9 +759,8 @@ describe('worker', () => {
     expect(files).toHaveLength(1);
     expect(files[0]).toBe(`${bundleHash}.js`);
 
-    // Verify the target bundle directory is empty (no assets uploaded)
-    const targetFiles = fs.readdirSync(targetBundleDir);
-    expect(targetFiles).toHaveLength(0);
+    // The target bundle directory should remain absent until assets are copied there
+    expect(fs.existsSync(targetBundleDir)).toBe(false);
   });
 
   // Incremental Render Endpoint Tests

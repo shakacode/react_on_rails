@@ -8,7 +8,7 @@ import {
   resetForTest,
   BUNDLE_TIMESTAMP,
 } from './helper';
-import { buildExecutionContext, hasVMContextForBundle, resetVM } from '../src/worker/vm';
+import { buildExecutionContext, buildVM, hasVMContextForBundle, resetVM } from '../src/worker/vm';
 import { getConfig } from '../src/shared/configBuilder';
 import { isErrorRenderResult } from '../src/shared/utils';
 
