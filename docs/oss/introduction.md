@@ -43,7 +43,6 @@ Unlike a separate SPA approach, React on Rails lets you leverage Rails conventio
 - ❌ You're building a standalone SPA with a separate API backend
 - ❌ You mainly want Rails-rendered HTML plus minimal JavaScript enhancements
 - ❌ You want a page-oriented SPA shell instead of embedding React into Rails views
-
 If you're evaluating the tradeoffs, start with **[Comparing React on Rails to alternatives](./getting-started/comparing-react-on-rails-to-alternatives.md)** for a narrative overview, or jump to the **[feature comparison table](./getting-started/comparison-with-alternatives.md)** for a side-by-side matrix with benchmarks.
 
 ## Getting Started
