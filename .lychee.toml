@@ -65,6 +65,7 @@ exclude = [
   '^https://frigade\.com/blog/bundle-size-reduction-with-rsc-and-frigade/?$', # Connection failed from CI
   '^https://tanstack\.com/router',           # Connection failed from CI
   '^https://lodash\.com',                    # Connection reset from CI
+  '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE
@@ -90,6 +91,7 @@ exclude = [
   '^https://devchat\.tv',  # Ruby Rogues podcast - times out in CI
   '^https?://chlg\.co',  # URL shortener - times out in CI
   '^https?://contributor-covenant\.org',  # Timeout in CI
+  '^https://www\.diva-portal\.org/smash/get/diva2:1903931/FULLTEXT01\.pdf$',  # Intermittent timeout in CI
 
   # ============================================================================
   # CHANGELOG COMPARE LINKS
