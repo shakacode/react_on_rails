@@ -95,7 +95,9 @@ export default function Providers({ children, user }) {
 <%# ERB view — Rails passes the data as props %>
 <%= stream_react_component("ProductPage",
       props: { user: current_user.as_json(only: [:id, :name]),
-               product: @product.as_json(include: [:specs, :reviews]) }) %>
+               product: @product.as_json(
+                          include: { specs: { only: [:id, :label, :value] },
+                                     reviews: { only: [:id, :text, :rating] } }) }) %>
 ```
 
 ```jsx
@@ -120,20 +122,22 @@ export default function ProductPage({ user, product }) {
 
 **Key insight:** Components that don't need context (static header, footer) stay **outside** the provider wrapper, keeping them as Server Components with zero JavaScript cost.
 
-## Pattern 3: Streaming Slow Data
+## Pattern 3: Streaming HTML Delivery
 
 > **Note:** This section covers a cross-cutting concern (data fetching via `stream_react_component`) that affects how you structure context and state. For the full treatment of data fetching patterns, see [Data Fetching Migration](rsc-data-fetching.md).
 
-In React on Rails, data comes from Rails as props. Rails fetches all data in the controller and passes it to `stream_react_component`, which uses React's streaming SSR to deliver the rendered HTML progressively.
+In React on Rails, data comes from Rails as props. Rails loads all data synchronously in the controller and passes it to `stream_react_component`, which streams the rendered HTML to the browser as React processes the component tree.
 
 ```erb
 <%= stream_react_component("ProductPage",
       props: { name: product.name, price: product.price,
-               reviews: product.reviews.includes(:author).as_json,
-               recommendations: RecommendationService.for(product).as_json }) %>
+               reviews: product.reviews
+                          .as_json(only: [:id, :text, :rating]),
+               recommendations: RecommendationService.for(product)
+                          .as_json(only: [:id, :name, :price]) }) %>
 ```
 
-The component renders with all data available as props. `stream_react_component` uses React's streaming SSR to deliver the HTML progressively:
+The component renders with all data available as props. `stream_react_component` streams the HTML to the browser as React processes the component tree:
 
 ```jsx
 // ProductPage.jsx -- Server Component
@@ -160,7 +164,7 @@ function ReviewList({ reviews }) {
 }
 ```
 
-All props are available immediately in the component. `stream_react_component` handles progressive HTML delivery via React's `renderToPipeableStream`.
+All data is loaded in Rails before rendering begins. `stream_react_component` then streams the rendered HTML to the browser via React's `renderToPipeableStream`.
 
 > **Note:** `React.cache()` is only available in React Server Component environments. It is not available in client components or non-RSC server rendering (e.g., `renderToString`).
 
