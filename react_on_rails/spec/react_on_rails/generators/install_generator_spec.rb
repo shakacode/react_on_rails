@@ -1858,6 +1858,9 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:use_rsc?).and_return(false)
 
       expect(install_generator).to receive(:say_status)
+        .with(:gsub, "bin/dev", true)
+        .twice
+      expect(install_generator).to receive(:say_status)
         .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
       expect(Dir).not_to receive(:chdir)
       expect(File).not_to receive(:chmod)
