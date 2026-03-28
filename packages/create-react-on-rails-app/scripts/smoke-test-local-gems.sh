@@ -105,7 +105,10 @@ expect_git_history() {
     return 1
   fi
 
-  git -C "$app_dir" ls-files --error-unmatch .gitignore .gitattributes >/dev/null 2>&1
+  git -C "$app_dir" ls-files --error-unmatch .gitignore .gitattributes >/dev/null || {
+    echo "Missing tracked Rails git scaffold files in $app_dir" >&2
+    return 1
+  }
   ! git -C "$app_dir" ls-files | grep -q '^tmp/cache/'
   ! git -C "$app_dir" ls-files | grep -q '^node_modules/'
 }
