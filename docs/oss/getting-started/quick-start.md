@@ -193,7 +193,6 @@ Now that you have React on Rails working, here's what to explore next:
 Start at [React on Rails Pro](../../pro/home-pro.md) for the canonical route map. From there you can jump to the [upgrade guide](../../pro/upgrading-to-pro.md), [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Free to evaluate — no license needed for development.
 :::
 
-- **[React on Rails Pro](../../pro/home-pro.md)** - Canonical Pro landing page and route map
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
 - **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - Three-step migration from OSS
 
