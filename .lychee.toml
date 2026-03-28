@@ -90,6 +90,7 @@ exclude = [
   '^https://devchat\.tv',  # Ruby Rogues podcast - times out in CI
   '^https?://chlg\.co',  # URL shortener - times out in CI
   '^https?://contributor-covenant\.org',  # Timeout in CI
+  '^https://www\.diva-portal\.org/smash/get/diva2:1903931/FULLTEXT01\.pdf$',  # Intermittent timeout in CI
 
   # ============================================================================
   # CHANGELOG COMPARE LINKS
