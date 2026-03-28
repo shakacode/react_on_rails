@@ -65,14 +65,14 @@ export function errorResponseResult(msg: string, tracingContext?: TracingContext
 }
 
 /**
- * @param renderingRequest The JavaScript code which threw an error
+ * @param requestDescription A description of the request that caused the error (e.g. JS code or a task description)
  * @param error The error that was thrown (typed as `unknown` to minimize casts in `catch`)
  * @param context Optional context to include in the error message
  */
-export function formatExceptionMessage(renderingRequest: string, error: unknown, context?: string) {
+export function formatExceptionMessage(requestDescription: string, error: unknown, context?: string) {
   return `${context ? `\nContext:\n${context}\n` : ''}
-JS code for rendering request was:
-${smartTrim(renderingRequest)}
+Request:
+${smartTrim(requestDescription)}
     
 EXCEPTION MESSAGE:
 ${(error as Error).message || error}
