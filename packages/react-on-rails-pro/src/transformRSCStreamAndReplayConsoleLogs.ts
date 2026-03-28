@@ -13,7 +13,7 @@
  */
 
 import { RSCPayloadChunk } from 'react-on-rails/types';
-import { sanitizeNonce } from './utils.ts';
+import { sanitizeNonce, replayConsoleLog } from './utils.ts';
 
 /**
  * Transforms an RSC stream and replays console logs on the client.
@@ -45,48 +45,46 @@ export default function transformRSCStreamAndReplayConsoleLogs(
       let { value, done } = await reader.read();
 
       const handleJsonChunk = (chunk: RSCPayloadChunk) => {
-        const { html, consoleReplayScript = '' } = chunk;
+        const { html, consoleReplayScript } = chunk;
         controller.enqueue(encoder.encode(html ?? ''));
+        replayConsoleLog(consoleReplayScript, sanitizedNonce);
+      };
 
-        const replayConsoleCode = consoleReplayScript
-          .trim()
-          .replace(/^<script[^>]*>/i, '')
-          .replace(/<\/script>$/i, '');
-        if (replayConsoleCode?.trim() !== '') {
-          const scriptElement = document.createElement('script');
-          if (sanitizedNonce) {
-            scriptElement.nonce = sanitizedNonce;
-          }
-          scriptElement.textContent = replayConsoleCode;
-          document.body.appendChild(scriptElement);
+      const parseAndHandleLines = (lines: string[]) => {
+        const jsonChunks = lines
+          .filter((line) => line.trim() !== '')
+          .map((line) => {
+            try {
+              return JSON.parse(line) as RSCPayloadChunk;
+            } catch (error) {
+              console.error('Error parsing JSON:', line, error);
+              throw error;
+            }
+          });
+
+        for (const jsonChunk of jsonChunks) {
+          handleJsonChunk(jsonChunk);
         }
       };
 
       try {
         while (!done) {
-          const decodedValue = typeof value === 'string' ? value : decoder.decode(value);
+          const decodedValue = typeof value === 'string' ? value : decoder.decode(value, { stream: true });
           const decodedChunks = lastIncompleteChunk + decodedValue;
           const chunks = decodedChunks.split('\n');
           lastIncompleteChunk = chunks.pop() ?? '';
 
-          const jsonChunks = chunks
-            .filter((line) => line.trim() !== '')
-            .map((line) => {
-              try {
-                return JSON.parse(line) as RSCPayloadChunk;
-              } catch (error) {
-                console.error('Error parsing JSON:', line, error);
-                throw error;
-              }
-            });
-
-          for (const jsonChunk of jsonChunks) {
-            handleJsonChunk(jsonChunk);
-          }
+          parseAndHandleLines(chunks);
 
           // eslint-disable-next-line no-await-in-loop
           ({ value, done } = await reader.read());
         }
+
+        const finalDecodedValue = lastIncompleteChunk + decoder.decode();
+        if (finalDecodedValue.trim() !== '') {
+          parseAndHandleLines(finalDecodedValue.split('\n'));
+        }
+
         controller.close();
       } catch (error) {
         console.error('Error transforming RSC stream:', error);

@@ -49,3 +49,22 @@ export const sanitizeNonce = (nonce?: string) => {
   const nonceWithAllowedCharsOnly = nonce?.replace(/[^a-zA-Z0-9+/=_-]/g, '');
   return nonceWithAllowedCharsOnly?.match(/^[a-zA-Z0-9+/_-]+={0,2}$/)?.[0];
 };
+
+export function replayConsoleLog(consoleReplayScript: string | undefined, sanitizedNonce?: string) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const replayConsoleCode = (consoleReplayScript ?? '')
+    .trim()
+    .replace(/^<script[^>]*>/i, '')
+    .replace(/<\/script>$/i, '');
+  if (replayConsoleCode?.trim() !== '') {
+    const scriptElement = document.createElement('script');
+    if (sanitizedNonce) {
+      scriptElement.nonce = sanitizedNonce;
+    }
+    scriptElement.textContent = replayConsoleCode;
+    document.body.appendChild(scriptElement);
+  }
+}
