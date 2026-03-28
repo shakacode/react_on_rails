@@ -686,9 +686,11 @@ module ReactOnRails
           checker.add_info("  Pro uses NodeRenderer for server rendering")
           if defined?(ExecJS) && ExecJS.runtime
             checker.add_info("  ExecJS available as fallback: #{ExecJS.runtime.name}")
-          else
+          elsif pro_execjs_fallback_enabled?
             checker.add_warning("  ⚠️  ExecJS fallback is enabled but ExecJS is not available")
             checker.add_info("  💡 Install mini_racer or set renderer_use_fallback_exec_js = false")
+          else
+            checker.add_info("  ℹ️  ExecJS fallback is disabled (renderer_use_fallback_exec_js = false)")
           end
         elsif defined?(ExecJS)
           runtime_name = ExecJS.runtime.name if ExecJS.runtime
@@ -816,7 +818,7 @@ module ReactOnRails
         if server_bundle_match
           checker.add_info("  server_bundle_js_file: #{server_bundle_match[1]}")
         else
-          checker.add_info("  server_bundle_js_file: server-bundle.js (default)")
+          checker.add_info('  server_bundle_js_file: "" (default, SSR disabled)')
         end
       end
 
@@ -842,24 +844,16 @@ module ReactOnRails
       # Check Shakapacker integration and provide recommendations
       check_shakapacker_private_output_path(rails_bundle_path)
 
-      # RSC bundle file (Pro feature)
-      runtime_config_supports_rsc_bundle =
-        case runtime_config
-        when nil
-          false
+      # RSC bundle file (Pro feature). Base runtime config does not expose this setting.
+      rsc_bundle_value =
+        if runtime_config && defined?(ReactOnRailsPro)
+          ReactOnRailsPro.configuration.rsc_bundle_js_file
         else
-          runtime_config.respond_to?(:rsc_bundle_js_file)
+          rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
+          rsc_bundle_match ? rsc_bundle_match[1] : nil
         end
-      if runtime_config_supports_rsc_bundle
-        rsc_bundle_value = runtime_config.rsc_bundle_js_file
-        if rsc_bundle_value.present?
-          checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_value} (React Server Components - Pro)")
-        end
-      else
-        rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
-        if rsc_bundle_match
-          checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_match[1]} (React Server Components - Pro)")
-        end
+      if rsc_bundle_value.present?
+        checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_value} (React Server Components - Pro)")
       end
 
       # Prerender setting
@@ -2429,6 +2423,20 @@ module ReactOnRails
     rescue StandardError, LoadError => e
       checker.add_warning("⚠️  Could not read Pro runtime renderer configuration: #{e.message}")
       @resolved_pro_server_renderer = nil
+    end
+
+    def pro_execjs_fallback_enabled?
+      return ReactOnRailsPro.configuration.renderer_use_fallback_exec_js if defined?(ReactOnRailsPro)
+
+      config_path = "config/initializers/react_on_rails_pro.rb"
+      return true unless File.exist?(config_path)
+
+      content = File.read(config_path)
+      fallback_match = content.match(/config\.renderer_use_fallback_exec_js\s*=\s*(true|false)/)
+      fallback_match ? fallback_match[1] == "true" : true
+    rescue StandardError, LoadError => e
+      checker.add_warning("⚠️  Could not read Pro fallback ExecJS configuration: #{e.message}")
+      true
     end
 
     # Resolve the JavaScript source path from Shakapacker config.

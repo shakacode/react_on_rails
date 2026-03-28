@@ -194,6 +194,22 @@ RSpec.describe ReactOnRails::Doctor do
       )
     end
 
+    it "shows SSR-disabled default when runtime config is unavailable and initializer does not set server bundle" do
+      write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
+        ReactOnRails.configure do |config|
+          config.prerender = false
+        end
+      RUBY
+      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(nil)
+
+      doctor.send(:check_react_on_rails_initializer)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).to include(
+        a_string_including('server_bundle_js_file: "" (default, SSR disabled)')
+      )
+    end
+
     it "omits component_registry_timeout when runtime value is the default" do
       allow(runtime_config).to receive(:component_registry_timeout).and_return(5000)
       allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
@@ -1564,6 +1580,33 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when Pro initializer has NodeRenderer, ExecJS is absent, and fallback is disabled" do
+      before do
+        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
+        write_project_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+          ReactOnRailsPro.configure do |config|
+            config.server_renderer = "NodeRenderer"
+            config.renderer_use_fallback_exec_js = false
+          end
+        RUBY
+        hide_const("ExecJS")
+      end
+
+      it "does not warn about missing ExecJS fallback" do
+        doctor.send(:check_server_rendering_engine)
+
+        info_messages = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
+        warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+        expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
+        expect(info_messages).to include(
+          a_string_including("ExecJS fallback is disabled (renderer_use_fallback_exec_js = false)")
+        )
+        expect(warning_messages).not_to include(
+          a_string_including("ExecJS fallback is enabled but ExecJS is not available")
+        )
+      end
+    end
+
     context "when Pro initializer does not have NodeRenderer" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
@@ -2077,12 +2120,26 @@ RSpec.describe ReactOnRails::Doctor do
 
   describe "react_on_rails_runtime_configuration" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
 
     it "memoizes nil when rails environment cannot be loaded" do
       expect(doctor).to receive(:ensure_rails_environment_loaded).once.and_return(false)
 
       expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
       expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
+    end
+
+    it "rescues and memoizes nil when ReactOnRails.configuration raises" do
+      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
+      allow(ReactOnRails).to receive(:configuration).and_raise(StandardError, "bad config")
+
+      expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
+      expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
+
+      warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+      warning_count =
+        warning_messages.count { |msg| msg.include?("Could not query React on Rails runtime configuration") }
+      expect(warning_count).to eq(1)
     end
   end
 
