@@ -203,7 +203,7 @@ Recommended starting points for sidecar configuration:
 | Rails | 1–2 cores | 2–4 cores | 2 GB | 4 GB |
 | Node Renderer | 1–2 cores | 2–4 cores | 2 GB | 4 GB |
 
-> **Important:** Set memory **requests** equal to **limits** for the renderer container. This reduces eviction risk under memory pressure by giving the container a higher QoS class. If using `--max-old-space-size`, set the container memory limit to `max-old-space-size × workersCount × 1.5` to account for overhead.
+> **Important:** Set memory **requests** equal to **limits** for the renderer container so its memory budget is explicit. Kubernetes QoS is determined at the pod level, so you only get `Guaranteed` QoS when **every** container in the pod has matching requests and limits. If using `--max-old-space-size`, set the container memory limit to `max-old-space-size × workersCount × 1.5` to account for overhead.
 
 ### jemalloc for Rails Memory
 
@@ -298,7 +298,7 @@ In production, `logLevel: 'warn'` is sufficient unless actively debugging.
 ### Container restarts frequently (OOM)
 
 1. **Check which container is OOM-killed** — Use your orchestrator's events/logs to identify if it's Rails or the Node Renderer.
-2. **If Node Renderer** — Set `NODE_OPTIONS="--max-old-space-size=512"` and enable `allWorkersRestartInterval`.
+2. **If Node Renderer** — Set `NODE_OPTIONS="--max-old-space-size=512"` and enable rolling restarts with both `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts`.
 3. **If Rails** — Consider jemalloc and review `WEB_CONCURRENCY` / `RAILS_MAX_THREADS` settings.
 4. **Monitor over time** — Memory growth is gradual. Monitor for 8+ hours to see the steady-state memory usage.
 
