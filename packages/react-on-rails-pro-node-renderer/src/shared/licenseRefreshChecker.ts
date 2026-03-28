@@ -61,7 +61,8 @@ export function shouldCheckForRefresh(): boolean {
  */
 export async function maybeRefreshLicense(): Promise<void> {
   if (refreshInFlight) {
-    return refreshInFlight;
+    await refreshInFlight;
+    return;
   }
 
   const refreshPromise = (async () => {

@@ -296,11 +296,6 @@ export function getLicensePlan(): ValidPlan | undefined {
   return cachedLicensePlan;
 }
 
-export async function warmLicenseValidationState(): Promise<void> {
-  await maybeRefreshLicense();
-  maybeSeedLicenseCache(determineDecodedLicenseData());
-}
-
 function determineDecodedLicenseData(): LicenseData | undefined {
   const licenseString = loadLicenseString();
   if (!licenseString) {
@@ -308,6 +303,11 @@ function determineDecodedLicenseData(): LicenseData | undefined {
   }
 
   return decodeLicense(licenseString);
+}
+
+export async function warmLicenseValidationState(): Promise<void> {
+  await maybeRefreshLicense();
+  maybeSeedLicenseCache(determineDecodedLicenseData());
 }
 
 export async function getValidatedLicenseData(): Promise<LicenseData> {
@@ -338,11 +338,11 @@ export async function getValidatedLicenseData(): Promise<LicenseData> {
 }
 
 export async function isEvaluation(): Promise<boolean> {
-  const plan = (await getValidatedLicenseData()).plan;
+  const { plan } = await getValidatedLicenseData();
   return typeof plan === 'string' && plan !== 'paid' && plan !== 'partner' && !plan.startsWith('paid_');
 }
 
-export async function getGraceDaysRemaining(): Promise<number | undefined> {
+export function getGraceDaysRemaining(): number | undefined {
   return undefined;
 }
 
