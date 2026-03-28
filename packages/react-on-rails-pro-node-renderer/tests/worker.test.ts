@@ -8,6 +8,7 @@ import packageJson from '../package.json';
 import worker, { disableHttp2 } from '../src/worker';
 import * as vm from '../src/worker/vm';
 import * as errorReporter from '../src/shared/errorReporter';
+import { getRequestBundleFilePath } from '../src/shared/utils';
 import {
   BUNDLE_TIMESTAMP,
   SECONDARY_BUNDLE_TIMESTAMP,
@@ -341,6 +342,24 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, bundleHash))).toBe(true);
   });
 
+  test('post /upload-assets rejects traversal bundle timestamps', async () => {
+    const app = createWorker({
+      password: 'my_password',
+    });
+
+    const form = formAutoContent({
+      gemVersion,
+      protocolVersion,
+      railsEnv,
+      password: 'my_password',
+      ['bundle_..']: createReadStream(getFixtureBundle()),
+    });
+
+    const res = await app.inject().post('/upload-assets').payload(form.payload).headers(form.headers).end();
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('Invalid bundle timestamp');
+  });
+
   test('post /upload-assets ignores targetBundles when bundle_<hash> fields are present (backward compat)', async () => {
     const bundleHash = 'compat-bundle-hash';
 
@@ -363,6 +382,10 @@ describe('worker', () => {
     const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
     expect(res.statusCode).toBe(200);
     expect(fs.existsSync(assetPath(testName, bundleHash))).toBe(true);
+  });
+
+  test('getRequestBundleFilePath rejects traversal bundle timestamps', () => {
+    expect(() => getRequestBundleFilePath('..')).toThrow('Invalid bundle timestamp');
   });
 
   test('post /upload-assets with multiple bundles and assets', async () => {

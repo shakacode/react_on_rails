@@ -2,31 +2,20 @@
 
 Complete reference for the Async Props API.
 
-## Controller Helpers
+## View Helpers
 
-### `async_prop`
+### `stream_react_component_with_async_props(component_name, options = {}, &props_block)`
 
-Wraps a block that will be evaluated asynchronously and streamed to the renderer.
+Streams a React component and exposes async props to the component via `getReactOnRailsAsyncProp`.
+The block should return a hash of async props to evaluate and stream.
 
-```ruby
-async_prop { expression }
-async_prop(options) { expression }
-```
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `block` | Block | The code to evaluate asynchronously |
-
-> **Status:** Per-prop `:timeout` and `:on_error` are not implemented in the current release. Use this page as the contract for the async prop flow, not as a promise that those helper options already exist.
-
-### `render_component`
-
-Renders a React component with support for async props.
-
-```ruby
-render_component(component_name, props:, options = {})
+```erb
+<%= stream_react_component_with_async_props("Dashboard", props: { title: "Dashboard" }) do
+  {
+    users: User.active.limit(10),
+    posts: Post.recent.limit(5)
+  }
+end %>
 ```
 
 #### Parameters
@@ -34,23 +23,26 @@ render_component(component_name, props:, options = {})
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `component_name` | String | Name of the registered React component |
-| `props` | Hash | Props to pass to the component (can include `async_prop` values) |
-| `options` | Hash | Additional rendering options |
+| `options` | Hash | Same options as `stream_react_component` (for example `props`, `dom_id`, `html_options`, `trace`) |
+| `props_block` | Proc | Returns a hash of async props to stream |
 
-#### Options
+> **Status:** Per-prop `timeout:` and `on_error:` are not implemented in the current release. Handle those concerns inside the block or with the global `ssr_timeout`.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `:prerender` | Boolean | `true` | Enable server-side rendering |
-| `:streaming` | Boolean | `true` | Enable streaming SSR (requires prerender) |
-| `:trace` | Boolean | `false` | Enable performance tracing |
+### `rsc_payload_react_component_with_async_props(component_name, options = {}, &props_block)`
+
+Same async-prop block contract, but renders the RSC payload stream instead of the HTML stream.
+
+```erb
+<%= rsc_payload_react_component_with_async_props("Dashboard") do
+  { users: User.active.limit(10) }
+end %>
+```
 
 ## React Component Props
 
 ### `getReactOnRailsAsyncProp`
 
-Async prop accessor injected into Server Components by `addAsyncPropsCapabilityToComponentProps()`.
-The function returns the same Promise on repeated calls for the same prop name.
+Async prop accessor injected into components rendered through the async-props helpers. The function returns the same Promise on repeated calls for the same prop name.
 
 ```tsx
 async function UsersList({ getReactOnRailsAsyncProp }) {
@@ -74,155 +66,64 @@ async function UsersList({ getReactOnRailsAsyncProp }) {
 
 #### Returns
 
-The resolved value of the async prop. The promise is shared across repeated calls so React can suspend and resume consistently.
+A Promise for the resolved value of the async prop. Repeated calls share the same underlying promise so React can suspend and resume consistently.
 
 ## Configuration
-
-### Rails Configuration
 
 ```ruby
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
-  # Node renderer settings
-  config.node_renderer_pool_size = 4
-  config.node_renderer_timeout = 30
-
-  # Async props settings
-  config.async_props_default_timeout = 30
-  config.async_props_parallel_limit = 10
-
-  # Logging
-  config.logging_level = :info  # :debug, :info, :warn, :error
+  config.server_renderer = "NodeRenderer"
+  config.enable_rsc_support = true
+  config.tracing = true
+  config.ssr_timeout = 5
+  config.renderer_http_pool_size = 10
+  config.renderer_http_pool_timeout = 5
+  config.renderer_http_pool_warn_timeout = 0.25
 end
 ```
 
-### Node Renderer Configuration
-
-```javascript
-// config/react_on_rails_pro.js
-module.exports = {
-  // Streaming settings
-  streamingSSR: true,
-  shellTimeout: 5000,  // ms to wait for shell before fallback
-
-  // AsyncPropsManager settings
-  asyncPropsTimeout: 30000,  // ms per async prop
-
-  // Error handling
-  onRenderError: (error, componentName) => {
-    console.error(`Render error in ${componentName}:`, error);
-  }
-};
-```
+The following options are **not** part of the current release and should not be documented as active APIs: `node_renderer_timeout`, `async_props_default_timeout`, `async_props_parallel_limit`, and `trace_async_props`.
 
 ## NDJSON Protocol
 
-### Message Types
+The async-props pipeline uses NDJSON between Rails and the Node renderer.
 
-#### Render Request (Rails → Node)
+### Request Flow (Rails → Node)
 
 ```json
-{
-  "renderingRequest": "{\"componentName\":\"App\",\"props\":{...}}"
-}
+{"renderingRequest": "{\"componentName\":\"App\",\"props\":{...}}"}
+{"resolvedAsyncProp": {"propName": "users", "value": [{"id": 1, "name": "Alice"}]}}
+{"resolvedAsyncProp": {"propName": "posts", "value": [{"id": 1, "title": "Hello"}]}}
+{"requestEnded": true}
 ```
 
-#### Resolved Async Prop (Rails → Node)
+### Response Flow (Node → Rails)
 
 ```json
-{
-  "resolvedAsyncProp": {
-    "propName": "users",
-    "value": [{"id": 1, "name": "Alice"}]
-  }
-}
-```
-
-#### Request Ended (Rails → Node)
-
-```json
-{
-  "requestEnded": true
-}
-```
-
-#### Request Closed Update (Rails → Node)
-
-```json
-{
-  "onRequestClosedUpdateChunk": {
-    "type": "error",
-    "message": "Client disconnected"
-  }
-}
-```
-
-### Response Types
-
-#### HTML Chunk (Node → Rails)
-
-```json
-{
-  "html": "<div>...</div>"
-}
-```
-
-#### Console Replay (Node → Rails)
-
-```json
-{
-  "consoleReplayScript": "<script>console.log(...)</script>"
-}
-```
-
-#### Render Complete (Node → Rails)
-
-```json
-{
-  "renderingFinished": true
-}
+{"html": "<!DOCTYPE html><html>..."}
+{"consoleReplayScript": "<script>..."}
+{"renderingFinished": true}
 ```
 
 ## TypeScript Types
 
-```typescript
-interface AsyncProp<T> {
-  propName: string;
-  promise: Promise<T>;
-  resolved: boolean;
-  value?: T;
-}
+```ts
+import type { WithAsyncProps } from 'react-on-rails';
 
-interface AsyncPropsManagerOptions {
-  timeout?: number;
-  onError?: (error: Error, propName: string) => void;
-}
+type AsyncProps = {
+  users: User[];
+  posts: Post[];
+};
 
-interface RenderRequest {
-  componentName: string;
-  props: Record<string, unknown>;
-  asyncProps: string[];  // Names of props that are async
-}
+type SyncProps = {
+  title: string;
+};
 
-interface UpdateChunk {
-  type: 'resolvedAsyncProp' | 'error' | 'requestClosed';
-  propName?: string;
-  value?: unknown;
-  message?: string;
-}
+type Props = WithAsyncProps<AsyncProps, SyncProps>;
 ```
-
-## Error Codes
-
-| Code | Description |
-|------|-------------|
-| `ASYNC_PROP_TIMEOUT` | Async prop did not resolve within timeout |
-| `ASYNC_PROP_ERROR` | Error during async prop evaluation |
-| `STREAM_CLOSED` | NDJSON stream closed unexpectedly |
-| `RENDER_ERROR` | React rendering error |
-| `HYDRATION_MISMATCH` | Server/client HTML mismatch |
 
 ## Next Steps
 
-- [Advanced Usage](./advanced-usage.md) - Error boundaries, caching, optimization
+- [Advanced Usage](./advanced-usage.md) - Error handling, caching, optimization
 - [How It Works](./how-it-works.md) - Deep dive into the architecture

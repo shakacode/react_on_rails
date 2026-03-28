@@ -46,7 +46,7 @@ Async Props uses NDJSON streaming between Rails and the Node renderer:
 
 ### How It Works
 
-1. **Rails Controller** defines async props using `async_prop` blocks
+1. **Rails view helper** defines async props using `stream_react_component_with_async_props`
 2. **NDJSON Stream** opens between Rails and Node renderer
 3. **Shell HTML** is sent to browser immediately
 4. **Data fetches** happen in parallel on the Rails side
@@ -55,34 +55,36 @@ Async Props uses NDJSON streaming between Rails and the Node renderer:
 
 ## Quick Start
 
-### 1. Define Async Props in Your Controller
+### 1. Define Async Props in Your View
 
-```ruby
-class DashboardController < ApplicationController
-  def show
-    render_component(
-      "Dashboard",
-      props: {
-        # Regular prop - available immediately
-        title: "My Dashboard",
-
-        # Async prop - streams when ready
-        users: async_prop { User.active.limit(10) },
-
-        # Another async prop - fetches in parallel
-        posts: async_prop { Post.recent.limit(5) }
-      }
-    )
-  end
-end
+```erb
+<%= stream_react_component_with_async_props("Dashboard", props: { title: "My Dashboard" }) do
+  {
+    users: User.active.limit(10),
+    posts: Post.recent.limit(5)
+  }
+end %>
 ```
 
 ### 2. Use Suspense in Your Component
 
 ```tsx
+import type { WithAsyncProps } from 'react-on-rails';
 import React, { Suspense } from 'react';
 
-function Dashboard({ title, users, posts }) {
+type AsyncProps = {
+  users: User[];
+  posts: Post[];
+};
+
+type SyncProps = {
+  title: string;
+};
+
+async function Dashboard({ title, getReactOnRailsAsyncProp }: WithAsyncProps<AsyncProps, SyncProps>) {
+  const users = await getReactOnRailsAsyncProp('users');
+  const posts = await getReactOnRailsAsyncProp('posts');
+
   return (
     <div>
       <h1>{title}</h1>

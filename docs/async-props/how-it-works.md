@@ -15,20 +15,23 @@ Async Props creates a bidirectional streaming connection between Rails and the N
 
 ### Phase 1: Request Initialization
 
-When a request hits your Rails controller:
+When a request hits your Rails view:
 
-1. **Controller evaluates regular props** immediately
-2. **Async props are wrapped** in `async_prop` blocks (not executed yet)
+1. **Rails view helper evaluates regular props** immediately
+2. **Async props are wrapped** in the block passed to `stream_react_component_with_async_props` (not executed yet)
 3. **NDJSON stream opens** to Node renderer
-4. **Render request sent** with component name and prop definitions
+4. **Render request sent** with component name, sync props, and async prop definitions
 
 ```ruby
-# In your controller
-render_component("Dashboard", props: {
-  title: "Dashboard",           # Immediate: sent in initial request
-  users: async_prop { ... },    # Deferred: streamed when ready
-  posts: async_prop { ... }     # Deferred: streamed when ready
-})
+# In your view
+<%= stream_react_component_with_async_props("Dashboard", props: {
+  title: "Dashboard"           # Immediate: sent in initial request
+}) do
+  {
+    users: User.active,        # Deferred: streamed when ready
+    posts: Post.recent         # Deferred: streamed when ready
+  }
+end %>
 ```
 
 ### Phase 2: Shell Rendering
@@ -68,7 +71,7 @@ Back on the Rails side:
 As each async prop arrives:
 
 1. **Node renderer receives** the resolved value
-2. **AsyncPropsManager caches** the value
+2. **Async prop state caches** the value
 3. **React Suspense boundary** resolves
 4. **HTML chunk streams** to browser
 5. **React hydrates** the new content
@@ -94,25 +97,14 @@ NDJSON (Newline-Delimited JSON) enables bidirectional streaming:
 {"renderingFinished": true}
 ```
 
-## AsyncPropsManager
+## Async Prop Resolution
 
-The `AsyncPropsManager` class orchestrates async prop resolution on the Node side:
+Async prop resolution happens internally on the Node side. The public API exposed to components is the `getReactOnRailsAsyncProp` prop:
 
-```typescript
-class AsyncPropsManager {
-  // Stores promises for each async prop
-  private promiseControllers: Map<string, PromiseController>;
-
-  // Called when Rails sends a resolved prop
-  setProp(propName: string, value: unknown) {
-    const controller = this.promiseControllers.get(propName);
-    controller.resolve(value);
-  }
-
-  // Called by React components to await props
-  getProp(propName: string): Promise<unknown> {
-    return this.getOrCreatePromiseController(propName).promise;
-  }
+```tsx
+async function Dashboard({ getReactOnRailsAsyncProp }) {
+  const users = await getReactOnRailsAsyncProp('users');
+  const posts = await getReactOnRailsAsyncProp('posts');
 }
 ```
 
@@ -121,7 +113,7 @@ class AsyncPropsManager {
 Each HTTP request gets its own isolated execution context:
 
 - **Separate VM context** for global isolation
-- **Own AsyncPropsManager** instance
+- **Own internal async-props state**
 - **Independent Suspense boundaries**
 - **No cross-request data leakage**
 
@@ -132,13 +124,15 @@ Errors are handled gracefully at each stage:
 ### Rails-side Errors
 
 ```ruby
-users: async_prop {
-  begin
-    User.active
-  rescue => e
-    { error: e.message }  # Streams error as resolved value
-  end
-}
+<%= stream_react_component_with_async_props("Dashboard") do
+  {
+    users: begin
+      User.active
+    rescue => e
+      { error: e.message }  # Streams error as resolved value
+    end
+  }
+end %>
 ```
 
 ### Node-side Errors
@@ -178,7 +172,7 @@ Shell Render (50ms) ────────────────────
 ```ruby
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
-  config.logging_level = :debug
+  config.tracing = true
 end
 ```
 

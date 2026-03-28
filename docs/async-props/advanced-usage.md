@@ -77,12 +77,12 @@ function Dashboard() {
 All async props fetch simultaneously:
 
 ```ruby
-# Both queries run in parallel
-render_component("Dashboard", props: {
-  users: async_prop { User.active },      # Starts immediately
-  posts: async_prop { Post.recent }       # Starts immediately
-})
-# Total time: max(users_time, posts_time)
+<%= stream_react_component_with_async_props("Dashboard") do
+  {
+    users: User.active,      # Starts immediately
+    posts: Post.recent       # Starts immediately
+  }
+end %>
 ```
 
 ### Sequential (When Needed)
@@ -90,40 +90,35 @@ render_component("Dashboard", props: {
 Chain dependent data:
 
 ```ruby
-render_component("Profile", props: {
-  user: async_prop {
-    user = User.find(params[:id])
-    {
-      user: user,
-      posts: user.posts.recent  # Depends on user
-    }
+<%= stream_react_component_with_async_props("Profile") do
+  user = User.find(params[:id])
+  {
+    user: user,
+    posts: user.posts.recent  # Depends on user
   }
-})
+end %>
 ```
 
-## Timeouts and Fallbacks
+## Error Handling
 
-### Per-Prop Timeout
-
-```ruby
-users: async_prop(timeout: 5) {
-  SlowExternalAPI.fetch_users
-}
-```
+Async Props does not expose per-prop `timeout:` or `on_error:` options yet. If a fetch can fail, handle the error inside the async block and return a fallback value that your component can render.
 
 ### Fallback Values
 
 ```ruby
-users: async_prop(on_error: ->(e) { { error: true, message: e.message } }) {
+users: begin
   ExternalService.users
-}
+rescue => e
+  Rails.logger.warn("users async prop failed: #{e.message}")
+  []
+end
 ```
 
 ### React-side Fallback
 
 ```tsx
-function UsersList() {
-  const usersResult = useAsyncProp<UsersResult>('users');
+async function UsersList({ getReactOnRailsAsyncProp }) {
+  const usersResult = await getReactOnRailsAsyncProp<UsersResult>('users');
 
   if (usersResult.error) {
     return <ErrorMessage message={usersResult.message} />;
@@ -138,20 +133,23 @@ function UsersList() {
 ### Rails-side Caching
 
 ```ruby
-users: async_prop {
-  Rails.cache.fetch("active_users", expires_in: 5.minutes) do
-    User.active.to_a
-  end
-}
+<%= stream_react_component_with_async_props("Dashboard") do
+  {
+    users: Rails.cache.fetch("active_users", expires_in: 5.minutes) do
+      User.active.to_a
+    end
+  }
+end %>
 ```
 
 ### Component-level Caching
 
 ```ruby
-render_component("Dashboard",
-  props: { users: async_prop { User.active } },
-  cache_key: ["dashboard", current_user.id, User.maximum(:updated_at)]
-)
+<%= stream_react_component_with_async_props("Dashboard", props: { title: "Dashboard" }) do
+  {
+    users: User.active
+  }
+end %>
 ```
 
 ## Optimizing Skeleton Loaders
@@ -188,8 +186,7 @@ render_component("Dashboard",
 ```ruby
 # config/environments/development.rb
 ReactOnRailsPro.configure do |config|
-  config.logging_level = :debug
-  config.trace_async_props = true
+  config.tracing = true
 end
 ```
 
@@ -197,8 +194,8 @@ end
 
 ```javascript
 // In your React component
-function UsersList() {
-  const users = useAsyncProp('users');
+async function UsersList({ getReactOnRailsAsyncProp }) {
+  const users = await getReactOnRailsAsyncProp('users');
   console.log('[AsyncProp] users resolved:', users);
   return ...;
 }
@@ -216,12 +213,12 @@ function UsersList() {
 ### Track Async Prop Timing
 
 ```ruby
-users: async_prop {
+users: begin
   start = Time.now
   result = User.active.to_a
   Rails.logger.info "[AsyncProp] users: #{(Time.now - start) * 1000}ms"
   result
-}
+end
 ```
 
 ### Server Timing Headers
@@ -231,16 +228,16 @@ users: async_prop {
 def show
   timing_data = {}
 
-  props = {
-    users: async_prop {
-      start = Time.now
-      result = User.active
-      timing_data[:users] = Time.now - start
-      result
+  stream_react_component_with_async_props("Dashboard") do
+    {
+      users: begin
+        start = Time.now
+        result = User.active
+        timing_data[:users] = Time.now - start
+        result
+      end
     }
-  }
-
-  render_component("Dashboard", props: props)
+  end
 
   response.headers['Server-Timing'] = timing_data.map { |k, v|
     "#{k};dur=#{(v * 1000).round}"
@@ -294,44 +291,16 @@ test('renders with async props', async () => {
 
 ## Common Patterns
 
-### Optimistic Updates
+### Read async props in an async Server Component
 
 ```tsx
-function UsersList() {
-  const [users, setUsers] = useState(useAsyncProp('users'));
-
-  const addUser = async (userData) => {
-    // Optimistic update
-    const optimisticUser = { ...userData, id: 'temp', pending: true };
-    setUsers([...users, optimisticUser]);
-
-    // Actual API call
-    const newUser = await api.createUser(userData);
-    setUsers(users => users.map(u =>
-      u.id === 'temp' ? newUser : u
-    ));
-  };
-
-  return ...;
+async function UsersList({ getReactOnRailsAsyncProp }) {
+  const users = await getReactOnRailsAsyncProp('users');
+  return <UsersTable users={users} />;
 }
 ```
 
-### Refresh on Focus
-
-```tsx
-function Dashboard() {
-  const users = useAsyncProp('users');
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    const handleFocus = () => setRefreshKey(k => k + 1);
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, []);
-
-  return <UsersList key={refreshKey} users={users} />;
-}
-```
+There is no `useAsyncProp` hook in React on Rails Pro. If a Client Component needs to manage the data after hydration, pass the resolved value down from a Server Component and seed local state from that value.
 
 ## Migration from Traditional SSR
 
@@ -354,24 +323,27 @@ end
 
 ```ruby
 # Controller
-def show
-  render_component("Dashboard", props: {
-    users: async_prop { User.active },
-    posts: async_prop { Post.recent }
-  })
-end
+<%= stream_react_component_with_async_props("Dashboard") do
+  {
+    users: User.active,
+    posts: Post.recent
+  }
+end %>
 ```
 
 ```tsx
 // Component (add Suspense)
-function Dashboard() {
+async function Dashboard({ getReactOnRailsAsyncProp }) {
+  const users = await getReactOnRailsAsyncProp('users');
+  const posts = await getReactOnRailsAsyncProp('posts');
+
   return (
     <>
       <Suspense fallback={<UsersSkeleton />}>
-        <UsersList />
+        <UsersList users={users} />
       </Suspense>
       <Suspense fallback={<PostsSkeleton />}>
-        <PostsList />
+        <PostsList posts={posts} />
       </Suspense>
     </>
   );

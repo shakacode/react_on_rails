@@ -180,18 +180,30 @@ export const delay = (milliseconds: number) =>
   });
 
 export function getBundleDirectory(bundleTimestamp: string | number) {
+  const safeBundleTimestamp = validateBundleTimestamp(bundleTimestamp);
   const { serverBundleCachePath } = getConfig();
-  return path.join(serverBundleCachePath, `${bundleTimestamp}`);
+  return path.join(serverBundleCachePath, safeBundleTimestamp);
 }
 
 export function getRequestBundleFilePath(bundleTimestamp: string | number) {
   const bundleDirectory = getBundleDirectory(bundleTimestamp);
-  return path.join(bundleDirectory, `${bundleTimestamp}.js`);
+  const safeBundleTimestamp = validateBundleTimestamp(bundleTimestamp);
+  return path.join(bundleDirectory, `${safeBundleTimestamp}.js`);
 }
 
 export function getAssetPath(bundleTimestamp: string | number, filename: string) {
   const bundleDirectory = getBundleDirectory(bundleTimestamp);
   return path.join(bundleDirectory, filename);
+}
+
+const SAFE_BUNDLE_TIMESTAMP_PATTERN = /^(?!\.{1,2}$)[A-Za-z0-9_.-]+$/;
+
+export function validateBundleTimestamp(bundleTimestamp: string | number): string {
+  const normalizedBundleTimestamp = `${bundleTimestamp}`;
+  if (!SAFE_BUNDLE_TIMESTAMP_PATTERN.test(normalizedBundleTimestamp)) {
+    throw new Error(`React On Rails Error: Invalid bundle timestamp: ${normalizedBundleTimestamp}`);
+  }
+  return normalizedBundleTimestamp;
 }
 
 export async function validateBundlesExist(
