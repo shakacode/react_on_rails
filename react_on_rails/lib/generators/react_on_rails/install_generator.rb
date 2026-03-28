@@ -354,6 +354,8 @@ module ReactOnRails
 
         # Copy bin scripts from templates
         template_bin_path = "#{__dir__}/templates/base/base/bin"
+        # Always exclude `dev` from the bulk copy; it is handled explicitly below
+        # so we can patch DEFAULT_ROUTE and AUTO_OPEN_BROWSER_ONCE after copying.
         directory_options = { exclude_pattern: %r{/dev(?:\.tt)?\z} }
         directory template_bin_path, "bin", directory_options
 

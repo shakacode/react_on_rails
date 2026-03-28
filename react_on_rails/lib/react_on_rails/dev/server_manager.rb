@@ -20,6 +20,7 @@ module ReactOnRails
       TEST_WATCH_MODES = %w[auto full client-only].freeze
       OPEN_BROWSER_WAIT_TIMEOUT = 60
       OPEN_BROWSER_POLL_INTERVAL = 0.5
+      # Relative to Dir.pwd; bin/dev is expected to run from the Rails app root.
       OPEN_BROWSER_ONCE_MARKER = File.join("tmp", "react_on_rails", "browser_opened_once").freeze
 
       class << self
@@ -924,6 +925,9 @@ module ReactOnRails
             return ["xdg-open"]
           end
 
+          # "start" requires a window title before the URL; the empty string is the
+          # conventional placeholder so Windows opens the browser instead of treating
+          # the URL as the title.
           return ["cmd", "/c", "start", ""] if %w[mswin mingw cygwin].any? { |platform| host_os.include?(platform) }
 
           nil

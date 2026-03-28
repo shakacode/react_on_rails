@@ -113,7 +113,12 @@ module ReactOnRails
           return
         end
 
-        inject_into_file "config/routes.rb", %(  root to: "home#index"\n), after: "Rails.application.routes.draw do\n"
+        inserted_root_route = inject_into_file "config/routes.rb",
+                                               %(  root to: "home#index"\n),
+                                               after: "Rails.application.routes.draw do\n"
+        return if inserted_root_route
+
+        say_status :warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow
       end
 
       def add_hello_world_route
