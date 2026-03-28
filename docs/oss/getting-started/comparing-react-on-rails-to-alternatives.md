@@ -10,7 +10,7 @@ Choose **React on Rails** when you want Rails and React tightly integrated, you 
 
 Choose **Hotwire/Turbo** when Rails-rendered HTML is still your preferred model and you only need modest JavaScript sprinkles or progressive enhancement.
 
-Choose **Inertia Rails** when you specifically want its controller-to-page-props protocol and a frontend shell as the main rendering model. A page-oriented SPA flow can also be implemented in React on Rails with a supported frontend router, but the integration model is different.
+Choose **Inertia Rails** when you want its controller-to-page-props protocol and a frontend shell as the main rendering model. Be aware that every page navigation requires a server round-trip, there is no code splitting with SSR, and adopting Inertia replaces your Rails views at the per-route level rather than letting you integrate React incrementally into existing templates.
 
 Choose **Next.js + separate Rails backend** when you want a hard frontend/backend boundary and are prepared to run two apps with an explicit API contract between them.
 
@@ -18,13 +18,13 @@ If you are currently on **react-rails**, prefer the migration path to React on R
 
 ## At a Glance
 
-| Option                   | Primary view model                                                  | Best fit                                                                              | What to watch                                                                                       |
-| ------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **React on Rails**       | Rails views rendering React components with tight Rails integration | Existing Rails apps, SSR, mixed Rails + React pages, progressive adoption             | More setup than lightweight helper-based integrations                                               |
-| **Hotwire/Turbo**        | Rails renders HTML, Turbo updates the page                          | Rails-first apps with minimal client-side complexity                                  | Not a React solution, so React ecosystem reuse is limited                                           |
-| **Inertia Rails**        | Controllers return page props to a client-rendered frontend shell   | Teams that want SPA-style page transitions without building a separate JSON API first | Different rendering model than traditional Rails views; review current SSR support in official docs |
-| **Next.js + Rails API**  | Next.js app consumes Rails API responses                            | Teams prioritizing frontend autonomy, edge delivery, or multi-client API reuse        | Two deployables, duplicated auth/session concerns, and stricter API lifecycle management            |
-| **react-rails (legacy)** | Rails views mount React components with helper-based integration    | Existing legacy apps already on react-rails                                           | Maintenance-focused path; plan migration to React on Rails for newer capabilities                   |
+| Option                   | Primary view model                                                  | Best fit                                                                              | What to watch                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **React on Rails**       | Rails views rendering React components with tight Rails integration | Existing Rails apps, SSR, mixed Rails + React pages, progressive adoption             | More setup than lightweight helper-based integrations                                                                                                 |
+| **Hotwire/Turbo**        | Rails renders HTML, Turbo updates the page                          | Rails-first apps with minimal client-side complexity                                  | Not a React solution, so React ecosystem reuse is limited                                                                                             |
+| **Inertia Rails**        | Controllers return page props to a client-rendered frontend shell   | Teams that want SPA-style page transitions without building a separate JSON API first | Every navigation is a server round-trip; replaces Rails views per-route rather than incremental adoption; review current SSR support in official docs |
+| **Next.js + Rails API**  | Next.js app consumes Rails API responses                            | Teams prioritizing frontend autonomy, edge delivery, or multi-client API reuse        | Two deployables, duplicated auth/session concerns, and stricter API lifecycle management                                                              |
+| **react-rails (legacy)** | Rails views mount React components with helper-based integration    | Existing legacy apps already on react-rails                                           | Maintenance-focused path; plan migration to React on Rails for newer capabilities                                                                     |
 
 ## React on Rails vs Hotwire/Turbo
 
@@ -42,13 +42,38 @@ Official docs:
 
 ## React on Rails vs Inertia Rails
 
-Inertia Rails gives you a different tradeoff. Instead of embedding React within Rails views, it uses Rails controllers to feed props into a frontend-driven page shell. That can feel closer to an SPA workflow while still avoiding a fully separate API for many use cases.
+Inertia Rails uses Rails controllers to feed props into a frontend-driven page shell. That can feel closer to an SPA workflow while still avoiding a fully separate API for many use cases.
 
-React on Rails keeps Rails views and helpers directly in play. That matters if you are incrementally adopting React inside an established Rails application, embedding React in only part of the UI, or relying on React component rendering from ERB/Haml without changing the app's page model.
+However, the two frameworks make fundamentally different integration and performance tradeoffs.
 
-Choose Inertia Rails if you want a page-oriented SPA style and are comfortable centering the frontend runtime in the request/response flow.
+### Integration model
 
-Choose React on Rails if you want deeper Rails-view integration, easier incremental adoption in existing apps, or the React on Rails Pro upgrade path for advanced rendering features.
+React on Rails lets you drop a `react_component` call into any ERB or Haml template. Props flow directly from the controller or view — no API layer, no JSON endpoint, no frontend shell. You can add React to a single section of a single page and leave the rest of your Rails views untouched. This makes incremental adoption straightforward: start with one interactive widget and expand from there.
+
+Inertia replaces the Rails view layer on a per-route basis. A controller action either returns an Inertia response or a traditional Rails response. You cannot embed a React component into part of an existing ERB template through Inertia — the entire page for that route becomes an Inertia page. For existing Rails applications with many views, this is a much larger adoption commitment.
+
+### Performance tradeoffs
+
+Every Inertia page navigation — even between client-side pages — requires a round-trip to a Rails controller action that serializes the full set of page props as JSON. This means:
+
+- **Server round-trip on every navigation.** Perceived performance depends on Rails response time for every page transition, not just the initial load.
+- **Full page props serialized every time.** There is no mechanism to fetch only the data a specific component needs. Large or complex prop sets add serialization overhead on every transition.
+- **No code splitting with SSR.** Each Inertia page loads as one monolithic component. React on Rails Pro supports route-based code splitting via Loadable Components, so users download only the JavaScript needed for the current page.
+- **No streaming SSR.** Inertia's opt-in SSR renders the complete page before sending any HTML to the browser. React on Rails Pro streams progressively with `renderToPipeableStream`, so users see content faster on complex pages.
+
+With React on Rails and a client-side router (for example TanStack Router in Pro), after the initial server-rendered page load, subsequent navigations can be handled entirely in JavaScript — fetching only the data each component needs and loading route-specific bundles on demand.
+
+### Other differences
+
+- **Controller coupling.** Inertia controllers return `inertia:` responses tied to the Inertia protocol. Switching to a different frontend approach later requires rewriting those controller actions. React on Rails uses standard Rails rendering with a view helper, so your controllers stay conventional.
+- **No React Server Components or fragment caching.** Inertia has no path to RSC or per-component caching. React on Rails Pro supports both.
+- **Multi-framework vs React-focused.** Inertia supports React, Vue, and Svelte, which is useful if your team works across frameworks. React on Rails is purpose-built for deep React integration with Rails.
+
+### When to choose which
+
+Choose Inertia Rails if you are building a new app from scratch, want SPA-style page transitions, and are comfortable replacing the Rails view layer entirely.
+
+Choose React on Rails if you want to integrate React into existing Rails views incrementally, need server rendering with code splitting or streaming, or want the upgrade path to React on Rails Pro features like React Server Components.
 
 Official docs:
 
@@ -82,7 +107,7 @@ react-rails is a good baseline comparison because it also helps you render React
 
 react-rails is lighter-weight and helper-oriented, but in practice it is mostly relevant for existing legacy integrations rather than new builds.
 
-React on Rails goes further on the Rails + React integration story: generator workflows, flexible bundler support (Shakapacker/webpack, Rspack, or Vite), server rendering support, richer integration patterns, and a clearer path to advanced features through React on Rails Pro.
+React on Rails goes further on the Rails + React integration story: generator workflows, flexible bundler support (Shakapacker/webpack or Rspack), server rendering support, richer integration patterns, and a clearer path to advanced features through React on Rails Pro.
 
 If you are already on react-rails, use the [migration guide](../migrating/migrating-from-react-rails.md) to move incrementally to React on Rails.
 
