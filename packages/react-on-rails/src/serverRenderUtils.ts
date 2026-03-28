@@ -54,11 +54,14 @@ export function buildRenderMetadata(
 }
 
 /**
- * Calculates the UTF-8 byte length of a string without requiring Buffer or TextEncoder.
- * Uses the same encoding rules as the WHATWG Encoding Standard.
- * Lone surrogates are counted as 3 bytes (U+FFFD replacement character), matching Buffer.byteLength behavior.
+ * Returns the UTF-8 byte length of a string.
+ * Uses native Buffer.byteLength when available (Node.js, Pro node renderer).
+ * Falls back to a pure-JS implementation for environments without Buffer (mini_racer).
  */
 function utf8ByteLength(str: string): number {
+  if (typeof Buffer !== 'undefined' && typeof Buffer.byteLength === 'function') {
+    return Buffer.byteLength(str, 'utf-8');
+  }
   let bytes = 0;
   for (let i = 0; i < str.length; i++) {
     const code = str.charCodeAt(i);
@@ -105,8 +108,6 @@ export function buildLengthPrefixedResult(
     htmlStr = JSON.stringify(html);
   }
   const metadata = JSON.stringify(buildRenderMetadata(consoleReplayScript, renderState));
-  // TODO: Consider using Buffer.byteLength(htmlStr, 'utf-8') for better performance once
-  // we confirm it won't break OSS users with webpack target:'web' or mini_racer runtime.
   const byteLength = utf8ByteLength(htmlStr);
   return `${metadata}\t${byteLength.toString(16).padStart(8, '0')}\n${htmlStr}`;
 }
