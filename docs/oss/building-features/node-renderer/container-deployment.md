@@ -178,7 +178,7 @@ const config = {
 
 **Sizing guideline:** Match worker count to expected concurrent SSR requests.
 
-A rough formula:
+A rough formula (assuming each SSR render takes roughly half a full Rails request cycle, so one renderer worker can serve ~2 concurrent threads — adjust the divisor based on your measured render times):
 
 ```text
 renderer_workers ≥ (WEB_CONCURRENCY × RAILS_MAX_THREADS × ssr_request_ratio) / 2
