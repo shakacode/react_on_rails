@@ -13,7 +13,7 @@ When running Rails and the Node Renderer in containers, you have three options, 
 
 Rails and the Node Renderer run together in a **single container**. This is the simplest setup and the recommended starting point.
 
-```
+```text
 ┌──────────────────────────┐
 │        Container         │
 │  ┌────────┐ ┌──────────┐│
@@ -45,7 +45,7 @@ end
 
 Rails and the Node Renderer run as separate containers within the **same pod/workload**, sharing the same lifecycle. Use this when you need to isolate and diagnose memory/CPU usage per process.
 
-```
+```text
 ┌─────────────────────────────────┐
 │           Pod / Workload        │
 │  ┌─────────────┐ ┌───────────┐ │
@@ -119,7 +119,7 @@ reactOnRailsProNodeRenderer(config);
 ```
 
 Or via environment variable:
-```
+```bash
 RENDERER_HOST=0.0.0.0
 ```
 
@@ -140,7 +140,7 @@ Typical memory profile:
 
 Use `NODE_OPTIONS` to cap V8's old-generation heap per worker:
 
-```
+```bash
 NODE_OPTIONS="--max-old-space-size=512"
 ```
 
@@ -167,14 +167,14 @@ const config = {
 **Sizing guideline:** Match worker count to expected concurrent SSR requests.
 
 A rough formula:
-```
+```text
 renderer_workers ≥ (WEB_CONCURRENCY × RAILS_MAX_THREADS × ssr_request_ratio) / 2
 ```
 
 Where `ssr_request_ratio` is the fraction of requests that need server rendering (often 30–60% for hybrid apps).
 
 Example: With `WEB_CONCURRENCY=4` and `RAILS_MAX_THREADS=8` (32 total Rails threads), and ~50% of requests needing SSR:
-```
+```text
 renderer_workers ≥ (4 × 8 × 0.5) / 2 = 8 workers
 ```
 
