@@ -1,15 +1,17 @@
 # Node Renderer JavaScript Configuration
 
 > **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com/)
+> Free or very low cost for startups and small companies. [Get a license →](https://reactonrails.com/docs/pro/)
 
-You can configure the node-renderer with only ENV values using the provided bin file `node-renderer`.
+You can configure the node-renderer entirely with ENV values from your own launch file or
+`package.json` script. The package does not ship a standalone `node-renderer` CLI.
 
-You can also create a custom configuration file to setup and launch the node-renderer.
+For most apps, create a small configuration file to set up and launch the node-renderer.
 
 The values in this file must be kept in sync with the `config/initializers/react_on_rails_pro.rb` file, as documented in [Configuration](../../configuration/configuration-pro.md).
 
-Here are the options available for the JavaScript renderer configuration object, as well as the available default ENV values if using the command line program node-renderer.
+Here are the options available for the JavaScript renderer configuration object, as well as the
+available default ENV values if you wire them into your own launch script.
 
 [//]: # 'If you change text here, you may want to update comments in packages/node-renderer/src/shared/configBuilder.ts as well.'
 
@@ -59,15 +61,16 @@ Deprecated options:
 
 ### Simple example:
 
-Create a file './node-renderer.js'
+Create a file `client/node-renderer.js`. The generator uses this filename and CommonJS syntax so
+the file runs directly with `node client/node-renderer.js` without extra ESM configuration.
 
 ```js
-import path from 'path';
-import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
+const path = require('path');
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 const config = {
-  // Save bundles to relative "./.node-renderer-bundles" dir of our app
-  serverBundleCachePath: path.resolve(__dirname, './.node-renderer-bundles'),
+  // Save bundles to relative "./.node-renderer-bundles" dir of our app root
+  serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
 
   // All other values are the defaults, as described above
 };
@@ -86,15 +89,15 @@ else if (process.env.CI) {
 reactOnRailsProNodeRenderer(config);
 ```
 
-And add this line to your `scripts` section of `package.json`
+And add a root-level script to the `scripts` section of your `package.json`
 
 ```json
   "scripts": {
-    "start": "echo 'Starting React on Rails Pro Node Renderer.' && node ./node-renderer.js"
+    "node-renderer": "node client/node-renderer.js"
   },
 ```
 
-`yarn start` will run the renderer.
+Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` command for your app).
 
 ## Custom Fastify Configuration
 
@@ -107,6 +110,10 @@ For advanced use cases, you can customize the Fastify server instance by importi
 ### Adding a Health Check Endpoint
 
 When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
+
+The advanced examples below use ES modules for readability. If you want this file to keep running
+as `node client/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
+example above or switch the file to `.mjs` or `"type": "module"`.
 
 ```js
 import masterRun from 'react-on-rails-pro-node-renderer/master';

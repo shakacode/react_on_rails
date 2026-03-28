@@ -1,6 +1,6 @@
 # React on Rails Pro
 
-Node rendering and caching performance enhancements for [React on Rails](https://github.com/shakacode/react_on_rails). Now supports React 18 with updates to React on Rails! Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for details and the updates to the [loadable-components instructions](../oss/building-features/code-splitting.md).
+Node rendering, caching, streaming SSR, and React Server Components for [React on Rails](https://github.com/shakacode/react_on_rails). Check the [React on Rails CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version and upgrade notes.
 
 ## Getting Started
 

@@ -32,8 +32,8 @@
 gem search react_on_rails --remote
 
 # Verify prerequisites
-ruby -v    # Should be 3.2+
-node -v    # Should be 20+
+ruby -v    # Should be 3.0+
+node -v    # Should be 18+
 rails -v   # Should be 7+ (5.2+ supported)
 ```
 

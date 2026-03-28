@@ -33,12 +33,12 @@ Ensure you're using React 19 in your `package.json`:
 
 ```json
 "dependencies": {
-  "react": "19.0.0",
-  "react-dom": "19.0.0"
+  "react": "19.0.4",
+  "react-dom": "19.0.4"
 }
 ```
 
-> Note: Check the React documentation for the latest release that supports streaming.
+> Note: Use the latest React 19 patch release that is compatible with your app and tooling.
 
 ### 2. Prepare Your React Components
 
