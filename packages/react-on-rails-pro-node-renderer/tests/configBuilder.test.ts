@@ -5,6 +5,7 @@ describe('configBuilder', () => {
     'RENDERER_PASSWORD',
     'RAILS_ENV',
     'REPLAY_SERVER_ASYNC_OPERATION_LOGS',
+    'RENDERER_WORKERS_COUNT',
   ] as const;
   const savedEnvValues = Object.fromEntries(envVarsToRestore.map((key) => [key, process.env[key]]));
 
