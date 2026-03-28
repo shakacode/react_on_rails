@@ -6,13 +6,13 @@ Node rendering, caching, streaming SSR, and React Server Components for [React o
 
 ## Route Map
 
-| Need                    | Start here                                            | Then read                                                                           |
-| ----------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Compare OSS and Pro     | [Upgrade to Pro](./upgrading-to-pro.md)               | [OSS vs Pro comparison](../oss/getting-started/oss-vs-pro.md)                       |
-| Dedicated Node.js SSR   | [Node Renderer](./node-renderer.md)                   | [Node Renderer technical docs](../oss/building-features/node-renderer/basics.md)    |
-| Progressive SSR         | [Streaming SSR](./streaming-ssr.md)                   | [Streaming SSR guide](../oss/building-features/streaming-server-rendering.md)       |
-| Cache rendered output   | [Fragment Caching](./fragment-caching.md)             | [SSR caching guide](../oss/building-features/caching.md)                            |
-| React Server Components | [RSC tutorial](./react-server-components/tutorial.md) | [Upgrade existing Pro app](./react-server-components/upgrading-existing-pro-app.md) |
+| Need                    | Start here                                                    | Then read                                                                           |
+| ----------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Compare OSS and Pro     | [OSS vs Pro comparison](../oss/getting-started/oss-vs-pro.md) | [Upgrade to Pro](./upgrading-to-pro.md)                                             |
+| Dedicated Node.js SSR   | [Node Renderer](./node-renderer.md)                           | [Node Renderer technical docs](../oss/building-features/node-renderer/basics.md)    |
+| Progressive SSR         | [Streaming SSR](./streaming-ssr.md)                           | [Streaming SSR guide](../oss/building-features/streaming-server-rendering.md)       |
+| Cache rendered output   | [Fragment Caching](./fragment-caching.md)                     | [SSR caching guide](../oss/building-features/caching.md)                            |
+| React Server Components | [RSC tutorial](./react-server-components/tutorial.md)         | [Upgrade existing Pro app](./react-server-components/upgrading-existing-pro-app.md) |
 
 ## Getting Started
 
