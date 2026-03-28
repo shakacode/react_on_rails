@@ -26,6 +26,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **[Pro] Fixed missing rake tasks in published gem**: The Pro gemspec excluded `lib/tasks/` from packaged files, so all `react_on_rails_pro:*` rake tasks (`verify_license`, `pre_stage_bundle_for_node_renderer`, `copy_assets_to_remote_vm_renderer`, `process_v8_logs`) were unavailable after gem install. [PR 2872](https://github.com/shakacode/react_on_rails/pull/2872) by [justin808](https://github.com/justin808).
 - **[Pro] Fixed bundle duplication in remote node renderer asset uploads**: When RSC support is enabled, running `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` no longer duplicates bundle JS files across bundle directories. Previously, both the server bundle and RSC bundle were copied into every target directory; now each bundle is placed only in its own directory while shared assets (manifests, stats) are correctly distributed to all. [PR 2768](https://github.com/shakacode/react_on_rails/pull/2768) by [AbanoubGhadban](https://github.com/AbanoubGhadban). Fixes [Issue 2766](https://github.com/shakacode/react_on_rails/issues/2766).
 
 ### [16.5.0] - 2026-03-25

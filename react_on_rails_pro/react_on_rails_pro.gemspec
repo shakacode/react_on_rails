@@ -22,7 +22,7 @@ Gem::Specification.new do |s|
 
   s.files = Dir.chdir(__dir__) do
     `git ls-files -z`.split("\x0").reject do |f|
-      f.match(%r{^(test|spec|features|tmp|node_modules|packages|coverage|Gemfile.lock|lib/tasks)/})
+      f.match(%r{^(test|spec|features|tmp|node_modules|packages|coverage|Gemfile.lock)/})
     end
   end
   s.bindir        = "exe"
