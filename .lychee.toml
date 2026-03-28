@@ -6,8 +6,8 @@
 accept = ["200", "308"]
 
 # Retry failed requests (handles transient 502/503/504/429 errors)
-max_retries = 4
-retry_wait_time = 15
+max_retries = 6
+retry_wait_time = 20
 
 # Timeout for each request
 timeout = 20
@@ -104,10 +104,6 @@ exclude = [
 
   # ============================================================================
   # GITHUB URLS THAT RETURN 502 FROM CI
-  # ============================================================================
-  '^https://github\.com/shakacode/react_on_rails/pull/1904$',  # Intermittent 502 from CI
-  '^https://github\.com/vtamara$',  # Intermittent 502 from CI
-
   # ============================================================================
   # DELETED GITHUB USER ACCOUNTS
   # ============================================================================

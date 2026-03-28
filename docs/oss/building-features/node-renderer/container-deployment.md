@@ -8,7 +8,7 @@ This guide covers deploying the Node Renderer in containerized environments (Doc
 ## Prerequisites
 
 - **React on Rails Pro** v16.4.0 or later
-- **Node.js** 18+ (LTS recommended)
+- **Node.js** 22+ (LTS recommended)
 - **Ruby** 3.1+ with Bundler
 - The `react-on-rails-pro-node-renderer` npm package installed in your project
 
@@ -131,13 +131,13 @@ end
 
 ## Dockerfile Example
 
-A minimal multi-stage Dockerfile that bundles Rails and the Node Renderer in a single image:
+A minimal Dockerfile that bundles Rails and the Node Renderer in a single image:
 
 ```dockerfile
-FROM ruby:3.3 AS base
+FROM ruby:3.3
 
-# Install Node.js 18
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+# Install Node.js 22 (LTS)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs libjemalloc2
 
 # jemalloc for Rails memory (adjust path for arm64: aarch64-linux-gnu)
@@ -440,7 +440,13 @@ metadata:
   name: rails-app
 spec:
   replicas: 2
+  selector:
+    matchLabels:
+      app: rails-app
   template:
+    metadata:
+      labels:
+        app: rails-app
     spec:
       terminationGracePeriodSeconds: 60
       containers:
@@ -473,11 +479,11 @@ spec:
             - name: NODE_OPTIONS
               value: '--max-old-space-size=512'
             - name: RENDERER_WORKERS_COUNT
-              value: '8'
+              value: '4'
           resources:
             requests:
               cpu: '1'
-              memory: '2Gi'
+              memory: '4Gi'
             limits:
               cpu: '2'
               memory: '4Gi'
