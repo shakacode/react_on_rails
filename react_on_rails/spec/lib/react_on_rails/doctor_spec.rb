@@ -2043,6 +2043,16 @@ RSpec.describe ReactOnRails::Doctor do
       expect(info_messages.any? { |msg| msg.include?("Rails environment unavailable and no initializer match found") })
         .to be true
     end
+
+    it "rescues LoadError when Pro runtime renderer cannot be queried" do
+      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_raise(LoadError, "missing pro gem")
+
+      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
+
+      warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
+      expect(warning_messages.any? { |msg| msg.include?("Could not read Pro runtime renderer configuration") })
+        .to be true
+    end
   end
 
   describe "check_pro_initializer_existence" do

@@ -2426,7 +2426,7 @@ module ReactOnRails
           )
           nil
         end
-    rescue StandardError => e
+    rescue StandardError, LoadError => e
       checker.add_warning("⚠️  Could not read Pro runtime renderer configuration: #{e.message}")
       @resolved_pro_server_renderer = nil
     end
