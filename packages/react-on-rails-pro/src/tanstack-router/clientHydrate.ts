@@ -95,6 +95,7 @@ function TanStackHydrationApp({
   // A full remount creates a fresh router and may legitimately issue another load.
   const didTriggerPostHydrationLoadRef = useRef(false);
   const didInitializeSsrGlobalRef = useRef(false);
+  const didSetLegacySsrFlagRef = useRef(false);
 
   if (routerRef.current === null) {
     const router = options.createRouter();
@@ -124,6 +125,7 @@ function TanStackHydrationApp({
     // hydrate() function.
     if (!hasSsrRouter && hasSsrPayload && !router.ssr) {
       router.ssr = { manifest: undefined };
+      didSetLegacySsrFlagRef.current = true;
     }
 
     routerRef.current = router;
@@ -171,7 +173,12 @@ function TanStackHydrationApp({
       .finally(() => {
         // Legacy hydration only: clear the temporary SSR hint after the first
         // client load has completed so it cannot influence later navigations.
-        router.ssr = undefined;
+        // Only clear when this module set it, so pre-existing router.ssr state
+        // from user code or upstream router internals is preserved.
+        if (didSetLegacySsrFlagRef.current) {
+          router.ssr = undefined;
+          didSetLegacySsrFlagRef.current = false;
+        }
       });
 
     return () => {

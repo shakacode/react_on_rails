@@ -326,6 +326,8 @@ describe('tanstack-router integration (Pro)', () => {
 
     await act(async () => {
       resolveLoad?.();
+      // Two ticks: one to settle .catch(), one to run .finally().
+      await Promise.resolve();
       await Promise.resolve();
     });
 
