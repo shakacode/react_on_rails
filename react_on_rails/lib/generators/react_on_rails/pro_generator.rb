@@ -163,9 +163,13 @@ module ReactOnRails
           return
         end
 
+        original_gemfile_content = gemfile_content
         atomic_write_file(gemfile_path, updated_content)
         say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
-        bundle_install_after_gem_swap
+        bundle_install_after_gem_swap(
+          gemfile_path: gemfile_path,
+          original_gemfile_content: original_gemfile_content
+        )
       rescue StandardError => e
         add_gemfile_update_warning(gemfile_path, e)
       end
@@ -188,13 +192,15 @@ module ReactOnRails
         File.delete(temp_path) if temp_path && File.exist?(temp_path)
       end
 
-      def bundle_install_after_gem_swap
+      def bundle_install_after_gem_swap(
+        gemfile_path: File.join(destination_root, "Gemfile"),
+        original_gemfile_content: nil
+      )
         if options[:pretend]
           say_status :pretend, "Skipping bundle install in --pretend mode", :yellow
           return
         end
 
-        gemfile_path = File.join(destination_root, "Gemfile")
         say "📦 Running bundle install after Gemfile update...", :yellow
         install_status = Bundler.with_unbundled_env do
           pid = Process.spawn(
@@ -210,31 +216,47 @@ module ReactOnRails
 
         return if install_status&.success?
 
-        if install_status.nil?
-          GeneratorMessages.add_warning(<<~MSG.strip)
-            ⚠️  Automatic bundle install timed out after #{ProSetup::AUTO_INSTALL_TIMEOUT} seconds.
+        rollback_message = rollback_gemfile_after_failed_bundle_install(
+          gemfile_path: gemfile_path,
+          original_gemfile_content: original_gemfile_content
+        )
 
-            Gemfile has been updated with react_on_rails_pro.
-            Please run manually:
-              bundle install
-          MSG
-          return
-        end
+        failure_header = if install_status.nil?
+                           "⚠️  Automatic bundle install timed out after #{ProSetup::AUTO_INSTALL_TIMEOUT} seconds."
+                         else
+                           "⚠️  Automatic bundle install failed after swapping Gemfile entries."
+                         end
 
         GeneratorMessages.add_warning(<<~MSG.strip)
-          ⚠️  Automatic bundle install failed after swapping Gemfile entries.
+          #{failure_header}
 
-          Gemfile has been updated with react_on_rails_pro.
+          #{rollback_message}
           Please run manually:
             bundle install
         MSG
       rescue StandardError => e
+        rollback_message = rollback_gemfile_after_failed_bundle_install(
+          gemfile_path: gemfile_path,
+          original_gemfile_content: original_gemfile_content
+        )
+
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Could not run automatic bundle install: #{e.class}: #{e.message}
 
+          #{rollback_message}
           Please run manually:
             bundle install
         MSG
+      end
+
+      def rollback_gemfile_after_failed_bundle_install(gemfile_path:, original_gemfile_content:)
+        return "Gemfile remains updated with react_on_rails_pro." unless original_gemfile_content
+
+        atomic_write_file(gemfile_path, original_gemfile_content)
+        "Gemfile has been reverted to its previous react_on_rails entry."
+      rescue StandardError => e
+        "Could not revert Gemfile automatically (#{e.class}: #{e.message}). " \
+        "Gemfile remains updated with react_on_rails_pro."
       end
 
       def update_imports_to_pro_package
@@ -252,7 +274,7 @@ module ReactOnRails
             next
           end
 
-          File.write(file, updated_content)
+          atomic_write_file(file, updated_content)
           updated_files += 1
         rescue StandardError => e
           GeneratorMessages.add_warning(<<~MSG.strip)

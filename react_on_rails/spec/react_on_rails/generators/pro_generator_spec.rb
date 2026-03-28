@@ -505,6 +505,7 @@ describe ProGenerator, type: :generator do
   describe "#bundle_install_after_gem_swap" do
     let(:generator) { described_class.new }
     let(:fake_pid) { 23_456 }
+    let(:gemfile_path) { File.join(destination_root, "Gemfile") }
 
     before do
       prepare_destination
@@ -548,6 +549,30 @@ describe ProGenerator, type: :generator do
       warning_text = GeneratorMessages.messages.join("\n")
       expect(warning_text).to include("timed out")
       expect(warning_text).to include("bundle install")
+    end
+
+    it "reverts Gemfile when bundle install fails after a swap" do
+      original_content = <<~RUBY
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0"
+      RUBY
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro", "~> 16.0"
+      RUBY
+      allow(generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: false))
+
+      generator.send(
+        :bundle_install_after_gem_swap,
+        gemfile_path: gemfile_path,
+        original_gemfile_content: original_content
+      )
+
+      expect(File.read(gemfile_path)).to eq(original_content)
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("failed after swapping Gemfile entries")
+      expect(warning_text).to include("Gemfile has been reverted to its previous react_on_rails entry")
     end
   end
 
@@ -642,6 +667,14 @@ describe ProGenerator, type: :generator do
       pretend_generator.send(:update_imports_to_pro_package)
 
       expect(File.read(application_js_path)).to eq(original_content)
+    end
+
+    it "uses atomic writes for rewritten import files" do
+      allow(generator).to receive(:atomic_write_file).and_call_original
+
+      generator.send(:update_imports_to_pro_package)
+
+      expect(generator).to have_received(:atomic_write_file).at_least(:once)
     end
 
     it "keeps multiline dynamic import tracking active when comments contain unrelated closing parentheses" do
