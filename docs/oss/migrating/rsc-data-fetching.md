@@ -542,7 +542,7 @@ function Comments({ postId }) {
 
 ## Request Deduplication with `React.cache()`
 
-> **React on Rails note:** In most React on Rails applications, data flows through controller props or async props, so `React.cache()` is unnecessary. This section applies when Server Components call data-fetching functions directly (for example, from the Node renderer). If you are using async props, the `getReactOnRailsAsyncProp` prop injected by `addAsyncPropsCapabilityToComponentProps()` already returns the same cached Promise on repeated calls.
+> **React on Rails note:** In most React on Rails applications, data flows through controller props or async props, so `React.cache()` is unnecessary. This section applies when Server Components call data-fetching functions directly (for example, from the Node renderer). If you are using async props (React on Rails Pro), repeated calls within the same request already share the same deduped Promise.
 
 `React.cache()` ensures a function is called only once per request, even when multiple Server Components invoke it:
 
