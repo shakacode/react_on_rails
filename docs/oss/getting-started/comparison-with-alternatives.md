@@ -44,9 +44,11 @@ The [Evil Martians Inertia Rails React Starter Kit](https://evilmartians.com/ope
 
 **Trade-offs:**
 
-- SSR is opt-in and requires additional Node.js SSR setup — not as integrated as React on Rails' built-in SSR story
-- Replaces Rails views at the per-route level — an action responds as either Inertia or traditional, though incremental adoption is supported
-- Requires adopting Inertia's conventions for data passing and page transitions
+- **Every page navigation is a server round-trip.** Even client-side transitions hit a Rails controller to serialize the next page's full props as JSON. There is no mechanism to fetch only the data a specific component needs, and perceived performance depends on Rails response time for every transition.
+- **All-or-nothing page model.** A route is either fully Inertia or fully traditional Rails — you cannot embed a React component into part of an existing ERB template. This makes incremental adoption in existing Rails apps significantly harder compared to React on Rails' `react_component` helper.
+- **SSR is opt-in and limited.** SSR requires a separate Node.js server process. There is no support for streaming SSR or code splitting with SSR, which are available in React on Rails Pro.
+- **Controller coupling.** Controllers become tied to the Inertia response protocol. Switching to a different frontend approach later requires rewriting controller actions.
+- **No path to React Server Components or fragment caching.**
 
 **Best for:** New apps where you want a SPA-like experience with server-side routing, using a controller-driven architecture across React, Vue, or Svelte.
 
