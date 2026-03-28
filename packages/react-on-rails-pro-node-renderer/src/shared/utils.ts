@@ -71,7 +71,7 @@ export function errorResponseResult(msg: string, tracingContext?: TracingContext
  */
 export function formatExceptionMessage(requestDescription: string, error: unknown, context?: string) {
   return `${context ? `\nContext:\n${context}\n` : ''}
-Request context:
+Request:
 ${smartTrim(requestDescription)}
 
 EXCEPTION MESSAGE:
