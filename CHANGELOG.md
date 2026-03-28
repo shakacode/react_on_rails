@@ -65,7 +65,6 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Migrated from `Async::Variable` to `Async::Promise`**: The streaming helper internals now use `Async::Promise` for async v2.29+ compatibility while preserving pre-first-chunk error propagation behavior. [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808). Fixes [Issue 2563](https://github.com/shakacode/react_on_rails/issues/2563).
 
-- **Consolidated CSP nonce sanitization**: Extracted the duplicate `sanitizeNonce` logic from `RenderUtils.ts` (OSS) and `utils.ts` (Pro) into a single shared `sanitizeNonce` module in the OSS package (`react-on-rails/sanitizeNonce`). The Pro package now imports from the OSS package instead of maintaining its own copy. Behavior is unchanged: sanitize-then-validate is applied, and values that still fail nonce-pattern validation after sanitization are omitted. [PR 2828](https://github.com/shakacode/react_on_rails/pull/2828) by [justin808](https://github.com/justin808). Fixes [Issue 2582](https://github.com/shakacode/react_on_rails/issues/2582).
 ### [16.4.0] - 2026-03-16
 
 #### Fixed
