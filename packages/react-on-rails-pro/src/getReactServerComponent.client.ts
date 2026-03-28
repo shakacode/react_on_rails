@@ -14,20 +14,13 @@
 
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
-import { RailsContext, RSCPayloadChunk } from 'react-on-rails/types';
-import {
-  createRSCPayloadKey,
-  fetch,
-  wrapInNewPromise,
-  extractErrorMessage,
-  sanitizeNonce,
-  replayConsoleLog,
-} from './utils.ts';
+import { RailsContext } from 'react-on-rails/types';
+import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
 import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
 
 declare global {
   interface Window {
-    REACT_ON_RAILS_RSC_PAYLOADS?: Record<string, RSCPayloadChunk[]>;
+    REACT_ON_RAILS_RSC_PAYLOADS?: Record<string, string[]>;
   }
 }
 
@@ -98,36 +91,20 @@ const fetchRSC = ({
   }
 };
 
-/**
- * Creates a ReadableStream of raw Flight data from preloaded RSC payload objects.
- *
- * The payloads are objects (not strings) because injectRSCPayload embeds JSON
- * directly as JavaScript expressions, avoiding the double JSON.stringify overhead.
- * This function extracts the html field and replays console logs from each chunk.
- */
-const createRSCStreamFromPreloadedPayloads = (payloads: RSCPayloadChunk[], cspNonce?: string) => {
-  const encoder = new TextEncoder();
-  const sanitizedNonceValue = sanitizeNonce(cspNonce);
-  let streamController: ReadableStreamController<Uint8Array> | undefined;
-  let closed = false;
-  const stream = new ReadableStream<Uint8Array>({
+const createRSCStreamFromArray = (payloads: string[]) => {
+  let streamController: ReadableStreamController<string> | undefined;
+  const stream = new ReadableStream<string>({
     start(controller) {
-      // Browser-only by design (callers read from window.REACT_ON_RAILS_RSC_PAYLOADS).
-      // If called outside the browser, close immediately to avoid hanging streams.
       if (typeof window === 'undefined') {
-        closed = true;
-        controller.close();
         return;
       }
-      const handleChunk = (chunk: RSCPayloadChunk) => {
-        if (closed) return;
-        controller.enqueue(encoder.encode(chunk.html ?? ''));
-        replayConsoleLog(chunk.consoleReplayScript, sanitizedNonceValue);
+      const handleChunk = (chunk: string) => {
+        controller.enqueue(chunk);
       };
 
       payloads.forEach(handleChunk);
       // eslint-disable-next-line no-param-reassign
-      payloads.push = (...chunks: RSCPayloadChunk[]) => {
+      payloads.push = (...chunks) => {
         chunks.forEach(handleChunk);
         return chunks.length;
       };
@@ -137,13 +114,9 @@ const createRSCStreamFromPreloadedPayloads = (payloads: RSCPayloadChunk[], cspNo
 
   if (typeof document !== 'undefined' && document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      closed = true;
       streamController?.close();
     });
   } else {
-    // Once parsing is past "loading", all inline <script> tags that push into this array
-    // have already executed, so the preloaded payload list is complete and can be closed now.
-    closed = true;
     streamController?.close();
   }
 
@@ -151,18 +124,23 @@ const createRSCStreamFromPreloadedPayloads = (payloads: RSCPayloadChunk[], cspNo
 };
 
 /**
- * Creates React elements from preloaded RSC payloads embedded in the page.
+ * Creates React elements from preloaded RSC payloads in the page.
  *
- * The payloads are RSCPayloadChunk objects pushed to the global array by
- * injectRSCPayload's script tags. This processes them directly without
- * JSON.parse overhead (the objects are already parsed by the JS engine).
+ * This function:
+ * 1. Creates a ReadableStream from the array of payload chunks
+ * 2. Transforms the stream to handle console logs and other processing
+ * 3. Uses React's createFromReadableStream to process the payload
  *
- * @param payloads - Array of RSC payload chunk objects from the global array
+ * This is used during hydration to avoid making HTTP requests when
+ * the payload is already embedded in the page.
+ *
+ * @param payloads - Array of RSC payload chunks from the global array
  * @returns A Promise resolving to the rendered React element
  */
-const createFromPreloadedPayloads = (payloads: RSCPayloadChunk[], cspNonce?: string) => {
-  const stream = createRSCStreamFromPreloadedPayloads(payloads, cspNonce);
-  const renderPromise = createFromReadableStream<React.ReactNode>(stream);
+const createFromPreloadedPayloads = (payloads: string[], cspNonce?: string) => {
+  const stream = createRSCStreamFromArray(payloads);
+  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream, cspNonce);
+  const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
   return wrapInNewPromise(renderPromise);
 };
 
