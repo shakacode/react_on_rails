@@ -1891,6 +1891,18 @@ RSpec.describe ReactOnRails::Doctor do
         expect(doctor.send(:resolved_webpack_config_path)).to eq("config/custom/webpack.config.ts")
       end
 
+      it "keeps sibling bundler candidates when shakapacker path uses a standard filename" do
+        allow(File).to receive(:file?).and_return(false)
+        allow(File).to receive(:file?).with("config/webpack/rspack.config.js").and_return(true)
+        allow(doctor).to receive(:bundler_config_directory)
+          .with("config/webpack/webpack.config.js")
+          .and_return("config/webpack")
+        allow(doctor).to receive(:shakapacker_assets_bundler_config_path)
+          .and_return("config/webpack/webpack.config.js")
+
+        expect(doctor.send(:resolved_webpack_config_path)).to eq("config/webpack/rspack.config.js")
+      end
+
       it "resolves rspack config candidates from the shakapacker-derived directory" do
         allow(File).to receive(:file?).and_return(false)
         allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)

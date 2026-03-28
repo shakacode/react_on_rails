@@ -34,20 +34,14 @@ module ReactOnRails
 
       shakapacker_config_dir = bundler_config_directory(shakapacker_config_path)
       if shakapacker_config_dir
-        shakapacker_basename = File.basename(shakapacker_config_path.to_s)
-        shakapacker_config_ext = File.extname(shakapacker_config_path.to_s).delete_prefix(".")
         candidates.concat(%w[js ts cjs mjs].flat_map do |ext|
-          # Skip only exact standard-name duplicates. Non-standard configured
-          # paths (for example `custom.config.cjs`) still probe standard-name
-          # fallbacks in the same directory; any accidental duplicates are
-          # de-duplicated by `candidates.uniq` below.
-          config_basenames = ["webpack.config.#{ext}", "rspack.config.#{ext}"]
-          next [] if ext == shakapacker_config_ext && config_basenames.include?(shakapacker_basename)
-
+          # Skip only the exact shakapacker path; still probe sibling
+          # standard-name configs (for example rspack when shakapacker points to
+          # webpack in the same directory).
           [
             File.join(shakapacker_config_dir, "webpack.config.#{ext}"),
             File.join(shakapacker_config_dir, "rspack.config.#{ext}")
-          ]
+          ].reject { |path| path == shakapacker_config_path }
         end)
       end
 
