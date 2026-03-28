@@ -252,6 +252,16 @@ describe('configBuilder', () => {
       expect(() => buildConfig()).not.toThrow();
     });
 
+    it('does not throw when only RAILS_ENV is development and NODE_ENV is unset', () => {
+      delete process.env.NODE_ENV;
+      process.env.RAILS_ENV = 'development';
+      delete process.env.RENDERER_PASSWORD;
+
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig()).not.toThrow();
+    });
+
     it('throws when neither NODE_ENV nor RAILS_ENV is set (fail-closed)', () => {
       delete process.env.NODE_ENV;
       delete process.env.RAILS_ENV;
@@ -288,6 +298,16 @@ describe('configBuilder', () => {
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining('buildConfig({ password: undefined }) preserves the env/default password'),
       );
+    });
+
+    it('does not warn about undefined password in development environments', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.RENDERER_PASSWORD = 'dev-password';
+
+      const { buildConfig, warn } = loadConfigBuilderWithMockedLogger();
+
+      buildConfig({ password: undefined });
+      expect(warn).not.toHaveBeenCalled();
     });
 
     it('keeps normal spread semantics for non-password undefined overrides', () => {

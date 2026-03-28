@@ -321,7 +321,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   const explicitUndefinedPassword =
     Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined;
 
-  if (explicitUndefinedPassword) {
+  if (explicitUndefinedPassword && !runtimeEnvsAllowDevelopmentDefaults()) {
     log.warn(
       'buildConfig({ password: undefined }) preserves the env/default password rather than clearing it. ' +
         'To explicitly clear the password, pass an empty string; note that an empty string is treated as ' +
