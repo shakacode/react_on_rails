@@ -365,7 +365,9 @@ function printSuccessMessage(appName: string, educationalCommitsEnabled: boolean
   logInfo('bin/dev will try to open the generated home page on first successful boot.');
   console.log('');
   if (educationalCommitsEnabled) {
-    logInfo('Educational commits skip GPG signing so scaffold automation does not block on local signer prompts.');
+    logInfo(
+      'Educational commits skip GPG signing so scaffold automation does not block on local signer prompts.',
+    );
     logInfo('Educational git history: git log --oneline --reverse');
   } else {
     logInfo(
