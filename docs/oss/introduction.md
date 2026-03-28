@@ -41,8 +41,10 @@ Unlike a separate SPA approach, React on Rails lets you leverage Rails conventio
 **Consider alternatives if:**
 
 - ❌ You're building a standalone SPA with a separate API backend
+- ❌ You mainly want Rails-rendered HTML plus minimal JavaScript enhancements
+- ❌ You want a page-oriented SPA shell instead of embedding React into Rails views
 
-For a detailed comparison with Inertia.js, Hotwire, and react-rails, see [Comparison with Alternatives](./getting-started/comparison-with-alternatives.md).
+If you're evaluating the tradeoffs, start with **[Comparing React on Rails to alternatives](./getting-started/comparing-react-on-rails-to-alternatives.md)** for a narrative overview, or jump to the **[feature comparison table](./getting-started/comparison-with-alternatives.md)** for a side-by-side matrix with benchmarks.
 
 ## Getting Started
 
@@ -76,15 +78,16 @@ Step-by-step walkthrough building a full app with Redux, routing, and deployment
 
 Find guidance for your specific scenario:
 
-| I want to...                        | Go here                                                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------- |
-| **Add React to existing Rails app** | [Installation Guide](./getting-started/installation-into-an-existing-rails-app.md)    |
-| **Enable server-side rendering**    | [SSR Guide](./core-concepts/react-server-rendering.md)                                |
-| **Set up hot reloading**            | [HMR Setup](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
-| **Use Redux with Rails**            | [Redux Integration](./building-features/react-and-redux.md)                           |
-| **Use TanStack Router**             | [TanStack Router Guide](./building-features/tanstack-router.md)                       |
-| **Deploy to production**            | [Deployment Guide](./deployment/README.md)                                            |
-| **Troubleshoot issues**             | [Troubleshooting](./deployment/troubleshooting.md)                                    |
+| I want to...                         | Go here                                                                               |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| **Add React to existing Rails app**  | [Installation Guide](./getting-started/installation-into-an-existing-rails-app.md)    |
+| **Compare Rails + frontend options** | [Comparison Guide](./getting-started/comparing-react-on-rails-to-alternatives.md)     |
+| **Enable server-side rendering**     | [SSR Guide](./core-concepts/react-server-rendering.md)                                |
+| **Set up hot reloading**             | [HMR Setup](./building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md) |
+| **Use Redux with Rails**             | [Redux Integration](./building-features/react-and-redux.md)                           |
+| **Use TanStack Router**              | [TanStack Router Guide](./building-features/tanstack-router.md)                       |
+| **Deploy to production**             | [Deployment Guide](./deployment/README.md)                                            |
+| **Troubleshoot issues**              | [Troubleshooting](./deployment/troubleshooting.md)                                    |
 
 ## Core Concepts
 

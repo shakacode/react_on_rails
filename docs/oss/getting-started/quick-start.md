@@ -26,19 +26,22 @@ Add the React on Rails gem and run its installer:
 # Add the gem
 bundle add react_on_rails --strict
 
-# Commit your changes (required for generator)
-git add . && git commit -m "Add react_on_rails gem"
+# Optional but recommended: commit or stash first so generated files show as a clean diff
+# git add . && git commit -m "Prepare for React on Rails install"
 
-# Run the installer
-bin/rails generate react_on_rails:install
+# Run the installer for TypeScript
+bin/rails generate react_on_rails:install --typescript
 
-# Optional: Use Rspack for ~20x faster builds
-# bin/rails generate react_on_rails:install --rspack
+# Optional: Use Rspack for faster builds
+# bin/rails generate react_on_rails:install --typescript --rspack
+
+# For JavaScript instead of TypeScript, omit --typescript
+# bin/rails generate react_on_rails:install
 ```
 
 Take a look at the files created by the generator.
 
-- jsx files created
+- Component files (`.tsx` for TypeScript, `.jsx` for JavaScript)
 - Shakapacker install
 - React component files in `client/`
 - A sample controller and view
@@ -82,7 +85,7 @@ You should see a page with a React component saying "Hello World"!
 
 Let's make a quick change to see hot reloading in action:
 
-1. Open `app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx`
+1. Open the generated HelloWorld component (`app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx`)
 2. Change the text from "Hello World" to "Hello from React!"
 3. Save the file
 4. Watch your browser automatically refresh
@@ -98,12 +101,12 @@ Now let's add a React component to one of your existing Rails views:
 mkdir -p app/javascript/src/SimpleCounter/ror_components
 
 # Create the component file
-touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.jsx
+touch app/javascript/src/SimpleCounter/ror_components/SimpleCounter.tsx
 ```
 
-Add this content to `SimpleCounter.jsx`:
+Add this content to `SimpleCounter.tsx`:
 
-```jsx
+```tsx
 import React, { useState } from 'react';
 
 const SimpleCounter = ({ initialCount = 0 }) => {
@@ -175,6 +178,7 @@ Now that you have React on Rails working, here's what to explore next:
 1. **[Using React on Rails](./using-react-on-rails.md)** - Core concepts explained
 2. **[View Helpers API](../api-reference/view-helpers-api.md)** - Learn all the options for `react_component`
 3. **[Hot Module Replacement](../building-features/hmr-and-hot-reloading-with-the-webpack-dev-server.md)** - Optimize your dev workflow
+4. **[Curious how React on Rails compares to alternatives?](./comparing-react-on-rails-to-alternatives.md)** - Supplemental context on Hotwire, Inertia Rails, and react-rails
 
 ### Dive Deeper
 
@@ -210,8 +214,8 @@ Start at [React on Rails Pro](../../pro/home-pro.md) for the canonical route map
 # Start development servers
 ./bin/dev
 
-# Generate React on Rails files
-bin/rails generate react_on_rails:install
+# Generate React on Rails files with TypeScript support
+bin/rails generate react_on_rails:install --typescript
 
 # Create a new component
 bin/rails generate react_on_rails:component MyComponent
@@ -222,11 +226,9 @@ pnpm run build  # or: yarn run build, npm run build
 
 ### Key File Locations
 
-- **Components**: `client/app/bundles/[ComponentName]/components/`
-- **Registration**: `client/app/bundles/[ComponentName]/startup/registration.js`
-- **Packs**: `app/javascript/packs/`
+- **Components (auto-bundling)**: `app/javascript/src/[ComponentName]/ror_components/`
 - **Config**: `config/initializers/react_on_rails.rb`
-- **Webpack**: `config/shakapacker.yml`
+- **Bundler config**: `config/shakapacker.yml`
 
 ---
 
