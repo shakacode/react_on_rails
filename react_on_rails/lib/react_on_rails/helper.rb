@@ -213,10 +213,9 @@ module ReactOnRails
       js_code = <<~JS
         (function() {
           var htmlResult = '';
-          var consoleReplayScript = '';
           var hasErrors = false;
           var renderingError = null;
-          var renderingErrorObject = {};
+          var renderingErrorObject = null;
 
           try {
             htmlResult =
@@ -250,15 +249,8 @@ module ReactOnRails
             };
           }
 
-          consoleReplayScript = ReactOnRails.getConsoleReplayScript();
-
-          return JSON.stringify({
-              html: htmlResult,
-              consoleReplayScript: consoleReplayScript,
-              hasErrors: hasErrors,
-              renderingError: renderingErrorObject
-          });
-
+          var consoleReplayScript = ReactOnRails.getConsoleReplayScript();
+          return ReactOnRails.prepareRenderResult(htmlResult, consoleReplayScript, hasErrors, renderingErrorObject);
         })()
       JS
 

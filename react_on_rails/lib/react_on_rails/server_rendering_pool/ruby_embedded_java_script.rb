@@ -230,20 +230,18 @@ module ReactOnRails
         # Parses a length-prefixed result string into a Hash.
         # Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
         # When content length is 0, html is set to nil (preserving null semantics from JS).
-        # Parses a rendering result string, auto-detecting the format:
-        # - Length-prefixed: <metadata JSON>\t<content byte length hex>\n<raw html>
-        # - JSON (legacy, from server_render_js helper): {"html":"...","consoleReplayScript":"..."}
+        # Parses a length-prefixed rendering result string into a Hash.
+        # Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
         def parse_render_result(result_string, render_options)
           str = result_string.to_s.b # Ensure plain String with binary encoding for byte-accurate slicing
           tab_idx = str.index("\t")
           newline_idx = tab_idx ? str.index("\n", tab_idx) : nil
 
-          result = if tab_idx && newline_idx
-                     parse_length_prefixed(str, tab_idx, newline_idx)
-                   else
-                     JSON.parse(result_string)
-                   end
+          unless tab_idx && newline_idx
+            raise "Malformed render result: expected length-prefixed format (metadata\\tcontent_len\\nhtml)"
+          end
 
+          result = parse_length_prefixed(str, tab_idx, newline_idx)
           replay_console_to_rails_logger(result, render_options)
           result
         rescue StandardError => e

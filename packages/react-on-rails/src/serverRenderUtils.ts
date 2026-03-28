@@ -2,6 +2,7 @@ import type {
   RegisteredComponent,
   RenderResult,
   RenderState,
+  RenderingError,
   StreamRenderState,
   FinalHtmlResult,
 } from './types/index.ts';
@@ -29,9 +30,16 @@ export function createResultObject(
  * This is the shared metadata builder used by both streaming and non-streaming paths.
  * It contains everything EXCEPT the html content, which travels as raw bytes.
  */
+type RenderMetadataSource = {
+  clientProps?: Record<string, unknown>;
+  hasErrors?: boolean;
+  error?: RenderingError;
+  isShellReady?: boolean;
+};
+
 export function buildRenderMetadata(
   consoleReplayScript: string,
-  renderState: RenderState | StreamRenderState,
+  renderState: RenderMetadataSource,
 ): Record<string, unknown> {
   return {
     consoleReplayScript,
@@ -46,6 +54,34 @@ export function buildRenderMetadata(
 }
 
 /**
+ * Calculates the UTF-8 byte length of a string without requiring Buffer or TextEncoder.
+ * Uses the same encoding rules as the WHATWG Encoding Standard.
+ * Lone surrogates are counted as 3 bytes (U+FFFD replacement character), matching Buffer.byteLength behavior.
+ */
+function utf8ByteLength(str: string): number {
+  let bytes = 0;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code <= 0x7f) {
+      bytes += 1;
+    } else if (code <= 0x7ff) {
+      bytes += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = i + 1 < str.length ? str.charCodeAt(i + 1) : 0;
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4; // valid surrogate pair
+        i++;
+      } else {
+        bytes += 3; // lone high surrogate → U+FFFD
+      }
+    } else {
+      bytes += 3; // BMP char (0x800-0xFFFF) or lone low surrogate
+    }
+  }
+  return bytes;
+}
+
+/**
  * Builds a length-prefixed result string from html content and render state.
  * Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
  *
@@ -55,7 +91,7 @@ export function buildRenderMetadata(
 export function buildLengthPrefixedResult(
   html: FinalHtmlResult | null,
   consoleReplayScript: string,
-  renderState: RenderState | StreamRenderState,
+  renderState: RenderMetadataSource,
 ): string {
   // html can be a string (common), null, or a ServerRenderHashRenderedHtml object
   // (when render functions return multiple named HTML fragments like { componentHtml, title }).
@@ -69,7 +105,9 @@ export function buildLengthPrefixedResult(
     htmlStr = JSON.stringify(html);
   }
   const metadata = JSON.stringify(buildRenderMetadata(consoleReplayScript, renderState));
-  const byteLength = Buffer.byteLength(htmlStr, 'utf-8');
+  // TODO: Consider using Buffer.byteLength(htmlStr, 'utf-8') for better performance once
+  // we confirm it won't break OSS users with webpack target:'web' or mini_racer runtime.
+  const byteLength = utf8ByteLength(htmlStr);
   return `${metadata}\t${byteLength.toString(16).padStart(8, '0')}\n${htmlStr}`;
 }
 
