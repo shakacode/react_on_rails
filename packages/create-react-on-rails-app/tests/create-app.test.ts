@@ -279,9 +279,9 @@ describe('createApp', () => {
       expect(env).toEqual(
         expect.objectContaining({
           GIT_AUTHOR_NAME: 'React on Rails Generator',
-          GIT_AUTHOR_EMAIL: 'generator@reactonrails.local',
+          GIT_AUTHOR_EMAIL: 'generator@reactonrails.invalid',
           GIT_COMMITTER_NAME: 'React on Rails Generator',
-          GIT_COMMITTER_EMAIL: 'generator@reactonrails.local',
+          GIT_COMMITTER_EMAIL: 'generator@reactonrails.invalid',
         }),
       );
     }

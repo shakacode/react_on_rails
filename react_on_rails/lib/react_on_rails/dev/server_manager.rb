@@ -858,6 +858,8 @@ module ReactOnRails
         def schedule_browser_open_if_requested(procfile, route:, open_browser:, open_browser_once:)
           return unless open_browser || open_browser_once
 
+          # --open-browser and --open-browser-once share scheduling, but only the latter writes
+          # the marker so explicit --open-browser continues to open on each invocation.
           schedule_browser_open(procfile_port(procfile), route: route, once: open_browser_once)
         end
 
