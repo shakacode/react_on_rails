@@ -461,7 +461,7 @@ module ReactOnRails
                                      pro: use_pro?,
                                      rsc: use_rsc?,
                                      shakapacker_just_installed: shakapacker_just_installed?,
-                                     landing_page: options.new_app?
+                                     landing_page: options.new_app? && new_app_root_route_available?
                                    ))
       end
 

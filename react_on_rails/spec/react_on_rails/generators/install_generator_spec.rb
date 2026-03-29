@@ -1903,6 +1903,24 @@ describe InstallGenerator, type: :generator do
       )
     end
 
+    specify "post-install message disables landing-page hints when root route is unavailable" do
+      install_generator = described_class.new([], { new_app: true })
+      allow(install_generator).to receive_messages(
+        shakapacker_setup_incomplete?: false,
+        new_app_root_route_available?: false,
+        use_rsc?: false,
+        use_pro?: false,
+        shakapacker_just_installed?: false
+      )
+
+      expect(GeneratorMessages).to receive(:helpful_message_after_installation)
+        .with(hash_including(landing_page: false))
+        .and_return("stubbed")
+      expect(GeneratorMessages).to receive(:add_info).with("stubbed")
+
+      install_generator.send(:add_post_install_message)
+    end
+
     specify "recovery_install_command keeps meaningful flags only" do
       install_generator = described_class.new(
         [],
