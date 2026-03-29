@@ -15,25 +15,20 @@ overrides:
   qs@>=6.7.0 <=6.14.1: '>=6.14.2'
   bn.js@>=5.0.0 <5.2.3: '>=5.2.3'
   bn.js@<4.12.3: '>=4.12.3 <5'
-  minimatch@<3.1.3: '>=3.1.3 <4'
-  minimatch@>=9.0.0 <9.0.6: '>=9.0.6'
-  basic-ftp@<5.2.0: '>=5.2.0'
-  minimatch@>=9.0.0 <9.0.7: '>=9.0.7'
   minimatch@<3.1.4: '>=3.1.4 <4'
-  serialize-javascript@<=7.0.2: '>=7.0.3'
+  minimatch@>=9.0.0 <9.0.7: '>=9.0.7 <10'
+  basic-ftp@<5.2.0: '>=5.2.0'
+  serialize-javascript@<7.0.5: '>=7.0.5'
   '@tootallnate/once@<3.0.1': '>=3.0.1'
   svgo@=4.0.0: '>=4.0.1'
   svgo@>=2.1.0 <2.8.1: '>=2.8.1 <3'
   immutable@>=5.0.0 <5.1.5: '>=5.1.5'
-  flatted@<3.4.0: '>=3.4.0'
   flatted@<=3.4.1: '>=3.4.2'
   smol-toml@<1.6.1: '>=1.6.1'
-  handlebars@>=4.0.0 <=4.7.8: '>=4.7.9'
-  serialize-javascript@<7.0.5: '>=7.0.5'
+  handlebars@>=4.0.0 <4.7.9: '>=4.7.9'
   path-to-regexp@<0.1.13: '>=0.1.13 <1'
   brace-expansion@<1.1.13: '>=1.1.13 <2'
   brace-expansion@>=2.0.0 <2.0.3: '>=2.0.3'
-  handlebars@>=4.0.0 <4.7.9: '>=4.7.9'
   picomatch@<2.3.2: '>=2.3.2 <3'
   picomatch@>=4.0.0 <4.0.4: '>=4.0.4'
   yaml@>=1.0.0 <1.10.3: '>=1.10.3 <2'
@@ -5999,12 +5994,12 @@ packages:
   minimalistic-crypto-utils@1.0.1:
     resolution: {integrity: sha512-JIYlbt6g8i5jKfJ3xz7rF0LXmv2TkDxBLUkiBeZ7bAx4GnnNMr8xFpGnOxn6GhTEHx3SjRrZEoU+j04prX1ktg==}
 
-  minimatch@10.2.4:
-    resolution: {integrity: sha512-oRjTw/97aTBN0RHbYCdtF1MQfvusSIBQM0IZEgzl6426+8jSC0nF1a/GmnVLpfB9yyr6g6FTqWqiZVbxrtaCIg==}
-    engines: {node: 18 || 20 || >=22}
-
   minimatch@3.1.5:
     resolution: {integrity: sha512-VgjWUsnnT6n+NUk6eZq77zeFdpW2LWDzP6zFGrCbHXiYNul5Dzqk2HHQ5uFH2DNW5Xbp8+jVzaeNt94ssEEl4w==}
+
+  minimatch@9.0.9:
+    resolution: {integrity: sha512-OBwBN9AL4dqmETlpS2zasx+vTeWclWzkblfZk7KTA5j3jeOONz/tRCnZomUyvNg83wL5Zv9Ss6HMJXAgL8R2Yg==}
+    engines: {node: '>=16 || 14 >=14.17'}
 
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
@@ -10971,7 +10966,7 @@ snapshots:
       '@typescript-eslint/types': 8.48.0
       '@typescript-eslint/visitor-keys': 8.48.0
       debug: 4.4.3
-      minimatch: 10.2.4
+      minimatch: 9.0.9
       semver: 7.7.4
       tinyglobby: 0.2.15
       ts-api-utils: 2.1.0(typescript@5.9.3)
@@ -14824,13 +14819,13 @@ snapshots:
 
   minimalistic-crypto-utils@1.0.1: {}
 
-  minimatch@10.2.4:
-    dependencies:
-      brace-expansion: 5.0.5
-
   minimatch@3.1.5:
     dependencies:
       brace-expansion: 1.1.13
+
+  minimatch@9.0.9:
+    dependencies:
+      brace-expansion: 5.0.5
 
   minimist@1.2.8: {}
 
