@@ -22,6 +22,25 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
     end
   end
 
+  describe "#generate_new_app_home_page?" do
+    it "returns false without calling add_root_route when --new-app is disabled" do
+      base_generator = described_class.new
+
+      expect(base_generator).not_to receive(:add_root_route)
+      expect(base_generator.send(:generate_new_app_home_page?)).to be(false)
+    end
+
+    it "lazily calls add_root_route when root-route state has not been initialized yet" do
+      base_generator = described_class.new([], { new_app: true })
+      allow(base_generator).to receive(:add_root_route) do
+        base_generator.instance_variable_set(:@new_app_root_route_added, true)
+      end
+
+      expect(base_generator.send(:generate_new_app_home_page?)).to be(true)
+      expect(base_generator).to have_received(:add_root_route).once
+    end
+  end
+
   describe "#copy_base_files in --pretend mode" do
     let(:base_generator) { described_class.new([], { pretend: true }) }
 

@@ -106,8 +106,13 @@ module ReactOnRails
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
 
       def add_root_route
-        @new_app_root_route_added = false
         return unless options.new_app?
+        # add_root_route normally runs before copy_base_files as a generator action.
+        # Guard against accidental double invocation (for example, if future
+        # refactors trigger lazy initialization in generate_new_app_home_page?).
+        return if defined?(@new_app_root_route_added)
+
+        @new_app_root_route_added = false
 
         if preexisting_root_route?
           say_status :skip, "Root route already exists; keeping existing root route", :yellow
@@ -303,8 +308,11 @@ module ReactOnRails
       private
 
       def generate_new_app_home_page?
-        # Depends on add_root_route running first and setting @new_app_root_route_added.
-        options.new_app? && new_app_root_route_added?
+        return false unless options.new_app?
+
+        # Keep this predicate resilient if generator action ordering changes.
+        add_root_route unless defined?(@new_app_root_route_added)
+        new_app_root_route_added?
       end
 
       def new_app_root_route_added?
@@ -315,13 +323,7 @@ module ReactOnRails
       end
 
       def preexisting_root_route?
-        return @preexisting_root_route if defined?(@preexisting_root_route)
-
-        routes_file = File.join(destination_root, "config/routes.rb")
-        @preexisting_root_route = File.file?(routes_file) &&
-                                  File.foreach(routes_file).any? do |line|
-                                    !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
-                                  end
+        root_route_present?
       end
 
       def home_page_config

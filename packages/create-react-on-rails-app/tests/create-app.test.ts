@@ -453,6 +453,32 @@ describe('createApp', () => {
     );
   });
 
+  it('guards Rails template rendering to supported railties major versions', () => {
+    let rendererScript = '';
+
+    mockedExecCaptureArgs.mockImplementation((command, args) => {
+      if (command === 'git' && args[0] === 'status') {
+        return 'M Gemfile';
+      }
+      if (command === 'git' && args[0] === 'config') {
+        throw new Error('git config not set');
+      }
+      if (command === 'ruby' && args[0] === '-e' && args[2] === 'gitignore.tt') {
+        rendererScript = args[1];
+        return '# rendered gitignore\n/tmp/*';
+      }
+      if (command === 'ruby' && args[0] === '-e' && args[2] === 'gitattributes.tt') {
+        return '# rendered gitattributes\ndb/schema.rb linguist-generated';
+      }
+
+      return '';
+    });
+
+    createApp('my-app', baseOptions);
+
+    expect(rendererScript).toMatch(/\[\s*7,\s*8\s*\]\.include\?\(railties_major\)/);
+  });
+
   it('uses --rsc generator mode when both --pro and --rsc are set', () => {
     const options = { ...baseOptions, pro: true, rsc: true };
     const appPath = path.resolve(process.cwd(), 'my-app');

@@ -316,4 +316,33 @@ RSpec.describe GeneratorHelper, type: :generator do
       end
     end
   end
+
+  describe "#root_route_present?" do
+    let(:routes_path) { File.join(destination_root, "config/routes.rb") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(routes_path))
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+    end
+
+    it "returns false when routes.rb is missing" do
+      FileUtils.rm_f(routes_path)
+
+      expect(root_route_present?).to be(false)
+    end
+
+    it "ignores commented root lines and matches active root routes" do
+      File.write(routes_path, <<~RUBY)
+        Rails.application.routes.draw do
+          # root to: "ignored#comment"
+          root to: "home#index"
+        end
+      RUBY
+
+      expect(root_route_present?).to be(true)
+    end
+  end
 end
