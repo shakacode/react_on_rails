@@ -49,7 +49,7 @@ RUN bundle install && \
 
 # Install JS dependencies
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile  # Yarn Classic (v1); for Yarn Berry (v2+), use --immutable
+RUN yarn install --immutable  # Yarn Berry (v2+); for Yarn Classic (v1), use --frozen-lockfile
 
 # Copy the full application
 COPY . .
@@ -67,7 +67,7 @@ FROM base
 
 # Install runtime dependencies only
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libpq5 && \
+    apt-get install --no-install-recommends -y libpq5 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy built artifacts
@@ -93,13 +93,16 @@ CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]
 - **`SECRET_KEY_BASE_DUMMY=1`** lets `assets:precompile` run without a real secret. Rails 7.1+ supports this natively.
 - **Server bundles** land in `ssr-generated/` (private, never served to browsers) while client bundles land in `public/webpack/production/`. Both are copied into the runtime image.
 - If you use `config.build_production_command`, it runs during `assets:precompile`. See [Configuration](../configuration/README.md#build_production_command).
-- **Add a `.dockerignore` file** to prevent host-specific files from being copied into the build. Without it, `COPY . .` can overwrite the freshly installed `node_modules/` with modules built for a different OS/architecture. A minimal `.dockerignore`:
+- **Add a `.dockerignore` file** to prevent host-specific files from being copied into the build. Without it, `COPY . .` can overwrite the freshly installed `node_modules/` with modules built for a different OS/architecture. A minimal `.dockerignore` (expand as appropriate for your project):
 
   ```text
   node_modules
   .git
   log
   tmp
+  spec
+  test
+  .github
   ```
 
 ### Using pnpm instead of Yarn
