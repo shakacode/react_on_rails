@@ -66,7 +66,7 @@ const sidebars: SidebarsConfig = {
         'core-concepts/webpack-configuration',
         'core-concepts/execjs-limitations',
         'core-concepts/performance-benchmarks',
-        { type: 'ref', id: 'pro/react-on-rails-pro' },
+        { type: 'ref', id: 'pro/react-on-rails-pro', label: 'React on Rails Pro (Overview)' },
       ],
     },
     {
@@ -181,11 +181,7 @@ const sidebars: SidebarsConfig = {
       label: 'Upgrading',
       items: [
         'upgrading/upgrading-react-on-rails',
-        {
-          type: 'link',
-          label: 'Full Changelog',
-          href: 'https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md',
-        },
+        { type: 'doc', id: 'upgrading/changelog', label: 'Full Changelog' },
         {
           type: 'category',
           label: 'Release Notes',
@@ -210,8 +206,10 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Migrating',
+      link: { type: 'generated-index', title: 'Migrating' },
       items: [
         'migrating/migrating-from-react-rails',
+        { type: 'ref', id: 'migrating/migrating-to-rsc' },
         'migrating/migrating-from-vite-rails',
         'migrating/migrating-from-webpack-to-rspack',
         'migrating/babel-to-swc-migration',
