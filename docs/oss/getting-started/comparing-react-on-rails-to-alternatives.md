@@ -1,5 +1,6 @@
 ---
 sidebar_label: 'Decision Guide'
+description: Narrative decision guide for choosing React on Rails vs Hotwire, Inertia, Next.js, Vite, and react-rails.
 ---
 
 # Comparing React on Rails to Alternatives

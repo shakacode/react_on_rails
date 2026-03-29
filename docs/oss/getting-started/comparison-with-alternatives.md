@@ -1,5 +1,6 @@
 ---
 sidebar_label: 'Feature Matrix & Benchmarks'
+description: Side-by-side feature matrix and performance-oriented comparison of Rails + React integration options.
 ---
 
 # Comparison with Alternatives

@@ -9,7 +9,11 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   docsSidebar: [
     'introduction',
-    'README',
+    {
+      type: 'link',
+      label: 'Documentation Guide',
+      href: 'https://github.com/shakacode/react_on_rails/blob/main/docs/README.md',
+    },
     {
       type: 'category',
       label: 'Choose a Path',
@@ -36,8 +40,14 @@ const sidebars: SidebarsConfig = {
         'getting-started/using-react-on-rails',
         'getting-started/oss-vs-pro',
         'getting-started/pro-quick-start',
-        'getting-started/comparison-with-alternatives',
-        'getting-started/comparing-react-on-rails-to-alternatives',
+        {
+          type: 'category',
+          label: 'Compare Alternatives',
+          items: [
+            'getting-started/comparison-with-alternatives',
+            'getting-started/comparing-react-on-rails-to-alternatives',
+          ],
+        },
         'getting-started/nextjs-with-separate-rails-backend',
         'getting-started/common-issues',
       ],
@@ -173,7 +183,11 @@ const sidebars: SidebarsConfig = {
       label: 'Upgrading',
       items: [
         'upgrading/upgrading-react-on-rails',
-        { type: 'doc', id: 'upgrading/changelog', label: 'Full Changelog' },
+        {
+          type: 'link',
+          label: 'Full Changelog',
+          href: 'https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md',
+        },
         {
           type: 'category',
           label: 'Release Notes',
