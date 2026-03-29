@@ -1,5 +1,8 @@
 name: Lint JS and Ruby
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
