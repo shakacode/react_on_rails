@@ -6,8 +6,8 @@
 accept = ["200", "308"]
 
 # Retry failed requests (handles transient 502/503/504/429 errors)
-max_retries = 4
-retry_wait_time = 15
+max_retries = 6
+retry_wait_time = 20
 
 # Timeout for each request
 timeout = 20
@@ -81,6 +81,7 @@ exclude = [
   '^https://(www\.)?estately\.com', # Returns 403
   '^https://hiring\.careerbuilder\.com',  # Returns 403
   '^https://(www\.)?yourmechanic\.com',  # Returns 403/503
+  '^https://hvmn\.com',  # Returns 503 from CI
 
   # ============================================================================
   # EXTERNAL SITES THAT TIMEOUT DURING CI CHECKS
@@ -102,7 +103,7 @@ exclude = [
   '^https://github\.com/shakacode/react_on_rails/compare/',
 
   # ============================================================================
-  # DELETED GITHUB USER ACCOUNTS
+  # DELETED GITHUB USER ACCOUNTS (return 502/404 from CI)
   # ============================================================================
   # Contributors whose accounts no longer exist
   '^https://github\.com/(alleycat-at-git|Conturbo|jblasco3|nostophilia|railsme|samphilipd|wouldntsavezion)$',
