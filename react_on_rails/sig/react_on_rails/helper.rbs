@@ -21,7 +21,10 @@ module ReactOnRails
     # Returns html_safe string (ActiveSupport::SafeBuffer)
     def redux_store: (
       String store_name,
-      ?Hash[Symbol, untyped] | String props
+      ?props: Hash[Symbol, untyped] | String,
+      ?defer: bool,
+      ?auto_load_bundle: bool?,
+      **untyped options
     ) -> safe_buffer
 
     # Returns html_safe string (ActiveSupport::SafeBuffer)

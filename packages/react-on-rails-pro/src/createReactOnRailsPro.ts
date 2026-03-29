@@ -72,7 +72,14 @@ function clientStartup() {
   globalThis.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
   const railsContext = getRailsContext();
-  if (railsContext?.rorPro === true) {
+  if (railsContext === null) {
+    // Context element not yet in DOM — early Pro hydration skipped, page-loaded sweep will recover.
+    if (typeof console !== 'undefined') {
+      console.warn(
+        '[React on Rails] railsContext not available at clientStartup — early Pro hydration skipped, falling back to page-load sweep.',
+      );
+    }
+  } else if (railsContext.rorPro) {
     // Streaming pages can trigger these incrementally as markup arrives. The later
     // page-loaded sweep is safe because ClientSideRenderer memoizes by DOM/store id.
     void renderOrHydrateCompleteComponents();
