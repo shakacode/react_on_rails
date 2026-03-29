@@ -106,6 +106,7 @@ module ReactOnRails
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
 
       def add_root_route
+        @new_app_root_route_added = false
         return unless options.new_app?
 
         if preexisting_root_route?
@@ -124,7 +125,15 @@ module ReactOnRails
         inject_into_file routes_path,
                          %(  root to: "home#index"\n),
                          after: routes_draw_declaration
-        return if File.read(routes_full_path).include?('root to: "home#index"')
+        if options[:pretend]
+          @new_app_root_route_added = true
+          return
+        end
+
+        if File.read(routes_full_path).include?('root to: "home#index"')
+          @new_app_root_route_added = true
+          return
+        end
 
         say_status :warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow
       end
@@ -293,7 +302,14 @@ module ReactOnRails
       private
 
       def generate_new_app_home_page?
-        options.new_app? && !preexisting_root_route?
+        options.new_app? && new_app_root_route_added?
+      end
+
+      def new_app_root_route_added?
+        return false unless options.new_app?
+        return @new_app_root_route_added if defined?(@new_app_root_route_added)
+
+        false
       end
 
       def preexisting_root_route?

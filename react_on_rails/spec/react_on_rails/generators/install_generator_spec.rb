@@ -77,7 +77,9 @@ describe InstallGenerator, type: :generator do
       assert_file "config/routes.rb" do |content|
         expect(content).to include('root to: "home#index"')
       end
-      assert_file "app/controllers/home_controller.rb"
+      assert_file "app/controllers/home_controller.rb" do |content|
+        expect(content).to include("def index; end")
+      end
       assert_file "app/views/home/index.html.erb" do |content|
         expect(content).to include("is ready.")
         expect(content).to include("/hello_world")
@@ -118,6 +120,26 @@ describe InstallGenerator, type: :generator do
 
       expect(generator)
         .to have_received(:say_status)
+        .with(:warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow)
+    end
+  end
+
+  context "when --new-app root route injection runs in pretend mode" do
+    let(:generator) { base_generator_fixture(new_app: true, pretend: true) }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(gitignore: false, spec: false)
+      allow(generator).to receive(:say_status)
+    end
+
+    it "does not emit a false warning after the pretend injection" do
+      Dir.chdir(destination_root) do
+        generator.send(:add_root_route)
+      end
+
+      expect(generator)
+        .not_to have_received(:say_status)
         .with(:warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow)
     end
   end
@@ -1531,6 +1553,55 @@ describe InstallGenerator, type: :generator do
     it "sets DEFAULT_ROUTE to hello_server in bin/dev" do
       assert_file "bin/dev" do |content|
         expect(content).to include('DEFAULT_ROUTE = "hello_server"')
+      end
+    end
+  end
+
+  context "with --new-app and a preexisting root route" do
+    before(:all) do
+      run_generator_test_with_args(%w[--new-app], package_json: true) do
+        simulate_existing_file("config/routes.rb", <<~RUBY)
+          Rails.application.routes.draw do
+            root to: "existing#home"
+          end
+        RUBY
+      end
+    end
+
+    it "keeps the existing root route and does not scaffold the landing page" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include('root to: "existing#home"')
+        expect(content).not_to include('root to: "home#index"')
+      end
+
+      assert_no_file "app/controllers/home_controller.rb"
+      assert_no_file "app/views/home/index.html.erb"
+    end
+
+    it "still uses the root path in bin/dev" do
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "/"')
+      end
+    end
+  end
+
+  context "with --new-app routes.rb in an unexpected format" do
+    before(:all) do
+      run_generator_test_with_args(%w[--new-app], package_json: true) do
+        simulate_existing_file("config/routes.rb", "draw_routes do\nend\n")
+      end
+    end
+
+    it "skips the landing page and falls back to the hello_world route in bin/dev" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).not_to include('root to: "home#index"')
+      end
+
+      assert_no_file "app/controllers/home_controller.rb"
+      assert_no_file "app/views/home/index.html.erb"
+
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "hello_world"')
       end
     end
   end

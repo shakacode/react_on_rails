@@ -409,6 +409,12 @@ describe('createApp', () => {
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000');
+    expect(gitCommitSubjects()).toEqual([
+      'Create Rails app with PostgreSQL',
+      'Add react_on_rails gem',
+      'Add react_on_rails_pro gem',
+      'Install React on Rails Pro with JavaScript and Webpack',
+    ]);
     expectRailsGitScaffoldRestored(appPath);
     expect(processExitSpy).not.toHaveBeenCalled();
   });

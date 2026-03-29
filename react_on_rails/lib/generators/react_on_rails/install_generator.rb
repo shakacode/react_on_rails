@@ -417,10 +417,19 @@ module ReactOnRails
       end
 
       def default_bin_dev_route
-        return "/" if options.new_app?
+        return "/" if options.new_app? && new_app_root_route_available?
         return "hello_server" if use_rsc? && !options.redux?
 
         "hello_world"
+      end
+
+      def new_app_root_route_available?
+        routes_path = File.join(destination_root, "config/routes.rb")
+        return false unless File.file?(routes_path)
+
+        File.foreach(routes_path).any? do |line|
+          !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
+        end
       end
 
       def stock_rails_bin_dev?
