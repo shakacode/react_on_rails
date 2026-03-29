@@ -362,10 +362,14 @@ spec:
         httpGet:
           path: /up
           port: 3000
+        initialDelaySeconds: 5
+        periodSeconds: 10
       livenessProbe:
         httpGet:
           path: /up
           port: 3000
+        initialDelaySeconds: 60
+        periodSeconds: 20
 ```
 
 ### Deploy
