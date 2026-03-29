@@ -907,13 +907,11 @@ module ReactOnRails
 
         def localhost_port_open?(port)
           %w[127.0.0.1 ::1].any? do |host|
-            begin
-              Socket.tcp(host, port, connect_timeout: 1) do
-                true
-              end
-            rescue StandardError
-              false
+            Socket.tcp(host, port, connect_timeout: 1) do
+              true
             end
+          rescue StandardError
+            false
           end
         end
 

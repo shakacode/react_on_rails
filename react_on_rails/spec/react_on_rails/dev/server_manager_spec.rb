@@ -1009,8 +1009,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     before do
       stub_const("#{described_class}::OPEN_BROWSER_ONCE_MARKER", File.join(marker_dir, "browser_opened_once"))
-      allow(described_class).to receive(:browser_auto_open_allowed?).and_return(true)
-      allow(described_class).to receive(:wait_for_server_on_port).and_return(true)
+      allow(described_class).to receive_messages(
+        browser_auto_open_allowed?: true,
+        wait_for_server_on_port: true
+      )
     end
 
     it "warns when automatic browser opening fails" do
