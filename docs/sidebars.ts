@@ -168,9 +168,8 @@ const sidebars: SidebarsConfig = {
       label: 'Deployment',
       items: [
         'deployment/README',
+        'deployment/docker-deployment',
         'deployment/heroku-deployment',
-        'deployment/elastic-beanstalk',
-        'deployment/capistrano-deployment',
         'deployment/server-rendering-tips',
         'deployment/troubleshooting',
         'deployment/troubleshooting-build-errors',
