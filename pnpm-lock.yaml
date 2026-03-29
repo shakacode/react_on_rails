@@ -14,29 +14,29 @@ overrides:
   lodash@>=4.0.0 <=4.17.22: '>=4.17.23'
   qs@>=6.7.0 <=6.14.1: '>=6.14.2'
   bn.js@>=5.0.0 <5.2.3: '>=5.2.3'
-  bn.js@<4.12.3: '>=4.12.3'
-  minimatch@<3.1.3: '>=3.1.3'
+  bn.js@<4.12.3: '>=4.12.3 <5'
+  minimatch@<3.1.3: '>=3.1.3 <4'
   minimatch@>=9.0.0 <9.0.6: '>=9.0.6'
   basic-ftp@<5.2.0: '>=5.2.0'
   minimatch@>=9.0.0 <9.0.7: '>=9.0.7'
-  minimatch@<3.1.4: '>=3.1.4'
+  minimatch@<3.1.4: '>=3.1.4 <4'
   serialize-javascript@<=7.0.2: '>=7.0.3'
   '@tootallnate/once@<3.0.1': '>=3.0.1'
   svgo@=4.0.0: '>=4.0.1'
-  svgo@>=2.1.0 <2.8.1: '>=2.8.1'
+  svgo@>=2.1.0 <2.8.1: '>=2.8.1 <3'
   immutable@>=5.0.0 <5.1.5: '>=5.1.5'
   flatted@<3.4.0: '>=3.4.0'
   flatted@<=3.4.1: '>=3.4.2'
   smol-toml@<1.6.1: '>=1.6.1'
   handlebars@>=4.0.0 <=4.7.8: '>=4.7.9'
   serialize-javascript@<7.0.5: '>=7.0.5'
-  path-to-regexp@<0.1.13: '>=0.1.13'
-  brace-expansion@<1.1.13: '>=1.1.13'
+  path-to-regexp@<0.1.13: '>=0.1.13 <1'
+  brace-expansion@<1.1.13: '>=1.1.13 <2'
   brace-expansion@>=2.0.0 <2.0.3: '>=2.0.3'
   handlebars@>=4.0.0 <4.7.9: '>=4.7.9'
-  picomatch@<2.3.2: '>=2.3.2'
+  picomatch@<2.3.2: '>=2.3.2 <3'
   picomatch@>=4.0.0 <4.0.4: '>=4.0.4'
-  yaml@>=1.0.0 <1.10.3: '>=1.10.3'
+  yaml@>=1.0.0 <1.10.3: '>=1.10.3 <2'
 
 importers:
 
@@ -3341,6 +3341,9 @@ packages:
     peerDependencies:
       '@babel/core': ^7.0.0
 
+  balanced-match@1.0.2:
+    resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
+
   balanced-match@2.0.0:
     resolution: {integrity: sha512-1ugUSr8BHXRnK23KfuYS+gVMC3LB8QGH9W1iGtDPsNWoQbgtXSExkBu2aDR4epiGWZOjZsj6lDl/N/AqqTC3UA==}
 
@@ -3411,8 +3414,8 @@ packages:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
     engines: {node: '>=8'}
 
-  bn.js@5.2.2:
-    resolution: {integrity: sha512-v2YAxEmKaBLahNwE1mjp4WON6huMNeuDvagFZW+ASCuA/ku0bXR9hSMw0XpiqMoA3+rmnyck/tPRSFQkoC9Cuw==}
+  bn.js@4.12.3:
+    resolution: {integrity: sha512-fGTi3gxV/23FTYdAoUtLYp6qySe2KE3teyZitipKNRuVYcBkoP/bB3guXN/XVKUe9mxCHXnc9C4ocyz8OmgN0g==}
 
   bn.js@5.2.3:
     resolution: {integrity: sha512-EAcmnPkxpntVL+DS7bO1zhcZNvCkxqtkd0ZY53h06GNQ3DEkkGZ/gKgmDv6DdZQGj9BgfSPKtJJ7Dp1GPP8f7w==}
@@ -3426,6 +3429,9 @@ packages:
 
   boolbase@1.0.0:
     resolution: {integrity: sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==}
+
+  brace-expansion@1.1.13:
+    resolution: {integrity: sha512-9ZLprWS6EENmhEOpjCYW2c8VkmOvckIJZfkr7rBW6dObmfgJ/L1GpSYW5Hpo9lDz4D1+n0Ckz8rU7FwHDQiG/w==}
 
   brace-expansion@5.0.5:
     resolution: {integrity: sha512-VZznLgtwhn+Mact9tfiwx64fA9erHH/MCXEUfB/0bX/6Fz6ny5EGTXYltMocqg4xFAQZtnO3DHWWXi8RiuN7cQ==}
@@ -3687,6 +3693,10 @@ packages:
     resolution: {integrity: sha512-NOKm8xhkzAjzFx8B2v5OAHT+u5pRQc2UCa2Vq9jYL/31o2wi9mxBA7LIFs3sV5VSC49z6pEhfbMULvShKj26WA==}
     engines: {node: '>= 6'}
 
+  commander@7.2.0:
+    resolution: {integrity: sha512-QrWXB+ZQSVPmIWIhtEO9H+gwHaMGYiF5ChvoJ+K9ZGHG/sVsa6yiesAD1GC/x46sET00Xlwo1u49RVVVzvcSkw==}
+    engines: {node: '>= 10'}
+
   commander@8.3.0:
     resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
     engines: {node: '>= 12'}
@@ -3711,6 +3721,9 @@ packages:
   compression@1.8.1:
     resolution: {integrity: sha512-9mAqGPHLakhCLeNyxPkK4xVo746zQ/czLH1Ky+vkitMnWfWZps8r0qXuwhwizagCRttsL4lfG4pIOvaWLpAP0w==}
     engines: {node: '>= 0.8.0'}
+
+  concat-map@0.0.1:
+    resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
 
   confusing-browser-globals@1.0.11:
     resolution: {integrity: sha512-JsPKdmh8ZkmnHxDk55FZ1TqVLvEQTvoByJZRN9jzI0UjxK/QgAmsphz7PGtqgPieQZ/CQcHWXCR7ATDNhGe+YA==}
@@ -3902,6 +3915,10 @@ packages:
   css-select@5.2.2:
     resolution: {integrity: sha512-TizTzUddG/xYLA3NXodFM0fSbNizXjOKhqiQQwvhlspadZokn1KDy0NZFS0wuEubIYAV5/c1/lAr0TaaFXEXzw==}
 
+  css-tree@1.1.3:
+    resolution: {integrity: sha512-tRpdppF7TRazZrjJ6v3stzv93qxRcSsFmW6cX0Zm2NVKpxE1WV1HblnghVv9TreireHkqI/VDEsfolRF1p6y7Q==}
+    engines: {node: '>=8.0.0'}
+
   css-tree@2.2.1:
     resolution: {integrity: sha512-OA0mILzGc1kCOCSJerOeqDxDQ4HOh+G8NbOJFOTgOCzpw7fCBubk0fEyxp8AgOL/jvLgYA/uV0cMbe43ElF1JA==}
     engines: {node: ^10 || ^12.20.0 || ^14.13.0 || >=15.0.0, npm: '>=7.0.0'}
@@ -3957,6 +3974,10 @@ packages:
     engines: {node: ^18.12.0 || ^20.9.0 || >=22.0}
     peerDependencies:
       postcss: ^8.4.32
+
+  csso@4.2.0:
+    resolution: {integrity: sha512-wvlcdIbf6pwKEk7vHj8/Bkc0B4ylXZruLvOgs9doS5eOsOpuodOV2zJChSpkp+pRpYQLQMeF04nr3Z68Sta9jA==}
+    engines: {node: '>=8.0.0'}
 
   csso@5.0.5:
     resolution: {integrity: sha512-0LrrStPOdJj+SPCCrGhzryycLjwcgUSHBtxNA8aIDxf0GLsRh1cKYhB00Gd1lDOS4yGH69+SNn13+TWbVHETFQ==}
@@ -5886,6 +5907,9 @@ packages:
   md5.js@1.3.5:
     resolution: {integrity: sha512-xitP+WxNPcTTOgnTJcrhM0xvdPepipPSf3I8EIpGKeFLjt3PlJLIDG3u8EX53ZIubkb+5U2+3rELYpEhHhzdkg==}
 
+  mdn-data@2.0.14:
+    resolution: {integrity: sha512-dn6wd0uw5GsdswPFfsgMp5NSB0/aDe6fK94YJV/AJDYXL6HVLWBsxeq7js7Ad+mU2K9LAlwpk6kN2D5mwCPVow==}
+
   mdn-data@2.0.28:
     resolution: {integrity: sha512-aylIc7Z9y4yzHYAJNuESG3hfhC+0Ibp/MAMiaOZgNv4pmEdFyfZhhhny4MNiAfWdBQ1RQ2mfDWmM1x8SvGyp8g==}
 
@@ -5979,9 +6003,8 @@ packages:
     resolution: {integrity: sha512-oRjTw/97aTBN0RHbYCdtF1MQfvusSIBQM0IZEgzl6426+8jSC0nF1a/GmnVLpfB9yyr6g6FTqWqiZVbxrtaCIg==}
     engines: {node: 18 || 20 || >=22}
 
-  minimatch@9.0.5:
-    resolution: {integrity: sha512-G6T0ZX48xgozx7587koeX9Ys2NYy6Gmv//P89sEte9V9whIapMNF4idKxnW2QtCcLiTWlb/wfCabAtAFWhhBow==}
-    engines: {node: '>=16 || 14 >=14.17'}
+  minimatch@3.1.5:
+    resolution: {integrity: sha512-VgjWUsnnT6n+NUk6eZq77zeFdpW2LWDzP6zFGrCbHXiYNul5Dzqk2HHQ5uFH2DNW5Xbp8+jVzaeNt94ssEEl4w==}
 
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
@@ -6310,8 +6333,8 @@ packages:
   path-parse@1.0.7:
     resolution: {integrity: sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw==}
 
-  path-to-regexp@8.4.0:
-    resolution: {integrity: sha512-PuseHIvAnz3bjrM2rGJtSgo1zjgxapTLZ7x2pjhzWwlp4SJQgK3f3iZIQwkpEnBaKz6seKBADpM4B4ySkuYypg==}
+  path-to-regexp@0.2.5:
+    resolution: {integrity: sha512-l6qtdDPIkmAmzEO6egquYDfqQGPMRNGjYtrU13HAXb3YSRrt7HSb1sJY0pKp6o2bAa86tSB6iwaW2JbthPKr7Q==}
 
   path-type@4.0.0:
     resolution: {integrity: sha512-gDKb8aZMDeD/tZWs9P6+q0J9Mwkdl6xMV8TjnGP3qJVJ06bdMgkbBlLU8IdfOsIsFz2BW1rNVT3XuNEl8zPAvw==}
@@ -6330,9 +6353,9 @@ packages:
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
-  picomatch@4.0.3:
-    resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
-    engines: {node: '>=12'}
+  picomatch@2.3.2:
+    resolution: {integrity: sha512-V7+vQEJ06Z+c5tSye8S+nHUfI51xoXIXjHQ99cQtKUkQqqO1kO/KCJUfZXuB47h/YBlDhah2H3hdUGXn8ie0oA==}
+    engines: {node: '>=8.6'}
 
   picomatch@4.0.4:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
@@ -7285,10 +7308,6 @@ packages:
     engines: {node: '>=14.0.0'}
     hasBin: true
 
-  sax@1.4.4:
-    resolution: {integrity: sha512-1n3r/tGXO6b6VXMdFT54SHzT9ytu9yr7TaELowdYpMqY/Ao7EnlQGmAQ1+RatX7Tkkdm6hONI2owqNx2aZj5Sw==}
-    engines: {node: '>=11.0.0'}
-
   sax@1.6.0:
     resolution: {integrity: sha512-6R3J5M4AcbtLUdZmRv2SygeVaM7IhrLXu9BmnOGmmACak8fiUtOsYNWUS4uK7upbmHIBbLBeFeI//477BKLBzA==}
     engines: {node: '>=11.0.0'}
@@ -7616,6 +7635,10 @@ packages:
     resolution: {integrity: sha512-o3yWv49B/o4QZk5ZcsALc6t0+eCelPc44zZsLtCQnZPDwFpDYSWcDnrv2TtMmMbQ7uKo3J0HTURCqckw23czNQ==}
     engines: {node: '>=12.0.0'}
 
+  stable@0.1.8:
+    resolution: {integrity: sha512-ji9qxRnOVfcuLDySj9qzhGSEFVobyt1kIOSkj1qZzYLzq7Tos/oUUWvotUPQLlrsidqsK6tBH89Bc9kL5zHA6w==}
+    deprecated: 'Modern JS already guarantees Array#sort() is a stable sort, so this library is deprecated. See the compatibility table on MDN: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort#browser_compatibility'
+
   stack-utils@2.0.6:
     resolution: {integrity: sha512-XlkWvfIm6RmsWtNJx+uqtKLS8eqFbxUg0ZzLXqY0caEy9l7hruX8IpiDnjsLavoBgqCCR71TqWO8MaXYheJ3RQ==}
     engines: {node: '>=10'}
@@ -7826,9 +7849,9 @@ packages:
   svg-tags@1.0.0:
     resolution: {integrity: sha512-ovssysQTa+luh7A5Weu3Rta6FJlFBBbInjOh722LIt6klpU2/HtdUbszju/G4devcvk8PGt7FCLv5wftu3THUA==}
 
-  svgo@4.0.0:
-    resolution: {integrity: sha512-VvrHQ+9uniE+Mvx3+C9IEe/lWasXCU0nXMY2kZeLrHNICuRiC8uMPyM14UEaMOFA5mhyQqEkB02VoQ16n3DLaw==}
-    engines: {node: '>=16'}
+  svgo@2.8.2:
+    resolution: {integrity: sha512-TyzE4NVGLUFy+H/Uy4N6c3G0HEeprsVfge6Lmq+0FdQQ/zqoVYB62IsBZORsiL+o96s6ff/V6/3UQo/C0cgCAA==}
+    engines: {node: '>=10.13.0'}
     hasBin: true
 
   svgo@4.0.1:
@@ -8547,6 +8570,10 @@ packages:
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
+
+  yaml@1.10.3:
+    resolution: {integrity: sha512-vIYeF1u3CjlhAFekPPAk2h/Kv4T3mAkMox5OymRiJQB0spDP10LHvt+K7G9Ny6NuuMAb25/6n1qyUjAcGNf/AA==}
+    engines: {node: '>= 6'}
 
   yaml@2.8.3:
     resolution: {integrity: sha512-AvbaCLOO2Otw/lW5bmh9d/WEdcDFdQp2Z2ZUH3pX9U2ihyUY0nvLv7J6TrWowklRGPYbB/IuIMfYgxaCPg5Bpg==}
@@ -9562,7 +9589,7 @@ snapshots:
     dependencies:
       '@eslint/object-schema': 2.1.7
       debug: 4.4.3
-      minimatch: 9.0.5
+      minimatch: 3.1.5
     transitivePeerDependencies:
       - supports-color
 
@@ -9583,7 +9610,7 @@ snapshots:
       ignore: 5.3.2
       import-fresh: 3.3.1
       js-yaml: 4.1.1
-      minimatch: 9.0.5
+      minimatch: 3.1.5
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
       - supports-color
@@ -11274,7 +11301,7 @@ snapshots:
   anymatch@3.1.3:
     dependencies:
       normalize-path: 3.0.0
-      picomatch: 4.0.3
+      picomatch: 2.3.2
 
   arg@5.0.2: {}
 
@@ -11365,7 +11392,7 @@ snapshots:
 
   asn1.js@4.10.1:
     dependencies:
-      bn.js: 5.2.2
+      bn.js: 4.12.3
       inherits: 2.0.4
       minimalistic-assert: 1.0.1
 
@@ -11557,6 +11584,8 @@ snapshots:
       babel-plugin-jest-hoist: 29.6.3
       babel-preset-current-node-syntax: 1.2.0(@babel/core@7.28.5)
 
+  balanced-match@1.0.2: {}
+
   balanced-match@2.0.0: {}
 
   balanced-match@4.0.4: {}
@@ -11612,7 +11641,7 @@ snapshots:
 
   binary-extensions@2.3.0: {}
 
-  bn.js@5.2.2: {}
+  bn.js@4.12.3: {}
 
   bn.js@5.2.3: {}
 
@@ -11639,6 +11668,11 @@ snapshots:
       multicast-dns: 7.2.5
 
   boolbase@1.0.0: {}
+
+  brace-expansion@1.1.13:
+    dependencies:
+      balanced-match: 1.0.2
+      concat-map: 0.0.1
 
   brace-expansion@5.0.5:
     dependencies:
@@ -11927,6 +11961,8 @@ snapshots:
 
   commander@4.1.1: {}
 
+  commander@7.2.0: {}
+
   commander@8.3.0: {}
 
   common-tags@1.8.2: {}
@@ -11960,6 +11996,8 @@ snapshots:
       vary: 1.1.2
     transitivePeerDependencies:
       - supports-color
+
+  concat-map@0.0.1: {}
 
   confusing-browser-globals@1.0.11: {}
 
@@ -12001,7 +12039,7 @@ snapshots:
       import-fresh: 3.3.1
       parse-json: 5.2.0
       path-type: 4.0.0
-      yaml: 2.8.3
+      yaml: 1.10.3
 
   cosmiconfig@8.3.6(typescript@5.9.3):
     dependencies:
@@ -12023,7 +12061,7 @@ snapshots:
 
   create-ecdh@4.0.4:
     dependencies:
-      bn.js: 5.2.2
+      bn.js: 4.12.3
       elliptic: 6.6.1
 
   create-hash@1.2.0:
@@ -12175,6 +12213,11 @@ snapshots:
       domutils: 3.2.2
       nth-check: 2.1.1
 
+  css-tree@1.1.3:
+    dependencies:
+      mdn-data: 2.0.14
+      source-map: 0.6.1
+
   css-tree@2.2.1:
     dependencies:
       mdn-data: 2.0.28
@@ -12271,13 +12314,17 @@ snapshots:
       cssnano-preset-default: 5.2.14(postcss@8.5.6)
       lilconfig: 2.1.0
       postcss: 8.5.6
-      yaml: 2.8.3
+      yaml: 1.10.3
 
   cssnano@7.1.2(postcss@8.5.6):
     dependencies:
       cssnano-preset-default: 7.0.10(postcss@8.5.6)
       lilconfig: 3.1.3
       postcss: 8.5.6
+
+  csso@4.2.0:
+    dependencies:
+      css-tree: 1.1.3
 
   csso@5.0.5:
     dependencies:
@@ -12422,7 +12469,7 @@ snapshots:
 
   diffie-hellman@5.0.3:
     dependencies:
-      bn.js: 5.2.2
+      bn.js: 4.12.3
       miller-rabin: 4.0.1
       randombytes: 2.1.0
 
@@ -12517,7 +12564,7 @@ snapshots:
 
   elliptic@6.6.1:
     dependencies:
-      bn.js: 5.2.2
+      bn.js: 4.12.3
       brorand: 1.1.0
       hash.js: 1.1.7
       hmac-drbg: 1.0.1
@@ -12788,7 +12835,7 @@ snapshots:
       hasown: 2.0.2
       is-core-module: 2.16.1
       is-glob: 4.0.3
-      minimatch: 9.0.5
+      minimatch: 3.1.5
       object.fromentries: 2.0.8
       object.groupby: 1.0.3
       object.values: 1.2.1
@@ -12827,7 +12874,7 @@ snapshots:
       hasown: 2.0.2
       jsx-ast-utils: 3.3.5
       language-tags: 1.0.9
-      minimatch: 9.0.5
+      minimatch: 3.1.5
       object.fromentries: 2.0.8
       safe-regex-test: 1.1.0
       string.prototype.includes: 2.0.1
@@ -12858,7 +12905,7 @@ snapshots:
       estraverse: 5.3.0
       hasown: 2.0.2
       jsx-ast-utils: 3.3.5
-      minimatch: 9.0.5
+      minimatch: 3.1.5
       object.entries: 1.1.9
       object.fromentries: 2.0.8
       object.values: 1.2.1
@@ -12926,7 +12973,7 @@ snapshots:
       is-glob: 4.0.3
       json-stable-stringify-without-jsonify: 1.0.1
       lodash.merge: 4.6.2
-      minimatch: 9.0.5
+      minimatch: 3.1.5
       natural-compare: 1.4.0
       optionator: 0.9.4
     optionalDependencies:
@@ -13053,7 +13100,7 @@ snapshots:
       methods: 1.1.2
       on-finished: 2.4.1
       parseurl: 1.3.3
-      path-to-regexp: 8.4.0
+      path-to-regexp: 0.2.5
       proxy-addr: 2.0.7
       qs: 6.15.0
       range-parser: 1.2.1
@@ -13405,7 +13452,7 @@ snapshots:
       fs.realpath: 1.0.0
       inflight: 1.0.6
       inherits: 2.0.4
-      minimatch: 9.0.5
+      minimatch: 3.1.5
       once: 1.4.0
       path-is-absolute: 1.0.1
 
@@ -14253,7 +14300,7 @@ snapshots:
       chalk: 4.1.2
       ci-info: 3.9.0
       graceful-fs: 4.2.11
-      picomatch: 4.0.3
+      picomatch: 2.3.2
 
   jest-util@30.2.0:
     dependencies:
@@ -14694,6 +14741,8 @@ snapshots:
       inherits: 2.0.4
       safe-buffer: 5.2.1
 
+  mdn-data@2.0.14: {}
+
   mdn-data@2.0.28: {}
 
   mdn-data@2.12.2: {}
@@ -14732,11 +14781,11 @@ snapshots:
   micromatch@4.0.8:
     dependencies:
       braces: 3.0.3
-      picomatch: 4.0.3
+      picomatch: 2.3.2
 
   miller-rabin@4.0.1:
     dependencies:
-      bn.js: 5.2.2
+      bn.js: 4.12.3
       brorand: 1.1.0
 
   mime-db@1.52.0: {}
@@ -14779,9 +14828,9 @@ snapshots:
     dependencies:
       brace-expansion: 5.0.5
 
-  minimatch@9.0.5:
+  minimatch@3.1.5:
     dependencies:
-      brace-expansion: 5.0.5
+      brace-expansion: 1.1.13
 
   minimist@1.2.8: {}
 
@@ -15153,7 +15202,7 @@ snapshots:
 
   path-parse@1.0.7: {}
 
-  path-to-regexp@8.4.0: {}
+  path-to-regexp@0.2.5: {}
 
   path-type@4.0.0: {}
 
@@ -15174,7 +15223,7 @@ snapshots:
 
   picocolors@1.1.1: {}
 
-  picomatch@4.0.3: {}
+  picomatch@2.3.2: {}
 
   picomatch@4.0.4: {}
 
@@ -15607,7 +15656,7 @@ snapshots:
     dependencies:
       postcss: 8.5.6
       postcss-value-parser: 4.2.0
-      svgo: 4.0.0
+      svgo: 2.8.2
 
   postcss-svgo@7.1.0(postcss@8.5.6):
     dependencies:
@@ -15721,7 +15770,7 @@ snapshots:
 
   public-encrypt@4.0.3:
     dependencies:
-      bn.js: 5.2.2
+      bn.js: 4.12.3
       browserify-rsa: 4.1.1
       create-hash: 1.2.0
       parse-asn1: 5.1.9
@@ -15916,7 +15965,7 @@ snapshots:
 
   readdirp@3.6.0:
     dependencies:
-      picomatch: 4.0.3
+      picomatch: 2.3.2
 
   readdirp@4.1.2: {}
 
@@ -16135,8 +16184,6 @@ snapshots:
       source-map-js: 1.2.1
     optionalDependencies:
       '@parcel/watcher': 2.5.6
-
-  sax@1.4.4: {}
 
   sax@1.6.0: {}
 
@@ -16505,6 +16552,8 @@ snapshots:
 
   stable-hash-x@0.2.0: {}
 
+  stable@0.1.8: {}
+
   stack-utils@2.0.6:
     dependencies:
       escape-string-regexp: 2.0.0
@@ -16788,15 +16837,15 @@ snapshots:
 
   svg-tags@1.0.0: {}
 
-  svgo@4.0.0:
+  svgo@2.8.2:
     dependencies:
-      commander: 11.1.0
-      css-select: 5.2.2
-      css-tree: 3.1.0
-      css-what: 6.2.2
-      csso: 5.0.5
+      commander: 7.2.0
+      css-select: 4.3.0
+      css-tree: 1.1.3
+      csso: 4.2.0
       picocolors: 1.1.1
-      sax: 1.4.4
+      sax: 1.6.0
+      stable: 0.1.8
 
   svgo@4.0.1:
     dependencies:
@@ -16978,7 +17027,7 @@ snapshots:
     dependencies:
       '@istanbuljs/schema': 0.1.3
       glob: 7.2.3
-      minimatch: 9.0.5
+      minimatch: 3.1.5
 
   text-decoder@1.2.3:
     dependencies:
@@ -17794,7 +17843,10 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  yaml@2.8.3: {}
+  yaml@1.10.3: {}
+
+  yaml@2.8.3:
+    optional: true
 
   yargs-parser@15.0.3:
     dependencies:
