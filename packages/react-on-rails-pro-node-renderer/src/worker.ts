@@ -524,9 +524,24 @@ export default function run(config: Partial<Config>) {
             port,
             message: err.message,
           };
-          process.send(startupFailure, undefined, undefined, () => {
+          const exitFallbackTimer = setTimeout(() => {
             process.exit(1);
-          });
+          }, 500);
+          exitFallbackTimer.unref();
+
+          try {
+            process.send(startupFailure, undefined, undefined, (sendErr) => {
+              clearTimeout(exitFallbackTimer);
+              if (sendErr) {
+                log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
+              }
+              process.exit(1);
+            });
+          } catch (sendErr) {
+            clearTimeout(exitFallbackTimer);
+            log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
+            process.exit(1);
+          }
           return;
         }
 
