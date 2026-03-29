@@ -65,7 +65,7 @@ For pages with multiple data sources, use [`stream_react_component`](#data-fetch
 
 ## Data Fetching in React on Rails Pro
 
-In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree.
+In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree. This approach is sometimes called **async props** because Rails can emit each prop independently, with Suspense boundaries streaming them to the browser as they resolve.
 
 This is the recommended data fetching pattern for React on Rails because:
 
@@ -168,6 +168,12 @@ function ProductList() {
 }
 ```
 
+```erb
+<%# ERB view — Rails passes the data as props %>
+<%= stream_react_component("ProductList",
+      props: { products: Product.limit(50).as_json(only: [:id, :name]) }) %>
+```
+
 ```jsx
 // After: Server Component -- receives data from Rails controller props
 function ProductList({ products }) {
@@ -246,8 +252,6 @@ export default function ProductList({ initialProducts }) {
 <%= stream_react_component("ProductsPage",
       props: { products: Product.limit(50).as_json }) %>
 ```
-
-> **Note:** `initialDataUpdatedAt` and `staleTime` are intentional here. Together they tell React Query that the Rails data is fresh for the next five minutes instead of treating it as stale immediately on mount.
 
 **How it works:**
 
