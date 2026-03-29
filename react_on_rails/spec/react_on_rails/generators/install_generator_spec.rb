@@ -1627,6 +1627,12 @@ describe InstallGenerator, type: :generator do
         expect(content).to include('DEFAULT_ROUTE = "hello_world"')
       end
     end
+
+    it "does not render a broken return-to-home quick link on the SSR demo page" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).not_to include("Return to the generated home page")
+      end
+    end
   end
 
   context "with --new-app --rsc" do
