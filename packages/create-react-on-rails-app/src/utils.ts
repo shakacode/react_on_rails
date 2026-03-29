@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'child_process';
 import chalk from 'chalk';
 
 function childEnv(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  // Always inherit PATH, HOME, and the rest of process.env; callers only add/override keys.
   return env ? { ...process.env, ...env } : process.env;
 }
 

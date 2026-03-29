@@ -419,6 +419,40 @@ describe('createApp', () => {
     expect(processExitSpy).not.toHaveBeenCalled();
   });
 
+  it('restores the Rails git scaffold from installed railties templates when available', () => {
+    const appPath = path.resolve(process.cwd(), 'my-app');
+
+    mockedExecCaptureArgs.mockImplementation((command, args) => {
+      if (command === 'git' && args[0] === 'status') {
+        return 'M Gemfile';
+      }
+      if (command === 'git' && args[0] === 'config') {
+        throw new Error('git config not set');
+      }
+      if (command === 'ruby' && args[0] === '-e' && args[2] === 'gitignore.tt') {
+        return '# rendered gitignore\n/tmp/*';
+      }
+      if (command === 'ruby' && args[0] === '-e' && args[2] === 'gitattributes.tt') {
+        return '# rendered gitattributes\ndb/schema.rb linguist-generated';
+      }
+
+      return '';
+    });
+
+    createApp('my-app', baseOptions);
+
+    expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
+      path.join(appPath, '.gitignore'),
+      '# rendered gitignore\n/tmp/*\n',
+      'utf8',
+    );
+    expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
+      path.join(appPath, '.gitattributes'),
+      '# rendered gitattributes\ndb/schema.rb linguist-generated\n',
+      'utf8',
+    );
+  });
+
   it('uses --rsc generator mode when both --pro and --rsc are set', () => {
     const options = { ...baseOptions, pro: true, rsc: true };
     const appPath = path.resolve(process.cwd(), 'my-app');
