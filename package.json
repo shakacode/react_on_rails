@@ -120,6 +120,12 @@
   "homepage": "https://github.com/shakacode/react_on_rails#readme",
   "packageManager": "pnpm@9.14.2",
   "pnpm": {
+    "// for overrides": [
+      "Generated via pnpm audit --fix, with manual caps added to prevent major version jumps.",
+      "These force patched versions of transitive dev dependencies. Remove when upstream packages update.",
+      "ajv overrides were intentionally excluded: ajv v8 breaks webpack's schema-utils/ajv-keywords.",
+      "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files."
+    ],
     "overrides": {
       "react": "$react",
       "react-dom": "$react-dom",
