@@ -1919,12 +1919,16 @@ describe InstallGenerator, type: :generator do
         shakapacker_just_installed?: false
       )
 
-      expect(GeneratorMessages).to receive(:helpful_message_after_installation)
+      allow(GeneratorMessages).to receive(:helpful_message_after_installation)
         .with(hash_including(landing_page: false))
         .and_return("stubbed")
-      expect(GeneratorMessages).to receive(:add_info).with("stubbed")
+      allow(GeneratorMessages).to receive(:add_info)
 
       install_generator.send(:add_post_install_message)
+
+      expect(GeneratorMessages).to have_received(:helpful_message_after_installation)
+        .with(hash_including(landing_page: false))
+      expect(GeneratorMessages).to have_received(:add_info).with("stubbed")
     end
 
     specify "recovery_install_command keeps meaningful flags only" do
