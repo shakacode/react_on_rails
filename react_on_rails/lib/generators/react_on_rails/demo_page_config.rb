@@ -29,6 +29,17 @@ module ReactOnRails
 
       private
 
+      def new_app_landing_page_available?
+        return false unless options[:new_app]
+
+        routes_path = File.join(destination_root, "config/routes.rb")
+        return false unless File.file?(routes_path)
+
+        File.foreach(routes_path).any? do |line|
+          !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
+        end
+      end
+
       def hello_world_intro(redux:)
         if redux
           "This route shows React on Rails with a Redux-backed component tree: Rails renders the initial HTML " \

@@ -122,17 +122,6 @@ module ReactOnRails
 
       private
 
-      def new_app_landing_page_available?
-        return false unless options[:new_app]
-
-        routes_path = File.join(destination_root, "config/routes.rb")
-        return false unless File.file?(routes_path)
-
-        File.foreach(routes_path).any? do |line|
-          !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
-        end
-      end
-
       def install_packages_with_fallback(packages, dev:, package_manager:)
         install_args = build_install_args(package_manager, dev, packages)
 

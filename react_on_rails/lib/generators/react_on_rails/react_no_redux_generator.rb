@@ -52,19 +52,6 @@ module ReactOnRails
                    rsc_demo: false
                  ))
       end
-
-      private
-
-      def new_app_landing_page_available?
-        return false unless options[:new_app]
-
-        routes_path = File.join(destination_root, "config/routes.rb")
-        return false unless File.file?(routes_path)
-
-        File.foreach(routes_path).any? do |line|
-          !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
-        end
-      end
     end
   end
 end
