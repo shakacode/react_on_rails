@@ -334,6 +334,16 @@ RSpec.describe GeneratorHelper, type: :generator do
       expect(root_route_present?).to be(false)
     end
 
+    it "returns false when routes.rb has no root route" do
+      File.write(routes_path, <<~RUBY)
+        Rails.application.routes.draw do
+          get "about", to: "pages#about"
+        end
+      RUBY
+
+      expect(root_route_present?).to be(false)
+    end
+
     it "ignores commented root lines and matches active root routes" do
       File.write(routes_path, <<~RUBY)
         Rails.application.routes.draw do
