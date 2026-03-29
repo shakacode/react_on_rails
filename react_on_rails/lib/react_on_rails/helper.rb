@@ -196,8 +196,8 @@ module ReactOnRails
     #                      Store files should be placed in directories matching this name, e.g.:
     #                        app/javascript/bundles/ror_stores/commentsStore.js
     #                      The store file must export default a store generator function.
-    def redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil, **options)
-      ReactOnRails::Helper.warn_removed_immediate_hydration_option("redux_store") if options.key?(:immediate_hydration)
+    def redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil, immediate_hydration: nil)
+      ReactOnRails::Helper.warn_removed_immediate_hydration_option("redux_store") unless immediate_hydration.nil?
 
       # Auto-load store pack if configured
       should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle

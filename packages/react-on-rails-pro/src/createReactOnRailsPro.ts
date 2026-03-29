@@ -73,9 +73,10 @@ function clientStartup() {
 
   const railsContext = getRailsContext();
   if (railsContext === null) {
-    // Context element not yet in DOM — early Pro hydration skipped, page-loaded sweep will recover.
-    if (typeof console !== 'undefined') {
-      console.warn(
+    // Context element not yet in DOM — expected in streaming scenarios.
+    // Early Pro hydration skipped; the page-loaded sweep will recover all components.
+    if (process.env.NODE_ENV !== 'production' && typeof console !== 'undefined') {
+      console.debug(
         '[React on Rails] railsContext not available at clientStartup — early Pro hydration skipped, falling back to page-load sweep.',
       );
     }

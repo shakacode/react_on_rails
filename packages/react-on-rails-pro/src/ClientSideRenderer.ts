@@ -281,6 +281,9 @@ async function forAllCompleteElementsAsync(
   await Promise.all(completeEls.map(callback));
 }
 
+// For Pro streaming pages: hydrate all components whose markup has been fully streamed
+// (identified by having a nextSibling). On non-streaming pages this matches ALL components,
+// but ClientSideRenderer memoizes by DOM node id so the later DOMContentLoaded sweep is a no-op.
 export const renderOrHydrateCompleteComponents = () =>
   forAllCompleteElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
 
