@@ -324,8 +324,7 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   if (explicitUndefinedPassword && !runtimeEnvsAllowDevelopmentDefaults()) {
     log.warn(
       'buildConfig({ password: undefined }) preserves the env/default password rather than clearing it. ' +
-        'To explicitly clear the password, pass an empty string; note that an empty string is treated as ' +
-        'absent and will fail validation in production-like environments.',
+        'In production-like environments, a password is always required and cannot be cleared.',
     );
   }
   const runtimeDefaultConfig = {
