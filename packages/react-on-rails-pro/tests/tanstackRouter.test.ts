@@ -39,7 +39,7 @@ function buildRouter(): TanStackRouter {
 type ActCallback = () => void | Promise<void>;
 
 async function compatAct(callback: ActCallback): Promise<void> {
-  const reactAct = (React as typeof React & { act?: ((cb: ActCallback) => Promise<unknown> | unknown) }).act;
+  const reactAct = (React as typeof React & { act?: (cb: ActCallback) => Promise<unknown> | unknown }).act;
   if (typeof reactAct === 'function') {
     await reactAct(callback);
     return;
