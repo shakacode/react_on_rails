@@ -2,6 +2,7 @@
 
 require "English"
 require "fileutils"
+require "net/http"
 require "open3"
 require "optparse"
 require "rainbow"
@@ -871,12 +872,22 @@ module ReactOnRails
           "http://localhost:#{port}/#{normalized_route}"
         end
 
+        def build_request_path(route)
+          normalized_route = route.to_s.strip
+          return "/" if normalized_route.empty? || normalized_route == "/"
+
+          normalized_route = normalized_route.sub(%r{\A/+}, "")
+          "/#{normalized_route}"
+        end
+
         def schedule_browser_open(port, route:, once:)
           return unless browser_auto_open_allowed?
 
           url = build_local_url(port, route)
+          request_path = build_request_path(route)
           Thread.new do
-            next unless wait_for_server_on_port(port)
+            Thread.current.report_on_exception = false if Thread.current.respond_to?(:report_on_exception=)
+            next unless wait_for_app_route(port, request_path)
 
             marker_state = prepare_browser_open_once_marker(once)
             next if marker_state == :already_opened
@@ -905,6 +916,32 @@ module ReactOnRails
 
             sleep OPEN_BROWSER_POLL_INTERVAL
           end
+        end
+
+        def wait_for_app_route(port, request_path)
+          deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + OPEN_BROWSER_WAIT_TIMEOUT
+
+          loop do
+            return true if app_route_ready?(port, request_path)
+            return false if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+            sleep OPEN_BROWSER_POLL_INTERVAL
+          end
+        end
+
+        def app_route_ready?(port, request_path)
+          return false unless localhost_port_open?(port)
+
+          response = http_get_localhost(port, request_path)
+          response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
+        end
+
+        def http_get_localhost(port, request_path)
+          Net::HTTP.start("127.0.0.1", port, open_timeout: 1, read_timeout: 1) do |http|
+            http.get(request_path)
+          end
+        rescue StandardError
+          nil
         end
 
         def localhost_port_open?(port)
