@@ -478,7 +478,7 @@ Webpack/Rspack compilation can exceed default container memory. Solutions:
 If SSR with ExecJS fails in the container but works locally:
 
 1. Ensure `ssr-generated/server-bundle.js` exists in the image
-2. Check that a JavaScript runtime is available. Install `mini_racer` or ensure `node` is on the `PATH` in the runtime stage.
+2. Check that a JavaScript runtime is available. The Dockerfile above intentionally excludes Node from the runtime stage. If your app needs runtime JS execution (e.g. ExecJS), either add `mini_racer` to your Gemfile (no Node required) or install Node in the runtime stage. For high-performance SSR, consider the [Pro Node Renderer sidecar](#node-renderer-in-containers) instead.
 3. Check logs: `RAILS_LOG_TO_STDOUT=true bundle exec rails console` and try `ReactOnRails::ServerRenderingPool.reset_pool`
 
 ## See also

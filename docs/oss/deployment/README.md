@@ -1,7 +1,5 @@
 # Deployment
 
-Shakapacker puts the necessary precompile steps automatically in the rake precompile step.
-
 ## Deployment guides
 
 - [Docker Deployment](./docker-deployment.md) — Containerized deployments with Kamal, Kubernetes, and Control Plane
