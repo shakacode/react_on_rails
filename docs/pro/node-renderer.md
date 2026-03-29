@@ -71,6 +71,44 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
+### Renderer Password Security
+
+The renderer password secures communication between Rails and the Node Renderer. React on Rails Pro enforces secure defaults by environment:
+
+| Environment           | Password Required? | Behavior                                                 |
+| --------------------- | ------------------ | -------------------------------------------------------- |
+| `development`         | No                 | Optional — no authentication if unset                    |
+| `test`                | No                 | Optional — no authentication if unset                    |
+| `(neither set)`       | **Yes**            | Treated as production-like; `RENDERER_PASSWORD` required |
+| `staging`             | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
+| `production`          | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
+| `qa`, `preview`, etc. | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
+
+In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without an explicit `RENDERER_PASSWORD`. Set the same password on both sides:
+
+```bash
+# Set for both Rails and Node Renderer
+export RENDERER_PASSWORD="your-secure-password"
+```
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
+```
+
+The Node Renderer reads `RENDERER_PASSWORD` directly from `process.env`. Rails does not automatically
+read that env var for `config.renderer_password`, so the initializer assignment above is required on
+the Ruby side.
+
+If neither `NODE_ENV` nor `RAILS_ENV` is set, the Node Renderer treats the environment as
+production-like and still requires `RENDERER_PASSWORD`.
+
+For local development, you can either omit the password entirely (no authentication) or set a convenience default:
+
+```ruby
+config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
+```
+
 ## Further Reading
 
 - [Node Renderer basics](../oss/building-features/node-renderer/basics.md) — Architecture and core concepts

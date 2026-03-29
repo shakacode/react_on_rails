@@ -229,10 +229,58 @@ module ReactOnRailsPro
     end
 
     def setup_renderer_password
+      # Explicit passwords, including values loaded from ENV in the initializer, skip URL extraction.
+      # Blank values fall through so URL extraction and production validation still catch misconfiguration.
       return if renderer_password.present?
 
       uri = URI(renderer_url)
       self.renderer_password = uri.password
+
+      validate_renderer_password_for_production
+    end
+
+    def validate_renderer_password_for_production
+      # Defense-in-depth: skip validation when a password is already configured (e.g. extracted
+      # from the renderer URL by setup_renderer_password, or set directly in the initializer).
+      return if renderer_password.present?
+      return unless node_renderer?
+
+      # Fail closed: only skip validation when RAILS_ENV is explicitly set to development or test.
+      # Rails.env defaults to "development" when RAILS_ENV is unset, which would silently skip
+      # validation in misconfigured environments. Checking ENV["RAILS_ENV"] directly matches the
+      # Node-side behavior where an unset environment is treated as production-like.
+      rails_env = ENV["RAILS_ENV"]&.downcase
+      return if rails_env.present? && %w[development test].include?(rails_env)
+
+      raise ReactOnRailsPro::Error, <<~MSG
+        RENDERER_PASSWORD must be set in production-like environments (staging, production, etc.)
+        when using the NodeRenderer.
+
+        In development and test environments, the renderer password is optional and no authentication
+        is required. In all other environments, you must explicitly configure a password to secure
+        communication between Rails and the Node Renderer.
+
+        To fix this, set the RENDERER_PASSWORD environment variable and configure it in your initializer:
+
+          # config/initializers/react_on_rails_pro.rb
+          ReactOnRailsPro.configure do |config|
+            config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
+          end
+
+        Then set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
+        Note: setting ENV["RENDERER_PASSWORD"] alone is not enough on the Ruby side unless
+        config.renderer_password is explicitly assigned from ENV.
+        An empty-string assignment still counts as missing and will raise in production-like environments.
+        If Rails and the Node Renderer disagree about startup behavior, verify both RAILS_ENV and NODE_ENV.
+
+        Environment matrix:
+          development    — password optional (no authentication)
+          test           — password optional (no authentication)
+          (RAILS_ENV unset) — treated as production-like; RENDERER_PASSWORD required
+          staging        — RENDERER_PASSWORD required
+          production     — RENDERER_PASSWORD required
+          (any other)    — RENDERER_PASSWORD required
+      MSG
     end
   end
 end
