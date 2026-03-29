@@ -524,6 +524,8 @@ export default function run(config: Partial<Config>) {
             port,
             message: err.message,
           };
+          // If the IPC callback never fires because the channel is already broken,
+          // force the worker to exit instead of hanging during startup failure.
           const exitFallbackTimer = setTimeout(() => {
             process.exit(1);
           }, 500);

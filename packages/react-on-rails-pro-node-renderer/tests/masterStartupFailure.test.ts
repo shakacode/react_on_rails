@@ -10,8 +10,10 @@ import {
  * while preserving the existing behavior for scheduled restarts and
  * runtime crashes.
  *
- * We test the decision logic in isolation by simulating the cluster events
- * that the master process listens to, rather than forking real workers.
+ * Most cases exercise the decision logic in isolation by simulating the
+ * cluster events that the master process listens to. We also keep one thin
+ * wiring test that runs masterRun() against a mocked cluster so regressions
+ * in the actual listener registration path are caught too.
  */
 
 function buildStartupFailureMessage(
@@ -29,6 +31,104 @@ function buildStartupFailureMessage(
     ...overrides,
   };
 }
+
+describe('masterRun wiring', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.resetModules();
+  });
+
+  it('registers the startup-failure listener before forking and aborts without reforking', () => {
+    const mockOperations: string[] = [];
+    const mockClusterHandlers: Record<string, (...args: unknown[]) => void> = {};
+    const mockFork = jest.fn(() => {
+      mockOperations.push('fork');
+      return {};
+    });
+    const mockCluster = {
+      on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+        mockOperations.push(`on:${event}`);
+        mockClusterHandlers[event] = handler;
+        return mockCluster;
+      }),
+      fork: mockFork,
+    };
+    const mockErrorReporterMessage = jest.fn();
+    const mockLog = {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      fatal: jest.fn(),
+    };
+    const mockBuildConfig = jest.fn(() => ({
+      workersCount: 2,
+      allWorkersRestartInterval: undefined,
+      delayBetweenIndividualWorkerRestarts: undefined,
+      gracefulWorkerRestartTimeout: 0,
+      serverBundleCachePath: '/tmp/react-on-rails-pro-node-renderer-bundles',
+    }));
+    const mockLogSanitizedConfig = jest.fn();
+    const mockGetLicenseStatus = jest.fn(() => 'valid');
+    const setIntervalSpy = jest.spyOn(global, 'setInterval').mockReturnValue(0 as unknown as NodeJS.Timeout);
+    const processExitSpy = jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`process.exit:${code}`);
+    }) as typeof process.exit);
+
+    jest.doMock('cluster', () => ({
+      __esModule: true,
+      default: mockCluster,
+    }));
+    jest.doMock('../src/shared/log', () => ({
+      __esModule: true,
+      default: mockLog,
+    }));
+    jest.doMock('../src/shared/errorReporter', () => ({
+      __esModule: true,
+      message: mockErrorReporterMessage,
+      error: jest.fn(),
+      addMessageNotifier: jest.fn(),
+      addErrorNotifier: jest.fn(),
+      addNotifier: jest.fn(),
+    }));
+    jest.doMock('../src/shared/configBuilder', () => ({
+      __esModule: true,
+      buildConfig: mockBuildConfig,
+      logSanitizedConfig: mockLogSanitizedConfig,
+    }));
+    jest.doMock('../src/shared/licenseValidator', () => ({
+      __esModule: true,
+      getLicenseStatus: mockGetLicenseStatus,
+    }));
+    jest.doMock('../src/master/restartWorkers', () => ({
+      __esModule: true,
+      default: jest.fn(),
+    }));
+
+    let masterRun: typeof import('../src/master').default;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line global-require
+      masterRun = require('../src/master').default as typeof import('../src/master').default;
+    });
+
+    masterRun();
+
+    expect(mockOperations).toEqual(['on:message', 'fork', 'fork', 'on:exit']);
+    expect(mockFork).toHaveBeenCalledTimes(2);
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+
+    const failure = buildStartupFailureMessage();
+    const worker = { id: 1, process: { exitCode: 1 } };
+
+    mockClusterHandlers.message(worker, failure);
+
+    expect(() => mockClusterHandlers.exit(worker)).toThrow('process.exit:1');
+    expect(mockErrorReporterMessage).toHaveBeenCalledWith(
+      'Node renderer startup failed: port 3800 is already in use',
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(1);
+    expect(mockFork).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe('master startup failure handling', () => {
   let isAbortingForStartupFailure: boolean;
