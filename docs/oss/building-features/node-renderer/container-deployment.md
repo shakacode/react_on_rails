@@ -488,6 +488,8 @@ spec:
           ports:
             - containerPort: 3800
           env:
+            - name: RENDERER_HOST
+              value: '0.0.0.0' # Required for Kubernetes HTTP probes
             - name: NODE_OPTIONS
               value: '--max-old-space-size=512'
             - name: RENDERER_WORKERS_COUNT
