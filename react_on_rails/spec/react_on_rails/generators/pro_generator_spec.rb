@@ -96,6 +96,22 @@ describe ProGenerator, type: :generator do
       expect(gemfile_content).not_to include("gem \"react_on_rails\",")
     end
 
+    it "strips all version constraints from multi-constraint declarations" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", ">= 15.0", "< 16.0", require: false
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = ReactOnRails::VERSION
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\", require: false")
+      expect(gemfile_content).not_to include(">= 15.0")
+      expect(gemfile_content).not_to include("< 16.0")
+    end
+
     it "preserves indentation when replacing a grouped Gemfile entry" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"

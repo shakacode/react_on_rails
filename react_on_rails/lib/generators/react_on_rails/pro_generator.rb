@@ -667,10 +667,14 @@ module ReactOnRails
       def build_pro_gem_replacement_line(indentation:, quote:, suffix:, parenthesized_gem_call: false)
         normalized_suffix = suffix || "\n"
         normalized_suffix = "#{normalized_suffix}\n" unless normalized_suffix.end_with?("\n")
-        normalized_suffix = normalized_suffix.sub(
-          /\A(?<prefix>\s*,(?:\s*#.*\n|\s+)*)["'][^"']*["'](?<trailing_comma>\s*,)?/
-        ) do
-          Regexp.last_match[:trailing_comma] ? Regexp.last_match[:prefix] : ""
+        version_arg_pattern = /\A(?<prefix>\s*,(?:\s*#.*\n|\s++)*)["'][^"']*["'](?<trailing_comma>\s*,)?/
+        loop do
+          updated_suffix = normalized_suffix.sub(version_arg_pattern) do
+            Regexp.last_match[:trailing_comma] ? Regexp.last_match[:prefix] : ""
+          end
+          break if updated_suffix == normalized_suffix
+
+          normalized_suffix = updated_suffix
         end
         normalized_suffix = normalized_suffix.sub(/\A,[ \t]{2,}/, ", ")
         normalized_suffix = normalized_suffix.sub(/\)(\s*(?:#.*)?\n)\z/, '\1') if parenthesized_gem_call
