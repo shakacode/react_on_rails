@@ -81,16 +81,16 @@ export default function masterRun(runningConfig?: Partial<Config>) {
   let isAbortingForStartupFailure = false;
   let fatalStartupFailure: { workerId: number; failure: WorkerStartupFailureMessage } | null = null;
 
-  for (let i = 0; i < workersCount; i += 1) {
-    cluster.fork();
-  }
-
   cluster.on('message', (worker, message) => {
     if (!isWorkerStartupFailureMessage(message) || isAbortingForStartupFailure) return;
 
     isAbortingForStartupFailure = true;
     fatalStartupFailure = { workerId: worker.id, failure: message };
   });
+
+  for (let i = 0; i < workersCount; i += 1) {
+    cluster.fork();
+  }
 
   // Listen for dying workers:
   cluster.on('exit', (worker) => {
@@ -102,10 +102,11 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
     if (isAbortingForStartupFailure) {
       const failure = fatalStartupFailure?.failure;
+      const failedWorkerId = fatalStartupFailure?.workerId ?? worker.id;
       const msg =
         failure?.code === 'EADDRINUSE'
           ? `Node renderer startup failed: port ${failure.port} is already in use`
-          : `Node renderer startup failed in worker ${worker.id}: ${failure?.message || `exit code ${worker.process.exitCode}`}`;
+          : `Node renderer startup failed in worker ${failedWorkerId}: ${failure?.message || `exit code ${worker.process.exitCode}`}`;
 
       errorReporter.message(msg);
       process.exit(1);

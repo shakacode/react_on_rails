@@ -12,9 +12,18 @@ export interface WorkerStartupFailureMessage {
 }
 
 export function isWorkerStartupFailureMessage(value: unknown): value is WorkerStartupFailureMessage {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const message = value as Partial<WorkerStartupFailureMessage>;
+
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { type?: string }).type === WORKER_STARTUP_FAILURE
+    message.type === WORKER_STARTUP_FAILURE &&
+    message.stage === 'listen' &&
+    typeof message.host === 'string' &&
+    typeof message.port === 'number' &&
+    !Number.isNaN(message.port) &&
+    typeof message.message === 'string'
   );
 }
