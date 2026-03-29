@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import {
@@ -35,6 +34,19 @@ function buildRouter(): TanStackRouter {
     dehydrate: jest.fn().mockReturnValue({ matches: [{ id: 'products' }] }),
     hydrate: jest.fn(),
   };
+}
+
+type ActCallback = () => void | Promise<void>;
+
+async function compatAct(callback: ActCallback): Promise<void> {
+  const reactAct = (React as typeof React & { act?: (cb: ActCallback) => Promise<unknown> | unknown }).act;
+  if (typeof reactAct === 'function') {
+    await reactAct(callback);
+    return;
+  }
+
+  const { act } = await import('react-dom/test-utils');
+  await act(callback);
 }
 
 describe('tanstack-router integration (Pro)', () => {
@@ -313,7 +325,7 @@ describe('tanstack-router integration (Pro)', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    await act(async () => {
+    await compatAct(async () => {
       root.render(React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props));
     });
 
@@ -324,7 +336,7 @@ describe('tanstack-router integration (Pro)', () => {
       throw new Error('Expected router.load to be invoked during hydration.');
     }
 
-    await act(async () => {
+    await compatAct(async () => {
       resolveLoad?.();
       // Two ticks: one to settle .catch(), one to run .finally().
       await Promise.resolve();
@@ -333,7 +345,7 @@ describe('tanstack-router integration (Pro)', () => {
 
     expect(router.ssr).toBeUndefined();
 
-    await act(async () => {
+    await compatAct(async () => {
       root.unmount();
     });
   });

@@ -126,11 +126,21 @@ What it does:
   1. Creates a new Rails app with PostgreSQL
   2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for --pro/--rsc)
   3. Runs the React on Rails generator (Shakapacker, components, webpack config)
+  4. Creates educational git commits for each major scaffold step
 
 After setup, run bin/dev and visit:
-  - http://localhost:3000/hello_world (default and --pro)
-  - http://localhost:3000/hello_server (--rsc)
+  - http://localhost:3000 (generated home page)
+  - /hello_world (default and --pro example page)
+  - /hello_server (--rsc example page)
 
+Inspect the generated setup history with:
+  - git log --oneline --reverse
+
+The generated app includes one git commit per logical setup step.`,
+  )
+  .addHelpText(
+    'after',
+    `
 --pro and --rsc support both JavaScript and TypeScript templates.
 
 Documentation: https://reactonrails.com/docs/`,

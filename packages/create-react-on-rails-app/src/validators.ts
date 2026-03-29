@@ -97,6 +97,23 @@ export function validateRails(): ValidationResult {
   return { valid: true, message: firstLine };
 }
 
+export function validateGit(): ValidationResult {
+  const gitVersion = getCommandVersion('git');
+
+  if (!gitVersion) {
+    return {
+      valid: false,
+      message:
+        'git is not installed or not found in PATH.\n\n' +
+        'create-react-on-rails-app now records the generated app as a step-by-step git history.\n' +
+        'Install git, then try again:\n' +
+        '  https://git-scm.com/downloads',
+    };
+  }
+
+  return { valid: true, message: gitVersion.split('\n')[0].trim() };
+}
+
 export function validatePackageManager(pm: 'npm' | 'pnpm'): ValidationResult {
   const version = getCommandVersion(pm);
 
@@ -120,6 +137,7 @@ export function validateAll(packageManager: 'npm' | 'pnpm'): PrerequisiteResults
     { name: 'Node.js', result: validateNode() },
     { name: 'Ruby', result: validateRuby() },
     { name: 'Rails', result: validateRails() },
+    { name: 'git', result: validateGit() },
     { name: 'Package Manager', result: validatePackageManager(packageManager) },
   ];
 

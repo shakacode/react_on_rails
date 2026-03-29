@@ -146,12 +146,130 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.renderer_password).to eq(password)
       end
 
-      it "is blank if not provided in the URL" do
+      it "is blank if not provided in the URL in development" do
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("development")
+
         ReactOnRailsPro.configure do |config|
           config.renderer_url = "https://localhost:3800"
         end
 
         expect(ReactOnRailsPro.configuration.renderer_password).to be_nil
+      end
+
+      context "when using NodeRenderer in production-like environments" do
+        before do
+          allow(ENV).to receive(:[]).and_call_original
+        end
+
+        it "raises an error if no password is set in production" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
+
+        it "raises an error if no password is set in staging" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("staging")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
+
+        it "raises when RAILS_ENV is unset (fail-closed, matching Node-side behavior)" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return(nil)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
+
+        it "does not raise when password is explicitly set in production" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "secure-password"
+            end
+          end.not_to raise_error
+        end
+
+        it "does not raise when password is embedded in the renderer URL in production" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://:secure-password@localhost:3800"
+            end
+          end.not_to raise_error
+        end
+
+        it "raises when renderer_password is explicitly set to blank in production" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = ""
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
+      end
+
+      context "when using NodeRenderer in development/test environments" do
+        before do
+          allow(ENV).to receive(:[]).and_call_original
+        end
+
+        it "does not raise in development even without a password" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("development")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+
+        it "does not raise in test even without a password" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("test")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+      end
+
+      context "when using ExecJS renderer" do
+        it "does not raise in production without a password" do
+          allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "ExecJS"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
       end
     end
 

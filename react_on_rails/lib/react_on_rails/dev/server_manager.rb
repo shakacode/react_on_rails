@@ -1,9 +1,14 @@
 # frozen_string_literal: true
 
 require "English"
+require "fileutils"
 require "open3"
+require "optparse"
 require "rainbow"
 require "erb"
+require "rbconfig"
+require "socket"
+require "time"
 require "yaml"
 require_relative "../packer_utils"
 require_relative "database_checker"
@@ -14,22 +19,32 @@ module ReactOnRails
     class ServerManager
       HELP_FLAGS = ["-h", "--help"].freeze
       TEST_WATCH_MODES = %w[auto full client-only].freeze
+      OPEN_BROWSER_WAIT_TIMEOUT = 60
+      OPEN_BROWSER_POLL_INTERVAL = 0.5
+      # Relative to Dir.pwd; bin/dev is expected to run from the Rails app root.
+      OPEN_BROWSER_ONCE_MARKER = File.join("tmp", "react_on_rails", "browser_opened_once").freeze
 
       class << self
         def start(mode = :development, procfile = nil, verbose: false, route: nil, rails_env: nil,
-                  skip_database_check: false)
+                  skip_database_check: false, open_browser: false, open_browser_once: false)
           case mode
           when :production_like
             run_production_like(_verbose: verbose, route: route, rails_env: rails_env,
-                                skip_database_check: skip_database_check)
+                                skip_database_check: skip_database_check,
+                                open_browser: open_browser,
+                                open_browser_once: open_browser_once)
           when :static
             procfile ||= "Procfile.dev-static-assets"
             run_static_development(procfile, verbose: verbose, route: route,
-                                             skip_database_check: skip_database_check)
+                                             skip_database_check: skip_database_check,
+                                             open_browser: open_browser,
+                                             open_browser_once: open_browser_once)
           when :development, :hmr
             procfile ||= "Procfile.dev"
             run_development(procfile, verbose: verbose, route: route,
-                                      skip_database_check: skip_database_check)
+                                      skip_database_check: skip_database_check,
+                                      open_browser: open_browser,
+                                      open_browser_once: open_browser_once)
           else
             raise ArgumentError, "Unknown mode: #{mode}"
           end
@@ -159,10 +174,8 @@ module ReactOnRails
         # Flags that take a value as the next argument (not using = syntax)
         FLAGS_WITH_VALUES = %w[--route --rails-env --test-watch-mode].freeze
 
-        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+        # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
         def run_from_command_line(args = ARGV)
-          require "optparse"
-
           # Get the command early to check for help/kill before running hooks
           # We need to do this before OptionParser processes flags like -h/--help
           # Skip arguments that are values for flags (e.g., "hello_world" after "--route")
@@ -171,37 +184,7 @@ module ReactOnRails
           # Check if help flags are present in args (before OptionParser processes them)
           help_requested = args.any? { |arg| HELP_FLAGS.include?(arg) }
 
-          options = { route: nil, rails_env: nil, verbose: false, skip_database_check: false, test_watch_mode: "auto" }
-
-          OptionParser.new do |opts|
-            opts.banner = "Usage: dev [command] [options]"
-
-            opts.on("--route ROUTE", "Specify the route to display in URLs (default: root)") do |route|
-              options[:route] = route
-            end
-
-            opts.on("--rails-env ENV", "Override RAILS_ENV for assets:precompile step only (prod mode only)") do |env|
-              options[:rails_env] = env
-            end
-
-            opts.on("-v", "--verbose", "Enable verbose output for pack generation") do
-              options[:verbose] = true
-            end
-
-            opts.on("--skip-database-check", "Skip database connectivity check (saves ~1-2s startup time)") do
-              options[:skip_database_check] = true
-            end
-
-            opts.on("--test-watch-mode MODE",
-                    "For `bin/dev test-watch`: auto (default), full, or client-only") do |mode|
-              options[:test_watch_mode] = mode
-            end
-
-            opts.on("-h", "--help", "Prints this help") do
-              show_help
-              exit
-            end
-          end.parse!(args)
+          options = parse_cli_options(args)
 
           # Run precompile hook once before starting any mode (except kill/help)
           # Then set environment variable to prevent duplicate execution in spawned processes.
@@ -218,10 +201,14 @@ module ReactOnRails
           when "production-assets", "prod"
             start(:production_like, nil, verbose: options[:verbose], route: options[:route],
                                          rails_env: options[:rails_env],
-                                         skip_database_check: options[:skip_database_check])
+                                         skip_database_check: options[:skip_database_check],
+                                         open_browser: options[:open_browser],
+                                         open_browser_once: options[:open_browser_once])
           when "static"
             start(:static, "Procfile.dev-static-assets", verbose: options[:verbose], route: options[:route],
-                                                         skip_database_check: options[:skip_database_check])
+                                                         skip_database_check: options[:skip_database_check],
+                                                         open_browser: options[:open_browser],
+                                                         open_browser_once: options[:open_browser_once])
           when "kill"
             kill_processes
           when "help"
@@ -230,14 +217,16 @@ module ReactOnRails
             run_test_watch(test_watch_mode: options[:test_watch_mode])
           when "hmr", nil
             start(:development, "Procfile.dev", verbose: options[:verbose], route: options[:route],
-                                                skip_database_check: options[:skip_database_check])
+                                                skip_database_check: options[:skip_database_check],
+                                                open_browser: options[:open_browser],
+                                                open_browser_once: options[:open_browser_once])
           else
             puts "Unknown argument: #{command}"
             puts "Run 'dev help' for usage information"
             exit 1
           end
         end
-        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength
+        # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
         private
 
@@ -497,6 +486,9 @@ module ReactOnRails
               #{Rainbow('--rails-env ENV').green.bold}      #{Rainbow('Override RAILS_ENV for assets:precompile step only (prod mode only)').white}
               #{Rainbow('--verbose, -v').green.bold}        #{Rainbow('Enable verbose output for pack generation').white}
               #{Rainbow('--skip-database-check').green.bold} #{Rainbow('Skip database connectivity check (saves ~1-2s startup time)').white}
+              #{Rainbow('--open-browser').green.bold}       #{Rainbow('Open the app URL in your browser when the server is ready').white}
+              #{Rainbow('--open-browser-once').green.bold}  #{Rainbow('Open the app once, then remember that it was already opened').white}
+              #{Rainbow('--no-open-browser').green.bold}    #{Rainbow('Disable automatic browser opening for this run').white}
               #{Rainbow('--test-watch-mode MODE').green.bold} #{Rainbow('For test-watch: auto, full, or client-only').white}
 
             #{Rainbow('📝 EXAMPLES:').cyan.bold}
@@ -504,6 +496,8 @@ module ReactOnRails
               #{Rainbow('bin/dev prod --rails-env=production').green.bold}  #{Rainbow('# NODE_ENV=production, RAILS_ENV=production').white}
               #{Rainbow('bin/dev prod --route=dashboard').green.bold}       #{Rainbow('# Custom route in URLs').white}
               #{Rainbow('bin/dev --skip-database-check').green.bold}        #{Rainbow('# Skip DB check for faster startup').white}
+              #{Rainbow('bin/dev --open-browser').green.bold}               #{Rainbow('# Open the app after the server comes up').white}
+              #{Rainbow('bin/dev --no-open-browser').green.bold}            #{Rainbow('# Override generated auto-open behavior').white}
               #{Rainbow('bin/dev test-watch').green.bold}                    #{Rainbow('# Auto-select full/client-only test watch').white}
               #{Rainbow('bin/dev test-watch --test-watch-mode=full').green.bold} #{Rainbow('# Always build server+client test bundles').white}
           OPTIONS
@@ -595,7 +589,8 @@ module ReactOnRails
         # rubocop:enable Metrics/AbcSize
 
         # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-        def run_production_like(_verbose: false, route: nil, rails_env: nil, skip_database_check: false)
+        def run_production_like(_verbose: false, route: nil, rails_env: nil, skip_database_check: false,
+                                open_browser: false, open_browser_once: false)
           procfile = "Procfile.dev-prod-assets"
 
           # Set PORT before foreman starts — foreman injects its own PORT=5000
@@ -671,6 +666,10 @@ module ReactOnRails
           if status.success?
             puts "✅ Assets precompiled successfully"
             ensure_default_port(procfile)
+            schedule_browser_open_if_requested(procfile,
+                                               route: route,
+                                               open_browser: open_browser,
+                                               open_browser_once: open_browser_once)
             ProcessManager.ensure_procfile(procfile)
             ProcessManager.run_with_process_manager(procfile)
           else
@@ -742,7 +741,8 @@ module ReactOnRails
         end
         # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-        def run_static_development(procfile, verbose: false, route: nil, skip_database_check: false)
+        def run_static_development(procfile, verbose: false, route: nil, skip_database_check: false,
+                                   open_browser: false, open_browser_once: false)
           # Check database setup before starting
           exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
 
@@ -774,11 +774,16 @@ module ReactOnRails
 
           PackGenerator.generate(verbose: verbose)
           ensure_default_port(procfile)
+          schedule_browser_open_if_requested(procfile,
+                                             route: route,
+                                             open_browser: open_browser,
+                                             open_browser_once: open_browser_once)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
 
-        def run_development(procfile, verbose: false, route: nil, skip_database_check: false)
+        def run_development(procfile, verbose: false, route: nil, skip_database_check: false,
+                            open_browser: false, open_browser_once: false)
           # Check database setup before starting
           exit 1 unless DatabaseChecker.check_database(skip: skip_database_check)
 
@@ -791,6 +796,10 @@ module ReactOnRails
 
           PackGenerator.generate(verbose: verbose)
           ensure_default_port(procfile)
+          schedule_browser_open_if_requested(procfile,
+                                             route: route,
+                                             open_browser: open_browser,
+                                             open_browser_once: open_browser_once)
           ProcessManager.ensure_procfile(procfile)
           ProcessManager.run_with_process_manager(procfile)
         end
@@ -800,7 +809,7 @@ module ReactOnRails
           features.each { |feature| puts "   - #{feature}" }
           puts ""
           puts ""
-          url = route ? "http://localhost:#{port}/#{route}" : "http://localhost:#{port}"
+          url = build_local_url(port, route)
           puts "💡 Access at: #{Rainbow(url).cyan.underline}"
           puts ""
         end
@@ -808,7 +817,7 @@ module ReactOnRails
         def print_procfile_info(procfile, route: nil)
           port = procfile_port(procfile)
           box_width = 60
-          url = route ? "http://localhost:#{port}/#{route}" : "http://localhost:#{port}"
+          url = build_local_url(port, route)
 
           puts ""
           puts box_border(box_width)
@@ -846,12 +855,208 @@ module ReactOnRails
           ENV["PORT"] = procfile_port(procfile).to_s
         end
 
+        def schedule_browser_open_if_requested(procfile, route:, open_browser:, open_browser_once:)
+          return unless open_browser || open_browser_once
+
+          # --open-browser and --open-browser-once share scheduling, but only the latter writes
+          # the marker so explicit --open-browser continues to open on each invocation.
+          schedule_browser_open(procfile_port(procfile), route: route, once: open_browser_once)
+        end
+
+        def build_local_url(port, route)
+          normalized_route = route.to_s.strip
+          return "http://localhost:#{port}" if normalized_route.empty? || normalized_route == "/"
+
+          normalized_route = normalized_route.sub(%r{\A/+}, "")
+          "http://localhost:#{port}/#{normalized_route}"
+        end
+
+        def schedule_browser_open(port, route:, once:)
+          return unless browser_auto_open_allowed?
+
+          url = build_local_url(port, route)
+          Thread.new do
+            next unless wait_for_server_on_port(port)
+
+            marker_state = prepare_browser_open_once_marker(once)
+            next if marker_state == :already_opened
+
+            if open_browser(url)
+              nil
+            else
+              clear_browser_open_once_marker_if_claimed(marker_state)
+              warn("[react_on_rails] Could not open browser automatically. Visit #{url} manually.")
+            end
+          rescue StandardError => e
+            warn("[react_on_rails] Browser auto-open failed: #{e.message}")
+          end
+        end
+
+        def browser_auto_open_allowed?
+          !ENV.key?("CI") && $stdin.tty? && $stdout.tty?
+        end
+
+        def wait_for_server_on_port(port)
+          deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + OPEN_BROWSER_WAIT_TIMEOUT
+
+          loop do
+            return true if localhost_port_open?(port)
+            return false if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+            sleep OPEN_BROWSER_POLL_INTERVAL
+          end
+        end
+
+        def localhost_port_open?(port)
+          %w[127.0.0.1 ::1].any? do |host|
+            Socket.tcp(host, port, connect_timeout: 1) do
+              true
+            end
+          rescue StandardError
+            false
+          end
+        end
+
+        def open_browser(url)
+          command = browser_command
+          return false unless command
+
+          system(*command, url, out: File::NULL, err: File::NULL)
+        rescue StandardError
+          false
+        end
+
+        def browser_command
+          host_os = RbConfig::CONFIG["host_os"]
+          return ["open"] if host_os.include?("darwin")
+
+          if %w[linux bsd].any? { |platform| host_os.include?(platform) } && command_available?("xdg-open")
+            return ["xdg-open"]
+          end
+
+          # "start" requires a window title before the URL; the empty string is the
+          # conventional placeholder so Windows opens the browser instead of treating
+          # the URL as the title.
+          return ["cmd", "/c", "start", ""] if %w[mswin mingw cygwin].any? { |platform| host_os.include?(platform) }
+
+          nil
+        end
+
+        def command_available?(command)
+          ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? do |directory|
+            executable = File.join(directory, command)
+            File.file?(executable) && File.executable?(executable)
+          end
+        end
+
+        def prepare_browser_open_once_marker(once)
+          return :not_requested unless once
+
+          FileUtils.mkdir_p(File.dirname(OPEN_BROWSER_ONCE_MARKER))
+          File.open(OPEN_BROWSER_ONCE_MARKER, File::WRONLY | File::CREAT | File::EXCL) do |marker|
+            marker.write("#{Time.now.utc.iso8601}\n")
+          end
+          :claimed
+        rescue Errno::EEXIST
+          :already_opened
+        rescue StandardError => e
+          warn("[react_on_rails] Could not write browser-opened marker: #{e.message}")
+          :untracked
+        end
+
+        def clear_browser_open_once_marker_if_claimed(marker_state)
+          return unless marker_state == :claimed
+
+          File.delete(OPEN_BROWSER_ONCE_MARKER)
+        rescue Errno::ENOENT
+          nil
+        rescue StandardError => e
+          warn("[react_on_rails] Could not remove browser-opened marker: #{e.message}")
+          nil
+        end
+
         def box_border(width)
           "┌#{'─' * (width - 2)}┐"
         end
 
         def box_bottom(width)
           "└#{'─' * (width - 2)}┘"
+        end
+
+        def parse_cli_options(args)
+          options = default_cli_options
+          build_option_parser(options).parse!(args)
+          options
+        end
+
+        def default_cli_options
+          {
+            route: nil,
+            rails_env: nil,
+            verbose: false,
+            skip_database_check: false,
+            test_watch_mode: "auto",
+            open_browser: false,
+            open_browser_once: false
+          }
+        end
+
+        def build_option_parser(options)
+          OptionParser.new do |opts|
+            opts.banner = "Usage: dev [command] [options]"
+            register_cli_flag_options(opts, options)
+            register_browser_cli_options(opts, options)
+            register_help_option(opts)
+          end
+        end
+
+        def register_cli_flag_options(opts, options)
+          opts.on("--route ROUTE", "Specify the route to display in URLs (default: root)") do |route|
+            options[:route] = route
+          end
+
+          opts.on("--rails-env ENV", "Override RAILS_ENV for assets:precompile step only (prod mode only)") do |env|
+            options[:rails_env] = env
+          end
+
+          opts.on("-v", "--verbose", "Enable verbose output for pack generation") do
+            options[:verbose] = true
+          end
+
+          opts.on("--skip-database-check", "Skip database connectivity check (saves ~1-2s startup time)") do
+            options[:skip_database_check] = true
+          end
+
+          opts.on("--test-watch-mode MODE", "For `bin/dev test-watch`: auto (default), full, or client-only") do |mode|
+            options[:test_watch_mode] = mode
+          end
+        end
+
+        def register_browser_cli_options(opts, options)
+          # OptionParser applies flags left-to-right, so later browser flags intentionally
+          # override earlier ones when callers pass multiple variants together.
+          opts.on("--open-browser", "Open the app in your browser once the server is reachable") do
+            options[:open_browser] = true
+            options[:open_browser_once] = false
+          end
+
+          opts.on("--open-browser-once",
+                  "Open the app in your browser after the first successful boot only") do
+            options[:open_browser_once] = true
+            options[:open_browser] = false
+          end
+
+          opts.on("--no-open-browser", "Disable automatic browser opening for this run") do
+            options[:open_browser] = false
+            options[:open_browser_once] = false
+          end
+        end
+
+        def register_help_option(opts)
+          opts.on("-h", "--help", "Prints this help") do
+            show_help
+            exit
+          end
         end
 
         def box_empty_line(width)
