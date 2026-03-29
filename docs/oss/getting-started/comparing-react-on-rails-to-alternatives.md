@@ -1,3 +1,7 @@
+---
+sidebar_label: 'Decision Guide'
+---
+
 # Comparing React on Rails to Alternatives
 
 If you are evaluating frontend approaches for a Rails application, the right choice depends on how much of your UI should live in React, how much Rails should keep rendering, and whether server rendering is a requirement from day one.

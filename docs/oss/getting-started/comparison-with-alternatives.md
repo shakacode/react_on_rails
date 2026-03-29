@@ -1,3 +1,7 @@
+---
+sidebar_label: 'Feature Matrix & Benchmarks'
+---
+
 # Comparison with Alternatives
 
 Choosing a React integration strategy for Rails? This guide compares React on Rails (OSS and Pro) with the main alternatives so you can make an informed decision.

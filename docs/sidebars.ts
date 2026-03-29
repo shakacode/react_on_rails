@@ -172,11 +172,7 @@ const sidebars: SidebarsConfig = {
       label: 'Upgrading',
       items: [
         'upgrading/upgrading-react-on-rails',
-        {
-          type: 'link',
-          label: 'Full Changelog (GitHub)',
-          href: 'https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md',
-        },
+        { type: 'doc', id: 'upgrading/changelog', label: 'Full Changelog' },
         {
           type: 'category',
           label: 'Release Notes',
