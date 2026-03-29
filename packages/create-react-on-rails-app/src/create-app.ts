@@ -210,9 +210,16 @@ function rewriteFileIfPresent(filePath: string, transform: (contents: string) =>
   }
 }
 
-function readInstalledRailsGitTemplate(appPath: string, templateName: 'gitignore.tt' | 'gitattributes.tt'): string | null {
+function readInstalledRailsGitTemplate(
+  appPath: string,
+  templateName: 'gitignore.tt' | 'gitattributes.tt',
+): string | null {
   try {
-    const renderedTemplate = execCaptureArgs('ruby', ['-e', RAILS_GIT_TEMPLATE_RENDERER, templateName], appPath);
+    const renderedTemplate = execCaptureArgs(
+      'ruby',
+      ['-e', RAILS_GIT_TEMPLATE_RENDERER, templateName],
+      appPath,
+    );
     return renderedTemplate.length > 0 ? `${renderedTemplate}\n` : null;
   } catch {
     return null;

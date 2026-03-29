@@ -78,6 +78,7 @@ describe InstallGenerator, type: :generator do
         expect(content).to include('root to: "home#index"')
       end
       assert_file "app/controllers/home_controller.rb" do |content|
+        expect(content).to include("protect_from_forgery with: :exception")
         expect(content).to include("def index; end")
       end
       assert_file "app/views/home/index.html.erb" do |content|

@@ -3,6 +3,7 @@
 require "English"
 require "fileutils"
 require "open3"
+require "optparse"
 require "rainbow"
 require "erb"
 require "rbconfig"
@@ -870,15 +871,22 @@ module ReactOnRails
 
         def schedule_browser_open(port, route:, once:)
           return unless browser_auto_open_allowed?
-          return if once && File.exist?(OPEN_BROWSER_ONCE_MARKER)
 
           url = build_local_url(port, route)
           Thread.new do
-            Thread.current.report_on_exception = false if Thread.current.respond_to?(:report_on_exception=)
             next unless wait_for_server_on_port(port)
-            next unless open_browser(url)
 
-            mark_browser_opened_once if once
+            marker_state = prepare_browser_open_once_marker(once)
+            next if marker_state == :already_opened
+
+            if open_browser(url)
+              nil
+            else
+              clear_browser_open_once_marker_if_claimed(marker_state)
+              warn("[react_on_rails] Could not open browser automatically. Visit #{url} manually.")
+            end
+          rescue StandardError => e
+            warn("[react_on_rails] Browser auto-open failed: #{e.message}")
           end
         end
 
@@ -899,12 +907,13 @@ module ReactOnRails
 
         def localhost_port_open?(port)
           %w[127.0.0.1 ::1].any? do |host|
-            Socket.tcp(host, port, connect_timeout: 1) do |socket|
-              socket.close
-              true
+            begin
+              Socket.tcp(host, port, connect_timeout: 1) do
+                true
+              end
+            rescue StandardError
+              false
             end
-          rescue StandardError
-            false
           end
         end
 
@@ -940,10 +949,29 @@ module ReactOnRails
           end
         end
 
-        def mark_browser_opened_once
+        def prepare_browser_open_once_marker(once)
+          return :not_requested unless once
+
           FileUtils.mkdir_p(File.dirname(OPEN_BROWSER_ONCE_MARKER))
-          File.write(OPEN_BROWSER_ONCE_MARKER, "#{Time.now.utc.iso8601}\n")
-        rescue StandardError
+          File.open(OPEN_BROWSER_ONCE_MARKER, File::WRONLY | File::CREAT | File::EXCL) do |marker|
+            marker.write("#{Time.now.utc.iso8601}\n")
+          end
+          :claimed
+        rescue Errno::EEXIST
+          :already_opened
+        rescue StandardError => e
+          warn("[react_on_rails] Could not write browser-opened marker: #{e.message}")
+          :untracked
+        end
+
+        def clear_browser_open_once_marker_if_claimed(marker_state)
+          return unless marker_state == :claimed
+
+          File.delete(OPEN_BROWSER_ONCE_MARKER)
+        rescue Errno::ENOENT
+          nil
+        rescue StandardError => e
+          warn("[react_on_rails] Could not remove browser-opened marker: #{e.message}")
           nil
         end
 
@@ -956,8 +984,6 @@ module ReactOnRails
         end
 
         def parse_cli_options(args)
-          require "optparse"
-
           options = default_cli_options
           build_option_parser(options).parse!(args)
           options
@@ -1007,6 +1033,8 @@ module ReactOnRails
         end
 
         def register_browser_cli_options(opts, options)
+          # OptionParser applies flags left-to-right, so later browser flags intentionally
+          # override earlier ones when callers pass multiple variants together.
           opts.on("--open-browser", "Open the app in your browser once the server is reachable") do
             options[:open_browser] = true
             options[:open_browser_once] = false

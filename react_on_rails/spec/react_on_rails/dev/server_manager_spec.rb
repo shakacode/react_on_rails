@@ -944,6 +944,26 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         described_class.run_from_command_line(["--open-browser-once"])
       end
 
+      it "lets later browser flags win when --open-browser-once comes last" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(open_browser: false, open_browser_once: true)
+        )
+
+        described_class.run_from_command_line(["--open-browser", "--open-browser-once"])
+      end
+
+      it "lets later browser flags win when --open-browser comes last" do
+        expect(described_class).to receive(:start).with(
+          :development,
+          "Procfile.dev",
+          hash_including(open_browser: true, open_browser_once: false)
+        )
+
+        described_class.run_from_command_line(["--open-browser-once", "--open-browser"])
+      end
+
       it "lets --no-open-browser override generated auto-open flags" do
         expect(described_class).to receive(:start).with(
           :development,
@@ -975,6 +995,56 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           described_class.run_from_command_line(["invalid_command"])
         end.to output("Unknown argument: invalid_command\nRun 'dev help' for usage information\n").to_stdout
       end
+    end
+  end
+
+  describe ".schedule_browser_open" do
+    let(:marker_dir) { Dir.mktmpdir }
+
+    around do |example|
+      example.run
+    ensure
+      FileUtils.remove_entry(marker_dir)
+    end
+
+    before do
+      stub_const("#{described_class}::OPEN_BROWSER_ONCE_MARKER", File.join(marker_dir, "browser_opened_once"))
+      allow(described_class).to receive(:browser_auto_open_allowed?).and_return(true)
+      allow(described_class).to receive(:wait_for_server_on_port).and_return(true)
+    end
+
+    it "warns when automatic browser opening fails" do
+      allow(described_class).to receive(:open_browser).and_return(false)
+      expect(described_class).to receive(:warn).with(
+        "[react_on_rails] Could not open browser automatically. Visit http://localhost:3000 manually."
+      )
+
+      described_class.send(:schedule_browser_open, 3000, route: "/", once: false).join
+    end
+
+    it "warns when the browser-open thread raises unexpectedly" do
+      allow(described_class).to receive(:wait_for_server_on_port).and_raise(SocketError, "boom")
+      expect(described_class).to receive(:warn).with("[react_on_rails] Browser auto-open failed: boom")
+
+      described_class.send(:schedule_browser_open, 3000, route: "/", once: false).join
+    end
+
+    it "does not open the browser again after the once marker is claimed" do
+      allow(described_class).to receive(:open_browser).and_return(true)
+
+      described_class.send(:schedule_browser_open, 3000, route: "/", once: true).join
+      described_class.send(:schedule_browser_open, 3000, route: "/", once: true).join
+
+      expect(described_class).to have_received(:open_browser).once
+    end
+
+    it "removes a claimed once marker when browser opening fails" do
+      allow(described_class).to receive(:open_browser).and_return(false)
+      allow(described_class).to receive(:warn)
+
+      described_class.send(:schedule_browser_open, 3000, route: "/", once: true).join
+
+      expect(File.exist?(described_class::OPEN_BROWSER_ONCE_MARKER)).to be(false)
     end
   end
 
