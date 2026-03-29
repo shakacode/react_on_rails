@@ -260,8 +260,6 @@ export default function ProductList({ initialProducts }) {
 
 > **Alternative:** For complex cases with many queries, you can use TanStack Query's `dehydrate`/`HydrationBoundary` pattern to prefetch and seed the entire QueryClient cache on the server. See the [TanStack Query SSR docs](https://tanstack.com/query/latest/docs/framework/react/guides/ssr) for details.
 
-> **Alternative:** For complex cases with many queries, you can use TanStack Query's `dehydrate`/`HydrationBoundary` pattern to prefetch and seed the entire QueryClient cache on the server. See the [TanStack Query SSR docs](https://tanstack.com/query/latest/docs/framework/react/guides/ssr) for details.
-
 ## Migrating from SWR
 
 SWR follows a similar pattern -- pass Rails controller props as `fallbackData` so the component renders instantly with server data:
