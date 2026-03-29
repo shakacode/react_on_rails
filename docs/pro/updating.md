@@ -91,6 +91,8 @@ const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails
 
 ### Migration Steps
 
+> **Version note:** The examples below use `16.5.1` for illustration. Check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version and substitute it in the commands below.
+
 #### Step 1: Update Gemfile
 
 **Remove** the GitHub Packages source and use standard gem installation:
@@ -99,7 +101,7 @@ const { reactOnRailsProNodeRenderer } = require('@shakacode-tools/react-on-rails
 - source "https://rubygems.pkg.github.com/shakacode-tools" do
 -   gem "react_on_rails_pro", "16.1.1"
 - end
-+ gem "react_on_rails_pro", "16.4.0"
++ gem "react_on_rails_pro", "16.5.1"
 ```
 
 Then run:
@@ -129,9 +131,9 @@ rm .npmrc
 ```diff
 {
   "dependencies": {
-+   "react-on-rails-pro": "16.4.0",
++   "react-on-rails-pro": "16.5.1",
 -   "@shakacode-tools/react-on-rails-pro-node-renderer": "16.1.1"
-+   "react-on-rails-pro-node-renderer": "16.4.0"
++   "react-on-rails-pro-node-renderer": "16.5.1"
   }
 }
 ```
@@ -268,8 +270,8 @@ If your app overrides `custom_rsc_payload_template`, make sure that override res
 `react_on_rails_pro` declares `react_on_rails` as a dependency, so you do not need a separate `gem "react_on_rails"` line in your Gemfile when using Pro. Remove it to avoid confusion about which line controls the version:
 
 ```diff
-- gem "react_on_rails", "16.4.0"
-  gem "react_on_rails_pro", "16.4.0"
+- gem "react_on_rails", "16.5.1"
+  gem "react_on_rails_pro", "16.5.1"
 ```
 
 ### Verify Migration
