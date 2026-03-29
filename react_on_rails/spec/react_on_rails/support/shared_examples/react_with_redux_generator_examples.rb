@@ -11,6 +11,10 @@ shared_examples "react_with_redux_generator" do
   it "creates appropriate templates" do
     assert_file("app/views/hello_world/index.html.erb") do |contents|
       expect(contents).to match(/"HelloWorldApp"/)
+      expect(contents).to include("Redux SSR Demo")
+      expect(contents).to include("Redux store bootstrapping")
+      expect(contents).to include("Inspect these files next")
+      expect(contents).to include("Compare OSS and Pro")
     end
   end
 

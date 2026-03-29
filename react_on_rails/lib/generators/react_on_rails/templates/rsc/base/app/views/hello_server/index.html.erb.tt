@@ -142,7 +142,7 @@
 
 <div class="ror-demo-page">
   <section class="hero">
-    <p class="eyebrow">React on Rails</p>
+    <p class="eyebrow">React on Rails Pro</p>
     <h1><%= config[:title] %></h1>
     <p class="lead"><%= config[:intro] %></p>
 
@@ -158,7 +158,7 @@
   </section>
 
   <section class="demo-surface">
-    <%%= react_component("<%= config[:component_name] %>", props: @hello_world_props, prerender: true) %>
+    <%%= stream_react_component("HelloServer", props: @hello_server_props) %>
   </section>
 
   <section class="grid">

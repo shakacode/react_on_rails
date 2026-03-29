@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "generator_messages"
+require_relative "demo_page_config"
 
 module ReactOnRails
   module Generators
@@ -22,6 +23,8 @@ module ReactOnRails
     # - detect_react_version: Detects installed React version
     #
     module RscSetup # rubocop:disable Metrics/ModuleLength
+      include DemoPageConfig
+
       DEFAULT_LAYOUT_NAME = "react_on_rails_default"
       LEGACY_LAYOUT_NAME = "hello_world"
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
@@ -251,7 +254,12 @@ module ReactOnRails
         # Create views directory if needed
         empty_directory("app/views/hello_server")
 
-        copy_file("templates/rsc/base/app/views/hello_server/index.html.erb", view_path)
+        template("templates/rsc/base/app/views/hello_server/index.html.erb.tt",
+                 view_path,
+                 build_hello_server_view_config(
+                   landing_page: new_app_landing_page_available?,
+                   redux_demo: options[:redux]
+                 ))
 
         say "✅ Created #{view_path}", :green
       end

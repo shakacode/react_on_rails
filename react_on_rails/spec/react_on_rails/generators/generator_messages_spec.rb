@@ -49,6 +49,18 @@ describe GeneratorMessages do
     expect(message).to include('react_component("HelloWorld", props: @hello_world_props, prerender: true)')
   end
 
+  it "points fresh-app installs at the landing page" do
+    message = described_class.helpful_message_after_installation(
+      component_name: "HelloWorld",
+      route: "hello_world",
+      landing_page: true
+    )
+
+    expect(message).to include("http://localhost:3000")
+    expect(message).not_to include("http://localhost:3000/hello_world")
+    expect(message).to include("Home page includes links to the generated example pages.")
+  end
+
   it "shows Pro upgrade hint for standard (non-Pro) install" do
     message = described_class.helpful_message_after_installation(
       component_name: "HelloWorld",

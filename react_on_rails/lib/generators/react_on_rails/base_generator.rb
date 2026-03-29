@@ -48,6 +48,13 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      # Hidden option: used by create-react-on-rails-app so fresh apps get a
+      # generated home page without changing existing-app installs.
+      class_option :new_app,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       # Keep this map in sync with templates under:
       # lib/generators/react_on_rails/templates/**/config/webpack/*.tt
       MANAGED_WEBPACK_FILE_TEMPLATES = {
@@ -98,6 +105,40 @@ module ReactOnRails
       private_constant :MANAGED_WEBPACK_FILE_TEMPLATES, :REMOVABLE_WEBPACK_FILES, :TemplateRenderContext,
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
 
+      def add_root_route
+        @new_app_root_route_added = false
+        return unless options.new_app?
+
+        if preexisting_root_route?
+          say_status :skip, "Root route already exists; keeping existing root route", :yellow
+          return
+        end
+
+        routes_path = "config/routes.rb"
+        routes_full_path = File.join(destination_root, routes_path)
+        # Support both LF and CRLF route files so new-app onboarding works on Windows checkouts too.
+        routes_draw_declaration = /^\s*Rails\.application\.routes\.draw do\r?\n/
+        unless File.read(routes_full_path).match?(routes_draw_declaration)
+          say_status :warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow
+          return
+        end
+
+        inject_into_file routes_path,
+                         %(  root to: "home#index"\n),
+                         after: routes_draw_declaration
+        if options[:pretend]
+          @new_app_root_route_added = true
+          return
+        end
+
+        if File.read(routes_full_path).include?('root to: "home#index"')
+          @new_app_root_route_added = true
+          return
+        end
+
+        say_status :warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow
+      end
+
       def add_hello_world_route
         # RSC uses HelloServer instead of HelloWorld, but Redux still needs hello_world route
         return if use_rsc? && !options.redux?
@@ -128,10 +169,16 @@ module ReactOnRails
         # HelloWorld controller only when not using RSC (RSC uses HelloServer)
         # Exception: Redux still needs the HelloWorld controller even with RSC
         base_files << "app/controllers/hello_world_controller.rb" unless use_rsc? && !options.redux?
+        base_files << "app/controllers/home_controller.rb" if generate_new_app_home_page?
         base_templates = %w[config/initializers/react_on_rails.rb]
         base_files.each { |file| copy_file("#{base_path}#{file}", file) }
         base_templates.each do |file|
           template("#{base_path}/#{file}.tt", file)
+        end
+
+        if generate_new_app_home_page?
+          empty_directory("app/views/home")
+          template("#{base_path}/app/views/home/index.html.erb.tt", "app/views/home/index.html.erb", home_page_config)
         end
 
         # Make the hook script executable (copy_file guarantees it exists)
@@ -254,6 +301,358 @@ module ReactOnRails
       STR
 
       private
+
+      def generate_new_app_home_page?
+        # Depends on add_root_route running first and setting @new_app_root_route_added.
+        options.new_app? && new_app_root_route_added?
+      end
+
+      def new_app_root_route_added?
+        return false unless options.new_app?
+        return @new_app_root_route_added if defined?(@new_app_root_route_added)
+
+        false
+      end
+
+      def preexisting_root_route?
+        return @preexisting_root_route if defined?(@preexisting_root_route)
+
+        routes_file = File.join(destination_root, "config/routes.rb")
+        @preexisting_root_route = File.file?(routes_file) &&
+                                  File.foreach(routes_file).any? do |line|
+                                    !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
+                                  end
+      end
+
+      def home_page_config
+        docs_url = if use_rsc?
+                     "https://reactonrails.com/docs/pro/react-server-components/"
+                   else
+                     "https://reactonrails.com/docs/"
+                   end
+
+        {
+          app_name: app_name,
+          docs_url: docs_url,
+          examples: home_page_examples,
+          file_hints: home_page_file_hints,
+          stack_badges: home_page_stack_badges,
+          learning_links: home_page_learning_links,
+          pro_cta: home_page_pro_cta,
+          pro_section: home_page_pro_section,
+          rendering_paths: home_page_rendering_paths
+        }
+      end
+
+      def home_page_examples
+        examples = []
+
+        if use_rsc?
+          examples << {
+            label: "Open RSC demo",
+            title: "HelloServer",
+            path: "/hello_server",
+            badge: "RSC",
+            description: "Async React Server Components streamed from Rails " \
+                         "with only client islands shipping JavaScript."
+          }
+        end
+
+        unless use_rsc? && !options.redux?
+          example_description = if options.redux?
+                                  "Redux-backed server rendering with hydration."
+                                else
+                                  "Server-rendered React with hydration and hot reloading."
+                                end
+
+          examples << {
+            label: "Open SSR demo",
+            title: options.redux? ? "HelloWorldApp" : "HelloWorld",
+            path: "/hello_world",
+            badge: "SSR",
+            description: example_description
+          }
+        end
+
+        examples
+      end
+
+      def home_page_file_hints
+        hints = [
+          {
+            path: "app/views/home/index.html.erb",
+            description: "Generated landing page. Replace this once your product has a real root route."
+          },
+          {
+            path: example_source_path,
+            description: "React source for the generated example components."
+          },
+          {
+            path: example_view_path,
+            description: "Rails view that mounts the generated example."
+          },
+          {
+            path: using_rspack? ? "config/rspack/" : "config/webpack/",
+            description: "Bundler configuration generated for this app."
+          },
+          {
+            path: "bin/dev",
+            description: "Launch Rails and the asset watcher together from one command."
+          }
+        ]
+
+        if use_pro?
+          hints << {
+            path: "client/node-renderer.js",
+            description: "Node renderer entrypoint used for Pro SSR and RSC."
+          }
+        end
+
+        hints
+      end
+
+      def home_page_learning_links
+        links = [
+          {
+            title: "Documentation guide",
+            url: "https://reactonrails.com/docs/",
+            description: "Core install, generator, and API docs for the OSS stack."
+          },
+          {
+            title: "Compare OSS and Pro",
+            url: "https://reactonrails.com/docs/getting-started/oss-vs-pro/",
+            description: "See which capabilities stay in OSS and which move into the Pro track."
+          },
+          {
+            title: "Pro quick start",
+            url: "https://reactonrails.com/docs/getting-started/pro-quick-start/",
+            description: "Add the Pro gem and package changes when you are ready for the upgrade."
+          },
+          {
+            title: "Marketplace RSC demo",
+            url: "https://github.com/shakacode/react-server-components-marketplace-demo",
+            description: "Study a larger app comparing traditional SSR, client boundaries, and streamed RSC."
+          }
+        ]
+
+        return links unless use_rsc?
+
+        [
+          {
+            title: "React Server Components guide",
+            url: "https://reactonrails.com/docs/pro/react-server-components/",
+            description: "Read the architecture, rendering flow, and migration guidance for the Pro RSC stack."
+          },
+          {
+            title: "RSC tutorial",
+            url: "https://reactonrails.com/docs/pro/react-server-components/tutorial/",
+            description: "Walk through the generated HelloServer example end to end."
+          }
+        ] + links
+      end
+
+      def home_page_pro_cta
+        if use_rsc?
+          {
+            label: "RSC tutorial",
+            url: "https://reactonrails.com/docs/pro/react-server-components/tutorial/"
+          }
+        elsif use_pro?
+          {
+            label: "See Pro docs",
+            url: "https://reactonrails.com/pro/"
+          }
+        else
+          {
+            label: "Compare OSS and Pro",
+            url: "https://reactonrails.com/docs/getting-started/oss-vs-pro/"
+          }
+        end
+      end
+
+      def home_page_pro_section
+        {
+          eyebrow: use_pro? ? "Included in this app" : "Worth evaluating next",
+          title: use_pro? ? "React on Rails Pro is already wired in" : "Why teams move from OSS to Pro",
+          description: use_pro? ? home_page_pro_description_for_enabled_app : home_page_pro_description_for_oss_app,
+          note: use_pro? ? home_page_pro_note_for_enabled_app : home_page_pro_note_for_oss_app,
+          features: home_page_pro_features,
+          links: home_page_pro_links
+        }
+      end
+
+      def home_page_pro_features
+        [
+          {
+            title: "React Server Components",
+            description: "Stream async server components from Rails and keep JavaScript on the client " \
+                         "only where it adds value."
+          },
+          {
+            title: "Node renderer",
+            description: "Use a Node-based rendering path when you need higher-throughput SSR or " \
+                         "richer runtime support."
+          },
+          {
+            title: "Upgrade path",
+            description: "Compare OSS and Pro, follow the quick start, and study the marketplace " \
+                         "demo before rolling changes into a real app."
+          }
+        ]
+      end
+
+      def home_page_pro_links
+        links = [
+          {
+            label: "React on Rails Pro",
+            url: "https://reactonrails.com/pro/"
+          },
+          {
+            label: "Marketplace demo",
+            url: "https://github.com/shakacode/react-server-components-marketplace-demo"
+          }
+        ]
+
+        if use_rsc?
+          links.unshift(
+            {
+              label: "RSC guide",
+              url: "https://reactonrails.com/docs/pro/react-server-components/"
+            }
+          )
+        else
+          links.unshift(
+            {
+              label: "OSS vs Pro",
+              url: "https://reactonrails.com/docs/getting-started/oss-vs-pro/"
+            }
+          )
+        end
+
+        links
+      end
+
+      def home_page_rendering_paths
+        [
+          home_page_ssr_path,
+          home_page_rsc_path,
+          home_page_compare_path
+        ]
+      end
+
+      def home_page_ssr_path
+        if use_rsc? && !options.redux?
+          {
+            badge: "SSR",
+            title: "Server render + hydrate",
+            description: "The OSS baseline: render HTML on the server, then hydrate React in the browser.",
+            url: "https://reactonrails.com/docs/getting-started/tutorial/",
+            cta: "Read the SSR tutorial",
+            external: true
+          }
+        else
+          {
+            badge: "SSR",
+            title: "Server render + hydrate",
+            description: "Rendered on the server, hydrated in the browser, and ready for hot reloading in development.",
+            url: "/hello_world",
+            cta: "Open SSR demo",
+            external: false
+          }
+        end
+      end
+
+      def home_page_rsc_path
+        if use_rsc?
+          {
+            badge: "RSC",
+            title: "Async server components",
+            description: "This app already streams React Server Components from Rails with small client islands.",
+            url: "/hello_server",
+            cta: "Open RSC demo",
+            external: false
+          }
+        else
+          {
+            badge: "RSC",
+            title: "Streaming with server/client boundaries",
+            description: "Use the Pro stack when you want React Server Components and streamed rendering.",
+            url: "https://reactonrails.com/docs/pro/react-server-components/",
+            cta: "See RSC docs",
+            external: true
+          }
+        end
+      end
+
+      def home_page_compare_path
+        if use_pro?
+          {
+            badge: "PRO",
+            title: "Node renderer + upgrade docs",
+            description: "Pro keeps the Rails integration story but adds the Node renderer, RSC " \
+                         "docs, and support paths.",
+            url: "https://reactonrails.com/pro/",
+            cta: "Open Pro overview",
+            external: true
+          }
+        else
+          {
+            badge: "COMPARE",
+            title: "Know when to upgrade",
+            description: "Stay on OSS for the baseline, then compare with Pro before you need RSC " \
+                         "or higher-throughput SSR.",
+            url: "https://reactonrails.com/docs/getting-started/oss-vs-pro/",
+            cta: "Compare OSS and Pro",
+            external: true
+          }
+        end
+      end
+
+      def home_page_stack_badges
+        badges = [
+          options.typescript? ? "TypeScript" : "JavaScript",
+          using_rspack? ? "Rspack" : "Webpack",
+          use_rsc? ? "React Server Components" : "Server-side rendering",
+          "Rails + PostgreSQL"
+        ]
+        badges << "React on Rails Pro" if use_pro?
+        badges
+      end
+
+      def example_source_path
+        return "app/javascript/src/HelloServer/" if use_rsc? && !options.redux?
+        return "app/javascript/src/HelloWorldApp/" if options.redux?
+
+        "app/javascript/src/HelloWorld/"
+      end
+
+      def example_view_path
+        use_rsc? && !options.redux? ? "app/views/hello_server/index.html.erb" : "app/views/hello_world/index.html.erb"
+      end
+
+      def home_page_pro_description_for_enabled_app
+        if use_rsc?
+          "This fresh app already includes the Pro RSC stack. Use the links below to go deeper on " \
+            "the generated HelloServer route, the Node renderer, and larger example apps."
+        else
+          "This fresh app already includes the Pro stack. Use the links below to learn the Node " \
+            "renderer and the broader upgrade story before you shape the app into your own product."
+        end
+      end
+
+      def home_page_pro_description_for_oss_app
+        "Stay on OSS for the base Rails + React workflow. Move to Pro when you want React Server Components, " \
+          "the Node renderer, or a clearer path for performance-focused rendering work."
+      end
+
+      def home_page_pro_note_for_enabled_app
+        "React on Rails Pro can be enabled route by route, so validate the flows that matter before " \
+          "expanding the footprint."
+      end
+
+      def home_page_pro_note_for_oss_app
+        "You can evaluate React on Rails Pro without a license while deciding whether it fits your app."
+      end
 
       def preferred_rspec_helper_file
         rails_helper = File.join(destination_root, "spec/rails_helper.rb")

@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Improved
+
+- **Fresh app onboarding for `create-react-on-rails-app`**: New apps now land on a generated root page with links to the local demos, docs, OSS vs Pro guidance, the Pro quick start, and the marketplace RSC demo. `bin/dev` opens that page on first boot, `--rsc` scaffolds the same fresh-app experience, and the generated app records step-by-step educational git commits for each scaffold phase. [PR 2849](https://github.com/shakacode/react_on_rails/pull/2849) by [justin808](https://github.com/justin808).
+
 ### [16.5.1] - 2026-03-27
 
 #### Fixed
