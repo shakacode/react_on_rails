@@ -535,7 +535,6 @@ export default function run(config: Partial<Config>) {
             log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
             process.exit(1);
           }
-          return;
         }
 
         process.exit(1);

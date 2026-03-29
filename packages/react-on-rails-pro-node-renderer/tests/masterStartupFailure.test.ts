@@ -123,7 +123,7 @@ describe('masterRun wiring', () => {
 
     expect(() => mockClusterHandlers.exit(worker)).toThrow('process.exit:1');
     expect(mockErrorReporterMessage).toHaveBeenCalledWith(
-      'Node renderer startup failed: port 3800 is already in use',
+      'Node renderer startup failed: localhost:3800 is already in use',
     );
     expect(processExitSpy).toHaveBeenCalledWith(1);
     expect(mockFork).toHaveBeenCalledTimes(2);
@@ -157,10 +157,11 @@ describe('master startup failure handling', () => {
 
     if (isAbortingForStartupFailure) {
       const failure = fatalStartupFailure?.failure;
+      const failedWorkerId = fatalStartupFailure?.workerId ?? worker.id;
       const msg =
         failure?.code === 'EADDRINUSE'
-          ? `Node renderer startup failed: port ${failure.port} is already in use`
-          : `Node renderer startup failed in worker ${worker.id}: ${failure?.message || `exit code ${worker.process.exitCode}`}`;
+          ? `Node renderer startup failed: ${failure.host}:${failure.port} is already in use`
+          : `Node renderer startup failed in worker ${failedWorkerId}: ${failure?.message || `exit code ${worker.process.exitCode}`}`;
 
       reportedMessages.push(msg);
       exitCode = 1;
@@ -193,7 +194,7 @@ describe('master startup failure handling', () => {
 
     expect(forkCount).toBe(0); // No refork
     expect(exitCode).toBe(1);
-    expect(reportedMessages).toEqual(['Node renderer startup failed: port 3800 is already in use']);
+    expect(reportedMessages).toEqual(['Node renderer startup failed: localhost:3800 is already in use']);
   });
 
   it('aborts with generic message on non-EADDRINUSE startup failure', () => {

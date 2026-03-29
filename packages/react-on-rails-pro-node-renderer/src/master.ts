@@ -105,7 +105,7 @@ export default function masterRun(runningConfig?: Partial<Config>) {
       const failedWorkerId = fatalStartupFailure?.workerId ?? worker.id;
       const msg =
         failure?.code === 'EADDRINUSE'
-          ? `Node renderer startup failed: port ${failure.port} is already in use`
+          ? `Node renderer startup failed: ${failure.host}:${failure.port} is already in use`
           : `Node renderer startup failed in worker ${failedWorkerId}: ${failure?.message || `exit code ${worker.process.exitCode}`}`;
 
       errorReporter.message(msg);
