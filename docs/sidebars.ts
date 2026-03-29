@@ -8,6 +8,7 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 const sidebars: SidebarsConfig = {
   docsSidebar: [
+    'introduction',
     'README',
     {
       type: 'category',
@@ -21,7 +22,6 @@ const sidebars: SidebarsConfig = {
         { type: 'ref', id: 'migrating/migrating-from-react-rails' },
       ],
     },
-    'introduction',
     {
       type: 'category',
       label: 'Getting Started',
@@ -123,6 +123,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'React Server Components',
+      link: { type: 'generated-index', title: 'React Server Components' },
       items: [
         'pro/react-server-components/index',
         'pro/react-server-components/purpose-and-benefits',
