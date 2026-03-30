@@ -139,24 +139,21 @@ async function handleNewBundleProvided(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
     } catch (error) {
-      // If another process completed the bundle while we were writing,
-      // the directory is in a valid state — no error to surface.
-      if (await isBundleComplete(providedNewBundle.timestamp)) {
-        log.info(
-          'Bundle %s was completed by another process during write. Skipping.',
-          bundleFilePathPerTimestamp,
+      const bundleComplete = await isBundleComplete(providedNewBundle.timestamp);
+      if (!bundleComplete) {
+        const msg = formatExceptionMessage(
+          renderingRequest,
+          error,
+          `Unexpected error when moving the bundle from ${providedNewBundle.bundle.savedFilePath} \
+to ${bundleFilePathPerTimestamp})`,
         );
-        return undefined;
+        log.error(msg);
+        return errorResponseResult(msg);
       }
-
-      const msg = formatExceptionMessage(
-        renderingRequest,
-        error,
-        `Unexpected error when preparing the bundle from ${providedNewBundle.bundle.savedFilePath} \
-to ${bundleFilePathPerTimestamp}`,
+      log.info(
+        'Bundle %s was completed by another process during write. Skipping.',
+        bundleFilePathPerTimestamp,
       );
-      log.error(msg);
-      return errorResponseResult(msg);
     }
 
     return undefined;
