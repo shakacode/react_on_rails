@@ -77,7 +77,7 @@ async function prepareResult(
  * @param assetsToCopy might be null
  */
 async function handleNewBundleProvided(
-  requestContext: string,
+  renderingRequest: string,
   providedNewBundle: ProvidedNewBundle,
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
@@ -95,7 +95,7 @@ async function handleNewBundleProvided(
 
     if (!wasLockAcquired) {
       const msg = formatExceptionMessage(
-        requestContext,
+        renderingRequest,
         errorMessage,
         `Failed to acquire lock ${lockfileName}. Worker: ${workerIdLabel()}.`,
       );
@@ -107,6 +107,10 @@ async function handleNewBundleProvided(
         `Moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
       await moveUploadedAsset(providedNewBundle.bundle, bundleFilePathPerTimestamp);
+      if (assetsToCopy) {
+        await copyUploadedAssets(assetsToCopy, bundleDirectory);
+      }
+
       log.info(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
@@ -114,7 +118,7 @@ async function handleNewBundleProvided(
       const fileExists = await fileExistsAsync(bundleFilePathPerTimestamp);
       if (!fileExists) {
         const msg = formatExceptionMessage(
-          requestContext,
+          renderingRequest,
           error,
           `Unexpected error when moving the bundle from ${providedNewBundle.bundle.savedFilePath} \
 to ${bundleFilePathPerTimestamp})`,
@@ -128,13 +132,6 @@ to ${bundleFilePathPerTimestamp})`,
       );
     }
 
-    // Always copy assets to the bundle directory — even if the bundle was
-    // already present (e.g., from a prior upload or another worker).
-    // copyUploadedAssets uses overwrite:true, so this is idempotent.
-    if (assetsToCopy) {
-      await copyUploadedAssets(assetsToCopy, bundleDirectory);
-    }
-
     return undefined;
   } finally {
     if (lockAcquired && lockfileName) {
@@ -143,7 +140,7 @@ to ${bundleFilePathPerTimestamp})`,
         await unlock(lockfileName);
       } catch (error) {
         const msg = formatExceptionMessage(
-          requestContext,
+          renderingRequest,
           error,
           `Error unlocking ${lockfileName} from worker ${workerIdLabel()}.`,
         );
@@ -153,15 +150,15 @@ to ${bundleFilePathPerTimestamp})`,
   }
 }
 
-export async function handleNewBundlesProvided(
-  requestContext: string,
+async function handleNewBundlesProvided(
+  renderingRequest: string,
   providedNewBundles: ProvidedNewBundle[],
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
   log.info('Worker received new bundles: %s', providedNewBundles);
 
   const handlingPromises = providedNewBundles.map((providedNewBundle) =>
-    handleNewBundleProvided(requestContext, providedNewBundle, assetsToCopy),
+    handleNewBundleProvided(renderingRequest, providedNewBundle, assetsToCopy),
   );
   // Defensive: use allSettled so that if handleNewBundleProvided ever throws
   // unexpectedly, all in-flight operations still complete before the handler

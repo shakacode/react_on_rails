@@ -44,8 +44,7 @@ module ReactOnRailsPro
       def upload_assets
         Rails.logger.info { "[ReactOnRailsPro] Uploading assets" }
 
-        # Early checks with descriptive messages. add_bundle_to_form(check_bundle: true) also
-        # validates existence, but these provide clearer context for the rake task user.
+        # Check if server bundle exists before trying to upload assets
         server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
         unless File.exist?(server_bundle_path)
           raise ReactOnRailsPro::Error, "Server bundle not found at #{server_bundle_path}. " \
@@ -67,12 +66,6 @@ module ReactOnRailsPro
         end
 
         form = form_with_assets_and_bundle
-        # TODO: targetBundles is only kept for backward compatibility with older node renderers
-        # (protocol 2.0.0) that require it. The new node renderer derives target directories from
-        # the bundle_<hash> form keys and ignores this field. Remove at the next breaking version.
-        # Note: it's not mandatory to keep this until then — users are expected to upgrade the
-        # node renderer and react_on_rails gem to the same version together — but it's an easy
-        # backward compatibility safeguard.
         form["targetBundles"] = target_bundles
 
         perform_request("/upload-assets", form: form)

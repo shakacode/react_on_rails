@@ -22,12 +22,8 @@ export interface TanStackRouter {
   };
   dehydrate?: () => unknown;
   hydrate?: (data: unknown) => void;
-  // TanStack Router's Transitioner checks this field (truthiness only) to skip
-  // auto-loading on mount.  The canonical shape is { manifest?: unknown }, set
-  // internally by TanStack's hydrate() during RouterClient hydration.  We set
-  // it on the legacy (non-RouterClient) hydration path to prevent a duplicate
-  // initial load that causes hydration mismatch.
-  ssr?: { manifest?: unknown };
+  // TanStack Router uses this internal field during SSR hydration.
+  ssr?: boolean | { manifest: unknown };
 }
 
 export interface TanStackHistory {

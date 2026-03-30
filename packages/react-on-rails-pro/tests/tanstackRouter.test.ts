@@ -1,5 +1,4 @@
 import * as React from 'react';
-import { createRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import {
   createTanStackRouterRenderFunction,
@@ -34,16 +33,6 @@ function buildRouter(): TanStackRouter {
     dehydrate: jest.fn().mockReturnValue({ matches: [{ id: 'products' }] }),
     hydrate: jest.fn(),
   };
-}
-
-type ActCallback = () => void | Promise<void>;
-
-async function compatAct(callback: ActCallback): Promise<void> {
-  const reactAct = (React as typeof React & { act?: (cb: ActCallback) => Promise<unknown> | unknown }).act;
-  if (typeof reactAct !== 'function') {
-    throw new Error('React.act is not available — React 18.3+ or 19+ is required');
-  }
-  await reactAct(callback);
 }
 
 describe('tanstack-router integration (Pro)', () => {
@@ -233,120 +222,6 @@ describe('tanstack-router integration (Pro)', () => {
     expect(observedProps[0]).toEqual({ userId: 42 });
   });
 
-  it('sets router.ssr to { manifest: undefined } on the legacy hydration path', () => {
-    const router = buildRouter();
-
-    const options = {
-      createRouter: () => router,
-    };
-    const deps = {
-      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
-      createMemoryHistory: jest.fn(),
-      createBrowserHistory: jest.fn().mockReturnValue({
-        location: {
-          pathname: '/products',
-          search: '?category=tools',
-          hash: '',
-          href: '/products?category=tools',
-          state: null,
-        },
-      }),
-    };
-
-    const renderFn = createTanStackRouterRenderFunction(options, deps);
-    const result = renderFn(
-      {
-        __tanstackRouterDehydratedState: {
-          url: '/products?category=tools',
-          dehydratedRouter: { matches: [{ id: 'products' }] },
-        },
-      },
-      {
-        serverSide: false,
-        pathname: '/products',
-        search: '?category=tools',
-      } as unknown as RailsContext,
-    );
-
-    renderToString(
-      React.createElement(result as React.ComponentType<Record<string, unknown>>, {
-        __tanstackRouterDehydratedState: {
-          url: '/products?category=tools',
-          dehydratedRouter: { matches: [{ id: 'products' }] },
-        },
-      }),
-    );
-
-    expect(router.ssr).toEqual({ manifest: undefined });
-  });
-
-  it('clears router.ssr after the post-hydration legacy load settles', async () => {
-    const router = buildRouter();
-    let resolveLoad: (() => void) | undefined;
-    router.load = jest.fn().mockImplementation(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveLoad = resolve;
-        }),
-    );
-
-    const options = {
-      createRouter: () => router,
-    };
-    const deps = {
-      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
-      createMemoryHistory: jest.fn(),
-      createBrowserHistory: jest.fn().mockReturnValue({
-        location: {
-          pathname: '/products',
-          search: '?category=tools',
-          hash: '',
-          href: '/products?category=tools',
-          state: null,
-        },
-      }),
-    };
-
-    const renderFn = createTanStackRouterRenderFunction(options, deps);
-    const props = {
-      __tanstackRouterDehydratedState: {
-        url: '/products?category=tools',
-        dehydratedRouter: { matches: [{ id: 'products' }] },
-      },
-    };
-    const clientApp = renderFn(props, {
-      serverSide: false,
-      pathname: '/products',
-      search: '?category=tools',
-    } as unknown as RailsContext);
-    const container = document.createElement('div');
-    const root = createRoot(container);
-
-    await compatAct(async () => {
-      root.render(React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props));
-    });
-
-    expect(router.load).toHaveBeenCalledTimes(1);
-    expect(router.ssr).toEqual({ manifest: undefined });
-
-    if (!resolveLoad) {
-      throw new Error('Expected router.load to be invoked during hydration.');
-    }
-
-    await compatAct(async () => {
-      resolveLoad?.();
-      // Two ticks: one to settle .catch(), one to run .finally().
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(router.ssr).toBeUndefined();
-
-    await compatAct(async () => {
-      root.unmount();
-    });
-  });
-
   it('does not throw on client hydration when the SSR payload has no dehydrated router data', () => {
     const router = buildRouter();
     router.dehydrate = jest.fn().mockReturnValue(null);
@@ -449,7 +324,7 @@ describe('tanstack-router integration (Pro)', () => {
       ),
     ).not.toThrow();
     expect(router.hydrate).not.toHaveBeenCalled();
-    expect(router.ssr).toBeFalsy();
+    expect(router.ssr).not.toBe(true);
   });
 
   it('builds SSR match payloads even when router.dehydrate is unavailable', async () => {
@@ -492,7 +367,7 @@ describe('tanstack-router integration (Pro)', () => {
     });
   });
 
-  it('does not set router.ssr on the server (effects do not run during renderToString)', async () => {
+  it('enables SSR mode for async server rendering before returning dehydrated state', async () => {
     const router = buildRouter();
 
     const result = await serverRenderTanStackAppAsync(
@@ -516,7 +391,7 @@ describe('tanstack-router integration (Pro)', () => {
     );
 
     expect(router.load).toHaveBeenCalled();
-    expect(router.ssr).toBeUndefined();
+    expect(router.ssr).toBe(true);
     expect(result.dehydratedState).toEqual({
       url: '/products?category=tools',
       dehydratedRouter: { matches: [{ id: 'products' }] },
