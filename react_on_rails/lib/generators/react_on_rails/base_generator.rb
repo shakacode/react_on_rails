@@ -121,6 +121,12 @@ module ReactOnRails
 
         routes_path = "config/routes.rb"
         routes_full_path = File.join(destination_root, routes_path)
+
+        unless File.file?(routes_full_path)
+          say_status :warn, "Could not inject root route; config/routes.rb was not found", :yellow
+          return
+        end
+
         # Support both LF and CRLF route files so new-app onboarding works on Windows checkouts too.
         routes_draw_declaration = /^\s*Rails\.application\.routes\.draw do\r?\n/
         unless File.read(routes_full_path).match?(routes_draw_declaration)
