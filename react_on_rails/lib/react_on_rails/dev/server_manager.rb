@@ -865,19 +865,21 @@ module ReactOnRails
         end
 
         def build_local_url(port, route)
-          normalized_route = route.to_s.strip
-          return "http://localhost:#{port}" if normalized_route.empty? || normalized_route == "/"
-
-          normalized_route = normalized_route.sub(%r{\A/+}, "")
-          "http://localhost:#{port}/#{normalized_route}"
+          path = normalize_route_path(route)
+          path = "" if path == "/"
+          "http://localhost:#{port}#{path}"
         end
 
         def build_request_path(route)
-          normalized_route = route.to_s.strip
-          return "/" if normalized_route.empty? || normalized_route == "/"
+          normalize_route_path(route)
+        end
 
-          normalized_route = normalized_route.sub(%r{\A/+}, "")
-          "/#{normalized_route}"
+        def normalize_route_path(route)
+          stripped = route.to_s.strip
+          return "/" if stripped.empty? || stripped == "/"
+
+          stripped = stripped.sub(%r{\A/+}, "")
+          "/#{stripped}"
         end
 
         def schedule_browser_open(port, route:, once:)
@@ -907,17 +909,6 @@ module ReactOnRails
           !ENV.key?("CI") && $stdin.tty? && $stdout.tty?
         end
 
-        def wait_for_server_on_port(port)
-          deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + OPEN_BROWSER_WAIT_TIMEOUT
-
-          loop do
-            return true if localhost_port_open?(port)
-            return false if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-            sleep OPEN_BROWSER_POLL_INTERVAL
-          end
-        end
-
         def wait_for_app_route(port, request_path)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + OPEN_BROWSER_WAIT_TIMEOUT
 
@@ -929,29 +920,24 @@ module ReactOnRails
           end
         end
 
-        def app_route_ready?(port, request_path)
-          return false unless localhost_port_open?(port)
+        LOCALHOST_ADDRESSES = %w[127.0.0.1 ::1].freeze
+        private_constant :LOCALHOST_ADDRESSES
 
+        def app_route_ready?(port, request_path)
           response = http_get_localhost(port, request_path)
           response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
         end
 
         def http_get_localhost(port, request_path)
-          Net::HTTP.start("127.0.0.1", port, open_timeout: 1, read_timeout: 1) do |http|
-            http.get(request_path)
-          end
-        rescue StandardError
-          nil
-        end
-
-        def localhost_port_open?(port)
-          %w[127.0.0.1 ::1].any? do |host|
-            Socket.tcp(host, port, connect_timeout: 1) do
-              true
+          LOCALHOST_ADDRESSES.each do |host|
+            response = Net::HTTP.start(host, port, open_timeout: 1, read_timeout: 1) do |http|
+              http.get(request_path)
             end
+            return response if response
           rescue StandardError
-            false
+            next
           end
+          nil
         end
 
         def open_browser(url)
