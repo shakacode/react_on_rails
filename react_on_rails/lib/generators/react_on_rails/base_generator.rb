@@ -159,6 +159,8 @@ module ReactOnRails
       end
 
       def copy_base_files
+        ensure_new_app_root_route_initialized
+
         base_path = "base/base/"
         base_files = %w[Procfile.dev
                         Procfile.dev-static-assets
@@ -308,11 +310,7 @@ module ReactOnRails
       private
 
       def generate_new_app_home_page?
-        return false unless options.new_app?
-
-        # Keep this predicate resilient if generator action ordering changes.
-        add_root_route unless defined?(@new_app_root_route_added)
-        new_app_root_route_added?
+        options.new_app? && new_app_root_route_added?
       end
 
       def new_app_root_route_added?
@@ -323,7 +321,18 @@ module ReactOnRails
       end
 
       def preexisting_root_route?
-        root_route_present?
+        return @preexisting_root_route if defined?(@preexisting_root_route)
+
+        @preexisting_root_route = root_route_present?
+      end
+
+      def ensure_new_app_root_route_initialized
+        return unless options.new_app?
+        return if defined?(@new_app_root_route_added)
+
+        # add_root_route should run as a generator action first, but keep this
+        # explicit call so copy_base_files remains safe if action ordering changes.
+        add_root_route
       end
 
       def home_page_config
