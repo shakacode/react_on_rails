@@ -2,16 +2,20 @@ import * as React from 'react';
 import serverRenderReactComponent from '../src/serverRenderReactComponent.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import type { RenderParams, RailsContext, RenderFunction, RenderFunctionResult } from '../src/types/index.ts';
+// eslint-disable-next-line import/no-relative-packages
+import LengthPrefixedStreamParser from '../../react-on-rails-pro/src/parseLengthPrefixedStream.ts';
 
-// Parses a length-prefixed result string: metadata\tcontent_len\ncontent
+// Parses a length-prefixed result string using the production parser.
 const parseLengthPrefixed = (str: string) => {
-  const newlineIdx = str.indexOf('\n');
-  const header = str.slice(0, newlineIdx);
-  const tabIdx = header.indexOf('\t');
-  const metadata = JSON.parse(header.slice(0, tabIdx));
-  const contentLen = parseInt(header.slice(tabIdx + 1), 16);
-  const html = contentLen > 0 ? str.slice(newlineIdx + 1, newlineIdx + 1 + contentLen) : null;
-  return { html, ...metadata };
+  const parser = new LengthPrefixedStreamParser();
+  const results: Array<{ html: string; [key: string]: unknown }> = [];
+  parser.feed(new TextEncoder().encode(str), (content, metadata) => {
+    results.push({ html: new TextDecoder().decode(content), ...metadata });
+  });
+  if (results.length !== 1) {
+    throw new Error(`Expected exactly 1 length-prefixed chunk, got ${results.length}`);
+  }
+  return results[0]!;
 };
 
 const assertIsString: (value: unknown) => asserts value is string = (value: unknown) => {
