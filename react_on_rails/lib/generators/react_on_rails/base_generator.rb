@@ -106,8 +106,13 @@ module ReactOnRails
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
 
       def add_root_route
-        @new_app_root_route_added = false
         return unless options.new_app?
+        # add_root_route normally runs before copy_base_files as a generator action.
+        # Guard against accidental double invocation (for example, if future
+        # refactors trigger lazy initialization in generate_new_app_home_page?).
+        return if defined?(@new_app_root_route_added)
+
+        @new_app_root_route_added = false
 
         if preexisting_root_route?
           say_status :skip, "Root route already exists; keeping existing root route", :yellow
@@ -116,6 +121,12 @@ module ReactOnRails
 
         routes_path = "config/routes.rb"
         routes_full_path = File.join(destination_root, routes_path)
+
+        unless File.file?(routes_full_path)
+          say_status :warn, "Could not inject root route; config/routes.rb was not found", :yellow
+          return
+        end
+
         # Support both LF and CRLF route files so new-app onboarding works on Windows checkouts too.
         routes_draw_declaration = /^\s*Rails\.application\.routes\.draw do\r?\n/
         unless File.read(routes_full_path).match?(routes_draw_declaration)
@@ -154,6 +165,8 @@ module ReactOnRails
       end
 
       def copy_base_files
+        ensure_new_app_root_route_initialized
+
         base_path = "base/base/"
         base_files = %w[Procfile.dev
                         Procfile.dev-static-assets
@@ -303,7 +316,6 @@ module ReactOnRails
       private
 
       def generate_new_app_home_page?
-        # Depends on add_root_route running first and setting @new_app_root_route_added.
         options.new_app? && new_app_root_route_added?
       end
 
@@ -317,11 +329,16 @@ module ReactOnRails
       def preexisting_root_route?
         return @preexisting_root_route if defined?(@preexisting_root_route)
 
-        routes_file = File.join(destination_root, "config/routes.rb")
-        @preexisting_root_route = File.file?(routes_file) &&
-                                  File.foreach(routes_file).any? do |line|
-                                    !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
-                                  end
+        @preexisting_root_route = root_route_present?
+      end
+
+      def ensure_new_app_root_route_initialized
+        return unless options.new_app?
+        return if defined?(@new_app_root_route_added)
+
+        # add_root_route should run as a generator action first, but keep this
+        # explicit call so copy_base_files remains safe if action ordering changes.
+        add_root_route
       end
 
       def home_page_config

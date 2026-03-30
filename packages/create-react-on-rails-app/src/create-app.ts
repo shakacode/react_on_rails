@@ -15,6 +15,11 @@ import {
 const DOCS_URL = 'https://reactonrails.com/docs/';
 const DEFAULT_GIT_AUTHOR_NAME = 'React on Rails Generator';
 const DEFAULT_GIT_AUTHOR_EMAIL = 'generator@reactonrails.invalid';
+const SUPPORTED_RAILTIES_MAJORS = [7, 8] as const;
+// Keep this renderer intentionally minimal. It renders Rails' installed
+// gitignore/gitattributes templates and falls back to bundled defaults when:
+// - railties is unavailable in the current Ruby environment, or
+// - railties major version is outside SUPPORTED_RAILTIES_MAJORS.
 const RAILS_GIT_TEMPLATE_RENDERER = `
 require "erb"
 
@@ -39,6 +44,11 @@ class ReactOnRailsGitTemplateContext
 end
 
 spec = Gem::Specification.find_by_name("railties")
+railties_major = spec.version.segments.first
+unless [${SUPPORTED_RAILTIES_MAJORS.join(', ')}].include?(railties_major)
+  warn "Unsupported railties major version for git template rendering: #{spec.version}"
+  exit 1
+end
 template_path = File.join(spec.gem_dir, "lib/rails/generators/rails/app/templates", ARGV[0])
 template = File.read(template_path)
 print ERB.new(template, trim_mode: "-").result(ReactOnRailsGitTemplateContext.new.get_binding)
