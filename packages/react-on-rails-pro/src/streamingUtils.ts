@@ -123,7 +123,9 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
 
       const contentBuf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, 'utf-8');
-      const metadataJson = JSON.stringify(buildRenderMetadata(consoleReplayScript, renderState));
+      const metadataObj = buildRenderMetadata(consoleReplayScript, renderState);
+      metadataObj.payloadType = 'string';
+      const metadataJson = JSON.stringify(metadataObj);
       const header = `${metadataJson}\t${contentBuf.length.toString(16).padStart(8, '0')}\n`;
       this.push(Buffer.concat([Buffer.from(header), contentBuf]));
 

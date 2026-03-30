@@ -2,6 +2,7 @@
 
 require "open-uri"
 require "execjs"
+require "react_on_rails/length_prefixed_parser"
 
 module ReactOnRails
   module ServerRenderingPool
@@ -227,39 +228,12 @@ module ReactOnRails
           raise ReactOnRails::Error, msg
         end
 
-        # Parses a length-prefixed result string into a Hash.
-        # Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
-        # When content length is 0, html is set to nil (preserving null semantics from JS).
-        # Parses a length-prefixed rendering result string into a Hash.
-        # Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
         def parse_render_result(result_string, render_options)
-          str = result_string.to_s.b # Ensure plain String with binary encoding for byte-accurate slicing
-          tab_idx = str.index("\t")
-          newline_idx = tab_idx ? str.index("\n", tab_idx) : nil
-
-          unless tab_idx && newline_idx
-            raise "Malformed render result: expected length-prefixed format (metadata\\tcontent_len\\nhtml)"
-          end
-
-          result = parse_length_prefixed(str, tab_idx, newline_idx)
+          result = ReactOnRails::LengthPrefixedParser.parse_one_chunk_result(result_string)
           replay_console_to_rails_logger(result, render_options)
           result
         rescue StandardError => e
           raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
-        end
-
-        def parse_length_prefixed(str, tab_idx, newline_idx)
-          meta_json = str.byteslice(0, tab_idx).force_encoding("UTF-8")
-          len_hex = str.byteslice(tab_idx + 1, newline_idx - tab_idx - 1)
-          raise "Invalid content length hex: #{len_hex.inspect}" unless len_hex.match?(/\A[0-9a-fA-F]+\z/)
-
-          content_len = len_hex.to_i(16)
-          html_raw = content_len.positive? ? str.byteslice(newline_idx + 1, content_len).force_encoding("UTF-8") : nil
-          # When html is a ServerRenderHashRenderedHtml (object), it was JSON-serialized
-          # by buildLengthPrefixedResult. Parse it back to a Hash so downstream consumers
-          # (react_component_hash) see the expected type.
-          html = html_raw&.start_with?("{") ? JSON.parse(html_raw) : html_raw
-          JSON.parse(meta_json).merge!("html" => html)
         end
 
         def replay_console_to_rails_logger(result, render_options)

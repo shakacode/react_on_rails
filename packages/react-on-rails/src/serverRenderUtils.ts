@@ -71,18 +71,22 @@ export function buildLengthPrefixedResult(
   consoleReplayScript: string,
   renderState: RenderMetadataSource,
 ): string {
-  // html can be a string (common), null, or a ServerRenderHashRenderedHtml object
-  // (when render functions return multiple named HTML fragments like { componentHtml, title }).
-  // For object values, JSON-serialize them so the content is a valid string on the wire.
+  // payloadType tells Ruby how to interpret the content bytes:
+  //   "string" — raw HTML, use as-is (the common case)
+  //   "object" — JSON-serialized value, needs JSON.parse (ServerRenderHash or null)
+  const metadataObj = buildRenderMetadata(consoleReplayScript, renderState);
   let htmlStr: string;
   if (html == null) {
-    htmlStr = '';
+    metadataObj.payloadType = 'object';
+    htmlStr = JSON.stringify(html); // "null"
   } else if (typeof html === 'string') {
+    metadataObj.payloadType = 'string';
     htmlStr = html;
   } else {
+    metadataObj.payloadType = 'object';
     htmlStr = JSON.stringify(html);
   }
-  const metadata = JSON.stringify(buildRenderMetadata(consoleReplayScript, renderState));
+  const metadata = JSON.stringify(metadataObj);
   const byteLength = utf8ByteLength(htmlStr);
   return `${metadata}\t${byteLength.toString(16).padStart(8, '0')}\n${htmlStr}`;
 }

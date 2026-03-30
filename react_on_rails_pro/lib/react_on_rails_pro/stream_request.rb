@@ -127,21 +127,17 @@ module ReactOnRailsPro
 
     private
 
-    def process_response_chunks(stream_response, error_body)
-      loop_response_chunks(stream_response) do |chunk|
+    def process_response_chunks(stream_response, error_body, &block)
+      parser = ReactOnRails::LengthPrefixedParser.new
+      stream_response.each do |chunk|
+        stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
+
         if response_has_error_status?(stream_response)
-          error_body << chunk.to_s
+          error_body << chunk
           next
         end
 
-        # Hashes (length-prefixed) are yielded as-is.
-        # Strings (plain text from error or edge cases) are stripped and skipped if empty.
-        if chunk.is_a?(String)
-          stripped = chunk.strip
-          yield stripped unless stripped.empty?
-        else
-          yield chunk
-        end
+        parser.feed(chunk, &block)
       end
     end
 
@@ -166,112 +162,6 @@ module ReactOnRailsPro
         raise ReactOnRailsPro::Error, error_body
       else
         raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
-      end
-    end
-
-    # Reads streaming response chunks using the length-prefixed protocol.
-    #
-    # Wire format per chunk: <metadata JSON>\t<content byte length hex>\n<raw content bytes>
-    # Yields Hash: { "html" => "<raw content>", "consoleReplayScript" => "...", ... }
-    #
-    # For error responses (plain text without \t), yields raw strings.
-    #
-    # The length-prefixed format avoids JSON.stringify on the HTML content (the bulk
-    # of the data), eliminating ~30% escaping overhead for typical payloads.
-    def loop_response_chunks(response, &block)
-      return enum_for(__method__, response) unless block
-
-      parser = LengthPrefixedParser.new
-      response.each do |chunk|
-        response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-        parser.feed(chunk, &block)
-      end
-    ensure
-      parser&.flush(&block)
-    end
-
-    # State machine parser for the length-prefixed streaming protocol.
-    # Buffers incoming bytes and yields complete chunks (Hash for length-prefixed,
-    # String for plain text error responses).
-    class LengthPrefixedParser
-      def initialize
-        @buf = "".b
-        @state = :header
-        @content_len = 0
-        @metadata = nil
-      end
-
-      def feed(chunk)
-        @buf << chunk
-
-        loop do
-          case @state
-          when :header
-            break unless (result = try_parse_header)
-
-            yield result if result.is_a?(String) # Plain text line (error response)
-          when :content
-            break unless (result = try_read_content)
-
-            yield result
-          end
-        end
-      end
-
-      def flush
-        case @state
-        when :content
-          # Stream ended mid-content — don't yield truncated HTML.
-          # The missing bytes indicate a connection drop or renderer crash.
-          # The error will surface via HTTPX error handling in each_chunk.
-          nil
-        when :header
-          yield @buf.force_encoding("UTF-8") unless @buf.empty?
-        end
-      end
-
-      private
-
-      def try_parse_header
-        idx = @buf.index("\n")
-        return nil unless idx
-
-        header = @buf.byteslice(0, idx)
-        @buf = @buf.byteslice(idx + 1, @buf.bytesize - idx - 1) || "".b
-        tab_idx = header.index("\t")
-
-        if tab_idx
-          parse_length_prefixed_header(header, tab_idx)
-          true # Signal state changed to :content; no value to yield
-        else
-          line = header.force_encoding("UTF-8")
-          line.strip.empty? ? true : line
-        end
-      end
-
-      def parse_length_prefixed_header(header, tab_idx)
-        meta_json = header.byteslice(0, tab_idx)
-        len_hex = header.byteslice(tab_idx + 1, header.bytesize - tab_idx - 1)
-        raise "Invalid content length hex: #{len_hex.inspect}" unless len_hex.match?(/\A[0-9a-fA-F]+\z/)
-
-        @metadata = JSON.parse(meta_json.force_encoding("UTF-8"))
-        @content_len = len_hex.to_i(16)
-        @state = :content
-      end
-
-      def try_read_content
-        return nil if @buf.bytesize < @content_len
-
-        # When content length is 0, set html to nil (preserves null semantics from JS)
-        html = if @content_len.positive?
-                 content = @buf.byteslice(0, @content_len)
-                 @buf = @buf.byteslice(@content_len, @buf.bytesize - @content_len) || "".b
-                 content.force_encoding("UTF-8")
-               end
-        result = { "html" => html }.merge!(@metadata)
-        @metadata = nil
-        @state = :header
-        result
       end
     end
   end
