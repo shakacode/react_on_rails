@@ -202,6 +202,57 @@ const extractBodyArrayField = <Key extends string>(
   return undefined;
 };
 
+type StartupListenErrorHandlerOptions = {
+  err: Error;
+  host: string;
+  port: number;
+  isWorker?: boolean;
+  send?: NodeJS.Process['send'];
+  exit?: NodeJS.Process['exit'];
+};
+
+export function handleStartupListenError({
+  err,
+  host,
+  port,
+  isWorker = cluster.isWorker,
+  send,
+  exit,
+}: StartupListenErrorHandlerOptions) {
+  const sendFn = send ?? process.send?.bind(process);
+  const exitFn = exit ?? ((code?: number) => process.exit(code));
+
+  log.error({ err, host, port }, 'Node renderer failed to start');
+
+  if (isWorker && sendFn) {
+    const startupFailure: WorkerStartupFailureMessage = {
+      type: WORKER_STARTUP_FAILURE,
+      stage: 'listen',
+      code: (err as NodeJS.ErrnoException).code,
+      errno: (err as NodeJS.ErrnoException).errno,
+      syscall: (err as NodeJS.ErrnoException).syscall,
+      host,
+      port,
+      message: err.message,
+    };
+    try {
+      sendFn(startupFailure, undefined, undefined, (sendErr) => {
+        if (sendErr) {
+          log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
+        }
+        exitFn(1);
+      });
+      return;
+    } catch (sendErr) {
+      log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
+      exitFn(1);
+      return;
+    }
+  }
+
+  exitFn(1);
+}
+
 export default function run(config: Partial<Config>) {
   // Store config in app state. From now it can be loaded by any module using
   // getConfig():
@@ -511,35 +562,8 @@ export default function run(config: Partial<Config>) {
   if (workersCount === 0 || cluster.isWorker) {
     app.listen({ port, host }, (err, address) => {
       if (err) {
-        log.error({ err, host, port }, 'Node renderer failed to start');
-
-        if (cluster.isWorker && process.send) {
-          const startupFailure: WorkerStartupFailureMessage = {
-            type: WORKER_STARTUP_FAILURE,
-            stage: 'listen',
-            code: (err as NodeJS.ErrnoException).code,
-            errno: (err as NodeJS.ErrnoException).errno,
-            syscall: (err as NodeJS.ErrnoException).syscall,
-            host,
-            port,
-            message: err.message,
-          };
-          try {
-            process.send(startupFailure, undefined, undefined, (sendErr) => {
-              if (sendErr) {
-                log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
-              }
-              process.exit(1);
-            });
-            return;
-          } catch (sendErr) {
-            log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
-            process.exit(1);
-            return;
-          }
-        }
-
-        process.exit(1);
+        handleStartupListenError({ err, host, port });
+        return;
       }
       const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
       log.info({ workerName, address }, 'Node renderer listening');

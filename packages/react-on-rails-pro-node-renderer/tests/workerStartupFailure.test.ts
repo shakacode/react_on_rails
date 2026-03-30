@@ -1,9 +1,9 @@
-import cluster from 'cluster';
 import {
   WORKER_STARTUP_FAILURE,
   isWorkerStartupFailureMessage,
   type WorkerStartupFailureMessage,
 } from '../src/shared/workerMessages';
+import { handleStartupListenError } from '../src/worker';
 
 describe('isWorkerStartupFailureMessage', () => {
   it('returns true for a valid startup failure message', () => {
@@ -37,82 +37,88 @@ describe('isWorkerStartupFailureMessage', () => {
   });
 });
 
-describe('worker startup failure IPC', () => {
-  const originalSend = process.send;
-  const originalExit = process.exit;
-  const originalIsWorker = cluster.isWorker;
-
-  afterEach(() => {
-    process.send = originalSend;
-    process.exit = originalExit;
-    Object.defineProperty(cluster, 'isWorker', { value: originalIsWorker, writable: true });
-  });
-
-  it('sends WORKER_STARTUP_FAILURE message in clustered mode', () => {
-    // Simulate a cluster worker environment
-    Object.defineProperty(cluster, 'isWorker', { value: true, writable: true });
-    const sentMessages: unknown[] = [];
-    const exitCalls: number[] = [];
-
-    process.send = ((msg: unknown, _handle?: unknown, _options?: unknown, callback?: () => void) => {
-      sentMessages.push(msg);
-      if (callback) callback();
-      return true;
-    }) as typeof process.send;
-
-    process.exit = ((code?: number) => {
-      exitCalls.push(code ?? 0);
-    }) as typeof process.exit;
-
-    // Simulate what the worker does on listen error
-    const err = Object.assign(new Error('listen EADDRINUSE: address already in use :::3800'), {
+describe('worker startup listen error handling', () => {
+  const buildListenError = () =>
+    Object.assign(new Error('listen EADDRINUSE: address already in use :::3800'), {
       code: 'EADDRINUSE',
       errno: -48,
       syscall: 'listen',
     });
-    const host = 'localhost';
-    const port = 3800;
 
-    const startupFailure: WorkerStartupFailureMessage = {
-      type: WORKER_STARTUP_FAILURE,
-      stage: 'listen',
-      code: err.code,
-      errno: err.errno,
-      syscall: err.syscall,
-      host,
-      port,
-      message: err.message,
-    };
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    process.send!(startupFailure, undefined, undefined, () => {
-      process.exit(1);
+  it('sends WORKER_STARTUP_FAILURE message in clustered mode via the production handler', () => {
+    const sentMessages: unknown[] = [];
+    const exitCalls: number[] = [];
+    const send = ((msg: unknown, _handle?: unknown, _options?: unknown, callback?: () => void) => {
+      sentMessages.push(msg);
+      callback?.();
+      return true;
+    }) as NodeJS.Process['send'];
+    const exit = ((code?: number) => {
+      exitCalls.push(code ?? 0);
+    }) as NodeJS.Process['exit'];
+
+    handleStartupListenError({
+      err: buildListenError(),
+      host: 'localhost',
+      port: 3800,
+      isWorker: true,
+      send,
+      exit,
     });
 
     expect(sentMessages).toHaveLength(1);
     expect(isWorkerStartupFailureMessage(sentMessages[0])).toBe(true);
-    expect((sentMessages[0] as WorkerStartupFailureMessage).code).toBe('EADDRINUSE');
+    expect(sentMessages[0]).toMatchObject({
+      type: WORKER_STARTUP_FAILURE,
+      stage: 'listen',
+      host: 'localhost',
+      port: 3800,
+      code: 'EADDRINUSE',
+    });
     expect(exitCalls).toEqual([1]);
   });
 
-  it('exits without IPC in single-process mode', () => {
-    Object.defineProperty(cluster, 'isWorker', { value: false, writable: true });
-    process.send = undefined;
-
+  it('exits without IPC in single-process mode via the production handler', () => {
+    const send = jest.fn();
     const exitCalls: number[] = [];
-    process.exit = ((code?: number) => {
+    const exit = ((code?: number) => {
       exitCalls.push(code ?? 0);
-    }) as typeof process.exit;
+    }) as NodeJS.Process['exit'];
 
-    // In single-process mode, cluster.isWorker is false and process.send is undefined
-    if (cluster.isWorker && process.send) {
-      // Should not reach here
-      process.send({ type: WORKER_STARTUP_FAILURE }, undefined, undefined, () => {
-        process.exit(1);
-      });
-      return;
-    }
+    handleStartupListenError({
+      err: buildListenError(),
+      host: 'localhost',
+      port: 3800,
+      isWorker: false,
+      send: send as unknown as NodeJS.Process['send'],
+      exit,
+    });
 
-    process.exit(1);
+    expect(send).not.toHaveBeenCalled();
+    expect(exitCalls).toEqual([1]);
+  });
+
+  it('exits when process.send throws synchronously', () => {
+    const send = (() => {
+      throw new Error('ERR_IPC_CHANNEL_CLOSED');
+    }) as NodeJS.Process['send'];
+    const exitCalls: number[] = [];
+    const exit = ((code?: number) => {
+      exitCalls.push(code ?? 0);
+    }) as NodeJS.Process['exit'];
+
+    handleStartupListenError({
+      err: buildListenError(),
+      host: 'localhost',
+      port: 3800,
+      isWorker: true,
+      send,
+      exit,
+    });
 
     expect(exitCalls).toEqual([1]);
   });

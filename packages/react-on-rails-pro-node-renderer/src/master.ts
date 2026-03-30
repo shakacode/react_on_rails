@@ -100,9 +100,8 @@ export default function masterRun(runningConfig?: Partial<Config>) {
       return;
     }
 
-    if (isAbortingForStartupFailure) {
-      const failure = fatalStartupFailure?.failure;
-      const failedWorkerId = fatalStartupFailure?.workerId ?? worker.id;
+    if (isAbortingForStartupFailure && fatalStartupFailure) {
+      const { failure, workerId: failedWorkerId } = fatalStartupFailure;
       const msg =
         failure?.code === 'EADDRINUSE'
           ? `Node renderer startup failed: ${failure.host}:${failure.port} is already in use`
@@ -110,6 +109,13 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
       errorReporter.message(msg);
       process.exit(1);
+      return;
+    }
+
+    if (isAbortingForStartupFailure) {
+      errorReporter.message('Node renderer startup failed before failure details were captured');
+      process.exit(1);
+      return;
     }
 
     // TODO: Track last rendering request per worker.id
