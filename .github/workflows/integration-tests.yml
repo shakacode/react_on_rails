@@ -1,8 +1,5 @@
 name: Integration Tests
 
-permissions:
-  contents: read
-
 on:
   push:
     branches:
@@ -12,7 +9,6 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - '.lychee.toml'
       - 'react_on_rails_pro/**'
   workflow_dispatch:
     inputs:

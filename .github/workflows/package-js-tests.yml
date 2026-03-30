@@ -1,8 +1,5 @@
 name: JS unit tests for Renderer package
 
-permissions:
-  contents: read
-
 on:
   push:
     branches:
@@ -12,7 +9,6 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - '.lychee.toml'
       - 'react_on_rails/lib/**'
       - 'react_on_rails/spec/react_on_rails/**'
       - 'react_on_rails_pro/**'

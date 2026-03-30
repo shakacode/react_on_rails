@@ -1,8 +1,5 @@
 name: Lint GitHub Actions
 
-permissions:
-  contents: read
-
 on:
   push:
     branches:

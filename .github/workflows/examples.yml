@@ -1,8 +1,5 @@
 name: Generator tests # TODO needs to be duplicated for RoR Pro
 
-permissions:
-  contents: read
-
 on:
   push:
     branches:
@@ -12,7 +9,6 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - '.lychee.toml'
   workflow_dispatch:
     inputs:
       force_run:

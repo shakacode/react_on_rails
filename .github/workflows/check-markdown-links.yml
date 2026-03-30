@@ -1,8 +1,5 @@
 name: Check Markdown Links
 
-permissions:
-  contents: read
-
 on:
   push:
     branches: [main]
