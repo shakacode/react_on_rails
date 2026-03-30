@@ -2,7 +2,7 @@
 
 This guide covers the React-side challenges of migrating an existing React on Rails application to React Server Components (RSC). It focuses on how to restructure your component tree, handle Context and state management, migrate data fetching patterns, deal with third-party library compatibility, and avoid common pitfalls.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/home-pro.md) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `rsc_payload_react_component`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
+> **React on Rails Pro required:** RSC support requires [React on Rails Pro](https://pro.reactonrails.com/) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `rsc_payload_react_component`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
 
 ## Why Migrate?
 
@@ -84,17 +84,6 @@ How to debug and avoid common problems. Covers:
 - Performance monitoring and bundle analysis tools
 - Common error messages and their solutions
 
-### 7. [Flight Payload Optimization](rsc-flight-payload.md)
-
-How to optimize RSC Flight payload size for better performance. Covers:
-
-- What's in the Flight payload and why it can be surprisingly large
-- Why "all display-only = server" is an oversimplification
-- The counterintuitive pattern: when presentational Client Components outperform Server Components
-- How to measure and analyze your Flight payload
-- Compression effectiveness and the LCP tradeoff
-- React on Rails double JSON.stringify overhead
-
 ## How RSC Maps to React on Rails
 
 Before diving into the React patterns, understand how RSC maps to React on Rails' architecture.
@@ -138,38 +127,10 @@ Before you start, audit your components using this classification:
 | **Refactorable** (yellow) | Mix of data fetching and interactivity                     | Split into a Server Component (data) + Client Component (interaction) |
 | **Client-only** (red)     | Uses `useState`, `useEffect`, event handlers, browser APIs | Keep `'use client'` -- these remain Client Components                 |
 
-## Migration Readiness Checklist
-
-Before starting any component migration, verify these items. Skipping them is the most common source of wasted debugging time:
-
-### Infrastructure
-
-- [ ] **React 19 installed** -- both `react` and `react-dom` at 19.x, with matching versions (`yarn why react` shows no duplicates)
-- [ ] **Node renderer configured** -- RSC requires `NodeRenderer`, not ExecJS. If `config.server_renderer` is not set to `"NodeRenderer"`, migrate first
-- [ ] **`react-on-rails-rsc` 19.0.4+** -- earlier versions vendored stale React builds. Check with `yarn why react-on-rails-rsc`
-- [ ] **Three webpack bundles building** -- client, server, and RSC bundles all compile without errors
-- [ ] **RSC manifests generated** -- `react-client-manifest.json` and `react-server-client-manifest.json` exist in your webpack output directory
-- [ ] **RSC payload route mounted** -- `rsc_payload_route` in `config/routes.rb`
-- [ ] **Procfile.dev updated** -- separate watcher process for the RSC bundle (`HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch`)
-
-### Common Pre-Migration Mistakes
-
-These mistakes account for the majority of setup failures:
-
-| Mistake                                                         | Symptom                                                           | Fix                                                                                                                                               |
-| --------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Missing `rsc_payload_route` in routes                           | 404 on RSC payload requests                                       | Add `rsc_payload_route` to `config/routes.rb`                                                                                                     |
-| Only 2 webpack bundles (forgot RSC)                             | Components remain Client Components after removing `'use client'` | Create `rscWebpackConfig.js` and add to build pipeline ([Step 4](rsc-preparing-app.md#step-4-set-up-the-rsc-webpack-bundle))                      |
-| `'use client'` on bundle entry files instead of component files | Can't migrate components individually                             | Move `'use client'` to each component source file ([Step 5](rsc-preparing-app.md#step-5-add-use-client-to-all-registered-component-entry-points)) |
-| Missing `'use client'` on `.server.jsx` files                   | Auto-bundled components break after enabling RSC                  | `.server.jsx` is a bundle convention, not an RSC designation -- add `'use client'` to both `.client.jsx` and `.server.jsx`                        |
-| React version duplicates in `node_modules`                      | Cryptic hook errors, "Invalid hook call"                          | Deduplicate with `yarn why react` and webpack aliases                                                                                             |
-| Not switching to `stream_react_component`                       | No streaming benefits, components render synchronously            | Replace `react_component` with `stream_react_component` in views                                                                                  |
-| Missing `include ReactOnRailsPro::Stream` in controller         | `stream_view_containing_react_components` undefined               | Add the concern to controllers that render React components                                                                                       |
-
 ## Prerequisites
 
 - React 19+
-- [React on Rails Pro](../../pro/home-pro.md) 4+ with React on Rails 15+
+- [React on Rails Pro](https://pro.reactonrails.com/) 4+ with React on Rails 15+
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20+
@@ -177,7 +138,6 @@ These mistakes account for the majority of setup failures:
 
 ## Related Guides
 
-- [Upgrading an Existing Pro App to RSC](../../pro/react-server-components/upgrading-existing-pro-app.md) — generator-based runbook for adding RSC to an existing Pro app, including legacy webpack compatibility and verification checklist
 - [React 19 Native Metadata](../building-features/react-19-native-metadata.md) — replace react-helmet and `react_component_hash` with React 19's built-in `<title>`, `<meta>`, and `<link>` hoisting. Native metadata works with streaming and RSC out of the box.
 
 ## References

@@ -24,21 +24,13 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 ### Workers crashing with memory leaks
 
-**Symptom**: Node renderer workers restart frequently or OOM. Memory grows monotonically over time.
+**Symptom**: Node renderer workers restart frequently or OOM.
 
-**Root cause**: The Node Renderer reuses V8 VM contexts across requests. Any module-level state in your server bundle (caches, Sets, memoized functions) persists across all requests and can grow unboundedly. This is the most common cause of OOM in the Node Renderer.
+**Fixes**:
 
-**Immediate mitigations**:
-
-- Set `NODE_OPTIONS=--max-old-space-size=<MB>` to cap V8 heap size and force more aggressive garbage collection
-- Enable rolling restarts with `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts` — these periodically kill and restart workers, reclaiming all accumulated memory
-
-**Investigation**:
-
-- Profile memory using `node --inspect` and heap snapshots (see [Profiling guide](./profiling-server-side-rendering-code.md))
-- Search your server bundle code for module-level `Map`, `Set`, `{}` caches, and `_.memoize` calls — these are the most common leak sources
-- Use `config.ssr_pre_hook_js` to run cleanup code before each render (e.g., clearing global state)
-- See the [Memory Leaks guide](./js-memory-leaks.md) for detailed patterns, an audit checklist, and fixes
+- Enable rolling restarts with `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts` — use high values to avoid all workers being down simultaneously
+- Profile memory using `node --inspect` (see [Profiling guide](./profiling-server-side-rendering-code.md))
+- Check for global state leaks and use `config.ssr_pre_hook_js` to clear them
 
 ### Workers killed during streaming
 

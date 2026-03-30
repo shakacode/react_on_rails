@@ -1,7 +1,7 @@
 # React on Rails Pro Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](../../pro/home-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
 
 For general React on Rails configuration options, see [Configuration](README.md).
 
@@ -171,5 +171,5 @@ end
 
 ## Need Help?
 
-- **Pro Features:** [React on Rails Pro](../../pro/home-pro.md)
+- **Pro Features:** [React on Rails Pro](https://pro.reactonrails.com/)
 - **Consulting:** [justin@shakacode.com](mailto:justin@shakacode.com)

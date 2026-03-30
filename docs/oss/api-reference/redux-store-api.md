@@ -15,7 +15,7 @@ If you are only rendering one React component on a page, as is typical to do a "
 Consider using the `redux_store` helper for the two following use cases:
 
 1. You want to have multiple React components accessing the same store at once.
-2. You want to place the props to hydrate the client side stores at the very end of your HTML, probably server rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](../../pro/home-pro.md) if you're at all concerned about performance.
+2. You want to place the props to hydrate the client side stores at the very end of your HTML, probably server rendered, so that the browser can render all earlier HTML first. This is particularly useful if your props will be large. However, you're probably better off using [React on Rails Pro](https://github.com/shakacode/react_on_rails/wiki) if you're at all concerned about performance.
 
 ## Multiple React Components on a Page with One Store
 

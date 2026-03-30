@@ -8,11 +8,11 @@ This guide will have you rendering React components in your Rails app as quickly
 
 Before starting, make sure you have:
 
-- **🚨 React on Rails 16.4.0+** (this guide)
+- **🚨 React on Rails 16.0+** (this guide)
 - **🚨 Shakapacker 6+** (7+ recommended for React on Rails 16)
 - **Rails 7+** application (Rails 5.2+ supported)
 - **Ruby 3.0+** (required)
-- **Node.js 18+** and a package manager (**npm**, **pnpm**, **Yarn**, or **bun**)
+- **Node.js 20+** and a package manager (**npm**, **Yarn**, or **pnpm**)
 - **Foreman or Overmind** (for running `bin/dev`)
 - **Basic familiarity** with React and Rails
 
@@ -26,7 +26,7 @@ Add the React on Rails gem and run its installer:
 # Add the gem
 bundle add react_on_rails --strict
 
-# Optional but recommended: commit or stash first so generated files show as a clean diff
+# Optional but recommended: commit or stash first for easier diff review
 # git add . && git commit -m "Prepare for React on Rails install"
 
 # Run the installer for TypeScript
@@ -85,7 +85,7 @@ You should see a page with a React component saying "Hello World"!
 
 Let's make a quick change to see hot reloading in action:
 
-1. Open the generated HelloWorld component (`app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx`)
+1. Open `app/javascript/src/HelloWorld/ror_components/HelloWorld.client.tsx`
 2. Change the text from "Hello World" to "Hello from React!"
 3. Save the file
 4. Watch your browser automatically refresh
@@ -194,11 +194,11 @@ Now that you have React on Rails working, here's what to explore next:
 ### Go Pro
 
 :::tip Pro Upgrade
-Start at [React on Rails Pro](../../pro/home-pro.md) for the canonical route map. From there you can jump to the [upgrade guide](../../pro/upgrading-to-pro.md), [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Free to evaluate — no license needed for development.
+React on Rails Pro adds [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and a [Node renderer](../../pro/node-renderer.md) for 10-100x faster SSR. Free to evaluate — no license needed for development. [Upgrade guide →](../../pro/upgrading-to-pro.md)
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
-- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - Three-step migration from OSS
+- **[Upgrade to Pro](../../pro/upgrading-to-pro.md)** - React Server Components, streaming SSR, and 3-10x faster SSR
 
 ## 🆘 Need Help?
 
@@ -214,8 +214,8 @@ Start at [React on Rails Pro](../../pro/home-pro.md) for the canonical route map
 # Start development servers
 ./bin/dev
 
-# Generate React on Rails files with TypeScript support
-bin/rails generate react_on_rails:install --typescript
+# Generate React on Rails files
+bin/rails generate react_on_rails:install
 
 # Create a new component
 bin/rails generate react_on_rails:component MyComponent
@@ -226,9 +226,11 @@ pnpm run build  # or: yarn run build, npm run build
 
 ### Key File Locations
 
-- **Components (auto-bundling)**: `app/javascript/src/[ComponentName]/ror_components/`
+- **Components**: `client/app/bundles/[ComponentName]/components/`
+- **Registration**: `client/app/bundles/[ComponentName]/startup/registration.js`
+- **Packs**: `app/javascript/packs/`
 - **Config**: `config/initializers/react_on_rails.rb`
-- **Bundler config**: `config/shakapacker.yml`
+- **Webpack**: `config/shakapacker.yml`
 
 ---
 

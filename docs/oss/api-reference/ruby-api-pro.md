@@ -1,7 +1,7 @@
 # Ruby API (Pro)
 
-> **Pro Feature** — Available with [React on Rails Pro](../../pro/home-pro.md).
-> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+> **Pro Feature** — Available with [React on Rails Pro](https://pro.reactonrails.com).
+> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
 
 ## View Helpers
 

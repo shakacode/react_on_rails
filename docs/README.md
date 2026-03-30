@@ -23,8 +23,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 ### Evaluating Rails + React options
 
 - [Examples and migration references](https://reactonrails.com/examples)
-- [Compare with alternatives (narrative overview)](./oss/getting-started/comparing-react-on-rails-to-alternatives.md)
-- [Detailed feature matrix and benchmarks](./oss/getting-started/comparison-with-alternatives.md)
+- [Compare with alternatives](./oss/getting-started/comparison-with-alternatives.md)
 - [Migrate from react-rails](./oss/migrating/migrating-from-react-rails.md)
 
 ## Dive deeper when you need it
@@ -34,18 +33,14 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 - [API Reference](./oss/api-reference/view-helpers-api.md)
 - [Deployment and troubleshooting](./oss/deployment/README.md)
 - [Configuration](./oss/configuration/README.md)
-- [Changelog](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md)
+- [Changelog](./oss/upgrading/changelog.md)
 
 ## Pro features
 
-Start at [React on Rails Pro](./pro/home-pro.md) for the canonical Pro route map, then choose the feature family you need:
-
-- [React Server Components](./pro/react-server-components/tutorial.md) - RSC tutorial and deep dive
-- [Streaming SSR](./pro/streaming-ssr.md) - Progressive server rendering
-- [Node Renderer](./pro/node-renderer.md) - Dedicated Node.js rendering server
-- [Fragment Caching](./pro/fragment-caching.md) - Cache rendered components
+- [React Server Components](./pro/react-server-components/tutorial.md) - RSC with Rails
+- [Streaming SSR](./oss/building-features/streaming-server-rendering.md) - Progressive server rendering
+- [Node Renderer](./oss/building-features/node-renderer/basics.md) - Dedicated Node.js rendering server
 - [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
-- [Node Renderer: Container Deployment](./oss/building-features/node-renderer/container-deployment.md) (Pro) - Sidecar vs. separate workloads, memory tuning, troubleshooting
 
 ## Friendly evaluation policy
 

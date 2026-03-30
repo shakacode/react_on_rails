@@ -1,32 +1,53 @@
 # React on Rails Pro
 
-React on Rails Pro is the advanced rendering and performance tier for React on Rails. Start with the open-source integration, then add Pro when you need higher SSR throughput, React Server Components, streaming SSR, or dedicated Node renderer tooling.
+Support React on Rails development [by becoming a Github sponsor](https://github.com/sponsors/shakacode) and get these benefits:
 
-## Start Here
+1. 1-hour per month of support via Slack, PR reviews, and Zoom for React on Rails,
+   React-Rails, Shakapacker, rails/webpacker, ReScript (ReasonML), TypeScript, Rust, etc.
+2. React on Rails Pro Software that extends React on Rails with Node server rendering,
+   fragment caching, code-splitting, and other performance enhancements for React on Rails.
 
-- [Pro docs home](./home-pro.md) - Canonical landing page for Pro feature docs
-- [Upgrade from OSS to Pro](./upgrading-to-pro.md) - Three-step upgrade path
-- [Installation](./installation.md) - Fresh install or manual setup
-- [Configuration](../oss/configuration/configuration-pro.md) - Pro-specific runtime settings
+See the [React on Rails Pro Support Plan](https://pro.reactonrails.com/).
 
-## What Pro Adds
+ShakaCode can also help you with your custom software development needs. We specialize in
+marketplace and e-commerce applications that utilize both Rails and React.
+Because we own [HiChee.com](https://hichee.com), we can leverage that code for your app!
 
-- [React Server Components](./react-server-components/tutorial.md)
-- [Streaming SSR](./streaming-ssr.md)
-- [Fragment caching](./fragment-caching.md)
-- [Node renderer](./node-renderer.md)
-- [Code splitting and bundle caching](../oss/building-features/code-splitting.md)
+Please email Justin Gordon [justin@shakacode.com](mailto:justin@shakacode.com), the
+maintainer of React on Rails, for more information.
 
-## Evaluation and Licensing
+### Pro: Docs
 
-No license token is required for local development, evaluation, testing, CI/CD, or staging. Production deployments require a paid license.
+See the [React on Rails Pro docs home](./home-pro.md).
 
-If your organization is budget-constrained, email [justin@shakacode.com](mailto:justin@shakacode.com). We can provide free or low-cost licenses in qualifying cases. For larger companies, paid licenses support continued React on Rails development.
+### Pro: React Server Components
 
-See [Upgrading to Pro](./upgrading-to-pro.md#try-pro-risk-free) for the current licensing and upgrade details.
+See the [performance breakthroughs guide here](./major-performance-breakthroughs-upgrade-guide.md).
 
-## Need Help?
+Yes! Big performance gains for the newest React features!
 
-- [Docs home](./home-pro.md)
-- [Upgrade guide](./upgrading-to-pro.md)
-- [ShakaCode consulting](mailto:react_on_rails@shakacode.com)
+### Pro: Fragment Caching
+
+Fragment caching is a [React on Rails Pro](https://pro.reactonrails.com/) feature. Fragment caching is a **HUGE** performance booster for your apps. Use the `cached_react_component` and `cached_react_component_hash`. The API is the same as `react_component` and `react_component_hash`, but for 2 differences:
+
+1. The `cache_key` takes the same parameters as any Rails `cache` view helper.
+1. The **props** are passed via a block so that evaluation of the props is not done unless the cache is broken. Suppose you put your props calculation into some method called `some_slow_method_that_returns_props`:
+
+```ruby
+<%= cached_react_component("App", cache_key: [@user, @post], prerender: true) do
+  some_slow_method_that_returns_props
+end %>
+```
+
+Such fragment caching saves CPU work for your web server and greatly reduces the request time. It completely skips the evaluation costs of:
+
+1. Database calls to compute the props.
+2. Serialization the props values hash into a JSON string for evaluating JavaScript to server render.
+3. Costs associated with evaluating JavaScript from your Ruby code.
+4. Creating the HTML string containing the props and the server-rendered JavaScript code.
+
+Note, even without server rendering (without step 3 above), fragment caching is still effective.
+
+### Pro: Integration with Node.js for Server Rendering
+
+Default server rendering is done by ExecJS. If you want to use a Node.js server for better-performing server-side rendering, [email justin@shakacode.com](mailto:justin@shakacode.com). ShakaCode has built a premium Node rendering server that is part of [React on Rails Pro](https://pro.reactonrails.com).

@@ -58,7 +58,7 @@ can pass the redux option if you'd like to have redux setup for you automaticall
     Passing the --rsc generator option sets up React Server Components support.
     This automatically includes Pro setup (--rsc implies --pro). Creates RSC
     webpack configuration, a HelloServer example component, and RSC routes.
-    Requires React 19 with a compatible `react-on-rails-rsc` version.
+    Requires React 19.0.x.
 
 *******************************************************************************
 
@@ -209,7 +209,7 @@ rails generate react_on_rails:install --pro
 
 **Prerequisites:**
 
-- Add `gem 'react_on_rails_pro', '16.4.0'` (or later — pin to the exact version you want) to your Gemfile and run `bundle install`
+- Add `gem 'react_on_rails_pro', '>= 16.3.0'` to your Gemfile and run `bundle install`
 - Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license
 
 **What gets created:**
@@ -246,7 +246,7 @@ For existing apps, use the standalone Pro generator to avoid re-processing base 
 rails generate react_on_rails:pro
 ```
 
-See the [React on Rails Pro overview](../../pro/home-pro.md) for feature details.
+See the [React on Rails Pro overview](../../pro/react-on-rails-pro.md) for feature details.
 
 ### React Server Components Support
 
@@ -261,7 +261,7 @@ rails generate react_on_rails:install --rsc
 **Prerequisites:**
 
 - React on Rails Pro gem installed (see Pro prerequisites above)
-- React 19 with a compatible `react-on-rails-rsc` version
+- React 19.0.x (RSC is not yet supported on React 19.1.x or later)
 
 RSC builds on React on Rails Pro's Node rendering infrastructure. The generator adds a separate webpack entry point for server components, configures the `RSCWebpackPlugin` in both client and server webpack configs, and sets up the `RSC_BUNDLE_ONLY` environment variable handling in `ServerClientOrBoth.js` for independent RSC bundle compilation.
 

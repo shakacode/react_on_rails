@@ -169,9 +169,7 @@ export default function ProductPage({ productId }) {
 ```erb
 <%# ERB view — Rails passes the data as props %>
 <%= stream_react_component("ProductPage",
-      props: { product: @product.as_json(
-                 include: { specs: { only: [:id, :label, :value] },
-                            reviews: { only: [:id, :text, :rating] } }) }) %>
+      props: { product: @product.as_json(include: [:specs, :reviews]) }) %>
 ```
 
 ```jsx
@@ -333,7 +331,7 @@ export default function Homepage() {
 
 ## Pattern 4: Streaming with `stream_react_component`
 
-In React on Rails, `stream_react_component` uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree. Rails loads all data synchronously and passes it as props:
+In React on Rails, `stream_react_component` uses React's streaming SSR (`renderToPipeableStream`) to deliver HTML progressively. Rails passes all data as props, and the streaming infrastructure delivers the rendered output efficiently:
 
 ```erb
 <%# ERB view — Rails passes all data as props %>
@@ -368,7 +366,7 @@ export default function Stats({ stats }) {
 }
 ```
 
-Rails loads all data as props before rendering begins. `stream_react_component` then streams the rendered HTML to the browser as React processes the component tree — no client-side fetching or loading states needed.
+`stream_react_component` streams the rendered HTML progressively to the browser. All data is available as props -- no client-side fetching or loading states needed.
 
 ## Pattern 5: Server Data to Interactive Client Components
 
@@ -433,11 +431,9 @@ export default function Comments({ comments }) {
 | `window`, `document`, `localStorage`              | Client         | Browser APIs                          |
 | Custom hooks using the above                      | Client         | Transitively client                   |
 | Data fetching (database, API)                     | Server         | Direct backend access, no bundle cost |
-| Rendering static/display-only content             | Server\*       | No JavaScript shipped                 |
+| Rendering static/display-only content             | Server         | No JavaScript shipped                 |
 | Using server-only secrets (API keys)              | Server         | Never exposed to client               |
 | Heavy dependencies (Markdown parsers, formatters) | Server         | Dependencies stay off client bundle   |
-
-_\*For components repeated many times with verbose markup (e.g., Tailwind utility classes), Server Component rendering can inflate the Flight payload. In those cases, a Client Component may produce a smaller page. See [Flight Payload Optimization](rsc-flight-payload.md) for details._
 
 ## Common Mistakes
 
@@ -505,7 +501,7 @@ export function ClientWrapper({ children }) {
 
 ### Mistake 3: Chunk contamination from shared `'use client'` files
 
-If your RSC page downloads unexpectedly large chunks, a shared `'use client'` component may accumulate chunks from multiple entry paths (including heavy SSR/client paths with unrelated dependencies). This can cause the browser to download hundreds of kilobytes of JavaScript it doesn't need. See [Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) for wrapper and prop-injection fixes.
+If your RSC page downloads unexpectedly large chunks, a shared `'use client'` component may be mapped to a heavy chunk group containing unrelated dependencies. This can cause the browser to download hundreds of kilobytes of JavaScript it doesn't need. See [Chunk Contamination](rsc-troubleshooting.md#chunk-contamination) for how to detect and fix it.
 
 ### Mistake 4: Confusing `'use client'` with `'use server'`
 
