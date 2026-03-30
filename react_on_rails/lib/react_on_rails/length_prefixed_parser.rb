@@ -85,8 +85,9 @@ module ReactOnRails
 
       tab_idx = header.index("\t")
       unless tab_idx
+        header_str = header.force_encoding(Encoding::UTF_8).inspect
         raise ReactOnRails::Error,
-              "Malformed length-prefixed header: missing tab separator in: #{header.force_encoding(Encoding::UTF_8).inspect}"
+              "Malformed length-prefixed header: missing tab separator in: #{header_str}"
       end
 
       parse_length_prefixed_header(header, tab_idx)
@@ -106,8 +107,9 @@ module ReactOnRails
       begin
         @metadata = JSON.parse(meta_json.force_encoding(Encoding::UTF_8))
       rescue JSON::ParserError => e
+        meta_str = meta_json.force_encoding(Encoding::UTF_8).inspect
         raise ReactOnRails::Error,
-              "Malformed length-prefixed header: invalid metadata JSON: #{meta_json.force_encoding(Encoding::UTF_8).inspect} (#{e.message})"
+              "Malformed length-prefixed header: invalid metadata JSON: #{meta_str} (#{e.message})"
       end
 
       @state = :content
