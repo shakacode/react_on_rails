@@ -924,7 +924,7 @@ describe ReactOnRailsProHelper do
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
                               count: 1) do |yielder|
         chunks.each do |chunk|
-          yielder.call("#{chunk.to_json}\n")
+          yielder.call(to_length_prefixed(chunk))
         end
       end
     end

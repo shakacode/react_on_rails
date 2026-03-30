@@ -10,7 +10,10 @@ RSpec.describe "RSC payload endpoint" do
   def parsed_chunks
     parser = ReactOnRails::LengthPrefixedParser.new
     chunks = []
-    parser.feed(response.body.b) { |chunk| chunks << chunk }
+    # Strip HTML comments (e.g., Rails view annotation comments like <!-- BEGIN ... -->)
+    # and any resulting empty lines, which would break the strict length-prefixed parser.
+    body = response.body.b.gsub(/<!--.*?-->/m, "").gsub(/^\s*\n/, "")
+    parser.feed(body) { |chunk| chunks << chunk }
     chunks
   end
 
