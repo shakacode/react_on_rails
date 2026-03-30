@@ -256,6 +256,49 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
   end
 
+  describe "browser auto-open readiness" do
+    it "normalizes routes to request paths" do
+      expect(described_class.send(:build_request_path, nil)).to eq("/")
+      expect(described_class.send(:build_request_path, "/")).to eq("/")
+      expect(described_class.send(:build_request_path, "hello_world")).to eq("/hello_world")
+      expect(described_class.send(:build_request_path, "/hello_server")).to eq("/hello_server")
+    end
+
+    it "treats a successful response as ready" do
+      response = Net::HTTPOK.new("1.1", "200", "OK")
+      allow(described_class).to receive(:http_get_localhost).with(3000, "/").and_return(response)
+
+      expect(described_class.send(:app_route_ready?, 3000, "/")).to be true
+    end
+
+    it "treats a redirect response as ready" do
+      response = Net::HTTPFound.new("1.1", "302", "Found")
+      allow(described_class).to receive(:http_get_localhost).with(3000, "/").and_return(response)
+
+      expect(described_class.send(:app_route_ready?, 3000, "/")).to be true
+    end
+
+    it "does not treat a server error response as ready" do
+      response = Net::HTTPInternalServerError.new("1.1", "500", "Internal Server Error")
+      allow(described_class).to receive(:http_get_localhost).with(3000, "/").and_return(response)
+
+      expect(described_class.send(:app_route_ready?, 3000, "/")).to be false
+    end
+
+    it "waits for the route to respond successfully before opening the browser" do
+      allow(described_class).to receive(:browser_auto_open_allowed?).and_return(true)
+      original_report_on_exception = Thread.current.report_on_exception
+      allow(Thread).to receive(:new).and_yield
+      allow(described_class).to receive(:wait_for_app_route).with(3000, "/").and_return(true)
+      allow(described_class).to receive(:prepare_browser_open_once_marker).with(true).and_return(:claimed)
+      expect(described_class).to receive(:open_browser).with("http://localhost:3000").and_return(true)
+
+      described_class.send(:schedule_browser_open, 3000, route: "/", once: true)
+    ensure
+      Thread.current.report_on_exception = original_report_on_exception
+    end
+  end
+
   describe ".kill_processes" do
     before do
       allow_any_instance_of(Kernel).to receive(:`).and_return("")
@@ -1011,7 +1054,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       stub_const("#{described_class}::OPEN_BROWSER_ONCE_MARKER", File.join(marker_dir, "browser_opened_once"))
       allow(described_class).to receive_messages(
         browser_auto_open_allowed?: true,
-        wait_for_server_on_port: true
+        wait_for_app_route: true
       )
     end
 
@@ -1025,7 +1068,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     it "warns when the browser-open thread raises unexpectedly" do
-      allow(described_class).to receive(:wait_for_server_on_port).and_raise(SocketError, "boom")
+      allow(described_class).to receive(:wait_for_app_route).and_raise(SocketError, "boom")
       expect(described_class).to receive(:warn).with("[react_on_rails] Browser auto-open failed: boom")
 
       described_class.send(:schedule_browser_open, 3000, route: "/", once: false).join
