@@ -139,34 +139,13 @@ async function handleNewBundleProvided(
         `Completed moving uploaded file ${providedNewBundle.bundle.savedFilePath} to ${bundleFilePathPerTimestamp}`,
       );
     } catch (error) {
-      // On Windows and some cross-device move fallbacks, fs-extra can surface
-      // EEXIST if a competing write already created the destination path.
-      const isExistingBundleWriteConflict =
-        (error as NodeJS.ErrnoException).code === 'EEXIST' &&
-        (await fileExistsAsync(bundleFilePathPerTimestamp));
-      if (isExistingBundleWriteConflict) {
-        log.warn(
-          'Bundle already existed when writing %s while lock was held. Preserving existing bundle, but content was not re-verified in this process.',
+      // If another process completed the bundle while we were writing,
+      // the directory is in a valid state — no error to surface.
+      if (await isBundleComplete(providedNewBundle.timestamp)) {
+        log.info(
+          'Bundle %s was completed by another process during write. Skipping.',
           bundleFilePathPerTimestamp,
         );
-        try {
-          if (assetsToCopy) {
-            await copyUploadedAssets(assetsToCopy, bundleDirectory);
-          }
-          // Complete-marker writes are idempotent. This keeps the loser path safe
-          // even if the competing writer exits after moving bundle bytes.
-          if (!(await isBundleComplete(providedNewBundle.timestamp))) {
-            await markBundleComplete(providedNewBundle.timestamp);
-          }
-        } catch (recoveryError) {
-          const msg = formatExceptionMessage(
-            renderingRequest,
-            recoveryError,
-            `Error during EEXIST recovery for bundle ${bundleFilePathPerTimestamp}`,
-          );
-          log.error(msg);
-          return errorResponseResult(msg);
-        }
         return undefined;
       }
 
