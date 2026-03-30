@@ -36,6 +36,21 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "creates the shakapacker watch wrapper and uses it in Procfiles" do
+      assert_file "bin/shakapacker-watch" do |content|
+        expect(content).to include('bin/shakapacker "$@" &')
+        expect(content).to include("trap cleanup INT TERM")
+      end
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=yes bin/shakapacker-watch --watch")
+      end
+
+      assert_file "Procfile.dev-static-assets" do |content|
+        expect(content).to include("js: bin/shakapacker-watch --watch")
+      end
+    end
+
     it "installs appropriate transpiler dependencies based on Shakapacker version" do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
@@ -1512,6 +1527,7 @@ describe InstallGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("RSC_BUNDLE_ONLY=yes")
         expect(content).to include("rsc-bundle:")
+        expect(content).to include("bin/shakapacker-watch --watch")
       end
     end
 
