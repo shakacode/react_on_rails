@@ -76,13 +76,12 @@ export function buildLengthPrefixedResult(
   //   "object" — JSON-serialized value, needs JSON.parse (ServerRenderHash or null)
   const metadataObj = buildRenderMetadata(consoleReplayScript, renderState);
   let htmlStr: string;
-  if (html == null) {
-    metadataObj.payloadType = 'object';
-    htmlStr = JSON.stringify(html); // "null"
-  } else if (typeof html === 'string') {
+  if (typeof html === 'string') {
     metadataObj.payloadType = 'string';
     htmlStr = html;
   } else {
+    // Handles null, ServerRenderHashRenderedHtml objects, etc.
+    // JSON.stringify(null) → "null", which Ruby will JSON.parse back.
     metadataObj.payloadType = 'object';
     htmlStr = JSON.stringify(html);
   }
