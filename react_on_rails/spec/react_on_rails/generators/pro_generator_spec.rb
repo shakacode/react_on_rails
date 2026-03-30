@@ -45,7 +45,7 @@ describe ProGenerator, type: :generator do
       expect(generator.send(:missing_pro_gem?, force: true)).to be true
       expect(Bundler).to have_received(:with_unbundled_env)
       expect(Process).to have_received(:spawn)
-        .with("bundle add react_on_rails_pro --version='#{ReactOnRails::VERSION}' --strict",
+        .with("bundle add react_on_rails_pro --version='#{generator.send(:pro_gem_version_requirement)}' --strict",
               out: anything, err: anything)
       error_text = GeneratorMessages.messages.join("\n")
       # Standalone message should NOT mention --pro flag
@@ -57,8 +57,11 @@ describe ProGenerator, type: :generator do
 
   describe "#run_generator" do
     let(:generator) { described_class.new }
+    let(:gemfile_path) { File.join(destination_root, "Gemfile") }
 
     before do
+      prepare_destination
+      allow(generator).to receive(:destination_root).and_return(destination_root)
       allow(generator).to receive(:print_generator_messages)
     end
 
@@ -71,6 +74,48 @@ describe ProGenerator, type: :generator do
 
       generator.run_generator
 
+      expect(generator).not_to have_received(:setup_pro)
+      expect(generator).not_to have_received(:add_pro_npm_dependencies)
+      expect(generator).not_to have_received(:update_imports_to_pro_package)
+      expect(generator).not_to have_received(:print_success_message)
+    end
+
+    it "passes the pre-prerequisite Gemfile snapshot into rollback handling" do
+      original_gemfile = <<~RUBY
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0"
+      RUBY
+      simulate_existing_file("Gemfile", original_gemfile)
+
+      allow(generator).to receive(:base_react_on_rails_installed?).and_return(true)
+      allow(generator).to receive(:attempt_pro_gem_auto_install) do
+        File.write(gemfile_path, <<~RUBY)
+          source "https://rubygems.org"
+          gem "react_on_rails", "~> 16.0"
+          gem "react_on_rails_pro", "~> 16.0"
+        RUBY
+        true
+      end
+      allow(generator).to receive(:setup_pro)
+      allow(generator).to receive(:add_pro_npm_dependencies)
+      allow(generator).to receive(:update_imports_to_pro_package)
+      allow(generator).to receive(:print_success_message)
+
+      captured_original_gemfile_content = nil
+      allow(generator).to receive(:bundle_install_after_gem_swap) do |gemfile_path:, original_gemfile_content:|
+        captured_original_gemfile_content = original_gemfile_content
+        generator.send(
+          :rollback_gemfile_after_failed_bundle_install,
+          gemfile_path: gemfile_path,
+          original_gemfile_content: original_gemfile_content
+        )
+        false
+      end
+
+      generator.run_generator
+
+      expect(captured_original_gemfile_content).to eq(original_gemfile)
+      expect(File.read(gemfile_path)).to eq(original_gemfile)
       expect(generator).not_to have_received(:setup_pro)
       expect(generator).not_to have_received(:add_pro_npm_dependencies)
       expect(generator).not_to have_received(:update_imports_to_pro_package)
@@ -97,7 +142,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).not_to match(/gem\s+["']react_on_rails["']/)
       expect(generator).to have_received(:bundle_install_after_gem_swap)
@@ -113,7 +158,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\", require: false")
       expect(gemfile_content).to include("if: ENV[\"ENABLE_ROR\"]")
       expect(gemfile_content).not_to include("gem \"react_on_rails\",")
@@ -129,7 +174,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\", require: false")
       expect(gemfile_content).not_to include(">= 15.0")
       expect(gemfile_content).not_to include("< 16.0")
@@ -148,7 +193,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("  gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
@@ -164,7 +209,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).not_to include("gem \"react_on_rails\",")
       expect(gemfile_content).not_to include("  \"~> 16.0\"")
@@ -182,7 +227,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).not_to include("gem \"react_on_rails\", # pinned for compatibility")
       expect(gemfile_content).not_to include("  \"~> 16.0\"")
@@ -199,7 +244,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).not_to include("gem \"react_on_rails\",#pinned for compatibility")
       expect(gemfile_content).not_to include("  \"~> 16.0\"")
@@ -218,7 +263,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).to include("gem \"rails\"")
       expect(gemfile_content).not_to include("~> 16.0")
@@ -237,7 +282,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).to include("gem \"rails\"")
       expect(gemfile_content).not_to include("~> 16.0")
@@ -254,7 +299,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).to include("gem \"rails\"")
     end
@@ -269,7 +314,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem 'react_on_rails_pro', '#{expected_version}'")
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
@@ -284,7 +329,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).not_to include("gem \"react_on_rails_pro\", \"#{expected_version}\")")
       expect(gemfile_content).not_to include('gem("react_on_rails"')
@@ -301,7 +346,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\", require: false")
       expect(gemfile_content).to include('if: ENV.fetch("ENABLE_ROR", false)')
       expect(gemfile_content).not_to include("false))")
@@ -320,7 +365,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).not_to include('"react_on_rails"')
       expect(gemfile_content).not_to include('"~> 16.0"')
@@ -340,7 +385,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\",")
       expect(gemfile_content).to include("require: false")
       expect(gemfile_content).not_to include('gem("react_on_rails"')
@@ -362,7 +407,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\",")
       expect(gemfile_content).to include("require: false,")
       expect(gemfile_content).to include('if: ENV["ENABLE_ROR"]')
@@ -384,7 +429,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).not_to include('"~> 16.0"')
       expect(gemfile_content).not_to include("gem(")
@@ -404,7 +449,7 @@ describe ProGenerator, type: :generator do
       expect { generator.send(:swap_base_gem_for_pro_in_gemfile) }.not_to raise_error
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\",")
       expect(gemfile_content).to include("require: false")
       expect(gemfile_content).not_to include("gem(")
@@ -425,7 +470,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).not_to include('"react_on_rails"')
       expect(gemfile_content).to include('if: ENV.fetch("ENABLE_ROR") { true }')
@@ -505,7 +550,7 @@ describe ProGenerator, type: :generator do
       generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       gemfile_content = File.read(gemfile_path)
-      expected_version = ReactOnRails::VERSION
+      expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
       expect(gemfile_content).not_to include("gem \"react_on_rails\" # pinned for compatibility")
       expect(generator).to have_received(:bundle_install_after_gem_swap)
@@ -525,6 +570,44 @@ describe ProGenerator, type: :generator do
       pretend_generator.send(:swap_base_gem_for_pro_in_gemfile)
 
       expect(File.read(gemfile_path)).to eq(original_content)
+    end
+
+    it "returns false and warns when neither base nor pro gem entries are present" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "rails"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      result = generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      expect(result).to be(false)
+      expect(File.read(gemfile_path)).to include('gem "rails"')
+      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Could not find react_on_rails or react_on_rails_pro in Gemfile")
+    end
+
+    it "returns false when only an auto-installed Pro gem entry is present" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "rails"
+        gem "react_on_rails_pro", "~> 16.0"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      result = generator.send(
+        :swap_base_gem_for_pro_in_gemfile,
+        original_gemfile_content_for_rollback: <<~RUBY
+          source "https://rubygems.org"
+          gem "rails"
+        RUBY
+      )
+
+      expect(result).to be(false)
+      expect(generator).not_to have_received(:bundle_install_after_gem_swap)
+      expect(GeneratorMessages.messages.join("\n"))
+        .to include("Could not find react_on_rails or react_on_rails_pro in Gemfile")
     end
 
     it "preserves Gemfile file mode when writing updates" do
@@ -874,6 +957,20 @@ describe ProGenerator, type: :generator do
       expect(rewritten).to include('import ReactOnRails from "react-on-rails";')
       expect(rewritten).to include('import ReactOnRails from "react-on-rails-pro";')
       expect(rewritten.scan("react-on-rails-pro").size).to eq(1)
+    end
+
+    it "ignores backticks that only appear inside multiline block comments" do
+      source = <<~JS
+        /* docs start
+         docs use `code
+        end */
+        import ReactOnRails from "react-on-rails";
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include("docs use `code")
+      expect(rewritten).to include('import ReactOnRails from "react-on-rails-pro";')
     end
 
     it "detects unclosed block comments when multiple block markers appear on one line" do

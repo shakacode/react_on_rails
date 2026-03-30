@@ -30,9 +30,13 @@ module ReactOnRails
                    hide: true
 
       def run_generator
+        original_gemfile_content_before_prerequisites = read_current_gemfile_content
+
         # When invoked by install_generator, skip prerequisites (parent already validated)
         if options[:invoked_by_install] || prerequisites_met?
-          return unless options[:invoked_by_install] || swap_base_gem_for_pro_in_gemfile
+          return unless options[:invoked_by_install] || swap_base_gem_for_pro_in_gemfile(
+            original_gemfile_content_for_rollback: original_gemfile_content_before_prerequisites
+          )
 
           setup_pro
           add_pro_npm_dependencies
@@ -51,14 +55,17 @@ module ReactOnRails
 
       private
 
-      def prerequisites_met?
-        !(missing_base_installation? || missing_pro_gem?(force: true))
+      def read_current_gemfile_content
+        gemfile_path = File.join(destination_root, "Gemfile")
+        return unless File.exist?(gemfile_path)
+
+        File.read(gemfile_path)
+      rescue StandardError
+        nil
       end
 
-      def pro_gem_version_requirement
-        return super if options[:invoked_by_install]
-
-        ReactOnRails::VERSION
+      def prerequisites_met?
+        !(missing_base_installation? || missing_pro_gem?(force: true))
       end
 
       def missing_base_installation?
@@ -88,7 +95,7 @@ module ReactOnRails
       end
 
       # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-      def swap_base_gem_for_pro_in_gemfile
+      def swap_base_gem_for_pro_in_gemfile(original_gemfile_content_for_rollback: nil)
         gemfile_path = File.join(destination_root, "Gemfile")
         unless File.exist?(gemfile_path)
           add_missing_gemfile_warning(gemfile_path)
@@ -100,9 +107,12 @@ module ReactOnRails
         base_gem_pattern = /^(\s*)gem(?:\s+|\(\s*)(["'])react_on_rails\2(?=\s*(?:,|\)|#|$))/
 
         has_pro_gem_entry = gemfile_content.match?(pro_gem_pattern)
+        had_pro_gem_entry_before_prerequisites =
+          original_gemfile_content_for_rollback&.match?(pro_gem_pattern)
         gemfile_lines = gemfile_content.lines
         updated_lines = []
         pro_entry_added = has_pro_gem_entry
+        base_gem_entry_found = false
         line_index = 0
 
         while line_index < gemfile_lines.length
@@ -110,6 +120,7 @@ module ReactOnRails
           multiline_parenthesized_match = match_multiline_parenthesized_base_gem(gemfile_lines, line_index)
 
           if multiline_parenthesized_match
+            base_gem_entry_found = true
             unless pro_entry_added
               indentation = multiline_parenthesized_match[:indentation]
               quote = multiline_parenthesized_match[:quote]
@@ -133,6 +144,8 @@ module ReactOnRails
             line_index += 1
             next
           end
+
+          base_gem_entry_found = true
 
           unless pro_entry_added
             indentation = match[1]
@@ -159,7 +172,14 @@ module ReactOnRails
         end
 
         updated_content = updated_lines.join
-        return true if updated_content == gemfile_content
+        if updated_content == gemfile_content
+          unless base_gem_entry_found || had_pro_gem_entry_before_prerequisites
+            add_missing_react_on_rails_gem_warning
+            return false
+          end
+
+          return true
+        end
 
         if has_pro_gem_entry
           say "ℹ️  Existing react_on_rails_pro Gemfile entry detected; preserving current version constraint", :yellow
@@ -170,7 +190,7 @@ module ReactOnRails
           return true
         end
 
-        original_gemfile_content = gemfile_content
+        original_gemfile_content = original_gemfile_content_for_rollback || gemfile_content
         atomic_write_file(gemfile_path, updated_content)
         say "✅ Replaced react_on_rails with react_on_rails_pro in Gemfile", :green
         bundle_install_after_gem_swap(
@@ -394,6 +414,16 @@ module ReactOnRails
         MSG
       end
 
+      def add_missing_react_on_rails_gem_warning
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Could not find react_on_rails or react_on_rails_pro in Gemfile.
+
+          If this app declares the gem in a .gemspec or another included file,
+          please update it manually:
+            replace react_on_rails with react_on_rails_pro
+        MSG
+      end
+
       # rubocop:disable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/MethodLength
       # rubocop:disable Metrics/PerceivedComplexity, Style/ExplicitBlockArgument
       def rewrite_non_comment_lines(content)
@@ -404,7 +434,7 @@ module ReactOnRails
 
         content.lines.map do |line|
           stripped = line.lstrip
-          line_for_template_literal_state = line_for_template_literal_tracking(line)
+          line_for_template_literal_state = line_for_template_literal_tracking(line, in_block_comment: in_block_comment)
           line_contains_unescaped_backtick =
             line_has_unescaped_backtick?(line, line_for_tracking: line_for_template_literal_state)
 
@@ -583,9 +613,37 @@ module ReactOnRails
         line_without_comments.sub(/\s*#.*$/, "")
       end
 
-      def line_for_template_literal_tracking(line)
+      def line_for_template_literal_tracking(line, in_block_comment: false)
         line_without_quoted_literals = line.gsub(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/, "")
-        line_without_quoted_literals.sub(%r{//.*$}, "")
+        line_for_comment_aware_template_tracking(
+          line_without_quoted_literals,
+          in_block_comment: in_block_comment
+        )
+      end
+
+      def line_for_comment_aware_template_tracking(line, in_block_comment:)
+        tracked_line = +""
+        scan_index = 0
+
+        while scan_index < line.length
+          if in_block_comment
+            closing_index = line.index("*/", scan_index)
+            return tracked_line unless closing_index
+
+            in_block_comment = false
+            scan_index = closing_index + 2
+          elsif line[scan_index, 2] == "//"
+            break
+          elsif line[scan_index, 2] == "/*"
+            in_block_comment = true
+            scan_index += 2
+          else
+            tracked_line << line[scan_index]
+            scan_index += 1
+          end
+        end
+
+        tracked_line
       end
 
       def line_has_unescaped_backtick?(line, line_for_tracking: nil)
@@ -748,7 +806,7 @@ module ReactOnRails
         normalized_suffix = normalized_suffix.sub(/\)(\s*(?:#.*)?\n)\z/, '\1') if parenthesized_gem_call
 
         "#{indentation}gem #{quote}react_on_rails_pro#{quote}, " \
-          "#{quote}#{ReactOnRails::VERSION}#{quote}#{normalized_suffix}"
+          "#{quote}#{pro_gem_version_requirement}#{quote}#{normalized_suffix}"
       end
 
       def print_success_message
