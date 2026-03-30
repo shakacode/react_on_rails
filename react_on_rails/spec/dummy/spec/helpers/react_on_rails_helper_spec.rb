@@ -487,7 +487,15 @@ describe ReactOnRailsHelper do
         function runGeneratedCode(generatedCode) {
           var ReactOnRails = {
             handleError: function() { return ''; },
-            getConsoleReplayScript: function() { return ''; }
+            getConsoleReplayScript: function() { return ''; },
+            prepareRenderResult: function(html, consoleReplayScript, hasErrors, renderingError) {
+              return JSON.stringify({
+                html: html,
+                consoleReplayScript: consoleReplayScript,
+                hasErrors: hasErrors,
+                renderingError: renderingError || null
+              });
+            }
           };
           // Evaluate generated wrapper JS in a test sandbox before Ruby post-processing.
           return eval(generatedCode);
