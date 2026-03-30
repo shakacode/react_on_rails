@@ -22,6 +22,15 @@ describe ReactOnRailsProHelper do
   # In order to test the pro helper, we need to load the methods from the regular helper.
   # I couldn't see any easier way to do this.
   include ReactOnRails::Helper
+
+  # Converts a chunk Hash to length-prefixed format for mock streaming responses.
+  # Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
+  def to_length_prefixed(chunk)
+    html = chunk[:html] || chunk["html"] || ""
+    metadata = chunk.except(:html, "html")
+    content_bytes = html.bytesize.to_s(16).rjust(8, "0")
+    "#{metadata.to_json}\t#{content_bytes}\n#{html}"
+  end
   include ReactOnRailsPro::Stream
   include Shakapacker::Helper
   include ApplicationHelper
@@ -330,15 +339,6 @@ describe ReactOnRailsProHelper do
       <<-HTML.strip
         <div id="TestingStreamableComponent-react-component-0">#{chunks.first[:html]}</div>
       HTML
-    end
-
-    # Converts a chunk Hash to length-prefixed format for mock streaming responses.
-    # Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
-    def to_length_prefixed(chunk)
-      html = chunk[:html] || chunk["html"] || ""
-      metadata = chunk.except(:html, "html")
-      content_bytes = html.bytesize.to_s(16).rjust(8, "0")
-      "#{metadata.to_json}\t#{content_bytes}\n#{html}"
     end
 
     # mock_chunks can be an Async::Queue or an Array
