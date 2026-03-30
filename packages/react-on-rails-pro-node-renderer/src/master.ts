@@ -110,7 +110,6 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
       errorReporter.message(msg);
       process.exit(1);
-      return;
     }
 
     // TODO: Track last rendering request per worker.id

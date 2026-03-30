@@ -531,9 +531,11 @@ export default function run(config: Partial<Config>) {
               }
               process.exit(1);
             });
+            return;
           } catch (sendErr) {
             log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
             process.exit(1);
+            return;
           }
         }
 
