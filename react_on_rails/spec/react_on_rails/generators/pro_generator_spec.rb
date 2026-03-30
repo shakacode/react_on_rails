@@ -45,13 +45,36 @@ describe ProGenerator, type: :generator do
       expect(generator.send(:missing_pro_gem?, force: true)).to be true
       expect(Bundler).to have_received(:with_unbundled_env)
       expect(Process).to have_received(:spawn)
-        .with(a_string_matching(/\Abundle add react_on_rails_pro --version='~> [\d.]+' --strict\z/),
+        .with("bundle add react_on_rails_pro --version='#{ReactOnRails::VERSION}' --strict",
               out: anything, err: anything)
       error_text = GeneratorMessages.messages.join("\n")
       # Standalone message should NOT mention --pro flag
       expect(error_text).to include("This generator requires the react_on_rails_pro gem")
       expect(error_text).not_to include("You specified")
       expect(error_text).to include("react_on_rails_pro")
+    end
+  end
+
+  describe "#run_generator" do
+    let(:generator) { described_class.new }
+
+    before do
+      allow(generator).to receive(:print_generator_messages)
+    end
+
+    it "stops before setup when the Gemfile swap fails" do
+      allow(generator).to receive_messages(prerequisites_met?: true, swap_base_gem_for_pro_in_gemfile: false)
+      allow(generator).to receive(:setup_pro)
+      allow(generator).to receive(:add_pro_npm_dependencies)
+      allow(generator).to receive(:update_imports_to_pro_package)
+      allow(generator).to receive(:print_success_message)
+
+      generator.run_generator
+
+      expect(generator).not_to have_received(:setup_pro)
+      expect(generator).not_to have_received(:add_pro_npm_dependencies)
+      expect(generator).not_to have_received(:update_imports_to_pro_package)
+      expect(generator).not_to have_received(:print_success_message)
     end
   end
 
@@ -606,6 +629,7 @@ describe ProGenerator, type: :generator do
       simulate_existing_file("app/javascript/packs/application.js", <<~JS)
         import ReactOnRails from "react-on-rails";
         const ror = require("react-on-rails");
+        const commentedRequire = require(/* webpackIgnore: true */ "react-on-rails");
         const lazyRor = import(/* webpackChunkName: "ror" */ "react-on-rails");
         const lazyRorMultiline = import(
           /* webpackMode: "lazy" */
@@ -620,6 +644,7 @@ describe ProGenerator, type: :generator do
         import ReactOnRailsServer from "react-on-rails/server";
         import ReactOnRailsClient from "react-on-rails/client";
         import "react-on-rails";
+        export { default as ReactOnRailsExport } from "react-on-rails";
         import CustomPackage from "react-on-rails-utils";
         const scoped = "@scope/react-on-rails";
         const url = "https://cdn.example.com/react-on-rails/client.js";
@@ -650,6 +675,7 @@ describe ProGenerator, type: :generator do
 
       expect(File.read(application_js_path)).to include('import ReactOnRails from "react-on-rails-pro";')
       expect(File.read(application_js_path)).to include('require("react-on-rails-pro")')
+      expect(File.read(application_js_path)).to include('require(/* webpackIgnore: true */ "react-on-rails-pro")')
       expect(File.read(application_js_path)).to include('import(/* webpackChunkName: "ror" */ "react-on-rails-pro")')
       expect(File.read(application_js_path)).to include('"react-on-rails-pro/client"')
       expect(File.read(application_js_path)).to include('"react-on-rails-pro/server"')
@@ -659,6 +685,9 @@ describe ProGenerator, type: :generator do
       expect(File.read(application_js_path)).to include('import ReactOnRailsServer from "react-on-rails-pro/server";')
       expect(File.read(application_js_path)).to include('import ReactOnRailsClient from "react-on-rails-pro/client";')
       expect(File.read(application_js_path)).to include('import "react-on-rails-pro";')
+      expect(File.read(application_js_path)).to include(
+        'export { default as ReactOnRailsExport } from "react-on-rails-pro";'
+      )
       expect(File.read(application_js_path)).to include('import CustomPackage from "react-on-rails-utils";')
       expect(File.read(application_js_path)).to include('const scoped = "@scope/react-on-rails";')
       expect(File.read(application_js_path)).to include('const url = "https://cdn.example.com/react-on-rails/client.js";')
@@ -743,6 +772,22 @@ describe ProGenerator, type: :generator do
       expect(rewritten).to include('"react-on-rails-pro";')
     end
 
+    it "rewrites re-export statements from react-on-rails" do
+      source = <<~JS
+        export { default as ReactOnRailsExport } from "react-on-rails";
+        export type {
+          ReactOnRailsComponent
+        } from
+          "react-on-rails";
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('export { default as ReactOnRailsExport } from "react-on-rails-pro";')
+      expect(rewritten).to include('"react-on-rails-pro";')
+      expect(rewritten.scan("react-on-rails-pro").size).to eq(2)
+    end
+
     it "does not rewrite imports inside multiline template literals" do
       source = <<~JS
         const importTemplate = `
@@ -772,6 +817,36 @@ describe ProGenerator, type: :generator do
       expect(rewritten).to include('import ReactOnRails from "react-on-rails";')
       expect(rewritten).to include('`; const ror = require("react-on-rails-pro");')
       expect(rewritten.scan("react-on-rails-pro").size).to eq(1)
+    end
+
+    it "rewrites imports that appear before a multiline template literal opens on the same line" do
+      source = <<~JS
+        const ror = require("react-on-rails"); const importTemplate = `
+          import ReactOnRails from "react-on-rails";
+        `;
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('const ror = require("react-on-rails-pro");')
+      expect(rewritten).to include('import ReactOnRails from "react-on-rails";')
+      expect(rewritten.scan("react-on-rails-pro").size).to eq(1)
+    end
+
+    it "rewrites all matching specifiers on a pending continuation line" do
+      source = <<~JS
+        import {
+          ReactOnRailsComponent
+        } from
+          "react-on-rails"; import ReactOnRails from "react-on-rails";
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten.scan("react-on-rails-pro").size).to eq(2)
+      expect(rewritten).to include(
+        '"react-on-rails-pro"; import ReactOnRails from "react-on-rails-pro";'
+      )
     end
 
     it "does not treat quoted backticks as multiline template delimiters" do

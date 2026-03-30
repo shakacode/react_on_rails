@@ -422,6 +422,19 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance.add_npm_dependencies_called?).to be(true)
     end
 
+    it "pins react and react-dom to the RSC-compatible 19.0.x track when RSC is enabled" do
+      instance.use_rsc = true
+
+      instance.send(:add_react_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ["react@~19.0.4", "react-dom@~19.0.4", "prop-types"],
+          dev: false
+        )
+      )
+    end
+
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
       instance.system_result = false
@@ -431,6 +444,16 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(warnings.size).to be > 0
       expect(warnings.first.to_s).to include("Failed to add React dependencies")
+    end
+
+    it "warns with the pinned React install command when the RSC add fails" do
+      instance.use_rsc = true
+      instance.add_npm_dependencies_result = false
+
+      instance.send(:add_react_dependencies)
+
+      expect(warnings.size).to be > 0
+      expect(warnings.first.to_s).to include("npm install react@~19.0.4 react-dom@~19.0.4 prop-types")
     end
   end
 

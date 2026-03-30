@@ -2181,6 +2181,24 @@ describe InstallGenerator, type: :generator do
 
       rsc_pro_install_generator.send(:invoke_generators)
     end
+
+    it "forwards RSC mode to the Redux generator for --rsc-pro --redux" do
+      rsc_pro_redux_install_generator = described_class.new([], { pretend: true, rsc_pro: true, redux: true })
+
+      allow(rsc_pro_redux_install_generator).to receive(:ensure_shakapacker_installed)
+      allow(rsc_pro_redux_install_generator).to receive(:setup_react_dependencies)
+
+      expect(rsc_pro_redux_install_generator).to receive(:invoke)
+        .with("react_on_rails:base", [], hash_including(pro: true, rsc: true, pretend: true))
+      expect(rsc_pro_redux_install_generator).to receive(:invoke)
+        .with("react_on_rails:react_with_redux", [], hash_including(rsc: true, pretend: true))
+      expect(rsc_pro_redux_install_generator).to receive(:invoke)
+        .with("react_on_rails:pro", [], hash_including(pretend: true))
+      expect(rsc_pro_redux_install_generator).to receive(:invoke)
+        .with("react_on_rails:rsc", [], hash_including(pretend: true))
+
+      rsc_pro_redux_install_generator.send(:invoke_generators)
+    end
   end
 
   context "when detecting existing bin-files on *nix" do
@@ -3377,6 +3395,42 @@ describe InstallGenerator, type: :generator do
       assert_file "bin/dev", custom_bin_dev
       assert_file "bin/switch-bundler"
       assert_file "bin/shakapacker-precompile-hook"
+    end
+
+    it "keeps DEFAULT_ROUTE unchanged in custom bin/dev files for non-RSC installs" do
+      custom_bin_dev = <<~RUBY
+        #!/usr/bin/env ruby
+        DEFAULT_ROUTE = "hello_world"
+      RUBY
+      simulate_existing_file("bin/dev", custom_bin_dev)
+
+      Dir.chdir(destination_root) do
+        install_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/dev", custom_bin_dev
+    end
+
+    it "warns instead of rewriting custom bin/dev files for --rsc installs" do
+      rsc_install_generator = described_class.new([], { rsc: true }, destination_root: destination_root)
+      custom_bin_dev = <<~RUBY
+        #!/usr/bin/env ruby
+        DEFAULT_ROUTE = "hello_world"
+      RUBY
+      simulate_existing_file("bin/dev", custom_bin_dev)
+
+      allow(rsc_install_generator).to receive(:say_status).and_call_original
+      expect(rsc_install_generator).to receive(:say_status).with(
+        :warn,
+        a_string_matching(%r{Custom bin/dev detected: update DEFAULT_ROUTE to "hello_server" manually for --rsc}),
+        :yellow
+      )
+
+      Dir.chdir(destination_root) do
+        rsc_install_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/dev", custom_bin_dev
     end
   end
 end

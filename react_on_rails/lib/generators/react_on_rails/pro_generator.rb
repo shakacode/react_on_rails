@@ -32,7 +32,8 @@ module ReactOnRails
       def run_generator
         # When invoked by install_generator, skip prerequisites (parent already validated)
         if options[:invoked_by_install] || prerequisites_met?
-          swap_base_gem_for_pro_in_gemfile unless options[:invoked_by_install]
+          return unless options[:invoked_by_install] || swap_base_gem_for_pro_in_gemfile
+
           setup_pro
           add_pro_npm_dependencies
           update_imports_to_pro_package unless options[:invoked_by_install]
@@ -52,6 +53,12 @@ module ReactOnRails
 
       def prerequisites_met?
         !(missing_base_installation? || missing_pro_gem?(force: true))
+      end
+
+      def pro_gem_version_requirement
+        return super if options[:invoked_by_install]
+
+        ReactOnRails::VERSION
       end
 
       def missing_base_installation?
@@ -85,7 +92,7 @@ module ReactOnRails
         gemfile_path = File.join(destination_root, "Gemfile")
         unless File.exist?(gemfile_path)
           add_missing_gemfile_warning(gemfile_path)
-          return
+          return false
         end
 
         gemfile_content = File.read(gemfile_path)
@@ -152,7 +159,7 @@ module ReactOnRails
         end
 
         updated_content = updated_lines.join
-        return if updated_content == gemfile_content
+        return true if updated_content == gemfile_content
 
         if has_pro_gem_entry
           say "ℹ️  Existing react_on_rails_pro Gemfile entry detected; preserving current version constraint", :yellow
@@ -160,7 +167,7 @@ module ReactOnRails
 
         if options[:pretend]
           say_status :pretend, "Would replace react_on_rails with react_on_rails_pro in Gemfile", :yellow
-          return
+          return true
         end
 
         original_gemfile_content = gemfile_content
@@ -172,6 +179,7 @@ module ReactOnRails
         )
       rescue StandardError => e
         add_gemfile_update_warning(gemfile_path, e)
+        false
       end
       # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
@@ -198,7 +206,7 @@ module ReactOnRails
       )
         if options[:pretend]
           say_status :pretend, "Skipping bundle install in --pretend mode", :yellow
-          return
+          return true
         end
 
         say "📦 Running bundle install after Gemfile update...", :yellow
@@ -214,26 +222,15 @@ module ReactOnRails
           wait_for_bundle_process(pid)
         end
 
-        return if install_status&.success?
+        return true if install_status&.success?
 
         rollback_message = rollback_gemfile_after_failed_bundle_install(
           gemfile_path: gemfile_path,
           original_gemfile_content: original_gemfile_content
         )
 
-        failure_header = if install_status.nil?
-                           "⚠️  Automatic bundle install timed out after #{ProSetup::AUTO_INSTALL_TIMEOUT} seconds."
-                         else
-                           "⚠️  Automatic bundle install failed after swapping Gemfile entries."
-                         end
-
-        GeneratorMessages.add_warning(<<~MSG.strip)
-          #{failure_header}
-
-          #{rollback_message}
-          Please run manually:
-            bundle install
-        MSG
+        add_bundle_install_failure_warning(install_status, rollback_message)
+        false
       rescue StandardError => e
         rollback_message = rollback_gemfile_after_failed_bundle_install(
           gemfile_path: gemfile_path,
@@ -242,6 +239,23 @@ module ReactOnRails
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Could not run automatic bundle install: #{e.class}: #{e.message}
+
+          #{rollback_message}
+          Please run manually:
+            bundle install
+        MSG
+        false
+      end
+
+      def add_bundle_install_failure_warning(install_status, rollback_message)
+        failure_header = if install_status.nil?
+                           "⚠️  Automatic bundle install timed out after #{ProSetup::AUTO_INSTALL_TIMEOUT} seconds."
+                         else
+                           "⚠️  Automatic bundle install failed after swapping Gemfile entries."
+                         end
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          #{failure_header}
 
           #{rollback_message}
           Please run manually:
@@ -305,7 +319,7 @@ module ReactOnRails
       def rewrite_react_on_rails_module_specifiers(content)
         static_import_specifier_pattern = %r{
           (?<prefix>
-            \A\s*(?:/\*.*?\*/\s*)?import(?:\s+type)?\s+.*?\s+from\s+|
+            \A\s*(?:/\*.*?\*/\s*)?(?:import|export)(?:\s+type)?\s+.*?\s+from\s+|
             \A\s*[\w\}\],\*\$\s]+\s+from\s+
           )
           (?<quote>["'])
@@ -316,7 +330,7 @@ module ReactOnRails
         dynamic_or_require_specifier_pattern = %r{
           (?<prefix>
             (?<!["'`])\bimport\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*|
-            (?<!["'`])\brequire\s*\(\s*
+            (?<!["'`])\brequire\s*\(\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*
           )
           (?<quote>["'])
           react-on-rails(?!-pro)
@@ -409,6 +423,16 @@ module ReactOnRails
               in_multiline_template_literal = updated_template_literal_state
               in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
+            elsif line_contains_unescaped_backtick
+              rewritten_line, pending_multiline_module_call_depth, pending_multiline_static_import_specifier =
+                rewrite_line_before_template_literal_open(
+                  line,
+                  pending_multiline_module_call_depth,
+                  pending_multiline_static_import_specifier
+                ) { |line_fragment| yield line_fragment }
+              in_multiline_template_literal = updated_template_literal_state
+              in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
+              rewritten_line
             else
               in_multiline_template_literal = updated_template_literal_state
               line
@@ -493,7 +517,7 @@ module ReactOnRails
       end
 
       def rewrite_pending_module_specifier(line)
-        line.sub(%r{(?<quote>["'])react-on-rails(?!-pro)(?=(?:["']|/))}) do
+        line.gsub(%r{(?<quote>["'])react-on-rails(?!-pro)(?=(?:["']|/))}) do
           "#{Regexp.last_match[:quote]}react-on-rails-pro"
         end
       end
@@ -529,7 +553,7 @@ module ReactOnRails
       def starts_pending_multiline_static_import_specifier?(line)
         line_without_literals = line_without_string_literals_and_inline_comments(line)
         return false unless line_without_literals.match?(
-          /\A\s*(?:import(?:\s+type)?\b.*\bfrom|import|[\w\}\],\*\$\s]+\s+from)\s*\z/
+          /\A\s*(?:(?:import|export)(?:\s+type)?\b.*\bfrom|import|export|[\w\}\],\*\$\s]+\s+from)\s*\z/
         )
         return false if line.match?(%r{\bfrom\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
         return false if line.match?(%r{\A\s*import\s*(?:/\*[^*]*\*+(?:[^/*][^*]*\*+)*/\s*)*["']})
@@ -571,11 +595,23 @@ module ReactOnRails
 
       def update_multiline_template_literal_state(in_multiline_template_literal, line)
         backticks = line.each_char.with_index.count do |char, index|
-          char == "`" && (index.zero? || line[index - 1] != "\\")
+          char == "`" && !character_escaped?(line, index)
         end
         return in_multiline_template_literal if backticks.even?
 
         !in_multiline_template_literal
+      end
+
+      def character_escaped?(line, index)
+        backslash_count = 0
+        scan_index = index - 1
+
+        while scan_index >= 0 && line[scan_index] == "\\"
+          backslash_count += 1
+          scan_index -= 1
+        end
+
+        backslash_count.odd?
       end
 
       def rewrite_line_after_block_comment_close(line, pending_depth, pending_multiline_static_import_specifier)
@@ -608,10 +644,42 @@ module ReactOnRails
         ["#{template_literal_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
+      def rewrite_line_before_template_literal_open(line, pending_depth, pending_multiline_static_import_specifier)
+        opening_index = first_unescaped_backtick_index(line)
+        return [line, pending_depth, pending_multiline_static_import_specifier] unless opening_index&.positive?
+
+        line_prefix = line[0, opening_index]
+        template_literal_suffix = line[opening_index..]
+        rewritten_prefix = yield line_prefix
+        rewritten_prefix, pending_multiline_static_import_specifier =
+          update_pending_multiline_static_import_tracking(rewritten_prefix, pending_multiline_static_import_specifier)
+        rewritten_prefix, pending_depth =
+          update_pending_multiline_module_call_tracking(rewritten_prefix, pending_depth)
+        ["#{rewritten_prefix}#{template_literal_suffix}", pending_depth, pending_multiline_static_import_specifier]
+      end
+
       def first_unescaped_backtick_index(line)
+        quote_state = nil
+
         line.each_char.with_index do |char, index|
-          return index if char == "`" && (index.zero? || line[index - 1] != "\\")
+          quote_state = next_quote_state(quote_state, char, line, index)
+          next if quote_state
+          return nil if line[index, 2] == "//"
+
+          return index if char == "`" && !character_escaped?(line, index)
         end
+        nil
+      end
+
+      def next_quote_state(current_state, char, line, index)
+        if current_state
+          return nil if char == current_state && !character_escaped?(line, index)
+
+          return current_state
+        end
+
+        return char if ["'", '"'].include?(char)
+
         nil
       end
 

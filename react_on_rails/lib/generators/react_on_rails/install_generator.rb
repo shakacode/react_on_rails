@@ -212,7 +212,7 @@ module ReactOnRails
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
                                                           invoked_by_install: true,
                                                           new_app: options.new_app?,
-                                                          rsc: options.rsc?,
+                                                          rsc: use_rsc?,
                                                           force: options[:force], skip: options[:skip],
                                                           pretend: options[:pretend] }
         elsif !use_rsc?
@@ -395,8 +395,6 @@ module ReactOnRails
             say_status :warn,
                        "Custom bin/dev detected: update DEFAULT_ROUTE to \"#{HELLO_SERVER_ROUTE}\" manually for --rsc",
                        :yellow
-          else
-            gsub_file "bin/dev", "DEFAULT_ROUTE = \"#{HELLO_WORLD_ROUTE}\"", "DEFAULT_ROUTE = \"#{HELLO_SERVER_ROUTE}\""
           end
         else
           copy_file("#{template_bin_path}/dev", "bin/dev")
