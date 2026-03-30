@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "generator_messages"
-require_relative "demo_page_config"
 
 module ReactOnRails
   module Generators
@@ -23,8 +22,6 @@ module ReactOnRails
     # - detect_react_version: Detects installed React version
     #
     module RscSetup # rubocop:disable Metrics/ModuleLength
-      include DemoPageConfig
-
       DEFAULT_LAYOUT_NAME = "react_on_rails_default"
       LEGACY_LAYOUT_NAME = "hello_world"
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
@@ -170,7 +167,7 @@ module ReactOnRails
             ⚠️  Procfile.dev not found. Skipping RSC bundle watcher addition.
 
             You'll need to add the RSC bundle watcher to your process manager manually:
-              rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker-watch --watch
+              rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
           MSG
           return
         end
@@ -185,7 +182,7 @@ module ReactOnRails
         rsc_watcher_line = <<~PROCFILE
 
           # React on Rails Pro - RSC bundle watcher
-          rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker-watch --watch
+          rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
         PROCFILE
 
         append_to_file("Procfile.dev", rsc_watcher_line)
@@ -254,12 +251,7 @@ module ReactOnRails
         # Create views directory if needed
         empty_directory("app/views/hello_server")
 
-        template("templates/rsc/base/app/views/hello_server/index.html.erb.tt",
-                 view_path,
-                 build_hello_server_view_config(
-                   landing_page: new_app_landing_page_available?,
-                   redux_demo: options[:redux]
-                 ))
+        copy_file("templates/rsc/base/app/views/hello_server/index.html.erb", view_path)
 
         say "✅ Created #{view_path}", :green
       end

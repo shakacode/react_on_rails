@@ -91,7 +91,6 @@ describe RscGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("rsc-bundle:")
         expect(content).to include("RSC_BUNDLE_ONLY")
-        expect(content).to include("bin/shakapacker-watch --watch")
       end
     end
 

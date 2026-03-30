@@ -50,18 +50,6 @@ module GeneratorHelper
     Dir.exist?(dest_dir) ? dest_dir : nil
   end
 
-  # Detect whether config/routes.rb defines any non-commented root route.
-  #
-  # @param routes_path [String] absolute path to routes.rb
-  # @return [Boolean] true when a root route exists
-  def root_route_present?(routes_path = File.join(destination_root, "config/routes.rb"))
-    return false unless File.file?(routes_path)
-
-    File.foreach(routes_path).any? do |line|
-      !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
-    end
-  end
-
   def setup_file_error(file, data)
     <<~MSG
       #{file} was not found.

@@ -67,6 +67,7 @@ module ReactOnRails
                          "This generator requires the react_on_rails_pro gem."
                        end
 
+        # TODO(#2575): Replace temporary email CTA after react-unrails.com flow is live.
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
 
@@ -79,7 +80,7 @@ module ReactOnRails
 
           No license needed for evaluation or non-production use.
           Free or low-cost production licenses available for startups and small companies.
-          See the upgrade guide: https://reactonrails.com/docs/pro/upgrading-to-pro/
+          Get started: https://pro.reactonrails.com/
         MSG
         true
       end

@@ -1,11 +1,6 @@
 import { execFileSync, spawnSync } from 'child_process';
 import chalk from 'chalk';
 
-function childEnv(env?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  // Always inherit PATH, HOME, and the rest of process.env; callers only add/override keys.
-  return env ? { ...process.env, ...env } : process.env;
-}
-
 /**
  * Execute a command and stream output to the current terminal.
  *
@@ -17,47 +12,14 @@ export function execLiveArgs(command: string, args: string[], cwd?: string, env?
   const result = spawnSync(command, args, {
     stdio: 'inherit',
     cwd,
-    env: childEnv(env),
+    ...(env ? { env } : {}),
   });
   if (result.error) {
     throw result.error;
-  }
-  if (result.status === null) {
-    throw new Error(`Command "${command}" was terminated by ${result.signal ?? 'unknown signal'}`);
   }
   if (result.status !== 0) {
     throw new Error(`Command "${command}" exited with code ${result.status}`);
   }
-}
-
-export function execCaptureArgs(
-  command: string,
-  args: string[],
-  cwd?: string,
-  env?: NodeJS.ProcessEnv,
-): string {
-  const result = spawnSync(command, args, {
-    stdio: 'pipe',
-    encoding: 'utf8',
-    cwd,
-    env: childEnv(env),
-  });
-  if (result.error) {
-    throw result.error;
-  }
-  if (result.status === null) {
-    throw new Error(`Command "${command}" was terminated by ${result.signal ?? 'unknown signal'}`);
-  }
-  if (result.status !== 0) {
-    const stderr = result.stderr?.trim();
-    throw new Error(
-      stderr && stderr.length > 0
-        ? `Command "${command}" exited with code ${result.status}: ${stderr}`
-        : `Command "${command}" exited with code ${result.status}`,
-    );
-  }
-
-  return result.stdout?.trim() ?? '';
 }
 
 export function getCommandVersion(command: string): string | null {

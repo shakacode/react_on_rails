@@ -84,202 +84,6 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
-  describe "#check_react_on_rails_initializer" do
-    let(:doctor) { described_class.new(verbose: false, fix: false) }
-    let(:checker) { doctor.instance_variable_get(:@checker) }
-    let(:runtime_config) do
-      instance_double(
-        ReactOnRails::Configuration,
-        server_bundle_js_file: "runtime-server-bundle.js",
-        server_bundle_output_path: "runtime-ssr-output",
-        enforce_private_server_bundles: true,
-        prerender: true,
-        server_renderer_pool_size: 3,
-        server_renderer_timeout: 45,
-        raise_on_prerender_error: true,
-        generated_component_packs_loading_strategy: :async,
-        auto_load_bundle: true,
-        component_registry_timeout: 7000,
-        development_mode: false,
-        trace: false,
-        logging_on_server: false,
-        replay_console: false,
-        build_test_command: "RAILS_ENV=test bin/shakapacker",
-        build_production_command: "RAILS_ENV=production bin/shakapacker",
-        i18n_dir: nil,
-        i18n_yml_dir: nil,
-        i18n_output_format: nil,
-        components_subdirectory: nil,
-        same_bundle_for_client_and_server: false,
-        random_dom_id: nil,
-        rendering_extension: nil,
-        rendering_props_extension: nil,
-        server_render_method: nil
-      )
-    end
-
-    around do |example|
-      Dir.mktmpdir do |tmpdir|
-        Dir.chdir(tmpdir) { example.run }
-      end
-    end
-
-    def write_project_file(path, content)
-      FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, content)
-    end
-
-    it "prefers runtime values over initializer regex parsing" do
-      write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
-        ReactOnRails.configure do |config|
-          config.server_bundle_js_file = "initializer-server-bundle.js"
-          config.prerender = false
-          config.auto_load_bundle = false
-        end
-      RUBY
-
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-
-      expect(info_messages).to include(a_string_including("Using loaded runtime configuration values"))
-      expect(info_messages).to include(a_string_including("server_bundle_js_file: runtime-server-bundle.js"))
-      expect(info_messages).to include(a_string_including("prerender: true"))
-      expect(info_messages).to include(a_string_including("auto_load_bundle: true"))
-      expect(info_messages).not_to include(a_string_including("random_dom_id:"))
-      expect(info_messages).not_to include(a_string_including("initializer-server-bundle.js"))
-    end
-
-    it "uses runtime values when initializer file is missing" do
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-
-      expect(warning_messages).not_to include(
-        a_string_including("React on Rails configuration file not found: config/initializers/react_on_rails.rb")
-      )
-      expect(info_messages).to include(
-        a_string_including("No config/initializers/react_on_rails.rb found (using runtime configuration)")
-      )
-      expect(info_messages).to include(a_string_including("Using loaded runtime configuration values"))
-      expect(info_messages).to include(a_string_including("server_bundle_js_file: runtime-server-bundle.js"))
-    end
-
-    it "shows initializer/default bundle value when runtime server_bundle_js_file is nil" do
-      allow(runtime_config).to receive(:server_bundle_js_file).and_return(nil)
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).to include(
-        a_string_including("server_bundle_js_file: server-bundle.js (initializer/default)")
-      )
-    end
-
-    it "treats whitespace-only runtime server_bundle_js_file as disabled" do
-      allow(runtime_config).to receive(:server_bundle_js_file).and_return("   ")
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).to include(
-        a_string_including('server_bundle_js_file: "" (disabled)')
-      )
-    end
-
-    it "shows SSR-disabled default when runtime config is unavailable and initializer does not set server bundle" do
-      write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
-        ReactOnRails.configure do |config|
-          config.prerender = false
-        end
-      RUBY
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(nil)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).to include(
-        a_string_including('server_bundle_js_file: "" (default, SSR disabled)')
-      )
-    end
-
-    it "omits component_registry_timeout when runtime value is the default" do
-      allow(runtime_config).to receive(:component_registry_timeout).and_return(5000)
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).not_to include(a_string_including("component_registry_timeout"))
-    end
-
-    it "omits auto_load_bundle when runtime value is the default" do
-      allow(runtime_config).to receive(:auto_load_bundle).and_return(false)
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).not_to include(a_string_including("auto_load_bundle"))
-    end
-
-    it "omits development/debugging runtime values when they match defaults" do
-      allow(runtime_config).to receive_messages(
-        development_mode: Rails.env.development?,
-        trace: Rails.env.development?,
-        logging_on_server: true,
-        replay_console: true
-      )
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).not_to include(a_string_including("development_mode"))
-      expect(info_messages).not_to include(a_string_including("trace"))
-      expect(info_messages).not_to include(a_string_including("logging_on_server"))
-      expect(info_messages).not_to include(a_string_including("replay_console"))
-    end
-
-    it "reports nil logging/replay values explicitly when runtime config is unexpected" do
-      allow(runtime_config).to receive_messages(logging_on_server: nil, replay_console: nil)
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).to include(a_string_including("logging_on_server: nil"))
-      expect(info_messages).to include(a_string_including("replay_console: nil"))
-    end
-
-    it "omits enforce_private_server_bundles when runtime value is the default" do
-      allow(runtime_config).to receive(:enforce_private_server_bundles).and_return(false)
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).not_to include(a_string_including("enforce_private_server_bundles"))
-    end
-
-    it "omits raise_on_prerender_error when runtime value matches environment default" do
-      allow(runtime_config).to receive(:raise_on_prerender_error).and_return(Rails.env.development?)
-      allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-      doctor.send(:check_react_on_rails_initializer)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      expect(info_messages).not_to include(a_string_including("raise_on_prerender_error"))
-    end
-  end
-
   describe "server bundle path detection" do
     let(:doctor) { described_class.new }
 
@@ -358,44 +162,12 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     describe "#server_bundle_filename" do
-      context "when runtime config sets server_bundle_js_file to an empty string" do
-        let(:runtime_config) do
-          instance_double(ReactOnRails::Configuration, server_bundle_js_file: "")
-        end
-
-        before do
-          allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-        end
-
-        it "returns an empty string" do
-          filename = doctor.send(:server_bundle_filename)
-          expect(filename).to eq("")
-        end
-      end
-
-      context "when runtime config has nil server_bundle_js_file" do
-        let(:runtime_config) do
-          instance_double(ReactOnRails::Configuration, server_bundle_js_file: nil)
-        end
-
-        before do
-          allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-          allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(false)
-        end
-
-        it "falls back to the default filename" do
-          filename = doctor.send(:server_bundle_filename)
-          expect(filename).to eq("server-bundle.js")
-        end
-      end
-
       context "when react_on_rails.rb has custom filename" do
         let(:initializer_content) do
           'config.server_bundle_js_file = "custom-server-bundle.js"'
         end
 
         before do
-          allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(nil)
           allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(true)
           allow(File).to receive(:read).with("config/initializers/react_on_rails.rb").and_return(initializer_content)
         end
@@ -408,7 +180,6 @@ RSpec.describe ReactOnRails::Doctor do
 
       context "when no custom filename is configured" do
         before do
-          allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(nil)
           allow(File).to receive(:exist?).with("config/initializers/react_on_rails.rb").and_return(false)
         end
 
@@ -417,23 +188,6 @@ RSpec.describe ReactOnRails::Doctor do
           expect(filename).to eq("server-bundle.js")
         end
       end
-    end
-  end
-
-  describe "#check_javascript_bundles" do
-    let(:doctor) { described_class.new(verbose: false, fix: false) }
-    let(:checker) { doctor.instance_variable_get(:@checker) }
-
-    it "treats whitespace server_bundle_js_file as disabled SSR" do
-      allow(doctor).to receive(:server_bundle_filename).and_return("   ")
-
-      doctor.send(:check_javascript_bundles)
-
-      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
-
-      expect(info_messages).to include(a_string_including("skipping SSR bundle existence check"))
-      expect(warning_messages).to be_empty
     end
   end
 
@@ -1349,79 +1103,6 @@ RSpec.describe ReactOnRails::Doctor do
       File.write(path, content)
     end
 
-    context "when runtime config conflicts with initializer text" do
-      let(:runtime_config) do
-        instance_double(
-          ReactOnRails::Configuration,
-          server_bundle_js_file: "",
-          prerender: true
-        )
-      end
-
-      it "uses runtime values and reports missing server bundle" do
-        write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
-          ReactOnRails.configure do |config|
-            config.server_bundle_js_file = "server-bundle.js"
-            config.prerender = false
-          end
-        RUBY
-
-        allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-        doctor.send(:check_server_bundle_prerender_consistency)
-
-        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
-        expect(warning_messages).to include(
-          a_string_including("Server rendering is enabled but server_bundle_js_file is not configured")
-        )
-      end
-    end
-
-    context "when initializer is missing but runtime config is available" do
-      let(:runtime_config) do
-        instance_double(
-          ReactOnRails::Configuration,
-          server_bundle_js_file: "",
-          prerender: true
-        )
-      end
-
-      it "still performs the consistency check" do
-        allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-        doctor.send(:check_server_bundle_prerender_consistency)
-
-        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
-        expect(warning_messages).to include(
-          a_string_including("Server rendering is enabled but server_bundle_js_file is not configured")
-        )
-      end
-    end
-
-    context "when runtime server_bundle_js_file is nil and prerender is enabled" do
-      let(:runtime_config) do
-        instance_double(
-          ReactOnRails::Configuration,
-          server_bundle_js_file: nil,
-          prerender: true
-        )
-      end
-
-      it "treats nil as initializer/default fallback instead of disabled" do
-        allow(doctor).to receive(:react_on_rails_runtime_configuration).and_return(runtime_config)
-
-        doctor.send(:check_server_bundle_prerender_consistency)
-
-        warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
-        success_messages = checker.messages.select { |msg| msg[:type] == :success }.map { |msg| msg[:content] }
-
-        expect(warning_messages).not_to include(
-          a_string_including("Server rendering is enabled but server_bundle_js_file is not configured")
-        )
-        expect(success_messages).to include(a_string_including("Server rendering configuration is consistent"))
-      end
-    end
-
     context "when views use stream_react_component (RSC/streaming apps)" do
       it "reports consistent configuration" do
         write_project_file("config/initializers/react_on_rails.rb", <<~RUBY)
@@ -1517,24 +1198,6 @@ RSpec.describe ReactOnRails::Doctor do
       File.write(path, content)
     end
 
-    context "when Pro runtime config reports NodeRenderer without initializer text" do
-      before do
-        allow(doctor).to receive(:resolved_pro_server_renderer).and_return("NodeRenderer")
-      end
-
-      it "treats ExecJS as fallback without rechecking Pro availability" do
-        stub_const("ExecJS", execjs_module)
-        expect(ReactOnRails::Utils).not_to receive(:react_on_rails_pro?)
-
-        doctor.send(:check_server_rendering_engine)
-
-        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
-        expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
-        expect(info_messages).to include(a_string_including("ExecJS available as fallback"))
-        expect(info_messages).not_to include(a_string_matching(/^\s+ExecJS Runtime:/))
-      end
-    end
-
     context "when Pro initializer has NodeRenderer" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
@@ -1575,33 +1238,6 @@ RSpec.describe ReactOnRails::Doctor do
         warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
         expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
         expect(warning_messages).to include(
-          a_string_including("ExecJS fallback is enabled but ExecJS is not available")
-        )
-      end
-    end
-
-    context "when Pro initializer has NodeRenderer, ExecJS is absent, and fallback is disabled" do
-      before do
-        allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        write_project_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
-          ReactOnRailsPro.configure do |config|
-            config.server_renderer = "NodeRenderer"
-            config.renderer_use_fallback_exec_js = false
-          end
-        RUBY
-        hide_const("ExecJS")
-      end
-
-      it "does not warn about missing ExecJS fallback" do
-        doctor.send(:check_server_rendering_engine)
-
-        info_messages = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
-        warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
-        expect(info_messages).to include(a_string_including("Pro uses NodeRenderer"))
-        expect(info_messages).to include(
-          a_string_including("ExecJS fallback is disabled (renderer_use_fallback_exec_js = false)")
-        )
-        expect(warning_messages).not_to include(
           a_string_including("ExecJS fallback is enabled but ExecJS is not available")
         )
       end
@@ -1866,72 +1502,36 @@ RSpec.describe ReactOnRails::Doctor do
 
   describe "private path resolution helpers" do
     describe "#resolved_webpack_config_path" do
-      it "prioritizes shakapacker's exact assets_bundler_config_path" do
-        allow(File).to receive(:file?).and_return(false)
-        allow(File).to receive(:file?).with("config/custom/custom-bundler.config.js").and_return(true)
-        allow(File).to receive(:file?).with("config/custom/webpack.config.js").and_return(true)
-        allow(doctor).to receive(:shakapacker_assets_bundler_config_path)
-          .and_return("config/custom/custom-bundler.config.js")
-        allow(doctor).to receive(:bundler_config_directory)
-          .with("config/custom/custom-bundler.config.js")
-          .and_return("config/custom")
-
-        expect(doctor.send(:resolved_webpack_config_path)).to eq("config/custom/custom-bundler.config.js")
-      end
-
-      it "falls back to shakapacker-derived webpack config candidates when exact shakapacker path is not a file" do
-        allow(File).to receive(:file?).and_return(false)
-        allow(File).to receive(:file?).with("config/custom/webpack.config.ts").and_return(true)
-        allow(doctor).to receive(:bundler_config_directory)
-          .with("config/custom/custom-bundler.config.js")
-          .and_return("config/custom")
-        allow(doctor).to receive(:shakapacker_assets_bundler_config_path)
-          .and_return("config/custom/custom-bundler.config.js")
+      it "prefers shakapacker-derived webpack config candidates over the default path" do
+        allow(File).to receive(:exist?).and_return(false)
+        allow(File).to receive(:exist?).with("config/custom/webpack.config.ts").and_return(true)
+        allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return("config/custom")
 
         expect(doctor.send(:resolved_webpack_config_path)).to eq("config/custom/webpack.config.ts")
       end
 
-      it "keeps sibling bundler candidates when shakapacker path uses a standard filename" do
-        allow(File).to receive(:file?).and_return(false)
-        allow(File).to receive(:file?).with("config/webpack/rspack.config.js").and_return(true)
-        allow(doctor).to receive(:bundler_config_directory)
-          .with("config/webpack/webpack.config.js")
-          .and_return("config/webpack")
-        allow(doctor).to receive(:shakapacker_assets_bundler_config_path)
-          .and_return("config/webpack/webpack.config.js")
-
-        expect(doctor.send(:resolved_webpack_config_path)).to eq("config/webpack/rspack.config.js")
-      end
-
       it "resolves rspack config candidates from the shakapacker-derived directory" do
-        allow(File).to receive(:file?).and_return(false)
-        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
-        allow(doctor).to receive(:bundler_config_directory)
-          .with("config/rspack/custom-bundler.config.js")
-          .and_return("config/rspack")
-        allow(doctor).to receive(:shakapacker_assets_bundler_config_path)
-          .and_return("config/rspack/custom-bundler.config.js")
+        allow(File).to receive(:exist?).and_return(false)
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return("config/rspack")
 
         expect(doctor.send(:resolved_webpack_config_path)).to eq("config/rspack/rspack.config.ts")
       end
 
       it "falls back to default rspack config paths when shakapacker directory is unavailable" do
-        allow(File).to receive(:file?).and_return(false)
-        allow(File).to receive(:file?).with("config/rspack/rspack.config.js").and_return(true)
-        allow(doctor).to receive(:bundler_config_directory).with(nil).and_return(nil)
-        allow(doctor).to receive(:shakapacker_assets_bundler_config_path).and_return(nil)
+        allow(File).to receive(:exist?).and_return(false)
+        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(true)
+        allow(doctor).to receive(:shakapacker_webpack_config_directory).and_return(nil)
 
         expect(doctor.send(:resolved_webpack_config_path)).to eq("config/rspack/rspack.config.js")
       end
     end
 
-    describe "#shakapacker_assets_bundler_config_path" do
-      it "normalizes shakapacker assets_bundler_config_path to a rails-relative path" do
-        rails_root = Pathname.new("/tmp/myapp")
-        allow(Rails).to receive(:root).and_return(rails_root)
+    describe "#shakapacker_webpack_config_directory" do
+      it "extracts a directory from shakapacker's config file path" do
         allow(doctor).to receive(:require).with("shakapacker").and_return(true)
         shakapacker_config = Struct.new(:assets_bundler_config_path).new(
-          "#{rails_root}/config/custom/custom-bundler.config.ts"
+          "#{Rails.root}/config/custom/webpack.config.ts"
         )
         shakapacker_class = Class.new do
           class << self
@@ -1941,65 +1541,7 @@ RSpec.describe ReactOnRails::Doctor do
         stub_const("Shakapacker", shakapacker_class)
         Shakapacker.config = shakapacker_config
 
-        expect(doctor.send(:shakapacker_assets_bundler_config_path)).to eq("config/custom/custom-bundler.config.ts")
-      end
-
-      it "keeps absolute assets_bundler_config_path outside Rails.root unchanged" do
-        rails_root = Pathname.new("/tmp/myapp")
-        allow(Rails).to receive(:root).and_return(rails_root)
-        allow(doctor).to receive(:require).with("shakapacker").and_return(true)
-        shakapacker_config = Struct.new(:assets_bundler_config_path).new("/opt/custom/bundler.config.js")
-        shakapacker_class = Class.new do
-          class << self
-            attr_accessor :config
-          end
-        end
-        stub_const("Shakapacker", shakapacker_class)
-        Shakapacker.config = shakapacker_config
-
-        expect(doctor.send(:shakapacker_assets_bundler_config_path)).to eq("/opt/custom/bundler.config.js")
-      end
-
-      it "does not strip absolute paths when Rails.root is filesystem root" do
-        allow(Rails).to receive(:root).and_return(Pathname.new("/"))
-        allow(doctor).to receive(:require).with("shakapacker").and_return(true)
-        shakapacker_config = Struct.new(:assets_bundler_config_path).new("/opt/custom/bundler.config.js")
-        shakapacker_class = Class.new do
-          class << self
-            attr_accessor :config
-          end
-        end
-        stub_const("Shakapacker", shakapacker_class)
-        Shakapacker.config = shakapacker_config
-
-        expect(doctor.send(:shakapacker_assets_bundler_config_path)).to eq("/opt/custom/bundler.config.js")
-      end
-
-      it "returns nil when normalization strips to an empty relative path" do
-        rails_root = Pathname.new("/tmp/myapp")
-        allow(Rails).to receive(:root).and_return(rails_root)
-        allow(doctor).to receive(:require).with("shakapacker").and_return(true)
-        shakapacker_config = Struct.new(:assets_bundler_config_path).new("#{rails_root}/")
-        shakapacker_class = Class.new do
-          class << self
-            attr_accessor :config
-          end
-        end
-        stub_const("Shakapacker", shakapacker_class)
-        Shakapacker.config = shakapacker_config
-
-        expect(doctor.send(:shakapacker_assets_bundler_config_path)).to be_nil
-      end
-    end
-
-    describe "#bundler_config_directory" do
-      it "extracts a directory from shakapacker's config file path" do
-        expect(doctor.send(:bundler_config_directory, "config/custom/webpack.config.ts"))
-          .to eq("config/custom")
-      end
-
-      it "returns nil for bare filenames without a directory component" do
-        expect(doctor.send(:bundler_config_directory, "webpack.config.js")).to be_nil
+        expect(doctor.send(:shakapacker_webpack_config_directory)).to eq("config/custom")
       end
     end
   end
@@ -2127,82 +1669,6 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("Could not load Rails environment") }).to be true
       end
-    end
-  end
-
-  describe "react_on_rails_runtime_configuration" do
-    let(:doctor) { described_class.new(verbose: false, fix: false) }
-    let(:checker) { doctor.instance_variable_get(:@checker) }
-
-    it "memoizes nil when rails environment cannot be loaded" do
-      expect(doctor).to receive(:ensure_rails_environment_loaded).once.and_return(false)
-
-      expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
-      expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
-    end
-
-    it "rescues and memoizes nil when ReactOnRails.configuration raises" do
-      allow(doctor).to receive(:ensure_rails_environment_loaded).and_return(true)
-      allow(ReactOnRails).to receive(:configuration).and_raise(StandardError, "bad config")
-
-      expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
-      expect(doctor.send(:react_on_rails_runtime_configuration)).to be_nil
-
-      warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
-      warning_count =
-        warning_messages.count { |msg| msg.include?("Could not query React on Rails runtime configuration") }
-      expect(warning_count).to eq(1)
-    end
-  end
-
-  describe "resolved_pro_server_renderer" do
-    let(:doctor) { described_class.new(verbose: false, fix: false) }
-    let(:checker) { doctor.instance_variable_get(:@checker) }
-
-    it "memoizes nil when Pro is not active" do
-      expect(ReactOnRails::Utils).to receive(:react_on_rails_pro?).once.and_return(false)
-
-      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
-      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
-    end
-
-    it "warns once when Pro is active but runtime and initializer renderer sources are unavailable" do
-      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-      allow(doctor).to receive_messages(
-        ensure_rails_environment_loaded: true,
-        pro_initializer_has_node_renderer?: false
-      )
-      hide_const("ReactOnRailsPro") if defined?(ReactOnRailsPro)
-
-      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
-      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
-
-      warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
-      expect(warning_messages.count { |msg| msg.include?("Could not determine Pro server renderer") }).to eq(1)
-    end
-
-    it "adds an info message when Rails env is unavailable and initializer fallback is absent" do
-      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-      allow(doctor).to receive_messages(
-        ensure_rails_environment_loaded: false,
-        pro_initializer_has_node_renderer?: false
-      )
-
-      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
-
-      info_messages = checker.messages.select { |m| m[:type] == :info }.map { |m| m[:content] }
-      expect(info_messages.any? { |msg| msg.include?("Rails environment unavailable and no initializer match found") })
-        .to be true
-    end
-
-    it "rescues LoadError when Pro runtime renderer cannot be queried" do
-      allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_raise(LoadError, "missing pro gem")
-
-      expect(doctor.send(:resolved_pro_server_renderer)).to be_nil
-
-      warning_messages = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }
-      expect(warning_messages.any? { |msg| msg.include?("Could not read Pro runtime renderer configuration") })
-        .to be true
     end
   end
 

@@ -29,8 +29,6 @@ module ReactOnRails
   DEFAULT_GENERATED_ASSETS_DIR = File.join(%w[public webpack], Rails.env).freeze
   DEFAULT_COMPONENT_REGISTRY_TIMEOUT = 5000
   DEFAULT_SERVER_BUNDLE_OUTPUT_PATH = "ssr-generated"
-  DEFAULT_SERVER_RENDERER_POOL_SIZE = 1
-  DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS = 20
 
   def self.configuration
     @configuration ||= Configuration.new(
@@ -46,8 +44,8 @@ module ReactOnRails
       raise_on_prerender_error: Rails.env.development?,
       trace: Rails.env.development?,
       development_mode: Rails.env.development?,
-      server_renderer_pool_size: DEFAULT_SERVER_RENDERER_POOL_SIZE,
-      server_renderer_timeout: DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS,
+      server_renderer_pool_size: 1,
+      server_renderer_timeout: 20,
       skip_display_none: nil,
       # skip_display_none is deprecated
       webpack_generated_files: %w[manifest.json],
@@ -465,7 +463,7 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: auto_load_bundle is set to true, yet components_subdirectory is not configured.\
         Please set components_subdirectory to the desired directory.  For more information, please see \
-        https://reactonrails.com/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation/
+        https://reactonrails.com/docs/guides/file-system-based-automated-bundle-generation.md
       MSG
 
       raise ReactOnRails::Error, msg

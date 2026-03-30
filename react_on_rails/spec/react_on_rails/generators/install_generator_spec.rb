@@ -36,21 +36,6 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "creates the shakapacker watch wrapper and uses it in Procfiles" do
-      assert_file "bin/shakapacker-watch" do |content|
-        expect(content).to include('bin/shakapacker "$@" &')
-        expect(content).to include("trap cleanup INT TERM")
-      end
-
-      assert_file "Procfile.dev" do |content|
-        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=yes bin/shakapacker-watch --watch")
-      end
-
-      assert_file "Procfile.dev-static-assets" do |content|
-        expect(content).to include("js: bin/shakapacker-watch --watch")
-      end
-    end
-
     it "installs appropriate transpiler dependencies based on Shakapacker version" do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
@@ -82,124 +67,6 @@ describe InstallGenerator, type: :generator do
       assert_file "config/shakapacker.yml" do |content|
         expect(content).to match(/^test:.*?^\s+compile:\s*false/m)
       end
-    end
-  end
-
-  context "with --new-app" do
-    before(:all) { run_generator_test_with_args(%w[--new-app], package_json: true) }
-
-    it "creates a root landing page" do
-      assert_file "config/routes.rb" do |content|
-        expect(content).to include('root to: "home#index"')
-      end
-      assert_file "app/controllers/home_controller.rb" do |content|
-        expect(content).to include("protect_from_forgery with: :exception")
-        expect(content).to include("def index; end")
-      end
-      assert_file "app/views/home/index.html.erb" do |content|
-        expect(content).to include("is ready.")
-        expect(content).to include("/hello_world")
-        expect(content).to include("Compare OSS and Pro")
-        expect(content).to include("https://github.com/shakacode/react-server-components-marketplace-demo")
-      end
-    end
-
-    it "uses the root path and one-time browser opening in bin/dev" do
-      assert_file "bin/dev" do |content|
-        expect(content).to include('DEFAULT_ROUTE = "/"')
-        expect(content).to include("AUTO_OPEN_BROWSER_ONCE = true")
-        expect(content).to include("--open-browser-once")
-      end
-    end
-
-    it "adds a return link from the SSR demo to the landing page" do
-      assert_file "app/views/hello_world/index.html.erb" do |content|
-        expect(content).to include("Return to the generated home page")
-      end
-    end
-  end
-
-  context "when --new-app config/routes.rb does not exist" do
-    let(:generator) { base_generator_fixture(new_app: true) }
-
-    before do
-      prepare_destination
-      simulate_existing_rails_files(gitignore: false, spec: false)
-      FileUtils.rm_f(File.join(destination_root, "config/routes.rb"))
-      allow(generator).to receive(:say_status)
-    end
-
-    it "warns instead of raising when config/routes.rb is missing" do
-      Dir.chdir(destination_root) do
-        generator.send(:add_root_route)
-      end
-
-      expect(generator)
-        .to have_received(:say_status)
-        .with(:warn, "Could not inject root route; config/routes.rb was not found", :yellow)
-    end
-  end
-
-  context "when --new-app routes.rb is in an unexpected format" do
-    let(:generator) { base_generator_fixture(new_app: true) }
-
-    before do
-      prepare_destination
-      simulate_existing_rails_files(gitignore: false, spec: false)
-      simulate_existing_file("config/routes.rb", "draw_routes do\nend\n")
-      allow(generator).to receive(:say_status)
-    end
-
-    it "warns instead of silently skipping the root route injection" do
-      Dir.chdir(destination_root) do
-        generator.send(:add_root_route)
-      end
-
-      expect(generator)
-        .to have_received(:say_status)
-        .with(:warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow)
-    end
-  end
-
-  context "when --new-app routes.rb uses CRLF line endings" do
-    let(:generator) { base_generator_fixture(new_app: true) }
-
-    before do
-      prepare_destination
-      simulate_existing_rails_files(gitignore: false, spec: false)
-      simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\r\nend\r\n")
-      allow(generator).to receive(:say_status)
-    end
-
-    it "injects the root route without warning" do
-      Dir.chdir(destination_root) do
-        generator.send(:add_root_route)
-      end
-
-      expect(generator)
-        .not_to have_received(:say_status)
-        .with(:warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow)
-      expect(File.read(File.join(destination_root, "config/routes.rb"))).to include('root to: "home#index"')
-    end
-  end
-
-  context "when --new-app root route injection runs in pretend mode" do
-    let(:generator) { base_generator_fixture(new_app: true, pretend: true) }
-
-    before do
-      prepare_destination
-      simulate_existing_rails_files(gitignore: false, spec: false)
-      allow(generator).to receive(:say_status)
-    end
-
-    it "does not emit a false warning after the pretend injection" do
-      Dir.chdir(destination_root) do
-        generator.send(:add_root_route)
-      end
-
-      expect(generator)
-        .not_to have_received(:say_status)
-        .with(:warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow)
     end
   end
 
@@ -1548,7 +1415,6 @@ describe InstallGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("RSC_BUNDLE_ONLY=yes")
         expect(content).to include("rsc-bundle:")
-        expect(content).to include("bin/shakapacker-watch --watch")
       end
     end
 
@@ -1617,90 +1483,6 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "with --new-app and a preexisting root route" do
-    before(:all) do
-      run_generator_test_with_args(%w[--new-app], package_json: true) do
-        simulate_existing_file("config/routes.rb", <<~RUBY)
-          Rails.application.routes.draw do
-            root to: "existing#home"
-          end
-        RUBY
-      end
-    end
-
-    it "keeps the existing root route and does not scaffold the landing page" do
-      assert_file "config/routes.rb" do |content|
-        expect(content).to include('root to: "existing#home"')
-        expect(content).not_to include('root to: "home#index"')
-      end
-
-      assert_no_file "app/controllers/home_controller.rb"
-      assert_no_file "app/views/home/index.html.erb"
-    end
-
-    it "still uses the root path in bin/dev" do
-      assert_file "bin/dev" do |content|
-        expect(content).to include('DEFAULT_ROUTE = "/"')
-      end
-    end
-  end
-
-  context "with --new-app routes.rb in an unexpected format" do
-    before(:all) do
-      run_generator_test_with_args(%w[--new-app], package_json: true) do
-        simulate_existing_file("config/routes.rb", "draw_routes do\nend\n")
-      end
-    end
-
-    it "skips the landing page and falls back to the hello_world route in bin/dev" do
-      assert_file "config/routes.rb" do |content|
-        expect(content).not_to include('root to: "home#index"')
-      end
-
-      assert_no_file "app/controllers/home_controller.rb"
-      assert_no_file "app/views/home/index.html.erb"
-
-      assert_file "bin/dev" do |content|
-        expect(content).to include('DEFAULT_ROUTE = "hello_world"')
-      end
-    end
-
-    it "does not render a broken return-to-home quick link on the SSR demo page" do
-      assert_file "app/views/hello_world/index.html.erb" do |content|
-        expect(content).not_to include("Return to the generated home page")
-      end
-    end
-  end
-
-  context "with --new-app --rsc" do
-    before(:all) { run_generator_test_with_args(%w[--new-app --rsc], package_json: true) }
-
-    it "creates a landing page that links to the RSC example" do
-      assert_file "config/routes.rb" do |content|
-        expect(content).to include('root to: "home#index"')
-      end
-      assert_file "app/views/home/index.html.erb" do |content|
-        expect(content).to include("/hello_server")
-        expect(content).to include("React Server Components")
-        expect(content).to include("https://reactonrails.com/docs/pro/react-server-components/tutorial/")
-        expect(content).to include("https://github.com/shakacode/react-server-components-marketplace-demo")
-      end
-    end
-
-    it "keeps the root path as the default bin/dev URL" do
-      assert_file "bin/dev" do |content|
-        expect(content).to include('DEFAULT_ROUTE = "/"')
-        expect(content).to include("AUTO_OPEN_BROWSER_ONCE = true")
-      end
-    end
-
-    it "adds a return link from the RSC demo to the landing page" do
-      assert_file "app/views/hello_server/index.html.erb" do |content|
-        expect(content).to include("Return to the generated home page")
-      end
-    end
-  end
-
   context "with --rsc --redux" do
     before(:all) { run_generator_test_with_args(%w[--rsc --redux], package_json: true) }
 
@@ -1713,13 +1495,6 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
-    end
-
-    it "links the Redux SSR demo to the RSC demo" do
-      assert_file "app/views/hello_world/index.html.erb" do |content|
-        expect(content).to include("/hello_server")
-        expect(content).to include("Open the RSC demo")
-      end
     end
 
     it "creates hello_world route and controller for Redux" do
@@ -1946,28 +1721,6 @@ describe InstallGenerator, type: :generator do
       )
     end
 
-    specify "post-install message disables landing-page hints when root route is unavailable" do
-      install_generator = described_class.new([], { new_app: true })
-      allow(install_generator).to receive_messages(
-        shakapacker_setup_incomplete?: false,
-        new_app_root_route_available?: false,
-        use_rsc?: false,
-        use_pro?: false,
-        shakapacker_just_installed?: false
-      )
-
-      allow(GeneratorMessages).to receive(:helpful_message_after_installation)
-        .with(hash_including(landing_page: false))
-        .and_return("stubbed")
-      allow(GeneratorMessages).to receive(:add_info)
-
-      install_generator.send(:add_post_install_message)
-
-      expect(GeneratorMessages).to have_received(:helpful_message_after_installation)
-        .with(hash_including(landing_page: false))
-      expect(GeneratorMessages).to have_received(:add_info).with("stubbed")
-    end
-
     specify "recovery_install_command keeps meaningful flags only" do
       install_generator = described_class.new(
         [],
@@ -2037,9 +1790,6 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:directory)
       allow(install_generator).to receive(:use_rsc?).and_return(false)
 
-      expect(install_generator).to receive(:say_status)
-        .with(:gsub, "bin/dev", true)
-        .twice
       expect(install_generator).to receive(:say_status)
         .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
       expect(Dir).not_to receive(:chdir)
@@ -2750,7 +2500,7 @@ describe InstallGenerator, type: :generator do
       expect(error_text).to include("--pro")
       expect(error_text).to include("react_on_rails_pro")
       expect(error_text).to include("~> #{expected_pro_version}")
-      expect(error_text).to include("https://reactonrails.com/docs/pro/upgrading-to-pro/")
+      expect(error_text).to include("https://pro.reactonrails.com/")
     end
   end
 

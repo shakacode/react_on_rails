@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # React on Rails configuration
-# See https://reactonrails.com/docs/configuration/
+# See https://github.com/shakacode/react_on_rails/blob/master/docs/oss/configuration/README.md
 # for complete documentation of all configuration options.
 
 ReactOnRails.configure do |config|
@@ -44,7 +44,7 @@ ReactOnRails.configure do |config|
   # ALTERNATIVE APPROACH: Set `compile: true` in config/shakapacker.yml test section
   # - Simpler setup, but less explicit control
   # - Can be slower due to on-demand recompilation
-  # - See: https://reactonrails.com/docs/building-features/testing-configuration/
+  # - See: https://github.com/shakacode/react_on_rails/blob/master/docs/oss/building-features/testing-configuration.md
   #
   # RSpec apps should also add to spec/rails_helper.rb (inside RSpec.configure):
   #   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
@@ -66,5 +66,5 @@ ReactOnRails.configure do |config|
   # - Custom rendering extensions
   # - And more...
   #
-  # See: https://reactonrails.com/docs/configuration/
+  # See: https://github.com/shakacode/react_on_rails/blob/master/docs/oss/configuration/README.md
 end

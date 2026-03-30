@@ -3,13 +3,11 @@
 require "rails/generators"
 require_relative "generator_helper"
 require_relative "generator_messages"
-require_relative "demo_page_config"
 
 module ReactOnRails
   module Generators
     class ReactWithReduxGenerator < Rails::Generators::Base
       include GeneratorHelper
-      include DemoPageConfig
 
       Rails::Generators.hide_namespace(namespace)
       source_root(File.expand_path("templates", __dir__))
@@ -21,16 +19,6 @@ module ReactOnRails
                    aliases: "-T"
 
       class_option :invoked_by_install,
-                   type: :boolean,
-                   default: false,
-                   hide: true
-
-      class_option :new_app,
-                   type: :boolean,
-                   default: false,
-                   hide: true
-
-      class_option :rsc,
                    type: :boolean,
                    default: false,
                    hide: true
@@ -81,17 +69,13 @@ module ReactOnRails
 
       def create_appropriate_templates
         base_path = "base/base"
+        config = {
+          component_name: "HelloWorldApp"
+        }
 
         # Only create the view template - no manual bundle needed for auto-bundling
         template("#{base_path}/app/views/hello_world/index.html.erb.tt",
-                 "app/views/hello_world/index.html.erb",
-                 build_hello_world_view_config(
-                   component_name: "HelloWorldApp",
-                   source_path: "app/javascript/src/HelloWorldApp/",
-                   landing_page: new_app_landing_page_available?,
-                   redux: true,
-                   rsc_demo: options[:rsc]
-                 ))
+                 "app/views/hello_world/index.html.erb", config)
       end
 
       def add_redux_npm_dependencies

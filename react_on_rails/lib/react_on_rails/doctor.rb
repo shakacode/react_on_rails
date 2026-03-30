@@ -198,11 +198,6 @@ module ReactOnRails
     end
 
     def check_javascript_bundles
-      if server_bundle_filename.to_s.strip.empty?
-        checker.add_info("ℹ️  server_bundle_js_file is blank (SSR disabled), skipping SSR bundle existence check")
-        return
-      end
-
       server_bundle_path = determine_server_bundle_path
       if File.exist?(server_bundle_path)
         checker.add_success("✅ Server bundle file exists at #{server_bundle_path}")
@@ -633,11 +628,11 @@ module ReactOnRails
 
       webpack_config_path = resolved_webpack_config_path
       if webpack_config_path
-        checker.add_success("✅ Bundler configuration: #{webpack_config_path}")
+        checker.add_success("✅ Webpack configuration: #{webpack_config_path}")
       else
-        checker.add_warning("⚠️  Missing bundler configuration: webpack/rspack config file not found")
+        checker.add_warning("⚠️  Missing Webpack configuration: config/webpack/webpack.config.js")
         checker.add_info(
-          "ℹ️  Checked default config locations and Shakapacker assets_bundler_config_path, if available."
+          "ℹ️  If your app uses a custom webpack config location, this warning may be informational."
         )
       end
 
@@ -679,18 +674,16 @@ module ReactOnRails
       checker.add_info("\n🖥️  Server Rendering Engine:")
 
       begin
-        pro_renderer = resolved_pro_server_renderer
-        uses_node_renderer = pro_renderer == "NodeRenderer"
+        uses_node_renderer = ReactOnRails::Utils.react_on_rails_pro? &&
+                             pro_initializer_has_node_renderer?
 
         if uses_node_renderer
           checker.add_info("  Pro uses NodeRenderer for server rendering")
           if defined?(ExecJS) && ExecJS.runtime
             checker.add_info("  ExecJS available as fallback: #{ExecJS.runtime.name}")
-          elsif pro_execjs_fallback_enabled?
+          else
             checker.add_warning("  ⚠️  ExecJS fallback is enabled but ExecJS is not available")
             checker.add_info("  💡 Install mini_racer or set renderer_use_fallback_exec_js = false")
-          else
-            checker.add_info("  ℹ️  ExecJS fallback is disabled (renderer_use_fallback_exec_js = false)")
           end
         elsif defined?(ExecJS)
           runtime_name = ExecJS.runtime.name if ExecJS.runtime
@@ -756,160 +749,90 @@ module ReactOnRails
 
     def check_react_on_rails_initializer
       config_path = "config/initializers/react_on_rails.rb"
-      runtime_config = react_on_rails_runtime_configuration
-      initializer_exists = File.exist?(config_path)
 
-      unless runtime_config || initializer_exists
+      unless File.exist?(config_path)
         checker.add_warning("⚠️  React on Rails configuration file not found: #{config_path}")
         checker.add_info("💡 Run 'rails generate react_on_rails:install' to create configuration file")
         return
       end
 
-      if !initializer_exists && runtime_config
-        checker.add_info("ℹ️  No config/initializers/react_on_rails.rb found (using runtime configuration)")
-      end
-
       begin
-        content = initializer_exists ? File.read(config_path) : ""
+        content = File.read(config_path)
 
         checker.add_info("📋 React on Rails Configuration:")
-        checker.add_info("📍 Documentation: https://reactonrails.com/docs/configuration/")
-        if runtime_config
-          checker.add_info("ℹ️  Using loaded runtime configuration values")
-        else
-          checker.add_info("ℹ️  Using initializer parsing fallback (Rails environment unavailable)")
-        end
+        checker.add_info("📍 Documentation: https://reactonrails.com/docs/guides/configuration/")
 
         # Analyze configuration settings
-        analyze_server_rendering_config(content, runtime_config)
-        analyze_performance_config(content, runtime_config)
-        analyze_development_config(content, runtime_config)
-        analyze_i18n_config(content, runtime_config)
-        analyze_component_loading_config(content, runtime_config)
-        analyze_custom_extensions(content, runtime_config)
+        analyze_server_rendering_config(content)
+        analyze_performance_config(content)
+        analyze_development_config(content)
+        analyze_i18n_config(content)
+        analyze_component_loading_config(content)
+        analyze_custom_extensions(content)
       rescue StandardError => e
         checker.add_warning("⚠️  Unable to read react_on_rails.rb: #{e.message}")
       end
     end
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    def analyze_server_rendering_config(content, runtime_config = nil)
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def analyze_server_rendering_config(content)
       checker.add_info("\n🖥️  Server Rendering:")
 
-      if runtime_config
-        raw_server_bundle_value = runtime_config.server_bundle_js_file
-        server_bundle_value =
-          if raw_server_bundle_value.is_a?(String)
-            raw_server_bundle_value.strip
-          else
-            raw_server_bundle_value
-          end
-        if server_bundle_value.present?
-          checker.add_info("  server_bundle_js_file: #{server_bundle_value}")
-        elsif server_bundle_value.nil?
-          fallback_server_bundle = server_bundle_filename
-          checker.add_info("  server_bundle_js_file: #{fallback_server_bundle} (initializer/default)")
-        else
-          checker.add_info("  server_bundle_js_file: \"\" (disabled)")
-        end
+      # Server bundle file
+      server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
+      if server_bundle_match
+        checker.add_info("  server_bundle_js_file: #{server_bundle_match[1]}")
       else
-        # Server bundle file
-        server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
-        if server_bundle_match
-          checker.add_info("  server_bundle_js_file: #{server_bundle_match[1]}")
-        else
-          checker.add_info('  server_bundle_js_file: "" (default, SSR disabled)')
-        end
+        checker.add_info("  server_bundle_js_file: server-bundle.js (default)")
       end
 
       # Server bundle output path
+      server_bundle_path_match = content.match(/config\.server_bundle_output_path\s*=\s*["']([^"']+)["']/)
       default_path = ReactOnRails::DEFAULT_SERVER_BUNDLE_OUTPUT_PATH
-      rails_bundle_path =
-        if runtime_config
-          runtime_config.server_bundle_output_path || default_path
-        else
-          server_bundle_path_match = content.match(/config\.server_bundle_output_path\s*=\s*["']([^"']+)["']/)
-          server_bundle_path_match ? server_bundle_path_match[1] : default_path
-        end
+      rails_bundle_path = server_bundle_path_match ? server_bundle_path_match[1] : default_path
       checker.add_info("  server_bundle_output_path: #{rails_bundle_path}")
 
       # Enforce private server bundles
-      if runtime_config
-        checker.add_info("  enforce_private_server_bundles: true") if runtime_config.enforce_private_server_bundles
-      else
-        enforce_private_match = content.match(/config\.enforce_private_server_bundles\s*=\s*([^\s\n,]+)/)
-        checker.add_info("  enforce_private_server_bundles: #{enforce_private_match[1]}") if enforce_private_match
-      end
+      enforce_private_match = content.match(/config\.enforce_private_server_bundles\s*=\s*([^\s\n,]+)/)
+      checker.add_info("  enforce_private_server_bundles: #{enforce_private_match[1]}") if enforce_private_match
 
       # Check Shakapacker integration and provide recommendations
       check_shakapacker_private_output_path(rails_bundle_path)
 
-      # RSC bundle file (Pro feature). Base runtime config does not expose this setting.
-      rsc_bundle_value =
-        if runtime_config && defined?(ReactOnRailsPro)
-          ReactOnRailsPro.configuration.rsc_bundle_js_file
-        else
-          rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
-          rsc_bundle_match ? rsc_bundle_match[1] : nil
-        end
-      if rsc_bundle_value.present?
-        checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_value} (React Server Components - Pro)")
+      # RSC bundle file (Pro feature)
+      rsc_bundle_match = content.match(/config\.rsc_bundle_js_file\s*=\s*["']([^"']+)["']/)
+      if rsc_bundle_match
+        checker.add_info("  rsc_bundle_js_file: #{rsc_bundle_match[1]} (React Server Components - Pro)")
       end
 
       # Prerender setting
-      prerender_value =
-        if runtime_config
-          runtime_config.prerender
-        else
-          prerender_match = content.match(/config\.prerender\s*=\s*([^\s\n,]+)/)
-          prerender_match ? prerender_match[1] : "false (default)"
-        end
+      prerender_match = content.match(/config\.prerender\s*=\s*([^\s\n,]+)/)
+      prerender_value = prerender_match ? prerender_match[1] : "false (default)"
       checker.add_info("  prerender: #{prerender_value}")
 
       # Server renderer pool settings
-      if runtime_config
-        # Default is 1; only report explicit non-default override.
-        checker.add_info("  server_renderer_pool_size: #{runtime_config.server_renderer_pool_size}") \
-          if runtime_config.server_renderer_pool_size != ReactOnRails::DEFAULT_SERVER_RENDERER_POOL_SIZE
-      else
-        pool_size_match = content.match(/config\.server_renderer_pool_size\s*=\s*([^\s\n,]+)/)
-        checker.add_info("  server_renderer_pool_size: #{pool_size_match[1]}") if pool_size_match
-      end
+      pool_size_match = content.match(/config\.server_renderer_pool_size\s*=\s*([^\s\n,]+)/)
+      checker.add_info("  server_renderer_pool_size: #{pool_size_match[1]}") if pool_size_match
 
-      if runtime_config
-        # Default is 20 seconds; only report explicit non-default override.
-        checker.add_info("  server_renderer_timeout: #{runtime_config.server_renderer_timeout} seconds") \
-          if runtime_config.server_renderer_timeout != ReactOnRails::DEFAULT_SERVER_RENDERER_TIMEOUT_SECONDS
-      else
-        timeout_match = content.match(/config\.server_renderer_timeout\s*=\s*([^\s\n,]+)/)
-        checker.add_info("  server_renderer_timeout: #{timeout_match[1]} seconds") if timeout_match
-      end
+      timeout_match = content.match(/config\.server_renderer_timeout\s*=\s*([^\s\n,]+)/)
+      checker.add_info("  server_renderer_timeout: #{timeout_match[1]} seconds") if timeout_match
 
       # Error handling
-      if runtime_config
-        checker.add_info("  raise_on_prerender_error: #{runtime_config.raise_on_prerender_error}") \
-          if runtime_config.raise_on_prerender_error != Rails.env.development?
-      else
-        raise_on_error_match = content.match(/config\.raise_on_prerender_error\s*=\s*([^\s\n,]+)/)
-        checker.add_info("  raise_on_prerender_error: #{raise_on_error_match[1]}") if raise_on_error_match
-      end
-    end
-    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+      raise_on_error_match = content.match(/config\.raise_on_prerender_error\s*=\s*([^\s\n,]+)/)
+      return unless raise_on_error_match
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    def analyze_performance_config(content, runtime_config = nil)
+      checker.add_info("  raise_on_prerender_error: #{raise_on_error_match[1]}")
+    end
+    # rubocop:enable Metrics/CyclomaticComplexity
+
+    # rubocop:disable Metrics/CyclomaticComplexity
+    def analyze_performance_config(content)
       checker.add_info("\n⚡ Performance & Loading:")
 
       # Component loading strategy
-      strategy =
-        if runtime_config
-          runtime_config.generated_component_packs_loading_strategy&.to_s
-        else
-          loading_strategy_match =
-            content.match(/config\.generated_component_packs_loading_strategy\s*=\s*:([^\s\n,]+)/)
-          loading_strategy_match&.[](1)
-        end
-      if strategy
+      loading_strategy_match = content.match(/config\.generated_component_packs_loading_strategy\s*=\s*:([^\s\n,]+)/)
+      if loading_strategy_match
+        strategy = loading_strategy_match[1]
         checker.add_info("  generated_component_packs_loading_strategy: :#{strategy}")
 
         case strategy
@@ -930,12 +853,8 @@ module ReactOnRails
       end
 
       # Auto load bundle
-      if runtime_config
-        checker.add_info("  auto_load_bundle: true") if runtime_config.auto_load_bundle
-      else
-        auto_load_match = content.match(/config\.auto_load_bundle\s*=\s*([^\s\n,]+)/)
-        checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
-      end
+      auto_load_match = content.match(/config\.auto_load_bundle\s*=\s*([^\s\n,]+)/)
+      checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
 
       # Deprecated immediate_hydration setting
       immediate_hydration_match = content.match(/config\.immediate_hydration\s*=\s*([^\s\n,]+)/)
@@ -946,179 +865,112 @@ module ReactOnRails
       end
 
       # Component registry timeout
-      if runtime_config
-        # Default is 5000 ms; only report explicit non-default override.
-        checker.add_info("  component_registry_timeout: #{runtime_config.component_registry_timeout}ms") \
-          if runtime_config.component_registry_timeout != ReactOnRails::DEFAULT_COMPONENT_REGISTRY_TIMEOUT
-      else
-        timeout_match = content.match(/config\.component_registry_timeout\s*=\s*([^\s\n,]+)/)
-        checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms") if timeout_match
-      end
-    end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+      timeout_match = content.match(/config\.component_registry_timeout\s*=\s*([^\s\n,]+)/)
+      return unless timeout_match
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
-    def analyze_development_config(content, runtime_config = nil)
+      checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms")
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
+
+    # rubocop:disable Metrics/AbcSize
+    def analyze_development_config(content)
       checker.add_info("\n🔧 Development & Debugging:")
 
-      if runtime_config
-        # development_mode/trace default to Rails.env.development?, so only
-        # surface explicit runtime divergence from that environment-driven
-        # default.
-        checker.add_info("  development_mode: #{runtime_config.development_mode}") \
-          if runtime_config.development_mode != Rails.env.development?
-        checker.add_info("  trace: #{runtime_config.trace}") \
-          if runtime_config.trace != Rails.env.development?
-        # logging_on_server/replay_console default to true in all environments,
-        # so any non-truthy runtime value is worth surfacing.
-        unless runtime_config.logging_on_server
-          checker.add_info("  logging_on_server: #{runtime_config.logging_on_server.inspect}")
-        end
-        unless runtime_config.replay_console
-          checker.add_info("  replay_console: #{runtime_config.replay_console.inspect}")
-        end
-        if runtime_config.build_test_command.present?
-          checker.add_info("  build_test_command: #{runtime_config.build_test_command}")
-        end
-        if runtime_config.build_production_command.present?
-          checker.add_info("  build_production_command: #{runtime_config.build_production_command}")
-        end
+      # Development mode
+      dev_mode_match = content.match(/config\.development_mode\s*=\s*([^\s\n,]+)/)
+      if dev_mode_match
+        checker.add_info("  development_mode: #{dev_mode_match[1]}")
       else
-        # Development mode
-        dev_mode_match = content.match(/config\.development_mode\s*=\s*([^\s\n,]+)/)
-        if dev_mode_match
-          checker.add_info("  development_mode: #{dev_mode_match[1]}")
-        else
-          checker.add_info("  development_mode: Rails.env.development? (default)")
-        end
-
-        # Trace setting
-        trace_match = content.match(/config\.trace\s*=\s*([^\s\n,]+)/)
-        if trace_match
-          checker.add_info("  trace: #{trace_match[1]}")
-        else
-          checker.add_info("  trace: Rails.env.development? (default)")
-        end
-
-        # Logging
-        logging_match = content.match(/config\.logging_on_server\s*=\s*([^\s\n,]+)/)
-        logging_value = logging_match ? logging_match[1] : "true (default)"
-        checker.add_info("  logging_on_server: #{logging_value}")
-
-        # Console replay
-        replay_match = content.match(/config\.replay_console\s*=\s*([^\s\n,]+)/)
-        replay_value = replay_match ? replay_match[1] : "true (default)"
-        checker.add_info("  replay_console: #{replay_value}")
-
-        # Build commands
-        build_test_match = content.match(/config\.build_test_command\s*=\s*["']([^"']+)["']/)
-        checker.add_info("  build_test_command: #{build_test_match[1]}") if build_test_match
-
-        build_prod_match = content.match(/config\.build_production_command\s*=\s*["']([^"']+)["']/)
-        checker.add_info("  build_production_command: #{build_prod_match[1]}") if build_prod_match
+        checker.add_info("  development_mode: Rails.env.development? (default)")
       end
-    end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-    def analyze_i18n_config(content, runtime_config = nil)
+      # Trace setting
+      trace_match = content.match(/config\.trace\s*=\s*([^\s\n,]+)/)
+      if trace_match
+        checker.add_info("  trace: #{trace_match[1]}")
+      else
+        checker.add_info("  trace: Rails.env.development? (default)")
+      end
+
+      # Logging
+      logging_match = content.match(/config\.logging_on_server\s*=\s*([^\s\n,]+)/)
+      logging_value = logging_match ? logging_match[1] : "true (default)"
+      checker.add_info("  logging_on_server: #{logging_value}")
+
+      # Console replay
+      replay_match = content.match(/config\.replay_console\s*=\s*([^\s\n,]+)/)
+      replay_value = replay_match ? replay_match[1] : "true (default)"
+      checker.add_info("  replay_console: #{replay_value}")
+
+      # Build commands
+      build_test_match = content.match(/config\.build_test_command\s*=\s*["']([^"']+)["']/)
+      checker.add_info("  build_test_command: #{build_test_match[1]}") if build_test_match
+
+      build_prod_match = content.match(/config\.build_production_command\s*=\s*["']([^"']+)["']/)
+      return unless build_prod_match
+
+      checker.add_info("  build_production_command: #{build_prod_match[1]}")
+    end
+    # rubocop:enable Metrics/AbcSize
+
+    def analyze_i18n_config(content)
       i18n_configs = []
 
-      if runtime_config
-        i18n_configs << "i18n_dir: #{runtime_config.i18n_dir}" if runtime_config.i18n_dir.present?
-        i18n_configs << "i18n_yml_dir: #{runtime_config.i18n_yml_dir}" if runtime_config.i18n_yml_dir.present?
-        if runtime_config.i18n_output_format.present?
-          i18n_configs << "i18n_output_format: #{runtime_config.i18n_output_format}"
-        end
-      else
-        i18n_dir_match = content.match(/config\.i18n_dir\s*=\s*["']([^"']+)["']/)
-        i18n_configs << "i18n_dir: #{i18n_dir_match[1]}" if i18n_dir_match
+      i18n_dir_match = content.match(/config\.i18n_dir\s*=\s*["']([^"']+)["']/)
+      i18n_configs << "i18n_dir: #{i18n_dir_match[1]}" if i18n_dir_match
 
-        i18n_yml_dir_match = content.match(/config\.i18n_yml_dir\s*=\s*["']([^"']+)["']/)
-        i18n_configs << "i18n_yml_dir: #{i18n_yml_dir_match[1]}" if i18n_yml_dir_match
+      i18n_yml_dir_match = content.match(/config\.i18n_yml_dir\s*=\s*["']([^"']+)["']/)
+      i18n_configs << "i18n_yml_dir: #{i18n_yml_dir_match[1]}" if i18n_yml_dir_match
 
-        i18n_format_match = content.match(/config\.i18n_output_format\s*=\s*["']([^"']+)["']/)
-        i18n_configs << "i18n_output_format: #{i18n_format_match[1]}" if i18n_format_match
-      end
+      i18n_format_match = content.match(/config\.i18n_output_format\s*=\s*["']([^"']+)["']/)
+      i18n_configs << "i18n_output_format: #{i18n_format_match[1]}" if i18n_format_match
 
       return unless i18n_configs.any?
 
       checker.add_info("\n🌍 Internationalization:")
       i18n_configs.each { |config| checker.add_info("  #{config}") }
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-    def analyze_component_loading_config(content, runtime_config = nil)
+    def analyze_component_loading_config(content)
       component_configs = []
-      filesystem_registry_enabled = false
 
-      if runtime_config
-        if runtime_config.components_subdirectory.present?
-          component_configs << "components_subdirectory: #{runtime_config.components_subdirectory}"
-          filesystem_registry_enabled = true
-        end
-        # Default is false; only report explicit non-default override.
-        if runtime_config.same_bundle_for_client_and_server
-          component_configs << "same_bundle_for_client_and_server: #{runtime_config.same_bundle_for_client_and_server}"
-        end
-        # Default is true; only report explicit non-default override.
-        component_configs << "random_dom_id: #{runtime_config.random_dom_id}" if runtime_config.random_dom_id == false
-      else
-        components_subdir_match = content.match(/config\.components_subdirectory\s*=\s*["']([^"']+)["']/)
-        if components_subdir_match
-          component_configs << "components_subdirectory: #{components_subdir_match[1]}"
-          filesystem_registry_enabled = true
-        end
-
-        same_bundle_match = content.match(/config\.same_bundle_for_client_and_server\s*=\s*([^\s\n,]+)/)
-        component_configs << "same_bundle_for_client_and_server: #{same_bundle_match[1]}" if same_bundle_match
-
-        random_dom_match = content.match(/config\.random_dom_id\s*=\s*([^\s\n,]+)/)
-        component_configs << "random_dom_id: #{random_dom_match[1]}" if random_dom_match
+      components_subdir_match = content.match(/config\.components_subdirectory\s*=\s*["']([^"']+)["']/)
+      if components_subdir_match
+        component_configs << "components_subdirectory: #{components_subdir_match[1]}"
+        checker.add_info("    ℹ️  File-system based component registry enabled")
       end
+
+      same_bundle_match = content.match(/config\.same_bundle_for_client_and_server\s*=\s*([^\s\n,]+)/)
+      component_configs << "same_bundle_for_client_and_server: #{same_bundle_match[1]}" if same_bundle_match
+
+      random_dom_match = content.match(/config\.random_dom_id\s*=\s*([^\s\n,]+)/)
+      component_configs << "random_dom_id: #{random_dom_match[1]}" if random_dom_match
 
       return unless component_configs.any?
 
       checker.add_info("\n📦 Component Loading:")
       component_configs.each { |config| checker.add_info("  #{config}") }
-      checker.add_info("    ℹ️  File-system based component registry enabled") if filesystem_registry_enabled
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-    def analyze_custom_extensions(content, runtime_config = nil)
-      extension_messages = []
-      has_rendering_extension = false
-
-      if runtime_config
-        has_rendering_extension = runtime_config.rendering_extension.present?
-        if runtime_config.rendering_props_extension.present?
-          extension_messages << "  rendering_props_extension: Custom props logic detected"
-        end
-        if runtime_config.server_render_method.present?
-          extension_messages << "  server_render_method: #{runtime_config.server_render_method}"
-        end
-      else
-        has_rendering_extension = /config\.rendering_extension\s*=\s*([^\s\n,]+)/.match?(content)
-        if /config\.rendering_props_extension\s*=\s*([^\s\n,]+)/.match?(content)
-          extension_messages << "  rendering_props_extension: Custom props logic detected"
-        end
-
-        server_method_match = content.match(/config\.server_render_method\s*=\s*["']([^"']+)["']/)
-        extension_messages << "  server_render_method: #{server_method_match[1]}" if server_method_match
-      end
-
-      return unless has_rendering_extension || extension_messages.any?
-
-      checker.add_info("\n🔌 Custom Extensions:")
-      if has_rendering_extension
+    def analyze_custom_extensions(content)
+      # Check for rendering extension
+      if /config\.rendering_extension\s*=\s*([^\s\n,]+)/.match?(content)
+        checker.add_info("\n🔌 Custom Extensions:")
         checker.add_info("  rendering_extension: Custom rendering logic detected")
-        checker.add_info("    ℹ️  See: https://reactonrails.com/docs/configuration/#rendering_extension")
+        checker.add_info("    ℹ️  See: https://reactonrails.com/docs/guides/rendering-extensions")
       end
-      extension_messages.each { |msg| checker.add_info(msg) }
+
+      # Check for rendering props extension
+      if /config\.rendering_props_extension\s*=\s*([^\s\n,]+)/.match?(content)
+        checker.add_info("  rendering_props_extension: Custom props logic detected")
+      end
+
+      # Check for server render method
+      server_method_match = content.match(/config\.server_render_method\s*=\s*["']([^"']+)["']/)
+      return unless server_method_match
+
+      checker.add_info("  server_render_method: #{server_method_match[1]}")
     end
-    # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     def check_deprecated_configuration_settings
       return unless File.exist?("config/initializers/react_on_rails.rb")
@@ -1143,7 +995,7 @@ module ReactOnRails
       deprecated_settings.each do |setting|
         checker.add_warning("  #{setting}")
       end
-      checker.add_info("📖 Migration guide: https://reactonrails.com/docs/upgrading/upgrading-react-on-rails")
+      checker.add_info("📖 Migration guide: https://reactonrails.com/docs/guides/upgrading-react-on-rails")
     end
 
     def check_breaking_changes_warnings
@@ -1211,7 +1063,7 @@ module ReactOnRails
 
       checker.add_info("\n🚨 React on Rails v16+ Breaking Changes Detected:")
       issues_found.each { |issue| checker.add_warning("  #{issue}") }
-      checker.add_info("📖 Full migration guide: https://reactonrails.com/docs/upgrading/upgrading-react-on-rails#upgrading-to-version-16")
+      checker.add_info("📖 Full migration guide: https://reactonrails.com/docs/guides/upgrading-react-on-rails#upgrading-to-version-16")
     end
     # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
@@ -1342,13 +1194,6 @@ module ReactOnRails
     end
 
     def server_bundle_filename
-      runtime_config = react_on_rails_runtime_configuration
-      if runtime_config
-        configured_value = runtime_config.server_bundle_js_file
-        # A blank runtime value intentionally disables SSR bundle checks; only nil falls back.
-        return configured_value unless configured_value.nil?
-      end
-
       # Try to read from React on Rails initializer
       initializer_path = "config/initializers/react_on_rails.rb"
       if File.exist?(initializer_path)
@@ -1377,32 +1222,20 @@ module ReactOnRails
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def check_server_bundle_prerender_consistency
       config_path = "config/initializers/react_on_rails.rb"
-      runtime_config = react_on_rails_runtime_configuration
-      return unless runtime_config || File.exist?(config_path)
+      return unless File.exist?(config_path)
 
       checker.add_info("\n🔍 Server Rendering Consistency:")
 
       begin
-        if runtime_config
-          server_bundle_value = runtime_config.server_bundle_js_file
-          server_bundle_set =
-            if server_bundle_value.nil?
-              server_bundle_filename.to_s.strip.present?
-            else
-              server_bundle_value.present?
-            end
-          prerender_set = runtime_config.prerender
-        else
-          content = File.read(config_path)
+        content = File.read(config_path)
 
-          # Check for server bundle configuration
-          server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
-          server_bundle_set = server_bundle_match && server_bundle_match[1].present?
+        # Check for server bundle configuration
+        server_bundle_match = content.match(/config\.server_bundle_js_file\s*=\s*["']([^"']+)["']/)
+        server_bundle_set = server_bundle_match && server_bundle_match[1].present?
 
-          # Check for global prerender setting
-          prerender_match = content.match(/config\.prerender\s*=\s*(true)/)
-          prerender_set = prerender_match
-        end
+        # Check for global prerender setting
+        prerender_match = content.match(/config\.prerender\s*=\s*(true)/)
+        prerender_set = prerender_match
 
         # Check if prerender is used in views
         uses_prerender = uses_prerender_in_views?
@@ -1411,7 +1244,7 @@ module ReactOnRails
         if (prerender_set || uses_prerender) && !server_bundle_set
           checker.add_warning("  ⚠️  Server rendering is enabled but server_bundle_js_file is not configured")
           checker.add_info("  💡 Set config.server_bundle_js_file = 'server-bundle.js' to enable SSR")
-          checker.add_info("  💡 See: https://reactonrails.com/docs/core-concepts/react-server-rendering/")
+          checker.add_info("  💡 See: https://reactonrails.com/docs/guides/server-rendering")
         elsif server_bundle_set && !prerender_set && !uses_prerender
           checker.add_info("  ℹ️  server_bundle_js_file is configured but prerender doesn't appear to be used")
           checker.add_info("  💡 Either use prerender: true in react_component calls or remove server_bundle_js_file")
@@ -2196,7 +2029,7 @@ module ReactOnRails
       checker.add_info("  💡 :async can cause race conditions. Options:")
       checker.add_info("    1. Upgrade to React on Rails Pro (recommended for :async support)")
       checker.add_info("    2. Change to :defer or :sync loading strategy")
-      checker.add_info("  📖 https://reactonrails.com/docs/configuration/")
+      checker.add_info("  📖 https://reactonrails.com/docs/guides/configuration/")
     end
 
     def scan_view_files_for_async_pack_tag
@@ -2381,62 +2214,9 @@ module ReactOnRails
       checker.add_warning(<<~MSG.strip)
         ⚠️  Could not load Rails environment: #{e.message}
 
-        Configuration diagnostics may reflect default values instead of your app's runtime configuration.
+        Pro/RSC diagnostics may reflect default values instead of your app's configuration.
       MSG
       false
-    end
-
-    def react_on_rails_runtime_configuration
-      return @react_on_rails_runtime_configuration if defined?(@react_on_rails_runtime_configuration)
-
-      @react_on_rails_runtime_configuration =
-        ensure_rails_environment_loaded ? ReactOnRails.configuration : nil
-    rescue StandardError, LoadError => e
-      checker.add_warning("⚠️  Could not query React on Rails runtime configuration: #{e.message}")
-      # Memoize as nil to avoid repeated failed lookups on subsequent checks.
-      @react_on_rails_runtime_configuration = nil
-    end
-
-    def resolved_pro_server_renderer
-      return @resolved_pro_server_renderer if defined?(@resolved_pro_server_renderer)
-      return (@resolved_pro_server_renderer = nil) unless ReactOnRails::Utils.react_on_rails_pro?
-
-      rails_environment_loaded = ensure_rails_environment_loaded
-      @resolved_pro_server_renderer =
-        if rails_environment_loaded && defined?(ReactOnRailsPro)
-          # server_renderer is stored as a plain string in Pro config (for example, "NodeRenderer").
-          ReactOnRailsPro.configuration.server_renderer.to_s
-        elsif pro_initializer_has_node_renderer?
-          "NodeRenderer"
-        elsif rails_environment_loaded
-          checker.add_warning(
-            "⚠️  Could not determine Pro server renderer: ReactOnRailsPro is unavailable " \
-            "and no initializer match found."
-          )
-          nil
-        else
-          checker.add_info(
-            "ℹ️  Could not determine Pro server renderer: Rails environment unavailable and no initializer match found."
-          )
-          nil
-        end
-    rescue StandardError, LoadError => e
-      checker.add_warning("⚠️  Could not read Pro runtime renderer configuration: #{e.message}")
-      @resolved_pro_server_renderer = nil
-    end
-
-    def pro_execjs_fallback_enabled?
-      return ReactOnRailsPro.configuration.renderer_use_fallback_exec_js if defined?(ReactOnRailsPro)
-
-      config_path = "config/initializers/react_on_rails_pro.rb"
-      return true unless File.exist?(config_path)
-
-      content = File.read(config_path)
-      fallback_match = content.match(/config\.renderer_use_fallback_exec_js\s*=\s*(true|false)/)
-      fallback_match ? fallback_match[1] == "true" : true
-    rescue StandardError, LoadError => e
-      checker.add_warning("⚠️  Could not read Pro fallback ExecJS configuration: #{e.message}")
-      true
     end
 
     # Resolve the JavaScript source path from Shakapacker config.

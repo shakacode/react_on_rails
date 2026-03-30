@@ -76,13 +76,6 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.start(:static)
     end
 
-    it "schedules a one-time browser open when requested" do
-      expect(described_class).to receive(:schedule_browser_open).with(3000, route: "/", once: true)
-      expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev")
-
-      described_class.start(:development, nil, route: "/", open_browser_once: true)
-    end
-
     it "starts production-like mode" do
       env = { "NODE_ENV" => "production" }
       argv = ["bundle", "exec", "rails", "assets:precompile"]
@@ -253,49 +246,6 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect_any_instance_of(Kernel).to receive(:exit).with(1)
         expect { described_class.start(:development) }.not_to raise_error
       end
-    end
-  end
-
-  describe "browser auto-open readiness" do
-    it "normalizes routes to request paths" do
-      expect(described_class.send(:build_request_path, nil)).to eq("/")
-      expect(described_class.send(:build_request_path, "/")).to eq("/")
-      expect(described_class.send(:build_request_path, "hello_world")).to eq("/hello_world")
-      expect(described_class.send(:build_request_path, "/hello_server")).to eq("/hello_server")
-    end
-
-    it "treats a successful response as ready" do
-      response = Net::HTTPOK.new("1.1", "200", "OK")
-      allow(described_class).to receive(:http_get_localhost).with(3000, "/").and_return(response)
-
-      expect(described_class.send(:app_route_ready?, 3000, "/")).to be true
-    end
-
-    it "treats a redirect response as ready" do
-      response = Net::HTTPFound.new("1.1", "302", "Found")
-      allow(described_class).to receive(:http_get_localhost).with(3000, "/").and_return(response)
-
-      expect(described_class.send(:app_route_ready?, 3000, "/")).to be true
-    end
-
-    it "does not treat a server error response as ready" do
-      response = Net::HTTPInternalServerError.new("1.1", "500", "Internal Server Error")
-      allow(described_class).to receive(:http_get_localhost).with(3000, "/").and_return(response)
-
-      expect(described_class.send(:app_route_ready?, 3000, "/")).to be false
-    end
-
-    it "waits for the route to respond successfully before opening the browser" do
-      allow(described_class).to receive(:browser_auto_open_allowed?).and_return(true)
-      original_report_on_exception = Thread.current.report_on_exception
-      allow(Thread).to receive(:new).and_yield
-      allow(described_class).to receive(:wait_for_app_route).with(3000, "/").and_return(true)
-      allow(described_class).to receive(:prepare_browser_open_once_marker).with(true).and_return(:claimed)
-      expect(described_class).to receive(:open_browser).with("http://localhost:3000").and_return(true)
-
-      described_class.send(:schedule_browser_open, 3000, route: "/", once: true)
-    ensure
-      Thread.current.report_on_exception = original_report_on_exception
     end
   end
 
@@ -966,58 +916,6 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
     end
 
-    context "with browser flags" do
-      it "passes --open-browser to start" do
-        expect(described_class).to receive(:start).with(
-          :development,
-          "Procfile.dev",
-          hash_including(open_browser: true, open_browser_once: false)
-        )
-
-        described_class.run_from_command_line(["--open-browser"])
-      end
-
-      it "passes --open-browser-once to start" do
-        expect(described_class).to receive(:start).with(
-          :development,
-          "Procfile.dev",
-          hash_including(open_browser: false, open_browser_once: true)
-        )
-
-        described_class.run_from_command_line(["--open-browser-once"])
-      end
-
-      it "lets later browser flags win when --open-browser-once comes last" do
-        expect(described_class).to receive(:start).with(
-          :development,
-          "Procfile.dev",
-          hash_including(open_browser: false, open_browser_once: true)
-        )
-
-        described_class.run_from_command_line(["--open-browser", "--open-browser-once"])
-      end
-
-      it "lets later browser flags win when --open-browser comes last" do
-        expect(described_class).to receive(:start).with(
-          :development,
-          "Procfile.dev",
-          hash_including(open_browser: true, open_browser_once: false)
-        )
-
-        described_class.run_from_command_line(["--open-browser-once", "--open-browser"])
-      end
-
-      it "lets --no-open-browser override generated auto-open flags" do
-        expect(described_class).to receive(:start).with(
-          :development,
-          "Procfile.dev",
-          hash_including(open_browser: false, open_browser_once: false)
-        )
-
-        described_class.run_from_command_line(["--open-browser-once", "--no-open-browser"])
-      end
-    end
-
     context "with no arguments (default mode)" do
       it "starts development mode with no route" do
         expect(described_class).to receive(:start).with(
@@ -1032,78 +930,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     context "with unknown command" do
       it "rejects and shows error message" do
+        expect_any_instance_of(Kernel).to receive(:puts).with("Unknown argument: invalid_command")
+        expect_any_instance_of(Kernel).to receive(:puts).with("Run 'dev help' for usage information")
         expect_any_instance_of(Kernel).to receive(:exit).with(1)
 
-        expect do
-          described_class.run_from_command_line(["invalid_command"])
-        end.to output("Unknown argument: invalid_command\nRun 'dev help' for usage information\n").to_stdout
+        described_class.run_from_command_line(["invalid_command"])
       end
-    end
-  end
-
-  describe ".schedule_browser_open" do
-    let(:marker_dir) { Dir.mktmpdir }
-
-    around do |example|
-      example.run
-    ensure
-      FileUtils.remove_entry(marker_dir)
-    end
-
-    before do
-      stub_const("#{described_class}::OPEN_BROWSER_ONCE_MARKER", File.join(marker_dir, "browser_opened_once"))
-      allow(described_class).to receive_messages(
-        browser_auto_open_allowed?: true,
-        wait_for_app_route: true
-      )
-    end
-
-    it "warns when automatic browser opening fails" do
-      allow(described_class).to receive(:open_browser).and_return(false)
-      expect(described_class).to receive(:warn).with(
-        "[react_on_rails] Could not open browser automatically. Visit http://localhost:3000 manually."
-      )
-
-      described_class.send(:schedule_browser_open, 3000, route: "/", once: false).join
-    end
-
-    it "warns when the browser-open thread raises unexpectedly" do
-      allow(described_class).to receive(:wait_for_app_route).and_raise(SocketError, "boom")
-      expect(described_class).to receive(:warn).with("[react_on_rails] Browser auto-open failed: boom")
-
-      described_class.send(:schedule_browser_open, 3000, route: "/", once: false).join
-    end
-
-    it "does not open the browser again after the once marker is claimed" do
-      allow(described_class).to receive(:open_browser).and_return(true)
-
-      described_class.send(:schedule_browser_open, 3000, route: "/", once: true).join
-      described_class.send(:schedule_browser_open, 3000, route: "/", once: true).join
-
-      expect(described_class).to have_received(:open_browser).once
-    end
-
-    it "removes a claimed once marker when browser opening fails" do
-      allow(described_class).to receive(:open_browser).and_return(false)
-      allow(described_class).to receive(:warn)
-
-      described_class.send(:schedule_browser_open, 3000, route: "/", once: true).join
-
-      expect(File.exist?(described_class::OPEN_BROWSER_ONCE_MARKER)).to be(false)
-    end
-  end
-
-  describe ".print_server_info" do
-    it "normalizes root routes without a double slash" do
-      expect do
-        described_class.send(:print_server_info, "Title", ["Feature"], 3000, route: "/")
-      end.to output(%r{http://localhost:3000(?!/)}).to_stdout_from_any_process
-    end
-
-    it "normalizes routes passed with a leading slash" do
-      expect do
-        described_class.send(:print_server_info, "Title", ["Feature"], 3000, route: "/hello_world")
-      end.to output(%r{http://localhost:3000/hello_world}).to_stdout_from_any_process
     end
   end
 end
