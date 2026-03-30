@@ -7,6 +7,14 @@ require "httpx"
 HTTPX::Plugins.load_plugin(:stream)
 
 describe ReactOnRailsPro::Request do
+  # Encodes an HTML string in the length-prefixed wire format expected by LengthPrefixedParser.
+  # Wire format: <metadata JSON>\t<content byte length hex>\n<raw content bytes>
+  def to_length_prefixed(html)
+    metadata = { "consoleReplayScript" => "", "hasErrors" => false, "isShellReady" => true, "payloadType" => "string" }
+    content_bytes = html.bytesize.to_s(16).rjust(8, "0")
+    "#{metadata.to_json}\t#{content_bytes}\n#{html}"
+  end
+
   let(:logger_mock) { instance_double(ActiveSupport::Logger).as_null_object }
   let(:renderer_url) { "http://node-renderer.com:3800" }
   let(:render_path) { "/render" }
@@ -50,38 +58,51 @@ describe ReactOnRailsPro::Request do
       expect(stream).to be_a(ReactOnRailsPro::StreamDecorator)
     end
 
-    shared_examples "receives response in chunks" do |description, chunks_received, chunks_expected|
-      it description do
-        mock_streaming_response(render_full_url, 200) do |yielder|
-          chunks_received.each do |chunk|
-            yielder.call(chunk)
-          end
-        end
-
-        stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');",
-                                                       is_rsc_payload: false)
-        chunks = []
-        stream.each_chunk do |chunk|
-          chunks << chunk
-        end
-        expect(chunks).to eq(chunks_expected)
+    it "yeilds chunks in order" do
+      mock_streaming_response(render_full_url, 200) do |yielder|
+        yielder.call(to_length_prefixed("First chunk"))
+        yielder.call(to_length_prefixed("Second chunk"))
+        yielder.call(to_length_prefixed("Final chunk"))
       end
+
+      stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');",
+                                                     is_rsc_payload: false)
+      chunks = []
+      stream.each_chunk { |chunk| chunks << chunk }
+      expect(chunks.map { |c| c["html"] }).to eq(["First chunk", "Second chunk", "Final chunk"])
     end
 
-    it_behaves_like "receives response in chunks",
-                    "yeilds chunks in order",
-                    ["First chunk\n", "Second chunk\n", "Final chunk\n"],
-                    ["First chunk", "Second chunk", "Final chunk"]
+    it "separates frames received in a single HTTP chunk" do
+      # Two complete length-prefixed frames arrive in a single HTTP chunk, then a third
+      combined = to_length_prefixed("First chunk") + to_length_prefixed("Second chunk")
+      mock_streaming_response(render_full_url, 200) do |yielder|
+        yielder.call(combined)
+        yielder.call(to_length_prefixed("Final chunk"))
+      end
 
-    it_behaves_like "receives response in chunks",
-                    "separates chunks by newline",
-                    ["First chunk\nSecond chunk\n", "Final chunk\n"],
-                    ["First chunk", "Second chunk", "Final chunk"]
+      stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');",
+                                                     is_rsc_payload: false)
+      chunks = []
+      stream.each_chunk { |chunk| chunks << chunk }
+      expect(chunks.map { |c| c["html"] }).to eq(["First chunk", "Second chunk", "Final chunk"])
+    end
 
-    it_behaves_like "receives response in chunks",
-                    "merges chunks until newline",
-                    ["First chunk", "Second chunk\n", "Final chunk\n"],
-                    ["First chunkSecond chunk", "Final chunk"]
+    it "reassembles frames split across HTTP chunks" do
+      # A single length-prefixed frame is split across two HTTP chunks
+      frame = to_length_prefixed("First chunk")
+      mid = frame.bytesize / 2
+      mock_streaming_response(render_full_url, 200) do |yielder|
+        yielder.call(frame.byteslice(0, mid))
+        yielder.call(frame.byteslice(mid, frame.bytesize - mid))
+        yielder.call(to_length_prefixed("Final chunk"))
+      end
+
+      stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');",
+                                                     is_rsc_payload: false)
+      chunks = []
+      stream.each_chunk { |chunk| chunks << chunk }
+      expect(chunks.map { |c| c["html"] }).to eq(["First chunk", "Final chunk"])
+    end
 
     [true, false].each do |use_delay|
       it "processes each chunk immediately when use_delay is #{use_delay}" do
@@ -89,16 +110,16 @@ describe ReactOnRailsPro::Request do
 
         mock_streaming_response(render_full_url, 200) do |yielder|
           sleep(0.2) if use_delay
-          yielder.call("First chunk\n")
-          expect(mocked_block).to have_received(:call).with("First chunk")
+          yielder.call(to_length_prefixed("First chunk"))
+          expect(mocked_block).to have_received(:call).with(hash_including("html" => "First chunk"))
 
           sleep(0.2) if use_delay
-          yielder.call("Second chunk\n  ")
-          expect(mocked_block).to have_received(:call).with("Second chunk")
+          yielder.call(to_length_prefixed("Second chunk"))
+          expect(mocked_block).to have_received(:call).with(hash_including("html" => "Second chunk"))
 
           sleep(0.2) if use_delay
-          yielder.call("Final chunk\n")
-          expect(mocked_block).to have_received(:call).with("Final chunk")
+          yielder.call(to_length_prefixed("Final chunk"))
+          expect(mocked_block).to have_received(:call).with(hash_including("html" => "Final chunk"))
         end
 
         stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');",
@@ -120,7 +141,7 @@ describe ReactOnRailsPro::Request do
       end
 
       second_request_info = mock_streaming_response(render_full_url, 200) do |yielder|
-        yielder.call("Hello, world!\n")
+        yielder.call(to_length_prefixed("Hello, world!"))
       end
 
       stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');", is_rsc_payload: false)
@@ -128,7 +149,7 @@ describe ReactOnRailsPro::Request do
       stream.each_chunk do |chunk|
         chunks << chunk
       end
-      expect(chunks).to eq(["Hello, world!"])
+      expect(chunks.map { |c| c["html"] }).to eq(["Hello, world!"])
 
       # First request should not have a bundle
       expect(first_request_info[:request].body.to_s).to include("renderingRequest=console.log")

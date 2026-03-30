@@ -38,7 +38,7 @@ function utf8ByteLength(str: string): number {
     return Buffer.byteLength(str, 'utf-8');
   }
   let bytes = 0;
-  for (let i = 0; i < str.length; i++) {
+  for (let i = 0; i < str.length; i += 1) {
     const code = str.charCodeAt(i);
     if (code <= 0x7f) {
       bytes += 1;
@@ -48,7 +48,7 @@ function utf8ByteLength(str: string): number {
       const next = i + 1 < str.length ? str.charCodeAt(i + 1) : 0;
       if (next >= 0xdc00 && next <= 0xdfff) {
         bytes += 4; // valid surrogate pair
-        i++;
+        i += 1;
       } else {
         bytes += 3; // lone high surrogate → U+FFFD
       }

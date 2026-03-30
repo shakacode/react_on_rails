@@ -79,7 +79,7 @@ export default class LengthPrefixedStreamParser {
         const content = this.buf.subarray(0, this.contentLen);
         this.buf = this.buf.subarray(this.contentLen);
         // Strip protocol-internal payloadType before passing to consumers
-        const { payloadType: _, ...metadata } = this.metadata;
+        const { payloadType: _payloadType, ...metadata } = this.metadata;
         onChunk(content, metadata);
         this.state = 'header';
       } else {
