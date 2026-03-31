@@ -9,8 +9,8 @@ module ReactOnRails
     # This module provides common functionality for adding and installing
     # JS dependencies to avoid code duplication between generators.
     #
-    # Since react_on_rails requires shakapacker, and shakapacker includes
-    # package_json as a dependency, the package_json gem is always available.
+    # For older shakapacker versions, the package_json gem may not be available.
+    # In that case this module falls back to direct package-manager commands.
     #
     # == Required Methods
     # Including classes must include GeneratorHelper module which provides:
@@ -440,7 +440,7 @@ module ReactOnRails
         MSG
       end
 
-      # Add a single dependency using package_json gem
+      # Add a single dependency.
       #
       # This method is used internally for adding the react-on-rails package
       # with version-specific handling (react-on-rails@VERSION).
@@ -453,51 +453,42 @@ module ReactOnRails
       # @param dev [Boolean] Whether to add as dev dependency
       # @return [Boolean] true if successful, false otherwise
       def add_package(package, dev: false)
-        pj = package_json
-        return false unless pj
-
-        begin
-          # Ensure package is in array format for package_json gem
-          packages_array = [package]
-          if dev
-            pj.manager.add(packages_array, type: :dev, exact: true)
-          else
-            pj.manager.add(packages_array, exact: true)
-          end
-          true
-        rescue StandardError
-          # Return false to trigger warning in calling method
-          false
-        end
+        add_packages([package], dev: dev)
       end
 
-      # Add multiple dependencies at once using package_json gem
+      # Add multiple dependencies.
       #
-      # This method delegates to GeneratorHelper's add_npm_dependencies for
-      # better package manager abstraction and batch processing efficiency.
+      # Tries package_json first (when available), then falls back to invoking
+      # the detected package manager directly.
       #
       # @param packages [Array<String>] Package names to add
       # @param dev [Boolean] Whether to add as dev dependencies
       # @return [Boolean] true if successful, false otherwise
       def add_packages(packages, dev: false)
-        # Use the add_npm_dependencies helper from GeneratorHelper
-        add_npm_dependencies(packages, dev: dev)
+        return true if add_npm_dependencies(packages, dev: dev)
+
+        install_packages_with_fallback(packages, dev: dev)
       end
 
       def install_js_dependencies
-        # Use package_json gem's install method (always available via shakapacker)
-        # package_json is guaranteed to be available because:
-        # 1. react_on_rails gemspec requires shakapacker
-        # 2. shakapacker gemspec requires package_json
-        # 3. GeneratorHelper provides package_json method
         pj = package_json
-        unless pj
-          GeneratorMessages.add_warning("package_json not available, skipping dependency installation")
-          return false
+        if pj
+          pj.manager.install
+          return true
         end
 
-        pj.manager.install
-        true
+        package_manager = fallback_package_manager
+        install_args = [package_manager, "install"]
+
+        return true if system(*install_args)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  JavaScript dependencies installation failed via #{package_manager}.
+
+          Please run manually:
+            #{install_args.join(' ')}
+        MSG
+        false
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  JavaScript dependencies installation failed: #{e.message}
@@ -509,6 +500,75 @@ module ReactOnRails
           • pnpm install (if using pnpm)
         MSG
         false
+      end
+
+      def install_packages_with_fallback(packages, dev:)
+        package_manager = fallback_package_manager
+        packages_to_install = filter_missing_packages(packages)
+        return true if packages_to_install.empty?
+
+        install_args = build_install_args(package_manager, dev, packages_to_install)
+
+        system(*install_args)
+      rescue StandardError
+        false
+      end
+
+      def fallback_package_manager
+        package_manager = GeneratorMessages.detect_package_manager
+        allowed_package_managers = %w[npm yarn pnpm bun].freeze
+        return package_manager if allowed_package_managers.include?(package_manager)
+
+        "npm"
+      end
+
+      def build_install_args(package_manager, dev, packages)
+        base_commands = {
+          "npm" => %w[npm install],
+          "yarn" => %w[yarn add],
+          "pnpm" => %w[pnpm add],
+          "bun" => %w[bun add]
+        }
+
+        base_args = base_commands.fetch(package_manager).dup
+        base_args << dev_flag_for(package_manager) if dev
+        base_args + packages
+      end
+
+      def dev_flag_for(package_manager)
+        case package_manager
+        when "npm", "pnpm" then "--save-dev"
+        when "yarn", "bun" then "--dev"
+        end
+      end
+
+      def filter_missing_packages(packages)
+        existing = existing_package_names
+        return packages if existing.empty?
+
+        packages.reject do |package_spec|
+          package_name = package_name_from_spec(package_spec)
+          package_name && existing.include?(package_name)
+        end
+      end
+
+      def existing_package_names
+        return [] unless File.exist?("package.json")
+
+        content = JSON.parse(File.read("package.json"))
+        dependencies = content.fetch("dependencies", {}).keys
+        dev_dependencies = content.fetch("devDependencies", {}).keys
+        (dependencies + dev_dependencies).uniq
+      rescue StandardError
+        []
+      end
+
+      def package_name_from_spec(package_spec)
+        scoped_match = package_spec.match(%r{\A(@[^/]+/[^@]+)(?:@.+)?\z})
+        return scoped_match[1] if scoped_match
+
+        unscoped_match = package_spec.match(/\A([^@]+)(?:@.+)?\z/)
+        unscoped_match&.[](1)
       end
     end
   end

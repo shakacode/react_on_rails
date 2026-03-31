@@ -10,9 +10,12 @@ module GeneratorHelper
     require "package_json" unless defined?(PackageJson)
     @package_json ||= PackageJson.read
   rescue LoadError
-    say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
-    say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
-               :yellow
+    unless @package_json_unavailable_warned
+      say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
+      say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
+                 :yellow
+      @package_json_unavailable_warned = true
+    end
     nil
   rescue StandardError => e
     say_status :warning, "Could not read package.json: #{e.message}", :yellow

@@ -9,6 +9,9 @@ Before swapping gems, check these first:
 1. **Webpacker vs Shakapacker**: if the app still uses `webpacker`, migrate to `shakapacker` first.
 2. **Bundler age**: some older `react-rails` apps still carry Bundler 1.x lockfiles. Those can fail on modern Ruby before you even reach the migration work.
 3. **Rails age**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 / Webpacker 3 apps are usually a staged migration, not a one-command migration.
+4. **Package manager metadata**: if you have `yarn.lock`, `pnpm-lock.yaml`, or `bun.lock*`, ensure `package.json` has a matching `packageManager` field (for example `yarn@1.22.22`).
+5. **Browserslist source**: use one source only. If `.browserslistrc` exists, remove `browserslist` from `package.json`.
+6. **JSX-in-.js projects**: current install generator auto-switches to Babel when JSX is detected in `.js` files. If your project has custom transpiler setup, review `config/shakapacker.yml` after generation.
 
 If you are already on `shakapacker` 7+ and React 18+, the migration is mostly about helper syntax, component registration, and generated defaults.
 
@@ -17,6 +20,12 @@ If `bundle install` fails before you even start because the lockfile was generat
 ```bash
 bundle _2.3.26_ lock --update
 bundle _2.3.26_ install
+```
+
+If `package.json` is missing `packageManager` and the app uses Yarn, set it before running install generators:
+
+```bash
+npm pkg set packageManager='yarn@1.22.22'
 ```
 
 1. Update Deps

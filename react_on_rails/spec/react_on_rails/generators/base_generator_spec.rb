@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "ripper"
 require_relative "../support/generator_spec_helper"
 
 RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
@@ -143,6 +144,7 @@ RSpec.describe ReactOnRails::Generators::BaseGenerator, type: :generator do
       expect(helper_content.scan("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)").size).to eq(1)
       expect(helper_content.scan("RSpec.configure do |config|").size).to eq(2)
       expect(helper_content).to include('config.example_status_persistence_file_path = "spec/examples.txt"')
+      expect(Ripper.sexp(helper_content)).not_to be_nil
     end
   end
 
