@@ -84,7 +84,7 @@ module StreamIntegrationHelpers
           end
         end
       end
-      "TEMPLATE\n"
+      "TEMPLATE"
     end
   end
 end
@@ -195,7 +195,7 @@ RSpec.describe "Streaming client disconnect integration" do
       expect(result[:stream_error]).to be_nil
       expect(result[:reader_error]).to be_nil
       expect(result[:chunks_received].size).to be >= 1
-      expect(result[:chunks_received].first).to eq("TEMPLATE\n")
+      expect(result[:chunks_received].first).to eq("TEMPLATE")
     end
 
     it "server can process another request after disconnect" do
@@ -212,7 +212,7 @@ RSpec.describe "Streaming client disconnect integration" do
 
       # Template + 3 component chunks
       expect(chunks.size).to eq(4)
-      expect(chunks.first).to eq("TEMPLATE\n")
+      expect(chunks.first).to eq("TEMPLATE")
     end
   end
 
@@ -327,7 +327,7 @@ RSpec.describe "Streaming client disconnect integration" do
 
       # Template + 300 component chunks
       expect(chunks.size).to eq(301)
-      expect(chunks.first).to eq("TEMPLATE\n")
+      expect(chunks.first).to eq("TEMPLATE")
     end
 
     it "server handles multiple sequential disconnects then recovers" do
