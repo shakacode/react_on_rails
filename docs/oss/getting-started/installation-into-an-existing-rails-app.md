@@ -47,9 +47,9 @@ If the generator reports dependency-install warnings, run your package manager i
 
 ```bash
 # pick one package manager
-yarn install
-# or: npm install
+npm install
 # or: pnpm install
+# or: yarn install
 # or: bun install
 
 bundle exec rails shakapacker:compile
