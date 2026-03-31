@@ -86,6 +86,7 @@ const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: strin
         }
         controller.close();
       } catch (error) {
+        console.error('[ReactOnRails] Error parsing RSC stream:', error);
         controller.error(error);
       }
     },
