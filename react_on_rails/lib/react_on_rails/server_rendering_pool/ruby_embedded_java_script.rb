@@ -229,7 +229,13 @@ module ReactOnRails
         end
 
         def parse_render_result(result_string, render_options)
-          result = ReactOnRails::LengthPrefixedParser.parse_one_chunk_result(result_string)
+          # Auto-detect format: length-prefixed (contains tab) or legacy JSON.
+          # ExecJS with older bundles may return JSON; node renderer returns length-prefixed.
+          result = if result_string.to_s.include?("\t")
+                     ReactOnRails::LengthPrefixedParser.parse_one_chunk_result(result_string)
+                   else
+                     JSON.parse(result_string.to_s)
+                   end
           replay_console_to_rails_logger(result, render_options)
           result
         rescue StandardError => e
