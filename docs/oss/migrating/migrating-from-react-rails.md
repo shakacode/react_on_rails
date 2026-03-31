@@ -70,7 +70,15 @@ npm pkg set packageManager='bun@1.2.13'
       bundle exec rails shakapacker:compile
       ```
 
-   3. Run your test suite and fix any app-specific breakages before merging.
+   3. Confirm no legacy positional `react_component` helper calls remain:
+
+      ```bash
+      rg -n "react_component\\s+['\\\"]" app/views
+      ```
+
+      If you find matches, convert them to options-style props before running tests.
+
+   4. Run your test suite and fix any app-specific breakages before merging.
 
 ## Legacy compatibility fixes that often make migration one-shot
 
