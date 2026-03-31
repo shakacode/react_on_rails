@@ -96,8 +96,17 @@ describe GeneratorMessages do
   end
 
   describe ".detect_package_manager" do
-    before do
+    let(:original_package_manager_env) { ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil) }
+
+    around do |example|
       ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      example.run
+
+      if original_package_manager_env
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_package_manager_env
+      else
+        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      end
     end
 
     it "returns bun when bun.lock exists" do

@@ -3114,8 +3114,7 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive_messages(
         using_swc?: true,
         add_packages: true,
-        add_babel_react_dependencies: true,
-        install_js_dependencies: true
+        add_babel_react_dependencies: true
       )
     end
 
@@ -3128,7 +3127,6 @@ describe InstallGenerator, type: :generator do
       expect(shakapacker_yml).to include('javascript_transpiler: "babel"')
       expect(install_generator).to have_received(:add_packages).with(["babel-loader"], dev: true)
       expect(install_generator).to have_received(:add_babel_react_dependencies)
-      expect(install_generator).to have_received(:install_js_dependencies)
     end
   end
 

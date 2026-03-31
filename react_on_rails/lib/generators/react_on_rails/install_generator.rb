@@ -251,8 +251,7 @@ module ReactOnRails
         set_javascript_transpiler_to_babel
         babel_loader_added = add_packages(["babel-loader"], dev: true)
         babel_preset_added = add_babel_react_dependencies
-        dependencies_installed = install_js_dependencies
-        return if babel_loader_added && babel_preset_added && dependencies_installed
+        return if babel_loader_added && babel_preset_added
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Babel compatibility dependencies may be incomplete after switching from SWC.
@@ -814,9 +813,12 @@ module ReactOnRails
         shakapacker_config_path = "config/shakapacker.yml"
         return unless File.exist?(shakapacker_config_path)
 
+        swc_transpiler_pattern = /^(\s*javascript_transpiler:\s*)["']?swc["']?(\s*(?:#.*)?)$/
+        return unless File.read(shakapacker_config_path).match?(swc_transpiler_pattern)
+
         gsub_file(
           shakapacker_config_path,
-          /^(\s*javascript_transpiler:\s*)["']?swc["']?(\s*(?:#.*)?)$/,
+          swc_transpiler_pattern,
           '\1"babel"\2'
         )
         @using_swc = false
