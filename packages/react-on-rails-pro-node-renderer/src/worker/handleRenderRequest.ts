@@ -9,7 +9,6 @@ import cluster from 'cluster';
 import path from 'path';
 import { mkdir } from 'fs/promises';
 import { lock, unlock } from '../shared/locks.js';
-import fileExistsAsync from '../shared/fileExistsAsync.js';
 import log from '../shared/log.js';
 import {
   Asset,
@@ -106,11 +105,7 @@ async function handleNewBundleProvided(
     }
 
     try {
-      const [bundleFileExists, bundleComplete] = await Promise.all([
-        fileExistsAsync(bundleFilePathPerTimestamp),
-        isBundleComplete(providedNewBundle.timestamp),
-      ]);
-      if (bundleFileExists && bundleComplete) {
+      if (await isBundleComplete(providedNewBundle.timestamp)) {
         log.info(
           'Bundle %s already exists and is complete. Skipping duplicate upload.',
           bundleFilePathPerTimestamp,
@@ -271,12 +266,7 @@ export async function handleRenderRequest({
     const missingBundles = (
       await Promise.all(
         [...(dependencyBundleTimestamps ?? []), bundleTimestamp].map(async (timestamp) => {
-          const bundleFilePath = getRequestBundleFilePath(timestamp);
-          const [fileExists, bundleComplete] = await Promise.all([
-            fileExistsAsync(bundleFilePath),
-            isBundleComplete(timestamp),
-          ]);
-          return fileExists && bundleComplete ? null : timestamp;
+          return (await isBundleComplete(timestamp)) ? null : timestamp;
         }),
       )
     ).filter((timestamp) => timestamp !== null);
