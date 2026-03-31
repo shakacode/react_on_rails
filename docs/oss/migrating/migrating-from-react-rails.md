@@ -38,7 +38,7 @@ npm pkg set packageManager='bun@1.2.13'
    3. Run `bundle install` and your package manager's install command.
    4. Commit changes.
 
-2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` installs node dependencies and also creates sample React component, Rails view/controller, and updates `config/routes.rb`.
+2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` attempts to install node dependencies, creates a sample React component, Rails view/controller, and updates `config/routes.rb`. In some existing apps, dependency installation is skipped and the generator prints manual install commands. Run those commands before continuing.
 
 3. Adapt the project: Check the changes and carefully accept, reject, or modify them as per your project's needs. Besides changes in `config/shakapacker` or `babel.config` which are project-specific, here are the most noticeable changes to address:
    1. Check Webpack config files at `config/webpack/*`. If coming from `react-rails` v3 on Shakapacker, the changes are usually localized. The most important difference is the server bundle entrypoint: `react-rails` commonly uses `server_rendering.js`, while React on Rails defaults to `server-bundle.js`.
@@ -56,6 +56,21 @@ npm pkg set packageManager='bun@1.2.13'
       - <%= react_component('Post', { title: 'New Post' }, { prerender: true }) %>
       + <%= react_component('Post', { props: { title: 'New Post' }, prerender: true }) %>
       ```
+
+4. Validate before final cleanup:
+   1. Confirm that old `react_ujs` references are gone:
+
+      ```bash
+      rg -n "react_ujs|ReactRailsUJS|server_rendering\\.js" app/javascript config
+      ```
+
+   2. Ensure compile succeeds:
+
+      ```bash
+      bundle exec rails shakapacker:compile
+      ```
+
+   3. Run your test suite and fix any app-specific breakages before merging.
 
 You can also check [react-rails-to-react-on-rails](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) branch on [react-rails example app](https://github.com/shakacode/react-rails-example-app) for an example of migration from `react-rails` v3 to `react_on_rails` v13.4.
 

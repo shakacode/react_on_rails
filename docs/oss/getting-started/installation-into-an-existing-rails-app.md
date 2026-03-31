@@ -16,7 +16,7 @@ bundle add shakapacker --strict
 bundle add react_on_rails --strict
 ```
 
-React on Rails installs the matching `react-on-rails` JavaScript package during the generator run, so you do not need to pre-install it in `package.json` unless you want to pin everything manually ahead of time.
+React on Rails attempts to install the matching `react-on-rails` JavaScript package during the generator run. In some existing apps, dependency installation is skipped and the generator prints manual install commands. If that happens, run those commands before starting the app.
 
 ### Optional: pin exact gem and npm versions yourself
 
@@ -42,6 +42,18 @@ bundle exec rails generate react_on_rails:install --typescript
 TypeScript is the recommended default for new integrations. If you want JavaScript instead, omit `--typescript`.
 
 For generator options such as `--rspack`, `--pro`, or `--rsc`, see the [generator details](../api-reference/generator-details.md).
+
+If the generator reports dependency-install warnings, run your package manager install and then compile once before starting the app:
+
+```bash
+# pick one package manager
+yarn install
+# or: npm install
+# or: pnpm install
+# or: bun install
+
+bundle exec rails shakapacker:compile
+```
 
 ## 3. Start the app
 
