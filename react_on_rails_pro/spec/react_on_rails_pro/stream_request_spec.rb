@@ -8,6 +8,13 @@ require "httpx"
 HTTPX::Plugins.load_plugin(:stream)
 
 RSpec.describe ReactOnRailsPro::StreamRequest do
+  # Wraps a string in the length-prefixed wire format for mock streaming responses.
+  def to_length_prefixed(html)
+    metadata = { "consoleReplayScript" => "", "hasErrors" => false, "isShellReady" => true, "payloadType" => "string" }
+    content_bytes = html.bytesize.to_s(16).rjust(8, "0")
+    "#{metadata.to_json}\t#{content_bytes}\n#{html}"
+  end
+
   describe ".create" do
     it "returns a StreamDecorator instance" do
       result = described_class.create { mock_response }
@@ -53,7 +60,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
       barrier_received = nil
       mock_response = double(HTTPX::StreamResponse, status: 200)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:each).and_yield("chunk\n")
+      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("chunk"))
 
       stream = described_class.create do |_send_bundle, barrier|
         barrier_received = barrier
@@ -72,7 +79,7 @@ RSpec.describe ReactOnRailsPro::StreamRequest do
 
       mock_response = double(HTTPX::StreamResponse, status: 200)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:each).and_yield("chunk\n")
+      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("chunk"))
 
       stream = described_class.create do |_send_bundle, _barrier|
         mock_response
