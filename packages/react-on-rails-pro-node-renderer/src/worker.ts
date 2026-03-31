@@ -240,15 +240,22 @@ export function handleStartupListenError({
       message: err.message,
     };
     try {
-      sendFn(startupFailure, undefined, undefined, (sendErr) => {
-        if (sendErr) {
-          log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
-        }
+      let exited = false;
+      const doExit = (sendErr?: Error | null) => {
+        if (exited) return;
+        exited = true;
+        if (sendErr) log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
         exitFn(1);
-      });
+      };
+      sendFn(startupFailure, undefined, undefined, doExit);
+      // Safety net: if the IPC channel is half-broken the callback may never
+      // fire, leaving this worker alive indefinitely. Force exit after a timeout.
+      const IPC_SEND_TIMEOUT_MS = 2000;
+      const timer = setTimeout(() => doExit(), IPC_SEND_TIMEOUT_MS);
+      if (typeof timer.unref === 'function') timer.unref();
       return;
     } catch (sendErr) {
-      log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
+      log.warn({ err: sendErr as Error }, 'Failed to send startup failure message to master');
       exitFn(1);
       return;
     }

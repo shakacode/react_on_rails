@@ -80,9 +80,12 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
   let isAbortingForStartupFailure = false;
   let fatalStartupFailure: { workerId: number; failure: WorkerStartupFailureMessage } | null = null;
+  let hasInitiatedShutdown = false;
 
   cluster.on('message', (worker, message) => {
-    if (!isWorkerStartupFailureMessage(message) || isAbortingForStartupFailure) return;
+    // Check the abort flag first to short-circuit the type-guard on every
+    // ordinary IPC message once we are already aborting.
+    if (isAbortingForStartupFailure || !isWorkerStartupFailureMessage(message)) return;
 
     isAbortingForStartupFailure = true;
     fatalStartupFailure = { workerId: worker.id, failure: message };
@@ -94,24 +97,33 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
   // Listen for dying workers:
   cluster.on('exit', (worker) => {
-    if (worker.isScheduledRestart) {
-      log.info('Restarting worker #%d on schedule', worker.id);
-      cluster.fork();
+    // Once a startup failure has been detected, abort regardless of whether
+    // this particular exit was from the failing worker, a scheduled restart,
+    // or an unrelated crash. Don't fork any more workers.
+    if (isAbortingForStartupFailure && fatalStartupFailure) {
+      if (!hasInitiatedShutdown) {
+        hasInitiatedShutdown = true;
+        // Note: the exiting worker may differ from the one that sent the
+        // failure message if multiple workers exit in rapid succession.
+        // We always report the first failure received.
+        const { failure, workerId: failedWorkerId } = fatalStartupFailure;
+        const msg =
+          failure.code === 'EADDRINUSE'
+            ? `Node renderer startup failed: ${failure.host}:${failure.port} is already in use`
+            : `Node renderer startup failed in worker ${failedWorkerId}: ${failure.message || `exit code ${worker.process.exitCode}`}`;
+
+        errorReporter.message(msg);
+        // Disconnect all live workers so they release their ports before the
+        // master exits. cluster.disconnect() is async — pass process.exit as
+        // the callback so we wait for workers to actually disconnect.
+        cluster.disconnect(() => process.exit(1));
+      }
       return;
     }
 
-    if (isAbortingForStartupFailure && fatalStartupFailure) {
-      const { failure, workerId: failedWorkerId } = fatalStartupFailure;
-      const msg =
-        failure.code === 'EADDRINUSE'
-          ? `Node renderer startup failed: ${failure.host}:${failure.port} is already in use`
-          : `Node renderer startup failed in worker ${failedWorkerId}: ${failure.message || `exit code ${worker.process.exitCode}`}`;
-
-      errorReporter.message(msg);
-      // Disconnect all live workers so they release their ports before the master exits.
-      // Without this, successfully-started workers become orphans still holding the port.
-      cluster.disconnect();
-      process.exit(1);
+    if (worker.isScheduledRestart) {
+      log.info('Restarting worker #%d on schedule', worker.id);
+      cluster.fork();
       return;
     }
 

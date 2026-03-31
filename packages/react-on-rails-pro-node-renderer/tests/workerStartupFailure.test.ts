@@ -35,6 +35,42 @@ describe('isWorkerStartupFailureMessage', () => {
   it('returns false for an object without type', () => {
     expect(isWorkerStartupFailureMessage({ stage: 'listen' })).toBe(false);
   });
+
+  it('returns false for a non-integer port', () => {
+    expect(
+      isWorkerStartupFailureMessage({
+        type: WORKER_STARTUP_FAILURE,
+        stage: 'listen',
+        host: 'localhost',
+        port: 3800.5,
+        message: 'some error',
+      }),
+    ).toBe(false);
+  });
+
+  it('returns false for an out-of-range port', () => {
+    expect(
+      isWorkerStartupFailureMessage({
+        type: WORKER_STARTUP_FAILURE,
+        stage: 'listen',
+        host: 'localhost',
+        port: 70000,
+        message: 'some error',
+      }),
+    ).toBe(false);
+  });
+
+  it('returns false for a negative port', () => {
+    expect(
+      isWorkerStartupFailureMessage({
+        type: WORKER_STARTUP_FAILURE,
+        stage: 'listen',
+        host: 'localhost',
+        port: -1,
+        message: 'some error',
+      }),
+    ).toBe(false);
+  });
 });
 
 describe('worker startup listen error handling', () => {
@@ -148,5 +184,67 @@ describe('worker startup listen error handling', () => {
     });
 
     expect(exitCalls).toEqual([1]);
+  });
+
+  it('exits via timeout fallback when IPC callback is never invoked', () => {
+    jest.useFakeTimers();
+    const exitCalls: number[] = [];
+    // send accepts the message but never invokes the callback, simulating a
+    // half-broken IPC channel.
+    const send = ((_msg: unknown, _handle?: unknown, _options?: unknown, _callback?: () => void) =>
+      true) as NodeJS.Process['send'];
+    const exit = ((code?: number) => {
+      exitCalls.push(code ?? 0);
+    }) as NodeJS.Process['exit'];
+
+    handleStartupListenError({
+      err: buildListenError(),
+      host: 'localhost',
+      port: 3800,
+      isWorker: true,
+      send,
+      exit,
+    });
+
+    // Callback was never invoked, so exit hasn't been called yet.
+    expect(exitCalls).toEqual([]);
+
+    // Advance past the IPC_SEND_TIMEOUT_MS (2000ms) fallback timer.
+    jest.advanceTimersByTime(2000);
+    expect(exitCalls).toEqual([1]);
+
+    jest.useRealTimers();
+  });
+
+  it('does not exit twice when callback fires after timeout', () => {
+    jest.useFakeTimers();
+    const exitCalls: number[] = [];
+    let savedCallback: (() => void) | undefined;
+    const send = ((_msg: unknown, _handle?: unknown, _options?: unknown, callback?: () => void) => {
+      savedCallback = callback;
+      return true;
+    }) as NodeJS.Process['send'];
+    const exit = ((code?: number) => {
+      exitCalls.push(code ?? 0);
+    }) as NodeJS.Process['exit'];
+
+    handleStartupListenError({
+      err: buildListenError(),
+      host: 'localhost',
+      port: 3800,
+      isWorker: true,
+      send,
+      exit,
+    });
+
+    // Timeout fires first.
+    jest.advanceTimersByTime(2000);
+    expect(exitCalls).toEqual([1]);
+
+    // Late callback — should be a no-op.
+    savedCallback?.();
+    expect(exitCalls).toEqual([1]);
+
+    jest.useRealTimers();
   });
 });

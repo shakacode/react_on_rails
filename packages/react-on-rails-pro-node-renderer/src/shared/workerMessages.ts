@@ -23,7 +23,9 @@ export function isWorkerStartupFailureMessage(value: unknown): value is WorkerSt
     message.stage === 'listen' &&
     typeof message.host === 'string' &&
     typeof message.port === 'number' &&
-    !Number.isNaN(message.port) &&
+    Number.isInteger(message.port) &&
+    message.port >= 0 &&
+    message.port <= 65535 &&
     typeof message.message === 'string'
   );
 }

@@ -14,7 +14,7 @@ type ClusterHandlers = {
 type MockCluster = {
   on: jest.Mock<MockCluster, [event: string, handler: (...args: unknown[]) => void]>;
   fork: jest.Mock<unknown, []>;
-  disconnect: jest.Mock<void, []>;
+  disconnect: jest.Mock<void, [callback?: () => void]>;
 };
 
 function buildStartupFailureMessage(
@@ -41,7 +41,9 @@ function setupMasterRunHarness() {
     return {};
   });
   const mockCluster = {} as MockCluster;
-  mockCluster.disconnect = jest.fn();
+  mockCluster.disconnect = jest.fn((callback?: () => void) => {
+    if (callback) callback();
+  });
   mockCluster.on = jest.fn((event: string, handler: (...args: unknown[]) => void) => {
     operations.push(`on:${event}`);
     if (event === 'message') {
@@ -189,6 +191,39 @@ describe('master startup failure handling via masterRun wiring', () => {
     expect(harness.mockErrorReporterMessage).toHaveBeenCalledWith(
       'Node renderer startup failed in worker 1: listen EACCES: permission denied 0.0.0.0:80',
     );
+  });
+
+  it('reports error only once when multiple workers exit during abort', () => {
+    const harness = setupMasterRunHarness();
+    // Use a disconnect mock that does NOT invoke the callback, so process.exit
+    // is not called and subsequent exit events can be observed.
+    harness.mockCluster.disconnect.mockImplementation(() => {});
+
+    harness.clusterHandlers.message({ id: 1, process: { exitCode: 1 } }, buildStartupFailureMessage());
+
+    // First exit triggers the error report and disconnect.
+    harness.clusterHandlers.exit({ id: 1, process: { exitCode: 1 } });
+    expect(harness.mockErrorReporterMessage).toHaveBeenCalledTimes(1);
+    expect(harness.mockCluster.disconnect).toHaveBeenCalledTimes(1);
+
+    // Second worker exit during abort — no duplicate report, no refork.
+    harness.clusterHandlers.exit({ id: 2, process: { exitCode: 1 } });
+    expect(harness.mockErrorReporterMessage).toHaveBeenCalledTimes(1);
+    expect(harness.mockCluster.disconnect).toHaveBeenCalledTimes(1);
+    expect(harness.mockFork).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not refork a scheduled-restart worker when aborting for startup failure', () => {
+    const harness = setupMasterRunHarness();
+
+    harness.clusterHandlers.message({ id: 1, process: { exitCode: 1 } }, buildStartupFailureMessage());
+
+    // A scheduled-restart worker exiting during abort should NOT be reforked.
+    expect(() =>
+      harness.clusterHandlers.exit({ id: 2, isScheduledRestart: true, process: { exitCode: 0 } }),
+    ).toThrow('process.exit:1');
+    expect(harness.mockFork).toHaveBeenCalledTimes(2);
+    expect(harness.mockErrorReporterMessage).toHaveBeenCalledTimes(1);
   });
 
   it('restarts scheduled-restart workers without reporting an error', () => {
