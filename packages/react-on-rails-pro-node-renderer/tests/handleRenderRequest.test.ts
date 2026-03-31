@@ -405,7 +405,7 @@ describe(testName, () => {
     expect(result.response).toEqual({
       status: 200,
       headers: { 'Cache-Control': 'public, max-age=31536000' },
-      data: JSON.stringify('undefined'),
+      data: 'undefined',
     });
   });
 
