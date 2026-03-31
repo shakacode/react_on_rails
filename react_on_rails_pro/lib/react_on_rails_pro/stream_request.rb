@@ -86,8 +86,9 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
-    def initialize(&request_block)
+    def initialize(length_prefixed: true, &request_block)
       @request_executor = request_block
+      @length_prefixed = length_prefixed
     end
 
     private_class_method :new
@@ -121,19 +122,22 @@ module ReactOnRailsPro
     end
 
     # Method to start the decoration
-    def self.create(&request_block)
-      StreamDecorator.new(new(&request_block))
+    def self.create(length_prefixed: true, &request_block)
+      StreamDecorator.new(new(length_prefixed: length_prefixed, &request_block))
     end
 
     private
 
     def process_response_chunks(stream_response, error_body, &block)
-      parser = ReactOnRails::LengthPrefixedParser.new
-      # Auto-detect format: length-prefixed (tab separator) vs raw text (incremental rendering).
-      # Incremental rendering streams raw text from the VM without the length-prefixed envelope.
-      format_detected = false
-      use_length_prefixed = true
+      if @length_prefixed
+        process_length_prefixed_chunks(stream_response, error_body, &block)
+      else
+        process_line_based_chunks(stream_response, error_body, &block)
+      end
+    end
 
+    def process_length_prefixed_chunks(stream_response, error_body, &block)
+      parser = ReactOnRails::LengthPrefixedParser.new
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
 
@@ -142,19 +146,22 @@ module ReactOnRailsPro
           next
         end
 
-        unless format_detected
-          format_detected = true
-          use_length_prefixed = chunk.include?("\t")
+        parser.feed(chunk, &block)
+      end
+    end
+
+    def process_line_based_chunks(stream_response, error_body)
+      stream_response.each do |chunk|
+        stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
+
+        if response_has_error_status?(stream_response)
+          error_body << chunk
+          next
         end
 
-        if use_length_prefixed
-          parser.feed(chunk, &block)
-        else
-          # Legacy line-based parsing for incremental rendering streams
-          chunk.split("\n").each do |line|
-            stripped = line.strip
-            yield stripped unless stripped.empty?
-          end
+        chunk.split("\n").each do |line|
+          stripped = line.strip
+          yield stripped unless stripped.empty?
         end
       end
     end

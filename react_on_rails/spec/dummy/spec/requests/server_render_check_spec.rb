@@ -19,7 +19,7 @@ describe "Server Rendering", :server_rendering do
       .to receive(:eval_js).and_return(invalid_json)
     expect { get server_side_hello_world_with_options_path }.to(raise_error do |error|
       expect(error.raven_context[:json]).to eq(invalid_json)
-      expect(error.raven_context[:original_error]).to be_a(ReactOnRails::Error)
+      expect(error.raven_context[:original_error]).to be_a(JSON::ParserError)
     end)
   end
 
