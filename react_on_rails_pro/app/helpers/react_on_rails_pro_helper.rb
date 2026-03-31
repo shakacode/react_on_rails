@@ -523,7 +523,10 @@ module ReactOnRailsProHelper
     render_options = create_render_options(react_component_name, options)
     json_stream = server_rendered_react_component(render_options)
     json_stream.transform do |chunk|
-      "#{chunk.to_json}\n".html_safe
+      html = chunk.delete("html") || ""
+      metadata = chunk.to_json
+      content_bytes = html.bytesize.to_s(16).rjust(8, "0")
+      "#{metadata}\t#{content_bytes}\n#{html}".html_safe
     end
   end
 

@@ -15,8 +15,8 @@
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
 import { RailsContext } from 'react-on-rails/types';
-import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
-import transformRSCStreamAndReplayConsoleLogs from './transformRSCStreamAndReplayConsoleLogs.ts';
+import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage, sanitizeNonce } from './utils.ts';
+import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
 
 declare global {
   interface Window {
@@ -30,13 +30,68 @@ export type ClientGetReactServerComponentProps = {
   enforceRefetch?: boolean;
 };
 
+/**
+ * Replays a consoleReplayScript by injecting it as a <script> element.
+ */
+const replayConsole = (consoleReplayScript: string, nonce?: string) => {
+  const code = consoleReplayScript
+    .trim()
+    .replace(/^<script[^>]*>/i, '')
+    .replace(/<\/script>$/i, '');
+  if (code.trim() !== '') {
+    const el = document.createElement('script');
+    if (nonce) {
+      el.nonce = nonce;
+    }
+    el.textContent = code;
+    document.body.appendChild(el);
+  }
+};
+
+/**
+ * Parses a length-prefixed RSC fetch response stream.
+ *
+ * Wire format per chunk: <metadata JSON>\t<hex content length>\n<raw Flight data>
+ *
+ * Extracts raw Flight data for React, replays console from metadata.
+ */
 const createFromFetch = async (fetchPromise: Promise<Response>, cspNonce?: string) => {
   const response = await fetchPromise;
-  const stream = response.body;
-  if (!stream) {
+  const { body } = response;
+  if (!body) {
     throw new Error('No stream found in response');
   }
-  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream, cspNonce);
+
+  const nonce = sanitizeNonce(cspNonce);
+  const parser = new LengthPrefixedStreamParser();
+
+  const transformedStream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const reader = body.getReader();
+      try {
+        let done = false;
+        while (!done) {
+          // eslint-disable-next-line no-await-in-loop
+          const readResult = await reader.read();
+          done = readResult.done;
+          if (readResult.value) {
+            parser.feed(readResult.value, (content, metadata) => {
+              controller.enqueue(content);
+              const consoleScript = (metadata.consoleReplayScript as string) ?? '';
+              if (consoleScript) {
+                replayConsole(consoleScript, nonce);
+              }
+            });
+          }
+        }
+        controller.close();
+      } catch (error) {
+        console.error('[ReactOnRails] Error parsing RSC stream:', error);
+        controller.error(error);
+      }
+    },
+  });
+
   const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
   return wrapInNewPromise(renderPromise);
 };
@@ -92,14 +147,15 @@ const fetchRSC = ({
 };
 
 const createRSCStreamFromArray = (payloads: string[]) => {
-  let streamController: ReadableStreamController<string> | undefined;
-  const stream = new ReadableStream<string>({
+  const encoder = new TextEncoder();
+  let streamController: ReadableStreamController<Uint8Array> | undefined;
+  const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       if (typeof window === 'undefined') {
         return;
       }
       const handleChunk = (chunk: string) => {
-        controller.enqueue(chunk);
+        controller.enqueue(encoder.encode(chunk));
       };
 
       payloads.forEach(handleChunk);
@@ -127,20 +183,21 @@ const createRSCStreamFromArray = (payloads: string[]) => {
  * Creates React elements from preloaded RSC payloads in the page.
  *
  * This function:
- * 1. Creates a ReadableStream from the array of payload chunks
- * 2. Transforms the stream to handle console logs and other processing
- * 3. Uses React's createFromReadableStream to process the payload
+ * 1. Creates a ReadableStream from the array of raw Flight data strings
+ * 2. Feeds the stream directly to React's createFromReadableStream
+ *
+ * Console replay is handled separately via standalone <script> tags
+ * emitted by injectRSCPayload, not through the payload array.
  *
  * This is used during hydration to avoid making HTTP requests when
  * the payload is already embedded in the page.
  *
- * @param payloads - Array of RSC payload chunks from the global array
+ * @param payloads - Array of raw Flight data strings from the global array
  * @returns A Promise resolving to the rendered React element
  */
-const createFromPreloadedPayloads = (payloads: string[], cspNonce?: string) => {
+const createFromPreloadedPayloads = (payloads: string[]) => {
   const stream = createRSCStreamFromArray(payloads);
-  const transformedStream = transformRSCStreamAndReplayConsoleLogs(stream, cspNonce);
-  const renderPromise = createFromReadableStream<React.ReactNode>(transformedStream);
+  const renderPromise = createFromReadableStream<React.ReactNode>(stream);
   return wrapInNewPromise(renderPromise);
 };
 
@@ -183,7 +240,7 @@ const getReactServerComponent =
       const rscPayloadKey = createRSCPayloadKey(componentName, componentProps, domNodeId);
       const payloads = window.REACT_ON_RAILS_RSC_PAYLOADS[rscPayloadKey];
       if (payloads) {
-        return createFromPreloadedPayloads(payloads, railsContext.cspNonce);
+        return createFromPreloadedPayloads(payloads);
       }
     }
     return fetchRSC({ componentName, componentProps, railsContext });

@@ -7,6 +7,7 @@ import * as PropTypes from 'prop-types';
 import streamServerRenderedReactComponent from '../src/streamServerRenderedReactComponent.ts';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
 import ReactOnRails from '../src/ReactOnRails.node.ts';
+import LengthPrefixedStreamParser from '../src/parseLengthPrefixedStream.ts';
 
 const AsyncContent = async ({ throwAsyncError }) => {
   await new Promise((resolve) => {
@@ -56,14 +57,25 @@ describe('streamServerRenderedReactComponent', () => {
     ComponentRegistry.components().clear();
   });
 
+  // Parses a length-prefixed stream chunk: metadata\tcontent_len\ncontent
+  const parseStreamChunk = (rawBytes) => {
+    const parser = new LengthPrefixedStreamParser();
+    const results = [];
+    parser.feed(rawBytes, (content, metadata) => {
+      const decoder = new TextDecoder();
+      results.push({ html: decoder.decode(content), ...metadata });
+    });
+    expect(results).toHaveLength(1);
+    return results[0];
+  };
+
   const expectStreamChunk = (chunk) => {
-    expect(typeof chunk).toBe('string');
-    const jsonChunk = JSON.parse(chunk);
-    expect(typeof jsonChunk.html).toBe('string');
-    expect(typeof jsonChunk.consoleReplayScript).toBe('string');
-    expect(typeof jsonChunk.hasErrors).toBe('boolean');
-    expect(typeof jsonChunk.isShellReady).toBe('boolean');
-    return jsonChunk;
+    const parsed = parseStreamChunk(chunk);
+    expect(typeof parsed.html).toBe('string');
+    expect(typeof parsed.consoleReplayScript).toBe('string');
+    expect(typeof parsed.hasErrors).toBe('boolean');
+    expect(typeof parsed.isShellReady).toBe('boolean');
+    return parsed;
   };
 
   const setupStreamTest = ({
@@ -116,8 +128,7 @@ describe('streamServerRenderedReactComponent', () => {
 
     const chunks = [];
     renderResult.on('data', (chunk) => {
-      const decodedText = new TextDecoder().decode(chunk);
-      chunks.push(expectStreamChunk(decodedText));
+      chunks.push(expectStreamChunk(chunk));
     });
 
     return { renderResult, chunks };
@@ -337,8 +348,7 @@ describe('streamServerRenderedReactComponent', () => {
 
     const chunks = [];
     renderResult.on('data', (chunk) => {
-      const decodedText = new TextDecoder().decode(chunk);
-      chunks.push(expectStreamChunk(decodedText));
+      chunks.push(expectStreamChunk(chunk));
     });
 
     await new Promise((resolve) => {

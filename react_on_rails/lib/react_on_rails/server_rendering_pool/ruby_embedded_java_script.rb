@@ -2,6 +2,7 @@
 
 require "open-uri"
 require "execjs"
+require "react_on_rails/length_prefixed_parser"
 
 module ReactOnRails
   module ServerRenderingPool
@@ -79,11 +80,14 @@ module ReactOnRails
             raise ReactOnRails::Error, msg, err.backtrace
           end
 
-          return parse_result_and_replay_console_messages(result, render_options) unless render_options.streaming?
+          return parse_render_result(result, render_options) unless render_options.streaming?
 
-          # Streamed component is returned as stream of strings.
-          # We need to parse each chunk and replay the console messages.
-          result.transform { |chunk| parse_result_and_replay_console_messages(chunk, render_options) }
+          # Streamed chunks are Hashes (from LengthPrefixedParser in stream_request.rb).
+          # Just replay console messages and pass through.
+          result.transform do |chunk|
+            replay_console_to_rails_logger(chunk, render_options)
+            chunk
+          end
         end
 
         def trace_js_code_used(msg, js_code, file_name = "tmp/server-generated.js", force: false)
@@ -224,26 +228,33 @@ module ReactOnRails
           raise ReactOnRails::Error, msg
         end
 
-        def parse_result_and_replay_console_messages(result_string, render_options)
-          result = nil
-          begin
-            result = JSON.parse(result_string)
-          rescue JSON::ParserError => e
-            raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
-          end
-
-          if render_options.logging_on_server
-            console_script = result["consoleReplayScript"]
-            console_script_lines = console_script.split("\n")
-            # Regular expression to match console.log or console.error calls with SERVER prefix
-            re = /console\.(?:log|error)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
-            console_script_lines&.each do |line|
-              match = re.match(line)
-              # Log matched messages to Rails logger with react_on_rails prefix
-              Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
-            end
-          end
+        def parse_render_result(result_string, render_options)
+          # Auto-detect format: length-prefixed (contains tab) or legacy JSON.
+          # ExecJS with older bundles may return JSON; node renderer returns length-prefixed.
+          result = if result_string.to_s.include?("\t")
+                     ReactOnRails::LengthPrefixedParser.parse_one_chunk_result(result_string)
+                   else
+                     JSON.parse(result_string.to_s)
+                   end
+          replay_console_to_rails_logger(result, render_options)
           result
+        rescue StandardError => e
+          raise ReactOnRails::JsonParseError.new(parse_error: e, json: result_string)
+        end
+
+        def replay_console_to_rails_logger(result, render_options)
+          return unless render_options.logging_on_server
+
+          console_script = result["consoleReplayScript"]
+          return if console_script.nil? || console_script.empty?
+
+          # Regular expression to match console.log or console.error calls with SERVER prefix
+          re = /console\.(?:log|error|info|warn)\.apply\(console, \["\[SERVER\] (?<msg>.*)"\]\);/
+          console_script.split("\n").each do |line|
+            match = re.match(line)
+            # Log matched messages to Rails logger with react_on_rails prefix
+            Rails.logger.info { "[react_on_rails] #{match[:msg]}" } if match
+          end
         end
       end
       # rubocop:enable Metrics/ClassLength

@@ -22,6 +22,15 @@ describe ReactOnRailsProHelper do
   # In order to test the pro helper, we need to load the methods from the regular helper.
   # I couldn't see any easier way to do this.
   include ReactOnRails::Helper
+
+  # Converts a chunk Hash to length-prefixed format for mock streaming responses.
+  # Format: <metadata JSON>\t<content byte length hex>\n<raw html content>
+  def to_length_prefixed(chunk)
+    html = chunk[:html] || chunk["html"] || ""
+    metadata = chunk.except(:html, "html")
+    content_bytes = html.bytesize.to_s(16).rjust(8, "0")
+    "#{metadata.to_json}\t#{content_bytes}\n#{html}"
+  end
   include ReactOnRailsPro::Stream
   include Shakapacker::Helper
   include ApplicationHelper
@@ -351,12 +360,12 @@ describe ReactOnRailsProHelper do
             break if chunk.nil?
 
             chunks_read << chunk
-            yielder.call("#{chunk.to_json}\n")
+            yielder.call(to_length_prefixed(chunk))
           end
         else
           mock_chunks.each do |chunk|
             chunks_read << chunk
-            yielder.call("#{chunk.to_json}\n")
+            yielder.call(to_length_prefixed(chunk))
           end
         end
       end
@@ -935,7 +944,7 @@ describe ReactOnRailsProHelper do
       mock_streaming_response(%r{http://localhost:3800/bundles/[a-f0-9]{32}-test/render/[a-f0-9]{32}}, 200,
                               count: 1) do |yielder|
         chunks.each do |chunk|
-          yielder.call("#{chunk.to_json}\n")
+          yielder.call(to_length_prefixed(chunk))
         end
       end
     end

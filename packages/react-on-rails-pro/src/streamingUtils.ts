@@ -18,7 +18,7 @@ import { PassThrough, Readable } from 'stream';
 import createReactOutput from 'react-on-rails/createReactOutput';
 import { isPromise, isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { consoleReplay } from 'react-on-rails/buildConsoleReplay';
-import { createResultObject, convertToError, validateComponent } from 'react-on-rails/serverRenderUtils';
+import { buildRenderMetadata, convertToError, validateComponent } from 'react-on-rails/serverRenderUtils';
 import {
   RenderParams,
   StreamRenderState,
@@ -111,18 +111,23 @@ export const transformRenderStreamChunksToResultObject = (renderState: StreamRen
   let previouslyReplayedConsoleMessages = 0;
 
   const transformStream = new PassThrough({
-    transform(chunk: Buffer, _, callback) {
-      const htmlChunk = chunk.toString();
-      // Get unwrapped console replay JavaScript (not wrapped in <script> tags)
-      // We use consoleReplay() instead of buildConsoleReplay() because streaming
-      // contexts handle script tag wrapping separately (e.g., with CSP nonces).
-      // This returns pure JavaScript without wrapping, which is then embedded
-      // into the result object JSON payload.
+    transform(chunk: Buffer | string, _, callback) {
+      // Length-prefixed streaming protocol: metadata and content are sent separately.
+      // Format: <metadata JSON>\t<content byte length in hex>\n<raw content bytes>
+      //
+      // This avoids JSON.stringify on the HTML content (the bulk of the data),
+      // eliminating ~30% escaping overhead. The metadata is a small JSON object
+      // (~80 bytes) without the html field. The content is sent as raw bytes with
+      // a length prefix, so it never needs escaping.
       const consoleReplayScript = consoleReplay(consoleHistory, previouslyReplayedConsoleMessages);
-
       previouslyReplayedConsoleMessages = consoleHistory?.length || 0;
-      const jsonChunk = JSON.stringify(createResultObject(htmlChunk, consoleReplayScript, renderState));
-      this.push(`${jsonChunk}\n`);
+
+      const contentBuf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, 'utf-8');
+      const metadataObj = buildRenderMetadata(consoleReplayScript, renderState);
+      metadataObj.payloadType = 'string';
+      const metadataJson = JSON.stringify(metadataObj);
+      const header = `${metadataJson}\t${contentBuf.length.toString(16).padStart(8, '0')}\n`;
+      this.push(Buffer.concat([Buffer.from(header), contentBuf]));
 
       // Reset the render state to ensure that the error is not carried over to the next chunk
       // eslint-disable-next-line no-param-reassign

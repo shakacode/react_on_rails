@@ -79,7 +79,8 @@ module ReactOnRailsPro
         # Determine bundle timestamp based on RSC support
         pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
-        ReactOnRailsPro::StreamRequest.create do |send_bundle, barrier|
+        # Incremental rendering streams raw text from the VM without length-prefixed envelope
+        ReactOnRailsPro::StreamRequest.create(length_prefixed: false) do |send_bundle, barrier|
           if send_bundle
             Rails.logger.info { "[ReactOnRailsPro] Sending bundle to the node renderer" }
             upload_assets

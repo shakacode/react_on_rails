@@ -8,6 +8,7 @@
  */
 
 import fs from 'fs';
+import { LengthPrefixedStreamParser } from './parseLengthPrefixedStream';
 import path from 'path';
 import http2 from 'http2';
 import FormData from 'form-data';
@@ -69,7 +70,7 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
     });
     request.setEncoding('utf8');
 
-    const chunks: string[] = [];
+    const parser = new LengthPrefixedStreamParser();
     let status: number | undefined;
     let settled = false;
 
@@ -78,11 +79,7 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
     });
 
     request.on('data', (data: string) => {
-      const decoded = data
-        .split('\n')
-        .map((c) => c.trim())
-        .filter((c) => c.length > 0);
-      chunks.push(...decoded);
+      parser.feed(data);
     });
 
     form.pipe(request);
@@ -92,7 +89,7 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
       if (settled) return;
       settled = true;
       client.destroy();
-      resolve({ status, chunks, timedOut });
+      resolve({ status, chunks: parser.htmlChunks, timedOut });
     };
 
     const timeout = setTimeout(() => finish(true), timeoutMs);
@@ -112,12 +109,27 @@ const makeRequest = (renderingRequest: string, timeoutMs = 3000) =>
 // The bundle exposes `Readable` globally via `global.Readable = require('stream').Readable`.
 // ---------------------------------------------------------------------------
 
+// Helper: builds a length-prefixed chunk string for the mock rendering requests.
+// Format: <metadata JSON>\t<content byte length hex>\n<raw content bytes>
+function buildLengthPrefixedChunk(html: string, metadata: Record<string, unknown> = {}): string {
+  const meta = {
+    consoleReplayScript: '',
+    hasErrors: false,
+    isShellReady: true,
+    payloadType: 'string',
+    ...metadata,
+  };
+  const metaJson = JSON.stringify(meta);
+  const byteLen = Buffer.byteLength(html).toString(16).padStart(8, '0');
+  return `${metaJson}\t${byteLen}\n${html}`;
+}
+
 const RENDERING_REQUEST = {
   /** Pushes one chunk, then destroys the stream with an error. */
   errorMidStream: `(function() {
     var stream = new Readable({ read() {} });
     setTimeout(function() {
-      stream.push('{"html":"<div>partial</div>","consoleReplayScript":"","hasErrors":false,"isShellReady":true}\\n');
+      stream.push(${JSON.stringify(buildLengthPrefixedChunk('<div>partial</div>'))});
     }, 10);
     setTimeout(function() {
       stream.destroy(new Error('mid-stream rendering error'));
@@ -138,7 +150,7 @@ const RENDERING_REQUEST = {
   happyPath: `(function() {
     var stream = new Readable({ read() {} });
     setTimeout(function() {
-      stream.push('{"html":"<div>ok</div>","consoleReplayScript":"","hasErrors":false,"isShellReady":true}\\n');
+      stream.push(${JSON.stringify(buildLengthPrefixedChunk('<div>ok</div>'))});
       stream.push(null);
     }, 10);
     return stream;

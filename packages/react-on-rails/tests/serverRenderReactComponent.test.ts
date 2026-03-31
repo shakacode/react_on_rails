@@ -1,13 +1,22 @@
 import * as React from 'react';
 import serverRenderReactComponent from '../src/serverRenderReactComponent.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
-import type {
-  RenderParams,
-  RenderResult,
-  RailsContext,
-  RenderFunction,
-  RenderFunctionResult,
-} from '../src/types/index.ts';
+import type { RenderParams, RailsContext, RenderFunction, RenderFunctionResult } from '../src/types/index.ts';
+// eslint-disable-next-line import/no-relative-packages
+import LengthPrefixedStreamParser from '../../react-on-rails-pro/src/parseLengthPrefixedStream.ts';
+
+// Parses a length-prefixed result string using the production parser.
+const parseLengthPrefixed = (str: string) => {
+  const parser = new LengthPrefixedStreamParser();
+  const results: Array<{ html: string; [key: string]: unknown }> = [];
+  parser.feed(new TextEncoder().encode(str), (content, metadata) => {
+    results.push({ html: new TextDecoder().decode(content), ...metadata });
+  });
+  if (results.length !== 1) {
+    throw new Error(`Expected exactly 1 length-prefixed chunk, got ${results.length}`);
+  }
+  return results[0]!;
+};
 
 const assertIsString: (value: unknown) => asserts value is string = (value: unknown) => {
   if (typeof value !== 'string') {
@@ -45,7 +54,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     assertIsString(html);
     const result = html && html.indexOf('>HELLO</div>') > 0;
@@ -70,7 +79,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     assertIsString(html);
     const result = html && html.indexOf('XYZ') > 0 && html.indexOf('Exception in rendering!') > 0;
@@ -97,7 +106,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     expect(html).toEqual(expectedHtml);
     expect(hasErrors).toBeFalsy();
@@ -122,7 +131,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: false,
     });
     assertIsString(renderResult);
-    const { html, hasErrors, clientProps }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors, clientProps } = parseLengthPrefixed(renderResult);
 
     expect(html).toEqual('<div>Hello with client props</div>');
     expect(clientProps).toEqual({
@@ -146,7 +155,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: false,
     });
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     expect(html).toContain('Exception in rendering!');
     expect(html).toContain('Element type is invalid');
@@ -179,7 +188,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     // Instead of expecting exact strings, check that it contains key parts of the error
     expect(html).toContain('Exception in rendering!');
@@ -205,10 +214,10 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const html = await renderResult.then((r) => r.html);
+    const parsed = parseLengthPrefixed(await renderResult);
 
-    expect(html).toEqual(expectedHtml);
-    await expect(renderResult.then((r) => r.hasErrors)).resolves.toBeFalsy();
+    expect(parsed.html).toEqual(expectedHtml);
+    expect(parsed.hasErrors).toBeFalsy();
   });
 
   it('serverRenderReactComponent processes async serverRenderHash renderedHtml', async () => {
@@ -228,7 +237,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const result = await renderResult;
+    const result = parseLengthPrefixed(await renderResult);
     expect(result.html).toEqual('<div>Hello</div>');
     expect(result.hasErrors).toBeFalsy();
   });
@@ -251,7 +260,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: true,
     });
     assertIsPromise(renderResult);
-    const result = await renderResult;
+    const result = parseLengthPrefixed(await renderResult);
     expect(result.html).toEqual('<div>Hello with async hash client props</div>');
     expect(result.clientProps).toEqual({
       __tanstackRouterDehydratedState: { url: '/products?category=tools' },
@@ -278,8 +287,9 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsPromise(renderResult);
-    const result = await renderResult;
-    expect(result.html).toMatchObject(reactComponentHashResult);
+    const result = parseLengthPrefixed(await renderResult);
+    // html is a JSON-serialized ServerRenderHashRenderedHtml object
+    expect(JSON.parse(result.html as string)).toMatchObject(reactComponentHashResult);
   });
 
   it('serverRenderReactComponent renders async render function that returns react component', async () => {
@@ -296,7 +306,7 @@ describe('serverRenderReactComponent', () => {
       renderingReturnsPromises: true,
     });
     assertIsPromise(renderResult);
-    const result = await renderResult;
+    const result = parseLengthPrefixed(await renderResult);
     expect(result.html).toBe('<div>Hello</div>');
   });
 
@@ -322,7 +332,7 @@ describe('serverRenderReactComponent', () => {
 
     const renderResult = serverRenderReactComponent(renderParams);
     assertIsString(renderResult);
-    const { html, hasErrors }: RenderResult = JSON.parse(renderResult) as RenderResult;
+    const { html, hasErrors } = parseLengthPrefixed(renderResult);
 
     assertIsString(html);
     const result = html && html.indexOf('renderer') > 0 && html.indexOf('Exception in rendering!') > 0;

@@ -86,8 +86,9 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
-    def initialize(&request_block)
+    def initialize(length_prefixed: true, &request_block)
       @request_executor = request_block
+      @length_prefixed = length_prefixed
     end
 
     private_class_method :new
@@ -120,15 +121,48 @@ module ReactOnRailsPro
       end
     end
 
-    def process_response_chunks(stream_response, error_body)
-      loop_response_lines(stream_response) do |chunk|
+    # Method to start the decoration
+    def self.create(length_prefixed: true, &request_block)
+      StreamDecorator.new(new(length_prefixed: length_prefixed, &request_block))
+    end
+
+    private
+
+    def process_response_chunks(stream_response, error_body, &block)
+      if @length_prefixed
+        process_length_prefixed_chunks(stream_response, error_body, &block)
+      else
+        process_line_based_chunks(stream_response, error_body, &block)
+      end
+    end
+
+    def process_length_prefixed_chunks(stream_response, error_body, &block)
+      parser = ReactOnRails::LengthPrefixedParser.new
+      stream_response.each do |chunk|
+        stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
+
         if response_has_error_status?(stream_response)
           error_body << chunk
           next
         end
 
-        processed_chunk = chunk.strip
-        yield processed_chunk unless processed_chunk.empty?
+        parser.feed(chunk, &block)
+      end
+    end
+
+    def process_line_based_chunks(stream_response, error_body)
+      stream_response.each do |chunk|
+        stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
+
+        if response_has_error_status?(stream_response)
+          error_body << chunk
+          next
+        end
+
+        chunk.split("\n").each do |line|
+          stripped = line.strip
+          yield stripped unless stripped.empty?
+        end
       end
     end
 
@@ -154,35 +188,6 @@ module ReactOnRailsPro
       else
         raise ReactOnRailsPro::Error, "Unexpected response code from renderer: #{response.status}:\n#{error_body}"
       end
-    end
-
-    # Method to start the decoration
-    def self.create(&request_block)
-      StreamDecorator.new(new(&request_block))
-    end
-
-    private
-
-    # This method is considered as an override of response.each_line
-    # It fixes the problem of not yielding the last chunk on error
-    # You can check the spec of `each_line` in `spec/react_on_rails_pro/stream_spec.rb` for more details
-    def loop_response_lines(response)
-      return enum_for(__method__, response) unless block_given?
-
-      line = "".b
-
-      response.each do |chunk|
-        response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-        line << chunk
-
-        while (idx = line.index("\n"))
-          yield line.byteslice(0..idx - 1)
-
-          line = line.byteslice(idx + 1..-1)
-        end
-      end
-    ensure
-      yield line unless line.empty?
     end
   end
 end

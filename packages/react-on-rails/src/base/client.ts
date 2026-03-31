@@ -317,6 +317,14 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
         'handleError is not available in "react-on-rails/client". Import "react-on-rails" server-side.',
       );
     },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    prepareRenderResult(...args: any[]): any {
+      void args; // Mark as used
+      throw new Error(
+        'prepareRenderResult is not available in "react-on-rails/client". Import "react-on-rails" server-side.',
+      );
+    },
   };
 
   // Cache the object and registries

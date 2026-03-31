@@ -455,7 +455,7 @@ export interface ReactOnRailsInternal extends ReactOnRails {
   /**
    * Used by server rendering by Rails
    */
-  serverRenderReactComponent(options: RenderParams): null | string | Promise<RenderResult>;
+  serverRenderReactComponent(options: RenderParams): null | string | Promise<string>;
   /**
    * Used by server rendering by Rails
    */
@@ -468,6 +468,16 @@ export interface ReactOnRailsInternal extends ReactOnRails {
    * Used by Rails to catch errors in rendering
    */
   handleError(options: ErrorOptions): string | undefined;
+  /**
+   * Prepares a rendering result in the length-prefixed wire format for transport to Ruby.
+   * Used by the server_render_js Rails helper to format arbitrary JS evaluation results.
+   */
+  prepareRenderResult(
+    html: string,
+    consoleReplayScript: string,
+    hasErrors: boolean,
+    renderingError: RenderingError | null,
+  ): string;
   /**
    * Used by Rails server rendering to replay console messages.
    * Returns the console replay script wrapped in script tags.
