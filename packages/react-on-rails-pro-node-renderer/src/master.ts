@@ -103,17 +103,14 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     if (isAbortingForStartupFailure && fatalStartupFailure) {
       const { failure, workerId: failedWorkerId } = fatalStartupFailure;
       const msg =
-        failure?.code === 'EADDRINUSE'
+        failure.code === 'EADDRINUSE'
           ? `Node renderer startup failed: ${failure.host}:${failure.port} is already in use`
-          : `Node renderer startup failed in worker ${failedWorkerId}: ${failure?.message || `exit code ${worker.process.exitCode}`}`;
+          : `Node renderer startup failed in worker ${failedWorkerId}: ${failure.message || `exit code ${worker.process.exitCode}`}`;
 
       errorReporter.message(msg);
-      process.exit(1);
-      return;
-    }
-
-    if (isAbortingForStartupFailure) {
-      errorReporter.message('Node renderer startup failed before failure details were captured');
+      // Disconnect all live workers so they release their ports before the master exits.
+      // Without this, successfully-started workers become orphans still holding the port.
+      cluster.disconnect();
       process.exit(1);
       return;
     }

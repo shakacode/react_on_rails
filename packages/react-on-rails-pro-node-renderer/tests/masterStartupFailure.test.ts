@@ -14,6 +14,7 @@ type ClusterHandlers = {
 type MockCluster = {
   on: jest.Mock<MockCluster, [event: string, handler: (...args: unknown[]) => void]>;
   fork: jest.Mock<unknown, []>;
+  disconnect: jest.Mock<void, []>;
 };
 
 function buildStartupFailureMessage(
@@ -40,6 +41,7 @@ function setupMasterRunHarness() {
     return {};
   });
   const mockCluster = {} as MockCluster;
+  mockCluster.disconnect = jest.fn();
   mockCluster.on = jest.fn((event: string, handler: (...args: unknown[]) => void) => {
     operations.push(`on:${event}`);
     if (event === 'message') {
@@ -121,6 +123,7 @@ function setupMasterRunHarness() {
     operations,
     clusterHandlers: clusterHandlers as ClusterHandlers,
     mockFork,
+    mockCluster,
     mockErrorReporterMessage,
     setIntervalSpy,
     processExitSpy,
@@ -163,6 +166,7 @@ describe('master startup failure handling via masterRun wiring', () => {
 
     expect(() => harness.clusterHandlers.exit(scenario.exitingWorker)).toThrow('process.exit:1');
     expect(harness.mockErrorReporterMessage).toHaveBeenCalledWith(scenario.expectedMessage);
+    expect(harness.mockCluster.disconnect).toHaveBeenCalledTimes(1);
     expect(harness.processExitSpy).toHaveBeenCalledWith(1);
     expect(harness.mockFork).toHaveBeenCalledTimes(2);
   });

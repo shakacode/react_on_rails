@@ -102,6 +102,33 @@ describe('worker startup listen error handling', () => {
     expect(exitCalls).toEqual([1]);
   });
 
+  it('logs a warning and exits when cluster worker has no IPC channel', () => {
+    // Temporarily remove process.send so the fallback `send ?? process.send?.bind(process)`
+    // resolves to undefined, simulating a worker whose IPC channel has been destroyed.
+    const originalSend = process.send;
+    delete (process as { send?: typeof process.send }).send;
+
+    const exitCalls: number[] = [];
+    const exit = ((code?: number) => {
+      exitCalls.push(code ?? 0);
+    }) as NodeJS.Process['exit'];
+
+    try {
+      handleStartupListenError({
+        err: buildListenError(),
+        host: 'localhost',
+        port: 3800,
+        isWorker: true,
+        send: undefined,
+        exit,
+      });
+
+      expect(exitCalls).toEqual([1]);
+    } finally {
+      process.send = originalSend;
+    }
+  });
+
   it('exits when process.send throws synchronously', () => {
     const send = (() => {
       throw new Error('ERR_IPC_CHANNEL_CLOSED');

@@ -224,6 +224,10 @@ export function handleStartupListenError({
 
   log.error({ err, host, port }, 'Node renderer failed to start');
 
+  if (isWorker && !sendFn) {
+    log.warn('Cluster worker has no IPC channel; cannot notify master of startup failure');
+  }
+
   if (isWorker && sendFn) {
     const startupFailure: WorkerStartupFailureMessage = {
       type: WORKER_STARTUP_FAILURE,
