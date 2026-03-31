@@ -323,8 +323,9 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args([], spec: true, package_json: true) }
 
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)" do
-      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
-      assert_file("spec/rails_helper.rb") { |contents| expect(contents).to match(expected) }
+      assert_file("spec/rails_helper.rb") do |contents|
+        expect(contents).to include("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      end
     end
   end
 
@@ -363,8 +364,9 @@ describe InstallGenerator, type: :generator do
     end
 
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config) for rspec" do
-      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
-      assert_file("spec/rails_helper.rb") { |contents| expect(contents).to match(expected) }
+      assert_file("spec/rails_helper.rb") do |contents|
+        expect(contents).to include("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      end
     end
 
     it "adds ReactOnRails::TestHelper.ensure_assets_compiled for minitest" do
@@ -3106,13 +3108,18 @@ describe InstallGenerator, type: :generator do
       YML
       simulate_existing_file("app/javascript/src/components/App.js", <<~JS)
         export default function App() {
-          return <div>Hello</div>
+          return <>Hello</>
         }
       JS
-      allow(install_generator).to receive_messages(using_swc?: true, add_packages: true, install_js_dependencies: true)
+      allow(install_generator).to receive_messages(
+        using_swc?: true,
+        add_packages: true,
+        add_babel_react_dependencies: true,
+        install_js_dependencies: true
+      )
     end
 
-    it "switches to babel and installs babel-loader when JSX is found in .js files" do
+    it "switches to babel and installs babel dependencies when JSX is found in .js files" do
       Dir.chdir(destination_root) do
         install_generator.send(:ensure_jsx_in_js_compatibility)
       end
@@ -3120,6 +3127,7 @@ describe InstallGenerator, type: :generator do
       shakapacker_yml = File.read(File.join(destination_root, "config/shakapacker.yml"))
       expect(shakapacker_yml).to include('javascript_transpiler: "babel"')
       expect(install_generator).to have_received(:add_packages).with(["babel-loader"], dev: true)
+      expect(install_generator).to have_received(:add_babel_react_dependencies)
       expect(install_generator).to have_received(:install_js_dependencies)
     end
   end

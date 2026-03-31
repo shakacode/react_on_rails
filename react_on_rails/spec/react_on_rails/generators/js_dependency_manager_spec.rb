@@ -196,7 +196,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.add_npm_dependencies_result = false
       result = instance.send(:add_packages, %w[package1])
       expect(result).to be(true)
-      expect(instance.system_calls).to include(%w[npm install package1])
+      expect(instance.system_calls).to include(%w[npm install --save-exact package1])
     end
 
     it "returns false when add_npm_dependencies and fallback both fail" do
@@ -214,6 +214,16 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(result).to be(true)
       expect(instance.system_calls).to eq([])
+    end
+
+    it "does not skip fallback install for versioned package specs" do
+      instance.add_npm_dependencies_result = false
+      allow(instance).to receive(:existing_package_names).and_return(%w[react])
+
+      result = instance.send(:add_packages, ["react@~19.0.4"])
+
+      expect(result).to be(true)
+      expect(instance.system_calls).to include(%w[npm install --save-exact react@~19.0.4])
     end
   end
 
@@ -238,7 +248,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.add_npm_dependencies_result = false
       result = instance.send(:add_package, "some-package")
       expect(result).to be(true)
-      expect(instance.system_calls).to include(%w[npm install some-package])
+      expect(instance.system_calls).to include(%w[npm install --save-exact some-package])
     end
 
     it "returns false when fallback install fails" do
@@ -394,8 +404,9 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_react_on_rails_package)
 
       expect(warnings.size).to be > 0
-      # When add_package catches exception, it returns false, triggering the "Failed to add" warning
-      expect(warnings.first.to_s).to include("Failed to add react-on-rails package")
+      warning_text = warnings.map(&:to_s).join("\n")
+      expect(warning_text).to include("Fallback package install failed: Connection refused")
+      expect(warning_text).to include("Failed to add react-on-rails package")
     end
   end
 

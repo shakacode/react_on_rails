@@ -29,12 +29,12 @@ module GeneratorHelper
     return false unless pj
 
     begin
-      if dev
-        pj.manager.add(packages, type: :dev, exact: true)
-      else
-        pj.manager.add(packages, exact: true)
-      end
-      true
+      result = if dev
+                 pj.manager.add(packages, type: :dev, exact: true)
+               else
+                 pj.manager.add(packages, exact: true)
+               end
+      !result.nil?
     rescue StandardError => e
       say_status :warning, "Could not add packages via package_json gem: #{e.message}", :yellow
       say_status :warning, "Will fall back to direct npm commands.", :yellow

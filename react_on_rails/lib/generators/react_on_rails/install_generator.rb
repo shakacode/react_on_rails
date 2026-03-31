@@ -249,8 +249,15 @@ module ReactOnRails
         say "⚙️  Detected JSX in .js files; switching shakapacker javascript_transpiler to babel for compatibility",
             :yellow
         set_javascript_transpiler_to_babel
-        add_packages(["babel-loader"], dev: true)
-        install_js_dependencies
+        babel_loader_added = add_packages(["babel-loader"], dev: true)
+        babel_preset_added = add_babel_react_dependencies
+        dependencies_installed = install_js_dependencies
+        return if babel_loader_added && babel_preset_added && dependencies_installed
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Babel compatibility dependencies may be incomplete after switching from SWC.
+          Please verify `babel-loader` and `@babel/preset-react` are installed.
+        MSG
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.
@@ -675,12 +682,7 @@ module ReactOnRails
       end
 
       def detect_package_manager_from_lockfiles
-        return "yarn" if File.exist?("yarn.lock")
-        return "pnpm" if File.exist?("pnpm-lock.yaml")
-        return "bun" if File.exist?("bun.lock") || File.exist?("bun.lockb")
-        return "npm" if File.exist?("package-lock.json")
-
-        nil
+        GeneratorMessages.detect_package_manager_from_lockfiles
       end
 
       def detect_package_manager_version(package_manager)
@@ -802,7 +804,7 @@ module ReactOnRails
       def jsx_in_js_files_present?
         Dir.glob("app/javascript/**/*.js").any? do |path|
           content = File.read(path)
-          content.match?(%r{<\s*[A-Za-z][\w:-]*(\s|>|/)}) || content.match?(/<\s*>\s*$/)
+          content.match?(%r{<\s*[A-Za-z][\w:-]*(\s|>|/)}) || content.match?(/<\s*>/)
         rescue StandardError
           false
         end
@@ -817,6 +819,7 @@ module ReactOnRails
           /^(\s*javascript_transpiler:\s*)["']?swc["']?(\s*(?:#.*)?)$/,
           '\1"babel"\2'
         )
+        @using_swc = false
       end
 
       def install_typescript_dependencies

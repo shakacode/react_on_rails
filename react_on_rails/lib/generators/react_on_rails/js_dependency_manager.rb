@@ -300,7 +300,7 @@ module ReactOnRails
 
       def add_babel_react_dependencies
         say "Installing Babel React preset dependency..."
-        return if add_packages(BABEL_REACT_DEPENDENCIES, dev: true)
+        return true if add_packages(BABEL_REACT_DEPENDENCIES, dev: true)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add Babel React preset dependency.
@@ -308,6 +308,7 @@ module ReactOnRails
           You can install it manually by running:
             npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
         MSG
+        false
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding Babel React preset dependency: #{e.message}
@@ -315,6 +316,7 @@ module ReactOnRails
           You can install it manually by running:
             npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
         MSG
+        false
       end
 
       def add_typescript_dependencies
@@ -510,24 +512,24 @@ module ReactOnRails
         install_args = build_install_args(package_manager, dev, packages_to_install)
 
         system(*install_args)
-      rescue StandardError
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Fallback package install failed: #{e.message}")
         false
       end
 
       def fallback_package_manager
         package_manager = GeneratorMessages.detect_package_manager
-        allowed_package_managers = %w[npm yarn pnpm bun].freeze
-        return package_manager if allowed_package_managers.include?(package_manager)
+        return package_manager if GeneratorMessages.supported_package_manager?(package_manager)
 
         "npm"
       end
 
       def build_install_args(package_manager, dev, packages)
         base_commands = {
-          "npm" => %w[npm install],
-          "yarn" => %w[yarn add],
-          "pnpm" => %w[pnpm add],
-          "bun" => %w[bun add]
+          "npm" => %w[npm install --save-exact],
+          "yarn" => %w[yarn add --exact],
+          "pnpm" => %w[pnpm add --save-exact],
+          "bun" => %w[bun add --exact]
         }
 
         base_args = base_commands.fetch(package_manager).dup
@@ -539,6 +541,8 @@ module ReactOnRails
         case package_manager
         when "npm", "pnpm" then "--save-dev"
         when "yarn", "bun" then "--dev"
+        else
+          raise ArgumentError, "Unknown package manager for dev flag: #{package_manager}"
         end
       end
 
@@ -548,7 +552,9 @@ module ReactOnRails
 
         packages.reject do |package_spec|
           package_name = package_name_from_spec(package_spec)
-          package_name && existing.include?(package_name)
+          next false unless package_name && existing.include?(package_name)
+
+          !version_specified?(package_spec, package_name)
         end
       end
 
@@ -569,6 +575,10 @@ module ReactOnRails
 
         unscoped_match = package_spec.match(/\A([^@]+)(?:@.+)?\z/)
         unscoped_match&.[](1)
+      end
+
+      def version_specified?(package_spec, package_name)
+        package_spec != package_name
       end
     end
   end
