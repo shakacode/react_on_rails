@@ -72,6 +72,41 @@ npm pkg set packageManager='bun@1.2.13'
 
    3. Run your test suite and fix any app-specific breakages before merging.
 
+## Legacy compatibility fixes that often make migration one-shot
+
+Older `react-rails` apps frequently need these additional fixes after the generator run:
+
+1. Remove old UJS mounting from legacy packs (`app/javascript/packs/application.js` and related files).
+
+   Remove patterns such as:
+
+   ```js
+   var componentRequireContext = require.context('components', true);
+   var ReactRailsUJS = require('react_ujs');
+   ReactRailsUJS.useContext(componentRequireContext);
+   ```
+
+2. If you are switching to React on Rails `server-bundle.js`, remove stale `app/javascript/packs/server_rendering.js` usage.
+
+3. Update existing ERB helper calls from old positional props to options-style props:
+
+   ```diff
+   - <%= react_component 'Post', @props, prerender: true %>
+   + <%= react_component('Post', { props: @props, prerender: true }) %>
+   ```
+
+4. For older Shakapacker setups, ensure `config/initializers/react_on_rails.rb` includes:
+
+   ```ruby
+   config.server_bundle_output_path = "ssr-generated"
+   ```
+
+5. If `spec/rails_helper.rb` gets a malformed merge after generator updates, keep a single valid `RSpec.configure do |config| ... end` block and include:
+
+   ```ruby
+   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+   ```
+
 You can also check [react-rails-to-react-on-rails](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) branch on [react-rails example app](https://github.com/shakacode/react-rails-example-app) for an example of migration from `react-rails` v3 to `react_on_rails` v13.4.
 
 For a more recent Rails 7-era migration example (published under ShakaCode), see [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example), based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example).

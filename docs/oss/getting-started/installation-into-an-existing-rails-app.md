@@ -55,6 +55,8 @@ npm install
 bundle exec rails shakapacker:compile
 ```
 
+If you are migrating from `react-rails`, also run the compatibility checklist in [Migrate from react-rails](../migrating/migrating-from-react-rails.md#legacy-compatibility-fixes-that-often-make-migration-one-shot).
+
 ## 3. Start the app
 
 Ensure that you have `overmind` or `foreman` installed so `bin/dev` can run both Rails and the asset watcher.
