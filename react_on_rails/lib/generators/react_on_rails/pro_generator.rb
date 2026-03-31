@@ -333,6 +333,7 @@ module ReactOnRails
           next [] unless Dir.exist?(root_path)
 
           Dir.glob(File.join(root_path, "**", "*.{#{js_extensions}}"))
+             .reject { |f| f.include?("/node_modules/") }
         end.uniq
       end
 
@@ -491,7 +492,7 @@ module ReactOnRails
                 )
               rewritten_line, pending_multiline_module_call_depth =
                 update_pending_multiline_module_call_tracking(rewritten_line, pending_multiline_module_call_depth)
-              in_block_comment = true if unclosed_block_comment_starts?(line)
+              in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
             else
               in_block_comment = true
@@ -508,7 +509,7 @@ module ReactOnRails
               )
             rewritten_line, pending_multiline_module_call_depth =
               update_pending_multiline_module_call_tracking(rewritten_line, pending_multiline_module_call_depth)
-            in_block_comment = true if unclosed_block_comment_starts?(line)
+            in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
             rewritten_line
           end
         end.join

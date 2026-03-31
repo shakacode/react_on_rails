@@ -106,7 +106,7 @@ module ReactOnRails
 
         "Note: #{PRO_GEM_NAME} #{ReactOnRails::VERSION} may not be published yet. " \
           "If you are testing from source, use a local Gemfile `path:` option."
-      rescue StandardError
+      rescue ArgumentError
         ""
       end
 
