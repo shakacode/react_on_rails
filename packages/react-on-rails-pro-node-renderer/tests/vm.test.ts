@@ -589,14 +589,16 @@ describe('buildVM and runInVM', () => {
       });
 
       // First call fails synchronously during vm.createContext()
-      await expect(buildVM(serverBundlePath)).rejects.toThrow('sync context creation failure');
+      await expect(buildExecutionContext([serverBundlePath], /* buildVmsIfNeeded */ true)).rejects.toThrow(
+        'sync context creation failure',
+      );
 
       // Restore vm.createContext before retrying
       createContextSpy.mockRestore();
 
       // Retry the SAME path — if vmCreationPromises wasn't cleaned up,
       // this would return the stale rejected promise and fail
-      await buildVM(serverBundlePath);
+      await buildExecutionContext([serverBundlePath], /* buildVmsIfNeeded */ true);
       expect(hasVMContextForBundle(serverBundlePath)).toBeTruthy();
     });
 
