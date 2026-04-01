@@ -96,6 +96,19 @@ describe GeneratorMessages do
   end
 
   describe ".detect_package_manager" do
+    let(:original_package_manager_env) { ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil) }
+
+    around do |example|
+      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      example.run
+
+      if original_package_manager_env
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_package_manager_env
+      else
+        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      end
+    end
+
     it "returns bun when bun.lock exists" do
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
@@ -113,6 +126,27 @@ describe GeneratorMessages do
       allow(File).to receive(:exist?).with("bun.lockb").and_return(true)
 
       expect(described_class.detect_package_manager).to eq("bun")
+    end
+
+    it "returns npm when package-lock.json exists" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
+      allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
+      allow(File).to receive(:exist?).with("bun.lock").and_return(false)
+      allow(File).to receive(:exist?).with("bun.lockb").and_return(false)
+      allow(File).to receive(:exist?).with("package-lock.json").and_return(true)
+
+      expect(described_class.detect_package_manager).to eq("npm")
+    end
+  end
+
+  describe ".supported_package_manager?" do
+    it "returns true for supported managers and false otherwise" do
+      expect(described_class.supported_package_manager?("npm")).to be(true)
+      expect(described_class.supported_package_manager?("yarn")).to be(true)
+      expect(described_class.supported_package_manager?("pnpm")).to be(true)
+      expect(described_class.supported_package_manager?("bun")).to be(true)
+      expect(described_class.supported_package_manager?("foo")).to be(false)
     end
   end
 end

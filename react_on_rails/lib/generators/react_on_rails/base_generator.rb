@@ -297,13 +297,11 @@ module ReactOnRails
       end
 
       CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<~STR
-        RSpec.configure do |config|
-          # Ensure that if we are running js tests, we are using latest webpack assets
-          # This will use the defaults of :js and :server_rendering meta tags
-          # Requires config.build_test_command in config/initializers/react_on_rails.rb.
-          # This is the default setup for React on Rails generated apps.
-          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-        end
+        # Ensure that if we are running js tests, we are using latest webpack assets
+        # This will use the defaults of :js and :server_rendering meta tags
+        # Requires config.build_test_command in config/initializers/react_on_rails.rb.
+        # This is the default setup for React on Rails generated apps.
+        ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       STR
 
       CONFIGURE_MINITEST_TO_COMPILE_ASSETS = <<~STR
@@ -1147,7 +1145,11 @@ module ReactOnRails
         content = File.read(helper_file)
         return if content.match?(/^\s*[^#\s][^#]*ReactOnRails::TestHelper\.configure_rspec_to_compile_assets/)
 
-        updated_content = content.sub("RSpec.configure do |config|", CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+        updated_content = content.sub(/^(?<indent>\s*)RSpec\.configure do \|config\|\s*$/) do |header|
+          indent = Regexp.last_match[:indent]
+          insertion = CONFIGURE_RSPEC_TO_COMPILE_ASSETS.lines.map { |line| "#{indent}  #{line}" }.join
+          "#{header}\n#{insertion}"
+        end
         return if updated_content == content
 
         File.write(helper_file, updated_content)
