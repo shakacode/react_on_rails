@@ -256,7 +256,9 @@ describe('worker', () => {
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest reports unexpected handleRenderRequest failures once', async () => {
-    const buildVMSpy = jest.spyOn(vm, 'buildVM').mockRejectedValueOnce(new Error('Injected buildVM failure'));
+    const buildExecutionContextSpy = jest
+      .spyOn(vm, 'buildExecutionContext')
+      .mockRejectedValueOnce(new Error('Injected buildExecutionContext failure'));
     const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
 
     try {
@@ -287,7 +289,7 @@ describe('worker', () => {
       );
       expect(res.payload).toContain('Caught top level error in handleRenderRequest');
     } finally {
-      buildVMSpy.mockRestore();
+      buildExecutionContextSpy.mockRestore();
       reportMessageSpy.mockRestore();
     }
   });
@@ -760,9 +762,7 @@ describe('worker', () => {
     expect(files).not.toContain('loadable-stats-other.json');
   });
 
-  test('post /upload-assets with no assets and no bundles (empty request)', async () => {
-    const bundleHash = 'empty-request-hash';
-
+  test('post /upload-assets with no assets and no bundles (empty request) returns 400', async () => {
     const app = createWorker({
       password: 'my_password',
     });
@@ -771,20 +771,13 @@ describe('worker', () => {
       gemVersion,
       protocolVersion,
       password: 'my_password',
-      targetBundles: [bundleHash],
-      // No assets or bundles uploaded
+      // No bundle_<hash> fields or assets uploaded
     });
 
     const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
-    expect(res.statusCode).toBe(200);
-
-    // Verify bundle directory is created
-    const bundleDirectory = path.join(serverBundleCachePathForTest(), bundleHash);
-    expect(fs.existsSync(bundleDirectory)).toBe(true);
-
-    // Verify no files were copied (since none were uploaded)
-    const files = fs.readdirSync(bundleDirectory);
-    expect(files).toHaveLength(0);
+    // The endpoint requires at least one bundle_<hash> field
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('No bundle_<hash> fields provided');
   });
 
   test('post /upload-assets with duplicate bundle hash silently skips overwrite and returns 200', async () => {
@@ -869,7 +862,7 @@ describe('worker', () => {
     expect(secondBundleSize).toBe(62); // Size of getFixtureBundle(), not getFixtureSecondaryBundle()
   });
 
-  test('post /upload-assets with bundles placed in their own hash directories, not targetBundles directories', async () => {
+  test('post /upload-assets places bundles in their own hash directories (targetBundles is ignored)', async () => {
     const bundleHash = 'actual-bundle-hash';
     const targetBundleHash = 'target-bundle-hash'; // Different from actual bundle hash
 
@@ -881,24 +874,22 @@ describe('worker', () => {
       gemVersion,
       protocolVersion,
       password: 'my_password',
-      targetBundles: [targetBundleHash], // This should NOT affect where the bundle is placed
+      targetBundles: [targetBundleHash], // Ignored by the endpoint — only bundle_<hash> fields matter
       [`bundle_${bundleHash}`]: createReadStream(getFixtureBundle()), // Bundle with its own hash
     });
 
     const res = await app.inject().post(`/upload-assets`).payload(form.payload).headers(form.headers).end();
     expect(res.statusCode).toBe(200);
 
-    // Verify the bundle was placed in its OWN hash directory, not the targetBundles directory
+    // Verify the bundle was placed in its OWN hash directory
     const actualBundleDir = path.join(serverBundleCachePathForTest(), bundleHash);
-    const targetBundleDir = path.join(serverBundleCachePathForTest(), targetBundleHash);
-
-    // Bundle should exist in its own hash directory
     expect(fs.existsSync(actualBundleDir)).toBe(true);
     const bundleFilePath = path.join(actualBundleDir, `${bundleHash}.js`);
     expect(fs.existsSync(bundleFilePath)).toBe(true);
 
-    // Target bundle directory should also exist (created for assets)
-    expect(fs.existsSync(targetBundleDir)).toBe(true);
+    // targetBundles is not used by the endpoint, so no directory is created for it
+    const targetBundleDir = path.join(serverBundleCachePathForTest(), targetBundleHash);
+    expect(fs.existsSync(targetBundleDir)).toBe(false);
 
     // But the bundle file should NOT be in the target bundle directory
     const targetBundleFilePath = path.join(targetBundleDir, `${bundleHash}.js`);
@@ -908,10 +899,6 @@ describe('worker', () => {
     const files = fs.readdirSync(actualBundleDir);
     expect(files).toHaveLength(1);
     expect(files[0]).toBe(`${bundleHash}.js`);
-
-    // Verify the target bundle directory is empty (no assets uploaded)
-    const targetFiles = fs.readdirSync(targetBundleDir);
-    expect(targetFiles).toHaveLength(0);
   });
 
   // Incremental Render Endpoint Tests
