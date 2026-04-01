@@ -385,7 +385,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 **Mitigation:**
 
-1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)). Configure your container orchestrator to wait for it before routing traffic.
+1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. The server accepts both HTTP/1.1 and HTTP/2 connections, so standard Kubernetes `httpGet` probes work out of the box. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)). Configure your container orchestrator to wait for it before routing traffic.
 2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
    ```yaml
    startupProbe:

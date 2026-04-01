@@ -162,13 +162,20 @@ export default function run(config: Partial<Config>) {
 
   const { serverBundleCachePath, logHttpLevel, port, host, fastifyServerOptions, workersCount } = getConfig();
 
-  const app = fastify({
-    http2: useHttp2 as true,
+  // Allow HTTP/1.1 connections alongside HTTP/2 so that Kubernetes httpGet
+  // probes (which only speak HTTP/1.1) work without curl workarounds.
+  // The Rails gem continues to use HTTP/2 for SSR requests.
+  // Fastify passes the `http` option to http2.createServer() at runtime,
+  // but its TypeScript types don't expose it for HTTP/2 mode.
+  const fastifyOptions: Record<string, unknown> = {
+    http2: useHttp2,
+    ...(useHttp2 ? { http: { allowHTTP1: true } } : {}),
     bodyLimit: 104857600, // 100 MB
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
     ...fastifyServerOptions,
-  });
+  };
+  const app = fastify(fastifyOptions as Parameters<typeof fastify>[0]);
 
   handleGracefulShutdown(app);
 
