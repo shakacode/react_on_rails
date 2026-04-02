@@ -1,15 +1,18 @@
 ---
 sidebar_label: Pro Release Notes Archive
-description: Archive of React on Rails Pro release notes that remain available at their existing routes.
+description: Central index for React on Rails Pro release notes, including legacy pre-monorepo notes.
 ---
 
 # React on Rails Pro Release Notes
 
-This archive keeps the React on Rails Pro release notes available in one place while preserving the existing version pages.
+This archive provides one stable sidebar entry for Pro release notes without listing every version directly in navigation.
 
-## Recent Pro Release Notes
+## Monorepo Era Release Notes
 
 - [v4 React Server Components](./v4-react-server-components.md)
+
+## Legacy (Pre-Monorepo) Release Notes
+
 - [4.0](./4.0.md)
 
 ## Full Version History
