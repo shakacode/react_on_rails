@@ -27,7 +27,7 @@ pre-commit:
 
     markdown-links:
       glob: "{*.md,**/*.md}"
-      run: bin/lefthook/markdown-link-lint all-changed
+      run: bin/lefthook/markdown-link-lint all-changed --offline
 
     trailing-newlines:
       run: bin/lefthook/check-trailing-newlines all-changed
@@ -37,3 +37,6 @@ pre-push:
   commands:
     branch-lint:
       run: bin/lefthook/ruby-lint branch
+
+    markdown-links:
+      run: bin/lefthook/markdown-link-lint branch

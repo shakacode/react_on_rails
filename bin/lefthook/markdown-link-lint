@@ -4,6 +4,7 @@ set -euo pipefail
 source "$(dirname "$0")/ensure-mise"
 
 CONTEXT="${1:-staged}"
+MODE="${2:-}"
 files="$(bin/lefthook/get-changed-files "$CONTEXT" '\.md$')"
 
 if [ -z "$files" ]; then
@@ -11,15 +12,30 @@ if [ -z "$files" ]; then
   exit 0
 fi
 
-if ! command -v lychee &> /dev/null; then
-  echo "Error: lychee is not installed. Install it with: cargo install lychee" >&2
-  echo "Then re-run your commit or run bin/check-links manually." >&2
-  exit 1
+lychee_args=(--config .lychee.toml)
+if [ "$MODE" = "--offline" ]; then
+  lychee_args+=(--offline)
+  mode_label="offline"
+else
+  mode_label="online"
 fi
 
-echo "🔗 Lychee on $CONTEXT Markdown files:"
-printf "  %s\n" $files
+if ! command -v lychee &> /dev/null; then
+  echo "⚠️  lychee is not installed; skipping ${mode_label} Markdown link check." >&2
+  echo "   Install with: brew install lychee  # macOS" >&2
+  echo "                 cargo install lychee # cross-platform" >&2
+  echo "   Or run bin/check-links manually before pushing." >&2
+  exit 0
+fi
 
-lychee --config .lychee.toml $files
+files_arr=()
+while IFS= read -r file; do
+  [ -n "$file" ] && files_arr+=("$file")
+done <<< "$files"
+
+echo "🔗 Lychee (${mode_label}) on $CONTEXT Markdown files:"
+printf "  %s\n" "${files_arr[@]}"
+
+lychee "${lychee_args[@]}" "${files_arr[@]}"
 
 echo "✅ Markdown link checks passed"
