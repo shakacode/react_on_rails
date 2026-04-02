@@ -298,6 +298,7 @@ ReactOnRailsPro.configure do |config|
 
   # Configure renderer connection
   config.renderer_url = ENV["REACT_RENDERER_URL"] || "http://localhost:3800"
+  # Optional: if omitted, Rails falls back to ENV["RENDERER_PASSWORD"]
   config.renderer_password = ENV["RENDERER_PASSWORD"] || "changeme"
 
   # Enable prerender caching (recommended)

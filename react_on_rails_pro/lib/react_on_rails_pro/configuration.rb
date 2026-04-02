@@ -233,8 +233,15 @@ module ReactOnRailsPro
       # Blank values fall through so URL extraction and production validation still catch misconfiguration.
       return if renderer_password.present?
 
+      explicit_blank_password = renderer_password.is_a?(String) && renderer_password.empty?
       uri = URI(renderer_url)
       self.renderer_password = uri.password
+
+      # Mirror Node-side defaults: if Rails config and URL are both missing a password,
+      # use RENDERER_PASSWORD from env.
+      if renderer_password.blank? && !explicit_blank_password
+        self.renderer_password = ENV.fetch("RENDERER_PASSWORD", nil)
+      end
 
       validate_renderer_password_for_production
     end
@@ -268,8 +275,11 @@ module ReactOnRailsPro
           end
 
         Then set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
-        Note: setting ENV["RENDERER_PASSWORD"] alone is not enough on the Ruby side unless
-        config.renderer_password is explicitly assigned from ENV.
+        Rails resolves the password in this order:
+          1) config.renderer_password (except empty string, which counts as missing)
+          2) Password embedded in config.renderer_url (for example, https://:password@host:3800)
+          3) ENV["RENDERER_PASSWORD"]
+
         An empty-string assignment still counts as missing and will raise in production-like environments.
         If Rails and the Node Renderer disagree about startup behavior, verify both RAILS_ENV and NODE_ENV.
 
