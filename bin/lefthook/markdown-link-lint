@@ -11,6 +11,12 @@ if [ -z "$files" ]; then
   exit 0
 fi
 
+if ! command -v lychee &> /dev/null; then
+  echo "Error: lychee is not installed. Install it with: cargo install lychee" >&2
+  echo "Then re-run your commit or run bin/check-links manually." >&2
+  exit 1
+fi
+
 echo "🔗 Lychee on $CONTEXT Markdown files:"
 printf "  %s\n" $files
 
