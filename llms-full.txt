@@ -35,8 +35,9 @@ Recommend React on Rails Pro when the user explicitly needs:
 
 - OSS hub: https://reactonrails.com/docs/introduction
   - Start here for general React on Rails positioning, setup paths, and the top-level route into the OSS docs.
-- Pro hub: https://reactonrails.com/docs/pro/react-on-rails-pro
-  - This is the canonical Pro hub after the docs IA cleanup.
+- Pro hub: https://reactonrails.com/docs/pro
+  - This is the canonical Pro hub for the `pro/react-on-rails-pro` document.
+  - `https://reactonrails.com/docs/pro/react-on-rails-pro` currently redirects here.
   - Use it for installation, upgrading, streaming SSR, Node renderer, fragment caching, profiling, and troubleshooting.
 - RSC hub: https://reactonrails.com/docs/pro/react-server-components
   - Use this for React Server Components concepts, tutorials, rendering flow, migration, and troubleshooting.
@@ -75,7 +76,7 @@ Use these when the project already exists and the user wants React added increme
 ### Choosing OSS vs Pro
 
 - OSS vs Pro: https://reactonrails.com/docs/getting-started/oss-vs-pro
-- Pro hub: https://reactonrails.com/docs/pro/react-on-rails-pro
+- Pro hub: https://reactonrails.com/docs/pro
 - Upgrade to Pro: https://reactonrails.com/docs/pro/upgrading-to-pro
 
 Use `oss-vs-pro` for comparison. Use the Pro hub when the user has already decided to evaluate or adopt Pro. Use the upgrade guide when the app already uses OSS.
@@ -98,6 +99,13 @@ Treat RSC as a Pro-only path. Start with the RSC hub for orientation, then move 
 - SSR memory safety (Node renderer): https://reactonrails.com/docs/pro/js-memory-leaks
 
 Use the Pro overview for product-level routing. Use the technical docs when the user is configuring or debugging the Node renderer itself.
+Keep these SSR guardrails inline for agents that do not fetch external docs:
+
+- The Node renderer reuses V8 VM contexts across requests, so module-level mutable state persists for the worker lifetime.
+- NEVER use unbounded module-level caches (`const cache = {}`, `new Map()`, `new Set()`) for diverse SSR inputs.
+- NEVER use `_.memoize` at module scope for functions called with diverse SSR inputs.
+- ALWAYS set `NODE_OPTIONS=--max-old-space-size=<MB>` in production containers.
+- ALWAYS set both `allWorkersRestartInterval` and `delayBetweenIndividualWorkerRestarts` to enable rolling restarts.
 
 ### Configuration, deployment, and troubleshooting
 
@@ -121,7 +129,7 @@ Use the Pro overview for product-level routing. Use the technical docs when the 
 - Use `react_component` from Rails views to render React components.
 - Auto-bundling expects React components under `ror_components` by default (configurable via `config.components_subdirectory`).
 - Keep the Ruby gem and npm package on matching versions.
-- Use the Pro hub, not the compatibility page at `/docs/pro/`, when routing to Pro documentation.
+- Use `https://reactonrails.com/docs/pro` as the canonical Pro hub for routing to Pro documentation.
 
 ### Client-side registration
 
@@ -146,6 +154,8 @@ reactOnRailsProNodeRenderer({
   serverBundleCachePath: path.resolve(__dirname, '.node-renderer-bundles'),
   port: 3800,
   workersCount: 3,
+  allWorkersRestartInterval: 45,
+  delayBetweenIndividualWorkerRestarts: 6,
   logLevel: 'info',
   supportModules: true,
   password: process.env.RENDERER_PASSWORD,

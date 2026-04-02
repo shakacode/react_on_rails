@@ -8,7 +8,7 @@ Use this file as the short machine-readable route map. Use `./llms-full.txt` for
 
 - Human docs overview: https://reactonrails.com/docs/
 - OSS docs hub: https://reactonrails.com/docs/introduction
-- Pro docs hub: https://reactonrails.com/docs/pro/react-on-rails-pro
+- Pro docs hub: https://reactonrails.com/docs/pro
 - RSC docs hub: https://reactonrails.com/docs/pro/react-server-components
 - Expanded machine-readable reference: `./llms-full.txt`
 - Agent usage guide: `./AGENTS_USER_GUIDE.md`
@@ -31,7 +31,7 @@ Use this file as the short machine-readable route map. Use `./llms-full.txt` for
   - Using React on Rails: https://reactonrails.com/docs/getting-started/using-react-on-rails
 - Choosing OSS vs Pro:
   - OSS vs Pro: https://reactonrails.com/docs/getting-started/oss-vs-pro
-  - Pro hub: https://reactonrails.com/docs/pro/react-on-rails-pro
+  - Pro hub: https://reactonrails.com/docs/pro
   - Upgrade to Pro: https://reactonrails.com/docs/pro/upgrading-to-pro
 - React Server Components:
   - RSC hub: https://reactonrails.com/docs/pro/react-server-components
@@ -55,6 +55,6 @@ Use this file as the short machine-readable route map. Use `./llms-full.txt` for
 
 ## Routing notes
 
-- Prefer the canonical Pro hub at `https://reactonrails.com/docs/pro/react-on-rails-pro`.
-- Treat `https://reactonrails.com/docs/pro/` as a compatibility landing page, not the primary machine-readable entry point.
+- Prefer the canonical Pro hub at `https://reactonrails.com/docs/pro`.
+- `https://reactonrails.com/docs/pro/react-on-rails-pro` currently redirects to the canonical Pro hub URL above.
 - Keep the machine-readable layer small: use the hub pages above first, then open only the task-specific docs you need.
