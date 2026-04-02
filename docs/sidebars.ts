@@ -23,7 +23,14 @@ const sidebars: SidebarsConfig = {
         'getting-started/using-react-on-rails',
         'getting-started/oss-vs-pro',
         'getting-started/pro-quick-start',
-        'getting-started/comparing-react-on-rails-to-alternatives',
+        {
+          type: 'category',
+          label: 'Compare Alternatives',
+          items: [
+            'getting-started/comparison-with-alternatives',
+            'getting-started/comparing-react-on-rails-to-alternatives',
+          ],
+        },
         'getting-started/nextjs-with-separate-rails-backend',
         'getting-started/common-issues',
       ],
@@ -220,6 +227,22 @@ const sidebars: SidebarsConfig = {
               ],
             },
           ],
+        },
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Contributing',
+      link: { type: 'generated-index', title: 'Contributing' },
+      items: [
+        'misc/doctrine',
+        'misc/style',
+        'misc/updating-dependencies',
+        'misc/credits',
+        {
+          type: 'category',
+          label: 'Resources',
+          items: ['misc/articles', 'misc/tips'],
         },
       ],
     },
