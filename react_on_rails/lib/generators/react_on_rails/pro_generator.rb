@@ -371,16 +371,18 @@ module ReactOnRails
         }x
 
         rewrite_non_comment_lines(content) do |line|
-          rewritten_line = line.gsub(static_import_specifier_pattern) do
-            "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
-          end
+          rewrite_outside_inline_template_literals(line) do |line_without_templates|
+            rewritten_line = line_without_templates.gsub(static_import_specifier_pattern) do
+              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+            end
 
-          rewritten_line = rewritten_line.gsub(dynamic_or_require_specifier_pattern) do
-            "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
-          end
+            rewritten_line = rewritten_line.gsub(dynamic_or_require_specifier_pattern) do
+              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+            end
 
-          rewritten_line.gsub(side_effect_import_pattern) do
-            "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+            rewritten_line.gsub(side_effect_import_pattern) do
+              "#{Regexp.last_match[:prefix]}#{Regexp.last_match[:quote]}react-on-rails-pro"
+            end
           end
         end
       end
@@ -634,6 +636,21 @@ module ReactOnRails
         return line_without_comments unless strip_ruby_comments
 
         line_without_comments.sub(/\s*#.*$/, "")
+      end
+
+      def rewrite_outside_inline_template_literals(line)
+        template_placeholders = []
+        line_without_inline_templates = line.gsub(/`(?:\\.|[^`\\])*`/) do |template_literal|
+          placeholder = "__ROR_TEMPLATE_LITERAL_PLACEHOLDER_#{template_placeholders.length}__"
+          template_placeholders << [placeholder, template_literal]
+          placeholder
+        end
+
+        rewritten_line = yield line_without_inline_templates
+        template_placeholders.each do |placeholder, template_literal|
+          rewritten_line = rewritten_line.sub(placeholder, template_literal)
+        end
+        rewritten_line
       end
 
       def line_for_template_literal_tracking(line, in_block_comment: false)

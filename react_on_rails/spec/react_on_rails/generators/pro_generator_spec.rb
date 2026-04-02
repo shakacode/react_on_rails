@@ -940,6 +940,29 @@ describe ProGenerator, type: :generator do
       expect(rewritten.scan("react-on-rails-pro").size).to eq(1)
     end
 
+    it "does not rewrite module specifiers inside single-line template literals" do
+      source = <<~JS
+        const inlineTemplate = `require("react-on-rails") and import("react-on-rails/client")`;
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('`require("react-on-rails") and import("react-on-rails/client")`')
+      expect(rewritten).not_to include("react-on-rails-pro")
+    end
+
+    it "rewrites module specifiers outside single-line template literals on the same line" do
+      source = <<~JS
+        const inlineTemplate = `require("react-on-rails")`; const ror = require("react-on-rails");
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('`require("react-on-rails")`')
+      expect(rewritten).to include('const ror = require("react-on-rails-pro");')
+      expect(rewritten.scan("react-on-rails-pro").size).to eq(1)
+    end
+
     it "rewrites all matching specifiers on a pending continuation line" do
       source = <<~JS
         import {
