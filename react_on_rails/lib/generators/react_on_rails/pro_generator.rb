@@ -103,7 +103,7 @@ module ReactOnRails
         end
 
         gemfile_content = File.read(gemfile_path)
-        pro_gem_pattern = /^\s*gem(?:\s+|\(\s*)["']react_on_rails_pro["']/
+        pro_gem_pattern = /^\s*gem(?:\s+|\(\s*(?:#.*\n\s*)*)["']react_on_rails_pro["']/
         base_gem_pattern = /^(\s*)gem(?:\s+|\(\s*)(["'])react_on_rails\2(?=\s*(?:,|\)|#|$))/
 
         has_pro_gem_entry = gemfile_content.match?(pro_gem_pattern)

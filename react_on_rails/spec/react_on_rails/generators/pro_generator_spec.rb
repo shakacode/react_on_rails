@@ -515,6 +515,29 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "does not add duplicate react_on_rails_pro entries when existing parenthesized declaration has comment lines" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails", "~> 16.0"
+        gem(
+          # pinned for compatibility
+          "react_on_rails_pro",
+          "~> 16.0"
+        )
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+      allow(generator).to receive(:say)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expect(gemfile_content).not_to match(/gem\s+["']react_on_rails["']/)
+      expect(gemfile_content.scan(/["']react_on_rails_pro["']/).size).to eq(1)
+      expect(generator).to have_received(:say)
+        .with("ℹ️  Existing react_on_rails_pro Gemfile entry detected; preserving current version constraint", :yellow)
+      expect(generator).to have_received(:bundle_install_after_gem_swap)
+    end
+
     it "does nothing when Gemfile has no react_on_rails entry" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
