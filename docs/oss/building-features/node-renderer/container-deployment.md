@@ -395,11 +395,15 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      periodSeconds: 5
      failureThreshold: 6
    ```
-3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. A TCP probe confirms the renderer port is accepting connections; for worker-level readiness semantics, expose a dedicated HTTP/1.1 health endpoint (for example via a sidecar) or use an `exec` probe:
+3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. Prefer an `exec` probe with an h2c-aware client for application-level readiness. Use `tcpSocket` only as a minimal fallback that confirms the port is accepting connections:
    ```yaml
    readinessProbe:
-     tcpSocket:
-       port: 3800
+     exec:
+       command:
+         - curl
+         - -sf
+         - --http2-prior-knowledge
+         - http://localhost:3800/info
      periodSeconds: 5
      failureThreshold: 3
    ```
@@ -505,8 +509,12 @@ spec:
             periodSeconds: 5
             failureThreshold: 6
           readinessProbe:
-            tcpSocket:
-              port: 3800
+            exec:
+              command:
+                - curl
+                - -sf
+                - --http2-prior-knowledge
+                - http://localhost:3800/info
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
@@ -557,7 +565,7 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-This handles transient startup ordering issues. For a more robust solution, add a startup dependency or init container that waits for the renderer's `/info` endpoint.
+This handles transient startup ordering issues. For a more robust solution, add a startup dependency or init container that waits for the renderer port to accept TCP connections, or queries `/info` with an h2c-aware client (for example, `curl --http2-prior-knowledge`).
 
 ## ControlPlane-Specific Notes
 
