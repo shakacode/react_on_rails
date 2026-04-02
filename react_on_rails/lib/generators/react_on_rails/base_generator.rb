@@ -106,8 +106,13 @@ module ReactOnRails
                        :DOCS_REFERENCE_MESSAGE, :TEMPLATE_RENDER_FAILED
 
       def add_root_route
-        @new_app_root_route_added = false
         return unless options.new_app?
+        # add_root_route normally runs before copy_base_files as a generator action.
+        # Guard against accidental double invocation (for example, if future
+        # refactors trigger lazy initialization in generate_new_app_home_page?).
+        return if defined?(@new_app_root_route_added)
+
+        @new_app_root_route_added = false
 
         if preexisting_root_route?
           say_status :skip, "Root route already exists; keeping existing root route", :yellow
@@ -116,6 +121,12 @@ module ReactOnRails
 
         routes_path = "config/routes.rb"
         routes_full_path = File.join(destination_root, routes_path)
+
+        unless File.file?(routes_full_path)
+          say_status :warn, "Could not inject root route; config/routes.rb was not found", :yellow
+          return
+        end
+
         # Support both LF and CRLF route files so new-app onboarding works on Windows checkouts too.
         routes_draw_declaration = /^\s*Rails\.application\.routes\.draw do\r?\n/
         unless File.read(routes_full_path).match?(routes_draw_declaration)
@@ -154,6 +165,8 @@ module ReactOnRails
       end
 
       def copy_base_files
+        ensure_new_app_root_route_initialized
+
         base_path = "base/base/"
         base_files = %w[Procfile.dev
                         Procfile.dev-static-assets
@@ -284,13 +297,11 @@ module ReactOnRails
       end
 
       CONFIGURE_RSPEC_TO_COMPILE_ASSETS = <<~STR
-        RSpec.configure do |config|
-          # Ensure that if we are running js tests, we are using latest webpack assets
-          # This will use the defaults of :js and :server_rendering meta tags
-          # Requires config.build_test_command in config/initializers/react_on_rails.rb.
-          # This is the default setup for React on Rails generated apps.
-          ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
-        end
+        # Ensure that if we are running js tests, we are using latest webpack assets
+        # This will use the defaults of :js and :server_rendering meta tags
+        # Requires config.build_test_command in config/initializers/react_on_rails.rb.
+        # This is the default setup for React on Rails generated apps.
+        ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
       STR
 
       CONFIGURE_MINITEST_TO_COMPILE_ASSETS = <<~STR
@@ -303,7 +314,6 @@ module ReactOnRails
       private
 
       def generate_new_app_home_page?
-        # Depends on add_root_route running first and setting @new_app_root_route_added.
         options.new_app? && new_app_root_route_added?
       end
 
@@ -317,11 +327,16 @@ module ReactOnRails
       def preexisting_root_route?
         return @preexisting_root_route if defined?(@preexisting_root_route)
 
-        routes_file = File.join(destination_root, "config/routes.rb")
-        @preexisting_root_route = File.file?(routes_file) &&
-                                  File.foreach(routes_file).any? do |line|
-                                    !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
-                                  end
+        @preexisting_root_route = root_route_present?
+      end
+
+      def ensure_new_app_root_route_initialized
+        return unless options.new_app?
+        return if defined?(@new_app_root_route_added)
+
+        # add_root_route should run as a generator action first, but keep this
+        # explicit call so copy_base_files remains safe if action ordering changes.
+        add_root_route
       end
 
       def home_page_config
@@ -1130,7 +1145,11 @@ module ReactOnRails
         content = File.read(helper_file)
         return if content.match?(/^\s*[^#\s][^#]*ReactOnRails::TestHelper\.configure_rspec_to_compile_assets/)
 
-        updated_content = content.sub("RSpec.configure do |config|", CONFIGURE_RSPEC_TO_COMPILE_ASSETS)
+        updated_content = content.sub(/^(?<indent>\s*)RSpec\.configure do \|config\|\s*$/) do |header|
+          indent = Regexp.last_match[:indent]
+          insertion = CONFIGURE_RSPEC_TO_COMPILE_ASSETS.lines.map { |line| "#{indent}  #{line}" }.join
+          "#{header}\n#{insertion}"
+        end
         return if updated_content == content
 
         File.write(helper_file, updated_content)

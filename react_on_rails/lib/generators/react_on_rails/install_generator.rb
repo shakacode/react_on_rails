@@ -3,6 +3,7 @@
 require "rails/generators"
 require "json"
 require "bundler"
+require "open3"
 require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
@@ -214,6 +215,7 @@ module ReactOnRails
         end
 
         setup_react_dependencies
+        ensure_jsx_in_js_compatibility
 
         # Invoke standalone Pro/RSC generators when flags are used
         # Pass invoked_by_install: true so they skip message printing (we handle it)
@@ -237,6 +239,24 @@ module ReactOnRails
         end
 
         setup_js_dependencies
+      end
+
+      def ensure_jsx_in_js_compatibility
+        return if options[:pretend]
+        return unless using_swc?
+        return unless jsx_in_js_files_present?
+
+        say "⚙️  Detected JSX in .js files; switching shakapacker javascript_transpiler to babel for compatibility",
+            :yellow
+        set_javascript_transpiler_to_babel
+        babel_loader_added = add_packages(["babel-loader"], dev: true)
+        babel_preset_added = add_babel_react_dependencies
+        return if babel_loader_added && babel_preset_added
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Babel compatibility dependencies may be incomplete after switching from SWC.
+          Please verify `babel-loader` and `@babel/preset-react` are installed.
+        MSG
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.
@@ -424,12 +444,7 @@ module ReactOnRails
       end
 
       def new_app_root_route_available?
-        routes_path = File.join(destination_root, "config/routes.rb")
-        return false unless File.file?(routes_path)
-
-        File.foreach(routes_path).any? do |line|
-          !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
-        end
+        root_route_present?
       end
 
       def stock_rails_bin_dev?
@@ -610,6 +625,8 @@ module ReactOnRails
           return false
         end
 
+        seed_package_manager_in_package_json_from_lockfile!
+
         # Then run the shakapacker installer
         # Use options.rspack? directly (not using_rspack?): shakapacker.yml doesn't exist yet at this
         # point, so using_rspack? would fall back to rspack_configured_in_project? which returns false,
@@ -619,11 +636,74 @@ module ReactOnRails
           system(shakapacker_install_env, "bundle exec rails shakapacker:install")
         end
         if success
+          resolve_browserslist_conflict_after_shakapacker_install
           true
         else
           handle_shakapacker_install_error
           false
         end
+      end
+
+      def seed_package_manager_in_package_json_from_lockfile!
+        return unless File.exist?("package.json")
+
+        package_json_content = JSON.parse(File.read("package.json"))
+        return if package_json_content["packageManager"]
+
+        manager = detect_package_manager_from_lockfiles
+        return unless manager
+
+        version = detect_package_manager_version(manager)
+        return unless version
+
+        package_json_content["packageManager"] = "#{manager}@#{version}"
+        File.write("package.json", "#{JSON.pretty_generate(package_json_content)}\n")
+        say "🔧 Added packageManager=#{manager}@#{version} to package.json before shakapacker:install", :yellow
+      rescue JSON::ParserError => e
+        GeneratorMessages.add_warning("⚠️  Could not parse package.json to set packageManager: #{e.message}")
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to seed packageManager in package.json: #{e.message}")
+      end
+
+      def resolve_browserslist_conflict_after_shakapacker_install
+        return unless File.exist?(".browserslistrc") && File.exist?("package.json")
+
+        package_json_content = JSON.parse(File.read("package.json"))
+        return unless package_json_content.key?("browserslist")
+
+        package_json_content.delete("browserslist")
+        File.write("package.json", "#{JSON.pretty_generate(package_json_content)}\n")
+        say "🔧 Removed package.json browserslist because .browserslistrc is present", :yellow
+      rescue JSON::ParserError => e
+        GeneratorMessages.add_warning("⚠️  Could not parse package.json for browserslist cleanup: #{e.message}")
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to clean browserslist conflict: #{e.message}")
+      end
+
+      def detect_package_manager_from_lockfiles
+        GeneratorMessages.detect_package_manager_from_lockfiles
+      end
+
+      def detect_package_manager_version(package_manager)
+        unless cli_exists?(package_manager)
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  #{package_manager} lockfile found but `#{package_manager}` command is not available on PATH.
+            Install #{package_manager} and re-run the generator.
+          MSG
+          return nil
+        end
+
+        stdout, stderr, status = Open3.capture3(package_manager, "--version")
+        return stdout.strip if status.success?
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to determine #{package_manager} version (#{stderr.strip}).
+          Install #{package_manager} and re-run the generator.
+        MSG
+        nil
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to detect #{package_manager} version: #{e.message}")
+        nil
       end
 
       def finalize_shakapacker_setup(yml_content_before)
@@ -718,6 +798,30 @@ module ReactOnRails
         end
 
         false
+      end
+
+      def jsx_in_js_files_present?
+        Dir.glob("app/javascript/**/*.js").any? do |path|
+          content = File.read(path)
+          content.match?(%r{<\s*[A-Za-z][\w:-]*(\s|>|/)}) || content.match?(/<\s*>/)
+        rescue StandardError
+          false
+        end
+      end
+
+      def set_javascript_transpiler_to_babel
+        shakapacker_config_path = "config/shakapacker.yml"
+        return unless File.exist?(shakapacker_config_path)
+
+        swc_transpiler_pattern = /^(\s*javascript_transpiler:\s*)["']?swc["']?(\s*(?:#.*)?)$/
+        return unless File.read(shakapacker_config_path).match?(swc_transpiler_pattern)
+
+        gsub_file(
+          shakapacker_config_path,
+          swc_transpiler_pattern,
+          '\1"babel"\2'
+        )
+        @using_swc = false
       end
 
       def install_typescript_dependencies

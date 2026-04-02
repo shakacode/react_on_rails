@@ -36,6 +36,21 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "creates the shakapacker watch wrapper and uses it in Procfiles" do
+      assert_file "bin/shakapacker-watch" do |content|
+        expect(content).to include('bin/shakapacker "$@" &')
+        expect(content).to include("trap cleanup INT TERM")
+      end
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=yes bin/shakapacker-watch --watch")
+      end
+
+      assert_file "Procfile.dev-static-assets" do |content|
+        expect(content).to include("js: bin/shakapacker-watch --watch")
+      end
+    end
+
     it "installs appropriate transpiler dependencies based on Shakapacker version" do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
@@ -101,6 +116,27 @@ describe InstallGenerator, type: :generator do
       assert_file "app/views/hello_world/index.html.erb" do |content|
         expect(content).to include("Return to the generated home page")
       end
+    end
+  end
+
+  context "when --new-app config/routes.rb does not exist" do
+    let(:generator) { base_generator_fixture(new_app: true) }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(gitignore: false, spec: false)
+      FileUtils.rm_f(File.join(destination_root, "config/routes.rb"))
+      allow(generator).to receive(:say_status)
+    end
+
+    it "warns instead of raising when config/routes.rb is missing" do
+      Dir.chdir(destination_root) do
+        generator.send(:add_root_route)
+      end
+
+      expect(generator)
+        .to have_received(:say_status)
+        .with(:warn, "Could not inject root route; config/routes.rb was not found", :yellow)
     end
   end
 
@@ -287,8 +323,9 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args([], spec: true, package_json: true) }
 
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)" do
-      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
-      assert_file("spec/rails_helper.rb") { |contents| expect(contents).to match(expected) }
+      assert_file("spec/rails_helper.rb") do |contents|
+        expect(contents).to include("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      end
     end
   end
 
@@ -327,8 +364,9 @@ describe InstallGenerator, type: :generator do
     end
 
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config) for rspec" do
-      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
-      assert_file("spec/rails_helper.rb") { |contents| expect(contents).to match(expected) }
+      assert_file("spec/rails_helper.rb") do |contents|
+        expect(contents).to include("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      end
     end
 
     it "adds ReactOnRails::TestHelper.ensure_assets_compiled for minitest" do
@@ -1512,6 +1550,7 @@ describe InstallGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("RSC_BUNDLE_ONLY=yes")
         expect(content).to include("rsc-bundle:")
+        expect(content).to include("bin/shakapacker-watch --watch")
       end
     end
 
@@ -2981,6 +3020,113 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_about_react_version_for_rsc)
       expect(GeneratorMessages.messages.join("\n")).not_to include("RSC")
+    end
+  end
+
+  describe "#seed_package_manager_in_package_json_from_lockfile!" do
+    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
+    before do
+      prepare_destination
+      simulate_existing_file("package.json", <<~JSON)
+        {
+          "name": "dummy-app",
+          "private": true,
+          "dependencies": {}
+        }
+      JSON
+      simulate_existing_file("yarn.lock", "")
+    end
+
+    it "adds packageManager when a lockfile exists and packageManager is missing" do
+      allow(install_generator).to receive(:cli_exists?).with("yarn").and_return(true)
+      allow(Open3).to receive(:capture3).with("yarn", "--version").and_return(["1.22.22\n", "", success_status])
+
+      Dir.chdir(destination_root) do
+        install_generator.send(:seed_package_manager_in_package_json_from_lockfile!)
+      end
+
+      package_json = JSON.parse(File.read(File.join(destination_root, "package.json")))
+      expect(package_json["packageManager"]).to eq("yarn@1.22.22")
+    end
+
+    it "does not overwrite an existing packageManager value" do
+      simulate_existing_file("package.json", <<~JSON)
+        {
+          "name": "dummy-app",
+          "private": true,
+          "packageManager": "pnpm@10.0.0"
+        }
+      JSON
+      allow(Open3).to receive(:capture3)
+
+      Dir.chdir(destination_root) do
+        install_generator.send(:seed_package_manager_in_package_json_from_lockfile!)
+      end
+
+      package_json = JSON.parse(File.read(File.join(destination_root, "package.json")))
+      expect(package_json["packageManager"]).to eq("pnpm@10.0.0")
+      expect(Open3).not_to have_received(:capture3)
+    end
+  end
+
+  describe "#resolve_browserslist_conflict_after_shakapacker_install" do
+    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+
+    before do
+      prepare_destination
+      simulate_existing_file(".browserslistrc", "defaults\n")
+      simulate_existing_file("package.json", <<~JSON)
+        {
+          "name": "dummy-app",
+          "private": true,
+          "browserslist": ["defaults"],
+          "packageManager": "yarn@1.22.22"
+        }
+      JSON
+    end
+
+    it "removes browserslist from package.json when .browserslistrc exists" do
+      Dir.chdir(destination_root) do
+        install_generator.send(:resolve_browserslist_conflict_after_shakapacker_install)
+      end
+
+      package_json = JSON.parse(File.read(File.join(destination_root, "package.json")))
+      expect(package_json.key?("browserslist")).to be(false)
+    end
+  end
+
+  describe "#ensure_jsx_in_js_compatibility" do
+    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+
+    before do
+      prepare_destination
+      simulate_existing_file("config/shakapacker.yml", <<~YML)
+        default: &default
+          javascript_transpiler: "swc"
+      YML
+      simulate_existing_file("app/javascript/src/components/App.js", <<~JS)
+        export default function App() {
+          return <>Hello</>
+        }
+      JS
+      allow(install_generator).to receive_messages(
+        using_swc?: true,
+        add_packages: true,
+        add_babel_react_dependencies: true
+      )
+    end
+
+    it "switches to babel and installs babel dependencies when JSX is found in .js files" do
+      Dir.chdir(destination_root) do
+        install_generator.send(:ensure_jsx_in_js_compatibility)
+      end
+
+      shakapacker_yml = File.read(File.join(destination_root, "config/shakapacker.yml"))
+      expect(shakapacker_yml).to include('javascript_transpiler: "babel"')
+      expect(install_generator).to have_received(:add_packages).with(["babel-loader"], dev: true)
+      expect(install_generator).to have_received(:add_babel_react_dependencies)
     end
   end
 

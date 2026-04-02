@@ -10,9 +10,12 @@ module GeneratorHelper
     require "package_json" unless defined?(PackageJson)
     @package_json ||= PackageJson.read
   rescue LoadError
-    say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
-    say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
-               :yellow
+    unless @package_json_unavailable_warned
+      say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
+      say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
+                 :yellow
+      @package_json_unavailable_warned = true
+    end
     nil
   rescue StandardError => e
     say_status :warning, "Could not read package.json: #{e.message}", :yellow
@@ -26,12 +29,12 @@ module GeneratorHelper
     return false unless pj
 
     begin
-      if dev
-        pj.manager.add(packages, type: :dev, exact: true)
-      else
-        pj.manager.add(packages, exact: true)
-      end
-      true
+      result = if dev
+                 pj.manager.add(packages, type: :dev, exact: true)
+               else
+                 pj.manager.add(packages, exact: true)
+               end
+      result ? true : false
     rescue StandardError => e
       say_status :warning, "Could not add packages via package_json gem: #{e.message}", :yellow
       say_status :warning, "Will fall back to direct npm commands.", :yellow
@@ -48,6 +51,18 @@ module GeneratorHelper
   def dest_dir_exists?(dir)
     dest_dir = File.join(destination_root, dir)
     Dir.exist?(dest_dir) ? dest_dir : nil
+  end
+
+  # Detect whether config/routes.rb defines any non-commented root route.
+  #
+  # @param routes_path [String] absolute path to routes.rb
+  # @return [Boolean] true when a root route exists
+  def root_route_present?(routes_path = File.join(destination_root, "config/routes.rb"))
+    return false unless File.file?(routes_path)
+
+    File.foreach(routes_path).any? do |line|
+      !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
+    end
   end
 
   def setup_file_error(file, data)

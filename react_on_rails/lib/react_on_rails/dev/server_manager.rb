@@ -2,6 +2,7 @@
 
 require "English"
 require "fileutils"
+require "net/http"
 require "open3"
 require "optparse"
 require "rainbow"
@@ -864,19 +865,31 @@ module ReactOnRails
         end
 
         def build_local_url(port, route)
-          normalized_route = route.to_s.strip
-          return "http://localhost:#{port}" if normalized_route.empty? || normalized_route == "/"
+          path = normalize_route_path(route)
+          path = "" if path == "/"
+          "http://localhost:#{port}#{path}"
+        end
 
-          normalized_route = normalized_route.sub(%r{\A/+}, "")
-          "http://localhost:#{port}/#{normalized_route}"
+        def build_request_path(route)
+          normalize_route_path(route)
+        end
+
+        def normalize_route_path(route)
+          stripped = route.to_s.strip
+          return "/" if stripped.empty? || stripped == "/"
+
+          stripped = stripped.sub(%r{\A/+}, "")
+          "/#{stripped}"
         end
 
         def schedule_browser_open(port, route:, once:)
           return unless browser_auto_open_allowed?
 
           url = build_local_url(port, route)
+          request_path = build_request_path(route)
           Thread.new do
-            next unless wait_for_server_on_port(port)
+            Thread.current.report_on_exception = false if Thread.current.respond_to?(:report_on_exception=)
+            next unless wait_for_app_route(port, request_path)
 
             marker_state = prepare_browser_open_once_marker(once)
             next if marker_state == :already_opened
@@ -896,25 +909,35 @@ module ReactOnRails
           !ENV.key?("CI") && $stdin.tty? && $stdout.tty?
         end
 
-        def wait_for_server_on_port(port)
+        def wait_for_app_route(port, request_path)
           deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + OPEN_BROWSER_WAIT_TIMEOUT
 
           loop do
-            return true if localhost_port_open?(port)
+            return true if app_route_ready?(port, request_path)
             return false if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
 
             sleep OPEN_BROWSER_POLL_INTERVAL
           end
         end
 
-        def localhost_port_open?(port)
-          %w[127.0.0.1 ::1].any? do |host|
-            Socket.tcp(host, port, connect_timeout: 1) do
-              true
+        LOCALHOST_ADDRESSES = %w[127.0.0.1 ::1].freeze
+        private_constant :LOCALHOST_ADDRESSES
+
+        def app_route_ready?(port, request_path)
+          response = http_get_localhost(port, request_path)
+          response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
+        end
+
+        def http_get_localhost(port, request_path)
+          LOCALHOST_ADDRESSES.each do |host|
+            response = Net::HTTP.start(host, port, open_timeout: 1, read_timeout: 1) do |http|
+              http.get(request_path)
             end
+            return response if response
           rescue StandardError
-            false
+            next
           end
+          nil
         end
 
         def open_browser(url)

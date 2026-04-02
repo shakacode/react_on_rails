@@ -5,6 +5,7 @@ require "rainbow"
 module GeneratorMessages
   PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
                      "\n       #{Rainbow('https://reactonrails.com/docs/pro/upgrading-to-pro/').cyan.underline}".freeze
+  SUPPORTED_PACKAGE_MANAGERS = %w[npm pnpm yarn bun].freeze
 
   # rubocop:disable Metrics/ClassLength
   class << self
@@ -106,15 +107,23 @@ module GeneratorMessages
     # this while the current working directory is the target Rails app root.
     def detect_package_manager
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
-      return env_package_manager if %w[npm pnpm yarn bun].include?(env_package_manager)
+      return env_package_manager if supported_package_manager?(env_package_manager)
 
-      # Check for lock files to determine package manager
+      # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
+      detect_package_manager_from_lockfiles || "npm"
+    end
+
+    def detect_package_manager_from_lockfiles
       return "yarn" if File.exist?("yarn.lock")
       return "pnpm" if File.exist?("pnpm-lock.yaml")
       return "bun" if File.exist?("bun.lock") || File.exist?("bun.lockb")
+      return "npm" if File.exist?("package-lock.json")
 
-      # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
-      "npm"
+      nil
+    end
+
+    def supported_package_manager?(package_manager)
+      SUPPORTED_PACKAGE_MANAGERS.include?(package_manager)
     end
 
     private
