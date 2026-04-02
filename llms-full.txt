@@ -95,6 +95,7 @@ Treat RSC as a Pro-only path. Start with the RSC hub for orientation, then move 
 - Node renderer basics: https://reactonrails.com/docs/building-features/node-renderer/basics
 - Node renderer JS configuration: https://reactonrails.com/docs/building-features/node-renderer/js-configuration
 - Node renderer troubleshooting: https://reactonrails.com/docs/building-features/node-renderer/troubleshooting
+- SSR memory safety (Node renderer): https://reactonrails.com/docs/pro/js-memory-leaks
 
 Use the Pro overview for product-level routing. Use the technical docs when the user is configuring or debugging the Node renderer itself.
 
@@ -118,7 +119,7 @@ Use the Pro overview for product-level routing. Use the technical docs when the 
 ## High-signal implementation rules
 
 - Use `react_component` from Rails views to render React components.
-- Auto-bundling expects React components under `ror_components`.
+- Auto-bundling expects React components under `ror_components` by default (configurable via `config.components_subdirectory`).
 - Keep the Ruby gem and npm package on matching versions.
 - Use the Pro hub, not the compatibility page at `/docs/pro/`, when routing to Pro documentation.
 
@@ -144,6 +145,8 @@ const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-rendere
 reactOnRailsProNodeRenderer({
   serverBundleCachePath: path.resolve(__dirname, '.node-renderer-bundles'),
   port: 3800,
+  workersCount: 3,
+  logLevel: 'info',
   supportModules: true,
   password: process.env.RENDERER_PASSWORD,
 });

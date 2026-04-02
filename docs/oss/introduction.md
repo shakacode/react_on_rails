@@ -127,7 +127,7 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 
 ### Professional Support
 
-- **[React on Rails Pro](../pro/home-pro.md)** - Advanced features (React Server Components, Suspense SSR, streaming)
+- **[React on Rails Pro](../pro/react-on-rails-pro.md)** - Advanced features (React Server Components, Suspense SSR, streaming)
 - **[ShakaCode Consulting](mailto:react_on_rails@shakacode.com)** - Expert help with React on Rails projects
 
 ## External Resources
