@@ -58,6 +58,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       attr_writer :using_rspack
 
+      def use_rsc?
+        @use_rsc == true
+      end
+
+      attr_writer :use_rsc
+
       # Test helpers
       attr_writer :add_npm_dependencies_result
 
@@ -416,6 +422,19 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance.add_npm_dependencies_called?).to be(true)
     end
 
+    it "pins react and react-dom to the RSC-compatible 19.0.x track when RSC is enabled" do
+      instance.use_rsc = true
+
+      instance.send(:add_react_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ["react@~19.0.4", "react-dom@~19.0.4", "prop-types"],
+          dev: false
+        )
+      )
+    end
+
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
       instance.system_result = false
@@ -425,6 +444,17 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(warnings.size).to be > 0
       expect(warnings.first.to_s).to include("Failed to add React dependencies")
+    end
+
+    it "warns with the pinned React install command when the RSC add fails" do
+      instance.use_rsc = true
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
+
+      instance.send(:add_react_dependencies)
+
+      expect(warnings.size).to be > 0
+      expect(warnings.first.to_s).to include("npm install react@~19.0.4 react-dom@~19.0.4 prop-types")
     end
   end
 
@@ -505,6 +535,43 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(warnings.size).to be > 0
       expect(warnings.first.to_s).to include("Failed to add TypeScript dependencies")
+    end
+  end
+
+  describe "#rsc_packages_with_version" do
+    it "defines an explicit RSC package version pin independent from the React semver range prefix" do
+      expect(ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE).to eq("~19.0.4")
+      expect(ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN).to eq("19.0.4")
+    end
+
+    it "pins react-on-rails-rsc to the React 19 compatibility track" do
+      expected_pin = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
+      expect(instance.send(:rsc_packages_with_version)).to eq([["react-on-rails-rsc@#{expected_pin}"], true])
+    end
+  end
+
+  describe "#add_rsc_dependencies" do
+    it "installs version-pinned rsc dependency" do
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.4"], true])
+
+      instance.send(:add_rsc_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(packages: ["react-on-rails-rsc@19.0.4"], dev: false)
+      )
+    end
+
+    it "falls back to unversioned package when pinned install fails" do
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.4"], true])
+
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@19.0.4"]).and_return(false)
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)
+
+      instance.send(:add_rsc_dependencies)
+
+      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc@19.0.4"])
+      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc"])
+      expect(warnings.join("\n")).to include("installed react-on-rails-rsc version may not match")
     end
   end
 

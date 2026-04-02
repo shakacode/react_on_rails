@@ -125,6 +125,10 @@ module ReactOnRails
         react-on-rails-rsc
       ].freeze
 
+      # RSC package releases follow the React 19.0.x line (independent from gem versioning).
+      RSC_REACT_VERSION_RANGE = "~19.0.4"
+      RSC_PACKAGE_VERSION_PIN = "19.0.4"
+
       private
 
       def setup_js_dependencies
@@ -218,7 +222,7 @@ module ReactOnRails
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
         # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
         react_deps = if respond_to?(:use_rsc?) && use_rsc?
-                       %w[react@~19.0.4 react-dom@~19.0.4 prop-types]
+                       ["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}", "prop-types"]
                      else
                        REACT_DEPENDENCIES
                      end
@@ -383,13 +387,29 @@ module ReactOnRails
 
       def add_rsc_dependencies
         say "Installing React Server Components dependencies..."
-        return if add_packages(RSC_DEPENDENCIES)
+        rsc_packages, used_version_pins = rsc_packages_with_version
+        return if add_packages(rsc_packages)
+
+        manual_install_packages = rsc_packages
+        if used_version_pins
+          warning_msg = "Could not install version-pinned RSC dependency. Retrying latest available package."
+          say_status :warning,
+                     warning_msg,
+                     :yellow
+          GeneratorMessages.add_warning(
+            "Warning: #{warning_msg} " \
+            "The installed react-on-rails-rsc version may not match the expected compatibility pin."
+          )
+          return if add_packages(RSC_DEPENDENCIES)
+
+          manual_install_packages = RSC_DEPENDENCIES
+        end
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add React Server Components dependencies.
 
           You can install them manually by running:
-            npm install #{RSC_DEPENDENCIES.join(' ')}
+            npm install #{manual_install_packages.join(' ')}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -398,6 +418,12 @@ module ReactOnRails
           You can install them manually by running:
             npm install #{RSC_DEPENDENCIES.join(' ')}
         MSG
+      end
+
+      # Returns [pinned_packages, used_version_pins]. used_version_pins is always true here;
+      # subclasses may override to return [packages, false] when pinning should be skipped.
+      def rsc_packages_with_version
+        [RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }, true]
       end
 
       def remove_base_package_if_present

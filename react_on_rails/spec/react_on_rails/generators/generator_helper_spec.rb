@@ -27,6 +27,11 @@ RSpec.describe GeneratorHelper, type: :generator do
     @shell ||= Thor::Shell::Color.new
   end
 
+  # GeneratorHelper methods expect an options hash as provided by Thor generators.
+  def options
+    @options ||= {}
+  end
+
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
 
   describe "#print_generator_messages" do
@@ -98,13 +103,27 @@ RSpec.describe GeneratorHelper, type: :generator do
         end
       end
 
-      context "when manager.add returns false" do
-        it "returns false so fallback installation can run" do
-          packages = ["react"]
+      context "when package manager add returns false" do
+        it "returns false so callers can fall back" do
+          packages = ["react-on-rails-rsc@99.99.99"]
+
           allow(mock_manager).to receive(:add).with(packages, exact: true).and_return(false)
 
           result = add_npm_dependencies(packages)
+          expect(mock_manager).to have_received(:add).with(packages, exact: true)
           expect(result).to be false
+        end
+      end
+
+      context "when package manager add returns nil" do
+        it "treats nil as success for side-effect-only package managers" do
+          packages = %w[react react-dom]
+
+          allow(mock_manager).to receive(:add).with(packages, exact: true).and_return(nil)
+
+          result = add_npm_dependencies(packages)
+          expect(mock_manager).to have_received(:add).with(packages, exact: true)
+          expect(result).to be true
         end
       end
 
@@ -181,6 +200,32 @@ RSpec.describe GeneratorHelper, type: :generator do
           a_hash_including(message: "This is normal before Shakapacker creates the package.json file.")
         )
       end
+    end
+  end
+
+  describe "RSC Pro mode helpers" do
+    it "enables rsc-pro mode for explicit --rsc-pro flag" do
+      allow(self).to receive(:options).and_return({ rsc_pro: true, rsc: false, pro: false })
+
+      expect(use_rsc_pro_mode?).to be(true)
+      expect(use_rsc?).to be(true)
+      expect(use_pro?).to be(true)
+    end
+
+    it "enables rsc-pro mode when --rsc and --pro are both set" do
+      allow(self).to receive(:options).and_return({ rsc_pro: false, rsc: true, pro: true })
+
+      expect(use_rsc_pro_mode?).to be(true)
+      expect(use_rsc?).to be(true)
+      expect(use_pro?).to be(true)
+    end
+
+    it "does not enable rsc-pro mode for standalone --pro" do
+      allow(self).to receive(:options).and_return({ rsc_pro: false, rsc: false, pro: true })
+
+      expect(use_rsc_pro_mode?).to be(false)
+      expect(use_rsc?).to be(false)
+      expect(use_pro?).to be(true)
     end
   end
 
