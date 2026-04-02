@@ -216,6 +216,24 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "preserves non-version options in non-parenthesized multiline declarations" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails",
+          "~> 16.0",
+          require: false
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = generator.send(:pro_gem_version_requirement)
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\",")
+      expect(gemfile_content).to include("require: false")
+      expect(gemfile_content).not_to include("\"~> 16.0\"")
+    end
+
     it "does not leave a trailing comma when replacing multiline declarations before another gem" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -984,6 +1002,28 @@ describe ProGenerator, type: :generator do
       expect(rewritten).to include('`require("react-on-rails")`')
       expect(rewritten).to include('const ror = require("react-on-rails-pro");')
       expect(rewritten.scan("react-on-rails-pro").size).to eq(1)
+    end
+
+    it "preserves escaped sequences when restoring inline template literal placeholders" do
+      source = <<~'JS'
+        const inlineTemplate = `\\n and \\1`;
+        const ror = require("react-on-rails");
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('const inlineTemplate = `\\\\n and \\\\1`;')
+      expect(rewritten).to include('const ror = require("react-on-rails-pro");')
+    end
+
+    it "rewrites imports between a closed inline template literal and a multiline template literal start" do
+      source = <<~JS
+        `done`; import("react-on-rails"); `multiline-start
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('`done`; import("react-on-rails-pro"); `multiline-start')
     end
 
     it "rewrites all matching specifiers on a pending continuation line" do
