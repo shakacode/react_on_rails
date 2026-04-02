@@ -25,6 +25,10 @@ pre-commit:
       run: bin/lefthook/prettier-format all-changed
       stage_fixed: true
 
+    markdown-links:
+      glob: "{*.md,**/*.md}"
+      run: bin/lefthook/markdown-link-lint all-changed
+
     trailing-newlines:
       run: bin/lefthook/check-trailing-newlines all-changed
       stage_fixed: true
