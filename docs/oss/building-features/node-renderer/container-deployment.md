@@ -143,7 +143,8 @@ COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 # jemalloc for Rails memory (adjust path for arm64: aarch64-linux-gnu)
-RUN apt-get update && apt-get install -y libjemalloc2 && rm -rf /var/lib/apt/lists/*
+# and curl for h2c health checks (`curl --http2-prior-knowledge`)
+RUN apt-get update && apt-get install -y libjemalloc2 curl && rm -rf /var/lib/apt/lists/*
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 ENV MALLOC_CONF="dirty_decay_ms:1000,muzzy_decay_ms:1000"
 
@@ -205,7 +206,7 @@ services:
       RENDERER_HOST: '0.0.0.0'
       NODE_OPTIONS: '--max-old-space-size=512'
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3800/info']
+      test: ['CMD', 'curl', '-sf', '--http2-prior-knowledge', 'http://localhost:3800/info']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -385,7 +386,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 **Mitigation:**
 
-1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are not compatible with this listener. Use a TCP probe, an `exec` probe (for example with `curl --http2-prior-knowledge`), or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)). Configure your container orchestrator to wait for it before routing traffic.
+1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are incompatible with this listener. Use a TCP probe, an `exec` probe (for example with `curl --http2-prior-knowledge`, which requires curl with HTTP/2 support in your container image), or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)). Configure your container orchestrator to wait for it before routing traffic.
 2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
    ```yaml
    startupProbe:
@@ -404,9 +405,11 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
          - -sf
          - --http2-prior-knowledge
          - http://localhost:3800/info
+     timeoutSeconds: 5
      periodSeconds: 5
      failureThreshold: 3
    ```
+   > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep HTTP2`. If curl is unavailable, use `tcpSocket` as a fallback.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
    ```yaml
    livenessProbe:
@@ -515,6 +518,7 @@ spec:
                 - -sf
                 - --http2-prior-knowledge
                 - http://localhost:3800/info
+            timeoutSeconds: 5
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
