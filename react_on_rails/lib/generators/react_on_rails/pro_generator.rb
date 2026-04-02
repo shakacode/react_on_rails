@@ -174,7 +174,12 @@ module ReactOnRails
         updated_content = updated_lines.join
         if updated_content == gemfile_content
           unless base_gem_entry_found || had_pro_gem_entry_before_prerequisites
-            add_missing_react_on_rails_gem_warning
+            rollback_message = rollback_gemfile_after_failed_swap_precondition(
+              gemfile_path: gemfile_path,
+              original_gemfile_content: original_gemfile_content_for_rollback,
+              current_gemfile_content: gemfile_content
+            )
+            add_missing_react_on_rails_gem_warning(rollback_message: rollback_message)
             return false
           end
 
@@ -359,7 +364,7 @@ module ReactOnRails
         }x
 
         side_effect_import_pattern = %r{
-          \A(?<prefix>\s*import\s+)
+          \A(?<prefix>\s*(?:/\*.*?\*/\s*)*import\s+)
           (?<quote>["'])
           react-on-rails(?!-pro)
           (?=(?:["']|/))
@@ -415,14 +420,31 @@ module ReactOnRails
         MSG
       end
 
-      def add_missing_react_on_rails_gem_warning
+      def add_missing_react_on_rails_gem_warning(rollback_message: nil)
+        rollback_section = rollback_message ? "\n\n#{rollback_message}" : ""
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Could not find react_on_rails or react_on_rails_pro in Gemfile.
 
           If this app declares the gem in a .gemspec or another included file,
           please update it manually:
             replace react_on_rails with react_on_rails_pro
+          #{rollback_section}
         MSG
+      end
+
+      def rollback_gemfile_after_failed_swap_precondition(
+        gemfile_path: File.join(destination_root, "Gemfile"),
+        original_gemfile_content: nil,
+        current_gemfile_content: nil
+      )
+        return nil unless original_gemfile_content
+        return nil if original_gemfile_content == current_gemfile_content
+
+        atomic_write_file(gemfile_path, original_gemfile_content)
+        "Gemfile has been reverted to its pre-generator state."
+      rescue StandardError => e
+        "Could not revert Gemfile automatically (#{e.class}: #{e.message}). " \
+        "Gemfile remains updated with react_on_rails_pro."
       end
 
       # rubocop:disable Metrics/AbcSize, Metrics/BlockLength, Metrics/CyclomaticComplexity, Metrics/MethodLength
@@ -803,6 +825,7 @@ module ReactOnRails
 
           normalized_suffix = updated_suffix
         end
+        normalized_suffix = normalized_suffix.sub(/\A,\s*(?:#[^\n]*)?\n\z/, "\n")
         normalized_suffix = normalized_suffix.sub(/\A,[ \t]{2,}/, ", ")
         normalized_suffix = normalized_suffix.sub(/\)(\s*(?:#.*)?\n)\z/, '\1') if parenthesized_gem_call
 

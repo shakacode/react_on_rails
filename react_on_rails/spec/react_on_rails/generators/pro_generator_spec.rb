@@ -216,6 +216,24 @@ describe ProGenerator, type: :generator do
       expect(generator).to have_received(:bundle_install_after_gem_swap)
     end
 
+    it "does not leave a trailing comma when replacing multiline declarations before another gem" do
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails",
+          "~> 16.0"
+        gem "rails"
+      RUBY
+      allow(generator).to receive(:bundle_install_after_gem_swap)
+
+      generator.send(:swap_base_gem_for_pro_in_gemfile)
+
+      gemfile_content = File.read(gemfile_path)
+      expected_version = generator.send(:pro_gem_version_requirement)
+      expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\"")
+      expect(gemfile_content).to include('gem "rails"')
+      expect(gemfile_content).not_to match(/react_on_rails_pro".*,\s*\n\s*gem "rails"/)
+    end
+
     it "replaces multiline declarations that have an inline comment after the trailing comma" do
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
@@ -589,6 +607,10 @@ describe ProGenerator, type: :generator do
     end
 
     it "returns false when only an auto-installed Pro gem entry is present" do
+      original_gemfile_content = <<~RUBY
+        source "https://rubygems.org"
+        gem "rails"
+      RUBY
       simulate_existing_file("Gemfile", <<~RUBY)
         source "https://rubygems.org"
         gem "rails"
@@ -598,13 +620,11 @@ describe ProGenerator, type: :generator do
 
       result = generator.send(
         :swap_base_gem_for_pro_in_gemfile,
-        original_gemfile_content_for_rollback: <<~RUBY
-          source "https://rubygems.org"
-          gem "rails"
-        RUBY
+        original_gemfile_content_for_rollback: original_gemfile_content
       )
 
       expect(result).to be(false)
+      expect(File.read(gemfile_path)).to eq(original_gemfile_content)
       expect(generator).not_to have_received(:bundle_install_after_gem_swap)
       expect(GeneratorMessages.messages.join("\n"))
         .to include("Could not find react_on_rails or react_on_rails_pro in Gemfile")
@@ -722,6 +742,7 @@ describe ProGenerator, type: :generator do
           "react-on-rails/server"
         );
         /* short comment */ import InlineReactOnRails from "react-on-rails";
+        /* eslint-disable import/no-unassigned-import */ import "react-on-rails";
         const keepRor = require("react-on-rails"); // /* not a block comment start
         const commentLikeString = "/* not a JS comment";
         import ReactOnRailsServer from "react-on-rails/server";
@@ -764,6 +785,9 @@ describe ProGenerator, type: :generator do
       expect(File.read(application_js_path)).to include('"react-on-rails-pro/server"')
       expect(File.read(application_js_path)).to include(
         '/* short comment */ import InlineReactOnRails from "react-on-rails-pro";'
+      )
+      expect(File.read(application_js_path)).to include(
+        '/* eslint-disable import/no-unassigned-import */ import "react-on-rails-pro";'
       )
       expect(File.read(application_js_path)).to include('import ReactOnRailsServer from "react-on-rails-pro/server";')
       expect(File.read(application_js_path)).to include('import ReactOnRailsClient from "react-on-rails-pro/client";')
@@ -998,6 +1022,10 @@ describe ProGenerator, type: :generator do
     before do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
       simulate_npm_files(package_json: true)
       # Simulate base React on Rails installed
       simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
@@ -1076,6 +1104,10 @@ describe ProGenerator, type: :generator do
     before do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
       simulate_npm_files(package_json: true)
       simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
@@ -1153,6 +1185,10 @@ describe ProGenerator, type: :generator do
     before do
       prepare_destination
       simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
       simulate_npm_files(package_json: true)
       simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
       simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
