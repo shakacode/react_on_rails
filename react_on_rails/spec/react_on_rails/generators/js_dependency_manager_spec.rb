@@ -449,6 +449,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     it "warns with the pinned React install command when the RSC add fails" do
       instance.use_rsc = true
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
 
       instance.send(:add_react_dependencies)
 
