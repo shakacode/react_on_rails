@@ -2,7 +2,7 @@
 # You can run these commands in separate shells
 rails: bundle exec rails s -p 3000
 dev-server: bin/shakapacker-dev-server
-server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch
+server-bundle: SERVER_BUNDLE_ONLY=yes bin/shakapacker-watch --watch
 
 # Bundle ReScript .res files
 rescript: pnpm build:rescript:dev
