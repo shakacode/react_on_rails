@@ -7,10 +7,17 @@ on:
   push:
     branches:
       - 'main'
+    paths-ignore:
+      - 'AGENTS_USER_GUIDE.md'
+      - 'llms.txt'
+      - 'llms-full.txt'
   pull_request:
     paths-ignore:
       - '**.md'
+      - 'AGENTS_USER_GUIDE.md'
       - 'docs/**'
+      - 'llms.txt'
+      - 'llms-full.txt'
       - '.lychee.toml'
       - 'react_on_rails_pro/**'
   workflow_dispatch:

@@ -1,124 +1,60 @@
 # React on Rails
 
-> React on Rails integrates React with Ruby on Rails, providing server-side rendering (SSR), component registration, and seamless Rails view integration. React on Rails Pro adds advanced features: a high-performance Node.js rendering server, fragment caching, prerender caching, React Server Components (RSC), and streaming SSR.
+React on Rails integrates React with Ruby on Rails. Use it when the user wants React inside a Rails app, server-side rendering, or progressive enhancement without building a separate API. Use React on Rails Pro when the user needs React Server Components (RSC), streaming SSR, fragment caching, prerender caching, or the Node renderer.
 
-## Package Relationships
+Use this file as the short machine-readable route map. Use `./llms-full.txt` for the expanded reference. Use `./AGENTS_USER_GUIDE.md` for the repo-oriented guide to the machine-readable layer.
 
-React on Rails consists of Ruby gems and npm packages that must be paired correctly:
+## Canonical entry points
 
-### Open-Source (base):
-- Ruby gem: `react_on_rails`
-- npm package: `react-on-rails`
+- Human docs overview: https://reactonrails.com/docs/
+- OSS docs hub: https://reactonrails.com/docs/introduction
+- Pro docs hub: https://reactonrails.com/docs/pro
+- RSC docs hub: https://reactonrails.com/docs/pro/react-server-components
+- Expanded machine-readable reference: `./llms-full.txt`
+- Agent usage guide: `./AGENTS_USER_GUIDE.md`
 
-### Pro (commercial, extends base):
-- Ruby gem: `react_on_rails_pro` (depends on `react_on_rails`)
-- npm package: `react-on-rails-pro` (REPLACES `react-on-rails`, do NOT use both)
-- npm package: `react-on-rails-pro-node-renderer` (standalone Fastify SSR server, optional)
+## Package pairing
 
-IMPORTANT: When using the `react_on_rails_pro` gem, you MUST use the `react-on-rails-pro` npm package. The base `react-on-rails` npm package will be rejected at runtime.
+- OSS: Ruby gem `react_on_rails` plus npm package `react-on-rails`
+- Pro: Ruby gem `react_on_rails_pro` plus npm package `react-on-rails-pro`
+- Optional Pro Node renderer: npm package `react-on-rails-pro-node-renderer`
+- Do not use `react_on_rails_pro` with the base `react-on-rails` npm package
 
-## Quick Setup
+## Start here by task
 
-### Base (open-source):
-```bash
-bundle add react_on_rails --strict
-bundle exec rails generate react_on_rails:install
-```
+- New Rails app with React:
+  - Quick Start: https://reactonrails.com/docs/getting-started/quick-start
+  - Create a New App: https://reactonrails.com/docs/getting-started/create-react-on-rails-app
+  - Tutorial: https://reactonrails.com/docs/getting-started/tutorial
+- Existing Rails app:
+  - Install into an Existing Rails App: https://reactonrails.com/docs/getting-started/installation-into-an-existing-rails-app
+  - Using React on Rails: https://reactonrails.com/docs/getting-started/using-react-on-rails
+- Choosing OSS vs Pro:
+  - OSS vs Pro: https://reactonrails.com/docs/getting-started/oss-vs-pro
+  - Pro hub: https://reactonrails.com/docs/pro
+  - Upgrade to Pro: https://reactonrails.com/docs/pro/upgrading-to-pro
+- React Server Components:
+  - RSC hub: https://reactonrails.com/docs/pro/react-server-components
+  - RSC tutorial: https://reactonrails.com/docs/pro/react-server-components/tutorial
+  - Add RSC to an existing Pro app: https://reactonrails.com/docs/pro/react-server-components/upgrading-existing-pro-app
+- Node renderer:
+  - Pro overview: https://reactonrails.com/docs/pro/node-renderer
+  - Technical basics: https://reactonrails.com/docs/building-features/node-renderer/basics
+  - JS configuration: https://reactonrails.com/docs/building-features/node-renderer/js-configuration
+- Configuration and deployment:
+  - Configuration overview: https://reactonrails.com/docs/configuration
+  - Pro configuration: https://reactonrails.com/docs/configuration/configuration-pro
+  - Deployment: https://reactonrails.com/docs/deployment
+  - Troubleshooting: https://reactonrails.com/docs/deployment/troubleshooting
+- Upgrading and migration:
+  - Upgrading: https://reactonrails.com/docs/upgrading/upgrading-react-on-rails
+  - OSS release notes: https://reactonrails.com/docs/upgrading/release-notes
+  - Pro release notes: https://reactonrails.com/docs/pro/release-notes
+  - Migrate from react-rails: https://reactonrails.com/docs/migrating/migrating-from-react-rails
+  - Migrate to RSC: https://reactonrails.com/docs/migrating/migrating-to-rsc
 
-### Pro with Node Renderer:
-```bash
-bundle add react_on_rails_pro --strict
-bundle exec rails generate react_on_rails:install --pro
-```
+## Routing notes
 
-### Pro with React Server Components:
-```bash
-bundle add react_on_rails_pro --strict
-bundle exec rails generate react_on_rails:install --rsc
-```
-
-## Node Renderer API
-
-The Node Renderer is a Fastify-based Node.js server for high-performance SSR.
-
-### Correct usage:
-```js
-const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
-
-reactOnRailsProNodeRenderer({
-  serverBundleCachePath: path.resolve(__dirname, '.node-renderer-bundles'),
-  port: 3800,
-  supportModules: true,
-  password: process.env.RENDERER_PASSWORD,
-  workersCount: 3,
-  logLevel: 'info',
-});
-```
-
-The function name is `reactOnRailsProNodeRenderer` (NOT `createServer` or `startRenderer`).
-The config key for the bundle cache directory is `serverBundleCachePath` (NOT `bundlePath`, which is deprecated).
-
-### Rails-side configuration:
-```ruby
-# config/initializers/react_on_rails_pro.rb
-ReactOnRailsPro.configure do |config|
-  config.server_renderer = "NodeRenderer"
-  config.renderer_url = ENV.fetch("REACT_RENDERER_URL", "http://localhost:3800")
-  config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
-  config.prerender_caching = true
-end
-```
-
-Key attributes: `server_renderer`, `renderer_url`, `renderer_password`, `prerender_caching`, `ssr_timeout`, `renderer_use_fallback_exec_js`, `throw_js_errors`, `tracing`, `dependency_globs`.
-
-### Webpack server config requirements (for Pro Node Renderer):
-```js
-// serverWebpackConfig.js output section
-libraryTarget: 'commonjs2',
-
-// after output section
-serverWebpackConfig.target = 'node';
-```
-
-## Client-Side Component Registration
-
-```js
-// With base package
-import ReactOnRails from 'react-on-rails';
-ReactOnRails.register({ MyComponent });
-
-// With Pro package (use this when react_on_rails_pro gem is installed)
-import ReactOnRails from 'react-on-rails-pro';
-ReactOnRails.register({ MyComponent });
-```
-
-## Pro-Exclusive Imports
-
-```js
-import { RSCRoute } from 'react-on-rails-pro/RSCRoute';
-import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
-import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
-```
-
-## SSR Memory Safety (Node Renderer)
-
-IMPORTANT: The Node Renderer reuses V8 VM contexts across requests. Module-level mutable state persists for the worker's lifetime. When writing or modifying code that runs during SSR:
-
-- NEVER use unbounded module-level caches (`const cache = {}`, `new Map()`, `new Set()`) — they grow with every unique request and cause OOM
-- NEVER use `_.memoize` at module scope for functions called with diverse SSR inputs
-- ALWAYS set `NODE_OPTIONS=--max-old-space-size=<MB>` in production containers
-- ALWAYS enable worker rolling restarts (`allWorkersRestartInterval` + `delayBetweenIndividualWorkerRestarts`)
-- React component state and hooks (`useState`, `useMemo`) are fine — React creates and discards them per render
-
-See: https://www.shakacode.com/react-on-rails-pro/docs/js-memory-leaks/
-
-## Documentation Links
-
-- Docs: https://reactonrails.com/docs/
-- Pro Docs: https://reactonrails.com/docs/pro/
-- Pro Installation: https://reactonrails.com/docs/pro/installation
-- Pro Configuration: https://reactonrails.com/docs/configuration/configuration-pro
-- Node Renderer Basics: https://reactonrails.com/docs/building-features/node-renderer/basics
-- Node Renderer JS Config: https://reactonrails.com/docs/building-features/node-renderer/js-configuration
-- RSC Tutorial: https://reactonrails.com/docs/pro/react-server-components/tutorial
-- GitHub: https://github.com/shakacode/react_on_rails
+- Prefer the canonical Pro hub at `https://reactonrails.com/docs/pro`.
+- `https://reactonrails.com/docs/pro/react-on-rails-pro` currently redirects to the canonical Pro hub URL above.
+- Keep the machine-readable layer small: use the hub pages above first, then open only the task-specific docs you need.
