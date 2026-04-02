@@ -38,7 +38,7 @@ npm pkg set packageManager='bun@1.2.13'
    3. Run `bundle install` and your package manager's install command.
    4. Commit changes.
 
-2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` attempts to install node dependencies, creates a sample React component, Rails view/controller, and updates `config/routes.rb`. In some existing apps, dependency installation is skipped and the generator prints manual install commands. Run those commands before continuing.
+2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` attempts to install node dependencies, creates a sample React component, Rails view/controller, and updates `config/routes.rb`. If dependency installation fails or required package-manager tooling is unavailable, the generator prints manual install commands. Run those commands before continuing.
 
 3. Adapt the project: Check the changes and carefully accept, reject, or modify them as per your project's needs. Besides changes in `config/shakapacker` or `babel.config` which are project-specific, here are the most noticeable changes to address:
    1. Check Webpack config files at `config/webpack/*`. If coming from `react-rails` v3 on Shakapacker, the changes are usually localized. The most important difference is the server bundle entrypoint: `react-rails` commonly uses `server_rendering.js`, while React on Rails defaults to `server-bundle.js`.
@@ -61,7 +61,9 @@ npm pkg set packageManager='bun@1.2.13'
    1. Confirm that old `react_ujs` references are gone:
 
       ```bash
-      rg -n "react_ujs|ReactRailsUJS|server_rendering\\.js" app/javascript config
+      rg -n "react_ujs|ReactRailsUJS|server_rendering\.js" app/javascript app/assets app/views config
+      # or without ripgrep:
+      grep -rn "react_ujs\|ReactRailsUJS\|server_rendering\.js" app/javascript app/assets app/views config
       ```
 
    2. Ensure compile succeeds:
@@ -103,7 +105,9 @@ Older `react-rails` apps frequently need these additional fixes after the genera
    + <%= react_component('Post', { props: @props, prerender: true }) %>
    ```
 
-4. For older Shakapacker setups, ensure `config/initializers/react_on_rails.rb` includes:
+4. If server bundles are not being found, verify `config/initializers/react_on_rails.rb` setup:
+   - On Shakapacker 9.0+, React on Rails usually auto-detects the output path from `private_output_path`. Leave this unset unless you intentionally need an override.
+   - On older setups, you may need an explicit value:
 
    ```ruby
    config.server_bundle_output_path = "ssr-generated"

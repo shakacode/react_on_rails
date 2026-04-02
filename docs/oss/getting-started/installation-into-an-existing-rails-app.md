@@ -16,7 +16,7 @@ bundle add shakapacker --strict
 bundle add react_on_rails --strict
 ```
 
-React on Rails attempts to install the matching `react-on-rails` JavaScript package during the generator run. In some existing apps, dependency installation is skipped and the generator prints manual install commands. If that happens, run those commands before starting the app.
+React on Rails attempts to install the matching `react-on-rails` JavaScript package during the generator run. In some existing apps, dependency installation can fail (or required package-manager tooling may be unavailable), and the generator prints manual install commands. Run those commands before starting the app.
 
 ### Optional: pin exact gem and npm versions yourself
 
@@ -43,7 +43,7 @@ TypeScript is the recommended default for new integrations. If you want JavaScri
 
 For generator options such as `--rspack`, `--pro`, or `--rsc`, see the [generator details](../api-reference/generator-details.md).
 
-If the generator reports dependency-install warnings, run your package manager install and then compile once before starting the app:
+If the generator reports dependency-install warnings (for example, `JavaScript dependencies installation failed ...` followed by `Please run manually:`), run your package manager install and then compile once before starting the app:
 
 ```bash
 # pick one package manager
