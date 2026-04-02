@@ -385,22 +385,20 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 **Mitigation:**
 
-1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. The server accepts both HTTP/1.1 and HTTP/2 connections, so standard Kubernetes `httpGet` probes work out of the box. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)). Configure your container orchestrator to wait for it before routing traffic.
+1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are not compatible with this listener. Use a TCP probe, an `exec` probe (for example with `curl --http2-prior-knowledge`), or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)). Configure your container orchestrator to wait for it before routing traffic.
 2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
    ```yaml
    startupProbe:
-     httpGet:
-       path: /info
+     tcpSocket:
        port: 3800
      initialDelaySeconds: 10
      periodSeconds: 5
      failureThreshold: 6
    ```
-3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. The built-in `/info` endpoint confirms the process is up; for worker-level readiness, use a custom `/health` route via `configureFastify()`:
+3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. A TCP probe confirms the renderer port is accepting connections; for worker-level readiness semantics, expose a dedicated HTTP/1.1 health endpoint (for example via a sidecar) or use an `exec` probe:
    ```yaml
    readinessProbe:
-     httpGet:
-       path: /info # or /health for worker-readiness semantics
+     tcpSocket:
        port: 3800
      periodSeconds: 5
      failureThreshold: 3
@@ -408,8 +406,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
    ```yaml
    livenessProbe:
-     httpGet:
-       path: /info
+     tcpSocket:
        port: 3800
      periodSeconds: 10
      failureThreshold: 3
@@ -502,21 +499,18 @@ spec:
               cpu: '2'
               memory: '4Gi'
           startupProbe:
-            httpGet:
-              path: /info
+            tcpSocket:
               port: 3800
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 6
           readinessProbe:
-            httpGet:
-              path: /info # or /health for worker-readiness semantics (see configureFastify)
+            tcpSocket:
               port: 3800
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            httpGet:
-              path: /info
+            tcpSocket:
               port: 3800
             periodSeconds: 10
             failureThreshold: 3
