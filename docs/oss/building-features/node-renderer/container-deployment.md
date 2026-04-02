@@ -143,7 +143,8 @@ COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 # jemalloc for Rails memory (adjust path for arm64: aarch64-linux-gnu)
-RUN apt-get update && apt-get install -y libjemalloc2 && rm -rf /var/lib/apt/lists/*
+# and curl for h2c health checks (`curl --http2-prior-knowledge`)
+RUN apt-get update && apt-get install -y libjemalloc2 curl && rm -rf /var/lib/apt/lists/*
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
 ENV MALLOC_CONF="dirty_decay_ms:1000,muzzy_decay_ms:1000"
 
@@ -205,7 +206,7 @@ services:
       RENDERER_HOST: '0.0.0.0'
       NODE_OPTIONS: '--max-old-space-size=512'
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3800/info']
+      test: ['CMD', 'curl', '-sf', '--http2-prior-knowledge', 'http://localhost:3800/info']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -385,31 +386,34 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 **Mitigation:**
 
-1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)). Configure your container orchestrator to wait for it before routing traffic.
+1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are incompatible with this listener. Use a TCP probe, an `exec` probe (for example with `curl --http2-prior-knowledge`, which requires curl with HTTP/2 support in your container image), or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Custom Fastify Configuration](./js-configuration.md#custom-fastify-configuration)). Configure your container orchestrator to wait for it before routing traffic.
 2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
    ```yaml
    startupProbe:
-     httpGet:
-       path: /info
+     tcpSocket:
        port: 3800
      initialDelaySeconds: 10
      periodSeconds: 5
      failureThreshold: 6
    ```
-3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. The built-in `/info` endpoint confirms the process is up; for worker-level readiness, use a custom `/health` route via `configureFastify()`:
+3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. Prefer an `exec` probe with an h2c-aware client for application-level readiness. Use `tcpSocket` only as a minimal fallback that confirms the port is accepting connections:
    ```yaml
    readinessProbe:
-     httpGet:
-       path: /info # or /health for worker-readiness semantics
-       port: 3800
+     exec:
+       command:
+         - curl
+         - -sf
+         - --http2-prior-knowledge
+         - http://localhost:3800/info
+     timeoutSeconds: 5
      periodSeconds: 5
      failureThreshold: 3
    ```
+   > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep HTTP2`. If curl is unavailable, use `tcpSocket` as a fallback.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
    ```yaml
    livenessProbe:
-     httpGet:
-       path: /info
+     tcpSocket:
        port: 3800
      periodSeconds: 10
      failureThreshold: 3
@@ -489,7 +493,7 @@ spec:
             - containerPort: 3800
           env:
             - name: RENDERER_HOST
-              value: '0.0.0.0' # Required for Kubernetes HTTP probes
+              value: '0.0.0.0' # Bind to all interfaces for pod-network access
             - name: NODE_OPTIONS
               value: '--max-old-space-size=512'
             - name: RENDERER_WORKERS_COUNT
@@ -502,21 +506,23 @@ spec:
               cpu: '2'
               memory: '4Gi'
           startupProbe:
-            httpGet:
-              path: /info
+            tcpSocket:
               port: 3800
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 6
           readinessProbe:
-            httpGet:
-              path: /info # or /health for worker-readiness semantics (see configureFastify)
-              port: 3800
+            exec:
+              command:
+                - curl
+                - -sf
+                - --http2-prior-knowledge
+                - http://localhost:3800/info
+            timeoutSeconds: 5
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            httpGet:
-              path: /info
+            tcpSocket:
               port: 3800
             periodSeconds: 10
             failureThreshold: 3
@@ -563,7 +569,7 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
-This handles transient startup ordering issues. For a more robust solution, add a startup dependency or init container that waits for the renderer's `/info` endpoint.
+This handles transient startup ordering issues. For a more robust solution, add a startup dependency or init container that waits for the renderer port to accept TCP connections, or queries `/info` with an h2c-aware client (for example, `curl --http2-prior-knowledge`).
 
 ## ControlPlane-Specific Notes
 
