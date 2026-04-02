@@ -1,3 +1,7 @@
+---
+slug: /pro
+---
+
 # React on Rails Pro
 
 React on Rails Pro is the advanced rendering and performance tier for React on Rails. Start with the open-source integration, then add Pro when you need higher SSR throughput, React Server Components, streaming SSR, fragment caching, or dedicated Node renderer tooling.

@@ -1,6 +1,6 @@
 # Node Renderer JavaScript Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](../../../pro/home-pro.md).
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
 > Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 You can configure the node-renderer entirely with ENV values from your own launch file or

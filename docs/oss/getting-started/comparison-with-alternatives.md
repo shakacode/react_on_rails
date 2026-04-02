@@ -171,7 +171,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 ### React on Rails Pro
 
-[React on Rails Pro](../../pro/home-pro.md) extends the OSS gem with production-grade rendering performance and modern React features.
+[React on Rails Pro](../../pro/react-on-rails-pro.md) extends the OSS gem with production-grade rendering performance and modern React features.
 
 **Key additions over OSS:**
 
@@ -182,7 +182,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Available for free or with startup-friendly pricing — see the [React on Rails Pro docs](../../pro/home-pro.md) for details and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+Available for free or with startup-friendly pricing — see the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
 

@@ -1,6 +1,6 @@
 # React on Rails: OSS vs Pro Feature Comparison
 
-React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. Available for free or with startup-friendly pricing — see the [React on Rails Pro docs](../../pro/home-pro.md) for details.
+React on Rails Pro extends the open-source gem with performance optimizations and advanced rendering capabilities. Available for free or with startup-friendly pricing — see the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details.
 
 ## Feature Matrix
 
@@ -43,6 +43,6 @@ Popmenu achieved a [73% decrease in average response times and 20-25% lower Hero
 
 ## Getting Started with Pro
 
-- [React on Rails Pro overview](../../pro/home-pro.md)
+- [React on Rails Pro overview](../../pro/react-on-rails-pro.md)
 - [Pro installation guide](../../pro/installation.md)
 - [Book a consultation](https://meetings.hubspot.com/justingordon/30-minute-consultation)
