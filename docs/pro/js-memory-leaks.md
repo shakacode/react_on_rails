@@ -1,6 +1,6 @@
 # Avoiding Memory Leaks in Node Renderer SSR
 
-> **Pro Feature** — Available with [React on Rails Pro](home-pro.md).
+> **Pro Feature** — Available with [React on Rails Pro](react-on-rails-pro.md).
 
 ## Why Memory Leaks Happen in the Node Renderer
 

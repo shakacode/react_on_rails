@@ -39,7 +39,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 
 ## Pro features
 
-Start at [React on Rails Pro](./pro/home-pro.md) for the canonical Pro route map, then choose the feature family you need:
+Start at [React on Rails Pro](./pro/react-on-rails-pro.md) for the canonical Pro route map, then choose the feature family you need:
 
 - [React Server Components](./pro/react-server-components/tutorial.md) - RSC tutorial and deep dive
 - [Streaming SSR](./pro/streaming-ssr.md) - Progressive server rendering

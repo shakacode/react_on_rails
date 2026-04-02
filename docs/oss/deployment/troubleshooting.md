@@ -486,7 +486,7 @@ console.log(ReactOnRails.registeredComponents());
 ### Professional support
 
 - **[ShakaCode](https://www.shakacode.com)** offers consulting and support services
-- **[React on Rails Pro](../../pro/home-pro.md)** includes priority support
+- **[React on Rails Pro](../../pro/react-on-rails-pro.md)** includes priority support
 
 ---
 
