@@ -165,14 +165,13 @@ export default function run(config: Partial<Config>) {
   // The renderer uses cleartext HTTP/2 (h2c). Node's `allowHTTP1` option only
   // applies to TLS servers (http2.createSecureServer), so it cannot enable
   // HTTP/1.1 Kubernetes httpGet probes on this listener.
-  const fastifyOptions: Record<string, unknown> = {
-    http2: useHttp2,
+  const app = fastify({
+    http2: useHttp2 as true,
     bodyLimit: 104857600, // 100 MB
     logger:
       logHttpLevel !== 'silent' ? { name: 'RORP HTTP', level: logHttpLevel, ...sharedLoggerOptions } : false,
     ...fastifyServerOptions,
-  };
-  const app = fastify(fastifyOptions as Parameters<typeof fastify>[0]);
+  });
 
   handleGracefulShutdown(app);
 
