@@ -3,6 +3,9 @@
 > **Pro Feature** — React Server Components require [React on Rails Pro](../react-on-rails-pro.md) with the node renderer.
 > Free or very low cost for startups and small companies. [Upgrade or licensing details →](../upgrading-to-pro.md#try-pro-risk-free)
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user explicitly wants React Server Components or an RSC migration path. It routes to the tutorial, deep dives, and migration guides. Treat RSC as a Pro-only feature that runs with the Node renderer.
+
 ## What Are React Server Components?
 
 React Server Components (RSC) allow you to write components that execute on the server and stream their rendered output to the client. Unlike traditional server-side rendering, which renders the entire page to a string before sending it, RSC streams individual component trees progressively and keeps server-only dependencies out of the client bundle entirely.
