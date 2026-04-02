@@ -11,7 +11,10 @@ on:
   pull_request:
     paths-ignore:
       - '**.md'
+      - 'AGENTS_USER_GUIDE.md'
       - 'docs/**'
+      - 'llms.txt'
+      - 'llms-full.txt'
       - '.lychee.toml'
       - 'react_on_rails_pro/**'
   workflow_dispatch:
