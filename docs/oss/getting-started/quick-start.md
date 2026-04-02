@@ -39,6 +39,17 @@ bin/rails generate react_on_rails:install --typescript
 # bin/rails generate react_on_rails:install
 ```
 
+If the generator reports dependency-install warnings (for example, `JavaScript dependencies installation failed ...`), run your package manager install and compile once before moving on:
+
+```bash
+npm install
+# or: pnpm install
+# or: yarn install
+# or: bun install
+
+bundle exec rails shakapacker:compile
+```
+
 Take a look at the files created by the generator.
 
 - Component files (`.tsx` for TypeScript, `.jsx` for JavaScript)

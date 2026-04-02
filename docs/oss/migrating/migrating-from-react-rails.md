@@ -38,7 +38,7 @@ npm pkg set packageManager='bun@1.2.13'
    3. Run `bundle install` and your package manager's install command.
    4. Commit changes.
 
-2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` installs node dependencies and also creates sample React component, Rails view/controller, and updates `config/routes.rb`.
+2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` attempts to install node dependencies, creates a sample React component, Rails view/controller, and updates `config/routes.rb`. If dependency installation fails, the generator prints manual install commands. If required package-manager tooling (Node.js and npm/yarn/pnpm/bun) is unavailable, the generator stops with setup guidance. Run the suggested commands or install missing tools before continuing.
 
 3. Adapt the project: Check the changes and carefully accept, reject, or modify them as per your project's needs. Besides changes in `config/shakapacker` or `babel.config` which are project-specific, here are the most noticeable changes to address:
    1. Check Webpack config files at `config/webpack/*`. If coming from `react-rails` v3 on Shakapacker, the changes are usually localized. The most important difference is the server bundle entrypoint: `react-rails` commonly uses `server_rendering.js`, while React on Rails defaults to `server-bundle.js`.
@@ -56,6 +56,73 @@ npm pkg set packageManager='bun@1.2.13'
       - <%= react_component('Post', { title: 'New Post' }, { prerender: true }) %>
       + <%= react_component('Post', { props: { title: 'New Post' }, prerender: true }) %>
       ```
+
+4. Validate before final cleanup:
+   1. Confirm that old `react_ujs` references are gone:
+
+      ```bash
+      rg -n "react_ujs|ReactRailsUJS|server_rendering\.js" app/javascript app/assets app/views config
+      # or without ripgrep:
+      grep -rn "react_ujs\|ReactRailsUJS\|server_rendering\.js" app/javascript app/assets app/views config
+      ```
+
+   2. Ensure compile succeeds:
+
+      ```bash
+      bundle exec rails shakapacker:compile
+      ```
+
+   3. Review `react_component` helper calls to ensure they use options-style props:
+
+      ```bash
+      rg -n "react_component\\b" app/views
+      # or without ripgrep:
+      grep -rEn "react_component\\b" app/views
+      ```
+
+      These commands list candidates only. Inspect each match manually and convert any legacy positional calls
+      (for example `react_component('Post', @props, prerender: true)`, `react_component 'Post', @props`,
+      `react_component :Post, @props`, or `react_component component_name, @props`) to options-style props
+      before running tests.
+
+   4. Run your test suite and fix any app-specific breakages before merging.
+
+## Legacy compatibility fixes that often make migration one-shot
+
+Older `react-rails` apps frequently need these additional fixes after the generator run:
+
+1. Remove old UJS mounting from legacy packs (`app/javascript/packs/application.js` and related files).
+
+   Remove patterns such as:
+
+   ```js
+   var componentRequireContext = require.context('components', true);
+   var ReactRailsUJS = require('react_ujs');
+   ReactRailsUJS.useContext(componentRequireContext);
+   ```
+
+2. If you are switching to React on Rails `server-bundle.js`, remove stale `app/javascript/packs/server_rendering.js` usage.
+
+3. Update existing ERB helper calls from old positional props to options-style props:
+
+   ```diff
+   - <%= react_component 'Post', @props, prerender: true %>
+   + <%= react_component('Post', { props: @props, prerender: true }) %>
+   ```
+
+4. If server bundles are not being found, verify `config/initializers/react_on_rails.rb` setup:
+   - On Shakapacker 9.0+, React on Rails usually auto-detects the output path from `private_output_path`. Leave this unset unless you intentionally need an override.
+   - On older setups, you may need an explicit value:
+
+   ```ruby
+   config.server_bundle_output_path = "ssr-generated"
+   ```
+
+5. If `spec/rails_helper.rb` gets a malformed merge after generator updates, keep a single valid `RSpec.configure do |config| ... end` block and include:
+
+   ```ruby
+   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+   ```
 
 You can also check [react-rails-to-react-on-rails](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) branch on [react-rails example app](https://github.com/shakacode/react-rails-example-app) for an example of migration from `react-rails` v3 to `react_on_rails` v13.4.
 
