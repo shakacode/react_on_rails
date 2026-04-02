@@ -75,15 +75,15 @@ npm pkg set packageManager='bun@1.2.13'
    3. Review `react_component` helper calls to ensure they use options-style props:
 
       ```bash
-      rg -n "react_component\\s*\\(|react_component\\s+['\\\"]" app/views
+      rg -n "react_component\\b" app/views
       # or without ripgrep:
-      grep -rn "react_component[[:space:]]*(" app/views
-      grep -rn "react_component[[:space:]]\\+['\\\"]" app/views
+      grep -rEn "react_component\\b" app/views
       ```
 
       These commands list candidates only. Inspect each match manually and convert any legacy positional calls
-      (for example `react_component('Post', @props, prerender: true)` or `react_component 'Post', @props`)
-      to options-style props before running tests.
+      (for example `react_component('Post', @props, prerender: true)`, `react_component 'Post', @props`,
+      `react_component :Post, @props`, or `react_component component_name, @props`) to options-style props
+      before running tests.
 
    4. Run your test suite and fix any app-specific breakages before merging.
 
