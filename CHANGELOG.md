@@ -24,12 +24,22 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+### [16.6.0.rc.0] - 2026-04-01
+
+#### Added
+
+- **[Pro]** **`react_on_rails:pro` now automates Pro and RSC Pro upgrades**: Added first-class `--rsc-pro` install mode, automatic `react_on_rails` -> `react_on_rails_pro` Gemfile and package swaps, and frontend import rewrites to streamline existing app upgrades. [PR 2822](https://github.com/shakacode/react_on_rails/pull/2822) by [justin808](https://github.com/justin808).
+
 #### Improved
 
+- **`react_on_rails:doctor` now prefers runtime configuration**: Doctor now reads loaded `ReactOnRails.configuration` values before falling back to initializer parsing, improving diagnostics for customized SSR and NodeRenderer setups. [PR 2823](https://github.com/shakacode/react_on_rails/pull/2823) by [justin808](https://github.com/justin808).
 - **Fresh app onboarding for `create-react-on-rails-app`**: New apps now land on a generated root page with links to the local demos, docs, OSS vs Pro guidance, the Pro quick start, and the marketplace RSC demo. `bin/dev` opens that page on first boot, `--rsc` scaffolds the same fresh-app experience, and the generated app records step-by-step educational git commits for each scaffold phase. [PR 2849](https://github.com/shakacode/react_on_rails/pull/2849) by [justin808](https://github.com/justin808).
 
 #### Fixed
 
+- **Legacy Shakapacker migrations are more resilient**: `react_on_rails:install` now falls back cleanly when the `package_json` gem is unavailable, installs only missing JS packages through the detected package manager, and auto-switches legacy JSX-in-`.js` apps to Babel when needed. [PR 2901](https://github.com/shakacode/react_on_rails/pull/2901) by [justin808](https://github.com/justin808).
+- **New-app root-route generation is more robust**: Generator root-route detection is now centralized, duplicate route insertion is avoided, and home-page generation warns instead of failing when `config/routes.rb` is missing or unexpected. [PR 2891](https://github.com/shakacode/react_on_rails/pull/2891) by [justin808](https://github.com/justin808).
+- **`bin/dev` now exits quietly on Ctrl-C**: The process manager and generated Shakapacker watcher wrapper now treat interrupt-driven shutdown as a clean exit, avoiding Ruby backtraces during local development. [PR 2652](https://github.com/shakacode/react_on_rails/pull/2652) by [justin808](https://github.com/justin808).
 - **`bin/dev` browser auto-open now waits for route readiness**: `--open-browser` and `--open-browser-once` now poll the target app route and open the browser only after receiving a success or redirect response, reducing premature opens during boot. [PR 2885](https://github.com/shakacode/react_on_rails/pull/2885) by [justin808](https://github.com/justin808).
 
 ### [16.5.1] - 2026-03-27
@@ -2071,7 +2081,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.6.0.rc.0...main
+[16.6.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0.rc.0
 [16.5.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...v16.5.1
 [16.5.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0
 [16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0
