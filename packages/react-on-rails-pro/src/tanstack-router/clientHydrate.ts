@@ -59,29 +59,42 @@ function TanStackHydrationApp({
     const browserHistory = createBrowserHistory();
     router.update({ history: browserHistory });
 
-    // Synchronously inject route matches to match server-rendered output.
-    // The server fully loads routes (via router.load()) before rendering, so
-    // all matches are resolved with status 'idle'. We replicate this on the
-    // client so the initial render produces the same component tree as the
-    // server HTML. This uses the same __store.setState pattern as TanStack
-    // Router's own hydrate() in @tanstack/router-core/ssr/ssr-client.js.
-    const matches = router.matchRoutes(router.state.location);
-    router.__store.setState((s: Record<string, unknown>) => ({
-      ...s,
-      status: 'idle',
-      resolvedLocation: (s as { location: unknown }).location,
-      matches,
-    }));
+    // Only apply SSR hydration when a server payload exists.
+    // Client-only renders (prerender: false) must not set router.ssr or
+    // inject matches — the Transitioner handles initial loading for those.
+    if (hasSsrPayload) {
+      // Validate internal APIs before using them.
+      if (typeof router.matchRoutes !== 'function' || !router.__store?.setState) {
+        throw new Error(
+          'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store are required ' +
+            'but not available. Ensure @tanstack/react-router >=1.139.0 is installed.',
+        );
+      }
 
-    // Set SSR flag so the Transitioner skips its initial router.load() call,
-    // preventing a state update during hydration that would cause a mismatch.
-    // The shape matches TanStack Router's internal $_TSR hydration contract
-    // (the Transitioner only checks truthiness).
-    router.ssr = { manifest: undefined };
+      // Synchronously inject route matches to match server-rendered output.
+      // The server fully loads routes (via router.load()) before rendering, so
+      // all matches are resolved with status 'idle'. We replicate this on the
+      // client so the initial render produces the same component tree as the
+      // server HTML. This uses the same __store.setState pattern as TanStack
+      // Router's own hydrate() in @tanstack/router-core/ssr/ssr-client.js.
+      const matches = router.matchRoutes(router.state.location);
+      router.__store.setState((s: Record<string, unknown>) => ({
+        ...s,
+        status: 'idle',
+        resolvedLocation: (s as { location: unknown }).location,
+        matches,
+      }));
 
-    // Hydrate router with dehydrated state from server if available.
-    if (hasDehydratedRouter && typeof router.hydrate === 'function') {
-      router.hydrate(dehydratedState.dehydratedRouter);
+      // Set SSR flag so the Transitioner skips its initial router.load() call,
+      // preventing a state update during hydration that would cause a mismatch.
+      // The shape matches TanStack Router's internal $_TSR hydration contract
+      // (the Transitioner only checks truthiness).
+      router.ssr = { manifest: undefined };
+
+      // Hydrate router with dehydrated state from server if available.
+      if (hasDehydratedRouter && typeof router.hydrate === 'function') {
+        router.hydrate(dehydratedState.dehydratedRouter);
+      }
     }
 
     routerRef.current = router;
@@ -102,12 +115,14 @@ function TanStackHydrationApp({
     }
     didTriggerPostHydrationLoadRef.current = true;
 
-    // Clear the SSR flag so it doesn't affect subsequent navigations.
-    router.ssr = undefined;
-
     let cancelled = false;
     router
       .load()
+      .then(() => {
+        // Clear the SSR flag after the load settles so it doesn't affect
+        // subsequent navigations.
+        router.ssr = undefined;
+      })
       .catch((err: unknown) => {
         if (!cancelled) {
           console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);

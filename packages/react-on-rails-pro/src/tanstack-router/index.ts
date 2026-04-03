@@ -46,9 +46,10 @@ interface TanStackRouterDeps {
    */
   RouterProvider: React.ComponentType<{ router: TanStackRouter }>;
   /**
-   * Optional RouterClient component from @tanstack/react-router/ssr/client.
-   * When provided, it enables TanStack Router's SSR client hydration path for
-   * router versions that do not expose router.dehydrate()/router.hydrate().
+   * @deprecated No longer used for hydration. RouterProvider is always used
+   * directly to match the server-rendered tree. RouterClient caused hydration
+   * mismatches because it wraps RouterProvider in <Await> which suspends.
+   * Kept for backward compatibility only.
    */
   RouterClient?: React.ComponentType<{ router: TanStackRouter }>;
   /**
