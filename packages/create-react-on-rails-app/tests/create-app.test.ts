@@ -274,10 +274,21 @@ describe('createApp', () => {
   }
 
   // Returns only the "step" commands (rails, bundle, pnpm, etc.) — excludes
-  // educational git operations (add, commit) so the count is resilient to
+  // educational git operations (add, commit) so assertions are resilient to
   // changes in the educational-commit interleaving.
   function stepCalls(): Array<[string, ...unknown[]]> {
     return mockedExecLiveArgs.mock.calls.filter(([cmd]) => cmd !== 'git');
+  }
+
+  function stepCallSummaries(): string[] {
+    return stepCalls().map(([cmd, args]) => {
+      const subArgs = args as string[];
+      if (cmd === 'rails') return `rails ${subArgs[0]}`;
+      if (cmd === 'bundle' && subArgs[0] === 'add') return `bundle add ${subArgs[1]}`;
+      if (cmd === 'bundle' && subArgs.includes('generate')) return 'bundle generate';
+      if (cmd === 'pnpm') return `pnpm ${subArgs[0]}`;
+      return `${cmd} ${subArgs[0]}`;
+    });
   }
 
   function expectFallbackGitIdentityOnCommits(): void {
@@ -354,7 +365,12 @@ describe('createApp', () => {
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
-    expect(stepCalls()).toHaveLength(4);
+    expect(stepCallSummaries()).toEqual([
+      'rails new',
+      'bundle add react_on_rails',
+      'bundle add react_on_rails_pro',
+      'bundle generate',
+    ]);
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000');
@@ -400,7 +416,12 @@ describe('createApp', () => {
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
-    expect(stepCalls()).toHaveLength(4);
+    expect(stepCallSummaries()).toEqual([
+      'rails new',
+      'bundle add react_on_rails',
+      'bundle add react_on_rails_pro',
+      'bundle generate',
+    ]);
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000');
@@ -565,7 +586,7 @@ describe('createApp', () => {
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
-    expect(stepCalls()).toHaveLength(3);
+    expect(stepCallSummaries()).toEqual(['rails new', 'bundle add react_on_rails', 'bundle generate']);
     expect(mockedExecLiveArgs).not.toHaveBeenCalledWith(
       'bundle',
       ['add', 'react_on_rails_pro'],
@@ -615,6 +636,13 @@ describe('createApp', () => {
       expect.stringContaining('system!("pnpm install")'),
       'utf8',
     );
+    expect(stepCallSummaries()).toEqual([
+      'rails new',
+      'bundle add react_on_rails',
+      'bundle generate',
+      'pnpm import',
+      'pnpm install',
+    ]);
     expect(gitCommitSubjects()).toEqual([
       'Create Rails app with PostgreSQL',
       'Add react_on_rails gem',
