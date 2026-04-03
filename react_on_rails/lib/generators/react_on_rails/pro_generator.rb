@@ -147,28 +147,25 @@ module ReactOnRails
 
           base_gem_entry_found = true
 
+          declaration = consume_non_parenthesized_base_gem_declaration(
+            gemfile_lines,
+            line_index,
+            match.end(0)
+          )
+
           unless pro_entry_added
             indentation = match[1]
             quote = match[2]
             updated_lines << build_pro_gem_replacement_line(
               indentation: indentation,
               quote: quote,
-              suffix: line[match.end(0)..],
+              suffix: declaration[:trailing_suffix],
               parenthesized_gem_call: match[0].include?("(")
             )
             pro_entry_added = true
           end
 
-          # Consume multiline gem declarations that continue with trailing commas.
-          line_index += 1
-          current_line = line
-          while line_index < gemfile_lines.length &&
-                line_continues_with_comma?(current_line) &&
-                gem_declaration_continues_on_next_line?(gemfile_lines[line_index])
-            next_line = gemfile_lines[line_index]
-            current_line = next_line unless comment_or_blank_line?(next_line)
-            line_index += 1
-          end
+          line_index = declaration[:next_index]
         end
 
         updated_content = updated_lines.join
@@ -476,17 +473,18 @@ module ReactOnRails
                   pending_multiline_static_import_specifier
                 ) { |line_fragment| yield line_fragment }
               in_multiline_template_literal = updated_template_literal_state
-              in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
+              in_block_comment = unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
             elsif line_contains_unescaped_backtick
               rewritten_line, pending_multiline_module_call_depth, pending_multiline_static_import_specifier =
                 rewrite_line_before_template_literal_open(
                   line,
                   pending_multiline_module_call_depth,
-                  pending_multiline_static_import_specifier
+                  pending_multiline_static_import_specifier,
+                  in_block_comment: in_block_comment
                 ) { |line_fragment| yield line_fragment }
               in_multiline_template_literal = updated_template_literal_state
-              in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
+              in_block_comment = unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
             else
               in_multiline_template_literal = updated_template_literal_state
@@ -648,7 +646,7 @@ module ReactOnRails
 
         rewritten_line = yield line_without_inline_templates
         template_placeholders.each do |placeholder, template_literal|
-          rewritten_line = rewritten_line.sub(placeholder, template_literal)
+          rewritten_line = rewritten_line.sub(placeholder) { template_literal }
         end
         rewritten_line
       end
@@ -742,8 +740,13 @@ module ReactOnRails
         ["#{template_literal_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
-      def rewrite_line_before_template_literal_open(line, pending_depth, pending_multiline_static_import_specifier)
-        opening_index = first_unescaped_backtick_index(line)
+      def rewrite_line_before_template_literal_open(
+        line,
+        pending_depth,
+        pending_multiline_static_import_specifier,
+        in_block_comment: false
+      )
+        opening_index = opening_backtick_index_for_multiline_start(line, in_block_comment: in_block_comment)
         return [line, pending_depth, pending_multiline_static_import_specifier] unless opening_index&.positive?
 
         line_prefix = line[0, opening_index]
@@ -757,17 +760,56 @@ module ReactOnRails
       end
 
       def first_unescaped_backtick_index(line)
-        quote_state = nil
-
-        line.each_char.with_index do |char, index|
-          quote_state = next_quote_state(quote_state, char, line, index)
-          next if quote_state
-          return nil if line[index, 2] == "//"
-
-          return index if char == "`" && !character_escaped?(line, index)
-        end
-        nil
+        unescaped_backtick_indexes(line, skip_comments: true).first
       end
+
+      def opening_backtick_index_for_multiline_start(line, in_block_comment: false)
+        backtick_indexes = unescaped_backtick_indexes(line, in_block_comment: in_block_comment)
+        return nil if backtick_indexes.empty? || backtick_indexes.length.even?
+
+        backtick_indexes.last
+      end
+
+      # rubocop:disable Metrics/CyclomaticComplexity
+      def unescaped_backtick_indexes(line, in_block_comment: false, skip_comments: false)
+        quote_state = nil
+        backtick_indexes = []
+
+        scan_index = 0
+        while scan_index < line.length
+          if in_block_comment
+            closing_index = line.index("*/", scan_index)
+            break unless closing_index
+
+            in_block_comment = false
+            scan_index = closing_index + 2
+            next
+          end
+
+          char = line[scan_index]
+          quote_state = next_quote_state(quote_state, char, line, scan_index)
+          if quote_state
+            scan_index += 1
+            next
+          end
+
+          unless skip_comments
+            break if line[scan_index, 2] == "//"
+
+            if line[scan_index, 2] == "/*"
+              in_block_comment = true
+              scan_index += 2
+              next
+            end
+          end
+
+          backtick_indexes << scan_index if char == "`" && !character_escaped?(line, scan_index)
+          scan_index += 1
+        end
+
+        backtick_indexes
+      end
+      # rubocop:enable Metrics/CyclomaticComplexity
 
       def next_quote_state(current_state, char, line, index)
         if current_state
@@ -830,13 +872,36 @@ module ReactOnRails
       end
       # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
+      def consume_non_parenthesized_base_gem_declaration(lines, start_index, match_end)
+        line_index = start_index
+        current_line = lines[line_index]
+        declaration_lines = [current_line]
+        line_index += 1
+
+        while line_index < lines.length &&
+              line_continues_with_comma?(current_line) &&
+              gem_declaration_continues_on_next_line?(lines[line_index])
+          next_line = lines[line_index]
+          declaration_lines << next_line
+          current_line = next_line unless comment_or_blank_line?(next_line)
+          line_index += 1
+        end
+
+        trailing_suffix = lines[start_index][match_end..].to_s + declaration_lines.drop(1).join
+        { trailing_suffix: trailing_suffix, next_index: line_index }
+      end
+
       def build_pro_gem_replacement_line(indentation:, quote:, suffix:, parenthesized_gem_call: false)
         normalized_suffix = suffix || "\n"
         normalized_suffix = "#{normalized_suffix}\n" unless normalized_suffix.end_with?("\n")
         version_arg_pattern = /\A(?<prefix>\s*,(?:\s*#.*\n|\s++)*)["'][^"']*["'](?<trailing_comma>\s*,)?/
         loop do
           updated_suffix = normalized_suffix.sub(version_arg_pattern) do
-            Regexp.last_match[:trailing_comma] ? Regexp.last_match[:prefix] : ""
+            if Regexp.last_match[:trailing_comma]
+              Regexp.last_match[:prefix].sub(/\n[ \t]*\z/, "")
+            else
+              ""
+            end
           end
           break if updated_suffix == normalized_suffix
 
