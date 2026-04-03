@@ -273,6 +273,24 @@ describe('createApp', () => {
     });
   }
 
+  // Returns only the "step" commands (rails, bundle, pnpm, etc.) — excludes
+  // educational git operations (add, commit) so assertions are resilient to
+  // changes in the educational-commit interleaving.
+  function stepCalls(): Array<[string, ...unknown[]]> {
+    return mockedExecLiveArgs.mock.calls.filter(([cmd]) => cmd !== 'git');
+  }
+
+  function stepCallSummaries(): string[] {
+    return stepCalls().map(([cmd, args]) => {
+      const subArgs = args as string[];
+      if (cmd === 'rails') return `rails ${subArgs[0]}`;
+      if (cmd === 'bundle' && subArgs[0] === 'add') return `bundle add ${subArgs[1]}`;
+      if (cmd === 'bundle' && subArgs.includes('generate')) return 'bundle generate';
+      if (cmd === 'pnpm') return `pnpm ${subArgs[0]}`;
+      return `${cmd} ${subArgs[0]}`;
+    });
+  }
+
   function expectFallbackGitIdentityOnCommits(): void {
     for (const [, args, , env] of gitCommitCalls()) {
       expect(args).toEqual(expect.arrayContaining(['-c', 'commit.gpgsign=false', 'commit']));
@@ -323,22 +341,16 @@ describe('createApp', () => {
 
     createApp('my-app', options);
 
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(1, 'rails', [
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('rails', [
       'new',
       'my-app',
       '--database=postgresql',
       '--skip-javascript',
       '--skip-git',
     ]);
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      4,
-      'bundle',
-      ['add', 'react_on_rails', '--strict'],
-      appPath,
-    );
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(7, 'bundle', ['add', 'react_on_rails_pro'], appPath);
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      10,
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('bundle', ['add', 'react_on_rails', '--strict'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('bundle', ['add', 'react_on_rails_pro'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
       [
         'exec',
@@ -353,7 +365,12 @@ describe('createApp', () => {
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
-    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(12);
+    expect(stepCallSummaries()).toEqual([
+      'rails new',
+      'bundle add react_on_rails',
+      'bundle add react_on_rails_pro',
+      'bundle generate',
+    ]);
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000');
@@ -375,22 +392,16 @@ describe('createApp', () => {
 
     createApp('my-app', options);
 
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(1, 'rails', [
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('rails', [
       'new',
       'my-app',
       '--database=postgresql',
       '--skip-javascript',
       '--skip-git',
     ]);
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      4,
-      'bundle',
-      ['add', 'react_on_rails', '--strict'],
-      appPath,
-    );
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(7, 'bundle', ['add', 'react_on_rails_pro'], appPath);
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      10,
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('bundle', ['add', 'react_on_rails', '--strict'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('bundle', ['add', 'react_on_rails_pro'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
       [
         'exec',
@@ -405,7 +416,12 @@ describe('createApp', () => {
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
-    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(12);
+    expect(stepCallSummaries()).toEqual([
+      'rails new',
+      'bundle add react_on_rails',
+      'bundle add react_on_rails_pro',
+      'bundle generate',
+    ]);
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails gem added');
     expect(mockedLogStepDone).toHaveBeenCalledWith('react_on_rails_pro gem added');
     expect(mockedLogInfo).toHaveBeenCalledWith('Then visit http://localhost:3000');
@@ -516,9 +532,8 @@ describe('createApp', () => {
 
     createApp('my-app', options);
 
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(7, 'bundle', ['add', 'react_on_rails_pro'], appPath);
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      10,
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('bundle', ['add', 'react_on_rails_pro'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
       [
         'exec',
@@ -557,27 +572,21 @@ describe('createApp', () => {
 
     createApp('my-app', baseOptions);
 
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(1, 'rails', [
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('rails', [
       'new',
       'my-app',
       '--database=postgresql',
       '--skip-javascript',
       '--skip-git',
     ]);
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      4,
-      'bundle',
-      ['add', 'react_on_rails', '--strict'],
-      appPath,
-    );
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      7,
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('bundle', ['add', 'react_on_rails', '--strict'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
       ['exec', 'rails', 'generate', 'react_on_rails:install', '--new-app', '--force', '--ignore-warnings'],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'npm' }),
     );
-    expect(mockedExecLiveArgs).toHaveBeenCalledTimes(9);
+    expect(stepCallSummaries()).toEqual(['rails new', 'bundle add react_on_rails', 'bundle generate']);
     expect(mockedExecLiveArgs).not.toHaveBeenCalledWith(
       'bundle',
       ['add', 'react_on_rails_pro'],
@@ -608,15 +617,14 @@ describe('createApp', () => {
 
     createApp('my-app', { ...baseOptions, packageManager: 'pnpm' });
 
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      7,
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
       ['exec', 'rails', 'generate', 'react_on_rails:install', '--new-app', '--force', '--ignore-warnings'],
       appPath,
       expect.objectContaining({ REACT_ON_RAILS_PACKAGE_MANAGER: 'pnpm' }),
     );
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(10, 'pnpm', ['import'], appPath);
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(11, 'pnpm', ['install'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('pnpm', ['import'], appPath);
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith('pnpm', ['install'], appPath);
     expect(mockedFs.rmSync).toHaveBeenCalledWith(packageLockPath, { force: true });
     expect(mockedFs.writeFileSync).toHaveBeenCalledWith(
       packageJsonPath,
@@ -628,6 +636,13 @@ describe('createApp', () => {
       expect.stringContaining('system!("pnpm install")'),
       'utf8',
     );
+    expect(stepCallSummaries()).toEqual([
+      'rails new',
+      'bundle add react_on_rails',
+      'bundle generate',
+      'pnpm import',
+      'pnpm install',
+    ]);
     expect(gitCommitSubjects()).toEqual([
       'Create Rails app with PostgreSQL',
       'Add react_on_rails gem',
@@ -697,13 +712,11 @@ describe('createApp', () => {
 
   it('cleans up app directory when react_on_rails add fails', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
-    mockedExecLiveArgs
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {
+    mockedExecLiveArgs.mockImplementation((command, args) => {
+      if (command === 'bundle' && args[0] === 'add' && args[1] === 'react_on_rails') {
         throw new Error('ror gem install failed');
-      });
+      }
+    });
 
     expect(() => createApp('my-app', baseOptions)).toThrow('process.exit');
     expect(mockedLogError).toHaveBeenCalledWith(
@@ -763,16 +776,11 @@ describe('createApp', () => {
 
   it('cleans up app directory when react_on_rails_pro add fails', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
-    mockedExecLiveArgs
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {
+    mockedExecLiveArgs.mockImplementation((command, args) => {
+      if (command === 'bundle' && args[0] === 'add' && args[1] === 'react_on_rails_pro') {
         throw new Error('pro gem install failed');
-      });
+      }
+    });
 
     expect(() => createApp('my-app', { ...baseOptions, rsc: true })).toThrow('process.exit');
     expect(mockedLogError).toHaveBeenCalledWith('Failed to add react_on_rails_pro gem required by --rsc.');
@@ -784,16 +792,11 @@ describe('createApp', () => {
 
   it('cleans up app directory when react_on_rails_pro add fails for --pro', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
-    mockedExecLiveArgs
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {
+    mockedExecLiveArgs.mockImplementation((command, args) => {
+      if (command === 'bundle' && args[0] === 'add' && args[1] === 'react_on_rails_pro') {
         throw new Error('pro gem install failed');
-      });
+      }
+    });
 
     expect(() => createApp('my-app', { ...baseOptions, pro: true })).toThrow('process.exit');
     expect(mockedLogError).toHaveBeenCalledWith('Failed to add react_on_rails_pro gem required by --pro.');
@@ -804,16 +807,11 @@ describe('createApp', () => {
   });
 
   it('falls back to manual cleanup guidance if automatic cleanup fails', () => {
-    mockedExecLiveArgs
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {
+    mockedExecLiveArgs.mockImplementation((command, args) => {
+      if (command === 'bundle' && args[0] === 'add' && args[1] === 'react_on_rails_pro') {
         throw new Error('pro gem install failed');
-      });
+      }
+    });
     mockedFs.rmSync.mockImplementationOnce(() => {
       throw new Error('cleanup failed');
     });
@@ -826,16 +824,11 @@ describe('createApp', () => {
 
   it('cleans up app directory when generator fails', () => {
     const appPath = path.resolve(process.cwd(), 'my-app');
-    mockedExecLiveArgs
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {})
-      .mockImplementationOnce(() => {
+    mockedExecLiveArgs.mockImplementation((command, args) => {
+      if (command === 'bundle' && args.includes('generate')) {
         throw new Error('generator failed');
-      });
+      }
+    });
 
     expect(() => createApp('my-app', baseOptions)).toThrow('process.exit');
     expect(mockedLogError).toHaveBeenCalledWith(
@@ -852,8 +845,7 @@ describe('createApp', () => {
 
     createApp('my-app', baseOptions);
 
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      4,
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
       ['add', 'react_on_rails', '--path', localGemPath],
       appPath,
@@ -867,8 +859,7 @@ describe('createApp', () => {
 
     createApp('my-app', { ...baseOptions, rsc: true });
 
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      7,
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
       ['add', 'react_on_rails_pro', '--path', localProGemPath],
       appPath,
@@ -882,8 +873,7 @@ describe('createApp', () => {
 
     createApp('my-app', { ...baseOptions, pro: true });
 
-    expect(mockedExecLiveArgs).toHaveBeenNthCalledWith(
-      7,
+    expect(mockedExecLiveArgs).toHaveBeenCalledWith(
       'bundle',
       ['add', 'react_on_rails_pro', '--path', localProGemPath],
       appPath,
