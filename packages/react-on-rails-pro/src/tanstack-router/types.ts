@@ -8,6 +8,10 @@ import type { ComponentType, ReactNode } from 'react';
 export interface TanStackRouter {
   update: (opts: { history: TanStackHistory }) => void;
   load: () => Promise<void>;
+  matchRoutes: (location: unknown) => unknown[];
+  __store: {
+    setState: (updater: (s: Record<string, unknown>) => Record<string, unknown>) => void;
+  };
   state: {
     status: string;
     location: {
@@ -24,9 +28,8 @@ export interface TanStackRouter {
   hydrate?: (data: unknown) => void;
   // TanStack Router's Transitioner checks this field (truthiness only) to skip
   // auto-loading on mount.  The canonical shape is { manifest?: unknown }, set
-  // internally by TanStack's hydrate() during RouterClient hydration.  We set
-  // it on the legacy (non-RouterClient) hydration path to prevent a duplicate
-  // initial load that causes hydration mismatch.
+  // by the client hydration path to prevent a duplicate initial load that
+  // causes hydration mismatch.
   ssr?: { manifest?: unknown };
 }
 
