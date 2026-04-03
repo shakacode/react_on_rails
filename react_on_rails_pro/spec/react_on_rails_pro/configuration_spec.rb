@@ -250,7 +250,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
         end
 
-        it "raises when renderer_password is explicitly set to blank in production, even with env password" do
+        it "resolves from ENV when renderer_password is blank in production" do
           allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
           allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
 
@@ -260,7 +260,23 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
               config.renderer_password = ""
               config.renderer_url = "https://localhost:3800"
             end
-          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+          end.not_to raise_error
+
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+        end
+
+        it "resolves from URL when renderer_password is blank and URL has embedded password" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = ""
+              config.renderer_url = "https://:url-password@localhost:3800"
+            end
+          end.not_to raise_error
+
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password")
         end
       end
 
