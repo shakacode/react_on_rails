@@ -290,7 +290,7 @@ module ReactOnRails
 
           env = { "RAILS_ENV" => "test" }
           if resolved_mode == "client-only"
-            env["CLIENT_BUNDLE_ONLY"] = "yes"
+            env["CLIENT_BUNDLE_ONLY"] = "true"
             puts Rainbow("🧪 Starting test watch (client-only mode)...").cyan
             puts Rainbow("   Reusing server bundle from existing watcher if available.").cyan
           else
@@ -320,7 +320,7 @@ module ReactOnRails
         def shakapacker_watch_process_running?
           # Detect existing shakapacker watcher processes (from either bin/dev or bin/dev static).
           # If one is already running, client-only test watch avoids duplicate server-bundle rebuilds.
-          server_only_watchers = find_process_pids("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+          server_only_watchers = find_process_pids("SERVER_BUNDLE_ONLY=true bin/shakapacker --watch")
           if server_only_watchers.any?
             return true if shared_private_output_paths?
 

@@ -2731,10 +2731,10 @@ module ReactOnRails
           The RSC bundle needs to be built separately from client/server bundles.
 
           If using Procfile.dev, add:
-            rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+            rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 
           If using a custom process manager, ensure the RSC bundle is built with
-          the RSC_BUNDLE_ONLY=yes environment variable.
+          the RSC_BUNDLE_ONLY=true environment variable.
         MSG
       end
     end

@@ -112,7 +112,7 @@ Remove precompile logic from your Procfiles:
 rescript: yarn res:watch
 rails: bundle exec rails server -p 3000
 wp-client: sleep 15 && bundle exec rake react_on_rails:locale && bin/shakapacker-dev-server
-wp-server: SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
+wp-server: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 ```
 
 **After (clean and simple):**
@@ -122,7 +122,7 @@ wp-server: SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
 rescript: yarn res:watch
 rails: bundle exec rails server -p 3000
 wp-client: bin/shakapacker-dev-server
-wp-server: SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
+wp-server: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 ```
 
 ### 4. Configure Build Commands

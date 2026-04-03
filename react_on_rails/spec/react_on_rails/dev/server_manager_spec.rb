@@ -528,12 +528,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "uses client-only mode in auto mode when watcher is already running" do
       allow(described_class).to receive(:find_process_pids)
-        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .with("SERVER_BUNDLE_ONLY=true bin/shakapacker --watch")
         .and_return([12_345])
       allow(described_class).to receive(:shared_private_output_paths?).and_return(true)
 
       expect(described_class).to receive(:exec).with(
-        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "yes" },
+        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "true" },
         "bin/shakapacker",
         "--watch"
       )
@@ -543,7 +543,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "uses full mode when only a server-bundle watcher is running but private paths differ" do
       allow(described_class).to receive(:find_process_pids)
-        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .with("SERVER_BUNDLE_ONLY=true bin/shakapacker --watch")
         .and_return([12_345])
       allow(described_class).to receive(:shared_private_output_paths?).and_return(false)
 
@@ -554,7 +554,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "uses client-only mode when full watcher is running and private paths are shared" do
       allow(described_class).to receive(:find_process_pids)
-        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .with("SERVER_BUNDLE_ONLY=true bin/shakapacker --watch")
         .and_return([])
       allow(described_class).to receive(:find_process_pids)
         .with("bin/shakapacker-dev-server")
@@ -565,7 +565,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(described_class).to receive(:shared_private_output_paths?).and_return(true)
 
       expect(described_class).to receive(:exec).with(
-        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "yes" },
+        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "true" },
         "bin/shakapacker",
         "--watch"
       )
@@ -575,7 +575,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "uses full mode when full watcher is running but sharing is unclear" do
       allow(described_class).to receive(:find_process_pids)
-        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .with("SERVER_BUNDLE_ONLY=true bin/shakapacker --watch")
         .and_return([])
       allow(described_class).to receive(:find_process_pids)
         .with("bin/shakapacker-dev-server")
@@ -592,7 +592,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "uses client-only mode when a dev-server/watcher pair is running" do
       allow(described_class).to receive(:find_process_pids)
-        .with("SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch")
+        .with("SERVER_BUNDLE_ONLY=true bin/shakapacker --watch")
         .and_return([])
       allow(described_class).to receive(:find_process_pids)
         .with("bin/shakapacker-dev-server")
@@ -603,7 +603,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(described_class).to receive(:shared_private_output_paths?).and_return(true)
 
       expect(described_class).to receive(:exec).with(
-        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "yes" },
+        { "RAILS_ENV" => "test", "CLIENT_BUNDLE_ONLY" => "true" },
         "bin/shakapacker",
         "--watch"
       )

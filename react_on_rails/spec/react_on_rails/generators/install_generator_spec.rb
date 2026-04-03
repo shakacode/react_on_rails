@@ -43,7 +43,7 @@ describe InstallGenerator, type: :generator do
       end
 
       assert_file "Procfile.dev" do |content|
-        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=yes bin/shakapacker-watch --watch")
+        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch")
       end
 
       assert_file "Procfile.dev-static-assets" do |content|
@@ -1548,7 +1548,7 @@ describe InstallGenerator, type: :generator do
 
     it "adds RSC bundle watcher to Procfile.dev" do
       assert_file "Procfile.dev" do |content|
-        expect(content).to include("RSC_BUNDLE_ONLY=yes")
+        expect(content).to include("RSC_BUNDLE_ONLY=true")
         expect(content).to include("rsc-bundle:")
         expect(content).to include("bin/shakapacker-watch --watch")
       end
@@ -1874,7 +1874,7 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
-      procfile_content = "rails: bundle exec rails s\nrsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker\n"
+      procfile_content = "rails: bundle exec rails s\nrsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker\n"
       allow(File).to receive(:read).with("/fake/path/Procfile.dev").and_return(procfile_content)
     end
 

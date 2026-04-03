@@ -136,9 +136,9 @@ After running the generator, verify the setup works end-to-end.
 bin/shakapacker
 
 # Or build individually to isolate errors
-CLIENT_BUNDLE_ONLY=yes bin/shakapacker
-SERVER_BUNDLE_ONLY=yes bin/shakapacker
-RSC_BUNDLE_ONLY=yes bin/shakapacker
+CLIENT_BUNDLE_ONLY=true bin/shakapacker
+SERVER_BUNDLE_ONLY=true bin/shakapacker
+RSC_BUNDLE_ONLY=true bin/shakapacker
 ```
 
 All three builds should succeed without errors.
