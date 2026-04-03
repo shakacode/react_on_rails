@@ -267,20 +267,24 @@ module ReactOnRailsPro
         is required. In all other environments, you must explicitly configure a password to secure
         communication between Rails and the Node Renderer.
 
-        To fix this, set the RENDERER_PASSWORD environment variable and configure it in your initializer:
+        To fix this, set the RENDERER_PASSWORD environment variable:
+
+          export RENDERER_PASSWORD="your-secure-password"
+
+        Rails reads it automatically. If you prefer to make it explicit in your initializer:
 
           # config/initializers/react_on_rails_pro.rb
           ReactOnRailsPro.configure do |config|
             config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
           end
 
-        Then set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
+        Set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
         Rails resolves the password in this order:
-          1) config.renderer_password (except empty string, which counts as missing)
+          1) config.renderer_password (empty string is treated as missing and skips ENV fallback)
           2) Password embedded in config.renderer_url (for example, https://:password@host:3800)
           3) ENV["RENDERER_PASSWORD"]
 
-        An empty-string assignment still counts as missing and will raise in production-like environments.
+        An empty-string assignment skips the ENV fallback and will raise in production-like environments.
         If Rails and the Node Renderer disagree about startup behavior, verify both RAILS_ENV and NODE_ENV.
 
         Environment matrix:

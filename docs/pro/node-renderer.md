@@ -99,7 +99,7 @@ config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
 The Node Renderer reads `RENDERER_PASSWORD` directly from `process.env`. On the Ruby side, React on Rails Pro
 resolves the password in this order:
 
-1. `config.renderer_password` (except empty string, which is treated as missing)
+1. `config.renderer_password` (empty string is treated as missing and skips the ENV fallback below)
 2. Password embedded in `config.renderer_url` (for example, `https://:password@localhost:3800`)
 3. `ENV["RENDERER_PASSWORD"]`
 
