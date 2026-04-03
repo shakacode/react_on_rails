@@ -84,16 +84,11 @@ The renderer password secures communication between Rails and the Node Renderer.
 | `production`          | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
 | `qa`, `preview`, etc. | **Yes**            | Raises error on boot if `RENDERER_PASSWORD` is missing   |
 
-In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without a truthy password. Set the same `RENDERER_PASSWORD` for both sides:
+In production-like environments (anything other than `development` or `test`), both the Rails app and the Node Renderer will refuse to start without a non-empty password. Set the same `RENDERER_PASSWORD` for both sides:
 
 ```bash
 # Set for both Rails and Node Renderer
 export RENDERER_PASSWORD="your-secure-password"
-```
-
-```ruby
-# config/initializers/react_on_rails_pro.rb
-config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
 ```
 
 The Node Renderer reads `RENDERER_PASSWORD` directly from `process.env`. On the Ruby side, React on Rails Pro
