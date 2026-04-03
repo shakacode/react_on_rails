@@ -237,7 +237,7 @@ Or via environment variable:
 RENDERER_HOST=0.0.0.0
 ```
 
-> **Security note:** Binding to `0.0.0.0` exposes the renderer on all network interfaces. Use it only when the renderer needs to be reachable across a network namespace. If the renderer is exposed to untrusted networks, enable the `password` authentication option. See [JS Configuration](./js-configuration.md) for details.
+> **Security note:** The renderer executes JavaScript via `vm.runInContext()`, making it a remote code execution service. Binding to `0.0.0.0` exposes this to the network. Use it only when the renderer must be reachable across a network namespace (separate workloads, Docker Compose). Always set `RENDERER_PASSWORD` and place the renderer behind private networking when bound to `0.0.0.0`. See [Network Security](./basics.md#network-security) for the full threat model.
 
 ## Optimizing Performance per Cost
 

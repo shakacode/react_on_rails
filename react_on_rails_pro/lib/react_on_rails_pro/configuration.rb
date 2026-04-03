@@ -230,11 +230,15 @@ module ReactOnRailsPro
 
     def setup_renderer_password
       # Explicit passwords, including values loaded from ENV in the initializer, skip URL extraction.
-      # Blank values fall through so URL extraction and production validation still catch misconfiguration.
+      # Blank values (nil or "") fall through so URL extraction and ENV fallback still apply.
       return if renderer_password.present?
 
       uri = URI(renderer_url)
       self.renderer_password = uri.password
+
+      # Mirror Node-side defaults: if Rails config and URL are both missing a password,
+      # use RENDERER_PASSWORD from env.
+      self.renderer_password = ENV.fetch("RENDERER_PASSWORD", nil) if renderer_password.blank?
 
       validate_renderer_password_for_production
     end
@@ -260,17 +264,23 @@ module ReactOnRailsPro
         is required. In all other environments, you must explicitly configure a password to secure
         communication between Rails and the Node Renderer.
 
-        To fix this, set the RENDERER_PASSWORD environment variable and configure it in your initializer:
+        To fix this, set the RENDERER_PASSWORD environment variable:
+
+          export RENDERER_PASSWORD="your-secure-password"
+
+        Rails reads it automatically. If you prefer to make it explicit in your initializer:
 
           # config/initializers/react_on_rails_pro.rb
           ReactOnRailsPro.configure do |config|
             config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
           end
 
-        Then set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
-        Note: setting ENV["RENDERER_PASSWORD"] alone is not enough on the Ruby side unless
-        config.renderer_password is explicitly assigned from ENV.
-        An empty-string assignment still counts as missing and will raise in production-like environments.
+        Set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
+        Rails resolves the password in this order:
+          1) config.renderer_password (blank values fall through to the next step)
+          2) Password embedded in config.renderer_url (for example, https://:password@host:3800)
+          3) ENV["RENDERER_PASSWORD"]
+
         If Rails and the Node Renderer disagree about startup behavior, verify both RAILS_ENV and NODE_ENV.
 
         Environment matrix:
