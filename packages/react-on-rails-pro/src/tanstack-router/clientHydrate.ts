@@ -1,9 +1,10 @@
-import { createElement, useEffect, useRef, type ReactElement } from 'react';
+import { createElement, useEffect, useRef, type ComponentType, type ReactElement } from 'react';
 import type {
   DehydratedRouterState,
   TanStackHistory,
   TanStackRouter,
   TanStackRouterOptions,
+  TanStackSsrMatch,
 } from './types.ts';
 import type { RailsContext } from 'react-on-rails/types';
 
@@ -31,6 +32,50 @@ interface TanStackHydrationAppProps {
   railsContext: RailsContext & { serverSide: false };
   RouterProvider: React.ComponentType<{ router: TanStackRouter }>;
   createBrowserHistory: () => TanStackHistory;
+}
+
+/**
+ * Converts a dehydrated match ID (using \0 separator) back to the standard
+ * route ID format (using / separator) used by matchRoutes().
+ */
+function rehydrateMatchId(dehydratedId: string): string {
+  return dehydratedId.split('\0').join('/');
+}
+
+/**
+ * Applies server-rendered match data (loaderData, beforeLoadContext, status, etc.)
+ * from the dehydrated SSR payload to fresh client matches. This ensures the first
+ * client render can access the same data the server used, preventing mismatches
+ * for routes that render from loader results.
+ */
+function applyDehydratedMatchData(
+  matches: unknown[],
+  ssrMatches: TanStackSsrMatch[],
+): unknown[] {
+  return matches.map((match) => {
+    const m = match as Record<string, unknown>;
+    const ssrMatch = ssrMatches.find((sm) => rehydrateMatchId(sm.i) === m.id);
+
+    if (ssrMatch) {
+      return {
+        ...m,
+        status: ssrMatch.s,
+        updatedAt: ssrMatch.u,
+        ...(ssrMatch.l !== undefined ? { loaderData: ssrMatch.l } : {}),
+        ...(ssrMatch.b !== undefined ? { __beforeLoadContext: ssrMatch.b } : {}),
+        ...(ssrMatch.e !== undefined ? { error: ssrMatch.e } : {}),
+        ...(ssrMatch.ssr !== undefined ? { ssr: ssrMatch.ssr } : {}),
+      };
+    }
+
+    // No server match — override pending to success to prevent MatchInner
+    // from throwing loadPromise (which would cause Suspense suspension).
+    if (m.status === 'pending') {
+      return { ...m, status: 'success' };
+    }
+
+    return m;
+  });
 }
 
 function TanStackHydrationApp({
@@ -73,23 +118,23 @@ function TanStackHydrationApp({
 
       // Synchronously inject route matches to match server-rendered output.
       // The server fully loads routes (via router.load()) before rendering, so
-      // all matches are resolved with status 'success'. We replicate this on the
-      // client so the initial render produces the same component tree as the
-      // server HTML. This uses the same __store.setState pattern as TanStack
-      // Router's own hydrate() in @tanstack/router-core/ssr/ssr-client.js.
+      // all matches are resolved. We replicate this on the client so the initial
+      // render produces the same component tree as the server HTML.
       //
-      // IMPORTANT: matchRoutes() returns matches with status 'pending' for routes
-      // that have loaders, beforeLoad, lazyFn, or preloadable components. Since the
-      // server already loaded everything, we must override to 'success' — otherwise
-      // MatchInner throws the loadPromise causing Suspense to suspend and a
-      // hydration mismatch.
-      const matches = router.matchRoutes(router.state.location);
-      for (const match of matches) {
-        const m = match as Record<string, unknown>;
-        if (m.status === 'pending') {
-          m.status = 'success';
-        }
-      }
+      // When ssrRouter match data is available (from serverRenderTanStackAppAsync),
+      // we apply loaderData, beforeLoadContext, status, etc. from the server payload
+      // so routes that render from loader results can hydrate correctly.
+      // Otherwise we override 'pending' to 'success' to prevent MatchInner from
+      // throwing loadPromise (which would cause Suspense suspension).
+      const rawMatches = router.matchRoutes(router.state.location);
+      const ssrMatches = dehydratedState?.ssrRouter?.matches;
+      const matches = ssrMatches?.length
+        ? applyDehydratedMatchData(rawMatches, ssrMatches)
+        : rawMatches.map((match) => {
+            const m = match as Record<string, unknown>;
+            return m.status === 'pending' ? { ...m, status: 'success' } : m;
+          });
+
       router.__store.setState((s: Record<string, unknown>) => ({
         ...s,
         status: 'idle',
@@ -101,7 +146,10 @@ function TanStackHydrationApp({
       // preventing a state update during hydration that would cause a mismatch.
       // The shape matches TanStack Router's internal $_TSR hydration contract
       // (the Transitioner only checks truthiness).
-      router.ssr = { manifest: undefined };
+      // Preserve user-set values from createRouter() (e.g. TanStack Start).
+      if (!router.ssr) {
+        router.ssr = { manifest: undefined };
+      }
 
       // Hydrate router with dehydrated state from server if available.
       // Note: router.hydrate() is not a built-in TanStack Router method — it
@@ -140,10 +188,14 @@ function TanStackHydrationApp({
         }
       })
       .finally(() => {
-        // Clear the SSR flag after the load settles (success or failure) so it
-        // doesn't permanently block the Transitioner from calling router.load()
-        // on subsequent navigations.
-        router.ssr = undefined;
+        // Only clear router.ssr if this mount is still active. On unmount,
+        // the cleanup sets cancelled=true. Each mount creates a new router
+        // via options.createRouter(), so there is no cross-instance interference,
+        // but the guard makes the intent explicit and prevents clearing a
+        // second mount's router.ssr if this load settles after unmount.
+        if (!cancelled) {
+          router.ssr = undefined;
+        }
       });
 
     return () => {
@@ -176,7 +228,7 @@ export function clientHydrateTanStackApp(
   RouterProvider: React.ComponentType<{ router: TanStackRouter }>,
   // RouterClient is accepted for backward compatibility but intentionally unused.
   // See TanStackHydrationApp JSDoc for why RouterProvider is used directly.
-  _RouterClient: unknown,
+  _RouterClient: ComponentType<{ router: TanStackRouter }> | undefined,
   createBrowserHistory: () => TanStackHistory,
 ): ReactElement {
   return createElement(TanStackHydrationApp, {
