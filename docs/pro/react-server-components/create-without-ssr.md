@@ -164,7 +164,7 @@ Finally, update `Procfile.dev` to generate the RSC bundle when running the devel
 # Procfile.dev
 # existing code...
 
-rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 
 ```
 

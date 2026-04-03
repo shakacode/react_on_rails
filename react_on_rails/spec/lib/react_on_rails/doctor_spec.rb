@@ -2418,7 +2418,7 @@ RSpec.describe ReactOnRails::Doctor do
             File.write("config/routes.rb", "Rails.application.routes.draw do\n  rsc_payload_route\nend")
             File.write("config/webpack/rscWebpackConfig.js", "module.exports = {}")
             File.write("package.json", '{"dependencies":{"react":"~19.0.4","react-on-rails-rsc":"1.0.0"}}')
-            File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch")
+            File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
             example.run
           end
         end
@@ -2459,7 +2459,7 @@ RSpec.describe ReactOnRails::Doctor do
             File.write("config/routes.rb", "rsc_payload_route")
             File.write("config/webpack/rscWebpackConfig.js", "{}")
             File.write("package.json", '{"dependencies":{"react":"~19.0.4","react-on-rails-rsc":"1.0.0"}}')
-            File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch")
+            File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
             example.run
           end
         end
@@ -2764,7 +2764,7 @@ RSpec.describe ReactOnRails::Doctor do
       around do |example|
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
-            File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch")
+            File.write("Procfile.dev", "rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
             example.run
           end
         end
@@ -2782,7 +2782,7 @@ RSpec.describe ReactOnRails::Doctor do
         Dir.mktmpdir do |tmpdir|
           Dir.chdir(tmpdir) do
             File.write("Procfile.dev",
-                       "web: bin/rails server\n# rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch")
+                       "web: bin/rails server\n# rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch")
             example.run
           end
         end

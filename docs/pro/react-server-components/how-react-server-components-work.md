@@ -87,11 +87,11 @@ Let's examine the `react-client-manifest.json` file.
 First, you need to build the client bundle by running:
 
 ```bash
-CLIENT_BUNDLE_ONLY=yes bin/shakapacker
+CLIENT_BUNDLE_ONLY=true bin/shakapacker
 ```
 
 > [!NOTE]
-> When you run `bin/dev`, the client bundle may not be written to the disk, it's served from the webpack-dev-server. That's why you need to run `CLIENT_BUNDLE_ONLY=yes bin/shakapacker` to ensure the client bundle is built and written to the disk.
+> When you run `bin/dev`, the client bundle may not be written to the disk, it's served from the webpack-dev-server. That's why you need to run `CLIENT_BUNDLE_ONLY=true bin/shakapacker` to ensure the client bundle is built and written to the disk.
 
 Then, you can find the `react-client-manifest.json` file in the `public/webpack/development` or `public/webpack/production` directory, depending on the environment you are building for.
 

@@ -6,4 +6,4 @@ rails: rails s -p 3000
 webpack-dev-server: HMR=true bin/shakapacker-dev-server
 
 # Keep the JS fresh for server rendering. Remove if not server rendering
-rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
+rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=true bin/shakapacker --watch

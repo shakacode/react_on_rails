@@ -336,8 +336,8 @@ Add the RSC bundle watcher to your `Procfile.dev`:
 # Procfile.dev
 rails: rails s -p 3000
 webpack-dev-server: HMR=true bin/shakapacker-dev-server
-rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
-rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
+rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 node-renderer: node client/node-renderer.js
 ```
 
@@ -583,7 +583,7 @@ After adding the RSC webpack config, you must also add a watcher process in `Pro
 **Fix:** Add the watcher line to `Procfile.dev`:
 
 ```text
-rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 ```
 
 ### Mistake 3: Confusing `.server.jsx` with Server Components

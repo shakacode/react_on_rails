@@ -150,7 +150,7 @@ Before starting any component migration, verify these items. Skipping them is th
 - [ ] **Three webpack bundles building** -- client, server, and RSC bundles all compile without errors
 - [ ] **RSC manifests generated** -- `react-client-manifest.json` and `react-server-client-manifest.json` exist in your webpack output directory
 - [ ] **RSC payload route mounted** -- `rsc_payload_route` in `config/routes.rb`
-- [ ] **Procfile.dev updated** -- separate watcher process for the RSC bundle (`HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch`)
+- [ ] **Procfile.dev updated** -- separate watcher process for the RSC bundle (`HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch`)
 
 ### Common Pre-Migration Mistakes
 
