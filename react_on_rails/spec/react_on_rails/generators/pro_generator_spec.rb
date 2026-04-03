@@ -1038,6 +1038,31 @@ describe ProGenerator, type: :generator do
       expect(rewritten).to include('odd backtick ` still comment */ import("react-on-rails-pro"); `multiline-start')
     end
 
+    it "rewrites imports after a block-comment-to-template-literal transition closes" do
+      source = <<~JS
+        /*
+         odd backtick ` still comment */ import("react-on-rails"); `multiline-start
+        content
+        `; import("react-on-rails");
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('import("react-on-rails-pro"); `multiline-start')
+      expect(rewritten).to include('`; import("react-on-rails-pro");')
+    end
+
+    it "finds the closing backtick when template literal content contains /* on the same line" do
+      source = <<~JS
+        const x = `multiline-start
+        content /* with embedded `; import("react-on-rails");
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('`; import("react-on-rails-pro");')
+    end
+
     it "rewrites all matching specifiers on a pending continuation line" do
       source = <<~JS
         import {

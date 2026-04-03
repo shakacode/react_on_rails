@@ -473,7 +473,7 @@ module ReactOnRails
                   pending_multiline_static_import_specifier
                 ) { |line_fragment| yield line_fragment }
               in_multiline_template_literal = updated_template_literal_state
-              in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
+              in_block_comment = unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
             elsif line_contains_unescaped_backtick
               rewritten_line, pending_multiline_module_call_depth, pending_multiline_static_import_specifier =
@@ -484,7 +484,7 @@ module ReactOnRails
                   in_block_comment: in_block_comment
                 ) { |line_fragment| yield line_fragment }
               in_multiline_template_literal = updated_template_literal_state
-              in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
+              in_block_comment = unclosed_block_comment_starts?(rewritten_line)
               rewritten_line
             else
               in_multiline_template_literal = updated_template_literal_state
@@ -760,7 +760,7 @@ module ReactOnRails
       end
 
       def first_unescaped_backtick_index(line)
-        unescaped_backtick_indexes(line).first
+        unescaped_backtick_indexes(line, skip_comments: true).first
       end
 
       def opening_backtick_index_for_multiline_start(line, in_block_comment: false)
@@ -771,7 +771,7 @@ module ReactOnRails
       end
 
       # rubocop:disable Metrics/CyclomaticComplexity
-      def unescaped_backtick_indexes(line, in_block_comment: false)
+      def unescaped_backtick_indexes(line, in_block_comment: false, skip_comments: false)
         quote_state = nil
         backtick_indexes = []
 
@@ -793,12 +793,14 @@ module ReactOnRails
             next
           end
 
-          break if line[scan_index, 2] == "//"
+          unless skip_comments
+            break if line[scan_index, 2] == "//"
 
-          if line[scan_index, 2] == "/*"
-            in_block_comment = true
-            scan_index += 2
-            next
+            if line[scan_index, 2] == "/*"
+              in_block_comment = true
+              scan_index += 2
+              next
+            end
           end
 
           backtick_indexes << scan_index if char == "`" && !character_escaped?(line, scan_index)
