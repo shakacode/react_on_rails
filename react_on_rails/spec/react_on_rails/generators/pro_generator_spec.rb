@@ -230,6 +230,7 @@ describe ProGenerator, type: :generator do
       gemfile_content = File.read(gemfile_path)
       expected_version = generator.send(:pro_gem_version_requirement)
       expect(gemfile_content).to include("gem \"react_on_rails_pro\", \"#{expected_version}\",")
+      expect(gemfile_content).not_to include(",\n  \n  require: false")
       expect(gemfile_content).to include("require: false")
       expect(gemfile_content).not_to include("\"~> 16.0\"")
     end
@@ -1024,6 +1025,17 @@ describe ProGenerator, type: :generator do
       rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
 
       expect(rewritten).to include('`done`; import("react-on-rails-pro"); `multiline-start')
+    end
+
+    it "rewrites imports after a block comment closes before a multiline template literal start" do
+      source = <<~JS
+        /*
+         odd backtick ` still comment */ import("react-on-rails"); `multiline-start
+      JS
+
+      rewritten = generator.send(:rewrite_react_on_rails_module_specifiers, source)
+
+      expect(rewritten).to include('odd backtick ` still comment */ import("react-on-rails-pro"); `multiline-start')
     end
 
     it "rewrites all matching specifiers on a pending continuation line" do

@@ -480,7 +480,8 @@ module ReactOnRails
                 rewrite_line_before_template_literal_open(
                   line,
                   pending_multiline_module_call_depth,
-                  pending_multiline_static_import_specifier
+                  pending_multiline_static_import_specifier,
+                  in_block_comment: in_block_comment
                 ) { |line_fragment| yield line_fragment }
               in_multiline_template_literal = updated_template_literal_state
               in_block_comment = true if unclosed_block_comment_starts?(rewritten_line)
@@ -739,8 +740,13 @@ module ReactOnRails
         ["#{template_literal_prefix}#{rewritten_fragment}", pending_depth, pending_multiline_static_import_specifier]
       end
 
-      def rewrite_line_before_template_literal_open(line, pending_depth, pending_multiline_static_import_specifier)
-        opening_index = opening_backtick_index_for_multiline_start(line)
+      def rewrite_line_before_template_literal_open(
+        line,
+        pending_depth,
+        pending_multiline_static_import_specifier,
+        in_block_comment: false
+      )
+        opening_index = opening_backtick_index_for_multiline_start(line, in_block_comment: in_block_comment)
         return [line, pending_depth, pending_multiline_static_import_specifier] unless opening_index&.positive?
 
         line_prefix = line[0, opening_index]
@@ -757,27 +763,51 @@ module ReactOnRails
         unescaped_backtick_indexes(line).first
       end
 
-      def opening_backtick_index_for_multiline_start(line)
-        backtick_indexes = unescaped_backtick_indexes(line)
+      def opening_backtick_index_for_multiline_start(line, in_block_comment: false)
+        backtick_indexes = unescaped_backtick_indexes(line, in_block_comment: in_block_comment)
         return nil if backtick_indexes.empty? || backtick_indexes.length.even?
 
         backtick_indexes.last
       end
 
-      def unescaped_backtick_indexes(line)
+      # rubocop:disable Metrics/CyclomaticComplexity
+      def unescaped_backtick_indexes(line, in_block_comment: false)
         quote_state = nil
         backtick_indexes = []
 
-        line.each_char.with_index do |char, index|
-          quote_state = next_quote_state(quote_state, char, line, index)
-          next if quote_state
-          break if line[index, 2] == "//"
+        scan_index = 0
+        while scan_index < line.length
+          if in_block_comment
+            closing_index = line.index("*/", scan_index)
+            break unless closing_index
 
-          backtick_indexes << index if char == "`" && !character_escaped?(line, index)
+            in_block_comment = false
+            scan_index = closing_index + 2
+            next
+          end
+
+          char = line[scan_index]
+          quote_state = next_quote_state(quote_state, char, line, scan_index)
+          if quote_state
+            scan_index += 1
+            next
+          end
+
+          break if line[scan_index, 2] == "//"
+
+          if line[scan_index, 2] == "/*"
+            in_block_comment = true
+            scan_index += 2
+            next
+          end
+
+          backtick_indexes << scan_index if char == "`" && !character_escaped?(line, scan_index)
+          scan_index += 1
         end
 
         backtick_indexes
       end
+      # rubocop:enable Metrics/CyclomaticComplexity
 
       def next_quote_state(current_state, char, line, index)
         if current_state
@@ -865,7 +895,11 @@ module ReactOnRails
         version_arg_pattern = /\A(?<prefix>\s*,(?:\s*#.*\n|\s++)*)["'][^"']*["'](?<trailing_comma>\s*,)?/
         loop do
           updated_suffix = normalized_suffix.sub(version_arg_pattern) do
-            Regexp.last_match[:trailing_comma] ? Regexp.last_match[:prefix] : ""
+            if Regexp.last_match[:trailing_comma]
+              Regexp.last_match[:prefix].sub(/\n[ \t]*\z/, "")
+            else
+              ""
+            end
           end
           break if updated_suffix == normalized_suffix
 
