@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **[Pro]** **Auto-resolve renderer password from ENV**: `setup_renderer_password` now falls back to `ENV["RENDERER_PASSWORD"]` when neither `config.renderer_password` nor a URL-embedded password is set, aligning Rails-side behavior with the Node Renderer defaults. Blank values (`nil` or `""`) are treated identically and fall through the full resolution chain: config → URL → ENV. [PR 2921](https://github.com/shakacode/react_on_rails/pull/2921) by [justin808](https://github.com/justin808).
+
 ### [16.6.0.rc.0] - 2026-04-01
 
 #### Added
