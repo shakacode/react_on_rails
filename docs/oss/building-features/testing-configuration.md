@@ -493,7 +493,7 @@ If you previously ran manual test watcher commands, migrate to the new wrapper:
 - Old: `RAILS_ENV=test bin/shakapacker --watch`
 - New: `bin/dev test-watch`
 
-- Old: `RAILS_ENV=test CLIENT_BUNDLE_ONLY=true bin/shakapacker --watch`
+- Old: `RAILS_ENV=test CLIENT_BUNDLE_ONLY=yes bin/shakapacker --watch`
 - New: `bin/dev test-watch --test-watch-mode=client-only`
 
 ### Advanced: Manual Shared Output (Alternative)
