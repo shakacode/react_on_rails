@@ -10,6 +10,13 @@ import type { RailsContext } from 'react-on-rails/types';
 
 /* eslint-disable import/prefer-default-export, no-underscore-dangle */
 
+type TanStackRouterHydrationInternals = TanStackRouter & {
+  matchRoutes: (location: unknown) => unknown[];
+  __store: {
+    setState: (updater: (s: Record<string, unknown>) => Record<string, unknown>) => void;
+  };
+};
+
 /**
  * Client-side hydration for a TanStack Router app.
  *
@@ -48,10 +55,7 @@ function rehydrateMatchId(dehydratedId: string): string {
  * client render can access the same data the server used, preventing mismatches
  * for routes that render from loader results.
  */
-function applyDehydratedMatchData(
-  matches: unknown[],
-  ssrMatches: TanStackSsrMatch[],
-): unknown[] {
+function applyDehydratedMatchData(matches: unknown[], ssrMatches: TanStackSsrMatch[]): unknown[] {
   return matches.map((match) => {
     const m = match as Record<string, unknown>;
     const ssrMatch = ssrMatches.find((sm) => rehydrateMatchId(sm.i) === m.id);
@@ -96,6 +100,7 @@ function TanStackHydrationApp({
 
   const routerRef = useRef<TanStackRouter | null>(null);
   const didTriggerPostHydrationLoadRef = useRef(false);
+  const didSetSsrFlagRef = useRef(false);
 
   if (routerRef.current === null) {
     const router = options.createRouter();
@@ -112,9 +117,10 @@ function TanStackHydrationApp({
       if (typeof router.matchRoutes !== 'function' || !router.__store?.setState) {
         throw new Error(
           'react-on-rails-pro/tanstack-router: router.matchRoutes() and router.__store are required ' +
-            'but not available. Ensure @tanstack/react-router >=1.139.0 is installed.',
+            'but not available. Ensure @tanstack/react-router >=1.139.0 <2.0.0 is installed.',
         );
       }
+      const hydrationRouter = router as TanStackRouterHydrationInternals;
 
       // Synchronously inject route matches to match server-rendered output.
       // The server fully loads routes (via router.load()) before rendering, so
@@ -126,7 +132,7 @@ function TanStackHydrationApp({
       // so routes that render from loader results can hydrate correctly.
       // Otherwise we override 'pending' to 'success' to prevent MatchInner from
       // throwing loadPromise (which would cause Suspense suspension).
-      const rawMatches = router.matchRoutes(router.state.location);
+      const rawMatches = hydrationRouter.matchRoutes(hydrationRouter.state.location);
       const ssrMatches = dehydratedState?.ssrRouter?.matches;
       const matches = ssrMatches?.length
         ? applyDehydratedMatchData(rawMatches, ssrMatches)
@@ -135,7 +141,7 @@ function TanStackHydrationApp({
             return m.status === 'pending' ? { ...m, status: 'success' } : m;
           });
 
-      router.__store.setState((s: Record<string, unknown>) => ({
+      hydrationRouter.__store.setState((s: Record<string, unknown>) => ({
         ...s,
         status: 'idle',
         resolvedLocation: (s as { location: unknown }).location,
@@ -149,16 +155,27 @@ function TanStackHydrationApp({
       // Preserve user-set values from createRouter() (e.g. TanStack Start).
       if (!router.ssr) {
         router.ssr = { manifest: undefined };
+        didSetSsrFlagRef.current = true;
       }
 
-      // Hydrate router with dehydrated state from server if available.
-      // Note: router.hydrate() is not a built-in TanStack Router method — it
-      // would only exist if the user's createRouter() attaches one. The guard
-      // is defensive; in practice this is currently a no-op since the standard
-      // router doesn't have a hydrate method (router.options.hydrate is the
-      // user callback, invoked differently by ssr-client.js).
-      if (hasDehydratedRouter && typeof router.hydrate === 'function') {
-        router.hydrate(dehydratedState.dehydratedRouter);
+      try {
+        // Hydrate router with dehydrated state from server if available.
+        // Note: router.hydrate() is not a built-in TanStack Router method — it
+        // would only exist if the user's createRouter() attaches one. The guard
+        // is defensive; in practice this is currently a no-op since the standard
+        // router doesn't have a hydrate method (router.options.hydrate is the
+        // user callback, invoked differently by ssr-client.js).
+        if (hasDehydratedRouter && typeof router.hydrate === 'function') {
+          router.hydrate(dehydratedState.dehydratedRouter);
+        }
+      } catch (error) {
+        // If render-phase hydration throws, clear only the temporary SSR flag
+        // created by this module so retries are not blocked.
+        if (didSetSsrFlagRef.current) {
+          router.ssr = undefined;
+          didSetSsrFlagRef.current = false;
+        }
+        throw error;
       }
     }
 
@@ -188,13 +205,12 @@ function TanStackHydrationApp({
         }
       })
       .finally(() => {
-        // Only clear router.ssr if this mount is still active. On unmount,
-        // the cleanup sets cancelled=true. Each mount creates a new router
-        // via options.createRouter(), so there is no cross-instance interference,
-        // but the guard makes the intent explicit and prevents clearing a
-        // second mount's router.ssr if this load settles after unmount.
-        if (!cancelled) {
+        // Only clear temporary router.ssr set by this module, and only when
+        // this mount is still active. This preserves user-provided router.ssr
+        // values from createRouter() while still unblocking Transitioner.
+        if (!cancelled && didSetSsrFlagRef.current) {
           router.ssr = undefined;
+          didSetSsrFlagRef.current = false;
         }
       });
 

@@ -116,6 +116,8 @@ export async function serverRenderTanStackAppAsync(
   const dehydratedState: DehydratedRouterState = {
     url,
     dehydratedRouter: typeof router.dehydrate === 'function' ? router.dehydrate() : null,
+    // Keep ssrRouter payload for compatibility and to restore server match data
+    // before first client render.
     ssrRouter: buildSsrRouterState(router),
   };
 

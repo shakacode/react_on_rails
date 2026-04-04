@@ -8,8 +8,11 @@ import type { ComponentType, ReactNode } from 'react';
 export interface TanStackRouter {
   update: (opts: { history: TanStackHistory }) => void;
   load: () => Promise<void>;
-  matchRoutes: (location: unknown) => unknown[];
-  __store: {
+  // Internal TanStack Router APIs used only by the hydration workaround.
+  // Kept optional in the public type so consumers/mocks are not forced
+  // to model private internals.
+  matchRoutes?: (location: unknown) => unknown[];
+  __store?: {
     setState: (updater: (s: Record<string, unknown>) => Record<string, unknown>) => void;
   };
   state: {
@@ -102,6 +105,6 @@ export interface DehydratedRouterState {
   url: string;
   /** Router dehydrated state from router.dehydrate() */
   dehydratedRouter: unknown;
-  /** TanStack Router SSR match payload used by RouterClient hydration */
+  /** Legacy TanStack SSR match payload used for compatibility and match-data restoration during hydration */
   ssrRouter?: TanStackSsrRouterState;
 }
