@@ -2,6 +2,9 @@
 
 This document describes all configuration options for React on Rails. Configuration is done in `/config/initializers/react_on_rails.rb`.
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page for OSS configuration options. Most apps only need 2-3 settings. For Pro-specific options (Node renderer, fragment caching, prerender caching, streaming SSR), see [Pro configuration](./configuration-pro.md).
+
 > **Good News!** Most applications only need 2-3 configuration options. React on Rails provides sensible defaults for everything else.
 
 :::tip Pro Configuration

@@ -2,6 +2,9 @@
 
 Use this path when you already have a Rails application and want React on Rails to generate the missing integration files for you.
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user has an existing Rails app and wants to add React. For new apps, use [Quick Start](./quick-start.md). If the app still uses Webpacker, expect a two-step migration (Webpacker → Shakapacker → React on Rails). Rails 7+ is recommended.
+
 ## Preflight
 
 - Rails 7+ is recommended. Rails 5.2+ can work, but Webpacker-era apps usually need an incremental upgrade first.

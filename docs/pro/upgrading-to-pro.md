@@ -2,6 +2,9 @@
 
 Already using React on Rails? Upgrading to Pro is straightforward: swap the gem and npm package with their Pro equivalents, then run the Pro generator. The upgrade is safe, reversible, and free to evaluate.
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user already has OSS React on Rails and wants to upgrade to Pro. The upgrade is three steps: swap the gem, swap the npm package, run the generator. Remember the pairing rule: `react_on_rails_pro` gem pairs with `react-on-rails-pro` npm package (never with the base `react-on-rails`).
+
 ## What You Get
 
 Pro adds performance and rendering features on top of everything in React on Rails OSS:

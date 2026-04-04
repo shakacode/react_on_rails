@@ -2,6 +2,9 @@
 
 > **Get your first React component running in Rails in 15 minutes**
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user wants the shortest path to a working React on Rails install in a new Rails app. For adding React to an existing app, use [Install into an Existing Rails App](./installation-into-an-existing-rails-app.md) instead. For a guided walkthrough, use the [Tutorial](./tutorial.md).
+
 This guide will have you rendering React components in your Rails app as quickly as possible. We'll skip the theory for now and focus on getting something working.
 
 ## ✅ Prerequisites

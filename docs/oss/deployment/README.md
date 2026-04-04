@@ -1,5 +1,8 @@
 # Deployment
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page to route to the correct deployment guide. For Docker/Kamal/Kubernetes/Control Plane, see [Docker Deployment](./docker-deployment.md). For Heroku, see [Heroku Deployment](./heroku-deployment.md). For SSR issues in production, see [Troubleshooting](./troubleshooting.md).
+
 ## Deployment guides
 
 - [Docker Deployment](./docker-deployment.md) — Containerized deployments with Kamal, Kubernetes, and Control Plane
