@@ -297,10 +297,10 @@ module ReactOnRailsPro
             # :write_timeout
             # :request_timeout
             # :operation_timeout
-            # :keep_alive_timeout
             timeout: {
               connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
-              read_timeout: ReactOnRailsPro.configuration.ssr_timeout
+              read_timeout: ReactOnRailsPro.configuration.ssr_timeout,
+              keep_alive_timeout: ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout
             }
           )
       rescue StandardError => e

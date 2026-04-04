@@ -15,6 +15,7 @@ module ReactOnRailsPro
       renderer_http_pool_size: Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE,
       renderer_http_pool_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
       renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT,
+      renderer_http_keep_alive_timeout: Configuration::DEFAULT_RENDERER_HTTP_KEEP_ALIVE_TIMEOUT,
       renderer_password: nil,
       tracing: Configuration::DEFAULT_TRACING,
       dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,
@@ -44,6 +45,7 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
     DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT = 0.25
+    DEFAULT_RENDERER_HTTP_KEEP_ALIVE_TIMEOUT = 30
     DEFAULT_SSR_TIMEOUT = 5
     DEFAULT_PRERENDER_CACHING = false
     DEFAULT_TRACING = false
@@ -65,6 +67,7 @@ module ReactOnRailsPro
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
+                  :renderer_http_keep_alive_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
                   :remote_bundle_cache_adapter, :ssr_pre_hook_js, :assets_to_copy,
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
@@ -94,7 +97,8 @@ module ReactOnRailsPro
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil, # rubocop:disable Metrics/AbcSize
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
                    renderer_http_pool_size: nil, renderer_http_pool_timeout: nil,
-                   renderer_http_pool_warn_timeout: nil, tracing: nil,
+                   renderer_http_pool_warn_timeout: nil, renderer_http_keep_alive_timeout: nil,
+                   tracing: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
                    remote_bundle_cache_adapter: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
@@ -111,6 +115,7 @@ module ReactOnRailsPro
       self.renderer_http_pool_size = renderer_http_pool_size
       self.renderer_http_pool_timeout = renderer_http_pool_timeout
       self.renderer_http_pool_warn_timeout = renderer_http_pool_warn_timeout
+      self.renderer_http_keep_alive_timeout = renderer_http_keep_alive_timeout
       self.tracing = tracing
       self.rendering_returns_promises = server_renderer == "NodeRenderer" ? rendering_returns_promises : false
       self.dependency_globs = dependency_globs
