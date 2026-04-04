@@ -23,15 +23,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/using-react-on-rails',
         'getting-started/oss-vs-pro',
         'getting-started/pro-quick-start',
-        {
-          type: 'category',
-          label: 'Compare Alternatives',
-          items: [
-            'getting-started/comparison-with-alternatives',
-            'getting-started/comparing-react-on-rails-to-alternatives',
-          ],
-        },
-        'getting-started/nextjs-with-separate-rails-backend',
+        'getting-started/comparing-react-on-rails-to-alternatives',
         'getting-started/common-issues',
       ],
     },
