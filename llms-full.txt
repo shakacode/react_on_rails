@@ -67,7 +67,7 @@ Use Quick Start when the user wants the shortest path to a working install. Use 
 
 ### Existing Rails app integration
 
-- Install into an Existing Rails App: https://reactonrails.com/docs/getting-started/installation-into-an-existing-rails-app
+- Install into an Existing Rails App: https://reactonrails.com/docs/getting-started/existing-rails-app
 - Using React on Rails: https://reactonrails.com/docs/getting-started/using-react-on-rails
 - React server rendering: https://reactonrails.com/docs/core-concepts/react-server-rendering
 

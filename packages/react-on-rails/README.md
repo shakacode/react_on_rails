@@ -97,7 +97,7 @@ rails generate react_on_rails:install
 ## Documentation
 
 - [Getting Started](https://reactonrails.com/docs/getting-started/quick-start/)
-- [Installation Guide](https://reactonrails.com/docs/getting-started/installation-into-an-existing-rails-app/)
+- [Installation Guide](https://reactonrails.com/docs/getting-started/existing-rails-app/)
 - [API Reference](https://reactonrails.com/docs/api-reference/)
 - [Configuration](https://reactonrails.com/docs/configuration/)
 
