@@ -151,6 +151,8 @@ const errorCode = (error: unknown): string | undefined => {
 const isValidRenderingRequest = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 
+const SENSITIVE_REQUEST_BODY_KEYS = new Set(['password']);
+
 const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   const { renderingRequest } = body;
   let renderingRequestType: string = typeof renderingRequest;
@@ -159,7 +161,7 @@ const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   } else if (Array.isArray(renderingRequest)) {
     renderingRequestType = 'array';
   }
-  const bodyKeys = Object.keys(body);
+  const bodyKeys = Object.keys(body).filter((key) => !SENSITIVE_REQUEST_BODY_KEYS.has(key));
 
   return [
     'Invalid "renderingRequest" field in render request.',

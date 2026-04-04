@@ -144,6 +144,49 @@ describe('worker', () => {
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is empty string', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: '',
+      })
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
+    expect(res.payload).toContain('Received type: string.');
+    expect(res.payload).toContain('Likely causes: request body truncation');
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest does not include password key in invalid renderingRequest diagnostics', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        password: 'super-secret',
+      })
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('Received body keys:');
+    expect(res.payload).not.toContain('password');
+  });
+
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest reports unexpected handleRenderRequest failures once', async () => {
     const buildVMSpy = jest.spyOn(vm, 'buildVM').mockRejectedValueOnce(new Error('Injected buildVM failure'));
     const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
