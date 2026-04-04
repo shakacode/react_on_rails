@@ -71,6 +71,9 @@ exclude = [
   # PLANNED DEPLOYMENTS NOT YET LIVE
   # ============================================================================
   '^https://ror-spec-dummy\.reactrails\.com',  # spec/dummy demo - deployment pending
+  '^https://reactonrails\.com/docs/getting-started/existing-rails-app',  # #2929 slug cleanup - live after docs deploy
+  '^https://reactonrails\.com/docs/core-concepts/auto-bundling/?',  # #2929 slug cleanup - live after docs deploy
+  '^https://reactonrails\.com/docs/api-reference/?$',  # Generated-index URL - not a standalone page
 
   # ============================================================================
   # SITES FROM PROJECTS.MD THAT BLOCK BOTS OR ARE UNRELIABLE

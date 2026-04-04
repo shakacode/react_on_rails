@@ -1,3 +1,7 @@
+---
+slug: existing-rails-app
+---
+
 # Install into an Existing Rails App
 
 Use this path when you already have a Rails application and want React on Rails to generate the missing integration files for you.
