@@ -33,10 +33,23 @@ const MODES = [
 const DEFAULT_KEY = '3';
 
 export function promptForMode(): Promise<ModeChoice> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
+    });
+
+    let answered = false;
+
+    rl.on('SIGINT', () => {
+      rl.close();
+      reject(new Error('Prompt cancelled by user (SIGINT)'));
+    });
+
+    rl.once('close', () => {
+      if (!answered) {
+        resolve({ pro: false, rsc: true });
+      }
     });
 
     console.log(chalk.bold('Select a setup mode:\n'));
@@ -47,6 +60,7 @@ export function promptForMode(): Promise<ModeChoice> {
     console.log('');
 
     rl.question(`Choice (1-3) [${DEFAULT_KEY}]: `, (answer) => {
+      answered = true;
       rl.close();
       const key = answer.trim() || DEFAULT_KEY;
       const selected = MODES.find((m) => m.key === key);

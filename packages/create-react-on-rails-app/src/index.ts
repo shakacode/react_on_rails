@@ -44,7 +44,7 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
   // Non-interactive environments (CI, pipes) fall back to standard mode.
   const modeExplicit = rawOpts.pro !== undefined || rawOpts.rsc !== undefined;
   if (!modeExplicit) {
-    if (process.stdin.isTTY) {
+    if (process.stdin.isTTY && process.stdout.isTTY) {
       const choice = await promptForMode();
       pro = choice.pro;
       rsc = choice.rsc;

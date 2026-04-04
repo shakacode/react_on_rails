@@ -7,13 +7,23 @@ const mockedReadline = jest.mocked(readline);
 
 describe('promptForMode', () => {
   let consoleLogSpy: jest.SpyInstance;
-  let mockRl: { question: jest.Mock; close: jest.Mock };
+  let mockRl: { question: jest.Mock; close: jest.Mock; on: jest.Mock; once: jest.Mock };
+  let eventHandlers: Record<string, ((...args: unknown[]) => void)[]>;
 
   beforeEach(() => {
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    eventHandlers = {};
     mockRl = {
       question: jest.fn(),
       close: jest.fn(),
+      on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+        (eventHandlers[event] ??= []).push(handler);
+        return mockRl;
+      }),
+      once: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+        (eventHandlers[event] ??= []).push(handler);
+        return mockRl;
+      }),
     };
     mockedReadline.createInterface.mockReturnValue(mockRl as unknown as readline.Interface);
   });
@@ -69,6 +79,22 @@ describe('promptForMode', () => {
     const result = await promptForMode();
 
     expect(result).toEqual({ pro: false, rsc: false });
+  });
+
+  it('rejects when user presses Ctrl+C (SIGINT)', async () => {
+    mockRl.question.mockImplementation(() => {});
+    const promise = promptForMode();
+    for (const handler of eventHandlers['SIGINT'] ?? []) handler();
+    await expect(promise).rejects.toThrow('Prompt cancelled by user (SIGINT)');
+    expect(mockRl.close).toHaveBeenCalled();
+  });
+
+  it('defaults to rsc when stdin closes (EOF/Ctrl+D)', async () => {
+    mockRl.question.mockImplementation(() => {});
+    const promise = promptForMode();
+    for (const handler of eventHandlers['close'] ?? []) handler();
+    const result = await promise;
+    expect(result).toEqual({ pro: false, rsc: true });
   });
 
   it('displays mode options to the user', async () => {
