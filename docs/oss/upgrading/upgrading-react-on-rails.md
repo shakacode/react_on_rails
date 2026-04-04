@@ -1,5 +1,8 @@
 # Upgrading React on Rails
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user is upgrading between React on Rails versions (e.g., v13 → v14). For upgrading from OSS to Pro, see [Upgrade to Pro](../../pro/upgrading-to-pro.md). For migrating from the `react-rails` gem, see [Migrating from react-rails](../migrating/migrating-from-react-rails.md). Check the [release notes](./release-notes/index.md) for version-specific breaking changes.
+
 ## Need Help Migrating?
 
 If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information about our [React on Rails Pro Support](../../pro/react-on-rails-pro.md).
