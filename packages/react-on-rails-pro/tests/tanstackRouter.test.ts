@@ -321,6 +321,72 @@ describe('tanstack-router integration (Pro)', () => {
     });
   });
 
+  it('rehydrates nested route match IDs from \\0-separated to /-separated format', () => {
+    // Pin the assumption that dehydrateSsrMatchId (serverRender.ts) uses \0 as
+    // the segment separator and rehydrateMatchId (clientHydrate.ts) reverses it.
+    // If TanStack Router's $_TSR wire format changes, this test will catch it.
+    const setState = jest.fn();
+    const router = buildRouter();
+    router.state.location.pathname = '/products/42';
+    router.matchRoutes = jest.fn().mockReturnValue([
+      { id: '/products', status: 'pending', updatedAt: 0 },
+      { id: '/products/$id', status: 'pending', updatedAt: 0 },
+    ]);
+    router.__store = { setState };
+
+    const renderFn = createTanStackRouterRenderFunction(
+      { createRouter: () => router },
+      {
+        RouterProvider: (_: { router: TanStackRouter }) => React.createElement('div'),
+        createMemoryHistory: jest.fn(),
+        createBrowserHistory: jest.fn().mockReturnValue({
+          location: { pathname: '/products/42', search: '', hash: '', href: '/products/42', state: null },
+        }),
+      },
+    );
+
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products/42',
+        dehydratedRouter: null,
+        ssrRouter: {
+          manifest: undefined,
+          lastMatchId: '\u0000products\u0000$id',
+          matches: [
+            { i: '\u0000products', l: { list: true }, s: 'success', u: 100 },
+            { i: '\u0000products\u0000$id', l: { product: { id: 42 } }, s: 'success', u: 200 },
+          ],
+        },
+      },
+    };
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products/42',
+      search: '',
+    } as unknown as RailsContext);
+
+    renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props));
+
+    expect(setState).toHaveBeenCalledTimes(1);
+
+    const updater = setState.mock.calls[0][0] as (s: Record<string, unknown>) => Record<string, unknown>;
+    const newState = updater({
+      status: 'pending',
+      location: '/products/42',
+      matches: [],
+    });
+
+    const matches = newState.matches as Array<Record<string, unknown>>;
+    expect(matches).toHaveLength(2);
+    // Verify nested route IDs were correctly rehydrated (\0 → /)
+    expect(matches[0].id).toBe('/products');
+    expect(matches[0].loaderData).toEqual({ list: true });
+    expect(matches[0].status).toBe('success');
+    expect(matches[1].id).toBe('/products/$id');
+    expect(matches[1].loaderData).toEqual({ product: { id: 42 } });
+    expect(matches[1].status).toBe('success');
+  });
+
   it('does not pass __tanstackRouterDehydratedState through AppWrapper props', () => {
     const router = buildRouter();
     const observedProps: Array<Record<string, unknown>> = [];

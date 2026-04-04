@@ -44,6 +44,10 @@ interface TanStackHydrationAppProps {
 /**
  * Converts a dehydrated match ID (using \0 separator) back to the standard
  * route ID format (using / separator) used by matchRoutes().
+ *
+ * Inverse of dehydrateSsrMatchId() in serverRender.ts, which replaces '/'
+ * with '\0' to match the $_TSR bootstrap wire format used by TanStack Router's
+ * DehydrateRouter component (see @tanstack/react-router/src/DehydrateRouter.tsx).
  */
 function rehydrateMatchId(dehydratedId: string): string {
   return dehydratedId.split('\0').join('/');
