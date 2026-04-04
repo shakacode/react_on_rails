@@ -20,7 +20,7 @@ yarn add --exact react-on-rails-pro@<VERSION>
 # bun add --exact react-on-rails-pro@<VERSION>
 
 # Then add the Ruby gem (react_on_rails_pro depends on react_on_rails, so one gem is enough):
-bundle add react_on_rails_pro --version="= <VERSION>" --strict
+bundle add react_on_rails_pro --version="= <VERSION>"
 ```
 
 Also, install version 19 of React, React DOM, and `react-on-rails-rsc`:

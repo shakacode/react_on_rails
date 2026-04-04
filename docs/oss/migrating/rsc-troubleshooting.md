@@ -952,7 +952,7 @@ React on Rails does not allow semver ranges (`^`, `~`, `>`, `<`, `*`) or special
 
 If you have the `react_on_rails_pro` gem in your Gemfile, you must use the `react-on-rails-pro` npm package, not `react-on-rails`.
 
-**Fix:** Replace the base package with the Pro package:
+**Fix:** Replace the base package with the Pro package. Replace `<VERSION>` with the gem version from the `Gem:` line in the error message:
 
 ```bash
 yarn remove react-on-rails && yarn add react-on-rails-pro@<VERSION> --exact
