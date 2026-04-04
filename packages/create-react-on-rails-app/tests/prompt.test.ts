@@ -1,5 +1,5 @@
 import readline from 'readline';
-import { promptForMode } from '../src/prompt';
+import { PROMPT_CANCELLED_BY_SIGINT, promptForMode } from '../src/prompt';
 
 jest.mock('readline');
 
@@ -15,7 +15,11 @@ describe('promptForMode', () => {
     eventHandlers = {};
     mockRl = {
       question: jest.fn(),
-      close: jest.fn(),
+      close: jest.fn(() => {
+        const closeHandlers = eventHandlers.close ?? [];
+        for (const handler of closeHandlers) handler();
+        delete eventHandlers.close;
+      }),
       on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
         (eventHandlers[event] ??= []).push(handler);
         return mockRl;
@@ -85,7 +89,7 @@ describe('promptForMode', () => {
     mockRl.question.mockImplementation(() => {});
     const promise = promptForMode();
     for (const handler of eventHandlers['SIGINT'] ?? []) handler();
-    await expect(promise).rejects.toThrow('Prompt cancelled by user (SIGINT)');
+    await expect(promise).rejects.toThrow(PROMPT_CANCELLED_BY_SIGINT);
     expect(mockRl.close).toHaveBeenCalled();
   });
 

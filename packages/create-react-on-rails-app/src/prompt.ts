@@ -6,6 +6,8 @@ export interface ModeChoice {
   rsc: boolean;
 }
 
+export const PROMPT_CANCELLED_BY_SIGINT = 'Prompt cancelled by user (SIGINT)';
+
 const MODES = [
   {
     key: '1',
@@ -42,8 +44,9 @@ export function promptForMode(): Promise<ModeChoice> {
     let answered = false;
 
     rl.on('SIGINT', () => {
+      answered = true;
       rl.close();
-      reject(new Error('Prompt cancelled by user (SIGINT)'));
+      reject(new Error(PROMPT_CANCELLED_BY_SIGINT));
     });
 
     rl.once('close', () => {
