@@ -17,6 +17,52 @@ type TanStackRouterHydrationInternals = TanStackRouter & {
   };
 };
 
+type TanStackRouterChunkPreloadInternals = TanStackRouter & {
+  loadRouteChunk?: (route: unknown) => Promise<unknown>;
+  looseRoutesById?: Record<string, unknown>;
+};
+
+function extractDehydratedData(dehydratedRouter: unknown): unknown {
+  if (!dehydratedRouter || typeof dehydratedRouter !== 'object') {
+    return undefined;
+  }
+  return (dehydratedRouter as { dehydratedData?: unknown }).dehydratedData;
+}
+
+function preloadMatchedRouteChunks(
+  router: TanStackRouterChunkPreloadInternals,
+  matches: unknown[],
+): Promise<void> | null {
+  if (typeof router.loadRouteChunk !== 'function' || !router.looseRoutesById) {
+    return null;
+  }
+
+  const routeChunkPromises: Array<Promise<unknown>> = [];
+  matches.forEach((match) => {
+    const { routeId } = match as { routeId?: unknown };
+    if (typeof routeId !== 'string') {
+      return;
+    }
+
+    const route = router.looseRoutesById?.[routeId];
+    if (!route) {
+      return;
+    }
+
+    routeChunkPromises.push(router.loadRouteChunk?.(route) as Promise<unknown>);
+  });
+
+  if (!routeChunkPromises.length) {
+    return null;
+  }
+
+  return Promise.all(routeChunkPromises)
+    .then(() => undefined)
+    .catch((error: unknown) => {
+      console.error('react-on-rails-pro/tanstack-router: Error preloading matched route chunks:', error);
+    });
+}
+
 /**
  * Client-side hydration for a TanStack Router app.
  *
@@ -105,6 +151,7 @@ function TanStackHydrationApp({
   const routerRef = useRef<TanStackRouter | null>(null);
   const didTriggerPostHydrationLoadRef = useRef(false);
   const didSetSsrFlagRef = useRef(false);
+  const routeChunkPreloadPromiseRef = useRef<Promise<void> | null>(null);
 
   if (routerRef.current === null) {
     const router = options.createRouter();
@@ -137,6 +184,10 @@ function TanStackHydrationApp({
       // Otherwise we override 'pending' to 'success' to prevent MatchInner from
       // throwing loadPromise (which would cause Suspense suspension).
       const rawMatches = hydrationRouter.matchRoutes(hydrationRouter.state.location);
+      routeChunkPreloadPromiseRef.current = preloadMatchedRouteChunks(
+        router as TanStackRouterChunkPreloadInternals,
+        rawMatches,
+      );
       const ssrMatches = dehydratedState?.ssrRouter?.matches;
       const matches = ssrMatches?.length
         ? applyDehydratedMatchData(rawMatches, ssrMatches)
@@ -163,12 +214,23 @@ function TanStackHydrationApp({
       }
 
       try {
-        // Hydrate router with dehydrated state from server if available.
-        // Note: router.hydrate() is not a built-in TanStack Router method — it
-        // would only exist if the user's createRouter() attaches one. The guard
-        // is defensive; in practice this is currently a no-op since the standard
-        // router doesn't have a hydrate method (router.options.hydrate is the
-        // user callback, invoked differently by ssr-client.js).
+        // Run user-defined hydration callback for custom dehydratedData
+        // (for example external query/cache payloads), matching TanStack
+        // Router's ssr-client behavior.
+        if (typeof router.options?.hydrate === 'function') {
+          const hydrationResult = router.options.hydrate(
+            extractDehydratedData(dehydratedState?.dehydratedRouter),
+          );
+          void Promise.resolve(hydrationResult).catch((error: unknown) => {
+            console.error(
+              'react-on-rails-pro/tanstack-router: Error in router.options.hydrate callback:',
+              error,
+            );
+          });
+        }
+
+        // Backward-compatibility hook: if user router exposes router.hydrate(),
+        // invoke it with the full dehydrated router payload.
         if (hasDehydratedRouter && typeof router.hydrate === 'function') {
           router.hydrate(dehydratedState.dehydratedRouter);
         }
@@ -201,8 +263,14 @@ function TanStackHydrationApp({
     didTriggerPostHydrationLoadRef.current = true;
 
     let cancelled = false;
-    router
-      .load()
+    const runPostHydrationLoad = async (): Promise<void> => {
+      if (routeChunkPreloadPromiseRef.current) {
+        await routeChunkPreloadPromiseRef.current;
+      }
+      await router.load();
+    };
+
+    void runPostHydrationLoad()
       .catch((err: unknown) => {
         if (!cancelled) {
           console.error('react-on-rails-pro/tanstack-router: Error loading routes after hydration:', err);
@@ -224,6 +292,10 @@ function TanStackHydrationApp({
 
     return () => {
       cancelled = true;
+      if (didSetSsrFlagRef.current) {
+        router.ssr = undefined;
+        didSetSsrFlagRef.current = false;
+      }
       const cancellableRouter = router as TanStackRouter & { cancelLoad?: () => void };
       if (typeof cancellableRouter.cancelLoad === 'function') {
         cancellableRouter.cancelLoad();

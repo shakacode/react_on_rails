@@ -15,6 +15,8 @@ export interface TanStackRouter {
   __store?: {
     setState: (updater: (s: Record<string, unknown>) => Record<string, unknown>) => void;
   };
+  looseRoutesById?: Record<string, unknown>;
+  loadRouteChunk?: (route: unknown) => Promise<unknown>;
   state: {
     status: string;
     location: {
@@ -29,6 +31,9 @@ export interface TanStackRouter {
   };
   dehydrate?: () => unknown;
   hydrate?: (data: unknown) => void;
+  options?: {
+    hydrate?: (dehydratedData: unknown) => Promise<unknown> | unknown;
+  };
   // TanStack Router's Transitioner checks this field (truthiness only) to skip
   // auto-loading on mount.  The canonical shape is { manifest?: unknown }.
   // Set during client hydration to prevent a duplicate initial load that
