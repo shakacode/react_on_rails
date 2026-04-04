@@ -136,6 +136,15 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 - **[React Documentation](https://react.dev)** - Official React documentation
 - **[Rails Guides](https://guides.rubyonrails.org)** - Ruby on Rails documentation
 
+## Contributing
+
+- **[React on Rails Doctrine](./misc/doctrine.md)** - Our design philosophy
+- **[Code Style](./misc/style.md)** - Coding style guidelines
+- **[Updating Dependencies](./misc/updating-dependencies.md)** - How to keep Ruby and JS dependencies current
+- **[Credits](./misc/credits.md)** - Authors and contributors
+- **[Articles, Videos, and Podcasts](./misc/articles.md)** - Community content
+- **[Tips](./misc/tips.md)** - Practical tips for working with React on Rails
+
 ---
 
 **Ready to start?** Pick your path above and let's build something great! 🚀
