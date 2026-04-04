@@ -136,7 +136,7 @@ Read the full **[React on Rails Doctrine](./misc/doctrine.md)** for our design p
 - **[React Documentation](https://react.dev)** - Official React documentation
 - **[Rails Guides](https://guides.rubyonrails.org)** - Ruby on Rails documentation
 
-## Contributing
+## Contributing & Resources
 
 - **[React on Rails Doctrine](./misc/doctrine.md)** - Our design philosophy
 - **[Code Style](./misc/style.md)** - Coding style guidelines
