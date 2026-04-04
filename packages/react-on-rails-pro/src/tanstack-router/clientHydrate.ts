@@ -209,10 +209,14 @@ function TanStackHydrationApp({
         }
       })
       .finally(() => {
-        // Only clear temporary router.ssr set by this module, and only when
-        // this mount is still active. This preserves user-provided router.ssr
-        // values from createRouter() while still unblocking Transitioner.
-        if (!cancelled && didSetSsrFlagRef.current) {
+        // Always clear temporary router.ssr set by this module, regardless of
+        // cancellation state. In React 18 StrictMode, the effect cleanup sets
+        // cancelled=true and didTriggerPostHydrationLoadRef prevents re-trigger
+        // on re-mount — if we skip cleanup here the SSR flag stays set
+        // permanently, blocking the Transitioner from ever calling router.load().
+        // The didSetSsrFlagRef guard ensures we only clear values this module
+        // created, preserving user-provided router.ssr from createRouter().
+        if (didSetSsrFlagRef.current) {
           router.ssr = undefined;
           didSetSsrFlagRef.current = false;
         }
