@@ -25,15 +25,23 @@ type TanStackRouterChunkPreloadInternals = TanStackRouter & {
 interface RouteChunkPreloadGateProps {
   preloadPromise: Promise<void> | null;
   preloadSettledRef: { current: boolean };
+  isHydrating?: boolean;
   children?: ReactElement;
 }
 
 function RouteChunkPreloadGate({
   preloadPromise,
   preloadSettledRef,
+  isHydrating,
   children,
 }: RouteChunkPreloadGateProps): ReactElement {
-  if (preloadPromise && !preloadSettledRef.current) {
+  // During SSR hydration (first render), skip the suspension gate to avoid a
+  // hydration mismatch: the server rendered RouterProvider content directly,
+  // so throwing a promise here would cause Suspense to render the null fallback
+  // instead of matching the server HTML. After hydration completes (the
+  // post-mount effect sets didTriggerPostHydrationLoadRef), the gate activates
+  // normally for any subsequent re-renders.
+  if (!isHydrating && preloadPromise && !preloadSettledRef.current) {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- Suspense boundaries intentionally suspend on thrown Promise.
     throw preloadPromise;
   }
@@ -377,12 +385,11 @@ function TanStackHydrationApp({
   // introduces a Suspense boundary that doesn't exist in the server HTML,
   // causing React hydration mismatch errors.
   //
-  // RouteChunkPreloadGate blocks the first render until matched lazy chunks
-  // finish preloading (when preload support is available), reducing hydration
-  // instability from lazy route suspensions.
-  //
-  // Suspense fallback remains null by design: we avoid rendering additional
-  // placeholder markup while waiting for preloads.
+  // RouteChunkPreloadGate blocks re-renders until matched lazy chunks finish
+  // preloading (when preload support is available). During the initial SSR
+  // hydration render, the gate is skipped to match the server-rendered tree
+  // and avoid a hydration mismatch. After the post-mount effect runs
+  // (didTriggerPostHydrationLoadRef becomes true), the gate activates normally.
   let app: ReactElement = createElement(
     Suspense,
     { fallback: null },
@@ -391,6 +398,7 @@ function TanStackHydrationApp({
       {
         preloadPromise: routeChunkPreloadPromiseRef.current,
         preloadSettledRef: routeChunkPreloadSettledRef,
+        isHydrating: hasSsrPayload && !didTriggerPostHydrationLoadRef.current,
       },
       createElement(RouterProvider, { router }),
     ),
