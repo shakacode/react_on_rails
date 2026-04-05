@@ -18,16 +18,16 @@ Pro includes core React on Rails as a dependency — just swap the packages and 
 
 ## Three Steps to Upgrade
 
-> **Version note:** Replace `<VERSION>` below with the latest version from [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md). React on Rails requires exact gem/npm version parity — use `=` for the gem and `--save-exact`/`--exact` for npm. After upgrading, run `bundle exec rake react_on_rails:sync_versions` to verify versions are aligned.
+> **Version note:** Replace `VERSION` below with the latest version from [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md). React on Rails requires exact gem/npm version parity — use `=` for the gem and `--save-exact`/`--exact` for npm. After upgrading, run `bundle exec rake react_on_rails:sync_versions` to verify versions are aligned.
 >
-> **RC versions:** RubyGems and npm use different pre-release separators — e.g., `<VERSION>.rc.9` on RubyGems (dots) vs `<VERSION>-rc.9` on npm (hyphen).
+> **RC versions:** RubyGems and npm use different pre-release separators — e.g., `VERSION.rc.9` on RubyGems (dots) vs `VERSION-rc.9` on npm (hyphen).
 
 ### 1. Swap the gem
 
 Replace `react_on_rails` with `react_on_rails_pro` in your Gemfile. Pro depends on the core gem, so you only need the Pro entry:
 
 ```ruby
-gem "react_on_rails_pro", "= <VERSION>"
+gem "react_on_rails_pro", "= VERSION"
 ```
 
 Then run `bundle install`.
@@ -36,7 +36,7 @@ Or use the command line, which handles both the Gemfile edits and install:
 
 ```bash
 bundle remove react_on_rails
-bundle add react_on_rails_pro --version="= <VERSION>"
+bundle add react_on_rails_pro --version="= VERSION"
 ```
 
 > **Important:** `bundle add` does not remove existing gems. You must run `bundle remove` first, otherwise both gems will appear in your Gemfile, which can cause Bundler warnings or version conflicts.
@@ -47,16 +47,16 @@ Replace `react-on-rails` with `react-on-rails-pro`:
 
 ```bash
 # npm
-npm uninstall react-on-rails && npm install react-on-rails-pro@<VERSION> --save-exact
+npm uninstall react-on-rails && npm install react-on-rails-pro@VERSION --save-exact
 
 # yarn
-yarn remove react-on-rails && yarn add react-on-rails-pro@<VERSION> --exact
+yarn remove react-on-rails && yarn add react-on-rails-pro@VERSION --exact
 
 # pnpm
-pnpm remove react-on-rails && pnpm add react-on-rails-pro@<VERSION> --save-exact
+pnpm remove react-on-rails && pnpm add react-on-rails-pro@VERSION --save-exact
 
 # bun
-bun remove react-on-rails && bun add react-on-rails-pro@<VERSION> --exact
+bun remove react-on-rails && bun add react-on-rails-pro@VERSION --exact
 ```
 
 Then update your imports:
@@ -90,7 +90,7 @@ That's it. Your app is now running React on Rails Pro.
 If you're setting up a new app (not upgrading an existing one), use the `--pro` flag:
 
 ```bash
-bundle add react_on_rails_pro --version="= <VERSION>"
+bundle add react_on_rails_pro --version="= VERSION"
 bundle exec rails generate react_on_rails:install --pro
 ```
 
