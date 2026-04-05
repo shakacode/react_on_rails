@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
+import { act as reactDomAct } from 'react-dom/test-utils';
 import {
   createTanStackRouterRenderFunction,
   serverRenderTanStackAppAsync,
@@ -56,13 +57,16 @@ function buildRouter(): TanStackRouter {
 }
 
 type ActCallback = () => void | Promise<void>;
+type ActFunction = (cb: ActCallback) => Promise<unknown> | unknown;
 
 async function compatAct(callback: ActCallback): Promise<void> {
-  const reactAct = (React as typeof React & { act?: (cb: ActCallback) => Promise<unknown> | unknown }).act;
-  if (typeof reactAct !== 'function') {
-    throw new Error('React.act is not available — React 18.3+ or 19+ is required');
+  const reactAct = (React as typeof React & { act?: ActFunction }).act;
+  const actFn: ActFunction | undefined = typeof reactAct === 'function' ? reactAct : reactDomAct;
+
+  if (typeof actFn !== 'function') {
+    throw new Error('No compatible React act implementation is available');
   }
-  await reactAct(callback);
+  await actFn(callback);
 }
 
 describe('tanstack-router integration (Pro)', () => {
