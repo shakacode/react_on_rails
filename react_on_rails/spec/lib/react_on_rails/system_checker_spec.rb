@@ -221,16 +221,16 @@ RSpec.describe ReactOnRails::SystemChecker do
   end
 
   describe "#check_version_patterns" do
-    it "warns about caret version patterns" do
+    it "errors on caret version patterns" do
       checker.send(:check_version_patterns, "^16.0.0", "16.0.0")
-      expect(checker.warnings?).to be true
-      expect(checker.messages.last[:content]).to include("caret (^) version pattern")
+      expect(checker.errors?).to be true
+      expect(checker.messages.last[:content]).to include("non-exact version")
     end
 
-    it "warns about tilde version patterns" do
+    it "errors on tilde version patterns" do
       checker.send(:check_version_patterns, "~16.0.0", "16.0.0")
-      expect(checker.warnings?).to be true
-      expect(checker.messages.last[:content]).to include("tilde (~) version pattern")
+      expect(checker.errors?).to be true
+      expect(checker.messages.last[:content]).to include("non-exact version")
     end
 
     it "does not warn about exact versions" do
@@ -257,10 +257,10 @@ RSpec.describe ReactOnRails::SystemChecker do
         stub_const("ReactOnRails::VERSION", "16.0.0")
       end
 
-      it "warns about tilde version patterns" do
+      it "errors on non-exact version patterns" do
         checker.send(:check_gemfile_version_patterns)
-        expect(checker.warnings?).to be true
-        expect(checker.messages.last[:content]).to include("Gemfile uses version pattern")
+        expect(checker.errors?).to be true
+        expect(checker.messages.last[:content]).to include("non-exact version constraint")
       end
     end
 
@@ -440,12 +440,12 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:read).with("package.json").and_return(package_json_content)
       end
 
-      it "adds a success message and version pattern warning" do
+      it "adds a success message and version pattern error" do
         checker.send(:check_package_version_sync)
         expect(checker.messages.any? do |msg|
           msg[:type] == :success && msg[:content].include?("versions match")
         end).to be true
-        expect(checker.warnings?).to be true
+        expect(checker.errors?).to be true
       end
     end
 
@@ -534,9 +534,9 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:read).with("package.json").and_return(package_json_content)
       end
 
-      it "adds a warning message" do
+      it "adds an error message" do
         checker.send(:check_package_version_sync)
-        expect(checker.warnings?).to be true
+        expect(checker.errors?).to be true
         expect(checker.messages.last[:content]).to include("Version mismatch detected")
       end
     end

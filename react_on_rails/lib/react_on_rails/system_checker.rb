@@ -244,14 +244,19 @@ module ReactOnRails
 
               Major version differences can cause serious compatibility issues.
               Update both packages to use the same major version immediately.
+
+              Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
             MSG
           else
-            add_warning(<<~MSG.strip)
-              ⚠️  Version mismatch detected:
+            add_error(<<~MSG.strip)
+              🚫 Version mismatch detected:
               • Gem version: #{gem_version}
               • #{package_name} version: #{npm_version}
 
-              Consider updating to exact, fixed matching versions of gem and npm package for best compatibility.
+              The gem and npm package versions must match exactly. Mismatched versions
+              will cause a runtime error on app startup.
+
+              Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
             MSG
           end
         end
@@ -728,16 +733,17 @@ module ReactOnRails
       MSG
     end
 
-    def check_version_patterns(npm_version, gem_version)
+    def check_version_patterns(npm_version, _gem_version)
       # Check for version range patterns in package.json
-      return unless /^[\^~]/.match?(npm_version)
+      return unless /^[\^~><*]/.match?(npm_version) || npm_version.include?(" ")
 
-      pattern_type = npm_version[0] == "^" ? "caret (^)" : "tilde (~)"
-      add_warning(<<~MSG.strip)
-        ⚠️  NPM package uses #{pattern_type} version pattern: #{npm_version}
+      add_error(<<~MSG.strip)
+        🚫 NPM package uses a non-exact version: #{npm_version}
 
-        While versions match, consider using exact version "#{gem_version}" in package.json
-        for guaranteed compatibility with the React on Rails gem.
+        React on Rails requires exact version matching. Non-exact constraints will
+        cause a runtime error on app startup.
+
+        Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
       MSG
     end
 
@@ -747,29 +753,36 @@ module ReactOnRails
 
       begin
         gemfile_content = File.read(gemfile_path)
-        react_on_rails_line = gemfile_content.lines.find { |line| line.match(/^\s*gem\s+['"]react_on_rails['"]/) }
-
-        return unless react_on_rails_line
-
-        # Check for version patterns in Gemfile
-        if /['"][~]/.match?(react_on_rails_line)
-          add_warning(<<~MSG.strip)
-            ⚠️  Gemfile uses version pattern for react_on_rails gem.
-
-            Consider using exact version in Gemfile for guaranteed compatibility:
-            gem 'react_on_rails', '#{ReactOnRails::VERSION}'
-          MSG
-        elsif />=\s*/.match?(react_on_rails_line)
-          add_warning(<<~MSG.strip)
-            ⚠️  Gemfile uses version range (>=) for react_on_rails gem.
-
-            Consider using exact version in Gemfile for guaranteed compatibility:
-            gem 'react_on_rails', '#{ReactOnRails::VERSION}'
-          MSG
+        check_gemfile_version_pattern_for(gemfile_content, "react_on_rails")
+        if ReactOnRails::Utils.react_on_rails_pro?
+          check_gemfile_version_pattern_for(gemfile_content,
+                                            "react_on_rails_pro")
         end
       rescue StandardError
         # Ignore errors reading Gemfile
       end
+    end
+
+    def check_gemfile_version_pattern_for(gemfile_content, gem_name)
+      gem_line = gemfile_content.lines.find { |line| line.match(/^\s*gem\s+['"]#{gem_name}['"]/) }
+      return unless gem_line
+
+      return unless /['"][~^]/.match?(gem_line) || />=\s*/.match?(gem_line)
+
+      version = if gem_name == "react_on_rails_pro"
+                  ReactOnRails::Utils.react_on_rails_pro_version
+                else
+                  ReactOnRails::VERSION
+                end
+      add_error(<<~MSG.strip)
+        🚫 Gemfile uses a non-exact version constraint for #{gem_name}.
+
+        React on Rails requires exact version matching between the gem and npm package.
+        Non-exact constraints can cause versions to drift apart, leading to runtime errors.
+
+        Fix: Use an exact version in your Gemfile:
+          gem '#{gem_name}', '#{version}'
+      MSG
     end
 
     def report_dependency_versions(package_json)

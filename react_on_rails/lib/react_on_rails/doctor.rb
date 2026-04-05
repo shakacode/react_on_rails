@@ -6,6 +6,7 @@ require "yaml"
 require_relative "utils"
 require_relative "config_path_resolver"
 require_relative "version_syntax_converter"
+require_relative "version_synchronizer"
 require_relative "system_checker"
 
 begin
@@ -145,6 +146,7 @@ module ReactOnRails
       checker.check_react_on_rails_packages
       check_version_wildcards
       check_pro_package_consistency
+      auto_fix_versions if fix
     end
 
     def check_packages
@@ -515,19 +517,29 @@ module ReactOnRails
 
       begin
         content = File.read(gemfile_path)
-        react_line = content.lines.find { |line| line.match(/^\s*gem\s+['"]react_on_rails['"]/) }
-
-        if react_line
-          if /['"][~^]/.match?(react_line)
-            checker.add_warning("⚠️  Gemfile uses wildcard version pattern (~, ^) for react_on_rails")
-          elsif />=\s*/.match?(react_line)
-            checker.add_warning("⚠️  Gemfile uses version range (>=) for react_on_rails")
-          else
-            checker.add_success("✅ Gemfile uses exact version for react_on_rails")
-          end
-        end
+        check_gem_wildcard_for(content, "react_on_rails")
+        check_gem_wildcard_for(content, "react_on_rails_pro") if ReactOnRails::Utils.react_on_rails_pro?
       rescue StandardError
         # Ignore errors reading Gemfile
+      end
+    end
+
+    def check_gem_wildcard_for(gemfile_content, gem_name)
+      react_line = gemfile_content.lines.find { |line| line.match(/^\s*gem\s+['"]#{gem_name}['"]/) }
+      return unless react_line
+
+      if /['"][~^]/.match?(react_line) || />=\s*/.match?(react_line)
+        checker.add_error(<<~MSG.strip)
+          🚫 Gemfile uses a non-exact version constraint for #{gem_name}.
+
+          React on Rails requires exact version matching between the gem and npm package.
+          Non-exact constraints (~ ^ >=) can cause the gem and npm package to drift apart.
+
+          Fix: Use an exact version in your Gemfile:
+            gem '#{gem_name}', '#{gem_name == 'react_on_rails_pro' ? ReactOnRails::Utils.react_on_rails_pro_version : ReactOnRails::VERSION}'
+        MSG
+      else
+        checker.add_success("✅ Gemfile uses exact version for #{gem_name}")
       end
     end
 
@@ -539,19 +551,54 @@ module ReactOnRails
         package_json = JSON.parse(File.read(package_json_path))
         all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
 
-        npm_version = all_deps["react-on-rails"]
-        if npm_version
-          if /[~^]/.match?(npm_version)
-            checker.add_warning("⚠️  package.json uses wildcard version pattern (~, ^) for react-on-rails")
-          else
-            checker.add_success("✅ package.json uses exact version for react-on-rails")
-          end
-        end
+        check_npm_wildcard_for(all_deps, "react-on-rails")
+        check_npm_wildcard_for(all_deps, "react-on-rails-pro") if ReactOnRails::Utils.react_on_rails_pro?
       rescue JSON::ParserError
         # Ignore JSON parsing errors
       rescue StandardError
         # Ignore other errors
       end
+    end
+
+    def check_npm_wildcard_for(all_deps, package_name)
+      npm_version = all_deps[package_name]
+      return unless npm_version
+
+      if /[~^><*]/.match?(npm_version) || npm_version.include?(" ")
+        install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+          package_name, ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION)
+        )
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json uses a non-exact version for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          Non-exact constraints (~ ^ >= * ranges) will cause a runtime error on app startup.
+
+          Fix: #{install_cmd}
+          Or run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      else
+        checker.add_success("✅ package.json uses exact version for #{package_name}")
+      end
+    end
+
+    def auto_fix_versions
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
+
+      synchronizer = ReactOnRails::VersionSynchronizer.new(package_json_path: package_json_path)
+      result = synchronizer.sync(write: true)
+
+      if result.changes.any?
+        checker.add_success("  ✅ FIX=true: Synced package.json versions (#{result.changes.length} update(s))")
+        result.changes.each do |change|
+          checker.add_info("    #{change[:section]}.#{change[:package]}: #{change[:from]} -> #{change[:to]}")
+        end
+      else
+        checker.add_info("  ℹ️  FIX=true: No package.json version changes needed")
+      end
+    rescue StandardError => e
+      checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
     end
 
     def check_pro_package_consistency

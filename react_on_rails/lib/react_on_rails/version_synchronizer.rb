@@ -146,18 +146,44 @@ module ReactOnRails
       version.is_a?(String) && version.match?(EXACT_VERSION_REGEX)
     end
 
+    # Strips semver range prefixes (^, ~, >=, etc.) and returns the bare version if valid.
+    def strip_range_prefix(version_spec)
+      return nil unless version_spec.is_a?(String)
+
+      stripped = version_spec.sub(/\A[~^>=<]+\s*/, "")
+      return stripped if exact_version?(stripped)
+
+      nil
+    end
+
     def parse_supported_spec(version_spec)
       return { version: version_spec, prefix: nil } if exact_version?(version_spec)
-      return unless version_spec.is_a?(String) && version_spec.start_with?(NPM_ALIAS_PREFIX)
 
+      # Handle npm alias syntax: npm:@scope/pkg@version
+      if version_spec.is_a?(String) && version_spec.start_with?(NPM_ALIAS_PREFIX)
+        return parse_npm_alias_spec(version_spec)
+      end
+
+      # Handle range prefixes: ^16.5.0, ~16.5.0, >=16.5.0, etc.
+      stripped = strip_range_prefix(version_spec)
+      return { version: stripped, prefix: nil } if stripped
+
+      nil
+    end
+
+    def parse_npm_alias_spec(version_spec)
       at_index = version_spec.rindex("@")
-      # Ensure at least one package-name character appears after "npm:" and before the version separator.
-      return unless at_index && at_index > NPM_ALIAS_PREFIX.length
+      return nil unless at_index && at_index > NPM_ALIAS_PREFIX.length
 
       alias_version = version_spec[(at_index + 1)..]
-      return unless exact_version?(alias_version)
+      prefix = version_spec[0..at_index]
+      return { version: alias_version, prefix: prefix } if exact_version?(alias_version)
 
-      { version: alias_version, prefix: version_spec[0..at_index] }
+      # Try stripping range prefix from alias version (e.g., npm:@scope/pkg@^16.5.0)
+      stripped = strip_range_prefix(alias_version)
+      return { version: stripped, prefix: prefix } if stripped
+
+      nil
     end
 
     def rewritten_spec(parsed_spec, expected_version)

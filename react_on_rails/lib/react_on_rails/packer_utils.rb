@@ -139,6 +139,8 @@ module ReactOnRails
         **ERROR** ReactOnRails: `nested_entries` is configured to be disabled in shakapacker. Please update \
         config/shakapacker.yml to enable nested entries. for more information read
         https://reactonrails.com/docs/core-concepts/auto-bundling/#enable-nested_entries-for-shakapacker
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
 
       raise ReactOnRails::Error, msg
@@ -150,6 +152,8 @@ module ReactOnRails
         Installed version: #{ReactOnRails::PackerUtils.shakapacker_version}
 
         To fix: Upgrade Shakapacker, or set `auto_load_bundle: false` in your ReactOnRails configuration.
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
 
       raise ReactOnRails::Error, msg
