@@ -161,6 +161,7 @@ const SENSITIVE_REQUEST_BODY_KEYS = new Set([
   'apikey',
   'authorization',
   'auth_token',
+  'auth-token',
   'access_token',
   'bearer',
 ]);
@@ -356,6 +357,10 @@ export default function run(config: Partial<Config>) {
     // }
 
     const { body } = req;
+    if (!body || typeof body !== 'object') {
+      await setResponse(badRequestResponseResult('Invalid or missing request body.'), res);
+      return;
+    }
     const { renderingRequest } = body;
     if (!isValidRenderingRequest(renderingRequest)) {
       await setResponse(badRequestResponseResult(invalidRenderingRequestMessage(body)), res);

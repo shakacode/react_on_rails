@@ -191,6 +191,28 @@ describe('worker', () => {
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is an array', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: ['a', 'b'],
+      })
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
+    expect(res.payload).toContain('Received type: array.');
+    expect(res.payload).toContain('Likely causes: request body truncation');
+  });
+
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest filters sensitive body keys case-insensitively in invalid renderingRequest diagnostics', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
