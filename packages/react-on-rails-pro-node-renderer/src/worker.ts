@@ -151,11 +151,11 @@ const errorCode = (error: unknown): string | undefined => {
 const isValidRenderingRequest = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 
-const SENSITIVE_REQUEST_BODY_KEYS = new Set(['password']);
+const SENSITIVE_REQUEST_BODY_KEYS = new Set(['password', 'token', 'secret', 'api_key']);
 
 const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   const { renderingRequest } = body;
-  let renderingRequestType: string = typeof renderingRequest;
+  let renderingRequestType: string = renderingRequest === '' ? 'string (empty)' : typeof renderingRequest;
   if (renderingRequest === null) {
     renderingRequestType = 'null';
   } else if (Array.isArray(renderingRequest)) {

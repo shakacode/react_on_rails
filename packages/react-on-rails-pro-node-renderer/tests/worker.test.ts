@@ -162,7 +162,7 @@ describe('worker', () => {
 
     expect(res.statusCode).toBe(400);
     expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
-    expect(res.payload).toContain('Received type: string.');
+    expect(res.payload).toContain('Received type: string (empty).');
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
