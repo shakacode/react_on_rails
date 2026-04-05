@@ -28,6 +28,12 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Auto-resolve renderer password from ENV**: `setup_renderer_password` now falls back to `ENV["RENDERER_PASSWORD"]` when neither `config.renderer_password` nor a URL-embedded password is set, aligning Rails-side behavior with the Node Renderer defaults. Blank values (`nil` or `""`) are treated identically and fall through the full resolution chain: config → URL → ENV. [PR 2921](https://github.com/shakacode/react_on_rails/pull/2921) by [justin808](https://github.com/justin808).
 
+#### Improved
+
+- **Doctor enforces strict version constraints**: `react_on_rails:doctor` now escalates non-exact gem and npm version specs (`^`, `~`, `>=`) from warnings to errors, matching the runtime VersionChecker behavior. Wildcard checks now also cover Pro packages (`react-on-rails-pro`, `react_on_rails_pro`). [PR 3070](https://github.com/shakacode/react_on_rails/pull/3070) by [justin808](https://github.com/justin808).
+- **Error messages recommend doctor**: Runtime version-check crashes, configuration validation errors, and autobundling errors now suggest running `bundle exec rake react_on_rails:doctor` for diagnostics and `bundle exec rake react_on_rails:sync_versions WRITE=true` to fix version mismatches. [PR 3070](https://github.com/shakacode/react_on_rails/pull/3070) by [justin808](https://github.com/justin808).
+- **`sync_versions` handles range specs**: Version ranges like `^16.5.0`, `~16.5.0`, and `>=16.5.0` are now parsed and rewritten to the exact expected version instead of being skipped as unsupported. When `FIX=true` is set, doctor auto-runs `sync_versions` to fix detected mismatches. [PR 3070](https://github.com/shakacode/react_on_rails/pull/3070) by [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **[Pro]** **Fixed TanStack Router SSR hydration mismatches in the async path**: Client hydration now restores server match data before first render, uses `RouterProvider` directly to match the server-rendered tree, and stops the post-hydration load when a custom `router.options.hydrate` callback fails instead of continuing with partially hydrated client state. [PR 2932](https://github.com/shakacode/react_on_rails/pull/2932) by [justin808](https://github.com/justin808).
