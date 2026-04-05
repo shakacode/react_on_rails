@@ -42,7 +42,8 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
 
   // When no mode flag is explicitly passed, prompt interactively (TTY only).
   // Non-interactive environments (CI, pipes) fall back to standard mode.
-  const modeExplicit = rawOpts.pro !== undefined || rawOpts.rsc !== undefined;
+  const modeExplicit =
+    rawOpts.pro !== undefined || rawOpts.rsc !== undefined || rawOpts.standard !== undefined;
   if (!modeExplicit) {
     if (process.stdin.isTTY && process.stdout.isTTY) {
       const choice = await promptForMode();
@@ -126,6 +127,7 @@ program
   .option('-t, --template <type>', 'javascript or typescript', 'typescript')
   .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
   .option('--rspack', 'Use Rspack instead of Webpack (~20x faster builds)', false)
+  .option('--standard', 'Generate open-source React on Rails setup (skip prompt)')
   .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)')
   .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)')
   .addHelpText(
@@ -135,15 +137,16 @@ Examples:
   $ npx create-react-on-rails-app my-app                        # prompts for mode
   $ npx create-react-on-rails-app my-app --rsc                  # skip prompt, use RSC
   $ npx create-react-on-rails-app my-app --pro                  # skip prompt, use Pro
+  $ npx create-react-on-rails-app my-app --standard             # skip prompt, use Standard
   $ npx create-react-on-rails-app my-app --template javascript
   $ npx create-react-on-rails-app my-app --rspack
   $ npx create-react-on-rails-app my-app --rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
-When no --pro or --rsc flag is given, an interactive prompt lets you choose
-between Standard, Pro, and RSC modes (default: RSC). When stdin or stdout is
-not a TTY (for example in CI, piped input, or redirected output), standard
-mode is used automatically.
+When no mode flag (--standard, --pro, or --rsc) is given, an interactive prompt
+lets you choose between Standard, Pro, and RSC modes (default: RSC). When stdin
+or stdout is not a TTY (for example in CI, piped input, or redirected output),
+standard mode is used automatically.
 
 What it does:
   1. Creates a new Rails app with PostgreSQL
@@ -181,7 +184,8 @@ Documentation: https://reactonrails.com/docs/`,
     }
   });
 
-program.parseAsync().catch((error: unknown) => {
+// eslint-disable-next-line import/prefer-default-export -- named export for test clarity
+export const ready = program.parseAsync().catch((error: unknown) => {
   logError(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

@@ -35,16 +35,14 @@ function setupMocks() {
 /**
  * Imports index.ts in an isolated module scope so that each test gets a fresh
  * Commander program. process.argv must be set before calling this.
+ * Awaits the exported `ready` promise so the async action fully completes.
  */
 function loadIndex(): Promise<void> {
   return new Promise((resolve, reject) => {
     jest.isolateModules(() => {
       try {
-        // The module calls program.parseAsync() at the top level. We let it
-        // run, then settle on the next tick so the async action completes.
-        require('../src/index');
-        // Give the async action time to execute
-        setTimeout(resolve, 50);
+        const mod = require('../src/index') as { ready: Promise<void> };
+        mod.ready.then(resolve, reject);
       } catch (err) {
         reject(err);
       }
@@ -106,6 +104,16 @@ describe('TTY detection branching in run()', () => {
     Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
     Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
     process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--rsc'];
+
+    await loadIndex();
+
+    expect(mockedPromptForMode).not.toHaveBeenCalled();
+  });
+
+  it('does not call promptForMode when --standard is explicitly passed', async () => {
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--standard'];
 
     await loadIndex();
 

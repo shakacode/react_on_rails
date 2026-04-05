@@ -25,8 +25,8 @@ When no `--pro` or `--rsc` flag is given, the CLI prompts you to choose a setup 
 The default choice is RSC. Press Enter to accept it, or type `1` or `2` to pick a different mode.
 In non-interactive environments (CI, pipes), standard mode is used automatically.
 
-To skip the prompt, pass `--pro` or `--rsc` explicitly.
-Both flags support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
+To skip the prompt, pass `--standard`, `--pro`, or `--rsc` explicitly.
+All mode flags support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 `--pro` and `--rsc` require `react_on_rails_pro` to be installable in your environment
 ([Pro setup docs](../../pro/installation.md)).
 
@@ -41,6 +41,9 @@ npx create-react-on-rails-app my-app --rsc
 
 # Skip prompt — use Pro directly
 npx create-react-on-rails-app my-app --pro
+
+# Skip prompt — use Standard (open-source) directly
+npx create-react-on-rails-app my-app --standard
 
 # JavaScript instead of TypeScript
 npx create-react-on-rails-app my-app --template javascript
@@ -57,13 +60,16 @@ npx create-react-on-rails-app my-app --rspack --rsc
 
 ### All Options
 
-| Option                       | Description                                                    | Default        |
-| ---------------------------- | -------------------------------------------------------------- | -------------- |
-| `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`   |
-| `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`        |
-| `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | prompted (TTY) |
-| `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | prompted (TTY) |
-| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected  |
+| Option                       | Description                                                    | Default       |
+| ---------------------------- | -------------------------------------------------------------- | ------------- |
+| `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`  |
+| `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`       |
+| `--standard`                 | Use open-source React on Rails (skip prompt)                   | `false`       |
+| `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | `false`       |
+| `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`       |
+| `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected |
+
+When none of `--standard`, `--pro`, or `--rsc` is given, the CLI prompts interactively in TTY environments (default: RSC). In non-TTY environments (CI, pipes, redirected output), standard mode is used automatically.
 
 ## What It Does
 
