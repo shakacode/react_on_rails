@@ -24,6 +24,7 @@ import {
 } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
 import {
+  badRequestResponseResult,
   errorResponseResult,
   formatExceptionMessage,
   ResponseResult,
@@ -151,7 +152,18 @@ const errorCode = (error: unknown): string | undefined => {
 const isValidRenderingRequest = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;
 
-const SENSITIVE_REQUEST_BODY_KEYS = new Set(['password', 'token', 'secret', 'api_key']);
+const SENSITIVE_REQUEST_BODY_KEYS = new Set([
+  'password',
+  'token',
+  'secret',
+  'api_key',
+  'api-key',
+  'apikey',
+  'authorization',
+  'auth_token',
+  'access_token',
+  'bearer',
+]);
 
 const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   const { renderingRequest } = body;
@@ -161,7 +173,7 @@ const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   } else if (Array.isArray(renderingRequest)) {
     renderingRequestType = 'array';
   }
-  const bodyKeys = Object.keys(body).filter((key) => !SENSITIVE_REQUEST_BODY_KEYS.has(key));
+  const bodyKeys = Object.keys(body).filter((key) => !SENSITIVE_REQUEST_BODY_KEYS.has(key.toLowerCase()));
 
   return [
     'Invalid "renderingRequest" field in render request.',
@@ -346,7 +358,7 @@ export default function run(config: Partial<Config>) {
     const { body } = req;
     const { renderingRequest } = body;
     if (!isValidRenderingRequest(renderingRequest)) {
-      await setResponse(errorResponseResult(invalidRenderingRequestMessage(body)), res);
+      await setResponse(badRequestResponseResult(invalidRenderingRequestMessage(body)), res);
       return;
     }
 

@@ -122,6 +122,31 @@ describe('worker', () => {
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest does not notify errorReporter for malformed renderingRequest', async () => {
+    const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
+
+    try {
+      const app = worker({
+        serverBundleCachePath: serverBundleCachePathForTest(),
+      });
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload({
+          gemVersion,
+          protocolVersion,
+          railsEnv,
+        })
+        .end();
+
+      expect(res.statusCode).toBe(400);
+      expect(reportMessageSpy).not.toHaveBeenCalled();
+    } finally {
+      reportMessageSpy.mockRestore();
+    }
+  });
+
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is null', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
@@ -166,7 +191,7 @@ describe('worker', () => {
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
-  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest does not include password key in invalid renderingRequest diagnostics', async () => {
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest filters sensitive body keys case-insensitively in invalid renderingRequest diagnostics', async () => {
     const app = worker({
       serverBundleCachePath: serverBundleCachePathForTest(),
     });
@@ -178,13 +203,21 @@ describe('worker', () => {
         gemVersion,
         protocolVersion,
         railsEnv,
-        password: 'super-secret',
+        Password: 'super-secret',
+        apiKey: 'token',
+        Authorization: 'Bearer abc',
+        AUTH_TOKEN: 'auth',
+        safeField: 'safe',
       })
       .end();
 
     expect(res.statusCode).toBe(400);
     expect(res.payload).toContain('Received body keys:');
-    expect(res.payload).not.toContain('password');
+    expect(res.payload).not.toContain('Password');
+    expect(res.payload).not.toContain('apiKey');
+    expect(res.payload).not.toContain('Authorization');
+    expect(res.payload).not.toContain('AUTH_TOKEN');
+    expect(res.payload).toContain('safeField');
   });
 
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest reports unexpected handleRenderRequest failures once', async () => {
