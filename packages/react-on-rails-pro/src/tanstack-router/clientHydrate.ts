@@ -75,7 +75,7 @@ function preloadMatchedRouteChunks(
       return;
     }
 
-    routeChunkPromises.push(router.loadRouteChunk?.(route) as Promise<unknown>);
+    routeChunkPromises.push(router.loadRouteChunk(route));
   });
 
   if (!routeChunkPromises.length) {
