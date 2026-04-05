@@ -225,7 +225,7 @@ export function handleStartupListenError({
   log.error({ err, host, port }, 'Node renderer failed to start');
 
   if (isWorker && !sendFn) {
-    log.warn('Cluster worker has no IPC channel; cannot notify master of startup failure');
+    log.error('Cluster worker has no IPC channel; cannot notify master of startup failure');
   }
 
   if (isWorker && sendFn) {
@@ -244,7 +244,7 @@ export function handleStartupListenError({
       const doExit = (sendErr?: Error | null) => {
         if (exited) return;
         exited = true;
-        if (sendErr) log.warn({ err: sendErr }, 'Failed to send startup failure message to master');
+        if (sendErr) log.error({ err: sendErr }, 'Failed to send startup failure message to master');
         exitFn(1);
       };
       sendFn(startupFailure, undefined, undefined, doExit);
@@ -255,7 +255,7 @@ export function handleStartupListenError({
       if (typeof timer.unref === 'function') timer.unref();
       return;
     } catch (sendErr) {
-      log.warn({ err: sendErr as Error }, 'Failed to send startup failure message to master');
+      log.error({ err: sendErr as Error }, 'Failed to send startup failure message to master');
       exitFn(1);
       return;
     }

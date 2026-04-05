@@ -132,6 +132,12 @@ function setupMasterRunHarness() {
   };
 }
 
+async function waitForSetImmediate() {
+  await new Promise<void>((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
 describe('master startup failure handling via masterRun wiring', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -237,10 +243,30 @@ describe('master startup failure handling via masterRun wiring', () => {
     expect(harness.processExitSpy).not.toHaveBeenCalled();
   });
 
-  it('reforks on unexpected runtime crash when no startup failure was received', () => {
+  it('waits one tick for startup-failure IPC before classifying an unexpected crash', async () => {
+    const harness = setupMasterRunHarness();
+    harness.mockCluster.disconnect.mockImplementation(() => {});
+    const worker = { id: 1, process: { exitCode: 1 } };
+
+    // Exit arrives first.
+    harness.clusterHandlers.exit(worker);
+    // Startup-failure message arrives before the deferred crash classification runs.
+    harness.clusterHandlers.message(worker, buildStartupFailureMessage());
+    await waitForSetImmediate();
+
+    expect(harness.mockErrorReporterMessage).toHaveBeenCalledWith(
+      'Node renderer startup failed: localhost:3800 is already in use',
+    );
+    expect(harness.mockCluster.disconnect).toHaveBeenCalledTimes(1);
+    expect(harness.mockFork).toHaveBeenCalledTimes(2);
+    expect(harness.processExitSpy).not.toHaveBeenCalled();
+  });
+
+  it('reforks on unexpected runtime crash when no startup failure was received', async () => {
     const harness = setupMasterRunHarness();
 
     harness.clusterHandlers.exit({ id: 3, process: { exitCode: 1 } });
+    await waitForSetImmediate();
 
     expect(harness.mockErrorReporterMessage).toHaveBeenCalledWith(
       'Worker 3 died UNEXPECTEDLY :(, restarting',
@@ -249,11 +275,12 @@ describe('master startup failure handling via masterRun wiring', () => {
     expect(harness.processExitSpy).not.toHaveBeenCalled();
   });
 
-  it('ignores malformed startup-failure messages and treats exit as runtime crash', () => {
+  it('ignores malformed startup-failure messages and treats exit as runtime crash', async () => {
     const harness = setupMasterRunHarness();
 
     harness.clusterHandlers.message({ id: 1, process: { exitCode: 1 } }, { type: WORKER_STARTUP_FAILURE });
     harness.clusterHandlers.exit({ id: 1, process: { exitCode: 1 } });
+    await waitForSetImmediate();
 
     expect(harness.mockErrorReporterMessage).toHaveBeenCalledWith(
       'Worker 1 died UNEXPECTEDLY :(, restarting',
