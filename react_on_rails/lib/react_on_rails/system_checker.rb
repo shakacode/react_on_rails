@@ -222,9 +222,10 @@ module ReactOnRails
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
 
-        # Skip workspace/local-link specs and non-exact range specs.
-        # Doctor#check_version_wildcards handles wildcard/range detection.
-        return if npm_version.match?(/\A(?:workspace:|file:|link:|npm:|[\^~><*])/) || npm_version.include?(" ")
+        # Skip workspace/local-link specs silently (not version-comparable).
+        return if npm_version.match?(/\A(?:workspace:|file:|link:|npm:)/)
+
+        return warn_non_exact_version(package_name, npm_version) if non_exact_range_spec?(npm_version)
 
         # Normalize NPM version format to Ruby gem format for comparison
         # Uses existing VersionSyntaxConverter to handle dash/dot differences
@@ -243,6 +244,15 @@ module ReactOnRails
       rescue StandardError
         # Handle other errors gracefully
       end
+    end
+
+    def non_exact_range_spec?(npm_version)
+      npm_version.match?(/\A[\^~><*]/) || npm_version.include?(" ")
+    end
+
+    def warn_non_exact_version(package_name, npm_version)
+      add_warning("⚠️  #{package_name} uses a non-exact version (#{npm_version}). " \
+                  "Run `rake react_on_rails:doctor` for full version checks.")
     end
 
     def report_version_mismatch(package_name, npm_version, normalized_npm_version, gem_version)

@@ -622,7 +622,7 @@ module ReactOnRails
       if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(npm_version)
         checker.add_success("✅ package.json uses exact version for #{package_name}")
       else
-        gem_version = if package_name == "react-on-rails-pro"
+        gem_version = if %w[react-on-rails-pro react-on-rails-pro-node-renderer].include?(package_name)
                         ReactOnRails::Utils.react_on_rails_pro_version
                       else
                         ReactOnRails::VERSION

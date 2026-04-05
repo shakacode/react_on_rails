@@ -374,10 +374,11 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:read).with("package.json").and_return(package_json_content)
       end
 
-      it "skips range specs (wildcard detection is handled by Doctor)" do
-        initial_message_count = checker.messages.count
+      it "warns about range specs and directs to Doctor" do
         checker.send(:check_package_version_sync)
-        expect(checker.messages.count).to eq(initial_message_count)
+        expect(checker.messages.any? do |msg|
+          msg[:type] == :warning && msg[:content].include?("Run `rake react_on_rails:doctor`")
+        end).to be true
         expect(checker.errors?).to be false
       end
     end
