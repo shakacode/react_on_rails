@@ -4,7 +4,7 @@ import { CliOptions } from './types.js';
 import { validateAll } from './validators.js';
 import { createApp, validateAppName } from './create-app.js';
 import { detectPackageManager, logError, logInfo } from './utils.js';
-import { promptForMode, PROMPT_CANCELLED_BY_SIGINT } from './prompt.js';
+import { promptForMode, PROMPT_CANCELLED } from './prompt.js';
 
 // Use require() for CJS compatibility - avoids __dirname + fs.readFileSync
 // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
@@ -44,12 +44,14 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
   // Non-interactive environments (CI, pipes) fall back to standard mode.
   const modeExplicit = rawOpts.pro !== undefined || rawOpts.rsc !== undefined;
   if (!modeExplicit) {
-    if (process.stdin.isTTY) {
+    if (process.stdin.isTTY && process.stdout.isTTY) {
       const choice = await promptForMode();
       pro = choice.pro;
       rsc = choice.rsc;
     } else {
-      logInfo('No mode flag specified and stdin is not a TTY; using standard mode.');
+      logInfo(
+        'No mode flag specified and not running interactively (stdin/stdout is not a TTY); using standard mode.',
+      );
     }
   }
 
@@ -139,8 +141,9 @@ Examples:
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
 When no --pro or --rsc flag is given, an interactive prompt lets you choose
-between Standard, Pro, and RSC modes (default: RSC). When stdin is not a TTY
-(for example in CI or with redirected input), standard mode is used automatically.
+between Standard, Pro, and RSC modes (default: RSC). When stdin or stdout is
+not a TTY (for example in CI, piped input, or redirected output), standard
+mode is used automatically.
 
 What it does:
   1. Creates a new Rails app with PostgreSQL
@@ -169,7 +172,7 @@ Documentation: https://reactonrails.com/docs/`,
     try {
       await run(appName, opts);
     } catch (error) {
-      if (error instanceof Error && error.message === PROMPT_CANCELLED_BY_SIGINT) {
+      if (error instanceof Error && error.message === PROMPT_CANCELLED) {
         console.log('');
         process.exit(0);
       }

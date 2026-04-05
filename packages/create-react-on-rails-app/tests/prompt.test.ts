@@ -1,5 +1,5 @@
 import readline from 'readline';
-import { PROMPT_CANCELLED_BY_SIGINT, promptForMode } from '../src/prompt';
+import { PROMPT_CANCELLED, promptForMode } from '../src/prompt';
 
 jest.mock('readline');
 
@@ -89,16 +89,15 @@ describe('promptForMode', () => {
     mockRl.question.mockImplementation(() => {});
     const promise = promptForMode();
     for (const handler of eventHandlers['SIGINT'] ?? []) handler();
-    await expect(promise).rejects.toThrow(PROMPT_CANCELLED_BY_SIGINT);
+    await expect(promise).rejects.toThrow(PROMPT_CANCELLED);
     expect(mockRl.close).toHaveBeenCalled();
   });
 
-  it('defaults to rsc when stdin closes (EOF/Ctrl+D)', async () => {
+  it('rejects when stdin closes (EOF/Ctrl+D)', async () => {
     mockRl.question.mockImplementation(() => {});
     const promise = promptForMode();
     for (const handler of eventHandlers['close'] ?? []) handler();
-    const result = await promise;
-    expect(result).toEqual({ pro: false, rsc: true });
+    await expect(promise).rejects.toThrow(PROMPT_CANCELLED);
   });
 
   it('displays mode options to the user', async () => {
