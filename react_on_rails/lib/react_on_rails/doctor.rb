@@ -142,11 +142,12 @@ module ReactOnRails
     end
 
     def check_react_on_rails_versions
-      # Use system_checker for comprehensive package validation instead of duplicating
+      # Auto-fix first so subsequent checks reflect the repaired state and
+      # don't leave stale errors that cause exit(1) despite a successful fix.
+      auto_fix_versions if fix
+
       checker.check_react_on_rails_packages
       check_pro_package_consistency
-      # Auto-fix before wildcard checks so resolved issues don't appear as errors
-      auto_fix_versions if fix
       check_version_wildcards
     end
 
