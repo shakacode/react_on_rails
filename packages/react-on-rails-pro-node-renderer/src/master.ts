@@ -98,9 +98,17 @@ export default function masterRun(runningConfig?: Partial<Config>) {
 
       errorReporter.message(msg);
       // Disconnect all live workers so they release their ports before the
-      // master exits. cluster.disconnect() is async — pass process.exit as
-      // the callback so we wait for workers to actually disconnect.
-      cluster.disconnect(() => process.exit(1));
+      // master exits. cluster.disconnect() is async — the callback fires
+      // once every worker has disconnected. A hard-deadline timer guarantees
+      // the master still exits if a worker is stuck (leaked handle, blocking
+      // syscall, etc.), following the same pattern as restartWorkers.ts.
+      const MASTER_SHUTDOWN_TIMEOUT_MS = 5000;
+      const shutdownTimer = setTimeout(() => process.exit(1), MASTER_SHUTDOWN_TIMEOUT_MS);
+      if (typeof shutdownTimer.unref === 'function') shutdownTimer.unref();
+      cluster.disconnect(() => {
+        clearTimeout(shutdownTimer);
+        process.exit(1);
+      });
     }
 
     return true;

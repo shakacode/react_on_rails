@@ -71,6 +71,9 @@ function setupMasterRunHarness() {
   const mockLogSanitizedConfig = jest.fn();
   const mockGetLicenseStatus = jest.fn(() => 'valid');
   const setIntervalSpy = jest.spyOn(global, 'setInterval').mockReturnValue(0 as unknown as NodeJS.Timeout);
+  const setTimeoutSpy = jest
+    .spyOn(global, 'setTimeout')
+    .mockReturnValue({ unref: jest.fn() } as unknown as NodeJS.Timeout);
   const processExitSpy = jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
     throw new Error(`process.exit:${code}`);
   }) as typeof process.exit);
@@ -128,6 +131,7 @@ function setupMasterRunHarness() {
     mockCluster,
     mockErrorReporterMessage,
     setIntervalSpy,
+    setTimeoutSpy,
     processExitSpy,
   };
 }
