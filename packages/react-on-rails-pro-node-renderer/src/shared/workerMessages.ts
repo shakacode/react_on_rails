@@ -18,6 +18,9 @@ export function isWorkerStartupFailureMessage(value: unknown): value is WorkerSt
 
   const message = value as Partial<WorkerStartupFailureMessage>;
 
+  // stage: 'listen' is the only supported stage today. To handle pre-listen
+  // failures (e.g. plugin registration), add a new stage value here and
+  // update the master handler accordingly.
   return (
     message.type === WORKER_STARTUP_FAILURE &&
     message.stage === 'listen' &&
