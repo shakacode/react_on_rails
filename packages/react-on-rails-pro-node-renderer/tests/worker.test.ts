@@ -229,6 +229,8 @@ describe('worker', () => {
         apiKey: 'token',
         Authorization: 'Bearer abc',
         AUTH_TOKEN: 'auth',
+        accessToken: 'access',
+        authToken: 'auth-camel',
         safeField: 'safe',
       })
       .end();
@@ -239,6 +241,8 @@ describe('worker', () => {
     expect(res.payload).not.toContain('apiKey');
     expect(res.payload).not.toContain('Authorization');
     expect(res.payload).not.toContain('AUTH_TOKEN');
+    expect(res.payload).not.toContain('accessToken');
+    expect(res.payload).not.toContain('authToken');
     expect(res.payload).toContain('safeField');
   });
 

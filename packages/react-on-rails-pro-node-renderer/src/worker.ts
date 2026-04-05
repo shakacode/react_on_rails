@@ -162,7 +162,9 @@ const SENSITIVE_REQUEST_BODY_KEYS = new Set([
   'authorization',
   'auth_token',
   'auth-token',
+  'authtoken',
   'access_token',
+  'accesstoken',
   'bearer',
 ]);
 
