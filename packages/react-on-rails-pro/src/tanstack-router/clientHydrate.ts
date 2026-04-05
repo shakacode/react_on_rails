@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, type ComponentType, type ReactElement } from 'react';
+import { Suspense, createElement, useEffect, useRef, type ComponentType, type ReactElement } from 'react';
 import type {
   DehydratedRouterState,
   TanStackHistory,
@@ -307,7 +307,17 @@ function TanStackHydrationApp({
   // RouterClient is NOT used because it wraps RouterProvider in <Await> which
   // introduces a Suspense boundary that doesn't exist in the server HTML,
   // causing React hydration mismatch errors.
-  let app: ReactElement = createElement(RouterProvider, { router });
+  //
+  // Suspense safety net: if a code-split route chunk hasn't loaded by the time
+  // React hydrates (rare — SSR includes <script> tags for chunks, so modules
+  // are typically cached before JS runs), the lazy route component may suspend.
+  // Wrapping in Suspense lets React 18+ keep the server HTML visible while the
+  // chunk loads, rather than crashing with an unhandled suspension.
+  let app: ReactElement = createElement(
+    Suspense,
+    { fallback: null },
+    createElement(RouterProvider, { router }),
+  );
   if (options.AppWrapper) {
     const wrapperProps = { ...incomingProps } as Record<string, unknown>;
     delete wrapperProps.__tanstackRouterDehydratedState;
@@ -316,6 +326,8 @@ function TanStackHydrationApp({
 
   return app;
 }
+
+let didWarnRouterClientDeprecated = false;
 
 export function clientHydrateTanStackApp(
   options: TanStackRouterOptions,
@@ -327,6 +339,15 @@ export function clientHydrateTanStackApp(
   _RouterClient: ComponentType<{ router: TanStackRouter }> | undefined,
   createBrowserHistory: () => TanStackHistory,
 ): ReactElement {
+  if (_RouterClient && !didWarnRouterClientDeprecated) {
+    didWarnRouterClientDeprecated = true;
+    console.warn(
+      'react-on-rails-pro/tanstack-router: The RouterClient parameter is deprecated and ignored. ' +
+        'RouterProvider is now used directly to avoid SSR hydration mismatches. ' +
+        'You can safely remove the RouterClient import from your createTanStackRouterRenderFunction call.',
+    );
+  }
+
   return createElement(TanStackHydrationApp, {
     options,
     incomingProps: props,
