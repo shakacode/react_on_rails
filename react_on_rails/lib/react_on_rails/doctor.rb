@@ -531,6 +531,9 @@ module ReactOnRails
       react_line = gemfile_content.lines.find { |line| line.match(/^\s*gem\s+['"]#{gem_name}['"]/) }
       return unless react_line
 
+      # Skip path/git/github gems — these are development configurations where version checks don't apply
+      return if react_line.match?(/\b(?:path|git|github):\s/)
+
       version_match = react_line.match(/gem\s+['"]#{gem_name}['"]\s*,\s*['"]([^'"]+)['"]/)
       return report_missing_gem_version(gem_name) unless version_match
 
@@ -587,12 +590,17 @@ module ReactOnRails
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
-        all_deps = ReactOnRails::VersionSynchronizer::PACKAGE_SECTIONS.each_with_object({}) do |section, deps|
-          deps.merge!(package_json[section] || {})
-        end
+        packages = ["react-on-rails"]
+        packages << "react-on-rails-pro" if ReactOnRails::Utils.react_on_rails_pro?
 
-        check_npm_wildcard_for(all_deps, "react-on-rails")
-        check_npm_wildcard_for(all_deps, "react-on-rails-pro") if ReactOnRails::Utils.react_on_rails_pro?
+        packages.each do |package_name|
+          ReactOnRails::VersionSynchronizer::PACKAGE_SECTIONS.each do |section|
+            deps = package_json[section] || {}
+            next unless deps.key?(package_name)
+
+            check_npm_wildcard_for(deps, package_name)
+          end
+        end
       rescue JSON::ParserError
         # Ignore JSON parsing errors
       rescue StandardError
@@ -604,8 +612,8 @@ module ReactOnRails
       npm_version = all_deps[package_name]
       return unless npm_version
 
-      # Skip workspace/local-link specs that cannot be compared or rewritten
-      return if npm_version.match?(/\A(?:workspace:|file:|link:)/)
+      # Skip workspace/local-link specs and npm aliases that cannot be trivially compared
+      return if npm_version.match?(/\A(?:workspace:|file:|link:|npm:)/)
 
       if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(npm_version)
         checker.add_success("✅ package.json uses exact version for #{package_name}")

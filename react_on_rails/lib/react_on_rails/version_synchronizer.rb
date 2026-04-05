@@ -146,13 +146,13 @@ module ReactOnRails
       version.is_a?(String) && version.match?(EXACT_VERSION_REGEX)
     end
 
-    # Strips forward-looking semver range prefixes (^, ~, >=, >) and returns the bare version.
-    # Excludes < and <= because those are upper-bound constraints with different semantics
-    # that should not be silently pinned to an exact version.
+    # Strips forward-looking semver range prefixes (^, ~, >=) and returns the bare version.
+    # Excludes bare > (strict greater-than), < and <= because pinning >X.Y.Z to exactly X.Y.Z
+    # would contradict the user's explicit exclusion of that version.
     def strip_range_prefix(version_spec)
       return nil unless version_spec.is_a?(String)
 
-      stripped = version_spec.sub(/\A(?:\^|~|>=?)\s*/, "")
+      stripped = version_spec.sub(/\A(?:\^|~|>=)\s*/, "")
       return stripped if stripped != version_spec && exact_version?(stripped)
 
       nil
