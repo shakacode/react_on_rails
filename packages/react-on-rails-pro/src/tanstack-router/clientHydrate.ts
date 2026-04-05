@@ -1,4 +1,4 @@
-import { Suspense, createElement, useEffect, useRef, type ComponentType, type ReactElement } from 'react';
+import { Suspense, createElement, useEffect, useRef, type ReactElement } from 'react';
 import type {
   DehydratedRouterState,
   TanStackHistory,
@@ -21,6 +21,24 @@ type TanStackRouterChunkPreloadInternals = TanStackRouter & {
   loadRouteChunk?: (route: unknown) => Promise<unknown>;
   looseRoutesById?: Record<string, unknown>;
 };
+
+interface RouteChunkPreloadGateProps {
+  preloadPromise: Promise<void> | null;
+  preloadSettledRef: { current: boolean };
+  children?: ReactElement;
+}
+
+function RouteChunkPreloadGate({
+  preloadPromise,
+  preloadSettledRef,
+  children,
+}: RouteChunkPreloadGateProps): ReactElement {
+  if (preloadPromise && !preloadSettledRef.current) {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- Suspense boundaries intentionally suspend on thrown Promise.
+    throw preloadPromise;
+  }
+  return children as ReactElement;
+}
 
 function extractDehydratedData(dehydratedRouter: unknown): unknown {
   if (!dehydratedRouter || typeof dehydratedRouter !== 'object') {
@@ -105,7 +123,11 @@ function rehydrateMatchId(dehydratedId: string): string {
  * client render can access the same data the server used, preventing mismatches
  * for routes that render from loader results.
  */
-function applyDehydratedMatchData(matches: unknown[], ssrMatches: TanStackSsrMatch[]): unknown[] {
+function applyDehydratedMatchData(
+  matches: unknown[],
+  ssrMatches: TanStackSsrMatch[],
+  onMissingSsrMatch?: (match: Record<string, unknown>) => void,
+): unknown[] {
   return matches.map((match) => {
     const m = match as Record<string, unknown>;
     const ssrMatch = ssrMatches.find((sm) => rehydrateMatchId(sm.i) === m.id);
@@ -125,6 +147,7 @@ function applyDehydratedMatchData(matches: unknown[], ssrMatches: TanStackSsrMat
     // No server match — override pending to success to prevent MatchInner
     // from throwing loadPromise (which would cause Suspense suspension).
     if (m.status === 'pending') {
+      onMissingSsrMatch?.(m);
       return { ...m, status: 'success' };
     }
 
@@ -152,6 +175,26 @@ function TanStackHydrationApp({
   const didTriggerPostHydrationLoadRef = useRef(false);
   const didSetSsrFlagRef = useRef(false);
   const routeChunkPreloadPromiseRef = useRef<Promise<void> | null>(null);
+  const routeChunkPreloadSettledRef = useRef(true);
+  const hydrationCallbackPromiseRef = useRef<Promise<void> | null>(null);
+  const didWarnPrivateInternalsRef = useRef(false);
+  const warnedMissingSsrMatchIdsRef = useRef<Set<string>>(new Set());
+
+  const warnMissingSsrMatch = (match: Record<string, unknown>): void => {
+    if (process.env.NODE_ENV !== 'development') {
+      return;
+    }
+    const routeId =
+      typeof match.id === 'string' || typeof match.id === 'number' ? String(match.id) : '<unknown>';
+    if (warnedMissingSsrMatchIdsRef.current.has(routeId)) {
+      return;
+    }
+    warnedMissingSsrMatchIdsRef.current.add(routeId);
+    console.warn(
+      `react-on-rails-pro/tanstack-router: No server match found for route "${routeId}". ` +
+        'Overriding match.status from "pending" to "success" to prevent hydration suspension.',
+    );
+  };
 
   if (routerRef.current === null) {
     const router = options.createRouter();
@@ -164,6 +207,15 @@ function TanStackHydrationApp({
     // Client-only renders (prerender: false) must not set router.ssr or
     // inject matches — the Transitioner handles initial loading for those.
     if (hasSsrPayload) {
+      if (process.env.NODE_ENV === 'development' && !didWarnPrivateInternalsRef.current) {
+        didWarnPrivateInternalsRef.current = true;
+        console.warn(
+          'react-on-rails-pro/tanstack-router: Hydration uses TanStack Router private internals ' +
+            '(matchRoutes, __store, loadRouteChunk, looseRoutesById). Keep @tanstack/react-router ' +
+            'within the supported range (>=1.139.0 <2.0.0) and run integration tests when upgrading.',
+        );
+      }
+
       // Validate internal APIs before using them.
       if (typeof router.matchRoutes !== 'function' || !router.__store?.setState) {
         throw new Error(
@@ -188,12 +240,24 @@ function TanStackHydrationApp({
         router as TanStackRouterChunkPreloadInternals,
         rawMatches,
       );
+      if (routeChunkPreloadPromiseRef.current) {
+        routeChunkPreloadSettledRef.current = false;
+        void routeChunkPreloadPromiseRef.current.finally(() => {
+          routeChunkPreloadSettledRef.current = true;
+        });
+      } else {
+        routeChunkPreloadSettledRef.current = true;
+      }
       const ssrMatches = dehydratedState?.ssrRouter?.matches;
       const matches = ssrMatches?.length
-        ? applyDehydratedMatchData(rawMatches, ssrMatches)
+        ? applyDehydratedMatchData(rawMatches, ssrMatches, warnMissingSsrMatch)
         : rawMatches.map((match) => {
             const m = match as Record<string, unknown>;
-            return m.status === 'pending' ? { ...m, status: 'success' } : m;
+            if (m.status === 'pending') {
+              warnMissingSsrMatch(m);
+              return { ...m, status: 'success' };
+            }
+            return m;
           });
 
       hydrationRouter.__store.setState((s: Record<string, unknown>) => ({
@@ -221,12 +285,14 @@ function TanStackHydrationApp({
           const hydrationResult = router.options.hydrate(
             extractDehydratedData(dehydratedState?.dehydratedRouter),
           );
-          void Promise.resolve(hydrationResult).catch((error: unknown) => {
-            console.error(
-              'react-on-rails-pro/tanstack-router: Error in router.options.hydrate callback:',
-              error,
-            );
-          });
+          hydrationCallbackPromiseRef.current = Promise.resolve(hydrationResult)
+            .then(() => undefined)
+            .catch((error: unknown) => {
+              console.error(
+                'react-on-rails-pro/tanstack-router: Error in router.options.hydrate callback:',
+                error,
+              );
+            });
         }
 
         // Backward-compatibility hook: if user router exposes router.hydrate(),
@@ -264,6 +330,9 @@ function TanStackHydrationApp({
 
     let cancelled = false;
     const runPostHydrationLoad = async (): Promise<void> => {
+      if (hydrationCallbackPromiseRef.current) {
+        await hydrationCallbackPromiseRef.current;
+      }
       if (routeChunkPreloadPromiseRef.current) {
         await routeChunkPreloadPromiseRef.current;
       }
@@ -308,15 +377,23 @@ function TanStackHydrationApp({
   // introduces a Suspense boundary that doesn't exist in the server HTML,
   // causing React hydration mismatch errors.
   //
-  // Suspense safety net: if a code-split route chunk hasn't loaded by the time
-  // React hydrates (rare — SSR includes <script> tags for chunks, so modules
-  // are typically cached before JS runs), the lazy route component may suspend.
-  // Wrapping in Suspense lets React 18+ keep the server HTML visible while the
-  // chunk loads, rather than crashing with an unhandled suspension.
+  // RouteChunkPreloadGate blocks the first render until matched lazy chunks
+  // finish preloading (when preload support is available), reducing hydration
+  // instability from lazy route suspensions.
+  //
+  // Suspense fallback remains null by design: we avoid rendering additional
+  // placeholder markup while waiting for preloads.
   let app: ReactElement = createElement(
     Suspense,
     { fallback: null },
-    createElement(RouterProvider, { router }),
+    createElement(
+      RouteChunkPreloadGate,
+      {
+        preloadPromise: routeChunkPreloadPromiseRef.current,
+        preloadSettledRef: routeChunkPreloadSettledRef,
+      },
+      createElement(RouterProvider, { router }),
+    ),
   );
   if (options.AppWrapper) {
     const wrapperProps = { ...incomingProps } as Record<string, unknown>;
@@ -327,27 +404,13 @@ function TanStackHydrationApp({
   return app;
 }
 
-let didWarnRouterClientDeprecated = false;
-
 export function clientHydrateTanStackApp(
   options: TanStackRouterOptions,
   props: Record<string, unknown>,
   railsContext: RailsContext & { serverSide: false },
   RouterProvider: React.ComponentType<{ router: TanStackRouter }>,
-  // RouterClient is accepted for backward compatibility but intentionally unused.
-  // See TanStackHydrationApp JSDoc for why RouterProvider is used directly.
-  _RouterClient: ComponentType<{ router: TanStackRouter }> | undefined,
   createBrowserHistory: () => TanStackHistory,
 ): ReactElement {
-  if (_RouterClient && !didWarnRouterClientDeprecated) {
-    didWarnRouterClientDeprecated = true;
-    console.warn(
-      'react-on-rails-pro/tanstack-router: The RouterClient parameter is deprecated and ignored. ' +
-        'RouterProvider is now used directly to avoid SSR hydration mismatches. ' +
-        'You can safely remove the RouterClient import from your createTanStackRouterRenderFunction call.',
-    );
-  }
-
   return createElement(TanStackHydrationApp, {
     options,
     incomingProps: props,

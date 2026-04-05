@@ -45,7 +45,7 @@ function buildRouter(): TanStackRouter {
     looseRoutesById: {
       '/products': productsRoute,
     },
-    loadRouteChunk: jest.fn().mockResolvedValue([]),
+    loadRouteChunk: undefined,
     state,
     options: {
       hydrate: jest.fn(),
@@ -270,6 +270,57 @@ describe('tanstack-router integration (Pro)', () => {
     expect(html).not.toContain('RouterClient');
     expect(providerCalls.length).toBeGreaterThan(0);
     expect(clientCalls).toHaveLength(0);
+  });
+
+  it('warns once per render function when RouterClient is provided', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const RouterClientA = (_: { router: TanStackRouter }) => React.createElement('div');
+    const RouterClientB = (_: { router: TanStackRouter }) => React.createElement('div');
+
+    const createDeps = (routerClient: (p: { router: TanStackRouter }) => React.ReactElement) => ({
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      RouterClient: routerClient,
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '',
+          hash: '',
+          href: '/products',
+          state: null,
+        },
+      }),
+    });
+
+    const renderFnA = createTanStackRouterRenderFunction(
+      { createRouter: () => buildRouter() },
+      createDeps(RouterClientA),
+    );
+    const appA = renderFnA({}, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext) as (props?: Record<string, unknown>) => React.ReactElement;
+    appA({});
+    appA({});
+
+    const renderFnB = createTanStackRouterRenderFunction(
+      { createRouter: () => buildRouter() },
+      createDeps(RouterClientB),
+    );
+    const appB = renderFnB({}, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext) as (props?: Record<string, unknown>) => React.ReactElement;
+    appB({});
+
+    const deprecationWarnings = warnSpy.mock.calls.filter((call) =>
+      String(call[0]).includes('RouterClient parameter is deprecated and ignored'),
+    );
+    expect(deprecationWarnings).toHaveLength(2);
+
+    warnSpy.mockRestore();
   });
 
   it('injects SSR match data into router store to prevent Suspense suspension during hydration', () => {
@@ -550,6 +601,46 @@ describe('tanstack-router integration (Pro)', () => {
     expect(loadRouteChunk).toHaveBeenNthCalledWith(2, productsRoute);
   });
 
+  it('throws a clear error when required hydration internals are unavailable', () => {
+    const router = buildRouter();
+    delete router.matchRoutes;
+    delete router.__store;
+
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '',
+          hash: '',
+          href: '/products',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+      },
+    };
+    const result = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '',
+    } as unknown as RailsContext);
+
+    expect(() =>
+      renderToString(React.createElement(result as React.ComponentType<Record<string, unknown>>, props)),
+    ).toThrow(/router\.matchRoutes\(\) and router\.__store are required/);
+  });
+
   it('runs router.options.hydrate callback with dehydratedData on the SSR hydration path', () => {
     const router = buildRouter();
     const hydrateCallback = jest.fn();
@@ -607,6 +698,74 @@ describe('tanstack-router integration (Pro)', () => {
 
     expect(hydrateCallback).toHaveBeenCalledTimes(1);
     expect(hydrateCallback).toHaveBeenCalledWith(dehydratedData);
+  });
+
+  it('waits for async router.options.hydrate before triggering post-hydration router.load', async () => {
+    const router = buildRouter();
+    let resolveHydrate: (() => void) | undefined;
+    const hydrateCallback = jest.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveHydrate = resolve;
+        }),
+    );
+    router.options = { hydrate: hydrateCallback };
+    router.load = jest.fn().mockResolvedValue(undefined);
+
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: {
+          matches: [{ id: 'products' }],
+          dehydratedData: { queryCache: { products: ['hammer'] } },
+        },
+      },
+    };
+    const clientApp = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await compatAct(async () => {
+      root.render(React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props));
+      await Promise.resolve();
+    });
+
+    expect(hydrateCallback).toHaveBeenCalledTimes(1);
+    expect(router.load).not.toHaveBeenCalled();
+
+    await compatAct(async () => {
+      resolveHydrate?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(router.load).toHaveBeenCalledTimes(1);
+
+    await compatAct(async () => {
+      root.unmount();
+    });
   });
 
   it('clears router.ssr after the post-hydration legacy load settles', async () => {

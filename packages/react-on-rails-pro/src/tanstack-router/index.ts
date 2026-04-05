@@ -82,6 +82,7 @@ export function createTanStackRouterRenderFunction(
   deps: TanStackRouterDeps,
 ): RenderFunction {
   const { RouterProvider, RouterClient, createMemoryHistory, createBrowserHistory } = deps;
+  let didWarnRouterClientDeprecated = false;
 
   const renderFn = (
     props: Record<string, unknown> = {},
@@ -114,12 +115,20 @@ export function createTanStackRouterRenderFunction(
     // This intentionally creates a fresh closure per renderFn call so the client component
     // captures the current railsContext and TanStack Router dependencies for that mount.
     return function TanStackRouterClientApp(clientProps: Record<string, unknown> = {}) {
+      if (RouterClient && !didWarnRouterClientDeprecated) {
+        didWarnRouterClientDeprecated = true;
+        console.warn(
+          'react-on-rails-pro/tanstack-router: The RouterClient parameter is deprecated and ignored. ' +
+            'RouterProvider is now used directly to avoid SSR hydration mismatches. ' +
+            'You can safely remove the RouterClient import from your createTanStackRouterRenderFunction call.',
+        );
+      }
+
       return clientHydrateTanStackApp(
         options,
         clientProps,
         railsContext as RailsContext & { serverSide: false },
         RouterProvider,
-        RouterClient,
         createBrowserHistory,
       );
     };
