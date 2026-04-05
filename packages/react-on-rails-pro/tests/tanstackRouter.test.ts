@@ -56,7 +56,13 @@ function buildRouter(): TanStackRouter {
 }
 
 async function compatAct(callback: () => void | Promise<void>): Promise<void> {
-  await React.act(callback);
+  // React 19 exports act on the React object; React 18 exports it from react-dom/test-utils
+  const actFn =
+    typeof React.act === 'function'
+      ? React.act
+      : // eslint-disable-next-line @typescript-eslint/no-require-imports
+        (require('react-dom/test-utils') as { act: typeof React.act }).act;
+  await actFn(callback);
 }
 
 describe('tanstack-router integration (Pro)', () => {
