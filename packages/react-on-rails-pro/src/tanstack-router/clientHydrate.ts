@@ -59,7 +59,8 @@ function preloadMatchedRouteChunks(
   router: TanStackRouterChunkPreloadInternals,
   matches: unknown[],
 ): Promise<void> | null {
-  if (typeof router.loadRouteChunk !== 'function' || !router.looseRoutesById) {
+  const { loadRouteChunk, looseRoutesById } = router;
+  if (typeof loadRouteChunk !== 'function' || !looseRoutesById) {
     return null;
   }
 
@@ -70,12 +71,12 @@ function preloadMatchedRouteChunks(
       return;
     }
 
-    const route = router.looseRoutesById?.[routeId];
+    const route = looseRoutesById[routeId];
     if (!route) {
       return;
     }
 
-    routeChunkPromises.push(router.loadRouteChunk(route));
+    routeChunkPromises.push(loadRouteChunk(route));
   });
 
   if (!routeChunkPromises.length) {
