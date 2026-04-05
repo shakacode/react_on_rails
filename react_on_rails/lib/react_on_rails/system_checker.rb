@@ -222,8 +222,9 @@ module ReactOnRails
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
 
-        # Skip workspace/local-link specs that cannot be compared or rewritten
-        return if npm_version.match?(/\A(?:workspace:|file:|link:)/)
+        # Skip workspace/local-link specs and non-exact range specs.
+        # Doctor#check_version_wildcards handles wildcard/range detection.
+        return if npm_version.match?(/\A(?:workspace:|file:|link:|[\^~><*])/) || npm_version.include?(" ")
 
         # Normalize NPM version format to Ruby gem format for comparison
         # Uses existing VersionSyntaxConverter to handle dash/dot differences
@@ -235,38 +236,41 @@ module ReactOnRails
         if normalized_npm_version == gem_version
           add_success("✅ React on Rails gem and #{package_name} NPM package versions match (#{gem_version})")
         else
-          # Check for major version differences
-          gem_major = gem_version.split(".")[0].to_i
-          npm_major = normalized_npm_version.split(".")[0].to_i
-
-          if gem_major != npm_major # rubocop:disable Style/NegatedIfElseCondition
-            add_error(<<~MSG.strip)
-              🚫 Major version mismatch detected:
-              • Gem version: #{gem_version} (major: #{gem_major})
-              • #{package_name} version: #{npm_version} (major: #{npm_major})
-
-              Major version differences can cause serious compatibility issues.
-              Update both packages to use the same major version immediately.
-
-              Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
-            MSG
-          else
-            add_error(<<~MSG.strip)
-              🚫 Version mismatch detected:
-              • Gem version: #{gem_version}
-              • #{package_name} version: #{npm_version}
-
-              The gem and npm package versions must match exactly. Mismatched versions
-              will cause a runtime error on app startup.
-
-              Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
-            MSG
-          end
+          report_version_mismatch(package_name, npm_version, normalized_npm_version, gem_version)
         end
       rescue JSON::ParserError
         # Ignore parsing errors, already handled elsewhere
       rescue StandardError
         # Handle other errors gracefully
+      end
+    end
+
+    def report_version_mismatch(package_name, npm_version, normalized_npm_version, gem_version)
+      gem_major = gem_version.split(".")[0].to_i
+      npm_major = normalized_npm_version.split(".")[0].to_i
+
+      if gem_major != npm_major # rubocop:disable Style/NegatedIfElseCondition
+        add_error(<<~MSG.strip)
+          🚫 Major version mismatch detected:
+          • Gem version: #{gem_version} (major: #{gem_major})
+          • #{package_name} version: #{npm_version} (major: #{npm_major})
+
+          Major version differences can cause serious compatibility issues.
+          Update both packages to use the same major version immediately.
+
+          Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      else
+        add_error(<<~MSG.strip)
+          🚫 Version mismatch detected:
+          • Gem version: #{gem_version}
+          • #{package_name} version: #{npm_version}
+
+          The gem and npm package versions must match exactly. Mismatched versions
+          will cause a runtime error on app startup.
+
+          Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
       end
     end
 
@@ -733,58 +737,6 @@ module ReactOnRails
 
         Install them with:
         npm install #{missing_deps.join(' ')}
-      MSG
-    end
-
-    def check_version_patterns(npm_version, _gem_version)
-      # Check for version range patterns in package.json
-      return unless /^[\^~><*]/.match?(npm_version) || npm_version.include?(" ")
-
-      add_error(<<~MSG.strip)
-        🚫 NPM package uses a non-exact version: #{npm_version}
-
-        React on Rails requires exact version matching. Non-exact constraints will
-        cause a runtime error on app startup.
-
-        Fix: bundle exec rake react_on_rails:sync_versions WRITE=true
-      MSG
-    end
-
-    def check_gemfile_version_patterns
-      gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-      return unless File.exist?(gemfile_path)
-
-      begin
-        gemfile_content = File.read(gemfile_path)
-        check_gemfile_version_pattern_for(gemfile_content, "react_on_rails")
-        if ReactOnRails::Utils.react_on_rails_pro?
-          check_gemfile_version_pattern_for(gemfile_content,
-                                            "react_on_rails_pro")
-        end
-      rescue StandardError
-        # Ignore errors reading Gemfile
-      end
-    end
-
-    def check_gemfile_version_pattern_for(gemfile_content, gem_name)
-      gem_line = gemfile_content.lines.find { |line| line.match(/^\s*gem\s+['"]#{gem_name}['"]/) }
-      return unless gem_line
-
-      return unless /['"][~^]/.match?(gem_line) || />=\s*/.match?(gem_line)
-
-      version = if gem_name == "react_on_rails_pro"
-                  ReactOnRails::Utils.react_on_rails_pro_version
-                else
-                  ReactOnRails::VERSION
-                end
-      add_error(<<~MSG.strip)
-        🚫 Gemfile uses a non-exact version constraint for #{gem_name}.
-
-        React on Rails requires exact version matching between the gem and npm package.
-        Non-exact constraints can cause versions to drift apart, leading to runtime errors.
-
-        Fix: Use an exact version in your Gemfile:
-          gem '#{gem_name}', '#{version}'
       MSG
     end
 

@@ -220,72 +220,6 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
   end
 
-  describe "#check_version_patterns" do
-    it "errors on caret version patterns" do
-      checker.send(:check_version_patterns, "^16.0.0", "16.0.0")
-      expect(checker.errors?).to be true
-      expect(checker.messages.last[:content]).to include("non-exact version")
-    end
-
-    it "errors on tilde version patterns" do
-      checker.send(:check_version_patterns, "~16.0.0", "16.0.0")
-      expect(checker.errors?).to be true
-      expect(checker.messages.last[:content]).to include("non-exact version")
-    end
-
-    it "does not warn about exact versions" do
-      initial_message_count = checker.messages.count
-      checker.send(:check_version_patterns, "16.0.0", "16.0.0")
-      expect(checker.messages.count).to eq(initial_message_count)
-    end
-  end
-
-  describe "#check_gemfile_version_patterns" do
-    context "when Gemfile has version patterns" do
-      let(:gemfile_content) do
-        <<~GEMFILE
-          gem 'rails', '~> 7.0'
-          gem 'react_on_rails', '~> 16.0'
-          gem 'other_gem'
-        GEMFILE
-      end
-
-      before do
-        gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-        allow(File).to receive(:exist?).with(gemfile_path).and_return(true)
-        allow(File).to receive(:read).with(gemfile_path).and_return(gemfile_content)
-        stub_const("ReactOnRails::VERSION", "16.0.0")
-      end
-
-      it "errors on non-exact version patterns" do
-        checker.send(:check_gemfile_version_patterns)
-        expect(checker.errors?).to be true
-        expect(checker.messages.last[:content]).to include("non-exact version constraint")
-      end
-    end
-
-    context "when Gemfile has exact versions" do
-      let(:gemfile_content) do
-        <<~GEMFILE
-          gem 'rails', '7.0.0'
-          gem 'react_on_rails', '16.0.0'
-        GEMFILE
-      end
-
-      before do
-        gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-        allow(File).to receive(:exist?).with(gemfile_path).and_return(true)
-        allow(File).to receive(:read).with(gemfile_path).and_return(gemfile_content)
-      end
-
-      it "does not warn about exact versions" do
-        initial_message_count = checker.messages.count
-        checker.send(:check_gemfile_version_patterns)
-        expect(checker.messages.count).to eq(initial_message_count)
-      end
-    end
-  end
-
   describe "#check_react_on_rails_npm_package" do
     context "when package.json exists with react-on-rails" do
       let(:package_json_content) do
@@ -440,13 +374,10 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:read).with("package.json").and_return(package_json_content)
       end
 
-      it "adds a success message (wildcard detection is handled by Doctor)" do
+      it "skips range specs (wildcard detection is handled by Doctor)" do
+        initial_message_count = checker.messages.count
         checker.send(:check_package_version_sync)
-        expect(checker.messages.any? do |msg|
-          msg[:type] == :success && msg[:content].include?("versions match")
-        end).to be true
-        # Version pattern errors are now detected by Doctor#check_version_wildcards
-        # to avoid duplicate error messages
+        expect(checker.messages.count).to eq(initial_message_count)
         expect(checker.errors?).to be false
       end
     end

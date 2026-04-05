@@ -2,6 +2,7 @@
 
 require "json"
 require "erb"
+require "stringio"
 require "yaml"
 require_relative "utils"
 require_relative "config_path_resolver"
@@ -531,10 +532,7 @@ module ReactOnRails
       return unless react_line
 
       version_match = react_line.match(/gem\s+['"]#{gem_name}['"]\s*,\s*['"]([^'"]+)['"]/)
-      unless version_match
-        checker.add_success("✅ Gemfile uses exact version for #{gem_name}")
-        return
-      end
+      return report_missing_gem_version(gem_name) unless version_match
 
       exact = begin
         Gem::Requirement.new(version_match[1]).exact?
@@ -545,20 +543,41 @@ module ReactOnRails
       if exact
         checker.add_success("✅ Gemfile uses exact version for #{gem_name}")
       else
-        version = if gem_name == "react_on_rails_pro"
-                    ReactOnRails::Utils.react_on_rails_pro_version
-                  else
-                    ReactOnRails::VERSION
-                  end
-        checker.add_error(<<~MSG.strip)
-          🚫 Gemfile uses a non-exact version constraint for #{gem_name}.
+        report_non_exact_gem_version(gem_name)
+      end
+    end
 
-          React on Rails requires exact version matching between the gem and npm package.
-          Non-exact constraints can cause the gem and npm package to drift apart.
+    def report_missing_gem_version(gem_name)
+      version = gem_expected_version(gem_name)
+      checker.add_error(<<~MSG.strip)
+        🚫 Gemfile specifies no version for #{gem_name}.
 
-          Fix: Use an exact version in your Gemfile:
-            gem '#{gem_name}', '#{version}'
-        MSG
+        React on Rails requires exact version pinning. Without a version constraint,
+        bundler may install any version and it can drift from the npm package.
+
+        Fix: Use an exact version in your Gemfile:
+          gem '#{gem_name}', '#{version}'
+      MSG
+    end
+
+    def report_non_exact_gem_version(gem_name)
+      version = gem_expected_version(gem_name)
+      checker.add_error(<<~MSG.strip)
+        🚫 Gemfile uses a non-exact version constraint for #{gem_name}.
+
+        React on Rails requires exact version matching between the gem and npm package.
+        Non-exact constraints can cause the gem and npm package to drift apart.
+
+        Fix: Use an exact version in your Gemfile:
+          gem '#{gem_name}', '#{version}'
+      MSG
+    end
+
+    def gem_expected_version(gem_name)
+      if gem_name == "react_on_rails_pro"
+        ReactOnRails::Utils.react_on_rails_pro_version
+      else
+        ReactOnRails::VERSION
       end
     end
 
@@ -584,6 +603,9 @@ module ReactOnRails
     def check_npm_wildcard_for(all_deps, package_name)
       npm_version = all_deps[package_name]
       return unless npm_version
+
+      # Skip workspace/local-link specs that cannot be compared or rewritten
+      return if npm_version.match?(/\A(?:workspace:|file:|link:)/)
 
       if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(npm_version)
         checker.add_success("✅ package.json uses exact version for #{package_name}")
@@ -612,19 +634,41 @@ module ReactOnRails
       package_json_path = resolved_package_json_path
       return unless File.exist?(package_json_path)
 
-      synchronizer = ReactOnRails::VersionSynchronizer.new(package_json_path: package_json_path)
+      synchronizer = ReactOnRails::VersionSynchronizer.new(package_json_path: package_json_path, io: StringIO.new)
       result = synchronizer.sync(write: true)
 
+      report_sync_changes(result)
+      report_skipped_specs(result)
+    rescue StandardError => e
+      checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
+    end
+
+    def report_sync_changes(result)
       if result.changes.any?
         checker.add_success("  ✅ FIX=true: Synced package.json versions (#{result.changes.length} update(s))")
         result.changes.each do |change|
           checker.add_info("    #{change[:section]}.#{change[:package]}: #{change[:from]} -> #{change[:to]}")
         end
+      elsif result.unsupported_specs.any? || result.missing_source_specs.any?
+        checker.add_warning("  ⚠️  FIX=true: Some package.json specs could not be auto-synced")
       else
         checker.add_info("  ℹ️  FIX=true: No package.json version changes needed")
       end
-    rescue StandardError => e
-      checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
+    end
+
+    def report_skipped_specs(result)
+      result.unsupported_specs.each do |spec|
+        checker.add_warning(
+          "  ⚠️  FIX=true: Skipped unsupported spec " \
+          "#{spec[:section]}.#{spec[:package]}: #{spec[:version]}"
+        )
+      end
+      result.missing_source_specs.each do |spec|
+        checker.add_warning(
+          "  ⚠️  FIX=true: Skipped #{spec[:section]}.#{spec[:package]} " \
+          "(#{spec[:source]} gem not loaded)"
+        )
+      end
     end
 
     def check_pro_package_consistency
