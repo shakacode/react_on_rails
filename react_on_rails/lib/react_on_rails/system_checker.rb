@@ -224,7 +224,7 @@ module ReactOnRails
 
         # Skip workspace/local-link specs and non-exact range specs.
         # Doctor#check_version_wildcards handles wildcard/range detection.
-        return if npm_version.match?(/\A(?:workspace:|file:|link:|[\^~><*])/) || npm_version.include?(" ")
+        return if npm_version.match?(/\A(?:workspace:|file:|link:|npm:|[\^~><*])/) || npm_version.include?(" ")
 
         # Normalize NPM version format to Ruby gem format for comparison
         # Uses existing VersionSyntaxConverter to handle dash/dot differences

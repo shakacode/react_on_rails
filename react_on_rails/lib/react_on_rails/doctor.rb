@@ -591,7 +591,10 @@ module ReactOnRails
       begin
         package_json = JSON.parse(File.read(package_json_path))
         packages = ["react-on-rails"]
-        packages << "react-on-rails-pro" if ReactOnRails::Utils.react_on_rails_pro?
+        if ReactOnRails::Utils.react_on_rails_pro?
+          packages << "react-on-rails-pro"
+          packages << "react-on-rails-pro-node-renderer"
+        end
 
         packages.each do |package_name|
           ReactOnRails::VersionSynchronizer::PACKAGE_SECTIONS.each do |section|
@@ -599,6 +602,7 @@ module ReactOnRails
             next unless deps.key?(package_name)
 
             check_npm_wildcard_for(deps, package_name)
+            break # only report once per package (avoid duplicates if listed in multiple sections)
           end
         end
       rescue JSON::ParserError
