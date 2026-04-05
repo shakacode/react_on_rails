@@ -440,12 +440,14 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:read).with("package.json").and_return(package_json_content)
       end
 
-      it "adds a success message and version pattern error" do
+      it "adds a success message (wildcard detection is handled by Doctor)" do
         checker.send(:check_package_version_sync)
         expect(checker.messages.any? do |msg|
           msg[:type] == :success && msg[:content].include?("versions match")
         end).to be true
-        expect(checker.errors?).to be true
+        # Version pattern errors are now detected by Doctor#check_version_wildcards
+        # to avoid duplicate error messages
+        expect(checker.errors?).to be false
       end
     end
 

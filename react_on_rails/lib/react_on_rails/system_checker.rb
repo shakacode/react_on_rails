@@ -169,11 +169,12 @@ module ReactOnRails
     end
 
     # React on Rails package validation
+    # NOTE: Wildcard/non-exact version checks (Gemfile and npm) are handled by
+    # Doctor#check_version_wildcards to avoid duplicate error messages.
     def check_react_on_rails_packages
       check_react_on_rails_gem
       check_react_on_rails_npm_package
       check_package_version_sync
-      check_gemfile_version_patterns
     end
 
     def check_react_on_rails_gem
@@ -221,6 +222,9 @@ module ReactOnRails
 
         return unless npm_version && defined?(ReactOnRails::VERSION)
 
+        # Skip workspace/local-link specs that cannot be compared or rewritten
+        return if npm_version.match?(/\A(?:workspace:|file:|link:)/)
+
         # Normalize NPM version format to Ruby gem format for comparison
         # Uses existing VersionSyntaxConverter to handle dash/dot differences
         # (e.g., "16.2.0-beta.10" → "16.2.0.beta.10")
@@ -230,7 +234,6 @@ module ReactOnRails
 
         if normalized_npm_version == gem_version
           add_success("✅ React on Rails gem and #{package_name} NPM package versions match (#{gem_version})")
-          check_version_patterns(npm_version, gem_version)
         else
           # Check for major version differences
           gem_major = gem_version.split(".")[0].to_i

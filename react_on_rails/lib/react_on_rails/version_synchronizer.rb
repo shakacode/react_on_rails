@@ -59,7 +59,7 @@ module ReactOnRails
       raise ReactOnRails::Error, "Unable to read #{package_json_path}: #{e.message}"
     end
 
-    def detect_changes(package_json_data)
+    def detect_changes(package_json_data) # rubocop:disable Metrics/CyclomaticComplexity
       expected_versions = expected_package_versions
       changes = []
       unsupported_specs = []
@@ -85,7 +85,7 @@ module ReactOnRails
             next
           end
           normalized_current_version = converter.rubygem_to_npm(parsed_spec[:version])
-          next if normalized_current_version == expected_version
+          next if normalized_current_version == expected_version && !parsed_spec[:non_exact]
 
           changes << {
             section: section,
@@ -146,18 +146,20 @@ module ReactOnRails
       version.is_a?(String) && version.match?(EXACT_VERSION_REGEX)
     end
 
-    # Strips semver range prefixes (^, ~, >=, etc.) and returns the bare version if valid.
+    # Strips forward-looking semver range prefixes (^, ~, >=, >) and returns the bare version.
+    # Excludes < and <= because those are upper-bound constraints with different semantics
+    # that should not be silently pinned to an exact version.
     def strip_range_prefix(version_spec)
       return nil unless version_spec.is_a?(String)
 
-      stripped = version_spec.sub(/\A[~^>=<]+\s*/, "")
-      return stripped if exact_version?(stripped)
+      stripped = version_spec.sub(/\A(?:\^|~|>=?)\s*/, "")
+      return stripped if stripped != version_spec && exact_version?(stripped)
 
       nil
     end
 
     def parse_supported_spec(version_spec)
-      return { version: version_spec, prefix: nil } if exact_version?(version_spec)
+      return { version: version_spec, prefix: nil, non_exact: false } if exact_version?(version_spec)
 
       # Handle npm alias syntax: npm:@scope/pkg@version
       if version_spec.is_a?(String) && version_spec.start_with?(NPM_ALIAS_PREFIX)
@@ -166,7 +168,7 @@ module ReactOnRails
 
       # Handle range prefixes: ^16.5.0, ~16.5.0, >=16.5.0, etc.
       stripped = strip_range_prefix(version_spec)
-      return { version: stripped, prefix: nil } if stripped
+      return { version: stripped, prefix: nil, non_exact: true } if stripped
 
       nil
     end
@@ -177,11 +179,11 @@ module ReactOnRails
 
       alias_version = version_spec[(at_index + 1)..]
       prefix = version_spec[0..at_index]
-      return { version: alias_version, prefix: prefix } if exact_version?(alias_version)
+      return { version: alias_version, prefix: prefix, non_exact: false } if exact_version?(alias_version)
 
       # Try stripping range prefix from alias version (e.g., npm:@scope/pkg@^16.5.0)
       stripped = strip_range_prefix(alias_version)
-      return { version: stripped, prefix: prefix } if stripped
+      return { version: stripped, prefix: prefix, non_exact: true } if stripped
 
       nil
     end
