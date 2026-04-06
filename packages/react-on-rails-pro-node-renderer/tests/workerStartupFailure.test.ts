@@ -3,7 +3,7 @@ import {
   isWorkerStartupFailureMessage,
   type WorkerStartupFailureMessage,
 } from '../src/shared/workerMessages';
-import { handleStartupListenError } from '../src/worker';
+import { handleStartupListenError } from '../src/worker/startupErrorHandler';
 
 describe('isWorkerStartupFailureMessage', () => {
   it('returns true for a valid startup failure message', () => {
