@@ -101,6 +101,151 @@ describe('worker', () => {
     expect(fs.existsSync(assetPathOther(testName, String(SECONDARY_BUNDLE_TIMESTAMP)))).toBe(true);
   });
 
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is missing', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+      })
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
+    expect(res.payload).toContain('Received type: undefined.');
+    expect(res.payload).toContain('Likely causes: request body truncation');
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest does not notify errorReporter for malformed renderingRequest', async () => {
+    const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());
+
+    try {
+      const app = worker({
+        serverBundleCachePath: serverBundleCachePathForTest(),
+      });
+
+      const res = await app
+        .inject()
+        .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+        .payload({
+          gemVersion,
+          protocolVersion,
+          railsEnv,
+        })
+        .end();
+
+      expect(res.statusCode).toBe(400);
+      expect(reportMessageSpy).not.toHaveBeenCalled();
+    } finally {
+      reportMessageSpy.mockRestore();
+    }
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is null', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: null,
+      })
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
+    expect(res.payload).toContain('Received type: null.');
+    expect(res.payload).toContain('Likely causes: request body truncation');
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is empty string', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: '',
+      })
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
+    expect(res.payload).toContain('Received type: string (empty).');
+    expect(res.payload).toContain('Likely causes: request body truncation');
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest returns actionable error when renderingRequest is an array', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        renderingRequest: ['a', 'b'],
+      })
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
+    expect(res.payload).toContain('Received type: array.');
+    expect(res.payload).toContain('Likely causes: request body truncation');
+  });
+
+  test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest filters sensitive body keys case-insensitively in invalid renderingRequest diagnostics', async () => {
+    const app = worker({
+      serverBundleCachePath: serverBundleCachePathForTest(),
+    });
+
+    const res = await app
+      .inject()
+      .post(`/bundles/${BUNDLE_TIMESTAMP}/render/d41d8cd98f00b204e9800998ecf8427e`)
+      .payload({
+        gemVersion,
+        protocolVersion,
+        railsEnv,
+        Password: 'super-secret',
+        apiKey: 'token',
+        Authorization: 'Bearer abc',
+        AUTH_TOKEN: 'auth',
+        accessToken: 'access',
+        authToken: 'auth-camel',
+        safeField: 'safe',
+      })
+      .end();
+
+    expect(res.statusCode).toBe(400);
+    expect(res.payload).toContain('Received body keys:');
+    expect(res.payload).not.toContain('Password');
+    expect(res.payload).not.toContain('apiKey');
+    expect(res.payload).not.toContain('Authorization');
+    expect(res.payload).not.toContain('AUTH_TOKEN');
+    expect(res.payload).not.toContain('accessToken');
+    expect(res.payload).not.toContain('authToken');
+    expect(res.payload).toContain('safeField');
+  });
+
   test('POST /bundles/:bundleTimestamp/render/:renderRequestDigest reports unexpected handleRenderRequest failures once', async () => {
     const buildVMSpy = jest.spyOn(vm, 'buildVM').mockRejectedValueOnce(new Error('Injected buildVM failure'));
     const reportMessageSpy = jest.spyOn(errorReporter, 'message').mockImplementation(jest.fn());

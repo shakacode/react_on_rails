@@ -74,9 +74,10 @@ module ReactOnRailsPro
             ReactOnRailsPro::Error.raise_duplicate_bundle_upload_error if send_bundle
 
             eval_js(js_code, render_options, send_bundle: true)
-          when 400
+          when ReactOnRailsPro::STATUS_BAD_REQUEST
             raise ReactOnRailsPro::Error,
-                  "Renderer unhandled error at the VM level: #{response.status}:\n#{response.body}"
+                  "Renderer rejected malformed request or hit an unhandled VM error: " \
+                  "#{response.status}:\n#{response.body}"
           else
             raise ReactOnRailsPro::Error,
                   "Unexpected response code from renderer: #{response.status}:\n#{response.body}"

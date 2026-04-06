@@ -49,13 +49,19 @@ export interface ResponseResult {
   stream?: Readable;
 }
 
-export function errorResponseResult(msg: string, tracingContext?: TracingContext): ResponseResult {
-  errorReporter.message(msg, tracingContext);
+const NO_CACHE_HEADERS = { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' } as const;
+
+export function badRequestResponseResult(msg: string): ResponseResult {
   return {
-    headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+    headers: NO_CACHE_HEADERS,
     status: 400,
     data: msg,
   };
+}
+
+export function errorResponseResult(msg: string, tracingContext?: TracingContext): ResponseResult {
+  errorReporter.message(msg, tracingContext);
+  return badRequestResponseResult(msg);
 }
 
 /**

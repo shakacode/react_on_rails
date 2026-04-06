@@ -41,7 +41,9 @@ async function prepareResult(
 
     let exceptionMessage = null;
     if (!result) {
-      const error = new Error('INVALID NIL or NULL result for rendering');
+      const error = new Error(
+        'INVALID NIL or NULL result for rendering. Ensure renderingRequest is a valid string and returns a value.',
+      );
       exceptionMessage = formatExceptionMessage(renderingRequest, error, 'INVALID result for prepareResult');
     } else if (isErrorRenderResult(result)) {
       ({ exceptionMessage } = result);
