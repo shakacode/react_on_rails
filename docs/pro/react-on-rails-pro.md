@@ -20,10 +20,6 @@ Because we own [HiChee.com](https://hichee.com), we can leverage that code for y
 Please email Justin Gordon [justin@shakacode.com](mailto:justin@shakacode.com), the
 maintainer of React on Rails, for more information.
 
-### Pro: Docs
-
-See the [React on Rails Pro docs home](./home-pro.md).
-
 ### Pro: React Server Components
 
 See the [performance breakthroughs guide here](./major-performance-breakthroughs-upgrade-guide.md).
