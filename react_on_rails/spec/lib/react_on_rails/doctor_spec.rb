@@ -1864,15 +1864,55 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#check_gem_wildcard_for" do
+    let(:doctor) { described_class.new }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    before do
+      stub_const("ReactOnRails::VERSION", "16.5.0")
+    end
+
+    it "accepts multiline Gemfile declarations with comment-only continuation lines" do
+      gemfile_content = <<~RUBY
+        gem 'react_on_rails',
+            # pinned for compatibility
+            '16.5.0'
+      RUBY
+
+      doctor.send(:check_gem_wildcard_for, gemfile_content, "react_on_rails")
+
+      expect(checker.messages.any? do |msg|
+        msg[:type] == :success && msg[:content].include?("Gemfile uses exact version for react_on_rails")
+      end).to be true
+      expect(checker.messages.any? do |msg|
+        msg[:type] == :error && msg[:content].include?("Gemfile specifies no version for react_on_rails")
+      end).to be false
+    end
+
+    it "accepts keyword-style Gemfile version declarations" do
+      gemfile_content = "gem 'react_on_rails', version: '16.5.0'\n"
+
+      doctor.send(:check_gem_wildcard_for, gemfile_content, "react_on_rails")
+
+      expect(checker.messages.any? do |msg|
+        msg[:type] == :success && msg[:content].include?("Gemfile uses exact version for react_on_rails")
+      end).to be true
+    end
+  end
+
   describe "#check_npm_alias_version" do
     let(:doctor) { described_class.new }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
     before do
+      stub_const("ReactOnRails::VERSION", "16.5.0")
       allow(ReactOnRails::Utils).to receive_messages(
         react_on_rails_pro_version: "16.5.0",
         package_manager_install_exact_command: "pnpm add react-on-rails-pro@16.5.0"
       )
+      allow(ReactOnRails::Utils).to receive(:package_manager_install_exact_command) do |package_name, version|
+        "pnpm add #{package_name}@#{version}"
+      end
     end
 
     it "reports an error for non-exact npm alias specs" do
@@ -1892,6 +1932,56 @@ RSpec.describe ReactOnRails::Doctor do
       expect(checker).to receive(:add_success).with("✅ package.json uses exact version for react-on-rails")
 
       doctor.send(:check_npm_alias_version, "npm:@scope/react-on-rails@16.5.0", "react-on-rails")
+    end
+
+    it "reports an error for exact npm alias versions that do not match expected version" do
+      expect(checker).to receive(:add_error).with(
+        include(
+          "npm alias version mismatch for react-on-rails: npm:@scope/react-on-rails@16.4.0",
+          "Expected exact version: 16.5.0",
+          "Fix: pnpm add react-on-rails@16.5.0"
+        )
+      )
+
+      doctor.send(:check_npm_alias_version, "npm:@scope/react-on-rails@16.4.0", "react-on-rails")
+    end
+
+    it "reports an error for npm aliases without a parseable trailing version" do
+      expect(checker).to receive(:add_error).with(
+        include(
+          "npm alias without a parseable version for react-on-rails: npm:@scope/react-on-rails",
+          "Fix: pnpm add react-on-rails@16.5.0"
+        )
+      )
+
+      doctor.send(:check_npm_alias_version, "npm:@scope/react-on-rails", "react-on-rails")
+    end
+  end
+
+  describe "#auto_fix_versions" do
+    let(:doctor) { described_class.new(verbose: false, fix: true) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    it "adds explicit guidance that Gemfile constraints are not auto-fixed" do
+      result = ReactOnRails::VersionSynchronizer::Result.new(
+        changes: [],
+        changed_files: [],
+        unsupported_specs: [],
+        missing_source_specs: []
+      )
+      synchronizer = instance_double(ReactOnRails::VersionSynchronizer, sync: result)
+
+      allow(doctor).to receive(:resolved_package_json_path).and_return("package.json")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("package.json").and_return(true)
+      allow(ReactOnRails::VersionSynchronizer).to receive(:new).and_return(synchronizer)
+
+      doctor.send(:auto_fix_versions)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).to include(
+        a_string_including("FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      )
     end
   end
 

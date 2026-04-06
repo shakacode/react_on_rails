@@ -205,6 +205,30 @@ module ReactOnRails
         end
       end
 
+      context "when a >= lower bound is above the expected gem version" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => ">=16.5.0"
+            }
+          )
+        end
+
+        it "skips auto-rewrite instead of pinning below the declared lower bound" do
+          result = synchronizer.sync(write: true)
+
+          expect(result.changes).to eq([])
+          expect(result.unsupported_specs).to contain_exactly(
+            {
+              section: "dependencies",
+              package: "react-on-rails",
+              version: ">=16.5.0"
+            }
+          )
+          expect(read_package_json.dig("dependencies", "react-on-rails")).to eq(">=16.5.0")
+        end
+      end
+
       context "when prerelease metadata has too many dotted segments" do
         before do
           write_package_json(

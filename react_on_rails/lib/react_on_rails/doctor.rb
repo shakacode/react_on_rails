@@ -532,16 +532,13 @@ module ReactOnRails
       line_index = lines.index { |line| line.match(/^\s*gem\s+['"]#{gem_name}['"]/) }
       return unless line_index
 
-      # Join with the next line to handle multi-line declarations (version on continuation line)
-      react_line = lines[line_index]
-      if react_line.rstrip.end_with?(",") && lines[line_index + 1]
-        react_line = "#{react_line.chomp} #{lines[line_index + 1]}"
-      end
+      react_line = build_gem_declaration_line(lines, line_index)
 
       # Skip path/git/github gems — these are development configurations where version checks don't apply
       return if react_line.match?(/\b(?:path|git|github):\s/)
 
-      version_match = react_line.match(/gem\s+['"]#{gem_name}['"]\s*,\s*['"]([^'"]+)['"]/)
+      version_match = react_line.match(/gem\s+['"]#{gem_name}['"]\s*,\s*['"]([^'"]+)['"]/) ||
+                      react_line.match(/gem\s+['"]#{gem_name}['"][^#\n]*\bversion:\s*['"]([^'"]+)['"]/)
       return report_missing_gem_version(gem_name) unless version_match
 
       exact = begin
@@ -555,6 +552,22 @@ module ReactOnRails
       else
         report_non_exact_gem_version(gem_name)
       end
+    end
+
+    def build_gem_declaration_line(lines, line_index)
+      declaration = lines[line_index]
+      look_ahead = line_index + 1
+
+      # Keep joining while the previous segment ends with a comma; skip blank/comment-only continuation lines.
+      while declaration.rstrip.end_with?(",") && lines[look_ahead]
+        next_line = lines[look_ahead]
+        look_ahead += 1
+        next if next_line.strip.empty? || next_line.strip.start_with?("#")
+
+        declaration = "#{declaration.chomp} #{next_line.strip}"
+      end
+
+      declaration
     end
 
     def report_missing_gem_version(gem_name)
@@ -634,14 +647,7 @@ module ReactOnRails
       if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(npm_version)
         checker.add_success("✅ package.json uses exact version for #{package_name}")
       else
-        gem_version = if %w[react-on-rails-pro react-on-rails-pro-node-renderer].include?(package_name)
-                        ReactOnRails::Utils.react_on_rails_pro_version
-                      else
-                        ReactOnRails::VERSION
-                      end
-        install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
-          package_name, ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
-        )
+        install_cmd = install_exact_command_for(package_name)
         checker.add_error(<<~MSG.strip)
           🚫 package.json uses a non-exact version for #{package_name}: #{npm_version}
 
@@ -655,21 +661,38 @@ module ReactOnRails
     end
 
     def check_npm_alias_version(npm_version, package_name)
+      expected_version = expected_npm_version_for(package_name)
+      install_cmd = install_exact_command_for(package_name)
       at_index = npm_version.rindex("@")
-      return unless at_index && at_index > ReactOnRails::VersionSynchronizer::NPM_ALIAS_PREFIX.length
+      unless at_index && at_index > ReactOnRails::VersionSynchronizer::NPM_ALIAS_PREFIX.length
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json uses an npm alias without a parseable version for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          npm alias specs must include an exact trailing version.
+
+          Fix: #{install_cmd}
+          Run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+        return
+      end
 
       alias_version = npm_version[(at_index + 1)..]
-      if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(alias_version)
+      exact_alias = ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(alias_version)
+
+      if exact_alias && alias_version == expected_version
         checker.add_success("✅ package.json uses exact version for #{package_name}")
+      elsif exact_alias
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json npm alias version mismatch for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          Expected exact version: #{expected_version}
+
+          Fix: #{install_cmd}
+          Run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
       else
-        gem_version = if %w[react-on-rails-pro react-on-rails-pro-node-renderer].include?(package_name)
-                        ReactOnRails::Utils.react_on_rails_pro_version
-                      else
-                        ReactOnRails::VERSION
-                      end
-        install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
-          package_name, ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
-        )
         checker.add_error(<<~MSG.strip)
           🚫 package.json uses a non-exact version in npm alias for #{package_name}: #{npm_version}
 
@@ -682,6 +705,19 @@ module ReactOnRails
       end
     end
 
+    def expected_npm_version_for(package_name)
+      gem_version = if %w[react-on-rails-pro react-on-rails-pro-node-renderer].include?(package_name)
+                      ReactOnRails::Utils.react_on_rails_pro_version
+                    else
+                      ReactOnRails::VERSION
+                    end
+      ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
+    end
+
+    def install_exact_command_for(package_name)
+      ReactOnRails::Utils.package_manager_install_exact_command(package_name, expected_npm_version_for(package_name))
+    end
+
     def auto_fix_versions
       package_json_path = resolved_package_json_path
       return unless File.exist?(package_json_path)
@@ -691,6 +727,7 @@ module ReactOnRails
 
       report_sync_changes(result)
       report_skipped_specs(result)
+      checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
     rescue StandardError => e
       checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
     end
