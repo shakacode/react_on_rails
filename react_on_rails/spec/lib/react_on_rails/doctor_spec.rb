@@ -1864,6 +1864,37 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#check_npm_alias_version" do
+    let(:doctor) { described_class.new }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    before do
+      allow(ReactOnRails::Utils).to receive_messages(
+        react_on_rails_pro_version: "16.5.0",
+        package_manager_install_exact_command: "pnpm add react-on-rails-pro@16.5.0"
+      )
+    end
+
+    it "reports an error for non-exact npm alias specs" do
+      expect(checker).to receive(:add_error).with(
+        include(
+          "non-exact version in npm alias for react-on-rails-pro: npm:@scope/react-on-rails-pro@^16.5.0",
+          "will cause a runtime error on app startup",
+          "Fix: pnpm add react-on-rails-pro@16.5.0",
+          "bundle exec rake react_on_rails:sync_versions WRITE=true"
+        )
+      )
+
+      doctor.send(:check_npm_alias_version, "npm:@scope/react-on-rails-pro@^16.5.0", "react-on-rails-pro")
+    end
+
+    it "reports success for exact npm alias specs" do
+      expect(checker).to receive(:add_success).with("✅ package.json uses exact version for react-on-rails")
+
+      doctor.send(:check_npm_alias_version, "npm:@scope/react-on-rails@16.5.0", "react-on-rails")
+    end
+  end
+
   describe "private path resolution helpers" do
     describe "#resolved_webpack_config_path" do
       it "prioritizes shakapacker's exact assets_bundler_config_path" do

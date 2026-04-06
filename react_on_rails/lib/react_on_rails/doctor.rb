@@ -662,9 +662,21 @@ module ReactOnRails
       if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(alias_version)
         checker.add_success("✅ package.json uses exact version for #{package_name}")
       else
-        checker.add_warning(<<~MSG.strip)
-          ⚠️  package.json uses a non-exact version in npm alias for #{package_name}: #{npm_version}
+        gem_version = if %w[react-on-rails-pro react-on-rails-pro-node-renderer].include?(package_name)
+                        ReactOnRails::Utils.react_on_rails_pro_version
+                      else
+                        ReactOnRails::VERSION
+                      end
+        install_cmd = ReactOnRails::Utils.package_manager_install_exact_command(
+          package_name, ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
+        )
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json uses a non-exact version in npm alias for #{package_name}: #{npm_version}
 
+          React on Rails requires exact version matching between the gem and npm package.
+          Non-exact constraints (~ ^ >= * ranges) will cause a runtime error on app startup.
+
+          Fix: #{install_cmd}
           Run: bundle exec rake react_on_rails:sync_versions WRITE=true
         MSG
       end
