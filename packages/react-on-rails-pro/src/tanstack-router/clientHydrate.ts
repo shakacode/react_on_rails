@@ -190,9 +190,6 @@ function TanStackHydrationApp({
   const warnedMissingSsrMatchIdsRef = useRef<Set<string>>(new Set());
 
   const warnMissingSsrMatch = (match: Record<string, unknown>): void => {
-    if (process.env.NODE_ENV !== 'development') {
-      return;
-    }
     const routeId =
       typeof match.id === 'string' || typeof match.id === 'number' ? String(match.id) : '<unknown>';
     if (warnedMissingSsrMatchIdsRef.current.has(routeId)) {
