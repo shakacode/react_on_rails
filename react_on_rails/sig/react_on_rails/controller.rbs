@@ -6,7 +6,7 @@ module ReactOnRails
     def redux_store: (
       String store_name,
       ?props: Hash[Symbol, untyped] | String,
-      ?immediate_hydration: bool?
+      **untyped rest
     ) -> void
 
     # Returns html_safe string (ActiveSupport::SafeBuffer)

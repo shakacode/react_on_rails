@@ -390,6 +390,7 @@ describe ReactOnRailsProHelper do
       it "warns when immediate_hydration option is passed" do
         mock_request_and_response
         allow(Rails.logger).to receive(:warn)
+        ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
 
         stream_react_component(
           component_name,

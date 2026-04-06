@@ -24,7 +24,7 @@ module ReactOnRails
       ?props: Hash[Symbol, untyped] | String,
       ?defer: bool,
       ?auto_load_bundle: bool?,
-      ?immediate_hydration: bool?
+      **untyped rest
     ) -> safe_buffer
 
     # Returns html_safe string (ActiveSupport::SafeBuffer)
