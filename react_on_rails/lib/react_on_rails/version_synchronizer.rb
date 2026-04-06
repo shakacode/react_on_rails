@@ -107,7 +107,7 @@ module ReactOnRails
       end
 
       normalized_current_version = converter.rubygem_to_npm(parsed_spec[:version])
-      return if normalized_current_version == expected_version && !parsed_spec[:non_exact]
+      return if normalized_current_version == expected_version && parsed_spec[:exact]
 
       changes << {
         section: section,
@@ -177,7 +177,7 @@ module ReactOnRails
     end
 
     def parse_supported_spec(version_spec)
-      return { version: version_spec, prefix: nil, non_exact: false, lower_bound: nil } if exact_version?(version_spec)
+      return { version: version_spec, prefix: nil, exact: true, lower_bound: nil } if exact_version?(version_spec)
 
       # Handle npm alias syntax: npm:@scope/pkg@version
       if version_spec.is_a?(String) && version_spec.start_with?(NPM_ALIAS_PREFIX)
@@ -190,7 +190,7 @@ module ReactOnRails
         return {
           version: stripped,
           prefix: nil,
-          non_exact: true,
+          exact: false,
           lower_bound: greater_or_equal_lower_bound(version_spec)
         }
       end
@@ -204,9 +204,7 @@ module ReactOnRails
 
       alias_version = version_spec[(at_index + 1)..]
       prefix = version_spec[0..at_index]
-      if exact_version?(alias_version)
-        return { version: alias_version, prefix: prefix, non_exact: false, lower_bound: nil }
-      end
+      return { version: alias_version, prefix: prefix, exact: true, lower_bound: nil } if exact_version?(alias_version)
 
       # Try stripping range prefix from alias version (e.g., npm:@scope/pkg@^16.5.0)
       stripped = strip_range_prefix(alias_version)
@@ -214,7 +212,7 @@ module ReactOnRails
         return {
           version: stripped,
           prefix: prefix,
-          non_exact: true,
+          exact: false,
           lower_bound: greater_or_equal_lower_bound(alias_version)
         }
       end

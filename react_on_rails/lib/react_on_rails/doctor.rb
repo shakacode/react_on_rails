@@ -559,12 +559,12 @@ module ReactOnRails
       look_ahead = line_index + 1
 
       # Keep joining while the previous segment ends with a comma; skip blank/comment-only continuation lines.
-      while declaration.rstrip.end_with?(",") && lines[look_ahead]
+      while declaration.sub(/#[^\n]*\z/, "").rstrip.end_with?(",") && lines[look_ahead]
         next_line = lines[look_ahead]
         look_ahead += 1
         next if next_line.strip.empty? || next_line.strip.start_with?("#")
 
-        declaration = "#{declaration.chomp} #{next_line.strip}"
+        declaration = "#{declaration.chomp.sub(/#[^\n]*\z/, '').rstrip} #{next_line.strip}"
       end
 
       declaration
