@@ -528,8 +528,15 @@ module ReactOnRails
     end
 
     def check_gem_wildcard_for(gemfile_content, gem_name)
-      react_line = gemfile_content.lines.find { |line| line.match(/^\s*gem\s+['"]#{gem_name}['"]/) }
-      return unless react_line
+      lines = gemfile_content.lines
+      line_index = lines.index { |line| line.match(/^\s*gem\s+['"]#{gem_name}['"]/) }
+      return unless line_index
+
+      # Join with the next line to handle multi-line declarations (version on continuation line)
+      react_line = lines[line_index]
+      if react_line.rstrip.end_with?(",") && lines[line_index + 1]
+        react_line = "#{react_line.chomp} #{lines[line_index + 1]}"
+      end
 
       # Skip path/git/github gems — these are development configurations where version checks don't apply
       return if react_line.match?(/\b(?:path|git|github):\s/)
@@ -616,8 +623,13 @@ module ReactOnRails
       npm_version = all_deps[package_name]
       return unless npm_version
 
-      # Skip workspace/local-link specs and npm aliases that cannot be trivially compared
-      return if npm_version.match?(/\A(?:workspace:|file:|link:|npm:)/)
+      # Skip workspace/local-link specs
+      return if npm_version.match?(/\A(?:workspace:|file:|link:)/)
+
+      # Handle npm alias syntax (e.g., npm:@scope/pkg@^16.5.0) — check the embedded version
+      if npm_version.start_with?(ReactOnRails::VersionSynchronizer::NPM_ALIAS_PREFIX)
+        return check_npm_alias_version(npm_version, package_name)
+      end
 
       if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(npm_version)
         checker.add_success("✅ package.json uses exact version for #{package_name}")
@@ -642,6 +654,22 @@ module ReactOnRails
       end
     end
 
+    def check_npm_alias_version(npm_version, package_name)
+      at_index = npm_version.rindex("@")
+      return unless at_index && at_index > ReactOnRails::VersionSynchronizer::NPM_ALIAS_PREFIX.length
+
+      alias_version = npm_version[(at_index + 1)..]
+      if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(alias_version)
+        checker.add_success("✅ package.json uses exact version for #{package_name}")
+      else
+        checker.add_warning(<<~MSG.strip)
+          ⚠️  package.json uses a non-exact version in npm alias for #{package_name}: #{npm_version}
+
+          Run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      end
+    end
+
     def auto_fix_versions
       package_json_path = resolved_package_json_path
       return unless File.exist?(package_json_path)
@@ -661,6 +689,7 @@ module ReactOnRails
         result.changes.each do |change|
           checker.add_info("    #{change[:section]}.#{change[:package]}: #{change[:from]} -> #{change[:to]}")
         end
+        checker.add_info("  ℹ️  Run your package manager install command to update the lockfile.")
       elsif result.unsupported_specs.any? || result.missing_source_specs.any?
         checker.add_warning("  ⚠️  FIX=true: Some package.json specs could not be auto-synced")
       else

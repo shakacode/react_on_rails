@@ -61,7 +61,10 @@ async function compatAct(callback: () => void | Promise<void>): Promise<void> {
     typeof React.act === 'function'
       ? React.act
       : // eslint-disable-next-line @typescript-eslint/no-require-imports
-        (require('react-dom/test-utils') as { act: typeof React.act }).act;
+        (require('react-dom/test-utils') as { act?: typeof React.act }).act;
+  if (typeof actFn !== 'function') {
+    throw new Error('act is not available — React 18 (react-dom/test-utils) or React 19+ is required');
+  }
   await actFn(callback);
 }
 
