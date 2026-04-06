@@ -387,6 +387,11 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     }
   });
 
+  // Coerce port to a number — user configs frequently pass env-derived strings
+  // (e.g. `port: env.RENDERER_PORT || 3800` yields the string "3800").
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- runtime value may be string despite the type
+  config.port = Number(config.port);
+
   const portValidationError = validatePort(config.port);
   if (portValidationError) {
     log.error(portValidationError);

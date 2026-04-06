@@ -135,6 +135,16 @@ describe('configBuilder', () => {
 
       expect(buildConfig({ port: 0 }).port).toBe(0);
     });
+
+    it('coerces a string port from env vars to a number', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.RAILS_ENV = 'development';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      // Simulates `port: env.RENDERER_PORT || 3800` where env var is the string "3800"
+      const config = buildConfig({ port: '3800' as unknown as number });
+      expect(config.port).toBe(3800);
+    });
   });
 
   describe('password validation in production-like environments', () => {
