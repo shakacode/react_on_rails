@@ -768,6 +768,139 @@ describe('tanstack-router integration (Pro)', () => {
     });
   });
 
+  it('does not call router.load after unmount if async hydration resolves later', async () => {
+    const router = buildRouter();
+    let resolveHydrate: (() => void) | undefined;
+    const hydrateCallback = jest.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveHydrate = resolve;
+        }),
+    );
+    router.options = { hydrate: hydrateCallback };
+    router.load = jest.fn().mockResolvedValue(undefined);
+
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: {
+          matches: [{ id: 'products' }],
+          dehydratedData: { queryCache: { products: ['hammer'] } },
+        },
+      },
+    };
+    const clientApp = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await compatAct(async () => {
+      root.render(React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props));
+      await Promise.resolve();
+    });
+
+    expect(hydrateCallback).toHaveBeenCalledTimes(1);
+    expect(router.load).not.toHaveBeenCalled();
+
+    await compatAct(async () => {
+      root.unmount();
+    });
+
+    if (!resolveHydrate) {
+      throw new Error('Expected router.options.hydrate to be invoked during hydration.');
+    }
+
+    await compatAct(async () => {
+      resolveHydrate?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(router.load).not.toHaveBeenCalled();
+  });
+
+  it('initializes hydration store injection once per created router in StrictMode', async () => {
+    const setStateCalls: jest.Mock[] = [];
+    const options = {
+      createRouter: jest.fn().mockImplementation(() => {
+        const router = buildRouter();
+        const setState = jest.fn();
+        router.__store = { setState };
+        setStateCalls.push(setState);
+        return router;
+      }),
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: { matches: [{ id: 'products' }] },
+      },
+    };
+    const clientApp = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await compatAct(async () => {
+      root.render(
+        React.createElement(
+          React.StrictMode,
+          null,
+          React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props),
+        ),
+      );
+      await Promise.resolve();
+    });
+
+    expect(setStateCalls.length).toBeGreaterThan(0);
+    setStateCalls.forEach((setState) => {
+      expect(setState).toHaveBeenCalledTimes(1);
+    });
+
+    await compatAct(async () => {
+      root.unmount();
+    });
+  });
+
   it('clears router.ssr after the post-hydration legacy load settles', async () => {
     const router = buildRouter();
     let resolveLoad: (() => void) | undefined;

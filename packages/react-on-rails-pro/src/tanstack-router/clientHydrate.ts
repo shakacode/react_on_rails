@@ -206,6 +206,16 @@ function TanStackHydrationApp({
   };
 
   if (routerRef.current === null) {
+    // Intentionally initialize the hydration router during render so the very
+    // first RouterProvider render sees SSR-injected matches and the temporary
+    // router.ssr flag. Moving this to an effect causes a first-render mismatch
+    // (the provider would render before hydration state is injected).
+    //
+    // Safety invariant: all mutations in this block target only the router
+    // instance created here and routerRef.current is assigned only after the
+    // block completes. If React discards this render (StrictMode/concurrency),
+    // the discarded router instance is dropped and a fresh instance is created
+    // and initialized on the next render.
     const router = options.createRouter();
 
     // Set browser history for client-side navigation
@@ -269,6 +279,8 @@ function TanStackHydrationApp({
             return m;
           });
 
+      // Render-phase store injection is required for hydration parity: this
+      // must happen before the first RouterProvider render.
       hydrationRouter.__store.setState((s: Record<string, unknown>) => ({
         ...s,
         status: 'idle',
@@ -341,9 +353,18 @@ function TanStackHydrationApp({
     const runPostHydrationLoad = async (): Promise<void> => {
       if (hydrationCallbackPromiseRef.current) {
         await hydrationCallbackPromiseRef.current;
+        if (cancelled) {
+          return;
+        }
       }
       if (routeChunkPreloadPromiseRef.current) {
         await routeChunkPreloadPromiseRef.current;
+        if (cancelled) {
+          return;
+        }
+      }
+      if (cancelled) {
+        return;
       }
       await router.load();
     };
