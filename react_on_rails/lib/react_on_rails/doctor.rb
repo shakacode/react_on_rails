@@ -727,7 +727,9 @@ module ReactOnRails
 
       report_sync_changes(result)
       report_skipped_specs(result)
-      checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      if result.changes.any?
+        checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      end
     rescue StandardError => e
       checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
     end

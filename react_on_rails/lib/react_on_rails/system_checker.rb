@@ -248,7 +248,7 @@ module ReactOnRails
     end
 
     def non_exact_range_spec?(npm_version)
-      npm_version.match?(/\A[\^~><*=]/) || npm_version.include?(" ")
+      npm_version.match?(/\A[\^~><*]/) || npm_version.include?(" ")
     end
 
     def report_version_mismatch(package_name, npm_version, normalized_npm_version, gem_version)
