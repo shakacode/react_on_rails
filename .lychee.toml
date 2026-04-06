@@ -6,8 +6,8 @@
 accept = ["200", "301", "308"]
 
 # Retry failed requests (handles transient 502/503/504/429 errors)
-max_retries = 4
-retry_wait_time = 15
+max_retries = 6
+retry_wait_time = 20
 
 # Timeout for each request
 timeout = 20
@@ -65,13 +65,15 @@ exclude = [
   '^https://frigade\.com/blog/bundle-size-reduction-with-rsc-and-frigade/?$', # Connection failed from CI
   '^https://tanstack\.com/router',           # Connection failed from CI
   '^https://lodash\.com',                    # Connection reset from CI
+  '^https://vite-ruby\.netlify\.app/?$',     # Intermittent connection resets from CI
 
   # ============================================================================
   # PLANNED DEPLOYMENTS NOT YET LIVE
   # ============================================================================
   '^https://ror-spec-dummy\.reactrails\.com',  # spec/dummy demo - deployment pending
-  '^https://pro\.reactonrails\.com/docs/',     # Pro docs site - pages being deployed incrementally
-  '^https://reactonrails\.com/pro',            # Pro page - deployment pending
+  '^https://reactonrails\.com/docs/getting-started/existing-rails-app',  # #2929 slug cleanup - live after docs deploy
+  '^https://reactonrails\.com/docs/core-concepts/auto-bundling/?',  # #2929 slug cleanup - live after docs deploy
+  '^https://reactonrails\.com/docs/api-reference/?$',  # Generated-index URL - not a standalone page
 
   # ============================================================================
   # SITES FROM PROJECTS.MD THAT BLOCK BOTS OR ARE UNRELIABLE
@@ -83,6 +85,8 @@ exclude = [
   '^https://(www\.)?estately\.com', # Returns 403
   '^https://hiring\.careerbuilder\.com',  # Returns 403
   '^https://(www\.)?yourmechanic\.com',  # Returns 403/503
+  '^https?://(www\.)?hvmn\.com',  # Returns 503 from CI
+  '^https://(www\.)?hawaiichee\.com/?$', # Intermittent 500 from CI
 
   # ============================================================================
   # EXTERNAL SITES THAT TIMEOUT DURING CI CHECKS
@@ -92,6 +96,7 @@ exclude = [
   '^https://devchat\.tv',  # Ruby Rogues podcast - times out in CI
   '^https?://chlg\.co',  # URL shortener - times out in CI
   '^https?://contributor-covenant\.org',  # Timeout in CI
+  '^https://www\.diva-portal\.org/smash/get/diva2:1903931/FULLTEXT01\.pdf$',  # Intermittent timeout in CI
 
   # ============================================================================
   # CHANGELOG COMPARE LINKS
@@ -103,7 +108,7 @@ exclude = [
   '^https://github\.com/shakacode/react_on_rails/compare/',
 
   # ============================================================================
-  # DELETED GITHUB USER ACCOUNTS
+  # DELETED GITHUB USER ACCOUNTS (return 502/404 from CI)
   # ============================================================================
   # Contributors whose accounts no longer exist
   '^https://github\.com/(alleycat-at-git|Conturbo|jblasco3|nostophilia|railsme|samphilipd|wouldntsavezion)$',
@@ -116,6 +121,7 @@ exclude = [
 
 # Exclude paths (regex patterns)
 exclude_path = [
+  'analysis/',                # Internal analysis notes with placeholder links
   'docs/planning/',           # Contains placeholder links
   '.*/node_modules/.*',       # Dependencies
   '.*/spec/.*',               # Test fixtures
