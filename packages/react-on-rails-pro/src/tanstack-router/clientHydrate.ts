@@ -306,14 +306,9 @@ function TanStackHydrationApp({
           const hydrationResult = router.options.hydrate(
             extractDehydratedData(dehydratedState?.dehydratedRouter),
           );
-          hydrationCallbackPromiseRef.current = Promise.resolve(hydrationResult)
-            .then(() => undefined)
-            .catch((error: unknown) => {
-              console.error(
-                'react-on-rails-pro/tanstack-router: Error in router.options.hydrate callback:',
-                error,
-              );
-            });
+          // Let async hydration failures reject so we do not continue into
+          // router.load() with partially hydrated client state.
+          hydrationCallbackPromiseRef.current = Promise.resolve(hydrationResult).then(() => undefined);
         }
 
         // Backward-compatibility hook: if user router exposes router.hydrate(),

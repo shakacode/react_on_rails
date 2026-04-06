@@ -768,6 +768,90 @@ describe('tanstack-router integration (Pro)', () => {
     });
   });
 
+  it('does not call router.load when async router.options.hydrate rejects', async () => {
+    const router = buildRouter();
+    let rejectHydrate: ((reason?: unknown) => void) | undefined;
+    const hydrationError = new Error('hydrate failed');
+    const hydrateCallback = jest.fn().mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectHydrate = reject;
+        }),
+    );
+    router.options = { hydrate: hydrateCallback };
+    router.load = jest.fn().mockResolvedValue(undefined);
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const options = {
+      createRouter: () => router,
+    };
+    const deps = {
+      RouterProvider: (_props: { router: TanStackRouter }) => React.createElement('div'),
+      createMemoryHistory: jest.fn(),
+      createBrowserHistory: jest.fn().mockReturnValue({
+        location: {
+          pathname: '/products',
+          search: '?category=tools',
+          hash: '',
+          href: '/products?category=tools',
+          state: null,
+        },
+      }),
+    };
+
+    const renderFn = createTanStackRouterRenderFunction(options, deps);
+    const props = {
+      __tanstackRouterDehydratedState: {
+        url: '/products?category=tools',
+        dehydratedRouter: {
+          matches: [{ id: 'products' }],
+          dehydratedData: { queryCache: { products: ['hammer'] } },
+        },
+      },
+    };
+    const clientApp = renderFn(props, {
+      serverSide: false,
+      pathname: '/products',
+      search: '?category=tools',
+    } as unknown as RailsContext);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    try {
+      await compatAct(async () => {
+        root.render(React.createElement(clientApp as React.ComponentType<Record<string, unknown>>, props));
+        await Promise.resolve();
+      });
+
+      expect(hydrateCallback).toHaveBeenCalledTimes(1);
+      expect(router.load).not.toHaveBeenCalled();
+      expect(router.ssr).toEqual({ manifest: undefined });
+
+      if (!rejectHydrate) {
+        throw new Error('Expected router.options.hydrate to be invoked during hydration.');
+      }
+
+      await compatAct(async () => {
+        rejectHydrate?.(hydrationError);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(router.load).not.toHaveBeenCalled();
+      expect(router.ssr).toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith(
+        'react-on-rails-pro/tanstack-router: Error loading routes after hydration:',
+        hydrationError,
+      );
+
+      await compatAct(async () => {
+        root.unmount();
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('does not call router.load after unmount if async hydration resolves later', async () => {
     const router = buildRouter();
     let resolveHydrate: (() => void) | undefined;
