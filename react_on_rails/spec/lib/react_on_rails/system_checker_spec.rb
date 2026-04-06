@@ -374,12 +374,9 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:read).with("package.json").and_return(package_json_content)
       end
 
-      it "warns about range specs and directs to Doctor" do
+      it "silently skips non-exact specs (Doctor handles the diagnostic)" do
         checker.send(:check_package_version_sync)
-        expect(checker.messages.any? do |msg|
-          msg[:type] == :warning && msg[:content].include?("Run `rake react_on_rails:doctor`")
-        end).to be true
-        expect(checker.errors?).to be false
+        expect(checker.messages).to be_empty
       end
     end
 
