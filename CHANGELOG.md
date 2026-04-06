@@ -31,6 +31,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **[Pro]** **Fixed TanStack Router SSR hydration mismatches in the async path**: Client hydration now restores server match data before first render, uses `RouterProvider` directly to match the server-rendered tree, and stops the post-hydration load when a custom `router.options.hydrate` callback fails instead of continuing with partially hydrated client state. [PR 2932](https://github.com/shakacode/react_on_rails/pull/2932) by [justin808](https://github.com/justin808).
+- **[Pro] Fixed infinite fork loop when node renderer worker fails to bind port**: When a worker failed during `app.listen()` (e.g., `EADDRINUSE`), the master previously reforked unconditionally, causing an infinite fork/crash loop that consumed CPU and filled logs. Workers now send a `WORKER_STARTUP_FAILURE` IPC message to the master before exiting; the master sets an abort flag and exits with a clear error message instead of reforking. Scheduled restarts and runtime crashes continue to refork as before. [PR 2881](https://github.com/shakacode/react_on_rails/pull/2881) by [justin808](https://github.com/justin808).
 
 ### [16.6.0.rc.0] - 2026-04-01
 
