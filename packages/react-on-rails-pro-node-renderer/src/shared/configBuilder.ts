@@ -142,6 +142,13 @@ function logLevel(level: string): LevelWithSilent {
   }
 }
 
+function validatePort(port: number): string | null {
+  if (!Number.isInteger(port) || !Number.isFinite(port) || port < 0 || port > 65535) {
+    return `RENDERER_PORT must be an integer between 0 and 65535. Received: ${String(port)}`;
+  }
+  return null;
+}
+
 function normalizedRuntimeEnvs() {
   return [env.RAILS_ENV, env.NODE_ENV]
     .filter((value): value is string => Boolean(value))
@@ -379,6 +386,12 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
       config!.port = parseInt(val, 10);
     }
   });
+
+  const portValidationError = validatePort(config.port);
+  if (portValidationError) {
+    log.error(portValidationError);
+    process.exit(1);
+  }
 
   if (
     'honeybadgerApiKey' in config ||

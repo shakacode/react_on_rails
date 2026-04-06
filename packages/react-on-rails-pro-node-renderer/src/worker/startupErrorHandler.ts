@@ -26,9 +26,8 @@ export function handleStartupListenError({
 
   if (isWorker && !sendFn) {
     log.error('Cluster worker has no IPC channel; cannot notify master of startup failure');
-  }
-
-  if (isWorker && sendFn) {
+    exitFn(1);
+  } else if (isWorker) {
     const startupFailure: WorkerStartupFailureMessage = {
       type: WORKER_STARTUP_FAILURE,
       stage: 'listen',
@@ -53,13 +52,11 @@ export function handleStartupListenError({
       const IPC_SEND_TIMEOUT_MS = 2000;
       const timer = setTimeout(() => doExit(), IPC_SEND_TIMEOUT_MS);
       if (typeof timer.unref === 'function') timer.unref();
-      return;
     } catch (sendErr) {
       log.error({ err: sendErr as Error }, 'Failed to send startup failure message to master');
       exitFn(1);
-      return;
     }
+  } else {
+    exitFn(1);
   }
-
-  exitFn(1);
 }

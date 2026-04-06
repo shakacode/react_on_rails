@@ -1,6 +1,7 @@
 describe('configBuilder', () => {
   const envVarsToRestore = [
     'RENDERER_HOST',
+    'RENDERER_PORT',
     'NODE_ENV',
     'RENDERER_PASSWORD',
     'RAILS_ENV',
@@ -111,6 +112,29 @@ describe('configBuilder', () => {
     const finalSettings = logPayload['Final renderer settings'] as Record<string, unknown>;
 
     expect(finalSettings.password).toBe('<EMPTY STRING>');
+  });
+
+  describe('port validation', () => {
+    it('throws when configured port is outside the valid TCP range', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.RAILS_ENV = 'development';
+      const processExit = mockProcessExit();
+      const { buildConfig, error } = loadConfigBuilderWithMockedLogger();
+
+      expect(() => buildConfig({ port: 70000 })).toThrow('process.exit: 1');
+      expect(processExit).toHaveBeenCalledWith(1);
+      expect(error).toHaveBeenCalledWith(
+        'RENDERER_PORT must be an integer between 0 and 65535. Received: 70000',
+      );
+    });
+
+    it('allows port 0 for ephemeral-port test setups', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.RAILS_ENV = 'development';
+      const { buildConfig } = loadConfigBuilderWithMockedLogger();
+
+      expect(buildConfig({ port: 0 }).port).toBe(0);
+    });
   });
 
   describe('password validation in production-like environments', () => {
