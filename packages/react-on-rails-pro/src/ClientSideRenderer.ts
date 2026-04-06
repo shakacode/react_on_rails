@@ -90,6 +90,10 @@ class ComponentRenderer {
     });
   }
 
+  hasStartedRendering(): boolean {
+    return this.renderPromise !== undefined;
+  }
+
   /**
    * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
    * delegates to a renderer registered by the user.
@@ -240,7 +244,11 @@ export function renderOrHydrateComponent(domIdOrElement: string | Element) {
   debugTurbolinks('renderOrHydrateComponent', domId);
   let root = renderedRoots.get(domId);
   if (!root) {
-    root = new ComponentRenderer(domIdOrElement);
+    const newRoot = new ComponentRenderer(domIdOrElement);
+    if (!newRoot.hasStartedRendering()) {
+      return Promise.resolve();
+    }
+    root = newRoot;
     renderedRoots.set(domId, root);
   }
   return root.waitUntilRendered();

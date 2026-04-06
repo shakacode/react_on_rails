@@ -31,5 +31,11 @@ RSpec.describe ReactOnRails::Controller do
         ]
       )
     end
+
+    it "raises an ArgumentError for unknown keywords" do
+      expect do
+        controller_instance.redux_store("TestStore", props: { a: 1 }, typo_option: true)
+      end.to raise_error(ArgumentError, "unknown keyword: :typo_option")
+    end
   end
 end

@@ -38,6 +38,7 @@ module ReactOnRails
         )
       end
 
+      # :nodoc:
       def reset_removed_immediate_hydration_warnings!
         IMMEDIATE_HYDRATION_WARNING_MUTEX.synchronize do
           @removed_immediate_hydration_warnings = {}
@@ -197,7 +198,15 @@ module ReactOnRails
     #                        app/javascript/bundles/ror_stores/commentsStore.js
     #                      The store file must export default a store generator function.
     def redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil, **rest)
-      ReactOnRails::Helper.warn_removed_immediate_hydration_option("redux_store") if rest.key?(:immediate_hydration)
+      immediate_hydration_present = rest.key?(:immediate_hydration)
+      unknown_keys = rest.keys - [:immediate_hydration]
+      if unknown_keys.any?
+        plural = unknown_keys.one? ? "" : "s"
+        unknown_options = unknown_keys.map { |key| ":#{key}" }.join(", ")
+        raise ArgumentError, "unknown keyword#{plural}: #{unknown_options}"
+      end
+
+      ReactOnRails::Helper.warn_removed_immediate_hydration_option("redux_store") if immediate_hydration_present
 
       # Auto-load store pack if configured
       should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle

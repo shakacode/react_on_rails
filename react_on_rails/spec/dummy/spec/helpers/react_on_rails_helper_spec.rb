@@ -600,6 +600,12 @@ describe ReactOnRailsHelper do
 
       expect(Rails.logger).to have_received(:warn).once.with(include("immediate_hydration"))
     end
+
+    it "raises an ArgumentError for unknown keywords" do
+      expect do
+        redux_store("reduxStore", props: props, typo_option: true)
+      end.to raise_error(ArgumentError, "unknown keyword: :typo_option")
+    end
   end
 
   describe "#server_render_js", :js, type: :system do
