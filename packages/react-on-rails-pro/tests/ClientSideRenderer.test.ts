@@ -5,7 +5,8 @@
 import * as React from 'react';
 import { resetRailsContext } from 'react-on-rails/context';
 import * as ComponentRegistry from '../src/ComponentRegistry.ts';
-import { renderOrHydrateComponent, unmountAll } from '../src/ClientSideRenderer.ts';
+import * as StoreRegistry from '../src/StoreRegistry.ts';
+import { renderOrHydrateComponent, hydrateStore, unmountAll } from '../src/ClientSideRenderer.ts';
 
 jest.mock('react-on-rails/reactHydrateOrRender', () => ({
   __esModule: true,
@@ -55,7 +56,15 @@ describe('ClientSideRenderer', () => {
     document.body.appendChild(railsContext);
   }
 
-  it('does not cache a renderer created before railsContext exists', async () => {
+  function setupTestStoreDom(storeName: string): Element {
+    const storeDataElement = document.createElement('div');
+    storeDataElement.setAttribute('data-js-react-on-rails-store', storeName);
+    storeDataElement.textContent = JSON.stringify({ key: 'value' });
+    document.body.appendChild(storeDataElement);
+    return storeDataElement;
+  }
+
+  it('does not cache a component renderer created before railsContext exists', async () => {
     ComponentRegistry.register({
       TestComponent: ({ greeting }: { greeting: string }) => React.createElement('div', null, greeting),
     });
@@ -67,5 +76,18 @@ describe('ClientSideRenderer', () => {
     addRailsContext();
     await renderOrHydrateComponent(componentSpec);
     expect(mockReactHydrateOrRender).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not cache a store renderer created before railsContext exists', async () => {
+    const storeGenerator = jest.fn((_props, _railsContext) => ({ getState: () => ({}) }));
+    StoreRegistry.register({ TestStore: storeGenerator });
+    const storeElement = setupTestStoreDom('TestStore');
+
+    await hydrateStore(storeElement);
+    expect(storeGenerator).not.toHaveBeenCalled();
+
+    addRailsContext();
+    await hydrateStore(storeElement);
+    expect(storeGenerator).toHaveBeenCalledTimes(1);
   });
 });

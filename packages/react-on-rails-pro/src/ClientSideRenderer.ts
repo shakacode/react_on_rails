@@ -225,6 +225,10 @@ class StoreRenderer {
     this.state = 'hydrated';
   }
 
+  hasStartedHydrating(): boolean {
+    return this.hydratePromise !== undefined;
+  }
+
   waitUntilHydrated(): Promise<void> {
     if (this.state === 'hydrating' && this.hydratePromise) {
       return this.hydratePromise;
@@ -321,7 +325,11 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
       return;
     }
 
-    storeRenderer = new StoreRenderer(storeDataElement);
+    const newStoreRenderer = new StoreRenderer(storeDataElement);
+    if (!newStoreRenderer.hasStartedHydrating()) {
+      return;
+    }
+    storeRenderer = newStoreRenderer;
     storeRenderers.set(storeName, storeRenderer);
   }
   await storeRenderer.waitUntilHydrated();
