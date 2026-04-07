@@ -317,7 +317,6 @@ describe ReactOnRailsProHelper do
           data-component-name="TestingStreamableComponent"
           data-trace="true"
           data-dom-id="TestingStreamableComponent-react-component-0"
-          data-immediate-hydration="true"
         >{"helloWorldData":{"name":"Mr. Server Side Rendering"}}</script>
       SCRIPT
     end
@@ -386,6 +385,21 @@ describe ReactOnRailsProHelper do
         mocked_rails_response = instance_double(ActionDispatch::Response)
         allow(mocked_rails_response).to receive(:stream).and_return(mocked_rails_stream)
         allow(self).to receive(:response).and_return(mocked_rails_response)
+      end
+
+      it "warns when immediate_hydration option is passed" do
+        mock_request_and_response
+        allow(Rails.logger).to receive(:warn)
+        ReactOnRails::Helper.reset_removed_immediate_hydration_warnings!
+
+        stream_react_component(
+          component_name,
+          props: props,
+          immediate_hydration: false,
+          **component_options
+        )
+
+        expect(Rails.logger).to have_received(:warn).with(include("immediate_hydration"))
       end
 
       it "returns the component shell that exist in the initial chunk with the consoleReplayScript" do

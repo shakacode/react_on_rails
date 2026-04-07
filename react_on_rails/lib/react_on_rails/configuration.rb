@@ -94,51 +94,6 @@ module ReactOnRails
                   :server_bundle_output_path, :enforce_private_server_bundles,
                   :check_database_on_dev_start
 
-    # Class instance variable and mutex to track if deprecation warning has been shown
-    # Using mutex to ensure thread-safety in multi-threaded environments
-    @immediate_hydration_warned = false
-    @immediate_hydration_mutex = Mutex.new
-
-    class << self
-      attr_accessor :immediate_hydration_warned, :immediate_hydration_mutex
-    end
-
-    # Deprecated: immediate_hydration configuration has been removed
-    def immediate_hydration=(value)
-      warned = false
-      self.class.immediate_hydration_mutex.synchronize do
-        warned = self.class.immediate_hydration_warned
-        self.class.immediate_hydration_warned = true unless warned
-      end
-
-      return if warned
-
-      Rails.logger.warn <<~WARNING
-        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
-        Immediate hydration is now automatically enabled for React on Rails Pro users.
-        Please remove 'config.immediate_hydration = #{value}' from your config/initializers/react_on_rails.rb file.
-        See CHANGELOG.md for migration instructions.
-      WARNING
-    end
-
-    def immediate_hydration
-      warned = false
-      self.class.immediate_hydration_mutex.synchronize do
-        warned = self.class.immediate_hydration_warned
-        self.class.immediate_hydration_warned = true unless warned
-      end
-
-      return nil if warned
-
-      Rails.logger.warn <<~WARNING
-        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
-        Immediate hydration is now automatically enabled for React on Rails Pro users.
-        Please remove any references to 'config.immediate_hydration' from your config/initializers/react_on_rails.rb file.
-        See CHANGELOG.md for migration instructions.
-      WARNING
-      nil
-    end
-
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil, make_generated_server_bundle_the_entrypoint: nil,

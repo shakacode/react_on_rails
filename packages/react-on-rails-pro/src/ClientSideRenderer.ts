@@ -23,14 +23,11 @@ import { isServerRenderHash } from 'react-on-rails/isServerRenderResult';
 import { supportsHydrate, supportsRootApi, unmountComponentAtNode } from 'react-on-rails/reactApis';
 import reactHydrateOrRender from 'react-on-rails/reactHydrateOrRender';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
-import { onPageLoaded } from 'react-on-rails/pageLifecycle';
+
 import * as StoreRegistry from './StoreRegistry.ts';
 import * as ComponentRegistry from './ComponentRegistry.ts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
-const IMMEDIATE_HYDRATION_PRO_WARNING =
-  "[REACT ON RAILS] The 'immediate_hydration' feature requires the React on Rails Pro gem to be installed on the server. " +
-  'Please visit https://pro.reactonrails.com/ for installation details.';
 
 async function delegateToRenderer(
   componentObj: RegisteredComponent,
@@ -93,27 +90,15 @@ class ComponentRenderer {
     });
   }
 
+  hasStartedRendering(): boolean {
+    return this.renderPromise !== undefined;
+  }
+
   /**
    * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
    * delegates to a renderer registered by the user.
    */
   private async render(el: Element, railsContext: RailsContext): Promise<void> {
-    const isImmediateHydrationRequested = el.getAttribute('data-immediate-hydration') === 'true';
-    // rorPro signals gem presence on the server, not license validity.
-    const hasProGemInstalled = railsContext.rorPro;
-
-    // Handle immediate_hydration feature usage without Pro gem installed
-    if (isImmediateHydrationRequested && !hasProGemInstalled) {
-      console.warn(IMMEDIATE_HYDRATION_PRO_WARNING);
-
-      // Fallback to standard behavior: wait for page load before hydrating
-      if (document.readyState === 'loading') {
-        await new Promise<void>((resolve) => {
-          onPageLoaded(resolve);
-        });
-      }
-    }
-
     // This must match lib/react_on_rails/helper.rb
     const name = el.getAttribute('data-component-name') || '';
     const { domNodeId } = this;
@@ -240,6 +225,10 @@ class StoreRenderer {
     this.state = 'hydrated';
   }
 
+  hasStartedHydrating(): boolean {
+    return this.hydratePromise !== undefined;
+  }
+
   waitUntilHydrated(): Promise<void> {
     if (this.state === 'hydrating' && this.hydratePromise) {
       return this.hydratePromise;
@@ -259,7 +248,11 @@ export function renderOrHydrateComponent(domIdOrElement: string | Element) {
   debugTurbolinks('renderOrHydrateComponent', domId);
   let root = renderedRoots.get(domId);
   if (!root) {
-    root = new ComponentRenderer(domIdOrElement);
+    const newRoot = new ComponentRenderer(domIdOrElement);
+    if (!newRoot.hasStartedRendering()) {
+      return Promise.resolve();
+    }
+    root = newRoot;
     renderedRoots.set(domId, root);
   }
   return root.waitUntilRendered();
@@ -286,8 +279,8 @@ async function forAllElementsAsync(
  * - Therefore, if nextSibling exists (even whitespace or comments), the closing
  *   tag was parsed and the content is guaranteed to be complete
  *
- * Elements without a nextSibling will be hydrated later when their
- * immediate hydration script executes and calls reactOnRailsComponentLoaded().
+ * Elements without a nextSibling will be hydrated via inline scripts as streaming completes (Pro),
+ * or on DOMContentLoaded (non-Pro).
  *
  * See: https://github.com/shakacode/react_on_rails/issues/2283
  */
@@ -300,11 +293,11 @@ async function forAllCompleteElementsAsync(
   await Promise.all(completeEls.map(callback));
 }
 
-export const renderOrHydrateImmediateHydratedComponents = () =>
-  forAllCompleteElementsAsync(
-    '.js-react-on-rails-component[data-immediate-hydration="true"]',
-    renderOrHydrateComponent,
-  );
+// For Pro streaming pages: hydrate all components whose markup has been fully streamed
+// (identified by having a nextSibling). On non-streaming pages this matches ALL components,
+// but ClientSideRenderer memoizes by DOM node id so the later DOMContentLoaded sweep is a no-op.
+export const renderOrHydrateCompleteComponents = () =>
+  forAllCompleteElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
 
 export const renderOrHydrateAllComponents = () =>
   forAllElementsAsync('.js-react-on-rails-component', renderOrHydrateComponent);
@@ -332,17 +325,18 @@ export async function hydrateStore(storeNameOrElement: string | Element) {
       return;
     }
 
-    storeRenderer = new StoreRenderer(storeDataElement);
+    const newStoreRenderer = new StoreRenderer(storeDataElement);
+    if (!newStoreRenderer.hasStartedHydrating()) {
+      return;
+    }
+    storeRenderer = newStoreRenderer;
     storeRenderers.set(storeName, storeRenderer);
   }
   await storeRenderer.waitUntilHydrated();
 }
 
-export const hydrateImmediateHydratedStores = () =>
-  forAllCompleteElementsAsync(
-    `[${REACT_ON_RAILS_STORE_ATTRIBUTE}][data-immediate-hydration="true"]`,
-    hydrateStore,
-  );
+export const hydrateCompleteStores = () =>
+  forAllCompleteElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);
 
 export const hydrateAllStores = () =>
   forAllElementsAsync(`[${REACT_ON_RAILS_STORE_ATTRIBUTE}]`, hydrateStore);
