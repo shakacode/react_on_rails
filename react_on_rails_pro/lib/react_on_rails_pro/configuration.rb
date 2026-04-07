@@ -67,7 +67,6 @@ module ReactOnRailsPro
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
-                  :renderer_http_keep_alive_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
                   :remote_bundle_cache_adapter, :ssr_pre_hook_js, :assets_to_copy,
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
@@ -75,7 +74,7 @@ module ReactOnRailsPro
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
                   :react_server_client_manifest_file
 
-    attr_reader :concurrent_component_streaming_buffer_size
+    attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout
 
     # Sets the buffer size for concurrent component streaming.
     #
@@ -92,6 +91,18 @@ module ReactOnRailsPro
               "config.concurrent_component_streaming_buffer_size must be a positive integer"
       end
       @concurrent_component_streaming_buffer_size = value
+    end
+
+    # Sets the keep-alive timeout (in seconds) for persistent HTTP connections to the node renderer.
+    #
+    # @param value [Numeric, nil] A positive number or nil (to use the HTTPX default)
+    # @raise [ReactOnRailsPro::Error] if value is not a positive number or nil
+    def renderer_http_keep_alive_timeout=(value)
+      unless value.nil? || (value.is_a?(Numeric) && value.positive?)
+        raise ReactOnRailsPro::Error,
+              "config.renderer_http_keep_alive_timeout must be a positive number or nil"
+      end
+      @renderer_http_keep_alive_timeout = value
     end
 
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil, # rubocop:disable Metrics/AbcSize
