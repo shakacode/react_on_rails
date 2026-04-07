@@ -150,6 +150,8 @@ This is the simplest approach, especially for production containers where you do
 
 #### Option B: Custom signal handler
 
+> **Note:** If you are already using Option A (`--heapsnapshot-signal=SIGUSR2`), do not also register a `process.on('SIGUSR2', ...)` handler — both will fire on every signal, producing duplicate snapshots. Remove one before using the other.
+
 If you need more control (e.g., forced GC before the snapshot, custom filenames, or writing to a specific directory), add a custom handler:
 
 ```javascript
@@ -172,8 +174,8 @@ Load both `.heapsnapshot` files in Chrome DevTools (Memory tab → Load) and use
 
 To diagnose leaks in a running container:
 
-1. Set `NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2"` in the container environment.
-2. Identify the worker PID: `ps aux | grep node` inside the container.
+1. Set `NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2"` in the container environment. If `NODE_OPTIONS` is already set (e.g., `--max-old-space-size=1536`), append the flag: `NODE_OPTIONS="--max-old-space-size=1536 --heapsnapshot-signal=SIGUSR2"`.
+2. Identify the worker PIDs: `ps aux | grep node` inside the container. In a multi-worker setup you'll see one PID per worker — signal each one separately to get a snapshot from each process.
 3. Capture a baseline snapshot: `kill -USR2 <worker-pid>`.
 4. Wait for traffic to accumulate (e.g., 10–30 minutes), then capture another: `kill -USR2 <worker-pid>`.
 5. Copy the `.heapsnapshot` files from the container to your local machine (e.g., `kubectl cp`, `docker cp`, or `cpln workload exec`).
