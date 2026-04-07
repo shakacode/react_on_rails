@@ -52,10 +52,10 @@ RSpec.describe "Streaming API" do
            # :write_timeout
            # :request_timeout
            # :operation_timeout
-           # :keep_alive_timeout
            timeout: {
              connect_timeout: 30,
-             read_timeout: 30
+             read_timeout: 30,
+             keep_alive_timeout: 30
            }
          )
   end
