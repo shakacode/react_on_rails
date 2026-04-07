@@ -136,20 +136,48 @@ done
 
 ### 2. Take V8 heap snapshots
 
-Use `v8.writeHeapSnapshot()` to capture heap state before and after load, then compare in Chrome DevTools:
+#### Option A: Built-in `--heapsnapshot-signal` (recommended)
+
+Node provides a built-in flag that writes heap snapshots on a signal — no custom code required:
+
+```bash
+NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2" node node-renderer.js
+```
+
+Then send `kill -USR2 <worker-pid>` at different times to capture snapshots. Each signal writes a `.heapsnapshot` file to the working directory.
+
+This is the simplest approach, especially for production containers where you don't want to modify application code.
+
+#### Option B: Custom signal handler
+
+If you need more control (e.g., forced GC before the snapshot, custom filenames, or writing to a specific directory), add a custom handler:
 
 ```javascript
-// In your renderer config, add a way to trigger snapshots:
 const v8 = require('v8');
 
 process.on('SIGUSR2', () => {
-  if (global.gc) global.gc(); // force GC first
+  if (global.gc) global.gc(); // force GC first (requires --expose-gc)
   const filename = v8.writeHeapSnapshot();
   console.log(`Heap snapshot written to ${filename}`);
 });
 ```
 
-Then send `kill -USR2 <worker-pid>` at different times and compare the snapshots in Chrome DevTools (Memory tab → Load).
+Then send `kill -USR2 <worker-pid>` at different times.
+
+#### Comparing snapshots
+
+Load both `.heapsnapshot` files in Chrome DevTools (Memory tab → Load) and use the **Comparison** view to see which objects accumulated between snapshots.
+
+#### Production container workflow
+
+To diagnose leaks in a running container:
+
+1. Set `NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2"` in the container environment.
+2. Identify the worker PID: `ps aux | grep node` inside the container.
+3. Capture a baseline snapshot: `kill -USR2 <worker-pid>`.
+4. Wait for traffic to accumulate (e.g., 10–30 minutes), then capture another: `kill -USR2 <worker-pid>`.
+5. Copy the `.heapsnapshot` files from the container to your local machine (e.g., `kubectl cp`, `docker cp`, or `cpln workload exec`).
+6. Compare the two snapshots in Chrome DevTools to identify what grew between them.
 
 ### 3. Use `--inspect` for live profiling
 
