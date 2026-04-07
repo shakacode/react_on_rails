@@ -23,6 +23,7 @@ import {
   type ProvidedNewBundle,
 } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
+import { handleStartupListenError } from './worker/startupErrorHandler.js';
 import {
   badRequestResponseResult,
   errorResponseResult,
@@ -510,8 +511,8 @@ export default function run(config: Partial<Config>) {
   if (workersCount === 0 || cluster.isWorker) {
     app.listen({ port, host }, (err, address) => {
       if (err) {
-        log.error({ err, host, port }, 'Node renderer failed to start');
-        process.exit(1);
+        handleStartupListenError({ err, host, port });
+        return;
       }
       const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
       log.info({ workerName, address }, 'Node renderer listening');
