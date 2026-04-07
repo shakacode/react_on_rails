@@ -177,7 +177,7 @@ const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
     renderingRequestType = 'null';
   } else if (Array.isArray(renderingRequest)) {
     renderingRequestType = 'array';
-  } else if (typeof renderingRequest === 'string') {
+  } else if (renderingRequest === '') {
     renderingRequestType = 'empty string';
   }
   const bodyKeys = Object.keys(body).filter((key) => !SENSITIVE_REQUEST_BODY_KEYS.has(key.toLowerCase()));
