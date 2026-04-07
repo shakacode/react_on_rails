@@ -55,14 +55,17 @@ function buildRouter(): TanStackRouter {
   };
 }
 
-type ActCallback = () => void | Promise<void>;
-
-async function compatAct(callback: ActCallback): Promise<void> {
-  const reactAct = (React as typeof React & { act?: (cb: ActCallback) => Promise<unknown> | unknown }).act;
-  if (typeof reactAct !== 'function') {
-    throw new Error('React.act is not available — React 18.3+ or 19+ is required');
+async function compatAct(callback: () => void | Promise<void>): Promise<void> {
+  // React 19 exports act on the React object; React 18 exports it from react-dom/test-utils
+  const actFn =
+    typeof React.act === 'function'
+      ? React.act
+      : // eslint-disable-next-line @typescript-eslint/no-require-imports
+        (require('react-dom/test-utils') as { act?: typeof React.act }).act;
+  if (typeof actFn !== 'function') {
+    throw new Error('act is not available — React 18 (react-dom/test-utils) or React 19+ is required');
   }
-  await reactAct(callback);
+  await actFn(callback);
 }
 
 describe('tanstack-router integration (Pro)', () => {
