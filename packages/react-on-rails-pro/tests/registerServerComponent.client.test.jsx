@@ -221,8 +221,8 @@ enableFetchMocks();
       expect(window.fetch).not.toHaveBeenCalled();
 
       // After first chunk, StaticServerComponent should be visible but AsyncComponent should be loading
-      expect(screen.getByText('StaticServerComponent')).toBeInTheDocument();
-      expect(screen.getByText('Loading AsyncComponent...')).toBeInTheDocument();
+      expect(await screen.findByText('StaticServerComponent')).toBeInTheDocument();
+      expect(await screen.findByText('Loading AsyncComponent...')).toBeInTheDocument();
       expect(screen.queryByText('AsyncComponent')).not.toBeInTheDocument();
 
       // Now push the second chunk object to the preloaded array and set document to complete
@@ -238,7 +238,7 @@ enableFetchMocks();
       expect(window.REACT_ON_RAILS_RSC_PAYLOADS['TestComponent-{}-test-container']).toHaveLength(2);
 
       // After the second chunk, AsyncComponent should now be visible and loading indicator gone
-      expect(screen.getByText('AsyncComponent')).toBeInTheDocument();
+      expect(await screen.findByText('AsyncComponent')).toBeInTheDocument();
       expect(screen.queryByText('Loading AsyncComponent...')).not.toBeInTheDocument();
 
       // Restore original readyState

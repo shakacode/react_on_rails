@@ -40,6 +40,17 @@ const collectStreamData = async (stream: NodeJS.ReadableStream): Promise<Buffer>
   return Buffer.concat(chunks);
 };
 
+const createNDJSONChunk = (size: number, fillChar = 'a') =>
+  `${JSON.stringify({ chunk: fillChar.repeat(size) })}\n`;
+
+const pushNDJSONChunks = (stream: PassThrough, chunkCount: number, chunkSize = 1024, fillChar = 'a') => {
+  const chunk = createNDJSONChunk(chunkSize, fillChar);
+  for (let i = 0; i < chunkCount; i++) {
+    stream.push(chunk);
+  }
+  stream.push(null);
+};
+
 // Simulates what React's renderToPipeableStream does: reads the RSC Flight stream (stream1)
 // and produces HTML output. In a real app, React uses stream1 to resolve server component
 // references and renders them to HTML. Here we just wrap the raw bytes in an HTML shell,
@@ -241,11 +252,7 @@ describe('RSCRequestTracker', () => {
       // This exceeds the default 16KB highWaterMark.
       const chunkCount = 64;
       const chunkSize = 1024;
-      const chunk = 'z'.repeat(chunkSize);
-      for (let i = 0; i < chunkCount; i++) {
-        source.push(chunk);
-      }
-      source.push(null);
+      pushNDJSONChunks(source, chunkCount, chunkSize, 'z');
 
       const result = (await collectStreamData(resultStream)).toString();
 
@@ -270,7 +277,7 @@ describe('RSCRequestTracker', () => {
       // Drip-feed 32KB over 32ms — simulates a real RSC stream producing chunks over time
       const chunkSize = 1024;
       const chunkCount = 32;
-      const chunk = 'q'.repeat(chunkSize);
+      const chunk = createNDJSONChunk(chunkSize, 'q');
       let pushed = 0;
       const pushInterval = setInterval(() => {
         if (pushed >= chunkCount) {
@@ -326,7 +333,7 @@ describe('RSCRequestTracker', () => {
       const resultStream = injectRSCPayload(htmlStream, tracker, 'blog-node');
 
       // Push 128KB as 1KB chunks
-      const totalBytes = pushChunks(source, HIGHWATER_MARK * 8);
+      pushNDJSONChunks(source, Math.ceil((HIGHWATER_MARK * 8) / 1024));
 
       const result = (await collectStreamData(resultStream)).toString();
 
@@ -350,7 +357,7 @@ describe('RSCRequestTracker', () => {
       // Drip-feed 128KB over ~128ms
       const chunkSize = 1024;
       const chunkCount = 128;
-      const chunk = 'r'.repeat(chunkSize);
+      const chunk = createNDJSONChunk(chunkSize, 'r');
       let pushed = 0;
       const pushInterval = setInterval(() => {
         if (pushed >= chunkCount) {

@@ -35,6 +35,29 @@ const collectStreamData = async (stream: Readable) => {
   return chunks.join('');
 };
 
+const collectStreamDataAndError = (stream: Readable) =>
+  new Promise<{ data: string; error?: Error }>((resolve) => {
+    const chunks: string[] = [];
+    let capturedError: Error | undefined;
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve({ data: chunks.join(''), error: capturedError });
+    };
+
+    stream.on('data', (chunk) => {
+      chunks.push(new TextDecoder().decode(chunk as Buffer));
+    });
+    stream.once('error', (error) => {
+      capturedError = error as Error;
+    });
+    stream.once('end', finish);
+    stream.once('close', finish);
+  });
+
 // Test setup helper
 const setupTest = (mockRSC: Readable) => {
   const railsContext = {} as RailsContextWithServerStreamingCapabilities;
@@ -237,18 +260,14 @@ describe('injectRSCPayload', () => {
     const { rscRequestTracker, domNodeId } = setupTest(mockRSC);
 
     const result = injectRSCPayload(mockHTML, rscRequestTracker, domNodeId);
-    const errorPromise = new Promise<Error>((resolve) => {
-      result.once('error', (error) => resolve(error as Error));
-    });
-    const resultStr = await collectStreamData(result);
-    const error = await errorPromise;
+    const { data: resultStr, error } = await collectStreamDataAndError(result);
 
     expect(resultStr).toContain('<html><body>Hello</body></html>');
     expect(resultStr).toContain(
       `<script>((self.REACT_ON_RAILS_RSC_PAYLOADS||={})["test-{}-test-node"]||=[]).push({"test":"data"})</script>`,
     );
     expect(resultStr).not.toContain('{"broken": }');
-    expect(error.message).toContain('Malformed NDJSON line in RSC stream');
+    expect(error?.message).toContain('Malformed NDJSON line in RSC stream');
   });
 
   it('adds sanitized nonce attribute to injected RSC script tags', async () => {
