@@ -53,12 +53,20 @@ on:
       - main
     paths-ignore:
       - '**.md'
+      - 'AGENTS_USER_GUIDE.md'
       - 'docs/**'
+      - 'llms.txt'
+      - 'llms-full.txt'
+      - '.lychee.toml'
   pull_request:
     types: [opened, synchronize, reopened, labeled]
     paths-ignore:
       - '**.md'
+      - 'AGENTS_USER_GUIDE.md'
       - 'docs/**'
+      - 'llms.txt'
+      - 'llms-full.txt'
+      - '.lychee.toml'
 # Cancel stale PR benchmark runs when new commits are pushed.
 # Main runs are never cancelled so every merge is measured.
 concurrency:

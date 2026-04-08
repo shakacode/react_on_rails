@@ -137,6 +137,9 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
       it "is the URI password if provided in the URL" do
         password = "abcdef"
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("env-password")
 
         url = "https://:#{password}@localhost:3800"
         ReactOnRailsPro.configure do |config|
@@ -146,12 +149,177 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.renderer_password).to eq(password)
       end
 
-      it "is blank if not provided in the URL" do
+      it "uses RENDERER_PASSWORD from ENV when neither renderer_password nor URL password is provided" do
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("env-password")
+
+        ReactOnRailsPro.configure do |config|
+          config.renderer_url = "https://localhost:3800"
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_password).to eq("env-password")
+      end
+
+      it "is blank if not provided in the URL in development" do
+        allow(ENV).to receive(:[]).and_call_original
+        allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("development")
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+
         ReactOnRailsPro.configure do |config|
           config.renderer_url = "https://localhost:3800"
         end
 
         expect(ReactOnRailsPro.configuration.renderer_password).to be_nil
+      end
+
+      context "when using NodeRenderer in production-like environments" do
+        before do
+          allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:fetch).and_call_original
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+        end
+
+        it "raises an error if no password is set in production" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
+
+        it "raises an error if no password is set in staging" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("staging")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
+
+        it "raises when RAILS_ENV is unset (fail-closed, matching Node-side behavior)" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return(nil)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
+
+        it "does not raise when password comes from RENDERER_PASSWORD env var in production" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+        end
+
+        it "does not raise when password is explicitly set in production" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = "secure-password"
+            end
+          end.not_to raise_error
+        end
+
+        it "does not raise when password is embedded in the renderer URL in production" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://:secure-password@localhost:3800"
+            end
+          end.not_to raise_error
+        end
+
+        it "resolves from ENV when renderer_password is blank in production" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = ""
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("secure-password")
+        end
+
+        it "resolves from URL when renderer_password is blank and URL has embedded password" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_password = ""
+              config.renderer_url = "https://:url-password@localhost:3800"
+            end
+          end.not_to raise_error
+
+          expect(ReactOnRailsPro.configuration.renderer_password).to eq("url-password")
+        end
+      end
+
+      context "when using NodeRenderer in development/test environments" do
+        before do
+          allow(ENV).to receive(:[]).and_call_original
+        end
+
+        it "does not raise in development even without a password" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("development")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+
+        it "does not raise in test even without a password" do
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("test")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+      end
+
+      context "when using ExecJS renderer" do
+        it "does not raise in production without a password" do
+          allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "ExecJS"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
       end
     end
 
@@ -258,6 +426,66 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         expect(ReactOnRailsPro.configuration.rsc_bundle_js_file).to eq("rsc-bundle.js")
         expect(ReactOnRailsPro.configuration.react_client_manifest_file).to eq("client-manifest.json")
         expect(ReactOnRailsPro.configuration.react_server_client_manifest_file).to eq("server-client-manifest.json")
+      end
+    end
+
+    describe ".renderer_http_keep_alive_timeout" do
+      it "defaults to 30" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(30)
+      end
+
+      it "accepts positive numbers" do
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_keep_alive_timeout = 60
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(60)
+      end
+
+      it "accepts nil" do
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_keep_alive_timeout = nil
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to be_nil
+      end
+
+      it "raises error for zero" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_keep_alive_timeout = 0
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a finite positive number or nil/)
+      end
+
+      it "raises error for negative numbers" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_keep_alive_timeout = -5
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a finite positive number or nil/)
+      end
+
+      it "raises error for non-numeric values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_keep_alive_timeout = "30"
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a finite positive number or nil/)
+      end
+
+      it "raises error for infinite values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_keep_alive_timeout = Float::INFINITY
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a finite positive number or nil/)
       end
     end
 

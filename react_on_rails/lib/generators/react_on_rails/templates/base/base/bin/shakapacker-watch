@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+set -eu
+
+child_pid=""
+
+cleanup() {
+  if [ -n "${child_pid}" ] && kill -0 "$child_pid" 2>/dev/null; then
+    kill -TERM "$child_pid" 2>/dev/null || true
+    wait "$child_pid" 2>/dev/null || true
+  fi
+
+  exit 0
+}
+
+bin/shakapacker "$@" &
+child_pid=$!
+trap cleanup INT TERM
+
+if wait "$child_pid"; then
+  status=0
+else
+  status=$?
+fi
+
+child_pid=""
+exit "$status"

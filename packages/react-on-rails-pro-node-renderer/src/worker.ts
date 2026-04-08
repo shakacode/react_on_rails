@@ -23,7 +23,9 @@ import {
   type ProvidedNewBundle,
 } from './worker/handleRenderRequest.js';
 import handleGracefulShutdown from './worker/handleGracefulShutdown.js';
+import { handleStartupListenError } from './worker/startupErrorHandler.js';
 import {
+  badRequestResponseResult,
   errorResponseResult,
   formatExceptionMessage,
   ResponseResult,
@@ -141,6 +143,54 @@ export const disableHttp2 = () => {
 
 type WithBodyArrayField<T, K extends string> = T & { [P in K | `${K}[]`]?: string | string[] };
 
+const INVALID_CONTENT_LENGTH_ERROR_CODE = 'FST_ERR_CTP_INVALID_CONTENT_LENGTH';
+
+const errorCode = (error: unknown): string | undefined => {
+  const code = (error as { code?: unknown })?.code;
+  return typeof code === 'string' ? code : undefined;
+};
+
+const isValidRenderingRequest = (value: unknown): value is string =>
+  typeof value === 'string' && value.length > 0;
+
+const SENSITIVE_REQUEST_BODY_KEYS = new Set([
+  'password',
+  'token',
+  'secret',
+  'api_key',
+  'api-key',
+  'apikey',
+  'authorization',
+  'auth_token',
+  'auth-token',
+  'authtoken',
+  'access_token',
+  'accesstoken',
+  'bearer',
+  'credentials',
+]);
+
+const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
+  const { renderingRequest } = body;
+  let renderingRequestType: string = typeof renderingRequest;
+  if (renderingRequest === null) {
+    renderingRequestType = 'null';
+  } else if (Array.isArray(renderingRequest)) {
+    renderingRequestType = 'array';
+  } else if (renderingRequest === '') {
+    renderingRequestType = 'empty string';
+  }
+  const bodyKeys = Object.keys(body).filter((key) => !SENSITIVE_REQUEST_BODY_KEYS.has(key.toLowerCase()));
+
+  return [
+    'Invalid "renderingRequest" field in render request.',
+    'Expected a non-empty string of JavaScript to execute in the SSR VM.',
+    `Received type: ${renderingRequestType}.`,
+    `Received body keys: ${bodyKeys.length > 0 ? bodyKeys.join(', ') : '(none)'}.`,
+    'Likely causes: request body truncation, malformed multipart form data, or Content-Length mismatch in a proxy/client.',
+  ].join('\n');
+};
+
 const extractBodyArrayField = <Key extends string>(
   body: WithBodyArrayField<Record<string, unknown>, Key>,
   key: Key,
@@ -162,6 +212,9 @@ export default function run(config: Partial<Config>) {
 
   const { serverBundleCachePath, logHttpLevel, port, host, fastifyServerOptions, workersCount } = getConfig();
 
+  // The renderer uses cleartext HTTP/2 (h2c). Node's `allowHTTP1` option only
+  // applies to TLS servers (http2.createSecureServer), so it cannot enable
+  // HTTP/1.1 Kubernetes httpGet probes on this listener.
   const app = fastify({
     http2: useHttp2 as true,
     bodyLimit: 104857600, // 100 MB
@@ -175,7 +228,17 @@ export default function run(config: Partial<Config>) {
   // We shouldn't have unhandled errors here, but just in case
   app.addHook('onError', (req, res, err, done) => {
     // Not errorReporter.error so that integrations can decide how to log the errors.
-    app.log.error({ msg: 'Unhandled Fastify error', err, req, res });
+    if (errorCode(err) === INVALID_CONTENT_LENGTH_ERROR_CODE) {
+      app.log.error({
+        msg: 'Invalid request body framing',
+        hint: 'Body size did not match Content-Length. Check client/proxy truncation and Content-Length handling.',
+        err,
+        req,
+        res,
+      });
+    } else {
+      app.log.error({ msg: 'Unhandled Fastify error', err, req, res });
+    }
     done();
   });
 
@@ -280,12 +343,7 @@ export default function run(config: Partial<Config>) {
   // the digest is part of the request URL. Yes, it's not used here, but the
   // server logs might show it to distinguish different requests.
   app.post<{
-    Body: WithBodyArrayField<
-      {
-        renderingRequest: string;
-      },
-      'dependencyBundleTimestamps'
-    >;
+    Body: WithBodyArrayField<Record<string, unknown>, 'dependencyBundleTimestamps'>;
     // Can't infer from the route like Express can
     Params: { bundleTimestamp: string; renderRequestDigest: string };
   }>('/bundles/:bundleTimestamp/render/:renderRequestDigest', async (req, res) => {
@@ -304,12 +362,22 @@ export default function run(config: Partial<Config>) {
     //   await delay(100000);
     // }
 
-    const { renderingRequest } = req.body;
+    const { body } = req;
+    if (!body || typeof body !== 'object') {
+      await setResponse(badRequestResponseResult('Invalid or missing request body.'), res);
+      return;
+    }
+    const { renderingRequest } = body;
+    if (!isValidRenderingRequest(renderingRequest)) {
+      await setResponse(badRequestResponseResult(invalidRenderingRequestMessage(body)), res);
+      return;
+    }
+
     const { bundleTimestamp } = req.params;
-    const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(req.body, bundleTimestamp);
+    const { providedNewBundles, assetsToCopy } = extractBundlesAndAssets(body, bundleTimestamp);
 
     try {
-      const dependencyBundleTimestamps = extractBodyArrayField(req.body, 'dependencyBundleTimestamps');
+      const dependencyBundleTimestamps = extractBodyArrayField(body, 'dependencyBundleTimestamps');
       await trace(async (context) => {
         try {
           const result = await handleRenderRequest({
@@ -446,8 +514,8 @@ export default function run(config: Partial<Config>) {
   if (workersCount === 0 || cluster.isWorker) {
     app.listen({ port, host }, (err, address) => {
       if (err) {
-        log.error({ err, host, port }, 'Node renderer failed to start');
-        process.exit(1);
+        handleStartupListenError({ err, host, port });
+        return;
       }
       const workerName = worker ? `worker #${worker.id}` : 'master (single-process)';
       log.info({ workerName, address }, 'Node renderer listening');

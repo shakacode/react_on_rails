@@ -1,2 +1,2 @@
 web: bin/rails server -p 3000
-js: bin/shakapacker --watch
+js: bin/shakapacker-watch --watch

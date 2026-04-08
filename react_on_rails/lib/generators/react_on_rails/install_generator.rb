@@ -3,6 +3,7 @@
 require "rails/generators"
 require "json"
 require "bundler"
+require "open3"
 require_relative "generator_helper"
 require_relative "generator_messages"
 require_relative "js_dependency_manager"
@@ -56,13 +57,21 @@ module ReactOnRails
       class_option :pro,
                    type: :boolean,
                    default: false,
-                   desc: "Install React on Rails Pro with Node Renderer. Default: false"
+                   desc: "Install React on Rails Pro with Node Renderer. " \
+                         "Combined with --rsc, uses --rsc-pro mode. Default: false"
 
       # --rsc
       class_option :rsc,
                    type: :boolean,
                    default: false,
-                   desc: "Install React Server Components support (includes Pro). Default: false"
+                   desc: "Install React Server Components support (includes Pro). " \
+                         "Combined with --pro, uses --rsc-pro mode. Default: false"
+
+      # --rsc-pro
+      class_option :rsc_pro,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install first-class Pro RSC mode with matched Pro/RSC defaults. Default: false"
 
       # Hidden option: allows tests (and advanced users) to signal that Shakapacker
       # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
@@ -76,9 +85,19 @@ module ReactOnRails
                    default: false,
                    hide: true
 
+      # Hidden option: used by create-react-on-rails-app to enable fresh-app
+      # scaffolding (landing page + browser-open defaults) without changing the
+      # behavior of install runs inside existing apps.
+      class_option :new_app,
+                   type: :boolean,
+                   default: false,
+                   hide: true
+
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
+      HELLO_WORLD_ROUTE = "hello_world"
+      HELLO_SERVER_ROUTE = "hello_server"
       # Matches the stock `bin/dev` written by Rails 8.x. Rails 7.1 commonly
       # generated a foreman-based shell script instead, which stock_rails_bin_dev?
       # also recognizes so the React on Rails template can replace either variant.
@@ -181,7 +200,7 @@ module ReactOnRails
         # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
-                 pro: options.pro?, rsc: options.rsc?,
+                 pro: use_pro?, rsc: use_rsc?, new_app: options.new_app?,
                  shakapacker_just_installed: shakapacker_just_installed?,
                  force: options[:force], skip: options[:skip], pretend: options[:pretend] }
 
@@ -192,17 +211,21 @@ module ReactOnRails
         if options.redux?
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
                                                           invoked_by_install: true,
+                                                          new_app: options.new_app?,
+                                                          rsc: use_rsc?,
                                                           force: options[:force], skip: options[:skip],
                                                           pretend: options[:pretend] }
         elsif !use_rsc?
           # Only generate HelloWorld if RSC is not enabled
           # For RSC, HelloServer replaces HelloWorld as the example component
           invoke "react_on_rails:react_no_redux", [], { typescript: options.typescript?,
+                                                        new_app: options.new_app?,
                                                         force: options[:force], skip: options[:skip],
                                                         pretend: options[:pretend] }
         end
 
         setup_react_dependencies
+        ensure_jsx_in_js_compatibility
 
         # Invoke standalone Pro/RSC generators when flags are used
         # Pass invoked_by_install: true so they skip message printing (we handle it)
@@ -214,6 +237,7 @@ module ReactOnRails
         return unless use_rsc?
 
         invoke "react_on_rails:rsc", [], { typescript: options.typescript?, invoked_by_install: true,
+                                           new_app: options.new_app?, redux: options.redux?,
                                            force: options[:force], skip: options[:skip],
                                            pretend: options[:pretend] }
       end
@@ -225,6 +249,24 @@ module ReactOnRails
         end
 
         setup_js_dependencies
+      end
+
+      def ensure_jsx_in_js_compatibility
+        return if options[:pretend]
+        return unless using_swc?
+        return unless jsx_in_js_files_present?
+
+        say "⚙️  Detected JSX in .js files; switching shakapacker javascript_transpiler to babel for compatibility",
+            :yellow
+        set_javascript_transpiler_to_babel
+        babel_loader_added = add_packages(["babel-loader"], dev: true)
+        babel_preset_added = add_babel_react_dependencies
+        return if babel_loader_added && babel_preset_added
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Babel compatibility dependencies may be incomplete after switching from SWC.
+          Please verify `babel-loader` and `@babel/preset-react` are installed.
+        MSG
       end
 
       # NOTE: other requirements for existing files such as .gitignore or application.
@@ -242,11 +284,12 @@ module ReactOnRails
         # it on a clean worktree. On a dirty tree, use the read-only pro_gem_installed?
         # check to catch a missing gem without triggering auto-install.
         if has_worktree_issues && use_pro? && !pro_gem_installed?
+          required_flag = pro_requirement_flag
           GeneratorMessages.add_error(<<~MSG.strip)
-            🚫 react_on_rails_pro gem is required for #{options[:rsc] ? '--rsc' : '--pro'} but is not installed.
+            🚫 react_on_rails_pro gem is required for #{required_flag} but is not installed.
             Auto-install was skipped because the worktree has uncommitted changes.
             Please add it manually:
-              gem 'react_on_rails_pro', '~> #{recommended_pro_gem_version}'
+              gem 'react_on_rails_pro', '#{pro_gem_version_requirement}'
             Then run: bundle install
           MSG
           return false
@@ -342,19 +385,21 @@ module ReactOnRails
 
         # Copy bin scripts from templates
         template_bin_path = "#{__dir__}/templates/base/base/bin"
-        directory_options = {}
-        directory_options[:exclude_pattern] = %r{/dev(?:\.tt)?\z} if preserve_existing_bin_dev?
+        # Always exclude `dev` from the bulk copy; it is handled explicitly below
+        # so we can patch DEFAULT_ROUTE and AUTO_OPEN_BROWSER_ONCE after copying.
+        directory_options = { exclude_pattern: %r{/dev(?:\.tt)?\z} }
         directory template_bin_path, "bin", directory_options
 
-        # For --rsc without --redux, hello_world doesn't exist — update DEFAULT_ROUTE
-        if use_rsc? && !options.redux?
-          if preserve_existing_bin_dev?
+        if preserve_existing_bin_dev?
+          if use_rsc? && !options.redux? && !options.new_app?
             say_status :warn,
-                       'Custom bin/dev detected: update DEFAULT_ROUTE to "hello_server" manually for --rsc',
+                       "Custom bin/dev detected: update DEFAULT_ROUTE to \"#{HELLO_SERVER_ROUTE}\" manually for --rsc",
                        :yellow
-          else
-            gsub_file "bin/dev", 'DEFAULT_ROUTE = "hello_world"', 'DEFAULT_ROUTE = "hello_server"'
           end
+        else
+          copy_file("#{template_bin_path}/dev", "bin/dev")
+          gsub_file "bin/dev", /^DEFAULT_ROUTE = .*$/, "DEFAULT_ROUTE = #{default_bin_dev_route.inspect}"
+          gsub_file "bin/dev", /^AUTO_OPEN_BROWSER_ONCE = .*$/, "AUTO_OPEN_BROWSER_ONCE = #{options.new_app?}"
         end
 
         # `directory` and `gsub_file` above are Thor actions that already honor
@@ -397,9 +442,20 @@ module ReactOnRails
       end
 
       def bin_scripts_to_chmod(template_bin_path)
-        files = Dir.children(template_bin_path)
-        files.reject! { |f| f == "dev" } if preserve_existing_bin_dev?
+        files = Dir.children(template_bin_path).reject { |filename| filename == "dev" }
+        files << "dev" unless preserve_existing_bin_dev?
         files.map { |filename| "bin/#{filename}" }
+      end
+
+      def default_bin_dev_route
+        return "/" if options.new_app? && new_app_root_route_available?
+        return "hello_server" if use_rsc? && !options.redux?
+
+        "hello_world"
+      end
+
+      def new_app_root_route_available?
+        root_route_present?
       end
 
       def stock_rails_bin_dev?
@@ -418,10 +474,10 @@ module ReactOnRails
         # Determine what route and component will be created by the generator
         if use_rsc? && !options.redux?
           # RSC without Redux: HelloServer replaces HelloWorld
-          route = "hello_server"
+          route = HELLO_SERVER_ROUTE
           component_name = "HelloServer"
         else
-          route = "hello_world"
+          route = HELLO_WORLD_ROUTE
           component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
         end
 
@@ -430,8 +486,10 @@ module ReactOnRails
                                      route: route,
                                      pro: use_pro?,
                                      rsc: use_rsc?,
-                                     shakapacker_just_installed: shakapacker_just_installed?
+                                     shakapacker_just_installed: shakapacker_just_installed?,
+                                     landing_page: options.new_app? && new_app_root_route_available?
                                    ))
+        GeneratorMessages.add_info(rsc_pro_verification_message) if use_rsc_pro_mode?
       end
 
       def shakapacker_setup_incomplete?
@@ -445,13 +503,26 @@ module ReactOnRails
         flags << "--typescript" if options.typescript?
         flags << "--rspack" if options.rspack?
 
-        if use_rsc?
+        if use_rsc_pro_mode?
+          flags << "--rsc-pro"
+        elsif options.rsc?
           flags << "--rsc"
         elsif options.pro?
           flags << "--pro"
         end
 
         ["rails generate react_on_rails:install", *flags].join(" ")
+      end
+
+      def rsc_pro_verification_message
+        <<~MSG
+
+          🔎 RSC Pro Verification:
+          ─────────────────────────────────────────────────────────────────────────
+          1. Start all processes: #{Rainbow('bin/dev').cyan}
+          2. Visit: #{Rainbow("http://localhost:<port>/#{HELLO_SERVER_ROUTE}").cyan.underline}
+          3. Confirm the page streams and the Like button hydrates on click.
+        MSG
       end
 
       def recovery_working_tree_lines
@@ -579,6 +650,8 @@ module ReactOnRails
           return false
         end
 
+        seed_package_manager_in_package_json_from_lockfile!
+
         # Then run the shakapacker installer
         # Use options.rspack? directly (not using_rspack?): shakapacker.yml doesn't exist yet at this
         # point, so using_rspack? would fall back to rspack_configured_in_project? which returns false,
@@ -588,11 +661,74 @@ module ReactOnRails
           system(shakapacker_install_env, "bundle exec rails shakapacker:install")
         end
         if success
+          resolve_browserslist_conflict_after_shakapacker_install
           true
         else
           handle_shakapacker_install_error
           false
         end
+      end
+
+      def seed_package_manager_in_package_json_from_lockfile!
+        return unless File.exist?("package.json")
+
+        package_json_content = JSON.parse(File.read("package.json"))
+        return if package_json_content["packageManager"]
+
+        manager = detect_package_manager_from_lockfiles
+        return unless manager
+
+        version = detect_package_manager_version(manager)
+        return unless version
+
+        package_json_content["packageManager"] = "#{manager}@#{version}"
+        File.write("package.json", "#{JSON.pretty_generate(package_json_content)}\n")
+        say "🔧 Added packageManager=#{manager}@#{version} to package.json before shakapacker:install", :yellow
+      rescue JSON::ParserError => e
+        GeneratorMessages.add_warning("⚠️  Could not parse package.json to set packageManager: #{e.message}")
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to seed packageManager in package.json: #{e.message}")
+      end
+
+      def resolve_browserslist_conflict_after_shakapacker_install
+        return unless File.exist?(".browserslistrc") && File.exist?("package.json")
+
+        package_json_content = JSON.parse(File.read("package.json"))
+        return unless package_json_content.key?("browserslist")
+
+        package_json_content.delete("browserslist")
+        File.write("package.json", "#{JSON.pretty_generate(package_json_content)}\n")
+        say "🔧 Removed package.json browserslist because .browserslistrc is present", :yellow
+      rescue JSON::ParserError => e
+        GeneratorMessages.add_warning("⚠️  Could not parse package.json for browserslist cleanup: #{e.message}")
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to clean browserslist conflict: #{e.message}")
+      end
+
+      def detect_package_manager_from_lockfiles
+        GeneratorMessages.detect_package_manager_from_lockfiles
+      end
+
+      def detect_package_manager_version(package_manager)
+        unless cli_exists?(package_manager)
+          GeneratorMessages.add_warning(<<~MSG.strip)
+            ⚠️  #{package_manager} lockfile found but `#{package_manager}` command is not available on PATH.
+            Install #{package_manager} and re-run the generator.
+          MSG
+          return nil
+        end
+
+        stdout, stderr, status = Open3.capture3(package_manager, "--version")
+        return stdout.strip if status.success?
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Failed to determine #{package_manager} version (#{stderr.strip}).
+          Install #{package_manager} and re-run the generator.
+        MSG
+        nil
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to detect #{package_manager} version: #{e.message}")
+        nil
       end
 
       def finalize_shakapacker_setup(yml_content_before)
@@ -687,6 +823,30 @@ module ReactOnRails
         end
 
         false
+      end
+
+      def jsx_in_js_files_present?
+        Dir.glob("app/javascript/**/*.js").any? do |path|
+          content = File.read(path)
+          content.match?(%r{<\s*[A-Za-z][\w:-]*(\s|>|/)}) || content.match?(/<\s*>/)
+        rescue StandardError
+          false
+        end
+      end
+
+      def set_javascript_transpiler_to_babel
+        shakapacker_config_path = "config/shakapacker.yml"
+        return unless File.exist?(shakapacker_config_path)
+
+        swc_transpiler_pattern = /^(\s*javascript_transpiler:\s*)["']?swc["']?(\s*(?:#.*)?)$/
+        return unless File.read(shakapacker_config_path).match?(swc_transpiler_pattern)
+
+        gsub_file(
+          shakapacker_config_path,
+          swc_transpiler_pattern,
+          '\1"babel"\2'
+        )
+        @using_swc = false
       end
 
       def install_typescript_dependencies

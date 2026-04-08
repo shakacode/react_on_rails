@@ -1,7 +1,7 @@
 # SSR Caching: Prerender Caching and Fragment Caching
 
 :::tip Pro Feature
-Available with [React on Rails Pro](../../pro/home-pro.md). Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
+Available with [React on Rails Pro](../../pro/react-on-rails-pro.md). Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../pro/upgrading-to-pro.md#try-pro-risk-free)
 :::
 
 Server-side rendering (SSR) is expensive. Every render evaluates JavaScript, assembles props from the database, serializes them to JSON, and produces HTML. React on Rails Pro provides two levels of caching that avoid repeating this work on every request. Both solve the same core problem — **eliminating redundant SSR** — but they operate at different layers and offer different tradeoffs.

@@ -2,6 +2,18 @@
 
 module ReactOnRails
   module ConfigPathResolver
+    # Keep JS before TS to match generator defaults and to prefer the
+    # JavaScript config deterministically when both variants are present.
+    WEBPACK_DEFAULT_CONFIG_CANDIDATES = %w[
+      config/webpack/webpack.config.js
+      config/webpack/webpack.config.ts
+    ].freeze
+    RSPACK_DEFAULT_CONFIG_CANDIDATES = %w[
+      config/rspack/rspack.config.js
+      config/rspack/rspack.config.ts
+    ].freeze
+    ALL_DEFAULT_CONFIG_CANDIDATES = (WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES).freeze
+
     private
 
     def resolved_package_json_path
@@ -12,39 +24,77 @@ module ReactOnRails
     end
 
     def resolved_webpack_config_path
-      webpack_config_candidates.find { |path| File.exist?(path) }
+      webpack_config_candidates.find { |path| File.file?(path) }
     end
 
     def webpack_config_candidates
       candidates = []
+      shakapacker_config_path = shakapacker_assets_bundler_config_path
+      candidates << shakapacker_config_path if shakapacker_config_path
 
-      shakapacker_config_dir = shakapacker_webpack_config_directory
+      shakapacker_config_dir = bundler_config_directory(shakapacker_config_path)
       if shakapacker_config_dir
         candidates.concat(%w[js ts cjs mjs].flat_map do |ext|
+          # Skip only the exact shakapacker path; still probe sibling
+          # standard-name configs (for example rspack when shakapacker points to
+          # webpack in the same directory).
           [
             File.join(shakapacker_config_dir, "webpack.config.#{ext}"),
             File.join(shakapacker_config_dir, "rspack.config.#{ext}")
-          ]
+          ].reject { |path| path == shakapacker_config_path }
         end)
       end
 
-      candidates << "config/webpack/webpack.config.js"
-      candidates << "config/webpack/webpack.config.ts"
-      candidates << "config/rspack/rspack.config.js"
-      candidates << "config/rspack/rspack.config.ts"
+      # Default fallback candidates intentionally mirror generator defaults
+      # (`.js` / `.ts`), while `.cjs` / `.mjs` are probed only within resolved
+      # shakapacker config directories above.
+      candidates.concat(WEBPACK_DEFAULT_CONFIG_CANDIDATES)
+      candidates.concat(RSPACK_DEFAULT_CONFIG_CANDIDATES)
       candidates.uniq
     end
 
-    def shakapacker_webpack_config_directory
+    def shakapacker_assets_bundler_config_path
+      # Use instance_variable_defined? instead of ||= so nil results are cached
+      # and we do not retry require/rescue work on each call.
+      if instance_variable_defined?(:@shakapacker_assets_bundler_config_path)
+        return @shakapacker_assets_bundler_config_path
+      end
+
       require "shakapacker"
-      path = Shakapacker.config.assets_bundler_config_path.to_s
+      @shakapacker_assets_bundler_config_path = normalize_shakapacker_assets_bundler_config_path(
+        Shakapacker.config.assets_bundler_config_path.to_s
+      )
+    rescue LoadError, NameError
+      # Doctor/install checks should degrade gracefully when Shakapacker is
+      # missing; callers fall back to discovered default config candidates.
+      @shakapacker_assets_bundler_config_path = nil
+    rescue StandardError => e
+      message = "ReactOnRails could not read Shakapacker assets_bundler_config_path: #{e.class}: #{e.message}"
+      warn(message) unless Rails.logger
+      Rails.logger&.debug do
+        message
+      end
+      @shakapacker_assets_bundler_config_path = nil
+    end
+
+    def normalize_shakapacker_assets_bundler_config_path(path)
       return nil if path.empty?
 
-      directory = File.dirname(path)
       rails_root = Rails.root.to_s
-      directory.start_with?("#{rails_root}/") ? directory.sub("#{rails_root}/", "") : directory
-    rescue LoadError, StandardError
-      nil
+      return path if rails_root.empty? || rails_root == "/"
+
+      # NOTE: Prefix normalization assumes matching separators and does not
+      # normalize Windows-style `\` vs `/` path variants.
+      rails_root_prefix = "#{rails_root}/"
+      normalized_path = path.start_with?(rails_root_prefix) ? path.delete_prefix(rails_root_prefix) : path
+      normalized_path.empty? ? nil : normalized_path
+    end
+
+    def bundler_config_directory(config_path)
+      return nil unless config_path
+
+      directory = File.dirname(config_path)
+      directory == "." ? nil : directory
     end
   end
 end

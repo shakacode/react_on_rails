@@ -11,15 +11,16 @@ To use Server Components in your React on Rails Pro project, you need to follow 
 1. Install the latest version of React on Rails and React on Rails Pro:
 
 ```bash
-# Pick one JS package manager command (Pro includes all base package functionality):
-yarn add --exact react-on-rails-pro@16.4.0
-# npm install --save-exact react-on-rails-pro@16.4.0
-# pnpm add --save-exact react-on-rails-pro@16.4.0
-# bun add --exact react-on-rails-pro@16.4.0
+# Pick one JS package manager command (Pro includes all base package functionality).
+# Replace VERSION with the latest from the CHANGELOG:
+# https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md
+yarn add --exact react-on-rails-pro@VERSION
+# npm install --save-exact react-on-rails-pro@VERSION
+# pnpm add --save-exact react-on-rails-pro@VERSION
+# bun add --exact react-on-rails-pro@VERSION
 
-# Then add the Ruby gems:
-bundle add react_on_rails --version "16.4.0" --strict
-bundle add react_on_rails_pro --version "16.4.0" --strict
+# Then add the Ruby gem (react_on_rails_pro depends on react_on_rails, so one gem is enough):
+bundle add react_on_rails_pro --version="= VERSION"
 ```
 
 Also, install version 19 of React, React DOM, and `react-on-rails-rsc`:
@@ -164,7 +165,7 @@ Finally, update `Procfile.dev` to generate the RSC bundle when running the devel
 # Procfile.dev
 # existing code...
 
-rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 
 ```
 

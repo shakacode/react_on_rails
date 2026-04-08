@@ -46,9 +46,10 @@ interface TanStackRouterDeps {
    */
   RouterProvider: React.ComponentType<{ router: TanStackRouter }>;
   /**
-   * Optional RouterClient component from @tanstack/react-router/ssr/client.
-   * When provided, it enables TanStack Router's SSR client hydration path for
-   * router versions that do not expose router.dehydrate()/router.hydrate().
+   * @deprecated No longer used for hydration. RouterProvider is always used
+   * directly to match the server-rendered tree. RouterClient caused hydration
+   * mismatches because it wraps RouterProvider in <Await> which suspends.
+   * Kept for backward compatibility only.
    */
   RouterClient?: React.ComponentType<{ router: TanStackRouter }>;
   /**
@@ -81,6 +82,7 @@ export function createTanStackRouterRenderFunction(
   deps: TanStackRouterDeps,
 ): RenderFunction {
   const { RouterProvider, RouterClient, createMemoryHistory, createBrowserHistory } = deps;
+  let didWarnRouterClientDeprecated = false;
 
   const renderFn = (
     props: Record<string, unknown> = {},
@@ -98,7 +100,7 @@ export function createTanStackRouterRenderFunction(
       return serverRenderTanStackAppAsync(
         options,
         props,
-        railsContext as RailsContext & { serverSide: true },
+        railsContext,
         RouterProvider,
         createMemoryHistory,
       ).then(({ appElement, dehydratedState }) => ({
@@ -113,12 +115,20 @@ export function createTanStackRouterRenderFunction(
     // This intentionally creates a fresh closure per renderFn call so the client component
     // captures the current railsContext and TanStack Router dependencies for that mount.
     return function TanStackRouterClientApp(clientProps: Record<string, unknown> = {}) {
+      if (RouterClient && !didWarnRouterClientDeprecated) {
+        didWarnRouterClientDeprecated = true;
+        console.warn(
+          'react-on-rails-pro/tanstack-router: The RouterClient parameter is deprecated and ignored. ' +
+            'RouterProvider is now used directly to avoid SSR hydration mismatches. ' +
+            'You can safely remove the RouterClient import from your createTanStackRouterRenderFunction call.',
+        );
+      }
+
       return clientHydrateTanStackApp(
         options,
         clientProps,
-        railsContext as RailsContext & { serverSide: false },
+        railsContext,
         RouterProvider,
-        RouterClient,
         createBrowserHistory,
       );
     };

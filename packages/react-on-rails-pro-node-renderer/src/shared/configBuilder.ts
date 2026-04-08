@@ -18,7 +18,6 @@ const DEFAULT_PORT = 3800;
 const DEFAULT_LOG_LEVEL = 'info';
 const { env } = process;
 const MAX_DEBUG_SNIPPET_LENGTH = 1000;
-const NODE_ENV = env.NODE_ENV || 'production';
 
 /* Update ./docs/node-renderer/js-configuration.md when something here changes */
 // Node renderer configuration
@@ -57,7 +56,7 @@ export interface Config {
   // Number of workers that will be forked to serve rendering requests.
   workersCount: number;
   // The password expected to receive from the **Rails client** to authenticate rendering requests.
-  // If no password is set, no authentication will be required.
+  // In development/test it is optional; in other environments the renderer refuses to start without it.
   password: string | undefined;
   // Next 2 params, allWorkersRestartInterval and delayBetweenIndividualWorkerRestarts must both
   // be set if you wish to have automatic worker restarting, say to clear memory leaks.
@@ -143,6 +142,35 @@ function logLevel(level: string): LevelWithSilent {
   }
 }
 
+function validatePort(port: number): string | null {
+  if (!Number.isInteger(port) || !Number.isFinite(port) || port < 0 || port > 65535) {
+    return `RENDERER_PORT must be an integer between 0 and 65535. Received: ${String(port)}`;
+  }
+  return null;
+}
+
+function normalizedRuntimeEnvs() {
+  return [env.RAILS_ENV, env.NODE_ENV]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.toLowerCase());
+}
+
+function runtimeEnvsAllowDevelopmentDefaults() {
+  const runtimeEnvs = normalizedRuntimeEnvs();
+  // Fail closed: every present runtime env must be development/test before we allow
+  // missing-password defaults. Any production-like value, or no env at all, still
+  // requires an explicit password.
+  return runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
+}
+
+function defaultReplayServerAsyncOperationLogs() {
+  if (env.REPLAY_SERVER_ASYNC_OPERATION_LOGS != null) {
+    return truthy(env.REPLAY_SERVER_ASYNC_OPERATION_LOGS);
+  }
+
+  return env.NODE_ENV?.toLowerCase() === 'development';
+}
+
 const defaultConfig: Config = {
   // Use env port if we run on Heroku
   port: Number(env.RENDERER_PORT) || DEFAULT_PORT,
@@ -187,10 +215,8 @@ const defaultConfig: Config = {
   // default to true if empty, otherwise it is set to false
   stubTimers: env.RENDERER_STUB_TIMERS === 'true' || !env.RENDERER_STUB_TIMERS,
 
-  // default to true in development, otherwise it is set to false
-  replayServerAsyncOperationLogs: truthy(
-    env.REPLAY_SERVER_ASYNC_OPERATION_LOGS ?? NODE_ENV === 'development',
-  ),
+  // Default to true in development, otherwise it is set to false.
+  replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
 
   // Maximum number of VM contexts to keep in memory. Defaults to 2 since typically only two contexts
   // are needed - one for the server bundle and one for React Server Components (RSC) if enabled.
@@ -208,7 +234,8 @@ function envValuesUsed() {
     RENDERER_BUNDLE_PATH:
       !userConfig.serverBundleCachePath && !userConfig.bundlePath && env.RENDERER_BUNDLE_PATH,
     RENDERER_WORKERS_COUNT: !userConfig.workersCount && env.RENDERER_WORKERS_COUNT,
-    RENDERER_PASSWORD: !userConfig.password && env.RENDERER_PASSWORD && '<MASKED>',
+    // Explicit password overrides, including empty strings, intentionally suppress the env-derived value here.
+    RENDERER_PASSWORD: userConfig.password === undefined && env.RENDERER_PASSWORD && '<MASKED>',
     RENDERER_SUPPORT_MODULES: !('supportModules' in userConfig) && env.RENDERER_SUPPORT_MODULES,
     RENDERER_STUB_TIMERS: !('stubTimers' in userConfig) && env.RENDERER_STUB_TIMERS,
     RENDERER_ALL_WORKERS_RESTART_INTERVAL:
@@ -226,10 +253,20 @@ function envValuesUsed() {
 }
 
 function sanitizedSettings(aConfig: Partial<Config> | undefined, defaultValue?: string) {
+  let sanitizedPassword = defaultValue;
+
+  if (aConfig?.password === '') {
+    sanitizedPassword = '<EMPTY STRING>';
+  } else if (aConfig?.password) {
+    sanitizedPassword = '<MASKED>';
+  }
+
   return aConfig && Object.keys(aConfig).length > 0
     ? {
         ...aConfig,
-        password: aConfig.password != null ? '<MASKED>' : defaultValue,
+        // Distinguish explicit empty-string overrides from truly missing passwords in diagnostics.
+        // Empty strings still flow through as explicit overrides and fail validation in production-like envs.
+        password: sanitizedPassword,
         allWorkersRestartInterval: aConfig.allWorkersRestartInterval || defaultValue,
         delayBetweenIndividualWorkerRestarts: aConfig.delayBetweenIndividualWorkerRestarts || defaultValue,
         gracefulWorkerRestartTimeout: aConfig.gracefulWorkerRestartTimeout || defaultValue,
@@ -241,19 +278,72 @@ export function logSanitizedConfig() {
   log.info({
     'Node Renderer version': packageJson.version,
     'Protocol version': packageJson.protocolVersion,
-    'Default settings': defaultConfig,
+    'Default settings at module load (env-backed values may lag current runtime)': sanitizedSettings(
+      defaultConfig,
+      '<NOT PROVIDED AT MODULE LOAD>',
+    ),
     'ENV values used for settings (use "RENDERER_" prefix)': envValuesUsed(),
     'Customized values for settings from config object (overrides ENV)': sanitizedSettings(userConfig),
     'Final renderer settings': sanitizedSettings(config, '<NOT PROVIDED>'),
   });
 }
 
+function validatePasswordForProduction(aConfig: Config): string | null {
+  // Only a truthy password satisfies the production-like requirement. Null, undefined, and empty strings are
+  // all treated as missing passwords.
+  if (aConfig.password) return null;
+
+  // Require all present runtime envs to be development/test; fail closed otherwise.
+  // If either env indicates a production-like value, or neither env is set, password is required.
+  // This preserves a fail-closed invariant across the renderer startup path and the Ruby-side checks.
+  const allowMissingPassword = runtimeEnvsAllowDevelopmentDefaults();
+  if (allowMissingPassword) return null;
+
+  return (
+    'RENDERER_PASSWORD must be set in production-like environments ' +
+    `(NODE_ENV: "${env.NODE_ENV ?? '(not set)'}", RAILS_ENV: "${env.RAILS_ENV ?? '(not set)'}").` +
+    '\n\n' +
+    'In development and test environments, the renderer password is optional and no authentication\n' +
+    'is required. In all other environments, you must explicitly configure a password to secure\n' +
+    'communication between Rails and the Node Renderer.\n\n' +
+    'To fix this, set the RENDERER_PASSWORD environment variable:\n\n' +
+    '  export RENDERER_PASSWORD="your-secure-password"\n\n' +
+    'Or pass it in the config object:\n\n' +
+    '  reactOnRailsProNodeRenderer({ password: process.env.RENDERER_PASSWORD });\n\n' +
+    'Environment matrix:\n' +
+    '  development — password optional (no authentication)\n' +
+    '  test        — password optional (no authentication)\n' +
+    '  (neither set) — treated as production-like; RENDERER_PASSWORD required\n' +
+    '  all other environments (staging, production, qa, preview, etc.) — RENDERER_PASSWORD required'
+  );
+}
+
 /**
- * Lazily create the config
+ * Lazily create the config.
+ * Passing password: undefined means "keep the env/default password", not "clear the password".
+ * Other undefined keys retain normal JavaScript spread semantics.
  */
 export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   userConfig = providedUserConfig || {};
-  config = { ...defaultConfig, ...userConfig };
+  const explicitUndefinedPassword =
+    Object.prototype.hasOwnProperty.call(userConfig, 'password') && userConfig.password === undefined;
+
+  if (explicitUndefinedPassword && !runtimeEnvsAllowDevelopmentDefaults()) {
+    log.warn(
+      'buildConfig({ password: undefined }) preserves the env/default password rather than clearing it. ' +
+        'In production-like environments, a password is always required and cannot be cleared.',
+    );
+  }
+  const runtimeDefaultConfig = {
+    ...defaultConfig,
+    password: env.RENDERER_PASSWORD,
+    // Re-evaluate env-derived defaults at build time in case env vars are set post-import.
+    replayServerAsyncOperationLogs: defaultReplayServerAsyncOperationLogs(),
+  };
+  config = { ...runtimeDefaultConfig, ...userConfig };
+  if (explicitUndefinedPassword) {
+    config.password = runtimeDefaultConfig.password;
+  }
 
   // Handle bundlePath deprecation
   if ('bundlePath' in userConfig) {
@@ -297,6 +387,17 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
     }
   });
 
+  // Coerce port to a number — user configs frequently pass env-derived strings
+  // (e.g. `port: env.RENDERER_PORT || 3800` yields the string "3800").
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- runtime value may be string despite the type
+  config.port = Number(config.port);
+
+  const portValidationError = validatePort(config.port);
+  if (portValidationError) {
+    log.error(portValidationError);
+    process.exit(1);
+  }
+
   if (
     'honeybadgerApiKey' in config ||
     'sentryDsn' in config ||
@@ -316,6 +417,12 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
   }
   if ('includeTimerPolyfills' in config) {
     log.error('includeTimerPolyfills is renamed to stubTimers in RoRP 4.0');
+    process.exit(1);
+  }
+
+  const passwordValidationError = validatePasswordForProduction(config);
+  if (passwordValidationError) {
+    log.error(passwordValidationError);
     process.exit(1);
   }
 

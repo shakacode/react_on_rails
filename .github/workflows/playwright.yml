@@ -1,9 +1,15 @@
 name: Playwright E2E Tests
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    paths-ignore:
+      - 'AGENTS_USER_GUIDE.md'
+      - 'llms.txt'
+      - 'llms-full.txt'
   workflow_dispatch:
 
 jobs:

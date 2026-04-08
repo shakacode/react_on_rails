@@ -23,8 +23,9 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 ### Evaluating Rails + React options
 
 - [Examples and migration references](https://reactonrails.com/examples)
-- [Compare with alternatives](./oss/getting-started/comparison-with-alternatives.md)
+- [Compare with alternatives](./oss/getting-started/comparing-react-on-rails-to-alternatives.md) — decision guide covering Hotwire, Inertia, Next.js, and more
 - [Migrate from react-rails](./oss/migrating/migrating-from-react-rails.md)
+- [Published migration example repo (Rails 7)](https://github.com/shakacode/react-on-rails-migration-example)
 
 ## Dive deeper when you need it
 
@@ -37,13 +38,14 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 
 ## Pro features
 
-Start at [React on Rails Pro](./pro/home-pro.md) for the canonical Pro route map, then choose the feature family you need:
+Start at [React on Rails Pro](./pro/react-on-rails-pro.md) for the canonical Pro route map, then choose the feature family you need:
 
 - [React Server Components](./pro/react-server-components/tutorial.md) - RSC tutorial and deep dive
 - [Streaming SSR](./pro/streaming-ssr.md) - Progressive server rendering
 - [Node Renderer](./pro/node-renderer.md) - Dedicated Node.js rendering server
 - [Fragment Caching](./pro/fragment-caching.md) - Cache rendered components
 - [Upgrading to Pro](./pro/upgrading-to-pro.md) - Switch from OSS to Pro in three steps
+- [Node Renderer: Container Deployment](./oss/building-features/node-renderer/container-deployment.md) (Pro) - Sidecar vs. separate workloads, memory tuning, troubleshooting
 
 ## Friendly evaluation policy
 

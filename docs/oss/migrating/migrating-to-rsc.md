@@ -2,7 +2,10 @@
 
 This guide covers the React-side challenges of migrating an existing React on Rails application to React Server Components (RSC). It focuses on how to restructure your component tree, handle Context and state management, migrate data fetching patterns, deal with third-party library compatibility, and avoid common pitfalls.
 
-> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/home-pro.md) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `rsc_payload_react_component`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user has an existing React on Rails app and wants to adopt RSC. This covers the React-side migration (component restructuring, state, data fetching). For the initial RSC setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). RSC requires Pro with the Node renderer.
+
+> **React on Rails Pro required:** RSC support requires [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with the node renderer. The Pro gem provides the streaming view helpers (`stream_react_component`, `rsc_payload_react_component`), the RSC webpack plugin and loader, and the `registerServerComponent` API. For setup, see the [RSC tutorial](../../pro/react-server-components/tutorial.md). For upgrade steps, see the [performance breakthroughs guide](../../pro/major-performance-breakthroughs-upgrade-guide.md).
 
 ## Why Migrate?
 
@@ -150,7 +153,7 @@ Before starting any component migration, verify these items. Skipping them is th
 - [ ] **Three webpack bundles building** -- client, server, and RSC bundles all compile without errors
 - [ ] **RSC manifests generated** -- `react-client-manifest.json` and `react-server-client-manifest.json` exist in your webpack output directory
 - [ ] **RSC payload route mounted** -- `rsc_payload_route` in `config/routes.rb`
-- [ ] **Procfile.dev updated** -- separate watcher process for the RSC bundle (`HMR=true RSC_BUNDLE_ONLY=yes bin/shakapacker --watch`)
+- [ ] **Procfile.dev updated** -- separate watcher process for the RSC bundle (`HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch`)
 
 ### Common Pre-Migration Mistakes
 
@@ -169,7 +172,7 @@ These mistakes account for the majority of setup failures:
 ## Prerequisites
 
 - React 19+
-- [React on Rails Pro](../../pro/home-pro.md) 4+ with React on Rails 15+
+- [React on Rails Pro](../../pro/react-on-rails-pro.md) 4+ with React on Rails 15+
 - Node renderer configured (RSC requires server-side JavaScript execution)
 - RSC webpack bundle configured (see [RSC tutorial](../../pro/react-server-components/tutorial.md))
 - Node.js 20+

@@ -38,8 +38,11 @@ shared_examples "rsc_hello_server_files" do |layout_name = "react_on_rails_defau
 
   it "creates HelloServer view with stream_react_component" do
     assert_file "app/views/hello_server/index.html.erb" do |content|
-      expect(content).to include("HelloServer")
+      expect(content).to include("React Server Components Demo")
       expect(content).to include("stream_react_component")
+      expect(content).to include("What this page shows")
+      expect(content).to include("Inspect these files next")
+      expect(content).to include("Marketplace RSC demo")
       expect(content).not_to include("prerender: true")
     end
   end

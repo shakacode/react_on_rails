@@ -1,6 +1,6 @@
 # Node Renderer Debugging
 
-> **Pro Feature** — Available with [React on Rails Pro](../../../pro/home-pro.md).
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
 > Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 Because the renderer communicates over a port to the server, you can start a renderer instance locally in your application and debug it.
@@ -54,17 +54,43 @@ Use this when you need full control over the renderer process — different flag
 
 ## Debugging Memory Leaks
 
-If worker memory grows over time, use heap snapshots to find the source:
+If worker memory grows over time, use heap snapshots to find the source.
 
-1. Start the renderer with `--expose-gc` to enable forced GC before snapshots:
-   ```bash
-   cd react_on_rails_pro/spec/dummy
-   # Adjust the port if your Rails app points at a different renderer URL.
-   RENDERER_PORT=3800 node --expose-gc client/node-renderer.js
-   ```
-2. Take heap snapshots at different times using `v8.writeHeapSnapshot()` (triggered via `SIGUSR2` signal or a custom endpoint).
-3. Load both snapshots in Chrome DevTools (Memory tab → Load) and use the **Comparison** view to see which objects accumulated between snapshots.
-4. Look for growing `string`, `Object`, and `Array` counts — these typically point to module-level caches.
+### Quick approach: `--heapsnapshot-signal` (no code changes)
+
+Use Node's built-in flag to write heap snapshots on demand:
+
+```bash
+cd react_on_rails_pro/spec/dummy
+# Adjust the port if your Rails app points at a different renderer URL.
+NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2" RENDERER_PORT=3800 node client/node-renderer.js
+```
+
+Then capture snapshots at different times:
+
+```bash
+kill -USR2 <worker-pid>   # writes a .heapsnapshot file to the working directory
+```
+
+This also works in production containers — set `NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2"` as an environment variable, send the signal at different times, then copy the `.heapsnapshot` files to your local machine for analysis.
+
+### Detailed approach: with forced GC
+
+For more precise results, start the renderer with `--expose-gc` and a custom signal handler that forces garbage collection before each snapshot. See the [Memory Leaks guide](../../../pro/js-memory-leaks.md#2-take-v8-heap-snapshots) for the code.
+
+### Analyzing snapshots
+
+1. Load both `.heapsnapshot` files in Chrome DevTools (Memory tab → Load).
+2. Use the **Comparison** view to see which objects accumulated between snapshots.
+3. Look for growing `string`, `Object`, and `Array` counts — these typically point to module-level caches.
+
+### Isolating memory issues with a separate renderer workload
+
+When diagnosing memory leaks in a containerized environment, running the Node renderer as a separate workload (instead of a sidecar) makes it easier to:
+
+- Monitor Node memory independently from Rails
+- Capture heap snapshots without affecting the Rails process
+- Restart or scale the renderer without restarting Rails
 
 See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common patterns and fixes.
 

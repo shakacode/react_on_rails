@@ -1,3 +1,8 @@
+---
+sidebar_label: 'Feature Matrix & Benchmarks'
+description: Side-by-side feature matrix and performance-oriented comparison of Rails + React integration options.
+---
+
 # Comparison with Alternatives
 
 Choosing a React integration strategy for Rails? This guide compares React on Rails (OSS and Pro) with the main alternatives so you can make an informed decision.
@@ -44,9 +49,11 @@ The [Evil Martians Inertia Rails React Starter Kit](https://evilmartians.com/ope
 
 **Trade-offs:**
 
-- SSR is opt-in and requires additional Node.js SSR setup — not as integrated as React on Rails' built-in SSR story
-- Replaces Rails views at the per-route level — an action responds as either Inertia or traditional, though incremental adoption is supported
-- Requires adopting Inertia's conventions for data passing and page transitions
+- **Every page navigation is a server round-trip.** Even client-side transitions hit a Rails controller to serialize page props as JSON. Inertia v2 adds [partial reloads](https://inertia-rails.dev/guide/partial-reloads) to narrow which props are refreshed, but a controller round-trip is still required for every transition and perceived performance depends on Rails response time.
+- **All-or-nothing per route.** A route is either fully Inertia or fully traditional Rails — you cannot embed a React component into part of an existing ERB template. This makes incremental adoption in existing Rails apps significantly harder compared to React on Rails' `react_component` helper.
+- **SSR is opt-in and limited.** SSR requires a separate Node.js server process. Route-level code splitting via dynamic imports works with SSR, but there is no component-level code splitting with SSR or streaming SSR, which are available in React on Rails Pro.
+- **Controller coupling.** Controllers become tied to the Inertia response protocol. Switching to a different frontend approach later requires rewriting controller actions.
+- **No path to React Server Components or fragment caching.**
 
 **Best for:** New apps where you want a SPA-like experience with server-side routing, using a controller-driven architecture across React, Vue, or Svelte.
 
@@ -164,7 +171,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 
 ### React on Rails Pro
 
-[React on Rails Pro](../../pro/home-pro.md) extends the OSS gem with production-grade rendering performance and modern React features.
+[React on Rails Pro](../../pro/react-on-rails-pro.md) extends the OSS gem with production-grade rendering performance and modern React features.
 
 **Key additions over OSS:**
 
@@ -175,7 +182,7 @@ Build speed is only part of the picture. Here's how the two approaches compare a
 - **Code splitting with SSR** — route-based splitting via Loadable Components
 - **TanStack Router SSR** — type-safe routing with server rendering
 
-Available for free or with startup-friendly pricing — see the [React on Rails Pro docs](../../pro/home-pro.md) for details and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
+Available for free or with startup-friendly pricing — see the [React on Rails Pro docs](../../pro/react-on-rails-pro.md) for details and the [OSS vs Pro feature matrix](./oss-vs-pro.md) for a detailed breakdown.
 
 **Best for:** Production Rails apps with high-traffic pages, SEO requirements, or need for React Server Components.
 

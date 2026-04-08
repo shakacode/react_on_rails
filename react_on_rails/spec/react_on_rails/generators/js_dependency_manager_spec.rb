@@ -38,6 +38,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
         @say_status_calls << { status: status, message: message, log_status: log_status }
       end
 
+      def system(*args)
+        @system_calls ||= []
+        @system_calls << args
+        @system_result.nil? ? true : @system_result
+      end
+
       # Mock using_swc? from GeneratorHelper (defaults to true for SWC testing)
       def using_swc?
         @using_swc.nil? ? true : @using_swc
@@ -52,6 +58,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       attr_writer :using_rspack
 
+      def use_rsc?
+        @use_rsc == true
+      end
+
+      attr_writer :use_rsc
+
       # Test helpers
       attr_writer :add_npm_dependencies_result
 
@@ -65,6 +77,12 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       def add_npm_dependencies_calls
         @add_npm_dependencies_calls ||= []
+      end
+
+      attr_writer :system_result
+
+      def system_calls
+        @system_calls ||= []
       end
 
       attr_writer :package_json
@@ -91,9 +109,11 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
   before do
     # Clear any previous messages
     GeneratorMessages.clear
+    allow(GeneratorMessages).to receive(:detect_package_manager).and_return("npm")
     # Set up default mocks
     instance.package_json = mock_package_json
     instance.add_npm_dependencies_result = true
+    instance.system_result = true
   end
 
   describe "constants" do
@@ -178,10 +198,38 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance.add_npm_dependencies_dev?).to be(true)
     end
 
-    it "returns false when add_npm_dependencies fails" do
+    it "falls back to direct package-manager install when add_npm_dependencies fails" do
       instance.add_npm_dependencies_result = false
       result = instance.send(:add_packages, %w[package1])
+      expect(result).to be(true)
+      expect(instance.system_calls).to include(%w[npm install --save-exact package1])
+    end
+
+    it "returns false when add_npm_dependencies and fallback both fail" do
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
+      result = instance.send(:add_packages, %w[package1])
       expect(result).to be(false)
+    end
+
+    it "skips fallback install for packages already present in package.json" do
+      instance.add_npm_dependencies_result = false
+      allow(instance).to receive(:existing_package_names).and_return(%w[package1])
+
+      result = instance.send(:add_packages, %w[package1])
+
+      expect(result).to be(true)
+      expect(instance.system_calls).to eq([])
+    end
+
+    it "does not skip fallback install for versioned package specs" do
+      instance.add_npm_dependencies_result = false
+      allow(instance).to receive(:existing_package_names).and_return(%w[react])
+
+      result = instance.send(:add_packages, ["react@~19.0.4"])
+
+      expect(result).to be(true)
+      expect(instance.system_calls).to include(%w[npm install --save-exact react@~19.0.4])
     end
   end
 
@@ -189,28 +237,37 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     it "adds a single package successfully" do
       result = instance.send(:add_package, "react-on-rails@16.0.0")
       expect(result).to be(true)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0"], exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["react-on-rails@16.0.0"], dev: false }
+      )
     end
 
     it "adds a dev dependency when dev: true" do
       result = instance.send(:add_package, "typescript", dev: true)
       expect(result).to be(true)
-      expect(mock_manager).to have_received(:add).with(["typescript"], type: :dev, exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["typescript"], dev: true }
+      )
     end
 
-    it "uses exact: true flag for consistency with add_npm_dependencies" do
-      instance.send(:add_package, "some-package")
-      expect(mock_manager).to have_received(:add).with(["some-package"], exact: true)
+    it "falls back to direct package-manager install when add_npm_dependencies fails" do
+      instance.add_npm_dependencies_result = false
+      result = instance.send(:add_package, "some-package")
+      expect(result).to be(true)
+      expect(instance.system_calls).to include(%w[npm install --save-exact some-package])
     end
 
-    it "returns false when package_json is nil" do
+    it "returns false when fallback install fails" do
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
       instance.package_json = nil
       result = instance.send(:add_package, "some-package")
       expect(result).to be(false)
     end
 
-    it "returns false and logs warning when add raises error" do
-      allow(mock_manager).to receive(:add).and_raise(StandardError, "Network error")
+    it "returns false when fallback raises an exception" do
+      instance.add_npm_dependencies_result = false
+      allow(instance).to receive(:system).and_raise(StandardError, "Network error")
       result = instance.send(:add_package, "some-package")
       expect(result).to be(false)
     end
@@ -223,14 +280,24 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(mock_manager).to have_received(:install)
     end
 
-    it "returns false and adds warning when package_json is nil" do
+    it "falls back to package manager install when package_json is nil" do
       instance.package_json = nil
+
+      result = instance.send(:install_js_dependencies)
+
+      expect(result).to be(true)
+      expect(instance.system_calls).to include(%w[npm install])
+    end
+
+    it "returns false and adds warning when fallback install fails" do
+      instance.package_json = nil
+      instance.system_result = false
 
       result = instance.send(:install_js_dependencies)
 
       expect(result).to be(false)
       expect(warnings.size).to be > 0
-      expect(warnings.first.to_s).to include("package_json not available")
+      expect(warnings.first.to_s).to include("JavaScript dependencies installation failed via npm")
     end
 
     it "returns false and adds warning when install fails" do
@@ -252,49 +319,65 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "adds react-on-rails with version for stable releases" do
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0"], exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["react-on-rails@16.0.0"], dev: false }
+      )
     end
 
     it "adds react-on-rails with version for RC pre-releases (npm format with hyphen)" do
       stub_const("ReactOnRails::VERSION", "16.0.0-rc.1")
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0-rc.1"], exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["react-on-rails@16.0.0-rc.1"], dev: false }
+      )
     end
 
     it "converts Ruby gem beta format to npm format" do
       stub_const("ReactOnRails::VERSION", "16.2.0.beta.10")
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.2.0-beta.10"], exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["react-on-rails@16.2.0-beta.10"], dev: false }
+      )
     end
 
     it "converts Ruby gem RC format to npm format" do
       stub_const("ReactOnRails::VERSION", "16.0.0.rc.1")
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0-rc.1"], exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["react-on-rails@16.0.0-rc.1"], dev: false }
+      )
     end
 
     it "converts Ruby gem alpha format to npm format" do
       stub_const("ReactOnRails::VERSION", "16.0.0.alpha.5")
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0-alpha.5"], exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["react-on-rails@16.0.0-alpha.5"], dev: false }
+      )
     end
 
     it "accepts npm format beta pre-releases (already with hyphen)" do
       stub_const("ReactOnRails::VERSION", "16.2.0-beta.10")
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.2.0-beta.10"], exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["react-on-rails@16.2.0-beta.10"], dev: false }
+      )
     end
 
     it "accepts npm format alpha releases (already with hyphen)" do
       stub_const("ReactOnRails::VERSION", "16.0.0-alpha.5")
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails@16.0.0-alpha.5"], exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["react-on-rails@16.0.0-alpha.5"], dev: false }
+      )
     end
 
     it "adds react-on-rails without version for invalid version formats" do
       stub_const("ReactOnRails::VERSION", "invalid-version")
       instance.send(:add_react_on_rails_package)
-      expect(mock_manager).to have_received(:add).with(["react-on-rails"], exact: true)
+      expect(instance.add_npm_dependencies_calls).to include(
+        { packages: ["react-on-rails"], dev: false }
+      )
     end
 
     it "warns about invalid version format when version doesn't match semver" do
@@ -310,7 +393,8 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     end
 
     it "adds warning when add_package fails" do
-      allow(mock_manager).to receive(:add).and_return(false)
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
       instance.package_json = nil
 
       instance.send(:add_react_on_rails_package)
@@ -320,13 +404,15 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     end
 
     it "catches exceptions in add_package and adds warning" do
-      allow(mock_manager).to receive(:add).and_raise(StandardError, "Connection refused")
+      instance.add_npm_dependencies_result = false
+      allow(instance).to receive(:system).and_raise(StandardError, "Connection refused")
 
       instance.send(:add_react_on_rails_package)
 
       expect(warnings.size).to be > 0
-      # When add_package catches exception, it returns false, triggering the "Failed to add" warning
-      expect(warnings.first.to_s).to include("Failed to add react-on-rails package")
+      warning_text = warnings.map(&:to_s).join("\n")
+      expect(warning_text).to include("Fallback package install failed: Connection refused")
+      expect(warning_text).to include("Failed to add react-on-rails package")
     end
   end
 
@@ -336,13 +422,39 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance.add_npm_dependencies_called?).to be(true)
     end
 
+    it "pins react and react-dom to the RSC-compatible 19.0.x track when RSC is enabled" do
+      instance.use_rsc = true
+
+      instance.send(:add_react_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ["react@~19.0.4", "react-dom@~19.0.4", "prop-types"],
+          dev: false
+        )
+      )
+    end
+
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
+      allow(instance).to receive(:existing_package_names).and_return([])
 
       instance.send(:add_react_dependencies)
 
       expect(warnings.size).to be > 0
       expect(warnings.first.to_s).to include("Failed to add React dependencies")
+    end
+
+    it "warns with the pinned React install command when the RSC add fails" do
+      instance.use_rsc = true
+      instance.add_npm_dependencies_result = false
+      instance.system_result = false
+
+      instance.send(:add_react_dependencies)
+
+      expect(warnings.size).to be > 0
+      expect(warnings.first.to_s).to include("npm install react@~19.0.4 react-dom@~19.0.4 prop-types")
     end
   end
 
@@ -354,6 +466,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
 
       instance.send(:add_css_dependencies)
 
@@ -380,6 +493,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
 
       instance.send(:add_dev_dependencies)
 
@@ -396,6 +510,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
 
       instance.send(:add_rspack_dependencies)
 
@@ -413,11 +528,50 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
+      allow(instance).to receive(:existing_package_names).and_return([])
 
       instance.send(:add_typescript_dependencies)
 
       expect(warnings.size).to be > 0
       expect(warnings.first.to_s).to include("Failed to add TypeScript dependencies")
+    end
+  end
+
+  describe "#rsc_packages_with_version" do
+    it "defines an explicit RSC package version pin independent from the React semver range prefix" do
+      expect(ReactOnRails::Generators::JsDependencyManager::RSC_REACT_VERSION_RANGE).to eq("~19.0.4")
+      expect(ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN).to eq("19.0.4")
+    end
+
+    it "pins react-on-rails-rsc to the React 19 compatibility track" do
+      expected_pin = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
+      expect(instance.send(:rsc_packages_with_version)).to eq([["react-on-rails-rsc@#{expected_pin}"], true])
+    end
+  end
+
+  describe "#add_rsc_dependencies" do
+    it "installs version-pinned rsc dependency" do
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.4"], true])
+
+      instance.send(:add_rsc_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(packages: ["react-on-rails-rsc@19.0.4"], dev: false)
+      )
+    end
+
+    it "falls back to unversioned package when pinned install fails" do
+      allow(instance).to receive(:rsc_packages_with_version).and_return([["react-on-rails-rsc@19.0.4"], true])
+
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc@19.0.4"]).and_return(false)
+      allow(instance).to receive(:add_packages).with(["react-on-rails-rsc"]).and_return(true)
+
+      instance.send(:add_rsc_dependencies)
+
+      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc@19.0.4"])
+      expect(instance).to have_received(:add_packages).with(["react-on-rails-rsc"])
+      expect(warnings.join("\n")).to include("installed react-on-rails-rsc version may not match")
     end
   end
 
@@ -430,6 +584,8 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
+      allow(instance).to receive(:existing_package_names).and_return([])
 
       instance.send(:add_babel_react_dependencies)
 
@@ -450,7 +606,9 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
   describe "error handling consistency" do
     it "all add_* methods use warnings instead of errors" do
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
       instance.package_json = nil
+      allow(instance).to receive(:existing_package_names).and_return([])
 
       # Call all add methods
       instance.send(:add_react_on_rails_package)
@@ -468,6 +626,8 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "all warning messages include manual installation instructions" do
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
+      allow(instance).to receive(:existing_package_names).and_return([])
 
       instance.send(:add_react_dependencies)
 
@@ -518,6 +678,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
     it "setup_js_dependencies completes successfully even when all package operations fail" do
       # Simulate complete package installation failure
       instance.add_npm_dependencies_result = false
+      instance.system_result = false
       instance.package_json = nil
 
       # This should not raise any exceptions

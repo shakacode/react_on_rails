@@ -10,6 +10,7 @@ import { buildConfig, Config, logSanitizedConfig } from './shared/configBuilder.
 import restartWorkers from './master/restartWorkers.js';
 import * as errorReporter from './shared/errorReporter.js';
 import { getLicenseStatus } from './shared/licenseValidator.js';
+import { isWorkerStartupFailureMessage, type WorkerStartupFailureMessage } from './shared/workerMessages.js';
 
 const MILLISECONDS_IN_MINUTE = 60000;
 // How often to scan for orphaned upload directories.
@@ -77,22 +78,81 @@ export default function masterRun(runningConfig?: Partial<Config>) {
     })();
   }, ORPHAN_CLEANUP_INTERVAL_MS);
 
+  let isAbortingForStartupFailure = false;
+  let fatalStartupFailure: { workerId: number; failure: WorkerStartupFailureMessage } | null = null;
+  let hasInitiatedShutdown = false;
+
+  const abortForStartupFailure = (): boolean => {
+    if (!(isAbortingForStartupFailure && fatalStartupFailure)) return false;
+
+    if (!hasInitiatedShutdown) {
+      hasInitiatedShutdown = true;
+      // Note: the exiting worker may differ from the one that sent the
+      // failure message if multiple workers exit in rapid succession.
+      // We always report the first failure received.
+      const { failure, workerId: failedWorkerId } = fatalStartupFailure;
+      const msg =
+        failure.code === 'EADDRINUSE'
+          ? `Node renderer startup failed: ${failure.host}:${failure.port} is already in use`
+          : `Node renderer startup failed in worker ${failedWorkerId}: ${failure.message}`;
+
+      errorReporter.message(msg);
+      // Disconnect all live workers so they release their ports before the
+      // master exits. cluster.disconnect() is async — the callback fires
+      // once every worker has disconnected. A hard-deadline timer guarantees
+      // the master still exits if a worker is stuck (leaked handle, blocking
+      // syscall, etc.), following the same pattern as restartWorkers.ts.
+      const MASTER_SHUTDOWN_TIMEOUT_MS = 5000;
+      const shutdownTimer = setTimeout(() => process.exit(1), MASTER_SHUTDOWN_TIMEOUT_MS);
+      if (typeof shutdownTimer.unref === 'function') shutdownTimer.unref();
+      cluster.disconnect(() => {
+        clearTimeout(shutdownTimer);
+        process.exit(1);
+      });
+    }
+
+    return true;
+  };
+
+  cluster.on('message', (worker, message) => {
+    // Check the abort flag first to short-circuit the type-guard on every
+    // ordinary IPC message once we are already aborting.
+    if (isAbortingForStartupFailure || !isWorkerStartupFailureMessage(message)) return;
+
+    isAbortingForStartupFailure = true;
+    fatalStartupFailure = { workerId: worker.id, failure: message };
+  });
+
   for (let i = 0; i < workersCount; i += 1) {
     cluster.fork();
   }
 
   // Listen for dying workers:
   cluster.on('exit', (worker) => {
+    // Once a startup failure has been detected, abort regardless of whether
+    // this particular exit was from the failing worker, a scheduled restart,
+    // or an unrelated crash. Don't fork any more workers.
+    if (abortForStartupFailure()) {
+      return;
+    }
+
     if (worker.isScheduledRestart) {
       log.info('Restarting worker #%d on schedule', worker.id);
-    } else {
+      cluster.fork();
+      return;
+    }
+
+    // Give in-flight startup-failure IPC messages one event-loop turn to be
+    // processed before classifying this as an ordinary runtime crash.
+    setImmediate(() => {
+      if (abortForStartupFailure()) return;
+
       // TODO: Track last rendering request per worker.id
       // TODO: Consider blocking a given rendering request if it kills a worker more than X times
       const msg = `Worker ${worker.id} died UNEXPECTEDLY :(, restarting`;
       errorReporter.message(msg);
-    }
-    // Replace the dead worker:
-    cluster.fork();
+      cluster.fork();
+    });
   });
 
   // Schedule regular restarts of workers

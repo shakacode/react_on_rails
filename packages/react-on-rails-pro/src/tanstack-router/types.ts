@@ -8,6 +8,15 @@ import type { ComponentType, ReactNode } from 'react';
 export interface TanStackRouter {
   update: (opts: { history: TanStackHistory }) => void;
   load: () => Promise<void>;
+  // Internal TanStack Router APIs used only by the hydration workaround.
+  // Kept optional in the public type so consumers/mocks are not forced
+  // to model private internals.
+  matchRoutes?: (location: unknown) => unknown[];
+  __store?: {
+    setState: (updater: (s: Record<string, unknown>) => Record<string, unknown>) => void;
+  };
+  looseRoutesById?: Record<string, unknown>;
+  loadRouteChunk?: (route: unknown) => Promise<unknown>;
   state: {
     status: string;
     location: {
@@ -22,8 +31,14 @@ export interface TanStackRouter {
   };
   dehydrate?: () => unknown;
   hydrate?: (data: unknown) => void;
-  // TanStack Router uses this internal field during SSR hydration.
-  ssr?: boolean | { manifest: unknown };
+  options?: {
+    hydrate?: (dehydratedData: unknown) => Promise<unknown> | unknown;
+  };
+  // TanStack Router's Transitioner checks this field (truthiness only) to skip
+  // auto-loading on mount.  The canonical shape is { manifest?: unknown }.
+  // Set during client hydration to prevent a duplicate initial load that
+  // causes hydration mismatch.
+  ssr?: { manifest?: unknown };
 }
 
 export interface TanStackHistory {
@@ -95,6 +110,6 @@ export interface DehydratedRouterState {
   url: string;
   /** Router dehydrated state from router.dehydrate() */
   dehydratedRouter: unknown;
-  /** TanStack Router SSR match payload used by RouterClient hydration */
+  /** Legacy TanStack SSR match payload used for compatibility and match-data restoration during hydration */
   ssrRouter?: TanStackSsrRouterState;
 }

@@ -31,14 +31,59 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
   and again when embedding in the `<script>` tag's `.push()` call. The second stringify is now eliminated by
   embedding JSON directly as a JavaScript expression (JSON is a strict subset of JS). This saves ~38KB (~24%
   of raw Flight data) on a typical product search page with 36 results.
-  [PR 2835](https://github.com/shakacode/react_on_rails/pull/2835) by
+  [PR 2879](https://github.com/shakacode/react_on_rails/pull/2879) by
   [justin808](https://github.com/justin808).
   Fixes [Issue 2522](https://github.com/shakacode/react_on_rails/issues/2522).
+
+#### Removed
+
+- **Removed `immediate_hydration` configuration and parameter**: The `immediate_hydration` config option, helper parameter, `data-immediate-hydration` HTML attribute, and `redux_store` `immediate_hydration:` keyword argument have been completely removed. Immediate hydration is now always enabled for React on Rails Pro users and disabled for non-Pro users, with no per-component override. Remove any `immediate_hydration` references from your initializer and helper calls. Passing `immediate_hydration:` to `react_component` / `react_component_hash` is now ignored, and passing it to `stream_react_component` logs a warning. This change also fixes HTML attribute escaping for redux store names to prevent attribute injection from unsafe store keys. Closes [Issue 2142](https://github.com/shakacode/react_on_rails/issues/2142).
+  [PR 2834](https://github.com/shakacode/react_on_rails/pull/2834) by
+  [justin808](https://github.com/justin808).
+
+#### Added
+
+- **[Pro]** **Auto-resolve renderer password from ENV**: `setup_renderer_password` now falls back to `ENV["RENDERER_PASSWORD"]` when neither `config.renderer_password` nor a URL-embedded password is set, aligning Rails-side behavior with the Node Renderer defaults. Blank values (`nil` or `""`) are treated identically and fall through the full resolution chain: config → URL → ENV. [PR 2921](https://github.com/shakacode/react_on_rails/pull/2921) by [justin808](https://github.com/justin808).
+
+#### Improved
+
+- **Doctor enforces strict version constraints**: `react_on_rails:doctor` now escalates non-exact gem and npm version specs (`^`, `~`, `>=`) from warnings to errors, matching the runtime VersionChecker behavior. Wildcard checks now also cover Pro packages (`react-on-rails-pro`, `react_on_rails_pro`). [PR 3070](https://github.com/shakacode/react_on_rails/pull/3070) by [justin808](https://github.com/justin808).
+- **Error messages recommend doctor**: Runtime version-check crashes, configuration validation errors, and autobundling errors now suggest running `bundle exec rake react_on_rails:doctor` for diagnostics and `bundle exec rake react_on_rails:sync_versions WRITE=true` to fix version mismatches. [PR 3070](https://github.com/shakacode/react_on_rails/pull/3070) by [justin808](https://github.com/justin808).
+- **`sync_versions` handles range specs**: Version ranges like `^16.5.0`, `~16.5.0`, and `>=16.5.0` are now parsed and rewritten to the exact expected version instead of being skipped as unsupported. When `FIX=true` is set, doctor auto-runs `sync_versions` to fix detected mismatches. [PR 3070](https://github.com/shakacode/react_on_rails/pull/3070) by [justin808](https://github.com/justin808).
+
+#### Fixed
+
+- **[Pro]** **Fixed TanStack Router SSR hydration mismatches in the async path**: Client hydration now restores server match data before first render, uses `RouterProvider` directly to match the server-rendered tree, and stops the post-hydration load when a custom `router.options.hydrate` callback fails instead of continuing with partially hydrated client state. [PR 2932](https://github.com/shakacode/react_on_rails/pull/2932) by [justin808](https://github.com/justin808).
+- **[Pro] Fixed infinite fork loop when node renderer worker fails to bind port**: When a worker failed during `app.listen()` (e.g., `EADDRINUSE`), the master previously reforked unconditionally, causing an infinite fork/crash loop that consumed CPU and filled logs. Workers now send a `WORKER_STARTUP_FAILURE` IPC message to the master before exiting; the master sets an abort flag and exits with a clear error message instead of reforking. Scheduled restarts and runtime crashes continue to refork as before. [PR 2881](https://github.com/shakacode/react_on_rails/pull/2881) by [justin808](https://github.com/justin808).
+
+### [16.6.0.rc.0] - 2026-04-01
+
+#### Added
+
+- **[Pro]** **`react_on_rails:pro` now automates Pro and RSC Pro upgrades**: Added first-class `--rsc-pro` install mode, automatic `react_on_rails` -> `react_on_rails_pro` Gemfile and package swaps, and frontend import rewrites to streamline existing app upgrades. [PR 2822](https://github.com/shakacode/react_on_rails/pull/2822) by [justin808](https://github.com/justin808).
+
+#### Improved
+
+- **`react_on_rails:doctor` now prefers runtime configuration**: Doctor now reads loaded `ReactOnRails.configuration` values before falling back to initializer parsing, improving diagnostics for customized SSR and NodeRenderer setups. [PR 2823](https://github.com/shakacode/react_on_rails/pull/2823) by [justin808](https://github.com/justin808).
+- **Fresh app onboarding for `create-react-on-rails-app`**: New apps now land on a generated root page with links to the local demos, docs, OSS vs Pro guidance, the Pro quick start, and the marketplace RSC demo. `bin/dev` opens that page on first boot, `--rsc` scaffolds the same fresh-app experience, and the generated app records step-by-step educational git commits for each scaffold phase. [PR 2849](https://github.com/shakacode/react_on_rails/pull/2849) by [justin808](https://github.com/justin808).
+
+#### Fixed
+
+- **Legacy Shakapacker migrations are more resilient**: `react_on_rails:install` now falls back cleanly when the `package_json` gem is unavailable, installs only missing JS packages through the detected package manager, and auto-switches legacy JSX-in-`.js` apps to Babel when needed. [PR 2901](https://github.com/shakacode/react_on_rails/pull/2901) by [justin808](https://github.com/justin808).
+- **New-app root-route generation is more robust**: Generator root-route detection is now centralized, duplicate route insertion is avoided, and home-page generation warns instead of failing when `config/routes.rb` is missing or unexpected. [PR 2891](https://github.com/shakacode/react_on_rails/pull/2891) by [justin808](https://github.com/justin808).
+- **`bin/dev` now exits quietly on Ctrl-C**: The process manager and generated Shakapacker watcher wrapper now treat interrupt-driven shutdown as a clean exit, avoiding Ruby backtraces during local development. [PR 2652](https://github.com/shakacode/react_on_rails/pull/2652) by [justin808](https://github.com/justin808).
+- **`bin/dev` browser auto-open now waits for route readiness**: `--open-browser` and `--open-browser-once` now poll the target app route and open the browser only after receiving a success or redirect response, reducing premature opens during boot. [PR 2885](https://github.com/shakacode/react_on_rails/pull/2885) by [justin808](https://github.com/justin808).
 
 ### [16.5.1] - 2026-03-27
 
 #### Fixed
 
+- **[Pro]** **TanStack Router: removed dependency on internal `router.ssr` flag**: Server-side rendering no longer
+  sets the internal `router.ssr` property (unnecessary since React effects don't run during `renderToString`).
+  Client-side legacy hydration path now uses the correct `{ manifest: undefined }` shape matching TanStack Router's
+  internal `$_TSR` contract instead of a bare `true` boolean, improving forward compatibility. The recommended
+  `RouterClient`/`ssrRouter` hydration path was already free of this dependency.
+  Fixes [Issue 2647](https://github.com/shakacode/react_on_rails/issues/2647). [PR 2833](https://github.com/shakacode/react_on_rails/pull/2833) by [justin808](https://github.com/justin808).
 - **[Pro] Fixed missing rake tasks in published gem**: The Pro gemspec excluded `lib/tasks/` from packaged files, so all `react_on_rails_pro:*` rake tasks (`verify_license`, `pre_stage_bundle_for_node_renderer`, `copy_assets_to_remote_vm_renderer`, `process_v8_logs`) were unavailable after gem install. [PR 2872](https://github.com/shakacode/react_on_rails/pull/2872) by [justin808](https://github.com/justin808).
 - **[Pro] Fixed bundle duplication in remote node renderer asset uploads**: When RSC support is enabled, running `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` no longer duplicates bundle JS files across bundle directories. Previously, both the server bundle and RSC bundle were copied into every target directory; now each bundle is placed only in its own directory while shared assets (manifests, stats) are correctly distributed to all. [PR 2768](https://github.com/shakacode/react_on_rails/pull/2768) by [AbanoubGhadban](https://github.com/AbanoubGhadban). Fixes [Issue 2766](https://github.com/shakacode/react_on_rails/issues/2766).
 
@@ -66,9 +111,11 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **Preserve runtime env vars across `Bundler.with_unbundled_env`**: Fixed `PORT` and `SHAKAPACKER_DEV_SERVER_PORT` being lost when `ProcessManager` runs foreman/overmind inside `Bundler.with_unbundled_env`, breaking auto-detected ports from `PortSelector`. Env vars are now captured before the unbundled block and passed explicitly to `system()`. [PR 2836](https://github.com/shakacode/react_on_rails/pull/2836) by [ihabadham](https://github.com/ihabadham).
 - **Fix doctor prerender check and ExecJS display for Pro/RSC apps**: `uses_prerender_in_views?` now detects Pro streaming helpers (`stream_react_component`, `cached_stream_react_component`, `rsc_payload_react_component`) that implicitly enable prerender. Server rendering engine display now correctly detects NodeRenderer configuration from the Pro initializer. [PR 2773](https://github.com/shakacode/react_on_rails/pull/2773) by [ihabadham](https://github.com/ihabadham).
 - **Fix doctor false positives for custom layouts**: `react_on_rails:doctor` now resolves `package.json` from `node_modules_location` config (instead of assuming repo root) and discovers webpack/rspack configs across common custom locations. Missing bundler config downgraded from error to contextual warning. [PR 2612](https://github.com/shakacode/react_on_rails/pull/2612) by [justin808](https://github.com/justin808).
+- **[Pro]** **Require `RENDERER_PASSWORD` in production-like Node Renderer environments**: The Pro Node Renderer now fails fast when started without a truthy `RENDERER_PASSWORD` outside development/test, masks module-load password defaults in diagnostic logs, warns when `buildConfig({ password: undefined })` preserves the env/default password, and clarifies the Ruby-side initializer requirement. [PR 2829](https://github.com/shakacode/react_on_rails/pull/2829) by [justin808](https://github.com/justin808).
 
 #### Breaking Changes
 
+- **[Pro]** **`RENDERER_PASSWORD` now required in production-like environments**: Existing staging/production deployments using NodeRenderer without a password will fail to start after upgrading. Set `RENDERER_PASSWORD` in the environment and configure `config.renderer_password = ENV.fetch("RENDERER_PASSWORD")` in your Rails initializer before upgrading. [PR 2829](https://github.com/shakacode/react_on_rails/pull/2829) by [justin808](https://github.com/justin808).
 - **[Pro]** **Minimum `async` gem version bumped to 2.29**: The streaming helper now requires `async >= 2.29` (previously `>= 2.6`) due to the migration from `Async::Variable` to `Async::Promise`. If your Gemfile pins the `async` gem below 2.29, you will need to update it before upgrading React on Rails Pro. Run `bundle update async` to pick up the new minimum.
   [PR 2832](https://github.com/shakacode/react_on_rails/pull/2832) by [justin808](https://github.com/justin808).
 
@@ -2066,7 +2113,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...main
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.6.0.rc.0...main
+[16.6.0.rc.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0.rc.0
 [16.5.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...v16.5.1
 [16.5.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0
 [16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0

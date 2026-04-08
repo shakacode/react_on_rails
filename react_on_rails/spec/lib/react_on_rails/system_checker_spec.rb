@@ -180,6 +180,17 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
   end
 
+  describe "#check_webpack_configuration" do
+    it "mentions custom assets_bundler_config_path when no bundler config is found" do
+      allow(checker).to receive(:detect_bundler_config_path).and_return(nil)
+
+      checker.check_webpack_configuration
+
+      error_message = checker.messages.find { |msg| msg[:type] == :error }[:content]
+      expect(error_message).to include("assets_bundler_config_path")
+    end
+  end
+
   describe "#check_react_on_rails_gem" do
     context "when gem is loaded" do
       before do
@@ -205,72 +216,6 @@ RSpec.describe ReactOnRails::SystemChecker do
         checker.check_react_on_rails_gem
         expect(checker.errors?).to be true
         expect(checker.messages.last[:content]).to include("React on Rails gem is not available")
-      end
-    end
-  end
-
-  describe "#check_version_patterns" do
-    it "warns about caret version patterns" do
-      checker.send(:check_version_patterns, "^16.0.0", "16.0.0")
-      expect(checker.warnings?).to be true
-      expect(checker.messages.last[:content]).to include("caret (^) version pattern")
-    end
-
-    it "warns about tilde version patterns" do
-      checker.send(:check_version_patterns, "~16.0.0", "16.0.0")
-      expect(checker.warnings?).to be true
-      expect(checker.messages.last[:content]).to include("tilde (~) version pattern")
-    end
-
-    it "does not warn about exact versions" do
-      initial_message_count = checker.messages.count
-      checker.send(:check_version_patterns, "16.0.0", "16.0.0")
-      expect(checker.messages.count).to eq(initial_message_count)
-    end
-  end
-
-  describe "#check_gemfile_version_patterns" do
-    context "when Gemfile has version patterns" do
-      let(:gemfile_content) do
-        <<~GEMFILE
-          gem 'rails', '~> 7.0'
-          gem 'react_on_rails', '~> 16.0'
-          gem 'other_gem'
-        GEMFILE
-      end
-
-      before do
-        gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-        allow(File).to receive(:exist?).with(gemfile_path).and_return(true)
-        allow(File).to receive(:read).with(gemfile_path).and_return(gemfile_content)
-        stub_const("ReactOnRails::VERSION", "16.0.0")
-      end
-
-      it "warns about tilde version patterns" do
-        checker.send(:check_gemfile_version_patterns)
-        expect(checker.warnings?).to be true
-        expect(checker.messages.last[:content]).to include("Gemfile uses version pattern")
-      end
-    end
-
-    context "when Gemfile has exact versions" do
-      let(:gemfile_content) do
-        <<~GEMFILE
-          gem 'rails', '7.0.0'
-          gem 'react_on_rails', '16.0.0'
-        GEMFILE
-      end
-
-      before do
-        gemfile_path = ENV["BUNDLE_GEMFILE"] || "Gemfile"
-        allow(File).to receive(:exist?).with(gemfile_path).and_return(true)
-        allow(File).to receive(:read).with(gemfile_path).and_return(gemfile_content)
-      end
-
-      it "does not warn about exact versions" do
-        initial_message_count = checker.messages.count
-        checker.send(:check_gemfile_version_patterns)
-        expect(checker.messages.count).to eq(initial_message_count)
       end
     end
   end
@@ -429,12 +374,9 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:read).with("package.json").and_return(package_json_content)
       end
 
-      it "adds a success message and version pattern warning" do
+      it "silently skips non-exact specs (Doctor handles the diagnostic)" do
         checker.send(:check_package_version_sync)
-        expect(checker.messages.any? do |msg|
-          msg[:type] == :success && msg[:content].include?("versions match")
-        end).to be true
-        expect(checker.warnings?).to be true
+        expect(checker.messages).to be_empty
       end
     end
 
@@ -523,9 +465,9 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:read).with("package.json").and_return(package_json_content)
       end
 
-      it "adds a warning message" do
+      it "adds an error message" do
         checker.send(:check_package_version_sync)
-        expect(checker.warnings?).to be true
+        expect(checker.errors?).to be true
         expect(checker.messages.last[:content]).to include("Version mismatch detected")
       end
     end
@@ -677,34 +619,51 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     describe "#shakapacker_configured?" do
       before do
-        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive_messages(exist?: false, file?: false)
         allow(File).to receive(:exist?).with("bin/shakapacker").and_return(true)
         allow(File).to receive(:exist?).with("bin/shakapacker-dev-server").and_return(true)
         allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
-        # Default all config files to missing
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(false)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(false)
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(false)
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(false)
       end
 
       it "returns true when webpack JS config exists" do
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.js").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
       it "returns true when webpack TS config exists" do
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
       it "returns true when rspack JS config exists" do
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.js").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
       it "returns true when rspack TS config exists" do
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
+
+      it "returns true when shakapacker assets_bundler_config_path points to a custom config" do
+        allow(File).to receive(:file?).with("config/custom/custom-bundler.config.js").and_return(true)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path)
+          .and_return("config/custom/custom-bundler.config.js")
+        allow(checker).to receive(:bundler_config_directory)
+          .with("config/custom/custom-bundler.config.js")
+          .and_return("config/custom")
+
+        expect(checker.send(:shakapacker_configured?)).to be true
+      end
+
+      it "falls back to discovered defaults when explicit shakapacker assets_bundler_config_path is missing" do
+        allow(File).to receive(:file?).with("config/custom/missing.config.js").and_return(false)
+        allow(File).to receive(:file?).with("config/custom/webpack.config.js").and_return(true)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom/missing.config.js")
+        allow(checker).to receive(:bundler_config_directory)
+          .with("config/custom/missing.config.js")
+          .and_return("config/custom")
+
         expect(checker.send(:shakapacker_configured?)).to be true
       end
 
@@ -714,25 +673,32 @@ RSpec.describe ReactOnRails::SystemChecker do
 
       it "returns false when binaries are missing" do
         allow(File).to receive(:exist?).with("bin/shakapacker").and_return(false)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.js").and_return(true)
         expect(checker.send(:shakapacker_configured?)).to be false
       end
     end
 
     describe "#detect_bundler_config_path" do
       before do
-        allow(File).to receive(:exist?).and_return(false)
+        allow(File).to receive_messages(exist?: false, file?: false)
       end
 
       it "returns the existing webpack TypeScript config when only webpack exists" do
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
 
         expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
       end
 
+      it "prefers webpack JavaScript config when both webpack defaults exist" do
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.js")
+      end
+
       it "prefers the bundler configured in shakapacker.yml when both bundlers exist" do
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
         allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
         allow(File).to receive(:read).with("config/shakapacker.yml").and_return("default:\n  assets_bundler: rspack\n")
 
@@ -742,13 +708,77 @@ RSpec.describe ReactOnRails::SystemChecker do
         end).to be true
       end
 
+      it "prefers configured assets_bundler when both custom-directory candidates exist" do
+        allow(File).to receive(:file?).with("config/custom/missing.config.js").and_return(false)
+        allow(File).to receive(:file?).with("config/custom/webpack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/custom/rspack.config.js").and_return(true)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom/missing.config.js")
+        allow(checker).to receive(:bundler_config_directory)
+          .with("config/custom/missing.config.js")
+          .and_return("config/custom")
+        allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(true)
+        allow(File).to receive(:read).with("config/shakapacker.yml").and_return("default:\n  assets_bundler: rspack\n")
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/custom/rspack.config.js")
+        expect(checker.messages.any? do |msg|
+          msg[:content].include?("Using rspack from config/shakapacker.yml")
+        end).to be true
+      end
+
       it "warns and defaults to webpack when both bundlers exist and config is ambiguous" do
-        allow(File).to receive(:exist?).with("config/rspack/rspack.config.ts").and_return(true)
-        allow(File).to receive(:exist?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
         allow(File).to receive(:exist?).with("config/shakapacker.yml").and_return(false)
 
         expect(checker.send(:detect_bundler_config_path)).to eq("config/webpack/webpack.config.ts")
         expect(checker.messages.any? { |msg| msg[:content].include?("defaulting to webpack") }).to be true
+      end
+
+      it "returns shakapacker's custom assets_bundler_config_path when present" do
+        allow(File).to receive(:file?).with("config/custom/custom-bundler.config.js").and_return(true)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path)
+          .and_return("config/custom/custom-bundler.config.js")
+        allow(checker).to receive(:bundler_config_directory)
+          .with("config/custom/custom-bundler.config.js")
+          .and_return("config/custom")
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/custom/custom-bundler.config.js")
+      end
+
+      it "honors explicit shakapacker config path even when both default bundler files exist" do
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.js").and_return(true)
+        allow(File).to receive(:file?).with("config/rspack/rspack.config.ts").and_return(false)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.ts").and_return(true)
+        allow(File).to receive(:file?).with("config/webpack/webpack.config.js").and_return(false)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/rspack/rspack.config.js")
+        allow(checker).to receive(:bundler_config_directory)
+          .with("config/rspack/rspack.config.js")
+          .and_return("config/rspack")
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/rspack/rspack.config.js")
+        expect(checker.messages.any? { |msg| msg[:content].include?("defaulting to webpack") }).to be false
+      end
+
+      it "ignores directory-valued custom assets_bundler_config_path entries" do
+        allow(File).to receive(:file?).with("config/custom").and_return(false)
+        allow(checker).to receive(:shakapacker_assets_bundler_config_path).and_return("config/custom")
+        allow(checker).to receive(:bundler_config_directory)
+          .with("config/custom")
+          .and_return("config/custom")
+
+        expect(checker.send(:detect_bundler_config_path)).to be_nil
+      end
+
+      it "falls back to resolved path if bundled classifier returns nil" do
+        allow(checker).to receive_messages(
+          resolved_webpack_config_path: "config/custom/custom-bundler.config.js",
+          resolve_default_bundler_config_path: nil
+        )
+        allow(checker).to receive(:explicit_shakapacker_bundler_config_path?)
+          .with("config/custom/custom-bundler.config.js")
+          .and_return(false)
+
+        expect(checker.send(:detect_bundler_config_path)).to eq("config/custom/custom-bundler.config.js")
       end
     end
 
@@ -802,6 +832,33 @@ RSpec.describe ReactOnRails::SystemChecker do
         info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
 
         expect(info_messages).to include("Add to config/webpack/webpack.config.ts")
+      end
+
+      it "uses configured assets_bundler for explicit custom shakapacker config paths" do
+        allow(checker).to receive(:explicit_shakapacker_bundler_config_path?)
+          .with("config/custom/bundler.config.js")
+          .and_return(true)
+        allow(checker).to receive(:configured_assets_bundler).and_return("rspack")
+
+        checker.send(:suggest_webpack_inspection, "config/custom/bundler.config.js")
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
+
+        expect(info_messages).to include("debug rspack builds")
+        expect(info_messages).to include("rspack-stats.json")
+      end
+
+      it "falls back to inferred bundler when custom shakapacker path has no assets_bundler setting" do
+        allow(checker).to receive(:explicit_shakapacker_bundler_config_path?)
+          .with("config/custom/bundler.config.js")
+          .and_return(true)
+        allow(checker).to receive(:configured_assets_bundler).and_return(nil)
+
+        checker.send(:suggest_webpack_inspection, "config/custom/bundler.config.js")
+        info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }.join("\n")
+
+        expect(info_messages).to include("debug webpack builds")
+        expect(info_messages).to include("webpack-stats.json")
+        expect(info_messages).to include("assets_bundler not set in config/shakapacker.yml")
       end
     end
 

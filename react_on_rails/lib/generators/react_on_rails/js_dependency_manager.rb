@@ -9,8 +9,8 @@ module ReactOnRails
     # This module provides common functionality for adding and installing
     # JS dependencies to avoid code duplication between generators.
     #
-    # Since react_on_rails requires shakapacker, and shakapacker includes
-    # package_json as a dependency, the package_json gem is always available.
+    # For older shakapacker versions, the package_json gem may not be available.
+    # In that case this module falls back to direct package-manager commands.
     #
     # == Required Methods
     # Including classes must include GeneratorHelper module which provides:
@@ -125,6 +125,10 @@ module ReactOnRails
         react-on-rails-rsc
       ].freeze
 
+      # RSC package releases follow the React 19.0.x line (independent from gem versioning).
+      RSC_REACT_VERSION_RANGE = "~19.0.4"
+      RSC_PACKAGE_VERSION_PIN = "19.0.4"
+
       private
 
       def setup_js_dependencies
@@ -218,7 +222,7 @@ module ReactOnRails
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
         # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
         react_deps = if respond_to?(:use_rsc?) && use_rsc?
-                       %w[react@~19.0.4 react-dom@~19.0.4 prop-types]
+                       ["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}", "prop-types"]
                      else
                        REACT_DEPENDENCIES
                      end
@@ -300,7 +304,7 @@ module ReactOnRails
 
       def add_babel_react_dependencies
         say "Installing Babel React preset dependency..."
-        return if add_packages(BABEL_REACT_DEPENDENCIES, dev: true)
+        return true if add_packages(BABEL_REACT_DEPENDENCIES, dev: true)
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add Babel React preset dependency.
@@ -308,6 +312,7 @@ module ReactOnRails
           You can install it manually by running:
             npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
         MSG
+        false
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Error adding Babel React preset dependency: #{e.message}
@@ -315,6 +320,7 @@ module ReactOnRails
           You can install it manually by running:
             npm install --save-dev #{BABEL_REACT_DEPENDENCIES.join(' ')}
         MSG
+        false
       end
 
       def add_typescript_dependencies
@@ -381,13 +387,29 @@ module ReactOnRails
 
       def add_rsc_dependencies
         say "Installing React Server Components dependencies..."
-        return if add_packages(RSC_DEPENDENCIES)
+        rsc_packages, used_version_pins = rsc_packages_with_version
+        return if add_packages(rsc_packages)
+
+        manual_install_packages = rsc_packages
+        if used_version_pins
+          warning_msg = "Could not install version-pinned RSC dependency. Retrying latest available package."
+          say_status :warning,
+                     warning_msg,
+                     :yellow
+          GeneratorMessages.add_warning(
+            "Warning: #{warning_msg} " \
+            "The installed react-on-rails-rsc version may not match the expected compatibility pin."
+          )
+          return if add_packages(RSC_DEPENDENCIES)
+
+          manual_install_packages = RSC_DEPENDENCIES
+        end
 
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  Failed to add React Server Components dependencies.
 
           You can install them manually by running:
-            npm install #{RSC_DEPENDENCIES.join(' ')}
+            npm install #{manual_install_packages.join(' ')}
         MSG
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
@@ -396,6 +418,12 @@ module ReactOnRails
           You can install them manually by running:
             npm install #{RSC_DEPENDENCIES.join(' ')}
         MSG
+      end
+
+      # Returns [pinned_packages, used_version_pins]. used_version_pins is always true here;
+      # subclasses may override to return [packages, false] when pinning should be skipped.
+      def rsc_packages_with_version
+        [RSC_DEPENDENCIES.map { |pkg| "#{pkg}@#{RSC_PACKAGE_VERSION_PIN}" }, true]
       end
 
       def remove_base_package_if_present
@@ -440,7 +468,7 @@ module ReactOnRails
         MSG
       end
 
-      # Add a single dependency using package_json gem
+      # Add a single dependency.
       #
       # This method is used internally for adding the react-on-rails package
       # with version-specific handling (react-on-rails@VERSION).
@@ -453,51 +481,42 @@ module ReactOnRails
       # @param dev [Boolean] Whether to add as dev dependency
       # @return [Boolean] true if successful, false otherwise
       def add_package(package, dev: false)
-        pj = package_json
-        return false unless pj
-
-        begin
-          # Ensure package is in array format for package_json gem
-          packages_array = [package]
-          if dev
-            pj.manager.add(packages_array, type: :dev, exact: true)
-          else
-            pj.manager.add(packages_array, exact: true)
-          end
-          true
-        rescue StandardError
-          # Return false to trigger warning in calling method
-          false
-        end
+        add_packages([package], dev: dev)
       end
 
-      # Add multiple dependencies at once using package_json gem
+      # Add multiple dependencies.
       #
-      # This method delegates to GeneratorHelper's add_npm_dependencies for
-      # better package manager abstraction and batch processing efficiency.
+      # Tries package_json first (when available), then falls back to invoking
+      # the detected package manager directly.
       #
       # @param packages [Array<String>] Package names to add
       # @param dev [Boolean] Whether to add as dev dependencies
       # @return [Boolean] true if successful, false otherwise
       def add_packages(packages, dev: false)
-        # Use the add_npm_dependencies helper from GeneratorHelper
-        add_npm_dependencies(packages, dev: dev)
+        return true if add_npm_dependencies(packages, dev: dev)
+
+        install_packages_with_fallback(packages, dev: dev)
       end
 
       def install_js_dependencies
-        # Use package_json gem's install method (always available via shakapacker)
-        # package_json is guaranteed to be available because:
-        # 1. react_on_rails gemspec requires shakapacker
-        # 2. shakapacker gemspec requires package_json
-        # 3. GeneratorHelper provides package_json method
         pj = package_json
-        unless pj
-          GeneratorMessages.add_warning("package_json not available, skipping dependency installation")
-          return false
+        if pj
+          pj.manager.install
+          return true
         end
 
-        pj.manager.install
-        true
+        package_manager = fallback_package_manager
+        install_args = [package_manager, "install"]
+
+        return true if system(*install_args)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  JavaScript dependencies installation failed via #{package_manager}.
+
+          Please run manually:
+            #{install_args.join(' ')}
+        MSG
+        false
       rescue StandardError => e
         GeneratorMessages.add_warning(<<~MSG.strip)
           ⚠️  JavaScript dependencies installation failed: #{e.message}
@@ -509,6 +528,83 @@ module ReactOnRails
           • pnpm install (if using pnpm)
         MSG
         false
+      end
+
+      def install_packages_with_fallback(packages, dev:)
+        package_manager = fallback_package_manager
+        packages_to_install = filter_missing_packages(packages)
+        return true if packages_to_install.empty?
+
+        install_args = build_install_args(package_manager, dev, packages_to_install)
+
+        system(*install_args)
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Fallback package install failed: #{e.message}")
+        false
+      end
+
+      def fallback_package_manager
+        package_manager = GeneratorMessages.detect_package_manager
+        return package_manager if GeneratorMessages.supported_package_manager?(package_manager)
+
+        "npm"
+      end
+
+      def build_install_args(package_manager, dev, packages)
+        base_commands = {
+          "npm" => %w[npm install --save-exact],
+          "yarn" => %w[yarn add --exact],
+          "pnpm" => %w[pnpm add --save-exact],
+          "bun" => %w[bun add --exact]
+        }
+
+        base_args = base_commands.fetch(package_manager).dup
+        base_args << dev_flag_for(package_manager) if dev
+        base_args + packages
+      end
+
+      def dev_flag_for(package_manager)
+        case package_manager
+        when "npm", "pnpm" then "--save-dev"
+        when "yarn", "bun" then "--dev"
+        else
+          raise ArgumentError, "Unknown package manager for dev flag: #{package_manager}"
+        end
+      end
+
+      def filter_missing_packages(packages)
+        existing = existing_package_names
+        return packages if existing.empty?
+
+        packages.reject do |package_spec|
+          package_name = package_name_from_spec(package_spec)
+          next false unless package_name && existing.include?(package_name)
+
+          !version_specified?(package_spec, package_name)
+        end
+      end
+
+      def existing_package_names
+        return [] unless File.exist?("package.json")
+
+        content = JSON.parse(File.read("package.json"))
+        dependencies = content.fetch("dependencies", {}).keys
+        dev_dependencies = content.fetch("devDependencies", {}).keys
+        (dependencies + dev_dependencies).uniq
+      rescue StandardError
+        []
+      end
+
+      def package_name_from_spec(package_spec)
+        scoped_match = package_spec.match(%r{\A(@[^/]+/[^@]+)(?:@.+)?\z})
+        return scoped_match[1] if scoped_match
+
+        unscoped_match = package_spec.match(/\A([^@]+)(?:@.+)?\z/)
+        unscoped_match&.[](1)
+      end
+
+      def version_specified?(package_spec, package_name)
+        package_spec != package_name
       end
     end
   end

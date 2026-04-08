@@ -60,20 +60,17 @@ module ReactOnRails
         return false if pro_gem_installed?
         return false if attempt_pro_gem_auto_install
 
-        context_line = if options.key?(:pro) || options.key?(:rsc)
-                         flag = options[:rsc] ? "--rsc" : "--pro"
-                         "You specified #{flag}, which requires the react_on_rails_pro gem."
-                       else
-                         "This generator requires the react_on_rails_pro gem."
-                       end
+        context_line = pro_gem_requirement_context_line
+        prerelease_note = rsc_pro_prerelease_note
 
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
 
           #{context_line}
+          #{prerelease_note}
 
           Please add manually to your Gemfile:
-            gem '#{PRO_GEM_NAME}', '~> #{recommended_pro_gem_version}'
+            gem '#{PRO_GEM_NAME}', '#{pro_gem_version_requirement}'
 
           Then run: bundle install
 
@@ -85,6 +82,33 @@ module ReactOnRails
       end
 
       private
+
+      def pro_gem_requirement_context_line
+        return "This generator requires the react_on_rails_pro gem." unless pro_flag_specified_for_context?
+
+        "You specified #{pro_requirement_flag}, which requires the react_on_rails_pro gem."
+      end
+
+      def pro_flag_specified_for_context?
+        use_pro?
+      end
+
+      def pro_requirement_flag
+        return "--rsc-pro" if use_rsc_pro_mode?
+        return "--rsc" if options[:rsc]
+
+        "--pro"
+      end
+
+      def rsc_pro_prerelease_note
+        return "" unless use_rsc_pro_mode?
+        return "" unless Gem::Version.new(ReactOnRails::VERSION).prerelease?
+
+        "Note: #{PRO_GEM_NAME} #{ReactOnRails::VERSION} may not be published yet. " \
+          "If you are testing from source, use a local Gemfile `path:` option."
+      rescue ArgumentError
+        ""
+      end
 
       # Attempt to auto-install the Pro gem via bundle add.
       # Uses Process.spawn instead of Timeout.timeout to avoid Thread#raise corrupting
@@ -459,7 +483,15 @@ module ReactOnRails
       end
 
       def pro_gem_auto_install_command
-        "bundle add #{PRO_GEM_NAME} --version='~> #{recommended_pro_gem_version}' --strict"
+        "bundle add #{PRO_GEM_NAME} --version='#{pro_gem_version_requirement}' --strict"
+      end
+
+      def pro_gem_version_requirement
+        # RSC Pro uses exact pinning so the Pro gem version always matches the
+        # paired RSC package version generated in the same run.
+        return ReactOnRails::VERSION if use_rsc_pro_mode?
+
+        "~> #{recommended_pro_gem_version}"
       end
 
       # Keep manual fallback pinned to the latest stable release (drop pre-release suffixes like .rc.N).

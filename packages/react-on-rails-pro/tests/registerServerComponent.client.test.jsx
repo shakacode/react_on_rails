@@ -235,6 +235,8 @@ enableFetchMocks();
         document.dispatchEvent(new Event('DOMContentLoaded'));
       });
 
+      expect(window.REACT_ON_RAILS_RSC_PAYLOADS['TestComponent-{}-test-container']).toHaveLength(2);
+
       // After the second chunk, AsyncComponent should now be visible and loading indicator gone
       expect(screen.getByText('AsyncComponent')).toBeInTheDocument();
       expect(screen.queryByText('Loading AsyncComponent...')).not.toBeInTheDocument();

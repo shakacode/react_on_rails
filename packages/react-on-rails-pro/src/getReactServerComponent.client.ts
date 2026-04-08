@@ -125,11 +125,13 @@ const createRSCStreamFromPreloadedPayloads = (payloads: RSCPayloadChunk[], cspNo
         replayConsoleLog(chunk.consoleReplayScript, sanitizedNonceValue);
       };
 
+      const previousPush = payloads.push.bind(payloads);
       payloads.forEach(handleChunk);
       // eslint-disable-next-line no-param-reassign
       payloads.push = (...chunks: RSCPayloadChunk[]) => {
+        const newLength = previousPush(...chunks);
         chunks.forEach(handleChunk);
-        return chunks.length;
+        return newLength;
       };
       streamController = controller;
     },

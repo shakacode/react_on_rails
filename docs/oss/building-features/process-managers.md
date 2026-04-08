@@ -346,7 +346,7 @@ The default `Procfile.dev` includes:
 ```procfile
 rails: bundle exec rails s -p ${PORT:-3000}
 dev-server: bin/shakapacker-dev-server
-server-bundle: SERVER_BUNDLE_ONLY=yes bin/shakapacker --watch
+server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 ```
 
 ## Running Multiple Worktrees Simultaneously

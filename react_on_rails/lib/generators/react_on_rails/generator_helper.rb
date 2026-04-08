@@ -10,9 +10,12 @@ module GeneratorHelper
     require "package_json" unless defined?(PackageJson)
     @package_json ||= PackageJson.read
   rescue LoadError
-    say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
-    say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
-               :yellow
+    unless @package_json_unavailable_warned
+      say_status :warning, "package_json gem not available. This is expected before Shakapacker installation.", :yellow
+      say_status :warning, "Dependencies will be installed using the default package manager after Shakapacker setup.",
+                 :yellow
+      @package_json_unavailable_warned = true
+    end
     nil
   rescue StandardError => e
     say_status :warning, "Could not read package.json: #{e.message}", :yellow
@@ -26,12 +29,13 @@ module GeneratorHelper
     return false unless pj
 
     begin
-      if dev
-        pj.manager.add(packages, type: :dev, exact: true)
-      else
-        pj.manager.add(packages, exact: true)
-      end
-      true
+      result = if dev
+                 pj.manager.add(packages, type: :dev, exact: true)
+               else
+                 pj.manager.add(packages, exact: true)
+               end
+      # package_json#add can return nil for successful side-effect operations.
+      result != false
     rescue StandardError => e
       say_status :warning, "Could not add packages via package_json gem: #{e.message}", :yellow
       say_status :warning, "Will fall back to direct npm commands.", :yellow
@@ -48,6 +52,18 @@ module GeneratorHelper
   def dest_dir_exists?(dir)
     dest_dir = File.join(destination_root, dir)
     Dir.exist?(dest_dir) ? dest_dir : nil
+  end
+
+  # Detect whether config/routes.rb defines any non-commented root route.
+  #
+  # @param routes_path [String] absolute path to routes.rb
+  # @return [Boolean] true when a root route exists
+  def root_route_present?(routes_path = File.join(destination_root, "config/routes.rb"))
+    return false unless File.file?(routes_path)
+
+    File.foreach(routes_path).any? do |line|
+      !line.match?(/^\s*#/) && line.match?(/^\s*root\b/)
+    end
   end
 
   def setup_file_error(file, data)
@@ -136,20 +152,28 @@ module GeneratorHelper
     @pro_gem_installed = true
   end
 
-  # Check if Pro features should be enabled
-  # Returns true if --pro flag is set OR --rsc flag is set (RSC implies Pro)
+  # Check if first-class RSC Pro mode should be enabled.
+  # Returns true when --rsc-pro is set, or when users explicitly pass both --rsc and --pro.
+  #
+  # @return [Boolean] true if RSC Pro mode semantics should be applied
+  def use_rsc_pro_mode?
+    options[:rsc_pro] || (options[:rsc] && options[:pro])
+  end
+
+  # Check if Pro features should be enabled.
+  # Returns true if --pro, --rsc, or --rsc-pro is set (RSC implies Pro).
   #
   # @return [Boolean] true if Pro setup should be included
   def use_pro?
-    options[:pro] || options[:rsc]
+    options[:pro] || options[:rsc] || options[:rsc_pro]
   end
 
   # Check if RSC (React Server Components) should be enabled
-  # Returns true only if --rsc flag is explicitly set
+  # Returns true if --rsc or --rsc-pro is explicitly set
   #
   # @return [Boolean] true if RSC setup should be included
   def use_rsc?
-    options[:rsc]
+    options[:rsc] || options[:rsc_pro]
   end
 
   # Determine if the project is using rspack as the bundler.

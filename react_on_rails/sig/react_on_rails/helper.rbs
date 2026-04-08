@@ -5,6 +5,9 @@ module ReactOnRails
 
     COMPONENT_HTML_KEY: String
 
+    def self.warn_removed_immediate_hydration_option: (String helper_name) -> void
+    def self.reset_removed_immediate_hydration_warnings!: () -> void
+
     # Main helper methods
     # Returns html_safe string (ActiveSupport::SafeBuffer)
     def react_component: (
@@ -21,7 +24,9 @@ module ReactOnRails
     # Returns html_safe string (ActiveSupport::SafeBuffer)
     def redux_store: (
       String store_name,
-      ?Hash[Symbol, untyped] | String props
+      ?props: Hash[Symbol, untyped] | String,
+      ?defer: bool,
+      ?auto_load_bundle: bool?
     ) -> safe_buffer
 
     # Returns html_safe string (ActiveSupport::SafeBuffer)

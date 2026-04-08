@@ -105,6 +105,9 @@ module ReactOnRails
 
           # Process not available in either context
           nil
+        rescue Interrupt
+          # Ctrl-C during overmind/foreman shutdown should exit quietly.
+          true
         end
 
         # Run a process outside of bundler context

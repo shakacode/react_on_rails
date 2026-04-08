@@ -1,14 +1,24 @@
 name: React on Rails Pro - Integration Tests
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
       - 'main'
-    # Always trigger on main; docs-only detection handles skipping heavy jobs
+    paths-ignore:
+      - 'AGENTS_USER_GUIDE.md'
+      - 'llms.txt'
+      - 'llms-full.txt'
   pull_request:
     paths-ignore:
       - '**.md'
+      - 'AGENTS_USER_GUIDE.md'
       - 'docs/**'
+      - 'llms.txt'
+      - 'llms-full.txt'
+      - '.lychee.toml'
       - 'react_on_rails/lib/**'
       - 'react_on_rails/spec/**'
       - 'packages/react_on_rails/**'
