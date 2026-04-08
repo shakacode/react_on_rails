@@ -670,7 +670,7 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("@rspack/core@^1.0.0")
         expect(content).to include("webpack@^5.0.0")
         # Version-stripping regex is used for package.json key deletion
-        expect(content).to include('dep[/\A(@[^\/]+\/[^@]+|[^@]+)/]')
+        expect(content).to include('dep[%r{\A(@[^/]+/[^@]+|[^@]+)}]')
       end
     end
 

@@ -90,10 +90,10 @@ class BundlerSwitcher
     # The regex handles scoped (@scope/name@ver) and unscoped (name@ver) packages, and is a no-op for
     # bare names without a version suffix (e.g., "@pmmmwh/react-refresh-webpack-plugin" stays unchanged).
     remove_deps[:dependencies].each do |dep|
-      package_json["dependencies"]&.delete(dep[/\A(@[^\/]+\/[^@]+|[^@]+)/])
+      package_json["dependencies"]&.delete(dep[%r{\A(@[^/]+/[^@]+|[^@]+)}])
     end
     remove_deps[:dev_dependencies].each do |dep|
-      package_json["devDependencies"]&.delete(dep[/\A(@[^\/]+\/[^@]+|[^@]+)/])
+      package_json["devDependencies"]&.delete(dep[%r{\A(@[^/]+/[^@]+|[^@]+)}])
     end
 
     puts "✅ Removed #{@target_bundler == 'rspack' ? 'webpack' : 'rspack'} dependencies"
