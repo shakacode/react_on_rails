@@ -300,12 +300,8 @@ module ReactOnRailsPro
             timeout: {
               connect_timeout: ReactOnRailsPro.configuration.renderer_http_pool_timeout,
               read_timeout: ReactOnRailsPro.configuration.ssr_timeout,
-              **(if ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout
-                   { keep_alive_timeout: ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout }
-                 else
-                   {}
-                 end)
-            }
+              keep_alive_timeout: ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout
+            }.compact
           )
       rescue StandardError => e
         message = <<~MSG
