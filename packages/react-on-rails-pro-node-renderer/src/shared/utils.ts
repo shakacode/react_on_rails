@@ -64,16 +64,20 @@ export function errorResponseResult(msg: string, tracingContext?: TracingContext
   return badRequestResponseResult(msg);
 }
 
+export type RequestInfo = { renderingRequest: string } | { label: string; content: string };
 /**
- * @param renderingRequest The JavaScript code which threw an error
+ * @param request Either a rendering request (auto-labeled) or a { label, content } pair
  * @param error The error that was thrown (typed as `unknown` to minimize casts in `catch`)
  * @param context Optional context to include in the error message
  */
-export function formatExceptionMessage(renderingRequest: string, error: unknown, context?: string) {
+export function formatExceptionMessage(request: RequestInfo, error: unknown, context?: string) {
+  const label = 'renderingRequest' in request ? 'JS code for rendering request was:' : request.label;
+  const content = 'renderingRequest' in request ? request.renderingRequest : request.content;
+
   return `${context ? `\nContext:\n${context}\n` : ''}
-JS code for rendering request was:
-${smartTrim(renderingRequest)}
-    
+${label}
+${smartTrim(content)}
+
 EXCEPTION MESSAGE:
 ${(error as Error).message || error}
 
