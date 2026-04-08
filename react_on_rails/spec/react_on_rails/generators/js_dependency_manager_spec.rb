@@ -438,7 +438,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(instance.add_npm_dependencies_calls).to include(
         a_hash_including(
-          packages: ["react@~19.0.4", "react-dom@~19.0.4", "prop-types"],
+          packages: ["react@~19.0.4", "react-dom@~19.0.4", "prop-types@^15.0.0"],
           dev: false
         )
       )
@@ -463,7 +463,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_react_dependencies)
 
       expect(warnings.size).to be > 0
-      expect(warnings.first.to_s).to include("npm install react@~19.0.4 react-dom@~19.0.4 prop-types")
+      expect(warnings.first.to_s).to include("npm install react@~19.0.4 react-dom@~19.0.4 prop-types@^15.0.0")
     end
   end
 
