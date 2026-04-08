@@ -642,7 +642,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_js_dependencies)
 
       babel_calls = instance.add_npm_dependencies_calls.select do |call|
-        call[:packages].include?("@babel/preset-react")
+        call[:packages].include?("@babel/preset-react@^7.0.0")
       end
       expect(babel_calls.size).to be > 0
       expect(babel_calls.all? { |call| call[:dev] }).to be(true)
@@ -654,7 +654,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_js_dependencies)
 
       babel_calls = instance.add_npm_dependencies_calls.select do |call|
-        call[:packages].include?("@babel/preset-react")
+        call[:packages].include?("@babel/preset-react@^7.0.0")
       end
       expect(babel_calls).to eq([])
     end
@@ -666,7 +666,7 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_js_dependencies)
 
       babel_calls = instance.add_npm_dependencies_calls.select do |call|
-        call[:packages].include?("@babel/preset-react")
+        call[:packages].include?("@babel/preset-react@^7.0.0")
       end
       expect(babel_calls).to eq([])
     end

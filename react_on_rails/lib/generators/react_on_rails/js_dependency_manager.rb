@@ -56,7 +56,8 @@ module ReactOnRails
       # changes from uncontrolled major version bumps (e.g., peer dependency conflicts)
       # while still allowing minor/patch updates. Pre-1.0 packages are left bare since
       # ^0.x ranges pin to the minor version, which is too narrow.
-      # SWC pins match Shakapacker's own version constraints.
+      # Exception: SWC deps are pinned to match Shakapacker's own version constraints
+      # (swc-loader@^0.2.0 is pre-1.0 but deliberately pinned for Shakapacker compat).
       #
       # Update these pins deliberately when adopting a new major version.
 

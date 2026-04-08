@@ -85,11 +85,12 @@ class BundlerSwitcher
     remove_deps = @target_bundler == "rspack" ? WEBPACK_DEPS : RSPACK_DEPS
 
     # Remove old bundler dependencies
+    # Strip version suffix (e.g., "webpack@^5.0.0" -> "webpack") since package.json keys are bare names
     remove_deps[:dependencies].each do |dep|
-      package_json["dependencies"]&.delete(dep)
+      package_json["dependencies"]&.delete(dep.sub(/@[^@]+$/, ""))
     end
     remove_deps[:dev_dependencies].each do |dep|
-      package_json["devDependencies"]&.delete(dep)
+      package_json["devDependencies"]&.delete(dep.sub(/@[^@]+$/, ""))
     end
 
     puts "✅ Removed #{@target_bundler == 'rspack' ? 'webpack' : 'rspack'} dependencies"
