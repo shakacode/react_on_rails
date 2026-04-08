@@ -36,6 +36,21 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "creates the shakapacker watch wrapper and uses it in Procfiles" do
+      assert_file "bin/shakapacker-watch" do |content|
+        expect(content).to include('bin/shakapacker "$@" &')
+        expect(content).to include("trap cleanup INT TERM")
+      end
+
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("server-bundle: SERVER_BUNDLE_ONLY=true bin/shakapacker-watch --watch")
+      end
+
+      assert_file "Procfile.dev-static-assets" do |content|
+        expect(content).to include("js: bin/shakapacker-watch --watch")
+      end
+    end
+
     it "installs appropriate transpiler dependencies based on Shakapacker version" do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
@@ -67,6 +82,124 @@ describe InstallGenerator, type: :generator do
       assert_file "config/shakapacker.yml" do |content|
         expect(content).to match(/^test:.*?^\s+compile:\s*false/m)
       end
+    end
+  end
+
+  context "with --new-app" do
+    before(:all) { run_generator_test_with_args(%w[--new-app], package_json: true) }
+
+    it "creates a root landing page" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include('root to: "home#index"')
+      end
+      assert_file "app/controllers/home_controller.rb" do |content|
+        expect(content).to include("protect_from_forgery with: :exception")
+        expect(content).to include("def index; end")
+      end
+      assert_file "app/views/home/index.html.erb" do |content|
+        expect(content).to include("is ready.")
+        expect(content).to include("/hello_world")
+        expect(content).to include("Compare OSS and Pro")
+        expect(content).to include("https://github.com/shakacode/react-server-components-marketplace-demo")
+      end
+    end
+
+    it "uses the root path and one-time browser opening in bin/dev" do
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "/"')
+        expect(content).to include("AUTO_OPEN_BROWSER_ONCE = true")
+        expect(content).to include("--open-browser-once")
+      end
+    end
+
+    it "adds a return link from the SSR demo to the landing page" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include("Return to the generated home page")
+      end
+    end
+  end
+
+  context "when --new-app config/routes.rb does not exist" do
+    let(:generator) { base_generator_fixture(new_app: true) }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(gitignore: false, spec: false)
+      FileUtils.rm_f(File.join(destination_root, "config/routes.rb"))
+      allow(generator).to receive(:say_status)
+    end
+
+    it "warns instead of raising when config/routes.rb is missing" do
+      Dir.chdir(destination_root) do
+        generator.send(:add_root_route)
+      end
+
+      expect(generator)
+        .to have_received(:say_status)
+        .with(:warn, "Could not inject root route; config/routes.rb was not found", :yellow)
+    end
+  end
+
+  context "when --new-app routes.rb is in an unexpected format" do
+    let(:generator) { base_generator_fixture(new_app: true) }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(gitignore: false, spec: false)
+      simulate_existing_file("config/routes.rb", "draw_routes do\nend\n")
+      allow(generator).to receive(:say_status)
+    end
+
+    it "warns instead of silently skipping the root route injection" do
+      Dir.chdir(destination_root) do
+        generator.send(:add_root_route)
+      end
+
+      expect(generator)
+        .to have_received(:say_status)
+        .with(:warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow)
+    end
+  end
+
+  context "when --new-app routes.rb uses CRLF line endings" do
+    let(:generator) { base_generator_fixture(new_app: true) }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(gitignore: false, spec: false)
+      simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\r\nend\r\n")
+      allow(generator).to receive(:say_status)
+    end
+
+    it "injects the root route without warning" do
+      Dir.chdir(destination_root) do
+        generator.send(:add_root_route)
+      end
+
+      expect(generator)
+        .not_to have_received(:say_status)
+        .with(:warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow)
+      expect(File.read(File.join(destination_root, "config/routes.rb"))).to include('root to: "home#index"')
+    end
+  end
+
+  context "when --new-app root route injection runs in pretend mode" do
+    let(:generator) { base_generator_fixture(new_app: true, pretend: true) }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(gitignore: false, spec: false)
+      allow(generator).to receive(:say_status)
+    end
+
+    it "does not emit a false warning after the pretend injection" do
+      Dir.chdir(destination_root) do
+        generator.send(:add_root_route)
+      end
+
+      expect(generator)
+        .not_to have_received(:say_status)
+        .with(:warn, "Could not inject root route; config/routes.rb format was unexpected", :yellow)
     end
   end
 
@@ -190,8 +323,9 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args([], spec: true, package_json: true) }
 
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)" do
-      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
-      assert_file("spec/rails_helper.rb") { |contents| expect(contents).to match(expected) }
+      assert_file("spec/rails_helper.rb") do |contents|
+        expect(contents).to include("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      end
     end
   end
 
@@ -230,8 +364,9 @@ describe InstallGenerator, type: :generator do
     end
 
     it "adds ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config) for rspec" do
-      expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_RSPEC_TO_COMPILE_ASSETS
-      assert_file("spec/rails_helper.rb") { |contents| expect(contents).to match(expected) }
+      assert_file("spec/rails_helper.rb") do |contents|
+        expect(contents).to include("ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)")
+      end
     end
 
     it "adds ReactOnRails::TestHelper.ensure_assets_compiled for minitest" do
@@ -1413,8 +1548,9 @@ describe InstallGenerator, type: :generator do
 
     it "adds RSC bundle watcher to Procfile.dev" do
       assert_file "Procfile.dev" do |content|
-        expect(content).to include("RSC_BUNDLE_ONLY=yes")
+        expect(content).to include("RSC_BUNDLE_ONLY=true")
         expect(content).to include("rsc-bundle:")
+        expect(content).to include("bin/shakapacker-watch --watch")
       end
     end
 
@@ -1483,6 +1619,116 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "with --new-app and a preexisting root route" do
+    before(:all) do
+      run_generator_test_with_args(%w[--new-app], package_json: true) do
+        simulate_existing_file("config/routes.rb", <<~RUBY)
+          Rails.application.routes.draw do
+            root to: "existing#home"
+          end
+        RUBY
+      end
+    end
+
+    it "keeps the existing root route and does not scaffold the landing page" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include('root to: "existing#home"')
+        expect(content).not_to include('root to: "home#index"')
+      end
+
+      assert_no_file "app/controllers/home_controller.rb"
+      assert_no_file "app/views/home/index.html.erb"
+    end
+
+    it "still uses the root path in bin/dev" do
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "/"')
+      end
+    end
+  end
+
+  context "with --new-app routes.rb in an unexpected format" do
+    before(:all) do
+      run_generator_test_with_args(%w[--new-app], package_json: true) do
+        simulate_existing_file("config/routes.rb", "draw_routes do\nend\n")
+      end
+    end
+
+    it "skips the landing page and falls back to the hello_world route in bin/dev" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).not_to include('root to: "home#index"')
+      end
+
+      assert_no_file "app/controllers/home_controller.rb"
+      assert_no_file "app/views/home/index.html.erb"
+
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "hello_world"')
+      end
+    end
+
+    it "does not render a broken return-to-home quick link on the SSR demo page" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).not_to include("Return to the generated home page")
+      end
+    end
+  end
+
+  context "with --new-app --rsc" do
+    before(:all) { run_generator_test_with_args(%w[--new-app --rsc], package_json: true) }
+
+    it "creates a landing page that links to the RSC example" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include('root to: "home#index"')
+      end
+      assert_file "app/views/home/index.html.erb" do |content|
+        expect(content).to include("/hello_server")
+        expect(content).to include("React Server Components")
+        expect(content).to include("https://reactonrails.com/docs/pro/react-server-components/tutorial/")
+        expect(content).to include("https://github.com/shakacode/react-server-components-marketplace-demo")
+      end
+    end
+
+    it "keeps the root path as the default bin/dev URL" do
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "/"')
+        expect(content).to include("AUTO_OPEN_BROWSER_ONCE = true")
+      end
+    end
+
+    it "adds a return link from the RSC demo to the landing page" do
+      assert_file "app/views/hello_server/index.html.erb" do |content|
+        expect(content).to include("Return to the generated home page")
+      end
+    end
+  end
+
+  context "with --rsc-pro" do
+    before(:all) { run_generator_test_with_args(%w[--rsc-pro], package_json: true) }
+
+    include_examples "rsc_common_files"
+    include_examples "rsc_hello_server_files"
+
+    it "pins Pro dependencies and installs the RSC dependency" do
+      expected_npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION)
+      expected_rsc_npm_version = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
+
+      assert_file "package.json" do |content|
+        package_json = JSON.parse(content)
+        deps = package_json["dependencies"] || {}
+        expect(deps["react-on-rails-rsc"]).to eq(expected_rsc_npm_version)
+        expect(deps["react-on-rails-pro"]).to eq(expected_npm_version)
+        expect(deps["react-on-rails-pro-node-renderer"]).to eq(expected_npm_version)
+      end
+    end
+
+    it "sets DEFAULT_ROUTE to hello_server in bin/dev" do
+      assert_file "bin/dev" do |content|
+        expect(content).to include('DEFAULT_ROUTE = "hello_server"')
+      end
+    end
+  end
+
   context "with --rsc --redux" do
     before(:all) { run_generator_test_with_args(%w[--rsc --redux], package_json: true) }
 
@@ -1495,6 +1741,13 @@ describe InstallGenerator, type: :generator do
       assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
       assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
+    end
+
+    it "links the Redux SSR demo to the RSC demo" do
+      assert_file "app/views/hello_world/index.html.erb" do |content|
+        expect(content).to include("/hello_server")
+        expect(content).to include("Open the RSC demo")
+      end
     end
 
     it "creates hello_world route and controller for Redux" do
@@ -1621,7 +1874,7 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:destination_root).and_return("/fake/path")
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with("/fake/path/Procfile.dev").and_return(true)
-      procfile_content = "rails: bundle exec rails s\nrsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker\n"
+      procfile_content = "rails: bundle exec rails s\nrsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker\n"
       allow(File).to receive(:read).with("/fake/path/Procfile.dev").and_return(procfile_content)
     end
 
@@ -1721,6 +1974,28 @@ describe InstallGenerator, type: :generator do
       )
     end
 
+    specify "post-install message disables landing-page hints when root route is unavailable" do
+      install_generator = described_class.new([], { new_app: true })
+      allow(install_generator).to receive_messages(
+        shakapacker_setup_incomplete?: false,
+        new_app_root_route_available?: false,
+        use_rsc?: false,
+        use_pro?: false,
+        shakapacker_just_installed?: false
+      )
+
+      allow(GeneratorMessages).to receive(:helpful_message_after_installation)
+        .with(hash_including(landing_page: false))
+        .and_return("stubbed")
+      allow(GeneratorMessages).to receive(:add_info)
+
+      install_generator.send(:add_post_install_message)
+
+      expect(GeneratorMessages).to have_received(:helpful_message_after_installation)
+        .with(hash_including(landing_page: false))
+      expect(GeneratorMessages).to have_received(:add_info).with("stubbed")
+    end
+
     specify "recovery_install_command keeps meaningful flags only" do
       install_generator = described_class.new(
         [],
@@ -1730,12 +2005,13 @@ describe InstallGenerator, type: :generator do
 
       command = install_generator.send(:recovery_install_command)
 
-      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --rspack --rsc")
+      expect(command).to eq("rails generate react_on_rails:install --redux --typescript --rspack --rsc-pro")
       expect(command).not_to include("--ignore-warnings")
       expect(command).not_to include("--force")
       expect(command).not_to include("--skip")
       expect(command).not_to include("--pretend")
       expect(command).not_to include("--pro")
+      expect(command).not_to match(/\s--rsc(\s|$)/)
     end
 
     specify "recovery_install_command includes --pro when requested without --rsc" do
@@ -1744,6 +2020,16 @@ describe InstallGenerator, type: :generator do
       command = install_generator.send(:recovery_install_command)
 
       expect(command).to eq("rails generate react_on_rails:install --pro")
+    end
+
+    specify "recovery_install_command prefers --rsc-pro over --rsc/--pro" do
+      install_generator = described_class.new([], { rsc_pro: true, rsc: true, pro: true })
+
+      command = install_generator.send(:recovery_install_command)
+
+      expect(command).to eq("rails generate react_on_rails:install --rsc-pro")
+      expect(command).not_to match(/\s--rsc(\s|$)/)
+      expect(command).not_to match(/\s--pro(\s|$)/)
     end
 
     specify "shakapacker install error preserves original install flags" do
@@ -1766,6 +2052,20 @@ describe InstallGenerator, type: :generator do
 
       expect(output_text).to include("clean up your working tree before rerunning")
       expect(output_text).to include("Then re-run: rails generate react_on_rails:install --rspack --pro")
+    end
+
+    specify "rsc-pro installs include a dedicated verification checklist message" do
+      run_generator_test_with_args(%w[--rsc-pro], package_json: true) do
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/shakapacker.yml", "default: {}\n")
+        simulate_existing_file("config/webpack/webpack.config.js", "// mock webpack config\n")
+      end
+
+      output_text = GeneratorMessages.output.join("\n")
+      expect(output_text).to include("RSC Pro Verification")
+      expect(output_text).to include("http://localhost:<port>/hello_server")
+      expect(output_text).to include("Like button hydrates on click")
     end
   end
 
@@ -1790,6 +2090,9 @@ describe InstallGenerator, type: :generator do
       allow(install_generator).to receive(:directory)
       allow(install_generator).to receive(:use_rsc?).and_return(false)
 
+      expect(install_generator).to receive(:say_status)
+        .with(:gsub, "bin/dev", true)
+        .twice
       expect(install_generator).to receive(:say_status)
         .with(:pretend, "Skipping chmod on bin scripts in --pretend mode", :yellow)
       expect(Dir).not_to receive(:chdir)
@@ -1861,6 +2164,40 @@ describe InstallGenerator, type: :generator do
         .with("react_on_rails:rsc", [], hash_including(pretend: true))
 
       redux_pro_rsc_install_generator.send(:invoke_generators)
+    end
+
+    it "treats --rsc-pro as pro+rsc when invoking sub-generators" do
+      rsc_pro_install_generator = described_class.new([], { pretend: true, rsc_pro: true })
+
+      allow(rsc_pro_install_generator).to receive(:ensure_shakapacker_installed)
+      allow(rsc_pro_install_generator).to receive(:setup_react_dependencies)
+
+      expect(rsc_pro_install_generator).to receive(:invoke)
+        .with("react_on_rails:base", [], hash_including(pro: true, rsc: true, pretend: true))
+      expect(rsc_pro_install_generator).to receive(:invoke)
+        .with("react_on_rails:pro", [], hash_including(pretend: true))
+      expect(rsc_pro_install_generator).to receive(:invoke)
+        .with("react_on_rails:rsc", [], hash_including(pretend: true))
+
+      rsc_pro_install_generator.send(:invoke_generators)
+    end
+
+    it "forwards RSC mode to the Redux generator for --rsc-pro --redux" do
+      rsc_pro_redux_install_generator = described_class.new([], { pretend: true, rsc_pro: true, redux: true })
+
+      allow(rsc_pro_redux_install_generator).to receive(:ensure_shakapacker_installed)
+      allow(rsc_pro_redux_install_generator).to receive(:setup_react_dependencies)
+
+      expect(rsc_pro_redux_install_generator).to receive(:invoke)
+        .with("react_on_rails:base", [], hash_including(pro: true, rsc: true, pretend: true))
+      expect(rsc_pro_redux_install_generator).to receive(:invoke)
+        .with("react_on_rails:react_with_redux", [], hash_including(rsc: true, pretend: true))
+      expect(rsc_pro_redux_install_generator).to receive(:invoke)
+        .with("react_on_rails:pro", [], hash_including(pretend: true))
+      expect(rsc_pro_redux_install_generator).to receive(:invoke)
+        .with("react_on_rails:rsc", [], hash_including(pretend: true))
+
+      rsc_pro_redux_install_generator.send(:invoke_generators)
     end
   end
 
@@ -2526,6 +2863,48 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when using --rsc-pro flag without Pro gem installed" do
+    let(:install_generator) { described_class.new([], { rsc_pro: true }) }
+    let(:expected_pro_version) { ReactOnRails::VERSION }
+    let(:fake_pid) { 12_345 }
+
+    before do
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+      allow(install_generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: false))
+    end
+
+    specify "missing_pro_gem? uses rsc-pro flag context and exact bundle-add version" do
+      expect(install_generator.send(:missing_pro_gem?)).to be true
+      expect(Bundler).to have_received(:with_unbundled_env)
+      expect(Process).to have_received(:spawn)
+        .with("bundle add react_on_rails_pro --version='#{expected_pro_version}' --strict",
+              out: anything,
+              err: anything)
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("--rsc-pro")
+      expect(error_text).to include("gem 'react_on_rails_pro', '#{expected_pro_version}'")
+      expect(error_text).not_to include("~> #{expected_pro_version}")
+    end
+
+    specify "missing_pro_gem? keeps prerelease suffix when rsc-pro exact pinning is used" do
+      stub_const("ReactOnRails::VERSION", "16.4.0.rc.5")
+
+      expect(install_generator.send(:missing_pro_gem?)).to be true
+      expect(Process).to have_received(:spawn)
+        .with("bundle add react_on_rails_pro --version='16.4.0.rc.5' --strict",
+              out: anything,
+              err: anything)
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("gem 'react_on_rails_pro', '16.4.0.rc.5'")
+      expect(error_text).to include("may not be published yet")
+      expect(error_text).to include("path:")
+    end
+  end
+
   context "when auto-installing Pro gem succeeds" do
     let(:install_generator) { described_class.new([], { pro: true }) }
     let(:fake_pid) { 12_345 }
@@ -2611,6 +2990,28 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when force-checking Pro gem without pro-related flags" do
+    let(:install_generator) { described_class.new([], { pro: false, rsc: false, rsc_pro: false }) }
+    let(:fake_pid) { 12_345 }
+
+    before do
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+      allow(Bundler).to receive(:with_unbundled_env).and_yield
+      allow(Process).to receive(:spawn).and_return(fake_pid)
+      allow(install_generator).to receive(:wait_for_bundle_process)
+        .with(fake_pid).and_return(instance_double(Process::Status, success?: false))
+    end
+
+    specify "missing_pro_gem?(force: true) uses generic context messaging" do
+      expect(install_generator.send(:missing_pro_gem?, force: true)).to be true
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("This generator requires the react_on_rails_pro gem.")
+      expect(error_text).not_to include("You specified")
+    end
+  end
+
   context "when --pro flag used on a dirty worktree without pro gem" do
     let(:install_generator) { described_class.new([], { pro: true }) }
 
@@ -2648,6 +3049,26 @@ describe InstallGenerator, type: :generator do
       expect(error_text).to include("react_on_rails_pro")
       expect(error_text).to include("uncommitted changes")
       expect(error_text).to include("--rsc")
+    end
+  end
+
+  context "when --rsc-pro flag used on a dirty worktree without pro gem" do
+    let(:install_generator) { described_class.new([], { rsc_pro: true }) }
+
+    before do
+      allow(ReactOnRails::GitUtils).to receive(:warn_if_uncommitted_changes).and_return(true)
+      allow(install_generator).to receive(:cli_exists?).with("git").and_return(true)
+      allow(install_generator).to receive_messages(missing_node?: false, missing_package_manager?: false)
+      allow(Gem).to receive(:loaded_specs).and_return({})
+      allow(install_generator).to receive(:gem_in_lockfile?).with("react_on_rails_pro").and_return(false)
+    end
+
+    specify "installation_prerequisites_met? returns false with clear error" do
+      expect(install_generator.send(:installation_prerequisites_met?)).to be false
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("react_on_rails_pro")
+      expect(error_text).to include("uncommitted changes")
+      expect(error_text).to include("--rsc-pro")
     end
   end
 
@@ -2771,6 +3192,113 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "#seed_package_manager_in_package_json_from_lockfile!" do
+    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+
+    before do
+      prepare_destination
+      simulate_existing_file("package.json", <<~JSON)
+        {
+          "name": "dummy-app",
+          "private": true,
+          "dependencies": {}
+        }
+      JSON
+      simulate_existing_file("yarn.lock", "")
+    end
+
+    it "adds packageManager when a lockfile exists and packageManager is missing" do
+      allow(install_generator).to receive(:cli_exists?).with("yarn").and_return(true)
+      allow(Open3).to receive(:capture3).with("yarn", "--version").and_return(["1.22.22\n", "", success_status])
+
+      Dir.chdir(destination_root) do
+        install_generator.send(:seed_package_manager_in_package_json_from_lockfile!)
+      end
+
+      package_json = JSON.parse(File.read(File.join(destination_root, "package.json")))
+      expect(package_json["packageManager"]).to eq("yarn@1.22.22")
+    end
+
+    it "does not overwrite an existing packageManager value" do
+      simulate_existing_file("package.json", <<~JSON)
+        {
+          "name": "dummy-app",
+          "private": true,
+          "packageManager": "pnpm@10.0.0"
+        }
+      JSON
+      allow(Open3).to receive(:capture3)
+
+      Dir.chdir(destination_root) do
+        install_generator.send(:seed_package_manager_in_package_json_from_lockfile!)
+      end
+
+      package_json = JSON.parse(File.read(File.join(destination_root, "package.json")))
+      expect(package_json["packageManager"]).to eq("pnpm@10.0.0")
+      expect(Open3).not_to have_received(:capture3)
+    end
+  end
+
+  describe "#resolve_browserslist_conflict_after_shakapacker_install" do
+    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+
+    before do
+      prepare_destination
+      simulate_existing_file(".browserslistrc", "defaults\n")
+      simulate_existing_file("package.json", <<~JSON)
+        {
+          "name": "dummy-app",
+          "private": true,
+          "browserslist": ["defaults"],
+          "packageManager": "yarn@1.22.22"
+        }
+      JSON
+    end
+
+    it "removes browserslist from package.json when .browserslistrc exists" do
+      Dir.chdir(destination_root) do
+        install_generator.send(:resolve_browserslist_conflict_after_shakapacker_install)
+      end
+
+      package_json = JSON.parse(File.read(File.join(destination_root, "package.json")))
+      expect(package_json.key?("browserslist")).to be(false)
+    end
+  end
+
+  describe "#ensure_jsx_in_js_compatibility" do
+    let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
+
+    before do
+      prepare_destination
+      simulate_existing_file("config/shakapacker.yml", <<~YML)
+        default: &default
+          javascript_transpiler: "swc"
+      YML
+      simulate_existing_file("app/javascript/src/components/App.js", <<~JS)
+        export default function App() {
+          return <>Hello</>
+        }
+      JS
+      allow(install_generator).to receive_messages(
+        using_swc?: true,
+        add_packages: true,
+        add_babel_react_dependencies: true
+      )
+    end
+
+    it "switches to babel and installs babel dependencies when JSX is found in .js files" do
+      Dir.chdir(destination_root) do
+        install_generator.send(:ensure_jsx_in_js_compatibility)
+      end
+
+      shakapacker_yml = File.read(File.join(destination_root, "config/shakapacker.yml"))
+      expect(shakapacker_yml).to include('javascript_transpiler: "babel"')
+      expect(install_generator).to have_received(:add_packages).with(["babel-loader"], dev: true)
+      expect(install_generator).to have_received(:add_babel_react_dependencies)
+    end
+  end
+
   describe "#add_bin_scripts" do
     let(:install_generator) { described_class.new([], {}, destination_root: destination_root) }
 
@@ -2867,6 +3395,42 @@ describe InstallGenerator, type: :generator do
       assert_file "bin/dev", custom_bin_dev
       assert_file "bin/switch-bundler"
       assert_file "bin/shakapacker-precompile-hook"
+    end
+
+    it "keeps DEFAULT_ROUTE unchanged in custom bin/dev files for non-RSC installs" do
+      custom_bin_dev = <<~RUBY
+        #!/usr/bin/env ruby
+        DEFAULT_ROUTE = "hello_world"
+      RUBY
+      simulate_existing_file("bin/dev", custom_bin_dev)
+
+      Dir.chdir(destination_root) do
+        install_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/dev", custom_bin_dev
+    end
+
+    it "warns instead of rewriting custom bin/dev files for --rsc installs" do
+      rsc_install_generator = described_class.new([], { rsc: true }, destination_root: destination_root)
+      custom_bin_dev = <<~RUBY
+        #!/usr/bin/env ruby
+        DEFAULT_ROUTE = "hello_world"
+      RUBY
+      simulate_existing_file("bin/dev", custom_bin_dev)
+
+      allow(rsc_install_generator).to receive(:say_status).and_call_original
+      expect(rsc_install_generator).to receive(:say_status).with(
+        :warn,
+        a_string_matching(%r{Custom bin/dev detected: update DEFAULT_ROUTE to "hello_server" manually for --rsc}),
+        :yellow
+      )
+
+      Dir.chdir(destination_root) do
+        rsc_install_generator.send(:add_bin_scripts)
+      end
+
+      assert_file "bin/dev", custom_bin_dev
     end
   end
 end

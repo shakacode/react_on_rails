@@ -5,7 +5,9 @@ require "rainbow"
 module GeneratorMessages
   PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
                      "\n       #{Rainbow('https://reactonrails.com/docs/pro/upgrading-to-pro/').cyan.underline}".freeze
+  SUPPORTED_PACKAGE_MANAGERS = %w[npm pnpm yarn bun].freeze
 
+  # rubocop:disable Metrics/ClassLength
   class << self
     def output
       @output ||= []
@@ -44,13 +46,20 @@ module GeneratorMessages
     end
 
     def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", pro: false,
-                                           rsc: false, shakapacker_just_installed: false)
+                                           rsc: false, shakapacker_just_installed: false, landing_page: false)
       process_manager_section = build_process_manager_section
       testing_section = build_testing_section
       package_manager = detect_package_manager
       shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed)
       render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
       render_label = build_render_label(route: route, rsc: rsc)
+      normalized_route = route.to_s.sub(%r{\A/+}, "")
+      visit_url = if landing_page || normalized_route.empty?
+                    "http://localhost:3000"
+                  else
+                    "http://localhost:3000/#{normalized_route}"
+                  end
+      landing_page_hint = landing_page ? "\n       Home page includes links to the generated example pages." : ""
       # rsc guard is defensive; callers via install_generator already pass pro: true when rsc is set
       pro_hint = pro || rsc ? "" : PRO_UPGRADE_HINT
 
@@ -75,7 +84,7 @@ module GeneratorMessages
            ./bin/dev prod         # Production-like mode for testing
            ./bin/dev help         # See all available options
 
-        4. Visit: #{Rainbow(route ? "http://localhost:3000/#{route}" : 'http://localhost:3000').cyan.underline}
+        4. Visit: #{Rainbow(visit_url).cyan.underline}#{landing_page_hint}
         ✨ KEY FEATURES:
         ─────────────────────────────────────────────────────────────────────────
         • Auto-registration enabled - Your layout only needs:
@@ -98,15 +107,23 @@ module GeneratorMessages
     # this while the current working directory is the target Rails app root.
     def detect_package_manager
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
-      return env_package_manager if %w[npm pnpm yarn bun].include?(env_package_manager)
+      return env_package_manager if supported_package_manager?(env_package_manager)
 
-      # Check for lock files to determine package manager
+      # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
+      detect_package_manager_from_lockfiles || "npm"
+    end
+
+    def detect_package_manager_from_lockfiles
       return "yarn" if File.exist?("yarn.lock")
       return "pnpm" if File.exist?("pnpm-lock.yaml")
       return "bun" if File.exist?("bun.lock") || File.exist?("bun.lockb")
+      return "npm" if File.exist?("package-lock.json")
 
-      # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
-      "npm"
+      nil
+    end
+
+    def supported_package_manager?(package_manager)
+      SUPPORTED_PACKAGE_MANAGERS.include?(package_manager)
     end
 
     private
@@ -212,4 +229,5 @@ module GeneratorMessages
       ""
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

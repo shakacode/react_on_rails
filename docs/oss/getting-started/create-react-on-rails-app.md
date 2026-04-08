@@ -11,31 +11,48 @@ bin/rails db:prepare
 bin/dev
 ```
 
-Visit [http://localhost:3000/hello_world](http://localhost:3000/hello_world) to see your React component.
+On fresh apps, `bin/dev` will try to open [http://localhost:3000](http://localhost:3000) the first time the app boots successfully.
+The generated home page links to the example pages, the key files React on Rails created for you,
+and follow-on docs for OSS vs Pro, React Server Components, and the marketplace demo.
+The generated app also includes a step-by-step git history so you can inspect each major scaffold phase with `git log --oneline --reverse`.
 
-This creates a TypeScript app by default. For JavaScript, use `--template javascript`.
-For React Server Components (RSC), add `--rsc` and visit `/hello_server` after setup.
-`--rsc` requires `react_on_rails_pro` to be installable in your environment
+When no `--pro` or `--rsc` flag is given, the CLI prompts you to choose a setup mode:
+
+1. **Standard** — open-source React on Rails with SSR
+2. **Pro** — adds Node.js server rendering (requires `react_on_rails_pro`)
+3. **RSC** — React Server Components (requires `react_on_rails_pro`) _(recommended, default)_
+
+The default choice is RSC. Press Enter to accept it, or type `1` or `2` to pick a different mode.
+In non-interactive environments (CI, pipes), standard mode is used automatically.
+
+To skip the prompt, pass `--standard`, `--pro`, or `--rsc` explicitly.
+All mode flags support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
+`--pro` and `--rsc` require `react_on_rails_pro` to be installable in your environment
 ([Pro setup docs](../../pro/installation.md)).
-RSC supports both JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 
 ## Options
 
 ```bash
+# Prompts for mode (Standard / Pro / RSC), defaults to RSC
+npx create-react-on-rails-app my-app
+
+# Skip prompt — use RSC directly
+npx create-react-on-rails-app my-app --rsc
+
+# Skip prompt — use Pro directly
+npx create-react-on-rails-app my-app --pro
+
+# Skip prompt — use Standard (open-source) directly
+npx create-react-on-rails-app my-app --standard
+
 # JavaScript instead of TypeScript
 npx create-react-on-rails-app my-app --template javascript
 
 # Use Rspack for ~20x faster builds
 npx create-react-on-rails-app my-app --rspack
 
-# Generate React Server Components setup (includes react_on_rails_pro)
-npx create-react-on-rails-app my-app --rsc
-
 # Specify package manager
 npx create-react-on-rails-app my-app --package-manager pnpm
-
-# Combine options
-npx create-react-on-rails-app my-app --rspack --package-manager pnpm
 
 # Combine RSC with Rspack
 npx create-react-on-rails-app my-app --rspack --rsc
@@ -47,25 +64,34 @@ npx create-react-on-rails-app my-app --rspack --rsc
 | ---------------------------- | -------------------------------------------------------------- | ------------- |
 | `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`  |
 | `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`       |
+| `--standard`                 | Use open-source React on Rails (skip prompt)                   | `false`       |
+| `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | `false`       |
 | `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`       |
 | `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected |
+
+When none of `--standard`, `--pro`, or `--rsc` is given, the CLI prompts interactively in TTY environments (default: RSC). In non-TTY environments (CI, pipes, redirected output), standard mode is used automatically.
 
 ## What It Does
 
 The CLI runs these steps automatically:
 
 1. **Creates a Rails app** (`rails new` with PostgreSQL, no default JS)
-2. **Adds required gems** (`bundle add react_on_rails`, plus `react_on_rails_pro` for `--rsc`)
+2. **Adds required gems** (`bundle add react_on_rails`, plus `react_on_rails_pro` for `--pro` / `--rsc`)
 3. **Runs the generator** (`rails generate react_on_rails:install` with your selected flags)
+4. **Creates educational git commits** for each logical setup step
 
 After completion, you get:
 
 - A Rails 7+ app with PostgreSQL
 - Shakapacker configured with Webpack (or Rspack) and HMR
 - A working HelloWorld React component (TypeScript by default)
+- A generated home page at `/` with links to the example pages, important project files, and Pro/RSC learning resources
+- A teaching-friendly git history that separates Rails creation, gem installation, generator output, and pnpm normalization
+- Standard Rails git scaffold files (`.gitignore` and `.gitattributes`) preserved in the generated app
+- Optional Pro setup (`--pro`) with Pro Node renderer wiring and the generated `/hello_world` example
 - Optional RSC setup (`--rsc`) with HelloServer route and Pro Node renderer wiring
 - Server-side rendering ready
-- Development scripts (`bin/dev` with hot reloading)
+- Development scripts (`bin/dev` with hot reloading and first-run browser open)
 
 ## Prerequisites
 
@@ -74,10 +100,11 @@ The CLI checks for these before starting:
 - **Node.js 18+**
 - **Ruby 3.0+**
 - **Rails 7.0+** (`gem install rails`)
+- **git**
 - **npm or pnpm**
 - **PostgreSQL** running locally (needed at `bin/rails db:prepare`, not validated by the CLI)
 
-If any of the first four are missing, you'll get a clear error message with installation instructions.
+If any of the first five are missing, you'll get a clear error message with installation instructions.
 
 ## Adding to an Existing Rails App
 

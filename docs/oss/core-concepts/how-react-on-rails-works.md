@@ -14,7 +14,7 @@ Optionally, you can also initialize a Redux store with the view or controller he
 
 In most cases, you should use the `prerender: false` (default behavior) with the provided `react_component` helper method to render the React component from your Rails views. In some cases, such as when SEO is vital, or many users will not have JavaScript enabled, you can enable server-rendering by passing `prerender: true` to your helper, or you can simply change the default in `config/initializers/react_on_rails`.
 
-Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](https://reactonrails.com/docs/pro/).
+Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. If you want to maximize the performance of your server rendering, then you want to use React on Rails Pro which uses NodeJS to do the server rendering. See the [docs for React on Rails Pro](../../pro/react-on-rails-pro.md).
 
 ## HTML Source Code
 

@@ -172,11 +172,20 @@ module ReactOnRails
           )
         end
 
-        it "skips non-exact specs instead of rewriting them" do
+        it "rewrites range specs to exact versions and skips truly unsupported specs" do
           result = synchronizer.sync(write: true)
 
-          expect(result.changes).to eq([])
-          expect(result.changed_files).to eq([])
+          # >=16.0.0 is now parseable — stripped to 16.0.0 and rewritten to expected version
+          expect(result.changes).to contain_exactly(
+            {
+              section: "dependencies",
+              package: "react-on-rails-pro",
+              from: ">=16.0.0",
+              to: "16.4.0-rc.5"
+            }
+          )
+          expect(result.changed_files).to eq([package_json_path.to_s])
+          # workspace:* and malformed 16.4.0- remain unsupported
           expect(result.unsupported_specs).to contain_exactly(
             {
               section: "dependencies",
@@ -185,19 +194,38 @@ module ReactOnRails
             },
             {
               section: "dependencies",
-              package: "react-on-rails-pro",
-              version: ">=16.0.0"
-            },
-            {
-              section: "dependencies",
               package: "react-on-rails-pro-node-renderer",
               version: "16.4.0-"
             }
           )
           expect(read_package_json.dig("dependencies", "react-on-rails")).to eq("workspace:*")
-          expect(read_package_json.dig("dependencies", "react-on-rails-pro")).to eq(">=16.0.0")
+          expect(read_package_json.dig("dependencies", "react-on-rails-pro")).to eq("16.4.0-rc.5")
           expect(read_package_json.dig("dependencies", "react-on-rails-pro-node-renderer")).to eq("16.4.0-")
           expect(io.string).to include("Skipped non-exact version specs")
+        end
+      end
+
+      context "when a >= lower bound is above the expected gem version" do
+        before do
+          write_package_json(
+            "dependencies" => {
+              "react-on-rails" => ">=16.5.0"
+            }
+          )
+        end
+
+        it "skips auto-rewrite instead of pinning below the declared lower bound" do
+          result = synchronizer.sync(write: true)
+
+          expect(result.changes).to eq([])
+          expect(result.unsupported_specs).to contain_exactly(
+            {
+              section: "dependencies",
+              package: "react-on-rails",
+              version: ">=16.5.0"
+            }
+          )
+          expect(read_package_json.dig("dependencies", "react-on-rails")).to eq(">=16.5.0")
         end
       end
 

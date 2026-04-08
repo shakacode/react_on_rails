@@ -14,7 +14,7 @@
 
 import { PassThrough } from 'stream';
 import { PipeableOrReadableStream } from 'react-on-rails/types';
-import sanitizeNonce from 'react-on-rails/sanitizeNonce';
+import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { createRSCPayloadKey } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 import safePipe from './safePipe.ts';

@@ -35,12 +35,17 @@ describe('sanitizeNonce', () => {
 
   it('strips invalid chars from injection input and returns the remaining nonce text', () => {
     // The output is attribute-safe and cannot inject markup; it may still be a nonce-like
-    // string that does not match any server-generated CSP nonce in practice.
+    // string that does not match any server-generated CSP nonce in practice, so the script
+    // tag would still be blocked by CSP.
     expect(sanitizeNonce('"><script>alert(1)</script>')).toBe('scriptalert1/script');
   });
 
   it('returns undefined for a nonce that is only padding characters', () => {
     expect(sanitizeNonce('===')).toBeUndefined();
+  });
+
+  it('returns undefined when padding appears in the middle of the nonce', () => {
+    expect(sanitizeNonce('abc=def')).toBeUndefined();
   });
 
   it('strips spaces and concatenates the result', () => {

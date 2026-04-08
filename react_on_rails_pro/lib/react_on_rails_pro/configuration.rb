@@ -15,6 +15,7 @@ module ReactOnRailsPro
       renderer_http_pool_size: Configuration::DEFAULT_RENDERER_HTTP_POOL_SIZE,
       renderer_http_pool_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_TIMEOUT,
       renderer_http_pool_warn_timeout: Configuration::DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT,
+      renderer_http_keep_alive_timeout: Configuration::DEFAULT_RENDERER_HTTP_KEEP_ALIVE_TIMEOUT,
       renderer_password: nil,
       tracing: Configuration::DEFAULT_TRACING,
       dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,
@@ -44,6 +45,7 @@ module ReactOnRailsPro
     DEFAULT_RENDERER_HTTP_POOL_SIZE = 10
     DEFAULT_RENDERER_HTTP_POOL_TIMEOUT = 5
     DEFAULT_RENDERER_HTTP_POOL_WARN_TIMEOUT = 0.25
+    DEFAULT_RENDERER_HTTP_KEEP_ALIVE_TIMEOUT = 30
     DEFAULT_SSR_TIMEOUT = 5
     DEFAULT_PRERENDER_CACHING = false
     DEFAULT_TRACING = false
@@ -72,7 +74,7 @@ module ReactOnRailsPro
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
                   :react_server_client_manifest_file
 
-    attr_reader :concurrent_component_streaming_buffer_size
+    attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout
 
     # Sets the buffer size for concurrent component streaming.
     #
@@ -91,10 +93,23 @@ module ReactOnRailsPro
       @concurrent_component_streaming_buffer_size = value
     end
 
+    # Sets the keep-alive timeout (in seconds) for persistent HTTP connections to the node renderer.
+    #
+    # @param value [Numeric, nil] A positive number or nil (to use the HTTPX default)
+    # @raise [ReactOnRailsPro::Error] if value is not a positive number or nil
+    def renderer_http_keep_alive_timeout=(value)
+      unless value.nil? || (value.is_a?(Numeric) && value.positive? && value.finite?)
+        raise ReactOnRailsPro::Error,
+              "config.renderer_http_keep_alive_timeout must be a finite positive number or nil"
+      end
+      @renderer_http_keep_alive_timeout = value
+    end
+
     def initialize(renderer_url: nil, renderer_password: nil, server_renderer: nil, # rubocop:disable Metrics/AbcSize
                    renderer_use_fallback_exec_js: nil, prerender_caching: nil,
                    renderer_http_pool_size: nil, renderer_http_pool_timeout: nil,
-                   renderer_http_pool_warn_timeout: nil, tracing: nil,
+                   renderer_http_pool_warn_timeout: nil, renderer_http_keep_alive_timeout: nil,
+                   tracing: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
                    remote_bundle_cache_adapter: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
@@ -111,6 +126,7 @@ module ReactOnRailsPro
       self.renderer_http_pool_size = renderer_http_pool_size
       self.renderer_http_pool_timeout = renderer_http_pool_timeout
       self.renderer_http_pool_warn_timeout = renderer_http_pool_warn_timeout
+      self.renderer_http_keep_alive_timeout = renderer_http_keep_alive_timeout
       self.tracing = tracing
       self.rendering_returns_promises = server_renderer == "NodeRenderer" ? rendering_returns_promises : false
       self.dependency_globs = dependency_globs
@@ -229,10 +245,68 @@ module ReactOnRailsPro
     end
 
     def setup_renderer_password
+      # Explicit passwords, including values loaded from ENV in the initializer, skip URL extraction.
+      # Blank values (nil or "") fall through so URL extraction and ENV fallback still apply.
       return if renderer_password.present?
 
       uri = URI(renderer_url)
       self.renderer_password = uri.password
+
+      # Mirror Node-side defaults: if Rails config and URL are both missing a password,
+      # use RENDERER_PASSWORD from env.
+      self.renderer_password = ENV.fetch("RENDERER_PASSWORD", nil) if renderer_password.blank?
+
+      validate_renderer_password_for_production
+    end
+
+    def validate_renderer_password_for_production
+      # Defense-in-depth: skip validation when a password is already configured (e.g. extracted
+      # from the renderer URL by setup_renderer_password, or set directly in the initializer).
+      return if renderer_password.present?
+      return unless node_renderer?
+
+      # Fail closed: only skip validation when RAILS_ENV is explicitly set to development or test.
+      # Rails.env defaults to "development" when RAILS_ENV is unset, which would silently skip
+      # validation in misconfigured environments. Checking ENV["RAILS_ENV"] directly matches the
+      # Node-side behavior where an unset environment is treated as production-like.
+      rails_env = ENV["RAILS_ENV"]&.downcase
+      return if rails_env.present? && %w[development test].include?(rails_env)
+
+      raise ReactOnRailsPro::Error, <<~MSG
+        RENDERER_PASSWORD must be set in production-like environments (staging, production, etc.)
+        when using the NodeRenderer.
+
+        In development and test environments, the renderer password is optional and no authentication
+        is required. In all other environments, you must explicitly configure a password to secure
+        communication between Rails and the Node Renderer.
+
+        To fix this, set the RENDERER_PASSWORD environment variable:
+
+          export RENDERER_PASSWORD="your-secure-password"
+
+        Rails reads it automatically. If you prefer to make it explicit in your initializer:
+
+          # config/initializers/react_on_rails_pro.rb
+          ReactOnRailsPro.configure do |config|
+            config.renderer_password = ENV.fetch("RENDERER_PASSWORD")
+          end
+
+        Set the same password for the Node Renderer via the RENDERER_PASSWORD environment variable.
+        Rails resolves the password in this order:
+          1) config.renderer_password (blank values fall through to the next step)
+          2) Password embedded in config.renderer_url (for example, https://:password@host:3800)
+          3) ENV["RENDERER_PASSWORD"]
+
+        If Rails and the Node Renderer disagree about startup behavior, verify both RAILS_ENV and NODE_ENV.
+
+        Environment matrix:
+          development    — password optional (no authentication)
+          test           — password optional (no authentication)
+          (RAILS_ENV unset) — treated as production-like; RENDERER_PASSWORD required
+          staging        — RENDERER_PASSWORD required
+          production     — RENDERER_PASSWORD required
+          (any other)    — RENDERER_PASSWORD required
+      MSG
     end
   end
 end

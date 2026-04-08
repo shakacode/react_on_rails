@@ -9,6 +9,9 @@ Before swapping gems, check these first:
 1. **Webpacker vs Shakapacker**: if the app still uses `webpacker`, migrate to `shakapacker` first.
 2. **Bundler age**: some older `react-rails` apps still carry Bundler 1.x lockfiles. Those can fail on modern Ruby before you even reach the migration work.
 3. **Rails age**: current `react_on_rails` requires Rails 5.2+. Rails 5.1 / Webpacker 3 apps are usually a staged migration, not a one-command migration.
+4. **Package manager metadata**: if you have `yarn.lock`, `pnpm-lock.yaml`, or `bun.lock*`, ensure `package.json` has a matching `packageManager` field (for example `npm@10.9.2`, `yarn@1.22.22`, `pnpm@10.12.1`, or `bun@1.2.13`).
+5. **Browserslist source**: use one source only. If `.browserslistrc` exists, remove `browserslist` from `package.json`.
+6. **JSX-in-.js projects**: current install generator auto-switches to Babel when JSX is detected in `.js` files. If your project has custom transpiler setup, review `config/shakapacker.yml` after generation.
 
 If you are already on `shakapacker` 7+ and React 18+, the migration is mostly about helper syntax, component registration, and generated defaults.
 
@@ -19,13 +22,23 @@ bundle _2.3.26_ lock --update
 bundle _2.3.26_ install
 ```
 
+If `package.json` is missing `packageManager`, set it to your project's actual manager and exact version before running install generators:
+
+```bash
+# pick the one that matches your lockfile
+npm pkg set packageManager='npm@10.9.2'
+npm pkg set packageManager='yarn@1.22.22'
+npm pkg set packageManager='pnpm@10.12.1'
+npm pkg set packageManager='bun@1.2.13'
+```
+
 1. Update Deps
    1. Replace `react-rails` in `Gemfile` with `react_on_rails` and make sure `shakapacker` is present.
    2. Remove `react_ujs` from `package.json`.
    3. Run `bundle install` and your package manager's install command.
    4. Commit changes.
 
-2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` installs node dependencies and also creates sample React component, Rails view/controller, and updates `config/routes.rb`.
+2. Run `rails g react_on_rails:install` but do not commit the change. `react_on_rails` attempts to install node dependencies, creates a sample React component, Rails view/controller, and updates `config/routes.rb`. If dependency installation fails, the generator prints manual install commands. If required package-manager tooling (Node.js and npm/yarn/pnpm/bun) is unavailable, the generator stops with setup guidance. Run the suggested commands or install missing tools before continuing.
 
 3. Adapt the project: Check the changes and carefully accept, reject, or modify them as per your project's needs. Besides changes in `config/shakapacker` or `babel.config` which are project-specific, here are the most noticeable changes to address:
    1. Check Webpack config files at `config/webpack/*`. If coming from `react-rails` v3 on Shakapacker, the changes are usually localized. The most important difference is the server bundle entrypoint: `react-rails` commonly uses `server_rendering.js`, while React on Rails defaults to `server-bundle.js`.
@@ -44,7 +57,76 @@ bundle _2.3.26_ install
       + <%= react_component('Post', { props: { title: 'New Post' }, prerender: true }) %>
       ```
 
+4. Validate before final cleanup:
+   1. Confirm that old `react_ujs` references are gone:
+
+      ```bash
+      rg -n "react_ujs|ReactRailsUJS|server_rendering\.js" app/javascript app/assets app/views config
+      # or without ripgrep:
+      grep -rn "react_ujs\|ReactRailsUJS\|server_rendering\.js" app/javascript app/assets app/views config
+      ```
+
+   2. Ensure compile succeeds:
+
+      ```bash
+      bundle exec rails shakapacker:compile
+      ```
+
+   3. Review `react_component` helper calls to ensure they use options-style props:
+
+      ```bash
+      rg -n "react_component\\b" app/views
+      # or without ripgrep:
+      grep -rEn "react_component\\b" app/views
+      ```
+
+      These commands list candidates only. Inspect each match manually and convert any legacy positional calls
+      (for example `react_component('Post', @props, prerender: true)`, `react_component 'Post', @props`,
+      `react_component :Post, @props`, or `react_component component_name, @props`) to options-style props
+      before running tests.
+
+   4. Run your test suite and fix any app-specific breakages before merging.
+
+## Legacy compatibility fixes that often make migration one-shot
+
+Older `react-rails` apps frequently need these additional fixes after the generator run:
+
+1. Remove old UJS mounting from legacy packs (`app/javascript/packs/application.js` and related files).
+
+   Remove patterns such as:
+
+   ```js
+   var componentRequireContext = require.context('components', true);
+   var ReactRailsUJS = require('react_ujs');
+   ReactRailsUJS.useContext(componentRequireContext);
+   ```
+
+2. If you are switching to React on Rails `server-bundle.js`, remove stale `app/javascript/packs/server_rendering.js` usage.
+
+3. Update existing ERB helper calls from old positional props to options-style props:
+
+   ```diff
+   - <%= react_component 'Post', @props, prerender: true %>
+   + <%= react_component('Post', { props: @props, prerender: true }) %>
+   ```
+
+4. If server bundles are not being found, verify `config/initializers/react_on_rails.rb` setup:
+   - On Shakapacker 9.0+, React on Rails usually auto-detects the output path from `private_output_path`. Leave this unset unless you intentionally need an override.
+   - On older setups, you may need an explicit value:
+
+   ```ruby
+   config.server_bundle_output_path = "ssr-generated"
+   ```
+
+5. If `spec/rails_helper.rb` gets a malformed merge after generator updates, keep a single valid `RSpec.configure do |config| ... end` block and include:
+
+   ```ruby
+   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
+   ```
+
 You can also check [react-rails-to-react-on-rails](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) branch on [react-rails example app](https://github.com/shakacode/react-rails-example-app) for an example of migration from `react-rails` v3 to `react_on_rails` v13.4.
+
+For a more recent Rails 7-era migration example (published under ShakaCode), see [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example), based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example).
 
 ## Practical checklist for Webpacker-era apps
 

@@ -61,17 +61,17 @@ Rails prepares the data in the controller and passes it as props. The component 
 - No loading spinner needed in the component itself
 - No JavaScript ships to the client for this component
 
-For pages with multiple data sources, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro) to stream the rendered HTML progressively.
+For pages with multiple data sources, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro) to stream the rendered HTML to the browser as React renders the component tree.
 
 ## Data Fetching in React on Rails Pro
 
-In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to deliver HTML progressively.
+In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree. This approach is sometimes called **async props** because Rails can emit each prop independently, with Suspense boundaries streaming them to the browser as they resolve.
 
 This is the recommended data fetching pattern for React on Rails because:
 
 - It preserves Rails' controller/model/view architecture
 - It leverages Rails' existing data access layers (ActiveRecord, authorization, caching)
-- It supports streaming SSR for progressive HTML delivery
+- It supports streaming SSR — HTML streams to the browser as React renders
 - All data passes as props -- no client-side fetching or loading states needed
 
 ### How Streaming Works
@@ -82,8 +82,10 @@ This is the recommended data fetching pattern for React on Rails because:
 <%= stream_react_component("ProductPage",
       props: { name: product.name,
                price: product.price,
-               reviews: product.reviews.includes(:author).as_json,
-               recommendations: product.recommended_products.as_json }) %>
+               reviews: product.reviews
+                          .as_json(only: [:id, :text, :rating]),
+               recommendations: product.recommended_products
+                          .as_json(only: [:id, :name, :price]) }) %>
 ```
 
 > **See also:** [React on Rails Pro streaming SSR](../../pro/streaming-ssr.md) for setup instructions and configuration options.
@@ -123,12 +125,14 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 
 **How it works:**
 
-1. Rails passes all data as props to `stream_react_component`
+1. Rails loads all data synchronously and passes it as props to `stream_react_component`
 2. `stream_react_component` uses React's `renderToPipeableStream` for streaming SSR
-3. The HTML streams progressively to the browser as React renders the component tree
+3. HTML streams to the browser as React renders the component tree
 4. No client-side fetching, loading states, or error handling needed
 5. The component renders with zero JavaScript cost as a Server Component
 
+> **HTML streaming vs. progressive data streaming:** With synchronous props, all data is loaded in Rails before rendering begins. The streaming here is _HTML streaming_ — React sends rendered HTML to the browser as it processes the component tree, rather than waiting for the entire page to finish rendering. For progressive data streaming where slow data sources resolve independently via Suspense boundaries, see [Streaming SSR](../../pro/streaming-ssr.md) (React on Rails Pro).
+>
 > **More details:** For setup instructions and configuration options, see the [React on Rails Pro RSC documentation](../../pro/react-server-components/tutorial.md).
 
 ## Migrating from React Query / TanStack Query
@@ -164,8 +168,14 @@ function ProductList() {
 }
 ```
 
+```erb
+<%# ERB view — Rails passes the data as props %>
+<%= stream_react_component("ProductList",
+      props: { products: Product.limit(50).as_json(only: [:id, :name]) }) %>
+```
+
 ```jsx
-// After: Server Component -- receives data as Rails props
+// After: Server Component -- receives data from Rails controller props
 function ProductList({ products }) {
   return (
     <ul>
@@ -177,17 +187,11 @@ function ProductList({ products }) {
 }
 ```
 
-```erb
-<%# ERB view — Rails passes the data as props %>
-<%= stream_react_component("ProductList",
-      props: { products: Product.limit(50).as_json }) %>
-```
+> **React on Rails note:** In React on Rails, the controller prepares the data and passes it as props -- no `async/await` in the component, no direct data layer calls. For data that's slow to compute, use [async props](#data-fetching-in-react-on-rails-pro) to stream it in progressively with Suspense. The generic `async function` + `await` pattern shown in other RSC frameworks bypasses Rails' authorization and caching layers and is not recommended.
 
-In React on Rails, data comes from Rails as props. The component simply renders it — no fetching, no loading states. For streaming SSR with progressive HTML delivery, use [`stream_react_component`](#data-fetching-in-react-on-rails-pro).
+### Pattern 2: Rails Props as Initial Data (Keep React Query for Client Features)
 
-### Pattern 2: Rails Props as `initialData` (Keep React Query for Client Features)
-
-When you need React Query's client features (background refetching, mutations, optimistic updates), pass Rails props as `initialData` so the component renders immediately and React Query takes over for subsequent updates:
+When you need React Query's client features (background refetching, mutations, optimistic updates), pass Rails controller props as `initialData` so the component renders instantly with server data, then React Query takes over for client-side updates:
 
 ```jsx
 // ReactQueryProvider.jsx -- Client Component (provides QueryClient)
@@ -203,7 +207,7 @@ export default function ReactQueryProvider({ children }) {
 ```
 
 ```jsx
-// ProductsPage.jsx -- Server Component
+// ProductsPage.jsx -- Server Component (receives data from Rails controller props)
 import ReactQueryProvider from './ReactQueryProvider';
 import ProductList from './ProductList';
 
@@ -253,17 +257,19 @@ export default function ProductList({ initialProducts }) {
 
 1. Rails controller fetches products and passes them as props
 2. Server Component passes the data to the Client Component as `initialProducts`
-3. React Query uses `initialData` to populate the cache -- no loading state on first render
+3. React Query uses `initialData` to populate the cache with no loading state on first render
 4. Subsequent refetches happen client-side as usual
 
-> **Note:** `initialDataUpdatedAt: Date.now()` uses the client render timestamp, not the actual Rails fetch time. This is close enough for most apps. For precise control, pass a timestamp from your Rails controller (e.g., `(Time.now.to_f * 1000).to_i`) as a prop and use that instead. If you don't need timed refetching at all, use `staleTime: Infinity` to prevent automatic refetches entirely.
+> **Note:** `initialDataUpdatedAt` and `staleTime` work together to prevent React Query from treating the Rails data as immediately stale on mount. `Date.now()` uses the client render timestamp, not the actual Rails fetch time — this is close enough for most apps. For precise control, pass a timestamp from your Rails controller (e.g., `(Time.now.to_f * 1000).to_i`) as a prop and use that instead. If you don't need timed refetching at all, use `staleTime: Infinity` to prevent automatic refetches entirely.
+
+> **Alternative:** For complex cases with many queries, you can use TanStack Query's `dehydrate`/`HydrationBoundary` pattern to prefetch and seed the entire QueryClient cache on the server. See the [TanStack Query SSR docs](https://tanstack.com/query/latest/docs/framework/react/guides/ssr) for details.
 
 ## Migrating from SWR
 
-SWR follows a similar pattern -- pass Rails props as `fallbackData` so the component renders immediately and SWR takes over for revalidation:
+SWR follows a similar pattern -- pass Rails controller props as `fallbackData` so the component renders instantly with server data:
 
 ```jsx
-// DashboardPage.jsx -- Server Component
+// DashboardPage.jsx -- Server Component (receives data from Rails controller props)
 import DashboardStats from './DashboardStats';
 
 export default function DashboardPage({ stats }) {
@@ -301,7 +307,9 @@ export default function DashboardStats({ fallbackData }) {
 
 ## Avoiding Server-Side Waterfalls
 
-In React on Rails, the most critical performance pitfall is sequential data fetching in the controller. When queries execute one after another, rendering is delayed by their total time:
+> **React on Rails note:** In React on Rails, the primary way to handle parallel data loading is [async props](#data-fetching-in-react-on-rails-pro) -- Rails emits each prop independently, and Suspense boundaries stream them to the browser as they resolve. The patterns below apply when you have async Server Components that fetch data directly (outside the async props flow).
+
+The most critical performance pitfall with Server Components is sequential data fetching. When one `await` blocks the next, you create a waterfall on the server:
 
 ### The Problem: Sequential Queries
 
@@ -383,7 +391,6 @@ function StatsPanel({ stats }) {
     </div>
   );
 }
-
 function PostFeed({ posts }) {
   return (
     <ul>
@@ -397,14 +404,16 @@ function PostFeed({ posts }) {
 
 ### Solution 3: Pass All Data as Props
 
-Fetch all data in the controller and pass it as props. `stream_react_component` handles progressive HTML delivery via React's streaming SSR:
+Fetch all data in the controller and pass it as props. `stream_react_component` streams the rendered HTML to the browser via React's `renderToPipeableStream`:
 
 ```erb
 <%= stream_react_component("ProductPage",
       props: { name: product.name,
                price: product.price,
-               reviews: product.reviews.includes(:author).as_json,
-               related: product.recommended_products.as_json }) %>
+               reviews: product.reviews
+                          .as_json(only: [:id, :text, :rating]),
+               related: product.recommended_products
+                          .as_json(only: [:id, :name, :price]) }) %>
 ```
 
 ```jsx
@@ -440,7 +449,7 @@ function RelatedProducts({ products }) {
 }
 ```
 
-All data is available immediately as props. `stream_react_component` streams the rendered HTML progressively to the browser.
+All data is loaded in Rails before rendering begins. `stream_react_component` then streams the rendered HTML to the browser as React processes the component tree.
 
 ## The `use()` Hook for Client Components
 
@@ -533,9 +542,9 @@ function Comments({ postId }) {
 
 ## Request Deduplication with `React.cache()`
 
-> **React on Rails note:** In most React on Rails applications, data flows through Rails controller props, so `React.cache()` is unnecessary. The section below applies when Server Components call data-fetching functions directly (e.g., via API calls from the Node renderer).
+> **React on Rails note:** In most React on Rails applications, data flows through controller props or async props, so `React.cache()` is unnecessary. This section applies when Server Components call data-fetching functions directly (for example, from the Node renderer). If you are using async props (React on Rails Pro), repeated calls within the same request already share the same deduped Promise.
 
-`React.cache()` ensures a function is called only once per request, even when multiple Server Components invoke it:
+When multiple Server Components need the same data, `React.cache()` ensures the fetch happens only once per request:
 
 ```jsx
 // lib/data.js -- Define at module level
@@ -617,7 +626,7 @@ This preserves Rails' full controller/model layer -- authentication, authorizati
 
 ## When to Keep Client-Side Fetching
 
-Not everything should move to the server. Keep client-side data fetching for:
+Not everything should move to the server. In React on Rails, most read-only data is already server-side -- Rails controller props deliver it to your components without any client-side fetching. The table below covers the cases where you should keep client-side fetching instead of relying on Rails controller props or [async props](#data-fetching-in-react-on-rails-pro):
 
 | Use Case                        | Why Client-Side                            | Recommended Tool                    |
 | ------------------------------- | ------------------------------------------ | ----------------------------------- |
@@ -676,9 +685,9 @@ export default function ChatWindow({ channelId, initialMessages }) {
 
 ## Loading States and Suspense Boundaries
 
-### Progressive Streaming Architecture
+### Streaming HTML Delivery
 
-Structure your page so critical content renders alongside secondary content, with `stream_react_component` handling progressive HTML delivery:
+With synchronous props, Rails loads all data before rendering begins. `stream_react_component` then streams the rendered HTML as React processes the component tree — the browser receives content as it's rendered rather than waiting for the entire page:
 
 ```erb
 <%# ERB view — Rails passes all data as props %>
@@ -863,9 +872,9 @@ For each component that fetches data:
 1. Remove the `'use client'` directive
 2. Remove `useState` for data, loading, and error
 3. Remove the `useEffect` data fetch
-4. Receive data as props from Rails (controller and/or ERB view helper props)
+4. Accept data as props from Rails (or use [async props](#data-fetching-in-react-on-rails-pro) for slow data)
 5. Use `stream_react_component` in the ERB view to enable streaming SSR
-6. Remove API routes that were only used for client-side fetching by this component
+6. Remove the API route if it was only used by this component
 
 ### Step 3: Add Suspense Boundaries
 
@@ -875,7 +884,7 @@ For each component that fetches data:
 
 ### Step 4: Optimize
 
-10. Use `stream_react_component` for streaming SSR with progressive HTML delivery
+10. Use `stream_react_component` for streaming HTML delivery via React's `renderToPipeableStream`
 11. Parallelize independent Ruby queries with threads to avoid server-side waterfalls
 12. For client-side updates after initial render, use React Query or SWR with `initialData`/`fallbackData`
 

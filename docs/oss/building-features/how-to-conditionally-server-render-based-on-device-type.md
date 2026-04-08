@@ -1,3 +1,7 @@
+---
+slug: conditional-server-rendering
+---
+
 # How to conditionally render server side based on the device type
 
 In general, we want to use CSS to do mobile responsive layouts.
@@ -35,6 +39,6 @@ ReactOnRails.configure do |config|
 end
 ```
 
-Note, full details of the React on Rails configuration are [available here](https://reactonrails.com/docs/configuration/).
+Note, full details of the React on Rails configuration are [available here](../configuration/README.md).
 
 See the doc file [render-functions-and-railscontext.md](../core-concepts/render-functions-and-railscontext.md#rails-context) for how your client-side code uses the device information

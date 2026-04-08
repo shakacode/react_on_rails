@@ -2,6 +2,9 @@
 
 Having issues with React on Rails? This guide covers the most common problems and their solutions.
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page for general React on Rails troubleshooting. For quick fixes to common setup issues, see [Common Issues](../getting-started/common-issues.md). For Pro-specific issues (streaming SSR, Node renderer, RSC), see [Pro Troubleshooting](../../pro/troubleshooting.md). Always try `bundle exec rails react_on_rails:doctor` first.
+
 ## 🔍 Quick Diagnosis
 
 ### Is your issue with...?
@@ -486,7 +489,7 @@ console.log(ReactOnRails.registeredComponents());
 ### Professional support
 
 - **[ShakaCode](https://www.shakacode.com)** offers consulting and support services
-- **[React on Rails Pro](https://pro.reactonrails.com/)** includes priority support
+- **[React on Rails Pro](../../pro/react-on-rails-pro.md)** includes priority support
 
 ---
 

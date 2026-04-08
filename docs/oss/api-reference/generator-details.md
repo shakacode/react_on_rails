@@ -209,7 +209,7 @@ rails generate react_on_rails:install --pro
 
 **Prerequisites:**
 
-- Add `gem 'react_on_rails_pro', '16.4.0'` (or later — pin to the exact version you want) to your Gemfile and run `bundle install`
+- Add `gem 'react_on_rails_pro'` to your Gemfile and run `bundle install` (check [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for the latest version)
 - Contact [justin@shakacode.com](mailto:justin@shakacode.com) for a license
 
 **What gets created:**
@@ -246,7 +246,7 @@ For existing apps, use the standalone Pro generator to avoid re-processing base 
 rails generate react_on_rails:pro
 ```
 
-See the [React on Rails Pro overview](../../pro/home-pro.md) for feature details.
+See the [React on Rails Pro overview](../../pro/react-on-rails-pro.md) for feature details.
 
 ### React Server Components Support
 

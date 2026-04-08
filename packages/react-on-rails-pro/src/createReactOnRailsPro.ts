@@ -14,6 +14,7 @@
 
 import { createBaseClientObject, type BaseClientObjectType } from 'react-on-rails/@internal/base/client';
 import { createBaseFullObject } from 'react-on-rails/@internal/base/full';
+import { getRailsContext } from 'react-on-rails/context';
 import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
 import type { ReactOnRailsInternal, RegisteredComponent, Store, StoreGenerator } from 'react-on-rails/types';
@@ -24,8 +25,8 @@ import {
   hydrateStore,
   renderOrHydrateAllComponents,
   hydrateAllStores,
-  renderOrHydrateImmediateHydratedComponents,
-  hydrateImmediateHydratedStores,
+  renderOrHydrateCompleteComponents,
+  hydrateCompleteStores,
   unmountAll,
 } from './ClientSideRenderer.ts';
 
@@ -47,7 +48,6 @@ type ReactOnRailsProSpecificFunctions = Pick<
   | 'serverRenderRSCReactComponent'
 >;
 
-// Pro client startup with immediate hydration support
 async function reactOnRailsPageLoaded() {
   debugTurbolinks('reactOnRailsPageLoaded [PRO]');
   await Promise.all([hydrateAllStores(), renderOrHydrateAllComponents()]);
@@ -71,8 +71,21 @@ function clientStartup() {
   // eslint-disable-next-line no-underscore-dangle
   globalThis.__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__ = true;
 
-  void renderOrHydrateImmediateHydratedComponents();
-  void hydrateImmediateHydratedStores();
+  const railsContext = getRailsContext();
+  if (railsContext === null) {
+    // Context element not yet in DOM — expected in streaming scenarios.
+    // Early Pro hydration skipped; the page-loaded sweep will recover all components.
+    if (process.env.NODE_ENV !== 'production' && typeof console !== 'undefined') {
+      console.debug(
+        '[React on Rails] railsContext not available at clientStartup — early Pro hydration skipped, falling back to page-load sweep.',
+      );
+    }
+  } else if (railsContext.rorPro) {
+    // Streaming pages can trigger these incrementally as markup arrives. The later
+    // page-loaded sweep is safe because ClientSideRenderer memoizes by DOM/store id.
+    void renderOrHydrateCompleteComponents();
+    void hydrateCompleteStores();
+  }
 
   onPageLoaded(reactOnRailsPageLoaded);
   onPageUnloaded(reactOnRailsPageUnloaded);
@@ -164,7 +177,7 @@ export default function createReactOnRailsPro(
     // Reset options to defaults (only on first initialization)
     reactOnRailsPro.resetOptions();
 
-    // Run Pro client startup with immediate hydration support (only on first initialization)
+    // Run Pro client startup (only on first initialization)
     clientStartup();
   }
 

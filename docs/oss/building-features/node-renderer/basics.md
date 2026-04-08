@@ -1,7 +1,7 @@
 # Node Renderer Basics
 
-> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
-> Free or very low cost for startups and small companies. [Get a license →](https://pro.reactonrails.com)
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 ## Requirements
 
@@ -33,6 +33,7 @@ See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak pa
 
 1. ENV values for the default config are (See [JS Configuration](./js-configuration.md) for more details):
    - `RENDERER_PORT`
+   - `RENDERER_HOST`
    - `RENDERER_LOG_LEVEL`
    - `RENDERER_BUNDLE_PATH`
    - `RENDERER_WORKERS_COUNT`
@@ -99,6 +100,27 @@ ReactOnRailsPro.configure do |config|
 end
 ```
 
+## Network Security
+
+The Node Renderer executes JavaScript sent to it by the Rails application using Node.js `vm.runInContext()`. This makes it, by design, a **remote code execution service** — any client that can reach the HTTP port can execute arbitrary JavaScript on the host machine.
+
+Node.js [`vm` contexts are not a security boundary](https://nodejs.org/api/vm.html#vm-executing-javascript). Escaping a `vm` sandbox to access the full Node.js runtime (file system, child processes, network) is well-documented and straightforward.
+
+To mitigate this, the renderer uses the same approach as PostgreSQL: **it binds to `localhost` by default**, so it is not reachable from the network at all. This provides two layers of defense:
+
+1. **Network layer** — Only processes on the same machine (or same Kubernetes pod network namespace) can reach the renderer. No remote attacker can connect.
+2. **Authentication layer** — The optional `password` setting (required in production-like environments) protects against unauthorized local callers.
+
+This means a developer running the renderer locally without a password is safe by default — the renderer is only reachable from their own machine, just as a default PostgreSQL installation only accepts local connections.
+
+**When you must bind to `0.0.0.0`** (e.g., separate container workloads in Docker Compose or Kubernetes separate-workload deployments):
+
+- Always set `RENDERER_PASSWORD` to a strong value
+- Place the renderer behind private networking or firewall rules
+- Never expose the renderer port to the public internet
+
+See [JS Configuration](./js-configuration.md) for the `host` and `password` options, and [Container Deployment](./container-deployment.md) for architecture-specific guidance.
+
 ## Troubleshooting
 
 - See [Memory Leaks guide](../../../pro/js-memory-leaks.md).
@@ -112,3 +134,4 @@ The NodeRenderer has a protocol version on both the Rails and Node sides. If the
 - [Installation](../../../pro/installation.md)
 - [Rails Options for node-renderer](../../configuration/configuration-pro.md)
 - [JS Options for node-renderer](./js-configuration.md)
+- [Container Deployment](./container-deployment.md) — Sidecar vs. separate workloads, memory tuning, autoscaling, and troubleshooting

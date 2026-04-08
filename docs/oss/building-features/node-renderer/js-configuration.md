@@ -1,7 +1,7 @@
 # Node Renderer JavaScript Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](https://reactonrails.com/docs/pro/).
-> Free or very low cost for startups and small companies. [Get a license →](https://reactonrails.com/docs/pro/)
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
+> Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 You can configure the node-renderer entirely with ENV values from your own launch file or
 `package.json` script. The package does not ship a standalone `node-renderer` CLI.
@@ -18,8 +18,8 @@ available default ENV values if you wire them into your own launch script.
 1. **port** (default: `process.env.RENDERER_PORT || 3800`) - The port the renderer should listen to.
    [On Heroku](https://devcenter.heroku.com/articles/dyno-startup-behavior#port-binding-of-web-dynos) or [ControlPlane](https://docs.controlplane.com/reference/workload/containers#port-variable) you may want to use `process.env.PORT`.
 1. **host** (default: `process.env.RENDERER_HOST || 'localhost'`) - The host/IP address the renderer should bind to.
-   Set it to `0.0.0.0` for containerized environments where external health checks need to reach the server.
-   **Security caution:** binding `host` to `0.0.0.0` exposes the renderer on all network interfaces. Use this only behind private networking, firewall/ALB rules, or with `password` authentication enabled. If those protections are not in place, keep `host` on `localhost`/loopback.
+   The default of `localhost` keeps the renderer reachable only from the local machine (or the same Kubernetes pod network namespace), following the same secure-by-default approach as PostgreSQL. Set to `0.0.0.0` only when the renderer must be reachable across a network boundary (e.g., separate container workloads in Docker Compose or Kubernetes).
+   **Security caution:** The renderer executes JavaScript sent to it via `vm.runInContext()`, making it a remote code execution service by design. The Node.js `vm` module is [not a security boundary](https://nodejs.org/api/vm.html#vm-executing-javascript). Binding to `0.0.0.0` without `password` authentication exposes this to anyone on the network. Only bind to `0.0.0.0` behind private networking or firewall rules, and always set `password` when the renderer is network-accessible. See [Network Security](./basics.md#network-security) for details.
 1. **logLevel** (default: `process.env.RENDERER_LOG_LEVEL || 'info'`) - The renderer log level. Set it to `silent` to turn logging off.
    [Available levels](https://getpino.io/#/docs/api?id=levels): `{ fatal: 60, error: 50, warn: 40, info: 30, debug: 20, trace: 10 }`. `silent` can be used as well.
 1. **logHttpLevel** (default: `process.env.RENDERER_LOG_HTTP_LEVEL || 'error'`) - The HTTP server log level (same allowed values as `logLevel`).
@@ -27,7 +27,8 @@ available default ENV values if you wire them into your own launch script.
 1. **serverBundleCachePath** (default: `process.env.RENDERER_SERVER_BUNDLE_CACHE_PATH || process.env.RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-node-renderer-bundles'` ) - Path to a cache directory where uploaded server bundle files will be stored. This is distinct from Shakapacker's public asset directory. For example you can set it to `path.resolve(__dirname, './.node-renderer-bundles')` if you configured renderer from the `/` directory of your app.
 1. **workersCount** (default: `process.env.RENDERER_WORKERS_COUNT || defaultWorkersCount()` where default is your CPUs count - 1) - Number of workers that will be forked to serve rendering requests. If you set this manually make sure that value is a **Number** and is `>= 0`. Setting this to `0` will run the renderer in a single process mode without forking any workers, which is useful for debugging purposes. For production use, the value should be `>= 1`.
 1. **password** (default: `env.RENDERER_PASSWORD`) - The password expected to receive from the **Rails client** to authenticate rendering requests.
-   If no password is set, no authentication will be required.
+   In `development` and `test` environments (checked via both `NODE_ENV` and `RAILS_ENV`), the password is optional — if unset, no authentication is required.
+   In all other environments (`staging`, `production`, etc.), the renderer will refuse to start without an explicit password. Set `RENDERER_PASSWORD` in your environment or pass `password` in the config object.
 1. **allWorkersRestartInterval** (default: `env.RENDERER_ALL_WORKERS_RESTART_INTERVAL`) - Interval in minutes between scheduled restarts of all workers. By default restarts are not enabled. If restarts are enabled, `delayBetweenIndividualWorkerRestarts` should also be set. **Recommended for production** — rolling restarts are the primary safety net against memory leaks from application code. See the [Memory Leaks guide](../../../pro/js-memory-leaks.md).
 1. **delayBetweenIndividualWorkerRestarts** (default: `env.RENDERER_DELAY_BETWEEN_INDIVIDUAL_WORKER_RESTARTS`) - Interval in minutes between individual worker restarts (when cluster restart is triggered). By default restarts are not enabled. If restarts are enabled, `allWorkersRestartInterval` should also be set. Set this high enough so that not all workers are down simultaneously (e.g., if you have 4 workers and set this to 5 minutes, the full restart cycle takes 20 minutes).
 1. **gracefulWorkerRestartTimeout**: (default: `env.GRACEFUL_WORKER_RESTART_TIMEOUT`) - Time in seconds that the master waits for a worker to gracefully restart (after serving all active requests) before killing it. Use this when you want to avoid situations where a worker gets stuck in an infinite loop and never restarts. This config is only usable if worker restart is enabled. The timeout starts when the worker should restart; if it elapses without a restart, the worker is killed.

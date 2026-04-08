@@ -140,6 +140,10 @@ module ReactOnRailsPro
         ReactOnRailsPro::Error.raise_duplicate_bundle_upload_error if send_bundle
 
         true
+      when ReactOnRailsPro::STATUS_BAD_REQUEST
+        raise ReactOnRailsPro::Error,
+              "Renderer rejected malformed request or hit an unhandled VM error: " \
+              "#{response.status}:\n#{error_body}"
       when ReactOnRailsPro::STATUS_INCOMPATIBLE
         raise ReactOnRailsPro::Error, error_body
       else

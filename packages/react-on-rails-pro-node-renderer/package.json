@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro-node-renderer",
-  "version": "16.5.1",
+  "version": "16.6.0-rc.0",
   "protocolVersion": "2.0.0",
   "description": "React on Rails Pro Node Renderer for server-side rendering",
   "main": "lib/ReactOnRailsProNodeRenderer.js",
@@ -29,7 +29,7 @@
   "dependencies": {
     "@fastify/formbody": "^7.4.0 || ^8.0.2",
     "@fastify/multipart": "^8.3.1 || ^9.0.3",
-    "fastify": "^5.8.1",
+    "fastify": "^5.8.3",
     "fs-extra": "^11.2.0",
     "jsonwebtoken": "^9.0.3",
     "lockfile": "^1.0.4",

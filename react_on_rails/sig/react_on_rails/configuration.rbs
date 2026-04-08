@@ -31,7 +31,6 @@ module ReactOnRails
     attr_accessor rendering_props_extension: String?
     attr_accessor make_generated_server_bundle_the_entrypoint: bool
     attr_accessor generated_component_packs_loading_strategy: Symbol?
-    attr_accessor immediate_hydration: bool
     attr_accessor component_registry_timeout: Integer
     attr_accessor server_bundle_output_path: String?
     attr_accessor enforce_private_server_bundles: bool
@@ -68,7 +67,6 @@ module ReactOnRails
       ?components_subdirectory: String?,
       ?stores_subdirectory: String?,
       ?auto_load_bundle: bool?,
-      ?immediate_hydration: bool?,
       ?component_registry_timeout: Integer?,
       ?server_bundle_output_path: String?,
       ?enforce_private_server_bundles: bool?

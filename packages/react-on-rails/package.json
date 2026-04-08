@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails",
-  "version": "16.5.1",
+  "version": "16.6.0-rc.0",
   "description": "react-on-rails JavaScript for react_on_rails Ruby gem",
   "main": "lib/ReactOnRails.full.js",
   "type": "module",
@@ -48,8 +48,8 @@
     "./serverRenderUtils": "./lib/serverRenderUtils.js",
     "./buildConsoleReplay": "./lib/buildConsoleReplay.js",
     "./ReactDOMServer": "./lib/ReactDOMServer.cjs",
-    "./sanitizeNonce": "./lib/sanitizeNonce.js",
     "./serverRenderReactComponent": "./lib/serverRenderReactComponent.js",
+    "./@internal/sanitizeNonce": "./lib/sanitizeNonce.js",
     "./@internal/base/client": "./lib/base/client.js",
     "./@internal/base/full": {
       "react-server": "./lib/base/full.rsc.js",

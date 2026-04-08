@@ -13,7 +13,7 @@
  */
 
 import { RSCPayloadChunk } from 'react-on-rails/types';
-import sanitizeNonce from 'react-on-rails/sanitizeNonce';
+import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 
 /**
  * Transforms an RSC stream and replays console logs on the client.

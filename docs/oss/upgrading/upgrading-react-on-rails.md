@@ -1,8 +1,11 @@
 # Upgrading React on Rails
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user is upgrading between React on Rails versions (e.g., v13 → v14). For upgrading from OSS to Pro, see [Upgrade to Pro](../../pro/upgrading-to-pro.md). For migrating from the `react-rails` gem, see [Migrating from react-rails](../migrating/migrating-from-react-rails.md). Check the [release notes](./release-notes/index.md) for version-specific breaking changes.
+
 ## Need Help Migrating?
 
-If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information about our [React on Rails Pro Support](https://reactonrails.com/docs/pro/).
+If you would like help in migrating between React on Rails versions or help with implementing server rendering, please contact [justin@shakacode.com](mailto:justin@shakacode.com) for more information about our [React on Rails Pro Support](../../pro/react-on-rails-pro.md).
 
 We specialize in helping companies to quickly and efficiently upgrade. The older versions use the Rails asset pipeline to package client assets. The current and recommended way is to use Webpack 4+ for asset preparation. You may also need help migrating from the `rails/webpacker`'s Webpack configuration to a better setup ready for Server Side Rendering.
 

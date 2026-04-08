@@ -11,21 +11,6 @@ import type { RailsContext } from 'react-on-rails/types';
 import { normalizeSearch } from './utils.ts';
 
 /**
- * Enables TanStack Router's internal SSR mode and verifies the flag is writable.
- */
-function enableRouterSsrMode(router: TanStackRouter): void {
-  const routerWithSsrFlag = router;
-  routerWithSsrFlag.ssr = true;
-
-  if (!routerWithSsrFlag.ssr) {
-    throw new Error(
-      'react-on-rails-pro/tanstack-router: Expected router.ssr to accept a boolean flag. ' +
-        'Please check that your @tanstack/react-router version is compatible.',
-    );
-  }
-}
-
-/**
  * Builds a React element tree with RouterProvider and optional AppWrapper.
  */
 function buildAppElement(
@@ -123,14 +108,16 @@ export async function serverRenderTanStackAppAsync(
   router.update({ history: memoryHistory });
 
   // Async path uses router.load() public API, so no private store access is needed.
+  // No router.ssr flag is set here: React effects (including Transitioner's auto-load)
+  // do not execute during server-side renderToString, and router.dehydrate() does not
+  // depend on router.ssr.
   await router.load();
-
-  // Ensure SSR output avoids client-only Suspense wrappers that can cause hydration mismatch.
-  enableRouterSsrMode(router);
 
   const dehydratedState: DehydratedRouterState = {
     url,
     dehydratedRouter: typeof router.dehydrate === 'function' ? router.dehydrate() : null,
+    // Keep ssrRouter payload for compatibility and to restore server match data
+    // before first client render.
     ssrRouter: buildSsrRouterState(router),
   };
 

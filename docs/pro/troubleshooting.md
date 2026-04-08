@@ -35,7 +35,8 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 
 **Investigation**:
 
-- Profile memory using `node --inspect` and heap snapshots (see [Profiling guide](./profiling-server-side-rendering-code.md))
+- Capture heap snapshots with `NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2"` — send `kill -USR2 <worker-pid>` at different times and compare in Chrome DevTools (see [Debugging guide](../oss/building-features/node-renderer/debugging.md#debugging-memory-leaks))
+- Profile memory using `node --inspect` and Chrome DevTools (see [Profiling guide](./profiling-server-side-rendering-code.md))
 - Search your server bundle code for module-level `Map`, `Set`, `{}` caches, and `_.memoize` calls — these are the most common leak sources
 - Use `config.ssr_pre_hook_js` to run cleanup code before each render (e.g., clearing global state)
 - See the [Memory Leaks guide](./js-memory-leaks.md) for detailed patterns, an audit checklist, and fixes

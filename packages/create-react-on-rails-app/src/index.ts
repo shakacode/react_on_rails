@@ -4,12 +4,13 @@ import { CliOptions } from './types.js';
 import { validateAll } from './validators.js';
 import { createApp, validateAppName } from './create-app.js';
 import { detectPackageManager, logError, logInfo } from './utils.js';
+import { promptForMode, PROMPT_CANCELLED } from './prompt.js';
 
 // Use require() for CJS compatibility - avoids __dirname + fs.readFileSync
 // eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
 const packageJson = require('../package.json') as { version: string };
 
-function run(appName: string, rawOpts: Record<string, unknown>): void {
+async function run(appName: string, rawOpts: Record<string, unknown>): Promise<void> {
   const { template } = rawOpts;
   if (typeof template !== 'string' || (template !== 'javascript' && template !== 'typescript')) {
     logError(`Invalid template "${String(template)}". Must be "javascript" or "typescript".`);
@@ -26,13 +27,8 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
     packageManager = detectPackageManager() ?? 'npm';
   }
 
-  const options: CliOptions = {
-    template,
-    packageManager: packageManager as 'npm' | 'pnpm',
-    rspack: Boolean(rawOpts.rspack),
-    pro: Boolean(rawOpts.pro),
-    rsc: Boolean(rawOpts.rsc),
-  };
+  let pro = Boolean(rawOpts.pro);
+  let rsc = Boolean(rawOpts.rsc);
 
   console.log('');
   console.log(`${chalk.bold('create-react-on-rails-app')} v${packageJson.version}`);
@@ -43,6 +39,30 @@ function run(appName: string, rawOpts: Record<string, unknown>): void {
     logError(nameValidation.error ?? 'Invalid app name');
     process.exit(1);
   }
+
+  // When no mode flag is explicitly passed, prompt interactively (TTY only).
+  // Non-interactive environments (CI, pipes) fall back to standard mode.
+  const modeExplicit =
+    rawOpts.pro !== undefined || rawOpts.rsc !== undefined || rawOpts.standard !== undefined;
+  if (!modeExplicit) {
+    if (process.stdin.isTTY && process.stdout.isTTY) {
+      const choice = await promptForMode();
+      pro = choice.pro;
+      rsc = choice.rsc;
+    } else {
+      logInfo(
+        'No mode flag specified and not running interactively (stdin/stdout is not a TTY); using standard mode.',
+      );
+    }
+  }
+
+  const options: CliOptions = {
+    template,
+    packageManager: packageManager as 'npm' | 'pnpm',
+    rspack: Boolean(rawOpts.rspack),
+    pro,
+    rsc,
+  };
 
   if (options.rsc && options.pro) {
     logInfo('Note: --rsc takes precedence over --pro; --pro will be ignored.');
@@ -107,41 +127,65 @@ program
   .option('-t, --template <type>', 'javascript or typescript', 'typescript')
   .option('-p, --package-manager <pm>', 'npm or pnpm (auto-detected if not specified)')
   .option('--rspack', 'Use Rspack instead of Webpack (~20x faster builds)', false)
-  .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)', false)
-  .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)', false)
+  .option('--standard', 'Generate open-source React on Rails setup (skip prompt)')
+  .option('--pro', 'Generate React on Rails Pro setup (installs react_on_rails_pro)')
+  .option('--rsc', 'Generate React Server Components setup (installs react_on_rails_pro)')
   .addHelpText(
     'after',
     `
 Examples:
-  $ npx create-react-on-rails-app my-app
+  $ npx create-react-on-rails-app my-app                        # prompts for mode
+  $ npx create-react-on-rails-app my-app --rsc                  # skip prompt, use RSC
+  $ npx create-react-on-rails-app my-app --pro                  # skip prompt, use Pro
+  $ npx create-react-on-rails-app my-app --standard             # skip prompt, use Standard
   $ npx create-react-on-rails-app my-app --template javascript
   $ npx create-react-on-rails-app my-app --rspack
-  $ npx create-react-on-rails-app my-app --pro
-  $ npx create-react-on-rails-app my-app --rsc
-  $ npx create-react-on-rails-app my-app --rspack --pro
   $ npx create-react-on-rails-app my-app --rspack --rsc
   $ npx create-react-on-rails-app my-app --package-manager pnpm
 
+When no mode flag (--standard, --pro, or --rsc) is given, an interactive prompt
+lets you choose between Standard, Pro, and RSC modes (default: RSC). When stdin
+or stdout is not a TTY (for example in CI, piped input, or redirected output),
+standard mode is used automatically.
+
 What it does:
   1. Creates a new Rails app with PostgreSQL
-  2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for --pro/--rsc)
+  2. Adds required gem(s) (react_on_rails, plus react_on_rails_pro for Pro/RSC)
   3. Runs the React on Rails generator (Shakapacker, components, webpack config)
+  4. Creates educational git commits for each major scaffold step
 
 After setup, run bin/dev and visit:
-  - http://localhost:3000/hello_world (default and --pro)
-  - http://localhost:3000/hello_server (--rsc)
+  - http://localhost:3000 (generated home page)
+  - /hello_world (default and --pro example page)
+  - /hello_server (--rsc example page)
 
+Inspect the generated setup history with:
+  - git log --oneline --reverse
+
+The generated app includes one git commit per logical setup step.`,
+  )
+  .addHelpText(
+    'after',
+    `
 --pro and --rsc support both JavaScript and TypeScript templates.
 
 Documentation: https://reactonrails.com/docs/`,
   )
-  .action((appName: string, opts: Record<string, unknown>) => {
+  .action(async (appName: string, opts: Record<string, unknown>) => {
     try {
-      run(appName, opts);
+      await run(appName, opts);
     } catch (error) {
+      if (error instanceof Error && error.message === PROMPT_CANCELLED) {
+        console.log('');
+        process.exit(0);
+      }
       logError(error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   });
 
-program.parse();
+// eslint-disable-next-line import/prefer-default-export -- named export for test clarity
+export const ready = program.parseAsync().catch((error: unknown) => {
+  logError(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});

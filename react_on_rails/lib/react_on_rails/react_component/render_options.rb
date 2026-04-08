@@ -4,7 +4,6 @@ require "react_on_rails/utils"
 
 module ReactOnRails
   module ReactComponent
-    # rubocop:disable Metrics/ClassLength
     class RenderOptions
       include Utils::Required
 
@@ -138,14 +137,6 @@ module ReactOnRails
         retrieve_configuration_value_for(:logging_on_server)
       end
 
-      def immediate_hydration
-        ReactOnRails::Utils.normalize_immediate_hydration(
-          options[:immediate_hydration],
-          react_component_name,
-          "Component"
-        )
-      end
-
       def to_s
         "{ react_component_name = #{react_component_name}, options = #{options}, request_digest = #{request_digest}"
       end
@@ -220,6 +211,5 @@ module ReactOnRails
         self.class.prerender_env_override
       end
     end
-    # rubocop:enable Metrics/ClassLength
   end
 end

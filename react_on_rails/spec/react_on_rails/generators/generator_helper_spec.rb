@@ -27,6 +27,11 @@ RSpec.describe GeneratorHelper, type: :generator do
     @shell ||= Thor::Shell::Color.new
   end
 
+  # GeneratorHelper methods expect an options hash as provided by Thor generators.
+  def options
+    @options ||= {}
+  end
+
   let(:destination_root) { File.expand_path("../dummy-for-generators", __dir__) }
 
   describe "#print_generator_messages" do
@@ -79,10 +84,10 @@ RSpec.describe GeneratorHelper, type: :generator do
       context "when adding regular dependencies" do
         it "calls manager.add with exact: true" do
           packages = %w[react react-dom]
-
-          expect(mock_manager).to receive(:add).with(packages, exact: true)
+          allow(mock_manager).to receive(:add).with(packages, exact: true).and_return(true)
 
           result = add_npm_dependencies(packages)
+          expect(mock_manager).to have_received(:add).with(packages, exact: true)
           expect(result).to be true
         end
       end
@@ -90,10 +95,34 @@ RSpec.describe GeneratorHelper, type: :generator do
       context "when adding dev dependencies" do
         it "calls manager.add with type: :dev and exact: true" do
           packages = ["@types/react", "@types/react-dom"]
-
-          expect(mock_manager).to receive(:add).with(packages, type: :dev, exact: true)
+          allow(mock_manager).to receive(:add).with(packages, type: :dev, exact: true).and_return(true)
 
           result = add_npm_dependencies(packages, dev: true)
+          expect(mock_manager).to have_received(:add).with(packages, type: :dev, exact: true)
+          expect(result).to be true
+        end
+      end
+
+      context "when package manager add returns false" do
+        it "returns false so callers can fall back" do
+          packages = ["react-on-rails-rsc@99.99.99"]
+
+          allow(mock_manager).to receive(:add).with(packages, exact: true).and_return(false)
+
+          result = add_npm_dependencies(packages)
+          expect(mock_manager).to have_received(:add).with(packages, exact: true)
+          expect(result).to be false
+        end
+      end
+
+      context "when package manager add returns nil" do
+        it "treats nil as success for side-effect-only package managers" do
+          packages = %w[react react-dom]
+
+          allow(mock_manager).to receive(:add).with(packages, exact: true).and_return(nil)
+
+          result = add_npm_dependencies(packages)
+          expect(mock_manager).to have_received(:add).with(packages, exact: true)
           expect(result).to be true
         end
       end
@@ -171,6 +200,32 @@ RSpec.describe GeneratorHelper, type: :generator do
           a_hash_including(message: "This is normal before Shakapacker creates the package.json file.")
         )
       end
+    end
+  end
+
+  describe "RSC Pro mode helpers" do
+    it "enables rsc-pro mode for explicit --rsc-pro flag" do
+      allow(self).to receive(:options).and_return({ rsc_pro: true, rsc: false, pro: false })
+
+      expect(use_rsc_pro_mode?).to be(true)
+      expect(use_rsc?).to be(true)
+      expect(use_pro?).to be(true)
+    end
+
+    it "enables rsc-pro mode when --rsc and --pro are both set" do
+      allow(self).to receive(:options).and_return({ rsc_pro: false, rsc: true, pro: true })
+
+      expect(use_rsc_pro_mode?).to be(true)
+      expect(use_rsc?).to be(true)
+      expect(use_pro?).to be(true)
+    end
+
+    it "does not enable rsc-pro mode for standalone --pro" do
+      allow(self).to receive(:options).and_return({ rsc_pro: false, rsc: false, pro: true })
+
+      expect(use_rsc_pro_mode?).to be(false)
+      expect(use_rsc?).to be(false)
+      expect(use_pro?).to be(true)
     end
   end
 
@@ -314,6 +369,45 @@ RSpec.describe GeneratorHelper, type: :generator do
           expect(using_swc?).to be true
         end
       end
+    end
+  end
+
+  describe "#root_route_present?" do
+    let(:routes_path) { File.join(destination_root, "config/routes.rb") }
+
+    before do
+      FileUtils.mkdir_p(File.dirname(routes_path))
+    end
+
+    after do
+      FileUtils.rm_rf(File.join(destination_root, "config"))
+    end
+
+    it "returns false when routes.rb is missing" do
+      FileUtils.rm_f(routes_path)
+
+      expect(root_route_present?).to be(false)
+    end
+
+    it "returns false when routes.rb has no root route" do
+      File.write(routes_path, <<~RUBY)
+        Rails.application.routes.draw do
+          get "about", to: "pages#about"
+        end
+      RUBY
+
+      expect(root_route_present?).to be(false)
+    end
+
+    it "ignores commented root lines and matches active root routes" do
+      File.write(routes_path, <<~RUBY)
+        Rails.application.routes.draw do
+          # root to: "ignored#comment"
+          root to: "home#index"
+        end
+      RUBY
+
+      expect(root_route_present?).to be(true)
     end
   end
 end
