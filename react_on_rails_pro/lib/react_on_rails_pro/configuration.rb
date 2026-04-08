@@ -98,9 +98,9 @@ module ReactOnRailsPro
     # @param value [Numeric, nil] A positive number or nil (to use the HTTPX default)
     # @raise [ReactOnRailsPro::Error] if value is not a positive number or nil
     def renderer_http_keep_alive_timeout=(value)
-      unless value.nil? || (value.is_a?(Numeric) && value.positive?)
+      unless value.nil? || (value.is_a?(Numeric) && value.positive? && value.finite?)
         raise ReactOnRailsPro::Error,
-              "config.renderer_http_keep_alive_timeout must be a positive number or nil"
+              "config.renderer_http_keep_alive_timeout must be a finite positive number or nil"
       end
       @renderer_http_keep_alive_timeout = value
     end

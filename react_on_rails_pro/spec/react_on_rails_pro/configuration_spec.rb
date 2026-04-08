@@ -458,7 +458,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             config.renderer_http_keep_alive_timeout = 0
           end
         end.to raise_error(ReactOnRailsPro::Error,
-                           /must be a positive number or nil/)
+                           /must be a finite positive number or nil/)
       end
 
       it "raises error for negative numbers" do
@@ -467,7 +467,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             config.renderer_http_keep_alive_timeout = -5
           end
         end.to raise_error(ReactOnRailsPro::Error,
-                           /must be a positive number or nil/)
+                           /must be a finite positive number or nil/)
       end
 
       it "raises error for non-numeric values" do
@@ -476,7 +476,16 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
             config.renderer_http_keep_alive_timeout = "30"
           end
         end.to raise_error(ReactOnRailsPro::Error,
-                           /must be a positive number or nil/)
+                           /must be a finite positive number or nil/)
+      end
+
+      it "raises error for infinite values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_keep_alive_timeout = Float::INFINITY
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a finite positive number or nil/)
       end
     end
 
