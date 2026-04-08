@@ -77,6 +77,7 @@ The task handles Ruby version switching for apps that require a different Ruby v
 
 - **Prefer local testing over CI iteration** — don't push "hopeful" fixes. Apply the **15-minute rule**: if 15 more minutes of local testing would catch the issue before CI does, spend the 15 minutes.
 - **Never claim a test is "fixed" without running it locally first.** Use "This SHOULD fix..." or "Proposed fix (UNTESTED)" for unverified changes.
+- **Automated tests passing is necessary but not sufficient.** If your changes affect how the app starts, builds, or serves, you must also verify the dev environment manually. See [Manual Dev Environment Testing](.claude/docs/manual-dev-environment-testing.md) for the full checklist.
 - **Ruby**: RSpec. Unit tests in `react_on_rails/spec/react_on_rails/`, integration tests via a dummy Rails app in `react_on_rails/spec/dummy/`.
 - **JavaScript/TypeScript**: Jest. Tests in `packages/react-on-rails/tests/`.
 - **E2E**: Playwright. Tests in `react_on_rails/spec/dummy/e2e/playwright/e2e/`. Run with `cd react_on_rails/spec/dummy && pnpm test:e2e`.
