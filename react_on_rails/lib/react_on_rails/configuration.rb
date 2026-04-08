@@ -21,6 +21,12 @@ end
 # rubocop:disable Metrics/ClassLength
 
 module ReactOnRails
+  # Rendering strategy configured once at boot time.
+  # Core default: ExecJSRenderingStrategy. Pro overrides with NodeRenderingStrategy.
+  class << self
+    attr_accessor :rendering_strategy, :js_code_builder
+  end
+
   def self.configure
     yield(configuration)
     configuration.setup_config_values

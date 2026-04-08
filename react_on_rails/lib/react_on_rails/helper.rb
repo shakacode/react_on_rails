@@ -262,8 +262,7 @@ module ReactOnRails
         })()
       JS
 
-      result = ReactOnRails::ServerRenderingPool
-               .server_render_js_with_console_logging(js_code, render_options)
+      result = ReactOnRails.rendering_strategy.execute_js(js_code, render_options)
 
       html = result["html"]
       console_script = result["consoleReplayScript"]
@@ -697,71 +696,71 @@ module ReactOnRails
     def server_rendered_react_component(render_options)
       return { "html" => "", "consoleReplayScript" => "" } unless render_options.prerender
 
+      validate_server_bundle_for_prerender!
+
+      render_request = build_render_request(render_options)
+      strategy = ReactOnRails.rendering_strategy
+      strategy.reset_if_bundle_changed
+
       react_component_name = render_options.react_component_name
       props = render_options.props
 
-      # On server `location` option is added (`location = request.fullpath`)
-      # React Router needs this to match the current route
-
-      # Make sure that we use up-to-date bundle file used for server rendering, which is defined
-      # by config file value for config.server_bundle_js_file
-      ReactOnRails::ServerRenderingPool.reset_pool_if_server_bundle_was_modified
-
-      # Since this code is not inserted on a web page, we don't need to escape props
-      #
-      # However, as JSON (returned from `props_string(props)`) isn't JavaScript,
-      # but we want treat it as such, we need to compensate for the difference.
-      #
-      # \u2028 and \u2029 are valid characters in strings in JSON, but are treated
-      # as newline separators in JavaScript. As no newlines are allowed in
-      # strings in JavaScript, this causes an exception.
-      #
-      # We fix this by replacing these unicode characters with their escaped versions.
-      # This should be safe, as the only place they can appear is in strings anyway.
-      #
-      # Read more here: http://timelessrepo.com/json-isnt-a-javascript-subset
-
-      js_code = ReactOnRails::ServerRenderingJsCode.server_rendering_component_js_code(
-        props_string: props_string(props).gsub("\u2028", '\u2028').gsub("\u2029", '\u2029'),
-        rails_context: rails_context(server_side: true).to_json,
-        redux_stores: initialize_redux_stores(render_options),
-        react_component_name: react_component_name,
-        render_options: render_options
-      )
-
       begin
-        result = ReactOnRails::ServerRenderingPool.server_render_js_with_console_logging(js_code, render_options)
+        result = strategy.execute(render_request)
       rescue StandardError => err
-        # This error came from the renderer
         raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                               # Sanitize as this might be browser logged
                                                props: sanitized_props_string(props),
                                                err: err,
-                                               js_code: js_code)
+                                               js_code: render_request.to_js)
       end
 
       if render_options.streaming?
         result.transform do |chunk_json_result|
           if should_raise_streaming_prerender_error?(chunk_json_result, render_options)
-            raise_prerender_error(chunk_json_result, react_component_name, props, js_code)
+            raise_prerender_error(chunk_json_result, react_component_name, props, render_request.to_js)
           end
-          # It doesn't make any transformation, it listens and raises error if a chunk has errors
           chunk_json_result
         end
 
         result.rescue do |err|
-          # This error came from the renderer
           raise ReactOnRails::PrerenderError.new(component_name: react_component_name,
-                                                 # Sanitize as this might be browser logged
                                                  props: sanitized_props_string(props),
                                                  err: err,
-                                                 js_code: js_code)
+                                                 js_code: render_request.to_js)
         end
       elsif result["hasErrors"] && render_options.raise_on_prerender_error
-        raise_prerender_error(result, react_component_name, props, js_code)
+        raise_prerender_error(result, react_component_name, props, render_request.to_js)
       end
 
       result
+    end
+
+    def build_render_request(render_options)
+      props = render_options.props
+      # JSON isn't a JavaScript subset: \u2028 and \u2029 are valid in JSON strings but
+      # treated as newline separators in JavaScript. Replace with escaped versions.
+      # See: http://timelessrepo.com/json-isnt-a-javascript-subset
+      escaped_props = props_string(props).gsub("\u2028", '\u2028').gsub("\u2029", '\u2029')
+
+      ReactOnRails::RenderRequest.new(
+        component_name: render_options.react_component_name,
+        props_string: escaped_props,
+        rails_context: rails_context(server_side: true).to_json,
+        store_initializations: initialize_redux_stores(render_options),
+        render_options: render_options
+      )
+    end
+
+    def validate_server_bundle_for_prerender!
+      return unless ReactOnRails.configuration.server_bundle_js_file.blank?
+
+      msg = <<~MSG
+        The `prerender` option to allow Server Side Rendering is marked as true but the ReactOnRails configuration
+        for `server_bundle_js_file` is nil or not present in `config/initializers/react_on_rails.rb`.
+        Set `config.server_bundle_js_file` to your javascript bundle to allow server side rendering.
+        Read more at https://reactonrails.com/docs/core-concepts/react-server-rendering/
+      MSG
+      raise ReactOnRails::Error, msg
     end
 
     def initialize_redux_stores(render_options)

@@ -100,8 +100,22 @@ module ReactOnRails
       end
     end
 
+    # Set default rendering strategy and JS code builder at boot time.
+    # Pro's engine runs after core (gem dependency order), so it can override these.
+    initializer "react_on_rails.setup_rendering_strategy" do
+      config.after_initialize do
+        ReactOnRails.rendering_strategy ||= ReactOnRails::ExecJSRenderingStrategy.new
+        ReactOnRails.js_code_builder ||= ReactOnRails::JsCodeBuilder.new
+      end
+    end
+
     config.to_prepare do
-      ReactOnRails::ServerRenderingPool.reset_pool
+      if ReactOnRails.rendering_strategy
+        ReactOnRails.rendering_strategy.reset
+      else
+        # Fallback before after_initialize has run (e.g. first to_prepare in dev)
+        ReactOnRails::ServerRenderingPool.reset_pool
+      end
     end
 
     # Rake tasks are automatically loaded from lib/tasks/*.rake by Rails::Engine

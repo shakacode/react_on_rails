@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+# DEPRECATED: Use ReactOnRails.js_code_builder and ReactOnRails::RenderRequest instead.
+# This module is kept for backward compatibility with direct callers.
 module ReactOnRails
   module ServerRenderingJsCode
     class << self
@@ -11,6 +13,7 @@ module ReactOnRails
                               end
       end
 
+      # @deprecated Use ReactOnRails::RenderRequest#to_js instead
       def server_rendering_component_js_code(
         props_string: nil,
         rails_context: nil,
