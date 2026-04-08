@@ -18,23 +18,38 @@ RSpec.describe ReactOnRails::ExecJSRenderingStrategy do
 
     let(:render_request) do
       instance_double(ReactOnRails::RenderRequest,
-                      render_options: render_options,
-                      to_js: "(function() { return '{}'; })()")
+                      component_name: "App",
+                      props_string: '{"data":"value"}',
+                      rails_context: '{"railsEnv":"test"}',
+                      store_initializations: "",
+                      render_options: render_options)
     end
 
     let(:expected_result) { { "html" => "<div>Hello</div>", "consoleReplayScript" => "" } }
 
     before do
-      allow(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript)
-        .to receive(:exec_server_render_js)
+      allow(ReactOnRails::ServerRenderingJsCode)
+        .to receive(:server_rendering_component_js_code)
+        .and_return("(function() { return '{}'; })()")
+      allow(ReactOnRails::ServerRenderingPool)
+        .to receive(:server_render_js_with_console_logging)
         .and_return(expected_result)
     end
 
-    it "builds JS from the render request and delegates to RubyEmbeddedJavaScript" do
+    it "generates JS via ServerRenderingJsCode and executes via ServerRenderingPool" do
       result = strategy.execute(render_request)
 
-      expect(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript)
-        .to have_received(:exec_server_render_js)
+      expect(ReactOnRails::ServerRenderingJsCode)
+        .to have_received(:server_rendering_component_js_code)
+        .with(
+          props_string: '{"data":"value"}',
+          rails_context: '{"railsEnv":"test"}',
+          redux_stores: "",
+          react_component_name: "App",
+          render_options: render_options
+        )
+      expect(ReactOnRails::ServerRenderingPool)
+        .to have_received(:server_render_js_with_console_logging)
         .with("(function() { return '{}'; })()", render_options)
       expect(result).to eq(expected_result)
     end
@@ -45,39 +60,39 @@ RSpec.describe ReactOnRails::ExecJSRenderingStrategy do
     let(:expected_result) { { "html" => "result", "consoleReplayScript" => "" } }
 
     before do
-      allow(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript)
-        .to receive(:exec_server_render_js)
+      allow(ReactOnRails::ServerRenderingPool)
+        .to receive(:server_render_js_with_console_logging)
         .and_return(expected_result)
     end
 
-    it "delegates raw JS to RubyEmbeddedJavaScript" do
+    it "delegates raw JS to ServerRenderingPool" do
       result = strategy.execute_js("var x = 1;", render_options)
 
-      expect(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript)
-        .to have_received(:exec_server_render_js)
+      expect(ReactOnRails::ServerRenderingPool)
+        .to have_received(:server_render_js_with_console_logging)
         .with("var x = 1;", render_options)
       expect(result).to eq(expected_result)
     end
   end
 
   describe "#reset" do
-    it "delegates to RubyEmbeddedJavaScript.reset_pool" do
-      allow(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript).to receive(:reset_pool)
+    it "delegates to ServerRenderingPool.reset_pool" do
+      allow(ReactOnRails::ServerRenderingPool).to receive(:reset_pool)
 
       strategy.reset
 
-      expect(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript).to have_received(:reset_pool)
+      expect(ReactOnRails::ServerRenderingPool).to have_received(:reset_pool)
     end
   end
 
   describe "#reset_if_bundle_changed" do
-    it "delegates to RubyEmbeddedJavaScript.reset_pool_if_server_bundle_was_modified" do
-      allow(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript)
+    it "delegates to ServerRenderingPool.reset_pool_if_server_bundle_was_modified" do
+      allow(ReactOnRails::ServerRenderingPool)
         .to receive(:reset_pool_if_server_bundle_was_modified)
 
       strategy.reset_if_bundle_changed
 
-      expect(ReactOnRails::ServerRenderingPool::RubyEmbeddedJavaScript)
+      expect(ReactOnRails::ServerRenderingPool)
         .to have_received(:reset_pool_if_server_bundle_was_modified)
     end
   end
