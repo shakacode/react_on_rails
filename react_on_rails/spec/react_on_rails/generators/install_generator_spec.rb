@@ -664,6 +664,16 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "switch-bundler has version-pinned deps and strips versions before deletion" do
+      assert_file "bin/switch-bundler" do |content|
+        # Version pins are present in the constants
+        expect(content).to include("@rspack/core@^1.0.0")
+        expect(content).to include("webpack@^5.0.0")
+        # Version-stripping regex is used for package.json key deletion
+        expect(content).to include('dep[/\A(@[^\/]+\/[^@]+|[^@]+)/]')
+      end
+    end
+
     it "installs rspack dependencies in package.json" do
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)

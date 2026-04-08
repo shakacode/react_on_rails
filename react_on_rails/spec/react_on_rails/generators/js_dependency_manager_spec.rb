@@ -420,6 +420,17 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance.add_npm_dependencies_called?).to be(true)
     end
 
+    it "passes version-pinned React packages to add_npm_dependencies" do
+      instance.send(:add_react_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ReactOnRails::Generators::JsDependencyManager::REACT_DEPENDENCIES,
+          dev: false
+        )
+      )
+    end
+
     it "pins react and react-dom to the RSC-compatible 19.0.x track when RSC is enabled" do
       instance.use_rsc = true
 
@@ -462,6 +473,17 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance.add_npm_dependencies_called?).to be(true)
     end
 
+    it "passes version-pinned CSS packages to add_npm_dependencies" do
+      instance.send(:add_css_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ReactOnRails::Generators::JsDependencyManager::CSS_DEPENDENCIES,
+          dev: false
+        )
+      )
+    end
+
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
       instance.system_result = false
@@ -480,6 +502,17 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance.add_npm_dependencies_dev?).to be(true)
     end
 
+    it "passes Webpack dev packages (bare, pre-1.0) to add_npm_dependencies" do
+      instance.send(:add_dev_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ReactOnRails::Generators::JsDependencyManager::DEV_DEPENDENCIES,
+          dev: true
+        )
+      )
+    end
+
     it "adds Rspack dev dependencies when --rspack flag is set" do
       instance.using_rspack = true
 
@@ -487,6 +520,19 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
       expect(instance.add_npm_dependencies_called?).to be(true)
       expect(instance.add_npm_dependencies_dev?).to be(true)
+    end
+
+    it "passes version-pinned Rspack dev packages when --rspack is set" do
+      instance.using_rspack = true
+
+      instance.send(:add_dev_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ReactOnRails::Generators::JsDependencyManager::RSPACK_DEV_DEPENDENCIES,
+          dev: true
+        )
+      )
     end
 
     it "adds warning when add_packages fails" do
@@ -506,6 +552,17 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       expect(instance.add_npm_dependencies_called?).to be(true)
     end
 
+    it "passes version-pinned Rspack packages to add_npm_dependencies" do
+      instance.send(:add_rspack_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ReactOnRails::Generators::JsDependencyManager::RSPACK_DEPENDENCIES,
+          dev: false
+        )
+      )
+    end
+
     it "adds warning when add_packages fails" do
       instance.add_npm_dependencies_result = false
       instance.system_result = false
@@ -522,6 +579,17 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
       instance.send(:add_typescript_dependencies)
       expect(instance.add_npm_dependencies_called?).to be(true)
       expect(instance.add_npm_dependencies_dev?).to be(true)
+    end
+
+    it "passes version-pinned TypeScript packages to add_npm_dependencies" do
+      instance.send(:add_typescript_dependencies)
+
+      expect(instance.add_npm_dependencies_calls).to include(
+        a_hash_including(
+          packages: ReactOnRails::Generators::JsDependencyManager::TYPESCRIPT_DEPENDENCIES,
+          dev: true
+        )
+      )
     end
 
     it "adds warning when add_packages fails" do
@@ -657,6 +725,18 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
         call[:packages].include?("@babel/preset-react@^7.0.0")
       end
       expect(babel_calls).to eq([])
+    end
+
+    it "passes version-pinned SWC packages when SWC is used" do
+      instance.using_swc = true
+
+      instance.send(:add_js_dependencies)
+
+      swc_calls = instance.add_npm_dependencies_calls.select do |call|
+        call[:packages] == ReactOnRails::Generators::JsDependencyManager::SWC_DEPENDENCIES
+      end
+      expect(swc_calls.size).to be > 0
+      expect(swc_calls.all? { |call| call[:dev] }).to be(true)
     end
 
     it "does not add Babel React preset when rspack is used and SWC is not configured" do

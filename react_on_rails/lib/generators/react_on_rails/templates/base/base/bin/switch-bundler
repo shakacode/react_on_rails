@@ -10,7 +10,7 @@ class BundlerSwitcher
   # Pre-1.0 packages are left bare since ^0.x pins to the minor version.
   WEBPACK_DEPS = {
     dependencies: %w[webpack@^5.0.0 webpack-assets-manifest@^6.0.0 webpack-merge@^6.0.0],
-    dev_dependencies: %w[webpack-cli@^7.0.0 webpack-dev-server@^5.0.0 @pmmmwh/react-refresh-webpack-plugin]
+    dev_dependencies: %w[webpack-cli@^6.0.0 webpack-dev-server@^5.0.0 @pmmmwh/react-refresh-webpack-plugin]
   }.freeze
 
   RSPACK_DEPS = {
