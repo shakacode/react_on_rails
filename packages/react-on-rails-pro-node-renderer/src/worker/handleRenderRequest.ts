@@ -22,6 +22,7 @@ import {
   isReadableStream,
   isErrorRenderResult,
   getRequestBundleFilePath,
+  type RequestInfo,
 } from '../shared/utils.js';
 import { getConfig } from '../shared/configBuilder.js';
 import type { TracingContext } from '../shared/tracing.js';
@@ -44,7 +45,11 @@ async function prepareResult(
       const error = new Error(
         'INVALID NIL or NULL result for rendering. Ensure renderingRequest is a valid string and returns a value.',
       );
-      exceptionMessage = formatExceptionMessage(renderingRequest, error, 'INVALID result for prepareResult');
+      exceptionMessage = formatExceptionMessage(
+        { renderingRequest },
+        error,
+        'INVALID result for prepareResult',
+      );
     } else if (isErrorRenderResult(result)) {
       ({ exceptionMessage } = result);
     }
@@ -67,7 +72,11 @@ async function prepareResult(
       data: result,
     };
   } catch (err) {
-    const exceptionMessage = formatExceptionMessage(renderingRequest, err, 'Unknown error calling runInVM');
+    const exceptionMessage = formatExceptionMessage(
+      { renderingRequest },
+      err,
+      'Unknown error calling runInVM',
+    );
     return errorResponseResult(exceptionMessage);
   }
 }
@@ -79,7 +88,7 @@ async function prepareResult(
  * @param assetsToCopy might be null
  */
 async function handleNewBundleProvided(
-  requestContext: string,
+  requestContext: RequestInfo,
   providedNewBundle: ProvidedNewBundle,
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
@@ -156,7 +165,7 @@ to ${bundleFilePathPerTimestamp})`,
 }
 
 export async function handleNewBundlesProvided(
-  requestContext: string,
+  requestContext: RequestInfo,
   providedNewBundles: ProvidedNewBundle[],
   assetsToCopy: Asset[] | null | undefined,
 ): Promise<ResponseResult | undefined> {
@@ -228,7 +237,7 @@ export async function handleRenderRequest({
 
     // If gem has posted updated bundle:
     if (providedNewBundles && providedNewBundles.length > 0) {
-      const result = await handleNewBundlesProvided(renderingRequest, providedNewBundles, assetsToCopy);
+      const result = await handleNewBundlesProvided({ renderingRequest }, providedNewBundles, assetsToCopy);
       if (result) {
         return result;
       }
@@ -263,7 +272,7 @@ export async function handleRenderRequest({
     return await prepareResult(renderingRequest, entryBundleFilePath);
   } catch (error) {
     const msg = formatExceptionMessage(
-      renderingRequest,
+      { renderingRequest },
       error,
       'Caught top level error in handleRenderRequest',
     );

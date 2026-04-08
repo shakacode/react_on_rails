@@ -391,7 +391,7 @@ export default function run(config: Partial<Config>) {
           await setResponse(result, res);
         } catch (err) {
           const exceptionMessage = formatExceptionMessage(
-            renderingRequest,
+            { renderingRequest },
             err,
             'UNHANDLED error in handleRenderRequest',
           );
@@ -399,7 +399,7 @@ export default function run(config: Partial<Config>) {
         }
       }, startSsrRequestOptions({ renderingRequest }));
     } catch (theErr) {
-      const exceptionMessage = formatExceptionMessage(renderingRequest, theErr);
+      const exceptionMessage = formatExceptionMessage({ renderingRequest }, theErr);
       await setResponse(errorResponseResult(`Unhandled top level error: ${exceptionMessage}`), res);
     }
   });
@@ -436,7 +436,11 @@ export default function run(config: Partial<Config>) {
       // endpoint so that concurrent /upload-assets and render requests
       // targeting the same bundle directory are mutually exclusive.
       // See https://github.com/shakacode/react_on_rails/issues/2463
-      const result = await handleNewBundlesProvided(taskDescription, providedNewBundles, assetsToCopy);
+      const result = await handleNewBundlesProvided(
+        { label: 'Request:', content: taskDescription },
+        providedNewBundles,
+        assetsToCopy,
+      );
       if (result) {
         await setResponse(result, res);
         return;
