@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **Pin third-party npm dependency versions in generator**: All third-party npm dependencies installed by the `react_on_rails:install` generator and `bin/switch-bundler` are now pinned to `^major.0.0` version ranges, preventing peer dependency conflicts from uncontrolled major version bumps. Fixes CI breakage caused by `@rspack/plugin-react-refresh@2.0.0` requiring `@rspack/core@^2.0.0-0` while `@rspack/core` latest was still `1.7.11`. SWC dependency pins match Shakapacker's own version constraints. Closes [Issue 3082](https://github.com/shakacode/react_on_rails/issues/3082) by [ihabadham](https://github.com/ihabadham).
+
 ### [16.6.0.rc.1] - 2026-04-07
 
 #### Removed

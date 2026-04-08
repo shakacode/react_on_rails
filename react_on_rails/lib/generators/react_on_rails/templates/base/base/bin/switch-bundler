@@ -6,14 +6,16 @@ require "json"
 
 # Script to switch between webpack and rspack bundlers
 class BundlerSwitcher
+  # Pinned to ^major.0.0 to prevent peer dependency conflicts from major version bumps.
+  # Pre-1.0 packages are left bare since ^0.x pins to the minor version.
   WEBPACK_DEPS = {
-    dependencies: %w[webpack webpack-assets-manifest webpack-merge],
-    dev_dependencies: %w[webpack-cli webpack-dev-server @pmmmwh/react-refresh-webpack-plugin]
+    dependencies: %w[webpack@^5.0.0 webpack-assets-manifest@^6.0.0 webpack-merge@^6.0.0],
+    dev_dependencies: %w[webpack-cli@^7.0.0 webpack-dev-server@^5.0.0 @pmmmwh/react-refresh-webpack-plugin]
   }.freeze
 
   RSPACK_DEPS = {
-    dependencies: %w[@rspack/core rspack-manifest-plugin],
-    dev_dependencies: %w[@rspack/cli @rspack/plugin-react-refresh]
+    dependencies: %w[@rspack/core@^1.0.0 rspack-manifest-plugin@^5.0.0],
+    dev_dependencies: %w[@rspack/cli@^1.0.0 @rspack/plugin-react-refresh@^1.0.0]
   }.freeze
 
   def initialize(target_bundler)

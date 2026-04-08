@@ -119,19 +119,17 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
   describe "constants" do
     it "defines REACT_DEPENDENCIES" do
       expect(ReactOnRails::Generators::JsDependencyManager::REACT_DEPENDENCIES).to eq(%w[
-                                                                                        react
-                                                                                        react-dom
-                                                                                        prop-types
+                                                                                        react@^19.0.0
+                                                                                        react-dom@^19.0.0
+                                                                                        prop-types@^15.0.0
                                                                                       ])
     end
 
     it "defines CSS_DEPENDENCIES" do
-      expect(ReactOnRails::Generators::JsDependencyManager::CSS_DEPENDENCIES).to eq(%w[
-                                                                                      css-loader
-                                                                                      css-minimizer-webpack-plugin
-                                                                                      mini-css-extract-plugin
-                                                                                      style-loader
-                                                                                    ])
+      expect(ReactOnRails::Generators::JsDependencyManager::CSS_DEPENDENCIES).to(
+        eq(%w[css-loader@^7.0.0 css-minimizer-webpack-plugin@^8.0.0 mini-css-extract-plugin@^2.0.0
+              style-loader@^4.0.0])
+      )
     end
 
     it "defines DEV_DEPENDENCIES" do
@@ -142,34 +140,34 @@ describe ReactOnRails::Generators::JsDependencyManager, type: :generator do
 
     it "defines RSPACK_DEPENDENCIES" do
       expect(ReactOnRails::Generators::JsDependencyManager::RSPACK_DEPENDENCIES).to eq(%w[
-                                                                                         @rspack/core
-                                                                                         rspack-manifest-plugin
+                                                                                         @rspack/core@^1.0.0
+                                                                                         rspack-manifest-plugin@^5.0.0
                                                                                        ])
     end
 
     it "defines RSPACK_DEV_DEPENDENCIES" do
       expect(ReactOnRails::Generators::JsDependencyManager::RSPACK_DEV_DEPENDENCIES).to(
-        eq(%w[@rspack/cli @rspack/plugin-react-refresh react-refresh])
+        eq(%w[@rspack/cli@^1.0.0 @rspack/plugin-react-refresh@^1.0.0 react-refresh])
       )
     end
 
     it "defines TYPESCRIPT_DEPENDENCIES" do
       expect(ReactOnRails::Generators::JsDependencyManager::TYPESCRIPT_DEPENDENCIES).to eq(%w[
-                                                                                             typescript
-                                                                                             @types/react
-                                                                                             @types/react-dom
+                                                                                             typescript@^6.0.0
+                                                                                             @types/react@^19.0.0
+                                                                                             @types/react-dom@^19.0.0
                                                                                            ])
     end
 
     it "defines SWC_DEPENDENCIES" do
       expect(ReactOnRails::Generators::JsDependencyManager::SWC_DEPENDENCIES).to(
-        eq(%w[@swc/core swc-loader])
+        eq(%w[@swc/core@^1.3.0 swc-loader@^0.2.0])
       )
     end
 
     it "defines BABEL_REACT_DEPENDENCIES" do
       expect(ReactOnRails::Generators::JsDependencyManager::BABEL_REACT_DEPENDENCIES).to eq(
-        %w[@babel/preset-react]
+        %w[@babel/preset-react@^7.0.0]
       )
     end
 
