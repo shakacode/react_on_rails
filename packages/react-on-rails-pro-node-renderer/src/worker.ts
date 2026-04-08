@@ -167,15 +167,18 @@ const SENSITIVE_REQUEST_BODY_KEYS = new Set([
   'access_token',
   'accesstoken',
   'bearer',
+  'credentials',
 ]);
 
 const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   const { renderingRequest } = body;
-  let renderingRequestType: string = renderingRequest === '' ? 'string (empty)' : typeof renderingRequest;
+  let renderingRequestType: string = typeof renderingRequest;
   if (renderingRequest === null) {
     renderingRequestType = 'null';
   } else if (Array.isArray(renderingRequest)) {
     renderingRequestType = 'array';
+  } else if (renderingRequest === '') {
+    renderingRequestType = 'empty string';
   }
   const bodyKeys = Object.keys(body).filter((key) => !SENSITIVE_REQUEST_BODY_KEYS.has(key.toLowerCase()));
 

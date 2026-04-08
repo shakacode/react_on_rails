@@ -429,6 +429,66 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe ".renderer_http_keep_alive_timeout" do
+      it "defaults to 30" do
+        ReactOnRailsPro.configure {} # rubocop:disable Lint/EmptyBlock
+
+        expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(30)
+      end
+
+      it "accepts positive numbers" do
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_keep_alive_timeout = 60
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to eq(60)
+      end
+
+      it "accepts nil" do
+        ReactOnRailsPro.configure do |config|
+          config.renderer_http_keep_alive_timeout = nil
+        end
+
+        expect(ReactOnRailsPro.configuration.renderer_http_keep_alive_timeout).to be_nil
+      end
+
+      it "raises error for zero" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_keep_alive_timeout = 0
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a finite positive number or nil/)
+      end
+
+      it "raises error for negative numbers" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_keep_alive_timeout = -5
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a finite positive number or nil/)
+      end
+
+      it "raises error for non-numeric values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_keep_alive_timeout = "30"
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a finite positive number or nil/)
+      end
+
+      it "raises error for infinite values" do
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.renderer_http_keep_alive_timeout = Float::INFINITY
+          end
+        end.to raise_error(ReactOnRailsPro::Error,
+                           /must be a finite positive number or nil/)
+      end
+    end
+
     describe ".concurrent_component_streaming_buffer_size" do
       it "accepts positive integers" do
         ReactOnRailsPro.configure do |config|
