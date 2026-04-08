@@ -8,6 +8,7 @@ require "json"
 class BundlerSwitcher
   # Pinned to ^major.0.0 to prevent peer dependency conflicts from major version bumps.
   # Pre-1.0 packages are left bare since ^0.x pins to the minor version.
+  # webpack-cli pinned to ^6 (not ^7) to stay within Shakapacker's supported peer range.
   WEBPACK_DEPS = {
     dependencies: %w[webpack@^5.0.0 webpack-assets-manifest@^6.0.0 webpack-merge@^6.0.0],
     dev_dependencies: %w[webpack-cli@^6.0.0 webpack-dev-server@^5.0.0 @pmmmwh/react-refresh-webpack-plugin]
