@@ -24,11 +24,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
-#### Fixed
-
-- **Pin third-party npm dependency versions in generator**: All third-party npm dependencies installed by the `react_on_rails:install` generator and `bin/switch-bundler` are now pinned to `^major.0.0` version ranges, preventing peer dependency conflicts from uncontrolled major version bumps. Fixes CI breakage caused by `@rspack/plugin-react-refresh@2.0.0` requiring `@rspack/core@^2.0.0-0` while `@rspack/core` latest was still `1.7.11`. SWC dependency pins match Shakapacker's own version constraints. Closes [Issue 3082](https://github.com/shakacode/react_on_rails/issues/3082). [PR 3083](https://github.com/shakacode/react_on_rails/pull/3083) by [ihabadham](https://github.com/ihabadham).
-
-### [16.6.0.rc.1] - 2026-04-07
+### [16.6.0] - 2026-04-09
 
 #### Removed
 
@@ -45,6 +41,8 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Improved
 
+- **[Pro]** **Clearer node renderer request context in exception messages**: Exception formatting now uses a generic `Request:` label instead of render-specific wording, so `/upload-assets` failures and other non-render paths report the actual request context more clearly. [PR 2877](https://github.com/shakacode/react_on_rails/pull/2877) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
+- **[Pro]** **Cleaner node renderer diagnostic output**: Invalid render-request diagnostics no longer redundantly list `renderingRequest` in the `bodyKeys` output since it is already reported via the `Received type:` line, and `renderer_http_keep_alive_timeout` documentation now recommends setting it shorter than the node renderer's server-side idle timeout. [PR 3086](https://github.com/shakacode/react_on_rails/pull/3086) by [justin808](https://github.com/justin808).
 - **Doctor enforces strict version constraints**: `react_on_rails:doctor` now escalates non-exact gem and npm version specs (`^`, `~`, `>=`) from warnings to errors, matching the runtime VersionChecker behavior. Wildcard checks now also cover Pro packages (`react-on-rails-pro`, `react_on_rails_pro`). [PR 3070](https://github.com/shakacode/react_on_rails/pull/3070) by [justin808](https://github.com/justin808).
 - **Error messages recommend doctor**: Runtime version-check crashes, configuration validation errors, and autobundling errors now suggest running `bundle exec rake react_on_rails:doctor` for diagnostics and `bundle exec rake react_on_rails:sync_versions WRITE=true` to fix version mismatches. [PR 3070](https://github.com/shakacode/react_on_rails/pull/3070) by [justin808](https://github.com/justin808).
 - **`sync_versions` handles range specs**: Version ranges like `^16.5.0`, `~16.5.0`, and `>=16.5.0` are now parsed and rewritten to the exact expected version instead of being skipped as unsupported. When `FIX=true` is set, doctor auto-runs `sync_versions` to fix detected mismatches. [PR 3070](https://github.com/shakacode/react_on_rails/pull/3070) by [justin808](https://github.com/justin808).
@@ -54,6 +52,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Fixed
 
+- **Pin third-party npm dependency versions in generator**: All third-party npm dependencies installed by the `react_on_rails:install` generator and `bin/switch-bundler` are now pinned to `^major.0.0` version ranges, preventing peer dependency conflicts from uncontrolled major version bumps. Fixes CI breakage caused by `@rspack/plugin-react-refresh@2.0.0` requiring `@rspack/core@^2.0.0-0` while `@rspack/core` latest was still `1.7.11`. SWC dependency pins match Shakapacker's own version constraints. Closes [Issue 3082](https://github.com/shakacode/react_on_rails/issues/3082). [PR 3083](https://github.com/shakacode/react_on_rails/pull/3083) by [ihabadham](https://github.com/ihabadham).
 - **[Pro]** **Fixed TanStack Router SSR hydration mismatches in the async path**: Client hydration now restores server match data before first render, uses `RouterProvider` directly to match the server-rendered tree, and stops the post-hydration load when a custom `router.options.hydrate` callback fails instead of continuing with partially hydrated client state. [PR 2932](https://github.com/shakacode/react_on_rails/pull/2932) by [justin808](https://github.com/justin808).
 - **[Pro] Fixed infinite fork loop when node renderer worker fails to bind port**: When a worker failed during `app.listen()` (e.g., `EADDRINUSE`), the master previously reforked unconditionally, causing an infinite fork/crash loop that consumed CPU and filled logs. Workers now send a `WORKER_STARTUP_FAILURE` IPC message to the master before exiting; the master sets an abort flag and exits with a clear error message instead of reforking. Scheduled restarts and runtime crashes continue to refork as before. [PR 2881](https://github.com/shakacode/react_on_rails/pull/2881) by [justin808](https://github.com/justin808).
 - **[Pro] Fixed Pro generator multiline and template-literal rewrites**: The Pro install generator now correctly handles multiline non-parenthesized `gem "react_on_rails"` declarations while preserving trailing options, and correctly rewrites module specifiers around template literals by preserving escaped sequences and detecting multiline template-literal starts after a closed inline template. [PR 2918](https://github.com/shakacode/react_on_rails/pull/2918) by [justin808](https://github.com/justin808).
@@ -2102,8 +2101,8 @@ such as:
 
 - Fix several generator-related issues.
 
-[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.6.0.rc.1...main
-[16.6.0.rc.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0.rc.1
+[unreleased]: https://github.com/shakacode/react_on_rails/compare/v16.6.0...main
+[16.6.0]: https://github.com/shakacode/react_on_rails/compare/v16.5.1...v16.6.0
 [16.5.1]: https://github.com/shakacode/react_on_rails/compare/v16.5.0...v16.5.1
 [16.5.0]: https://github.com/shakacode/react_on_rails/compare/v16.4.0...v16.5.0
 [16.4.0]: https://github.com/shakacode/react_on_rails/compare/v16.3.0...v16.4.0
