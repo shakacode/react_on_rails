@@ -31,7 +31,7 @@ Nothing else matters if the dev server won't start.
 ```bash
 # 1. Install dependencies
 bundle install
-yarn install  # or pnpm install, per project
+pnpm install  # or your project's required JS package manager
 
 # 2. Start the dev server
 bin/dev
@@ -48,7 +48,7 @@ Verify:
 
 ### Phase 2: Page Smoke Test
 
-Visit every route the app exposes. For each page:
+Visit the primary routes and every route touched by your PR. For each page:
 
 - [ ] Page loads without 500/404 errors
 - [ ] React components are visible (not empty containers waiting for JS)
@@ -90,8 +90,9 @@ After running for 1-2 minutes:
 | Dependency changes (Gemfile, package.json) | 1, 2                       |
 | SSR / Node renderer changes                | 1, 2, 3                    |
 | Rails initializer or env config            | 1, 2, 3                    |
-| New routes or pages                        | 2, 3, 4                    |
-| React component changes                    | 2, 4                       |
+| Environment variables used at startup      | 1, 2, 3                    |
+| New routes or pages                        | 1, 2, 3, 4                 |
+| React component changes                    | 1, 2, 4                    |
 | CI workflow only                           | None (Phase 1 recommended) |
 
 ## Common Failure Modes
@@ -129,4 +130,4 @@ If you **cannot** run `bin/dev` (missing database, credentials, services), say s
 Automated tests pass but manual dev server verification is required before merge.
 ```
 
-**Never omit this section.** A test plan that only lists automated test results is not sufficient for changes that affect the dev environment.
+Include this section for every PR: if manual dev testing was required or run, provide checklist results; if skipped (for optional cases), state that it was skipped and why.
