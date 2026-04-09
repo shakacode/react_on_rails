@@ -1732,6 +1732,48 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "creates node-renderer.js" do
+      assert_file "client/node-renderer.js" do |content|
+        expect(content).to include("reactOnRailsProNodeRenderer")
+        expect(content).to include("require('react-on-rails-pro-node-renderer')")
+      end
+    end
+
+    it "adds RSC bundle watcher to Procfile.dev" do
+      assert_file "Procfile.dev" do |content|
+        expect(content).to include("RSC_BUNDLE_ONLY=true")
+        expect(content).to include("rsc-bundle:")
+        expect(content).to include("bin/shakapacker-watch --watch")
+      end
+    end
+
+    it "creates HelloServer instead of HelloWorld" do
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.client.jsx"
+      assert_no_file "app/javascript/src/HelloWorld/ror_components/HelloWorld.server.jsx"
+      assert_no_file "app/controllers/hello_world_controller.rb"
+      assert_file "config/routes.rb" do |content|
+        expect(content).not_to include("hello_world")
+      end
+
+      assert_file "app/javascript/src/HelloServer/ror_components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/components/HelloServer.jsx"
+      assert_file "app/javascript/src/HelloServer/components/LikeButton.jsx"
+    end
+
+    it "adds HelloServer route and RSC payload route" do
+      assert_file "config/routes.rb" do |content|
+        expect(content).to include("hello_server")
+        expect(content).to include("rsc_payload")
+      end
+    end
+
+    it "creates rscWebpackConfig.js" do
+      assert_file "config/webpack/rscWebpackConfig.js" do |content|
+        expect(content).to include("rsc-bundle")
+        expect(content).to include("react-server")
+      end
+    end
+
     it "sets DEFAULT_ROUTE to hello_server in bin/dev" do
       assert_file "bin/dev" do |content|
         expect(content).to include('DEFAULT_ROUTE = "hello_server"')
