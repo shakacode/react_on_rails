@@ -1,0 +1,21 @@
+# Docs intentionally excluded from docs/sidebars.ts
+#
+# One doc ID per line. Inline comments (after #) are allowed.
+# The CI guard (script/check-docs-sidebar) skips these IDs.
+#
+# To add an exclusion: add the doc ID below with a reason comment.
+# To remove an exclusion: delete the line and add the ID to sidebars.ts.
+
+# Legacy stubs that redirect to the Docusaurus archive plugin
+building-features/hmr-and-hot-reloading-with-the-webpack-dev-server
+building-features/rails-webpacker-react-integration-options
+deployment/troubleshooting-when-using-webpacker
+misc/asset-pipeline
+
+# Contributing/Resources pages (linked from introduction.md, not the sidebar)
+misc/doctrine
+misc/style
+misc/updating-dependencies
+misc/credits
+misc/articles
+misc/tips

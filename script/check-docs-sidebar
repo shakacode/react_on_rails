@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+# Check Docs Sidebar
+# Verifies that newly added published docs have corresponding entries in docs/sidebars.ts.
+# Usage: script/check-docs-sidebar [base-ref] [current-ref]
+#
+# Exit codes:
+#   0 — all new docs have sidebar entries (or no new docs were added)
+#   1 — one or more new docs are missing from sidebars.ts
+
+set -euo pipefail
+
+BASE_REF="${1:-origin/main}"
+CURRENT_REF="${2:-HEAD}"
+
+# Handle initial commits where before SHA is all zeros
+if [[ "$BASE_REF" =~ ^0+$ ]]; then
+  BASE_REF="origin/main"
+fi
+
+SIDEBAR_FILE="docs/sidebars.ts"
+EXCLUSIONS_FILE="docs/.sidebar-exclusions"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+if [ ! -f "$SIDEBAR_FILE" ]; then
+  echo -e "${RED}Error: $SIDEBAR_FILE not found${NC}"
+  exit 1
+fi
+
+# Fetch the base ref if it's a remote ref
+if [[ "$BASE_REF" == origin/* ]]; then
+  BASE_BRANCH="${BASE_REF#origin/}"
+  if ! git fetch origin "$BASE_BRANCH" --depth=50 2>/dev/null; then
+    echo -e "${YELLOW}Warning: Failed to fetch $BASE_REF, using local ref${NC}"
+  fi
+fi
+
+# Get newly added doc files (committed changes only — diff-filter=A means added)
+ADDED_FILES=$(git diff --name-only --diff-filter=A "$BASE_REF"..."$CURRENT_REF" 2>/dev/null || echo "")
+
+# For local development, also include untracked files
+if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
+  UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || echo "")
+  ADDED_FILES=$(printf "%s\n%s" "$ADDED_FILES" "$UNTRACKED" | sort -u | grep -v '^$' || echo "")
+fi
+
+# Filter to published doc files only (docs/oss/** and docs/pro/**)
+DOC_FILES=$(echo "$ADDED_FILES" | grep -E '^docs/(oss|pro)/.*\.(md|mdx)$' || echo "")
+
+if [ -z "$DOC_FILES" ]; then
+  echo -e "${GREEN}✓ No new published doc files detected${NC}"
+  exit 0
+fi
+
+echo "Checking new docs against $SIDEBAR_FILE..."
+echo ""
+
+# Load exclusions into an associative array for O(1) lookup
+declare -A EXCLUSION_MAP
+if [ -f "$EXCLUSIONS_FILE" ]; then
+  while IFS= read -r line; do
+    # Strip inline comments and trailing whitespace
+    line="${line%%#*}"
+    line="${line%"${line##*[![:space:]]}"}"
+    # Skip blank lines
+    [ -z "$line" ] && continue
+    EXCLUSION_MAP["$line"]=1
+  done < "$EXCLUSIONS_FILE"
+fi
+
+# Read sidebar file once
+SIDEBAR_CONTENT=$(cat "$SIDEBAR_FILE")
+
+MISSING=()
+CHECKED=0
+
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  CHECKED=$((CHECKED + 1))
+
+  # Convert file path to sidebar ID:
+  #   docs/oss/getting-started/quick-start.md  → getting-started/quick-start
+  #   docs/pro/installation.md                 → pro/installation
+  DOC_ID="${file#docs/oss/}"
+  if [ "$DOC_ID" = "$file" ]; then
+    # Not under docs/oss/, must be docs/pro/ — strip only docs/ prefix
+    DOC_ID="${file#docs/}"
+  fi
+  DOC_ID="${DOC_ID%.md}"
+  DOC_ID="${DOC_ID%.mdx}"
+
+  # Check exclusion list
+  if [ "${EXCLUSION_MAP[$DOC_ID]+_}" ]; then
+    echo -e "  ${YELLOW}⊘${NC} $DOC_ID  ${YELLOW}(excluded)${NC}"
+    continue
+  fi
+
+  # Check if the ID appears as a quoted string in sidebars.ts
+  if echo "$SIDEBAR_CONTENT" | grep -qF "'${DOC_ID}'"; then
+    echo -e "  ${GREEN}✓${NC} $DOC_ID"
+  elif echo "$SIDEBAR_CONTENT" | grep -qF "\"${DOC_ID}\""; then
+    echo -e "  ${GREEN}✓${NC} $DOC_ID"
+  else
+    echo -e "  ${RED}✗${NC} $DOC_ID  ${RED}(missing from sidebars.ts)${NC}"
+    MISSING+=("$DOC_ID  ← $file")
+  fi
+done <<< "$DOC_FILES"
+
+echo ""
+
+if [ ${#MISSING[@]} -eq 0 ]; then
+  echo -e "${GREEN}✓ All $CHECKED new doc(s) have sidebar entries${NC}"
+  exit 0
+else
+  echo -e "${RED}✗ ${#MISSING[@]} doc(s) missing from docs/sidebars.ts:${NC}"
+  for entry in "${MISSING[@]}"; do
+    echo -e "${RED}    $entry${NC}"
+  done
+  echo ""
+  echo "To fix: add the doc ID to the appropriate section in docs/sidebars.ts"
+  echo "To exclude intentionally: add the doc ID to docs/.sidebar-exclusions with a reason"
+  exit 1
+fi
