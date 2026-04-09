@@ -181,6 +181,21 @@ For a practical example of route organization, see the [routes configuration fil
 
 **Note:** This tutorial uses a legacy directory structure (`client/app/bundles`) from earlier React on Rails versions. Modern projects use `app/javascript/src/` structure as shown in this guide. The React Router integration patterns remain applicable.
 
+## `<Navigate>` Component SSR Behavior
+
+When using React Router's `<Navigate>` component with server-side rendering, be aware of the following behavior:
+
+- **During SSR, `<Navigate>` is a no-op.** It renders `null` and logs a warning in development mode. No redirect is performed on the server — Rails still sends the full response with whatever HTML was rendered.
+- **The redirect only fires on the client** via `useEffect`, which runs after hydration. This means:
+  - Users briefly see the SSR content before being redirected (content flash).
+  - Search engines see the original page content, not a redirect — there is no HTTP 301/302 status code.
+  - The client-side redirect adds a navigation entry to the browser history.
+
+**Recommendations for SSR redirects:**
+
+1. **Prefer Rails controller redirects** for auth guards, canonical URLs, and SEO-critical redirects. Check conditions in your controller and call `redirect_to` before rendering.
+2. **Use `<Navigate>` only for client-side routing transitions** where a brief flash is acceptable and SEO redirect semantics are not needed.
+
 ## Additional Resources
 
 - [React Router Official Documentation](https://reactrouter.com/)

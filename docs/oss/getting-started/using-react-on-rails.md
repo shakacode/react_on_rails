@@ -192,13 +192,13 @@ For advanced server rendering (like routing + hydration state), you can return a
 ({
   renderedHtml: {
     componentHtml,
-    redirectLocation,
-    error,
+    title,
+    metaTags,
   },
 });
 ```
 
-Use with `react_component_hash` helper for multiple HTML strings (useful with React Helmet for meta tags).
+Use with `react_component_hash` helper for multiple HTML strings (useful with React Helmet for meta tags). Note that `react_component_hash` always forces `prerender: true`.
 
 If you also need to send extra data back to the browser for hydration, add `clientProps`:
 
@@ -209,12 +209,13 @@ If you also need to send extra data back to the browser for hydration, add `clie
     // Optional: merged into client hydration props on the Rails side
     routerDehydratedState: { url: railsContext.location },
   },
-  redirectLocation: { pathname: '/login', search: '' }, // Optional
-  routeError: null, // Optional
 });
 ```
 
 Think of it like this: `renderedHtml` is what the user sees now, and `clientProps` is a lunchbox of data React uses after the page loads.
+
+> [!NOTE]
+> The legacy `redirectLocation` and `routeError` return fields (from React Router v3/v4 era) are still supported but deprecated. They do not trigger actual server-side redirects or error pages. See the [Render-Functions Guide](../core-concepts/render-functions.md#8-redirect-information-legacy) for modern alternatives.
 
 For complete Render-Function details and examples, see the [Render-Functions Guide](../core-concepts/render-functions.md).
 

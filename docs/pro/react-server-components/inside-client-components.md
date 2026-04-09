@@ -55,11 +55,20 @@ import registerServerComponent from 'react-on-rails-pro/registerServerComponent/
 import MyServerComponent from './components/MyServerComponent';
 import AnotherServerComponent from './components/AnotherServerComponent';
 
+// Server bundle: pass an object mapping names to components
 registerServerComponent({
   MyServerComponent,
   AnotherServerComponent,
 });
 ```
+
+> [!WARNING]
+> **`registerServerComponent` has different signatures per bundle.** This is an intentional design choice, not a bug:
+>
+> - **Server/RSC bundle:** `registerServerComponent({ Name: Component })` — takes an object mapping names to component implementations (the component code is bundled on the server).
+> - **Client bundle:** `registerServerComponent({ rscPayloadGenerationUrlPath: '...' }, 'Name1', 'Name2')` — takes an options object followed by component name strings (the component code is **not** bundled on the client; only the name is registered for RSC payload fetching).
+>
+> See [Creating a React Server Component Page](./create-without-ssr.md) for complete examples of both signatures.
 
 > [!NOTE]
 > Server components only need to be registered in the client bundle if they will be rendered directly in Rails views using the `stream_react_component` helper. If you're only using server components inside client components via `RSCRoute`, you can skip client bundle registration entirely. In this case, it's enough to register the server component in the server and RSC bundles.

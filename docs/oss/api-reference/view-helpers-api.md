@@ -24,7 +24,7 @@ Uncommonly used options:
   id: nil,
 ```
 
-- **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape `{ renderedHtml, clientProps?, redirectLocation?, routeError? }`), or a "renderer function" that manually renders a React component to the DOM (client-side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
+- **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape `{ renderedHtml, clientProps? }`), or a "renderer function" that manually renders a React component to the DOM (client-side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID. The legacy `redirectLocation` and `routeError` return fields are still supported but deprecated — see the [Render-Functions Guide](../core-concepts/render-functions.md#8-redirect-information-legacy) for modern alternatives.
   All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](../configuration/README.md).
 - **general options:**
   - **props:** Ruby Hash which contains the properties to pass to the React object, or a JSON string. If you pass a string, we'll escape it for you.
@@ -51,10 +51,10 @@ Uncommonly used options:
 `react_component_hash` is used to return multiple HTML strings for server rendering, such as for
 adding meta-tags to a page. It is exactly like react_component except for the following:
 
-1. `prerender: true` is automatically added to options, as this method doesn't make sense for
-   client only rendering.
-2. Your JavaScript Render-Function for server rendering must return an Object rather than a React Component.
+1. **`prerender: true` is always forced** — even if you pass `prerender: false`, it is silently overwritten. This helper only makes sense for server rendering.
+2. Your JavaScript Render-Function for server rendering must return an Object with a `renderedHtml` property containing `componentHtml` and any other keys.
 3. Your view code must expect an object and not a string.
+4. Cannot be used with renderer functions (3-parameter functions) — these are client-only.
 
 Here is an example of ERB view code:
 
@@ -88,6 +88,10 @@ export default (props, _railsContext) => {
 ### rails_context
 
 You can call `rails_context` or `rails_context(server_side: true|false)` from your controller or view to see what values are in the Rails Context. Pass true or false depending on whether you want to see the server-side or the client-side `rails_context`. Typically, for computing cache keys, you should leave `server_side` as the default true. When calling this from a controller method, use `helpers.rails_context`.
+
+---
+
+For a complete table of which component/return types work with each helper, see the [Compatibility Matrix](../core-concepts/render-functions.md#compatibility-matrix) in the Render-Functions guide.
 
 ---
 
@@ -154,6 +158,9 @@ Progressive server-side rendering using React 18+ streaming with `renderToPipeab
 - Faster Time to First Byte (TTFB)
 - Progressive page loading with Suspense boundaries
 - Better perceived performance
+
+> [!IMPORTANT]
+> `stream_react_component` always forces `prerender: true` and `immediate_hydration: true`, even if you pass different values. It only works with React components or render functions that return React components — it does not support render functions returning `{ renderedHtml }` objects.
 
 See the [Streaming Server Rendering guide](../building-features/streaming-server-rendering.md) for usage details.
 
