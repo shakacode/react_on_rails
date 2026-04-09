@@ -180,7 +180,9 @@ const invalidRenderingRequestMessage = (body: Record<string, unknown>) => {
   } else if (renderingRequest === '') {
     renderingRequestType = 'empty string';
   }
-  const bodyKeys = Object.keys(body).filter((key) => !SENSITIVE_REQUEST_BODY_KEYS.has(key.toLowerCase()));
+  const bodyKeys = Object.keys(body).filter(
+    (key) => key !== 'renderingRequest' && !SENSITIVE_REQUEST_BODY_KEYS.has(key.toLowerCase()),
+  );
 
   return [
     'Invalid "renderingRequest" field in render request.',

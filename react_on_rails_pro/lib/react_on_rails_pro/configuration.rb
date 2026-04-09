@@ -95,6 +95,11 @@ module ReactOnRailsPro
 
     # Sets the keep-alive timeout (in seconds) for persistent HTTP connections to the node renderer.
     #
+    # For best results, set this value to slightly less than the node renderer's own
+    # keep-alive / idle-connection timeout. If the client-side timeout is longer than
+    # the server's, connections may be reused after the server has already closed them,
+    # resulting in stale-connection errors. If set to nil, the HTTPX default is used.
+    #
     # @param value [Numeric, nil] A positive number or nil (to use the HTTPX default)
     # @raise [ReactOnRailsPro::Error] if value is not a positive number or nil
     def renderer_http_keep_alive_timeout=(value)
