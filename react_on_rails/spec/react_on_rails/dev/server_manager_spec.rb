@@ -77,7 +77,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     it "schedules a one-time browser open when requested" do
-      expect(described_class).to receive(:schedule_browser_open).with(3000, route: "/", once: true)
+      expect(described_class).to receive(:schedule_browser_open).with(3000, route: "/", once: true, explicit: false)
       expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev")
 
       described_class.start(:development, nil, route: "/", open_browser_once: true)
@@ -287,15 +287,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
     it "waits for the route to respond successfully before opening the browser" do
       allow(described_class).to receive(:browser_auto_open_allowed?).and_return(true)
-      original_report_on_exception = Thread.current.report_on_exception
       allow(Thread).to receive(:new).and_yield
       allow(described_class).to receive(:wait_for_app_route).with(3000, "/").and_return(true)
       allow(described_class).to receive(:prepare_browser_open_once_marker).with(true).and_return(:claimed)
       expect(described_class).to receive(:open_browser).with("http://localhost:3000").and_return(true)
 
       described_class.send(:schedule_browser_open, 3000, route: "/", once: true)
-    ensure
-      Thread.current.report_on_exception = original_report_on_exception
     end
   end
 
@@ -1084,7 +1081,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     before do
-      stub_const("#{described_class}::OPEN_BROWSER_ONCE_MARKER", File.join(marker_dir, "browser_opened_once"))
+      marker_path = File.join(marker_dir, "browser_opened_once")
+      allow(described_class).to receive(:open_browser_once_marker).and_return(marker_path)
       allow(described_class).to receive_messages(
         browser_auto_open_allowed?: true,
         wait_for_app_route: true
@@ -1122,7 +1120,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       described_class.send(:schedule_browser_open, 3000, route: "/", once: true).join
 
-      expect(File.exist?(described_class::OPEN_BROWSER_ONCE_MARKER)).to be(false)
+      expect(File.exist?(described_class.send(:open_browser_once_marker))).to be(false)
     end
   end
 

@@ -22,8 +22,6 @@ module ReactOnRails
       TEST_WATCH_MODES = %w[auto full client-only].freeze
       OPEN_BROWSER_WAIT_TIMEOUT = 60
       OPEN_BROWSER_POLL_INTERVAL = 0.5
-      # Relative to Dir.pwd; bin/dev is expected to run from the Rails app root.
-      OPEN_BROWSER_ONCE_MARKER = File.join("tmp", "react_on_rails", "browser_opened_once").freeze
 
       class << self
         def start(mode = :development, procfile = nil, verbose: false, route: nil, rails_env: nil,
@@ -861,9 +859,11 @@ module ReactOnRails
         def schedule_browser_open_if_requested(procfile, route:, open_browser:, open_browser_once:)
           return unless open_browser || open_browser_once
 
-          # --open-browser and --open-browser-once share scheduling, but only the latter writes
-          # the marker so explicit --open-browser continues to open on each invocation.
-          schedule_browser_open(procfile_port(procfile), route: route, once: open_browser_once)
+          # --open-browser is an explicit user request and bypasses TTY gating.
+          # --open-browser-once is an auto-open and respects TTY/CI guards.
+          explicit = open_browser && !open_browser_once
+          schedule_browser_open(procfile_port(procfile), route: route, once: open_browser_once,
+                                                         explicit: explicit)
         end
 
         def build_local_url(port, route)
@@ -884,30 +884,31 @@ module ReactOnRails
           "/#{stripped}"
         end
 
-        def schedule_browser_open(port, route:, once:)
-          return unless browser_auto_open_allowed?
+        def schedule_browser_open(port, route:, once:, explicit: false)
+          return unless browser_auto_open_allowed?(explicit: explicit)
 
           url = build_local_url(port, route)
           request_path = build_request_path(route)
           Thread.new do
-            Thread.current.report_on_exception = false if Thread.current.respond_to?(:report_on_exception=)
-            next unless wait_for_app_route(port, request_path)
-
-            marker_state = prepare_browser_open_once_marker(once)
-            next if marker_state == :already_opened
-
-            if open_browser(url)
-              nil
-            else
-              clear_browser_open_once_marker_if_claimed(marker_state)
-              warn("[react_on_rails] Could not open browser automatically. Visit #{url} manually.")
+            if wait_for_app_route(port, request_path)
+              marker_state = prepare_browser_open_once_marker(once)
+              if marker_state != :already_opened && !open_browser(url)
+                clear_browser_open_once_marker_if_claimed(marker_state)
+                warn("[react_on_rails] Could not open browser automatically. Visit #{url} manually.")
+              end
             end
           rescue StandardError => e
             warn("[react_on_rails] Browser auto-open failed: #{e.message}")
           end
         end
 
-        def browser_auto_open_allowed?
+        # Explicit user requests (--open-browser) bypass TTY/CI gating because the
+        # developer deliberately asked for a browser open. Auto-opens
+        # (--open-browser-once) respect the guards to avoid surprises in CI or
+        # non-interactive shells.
+        def browser_auto_open_allowed?(explicit: false)
+          return true if explicit
+
           !ENV.key?("CI") && $stdin.tty? && $stdout.tty?
         end
 
@@ -930,13 +931,21 @@ module ReactOnRails
           response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)
         end
 
+        # Connection-level exceptions expected while the server is still booting.
+        LOCALHOST_CONNECT_ERRORS = [
+          Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EHOSTUNREACH,
+          Errno::ENETUNREACH, Errno::ETIMEDOUT, Errno::EADDRNOTAVAIL,
+          SocketError, Net::OpenTimeout, Net::ReadTimeout
+        ].freeze
+        private_constant :LOCALHOST_CONNECT_ERRORS
+
         def http_get_localhost(port, request_path)
           LOCALHOST_ADDRESSES.each do |host|
             response = Net::HTTP.start(host, port, open_timeout: 1, read_timeout: 1) do |http|
               http.get(request_path)
             end
             return response if response
-          rescue StandardError
+          rescue *LOCALHOST_CONNECT_ERRORS
             next
           end
           nil
@@ -944,7 +953,11 @@ module ReactOnRails
 
         def open_browser(url)
           command = browser_command
-          return false unless command
+          unless command
+            hint = wsl? ? " On WSL, install wslu (for wslview) or wsl-open." : ""
+            warn("[react_on_rails] No browser launcher found for this platform.#{hint}")
+            return false
+          end
 
           system(*command, url, out: File::NULL, err: File::NULL)
         rescue StandardError
@@ -955,9 +968,7 @@ module ReactOnRails
           host_os = RbConfig::CONFIG["host_os"]
           return ["open"] if host_os.include?("darwin")
 
-          if %w[linux bsd].any? { |platform| host_os.include?(platform) } && command_available?("xdg-open")
-            return ["xdg-open"]
-          end
+          return linux_browser_command if %w[linux bsd].any? { |platform| host_os.include?(platform) }
 
           # "start" requires a window title before the URL; the empty string is the
           # conventional placeholder so Windows opens the browser instead of treating
@@ -967,6 +978,23 @@ module ReactOnRails
           nil
         end
 
+        # WSL reports a Linux host_os but typically lacks xdg-open.
+        # Try WSL-specific launchers first, then fall back to xdg-open.
+        def linux_browser_command
+          if wsl?
+            return ["wslview"] if command_available?("wslview")
+            return ["wsl-open"] if command_available?("wsl-open")
+          end
+
+          return ["xdg-open"] if command_available?("xdg-open")
+
+          nil
+        end
+
+        def wsl?
+          ENV.key?("WSL_DISTRO_NAME") || ENV.key?("WSLENV")
+        end
+
         def command_available?(command)
           ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).any? do |directory|
             executable = File.join(directory, command)
@@ -974,11 +1002,17 @@ module ReactOnRails
           end
         end
 
+        # Resolved lazily at call time so the path is correct even when this file
+        # is required before the process has chdir'd into the Rails app root.
+        def open_browser_once_marker
+          File.join(Dir.pwd, "tmp", "react_on_rails", "browser_opened_once")
+        end
+
         def prepare_browser_open_once_marker(once)
           return :not_requested unless once
 
-          FileUtils.mkdir_p(File.dirname(OPEN_BROWSER_ONCE_MARKER))
-          File.open(OPEN_BROWSER_ONCE_MARKER, File::WRONLY | File::CREAT | File::EXCL) do |marker|
+          FileUtils.mkdir_p(File.dirname(open_browser_once_marker))
+          File.open(open_browser_once_marker, File::WRONLY | File::CREAT | File::EXCL) do |marker|
             marker.write("#{Time.now.utc.iso8601}\n")
           end
           :claimed
@@ -992,7 +1026,7 @@ module ReactOnRails
         def clear_browser_open_once_marker_if_claimed(marker_state)
           return unless marker_state == :claimed
 
-          File.delete(OPEN_BROWSER_ONCE_MARKER)
+          File.delete(open_browser_once_marker)
         rescue Errno::ENOENT
           nil
         rescue StandardError => e
