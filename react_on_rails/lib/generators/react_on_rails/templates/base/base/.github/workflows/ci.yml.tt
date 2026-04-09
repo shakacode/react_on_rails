@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Install JS dependencies
+        run: <%= config[:package_manager] %> install
+
+      - name: Set up database
+        run: bin/rails db:prepare
+        env:
+          RAILS_ENV: test
+
+      - name: Build JavaScript bundles
+        run: bin/shakapacker
+        env:
+          RAILS_ENV: test
+          NODE_ENV: test
+
+      - name: Run tests
+        run: bundle exec rspec
+        env:
+          RAILS_ENV: test

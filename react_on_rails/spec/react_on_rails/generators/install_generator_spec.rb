@@ -29,6 +29,7 @@ describe InstallGenerator, type: :generator do
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
+    include_examples "scaffold_ci_and_scripts"
 
     it "sets DEFAULT_ROUTE to hello_world in bin/dev" do
       assert_file "bin/dev" do |content|
@@ -1548,6 +1549,7 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args(%w[--rsc], package_json: true) }
 
     include_examples "rsc_common_files"
+    include_examples "scaffold_ci_and_scripts"
 
     it "creates node-renderer.js" do
       assert_file "client/node-renderer.js" do |content|
@@ -1873,6 +1875,22 @@ describe InstallGenerator, type: :generator do
       assert_file "config/webpack/rscWebpackConfig.js" do |content|
         expect(content).to include("// existing RSC config")
         expect(content).not_to include("serverWebpackConfig(true)")
+      end
+    end
+  end
+
+  context "when .github/workflows/ci.yml already exists" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_dir(".github/workflows")
+        simulate_existing_file(".github/workflows/ci.yml", "# custom CI\n")
+      end
+    end
+
+    it "does not overwrite existing CI workflow" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("# custom CI")
+        expect(content).not_to include("actions/checkout")
       end
     end
   end

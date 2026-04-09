@@ -163,6 +163,7 @@ module ReactOnRails
 
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
+          add_ci_workflow
           add_bin_scripts
           add_post_install_message
         else
@@ -225,6 +226,7 @@ module ReactOnRails
         end
 
         setup_react_dependencies
+        add_package_json_scripts
         ensure_jsx_in_js_compatibility
 
         # Invoke standalone Pro/RSC generators when flags are used
@@ -249,6 +251,40 @@ module ReactOnRails
         end
 
         setup_js_dependencies
+      end
+
+      def add_ci_workflow
+        ci_path = ".github/workflows/ci.yml"
+        if File.exist?(File.join(destination_root, ci_path))
+          say_status :skip, "#{ci_path} already exists", :yellow
+          return
+        end
+
+        say "📝 Generating CI workflow...", :yellow
+        package_manager = GeneratorMessages.detect_package_manager
+        template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
+                 { package_manager: package_manager })
+        say "✅ Created #{ci_path}", :green
+      end
+
+      def add_package_json_scripts
+        return if options[:pretend]
+
+        package_json_path = File.join(destination_root, "package.json")
+        return unless File.exist?(package_json_path)
+
+        content = JSON.parse(File.read(package_json_path))
+        scripts = content["scripts"] ||= {}
+
+        scripts["build"] ||= "RAILS_ENV=${RAILS_ENV:-development} NODE_ENV=${NODE_ENV:-development} bin/shakapacker"
+        scripts["build:test"] ||= "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+
+        File.write(package_json_path, "#{JSON.pretty_generate(content)}\n")
+        say "📝 Added build scripts to package.json", :yellow
+      rescue JSON::ParserError => e
+        GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
+      rescue StandardError => e
+        GeneratorMessages.add_warning("⚠️  Failed to add build scripts to package.json: #{e.message}")
       end
 
       def ensure_jsx_in_js_compatibility

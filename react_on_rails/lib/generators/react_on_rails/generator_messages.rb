@@ -49,6 +49,7 @@ module GeneratorMessages
                                            rsc: false, shakapacker_just_installed: false, landing_page: false)
       process_manager_section = build_process_manager_section
       testing_section = build_testing_section
+      ci_section = build_ci_section
       package_manager = detect_package_manager
       shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed)
       render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
@@ -99,7 +100,7 @@ module GeneratorMessages
         • Documentation: #{Rainbow('https://reactonrails.com/docs/').cyan.underline}
         • Webpack customization: #{Rainbow('https://github.com/shakacode/shakapacker#webpack-configuration').cyan.underline}
 
-        💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}#{pro_hint}
+        💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}#{ci_section}#{pro_hint}
       MSG
     end
 
@@ -127,6 +128,23 @@ module GeneratorMessages
     end
 
     private
+
+    def build_ci_section
+      <<~CI
+
+
+        🔄 CI / BUILD ORDERING:
+        ─────────────────────────────────────────────────────────────────────────
+        JavaScript bundles must be built before running Rails tests.
+        A GitHub Actions workflow has been generated at .github/workflows/ci.yml.
+
+        To build bundles manually before tests:
+        #{Rainbow('RAILS_ENV=test NODE_ENV=test bin/shakapacker').cyan}
+
+        Or use the generated package.json script:
+        #{Rainbow('npm run build:test').cyan}
+      CI
+    end
 
     def build_render_example(component_name:, route:, rsc:)
       if rsc
