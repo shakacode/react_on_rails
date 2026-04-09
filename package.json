@@ -124,7 +124,9 @@
       "Generated via pnpm audit --fix, with manual caps added to prevent major version jumps.",
       "These force patched versions of transitive dev dependencies. Remove when upstream packages update.",
       "ajv overrides were intentionally excluded: ajv v8 breaks webpack's schema-utils/ajv-keywords.",
-      "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files."
+      "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files.",
+      "webpack: 5.106.0 breaks ExecJS SSR (anonymous default export codegen bug).",
+      "Upstream fix: webpack/webpack#20796 — remove webpack override once a patched version ships."
     ],
     "overrides": {
       "react": "$react",
@@ -153,7 +155,8 @@
       "brace-expansion@>=2.0.0 <2.0.3": ">=2.0.3 <3",
       "picomatch@<2.3.2": ">=2.3.2 <3",
       "picomatch@>=4.0.0 <4.0.4": ">=4.0.4 <5",
-      "yaml@>=1.0.0 <1.10.3": ">=1.10.3 <2"
+      "yaml@>=1.0.0 <1.10.3": ">=1.10.3 <2",
+      "webpack": ">=5.0.0 <5.106.0"
     }
   }
 }
