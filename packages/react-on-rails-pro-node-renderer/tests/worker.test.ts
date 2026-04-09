@@ -210,6 +210,7 @@ describe('worker', () => {
     expect(res.statusCode).toBe(400);
     expect(res.payload).toContain('Invalid "renderingRequest" field in render request.');
     expect(res.payload).toContain('Received type: array.');
+    expect(res.payload).not.toMatch(/Received body keys:.*renderingRequest/);
     expect(res.payload).toContain('Likely causes: request body truncation');
   });
 
@@ -231,6 +232,7 @@ describe('worker', () => {
         AUTH_TOKEN: 'auth',
         accessToken: 'access',
         authToken: 'auth-camel',
+        Credentials: 'creds-secret',
         safeField: 'safe',
       })
       .end();
@@ -243,6 +245,7 @@ describe('worker', () => {
     expect(res.payload).not.toContain('AUTH_TOKEN');
     expect(res.payload).not.toContain('accessToken');
     expect(res.payload).not.toContain('authToken');
+    expect(res.payload).not.toContain('Credentials');
     expect(res.payload).toContain('safeField');
   });
 
