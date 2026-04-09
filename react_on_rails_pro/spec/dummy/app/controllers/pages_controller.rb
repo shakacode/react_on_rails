@@ -24,6 +24,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   before_action :initialize_shared_store, only: %i[client_side_hello_world_shared_store_controller
                                                    server_side_hello_world_shared_store_controller]
 
+  before_action :set_demo_locale, only: :react_intl_rsc_demo
+
   # Used for testing streamed html pages
   # Capybara doesn't support streaming, so we need to navigate to an empty page first
   # and then make an XHR request to the desired page
@@ -205,6 +207,14 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/rsc_native_metadata")
   end
 
+  # Demo: react-intl inside a React Server Component via the render function workaround.
+  # The `before_action :set_demo_locale` hook reads `params[:locale]` and sets `I18n.locale`,
+  # which then flows through `railsContext.i18nLocale` into the Server Component.
+  # See shakacode/react_on_rails#3081 for the tracking issue behind this workaround.
+  def react_intl_rsc_demo
+    stream_view_containing_react_components(template: "/pages/react_intl_rsc_demo")
+  end
+
   # Demo page showing 10 async components rendering concurrently
   # Each component delays 1 second - sequential would take ~10s, concurrent takes ~1s
   def async_components_demo
@@ -230,6 +240,16 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def initialize_shared_store
     redux_store("SharedReduxStore", props: @app_props_server_render)
+  end
+
+  # Demo-only locale switcher for the react-intl RSC example page. Reads
+  # `?locale=en|fr|ar` from the query string and sets `I18n.locale` so that
+  # `railsContext.i18nLocale` (built in `ReactOnRails::Helper#rails_context`)
+  # picks it up and forwards it to the Server Component render function.
+  def set_demo_locale
+    requested = params[:locale].to_s
+    allowed = %w[en fr ar]
+    I18n.locale = allowed.include?(requested) ? requested.to_sym : I18n.default_locale
   end
 
   def data

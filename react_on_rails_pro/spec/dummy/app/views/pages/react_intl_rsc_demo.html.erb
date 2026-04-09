@@ -1,0 +1,96 @@
+<%= stream_react_component("ReactIntlRSCDemo",
+                           props: { userName: "Abanoub", cartItems: 5, productPrice: 1234.56 },
+                           prerender: true,
+                           trace: true,
+                           id: "ReactIntlRSCDemo-react-component-0") %>
+
+<hr/>
+
+<h2>Switch locale</h2>
+<p>
+  <%= link_to "English", react_intl_rsc_demo_path(locale: "en") %> |
+  <%= link_to "Français", react_intl_rsc_demo_path(locale: "fr") %> |
+  <%= link_to "العربية", react_intl_rsc_demo_path(locale: "ar") %>
+</p>
+<p>
+  The locale switch triggers a full page reload. Server Components render on the server,
+  so the new locale has to travel from Rails → <code>railsContext.i18nLocale</code> →
+  the render function, and the Server Component tree is re-serialized in the new language.
+  There is no way to switch locales on the client for Server Component content without a
+  server roundtrip.
+</p>
+
+<hr/>
+
+<h2>About this example</h2>
+<p>
+  This page demonstrates using <code>react-intl</code>'s formatter inside a React Server
+  Component. Because Server Components can't use React hooks or Context, the usual
+  <code>useIntl()</code> / <code>&lt;IntlProvider&gt;</code> API is unavailable. The workaround
+  shown here uses:
+</p>
+<ol>
+  <li>
+    <strong>The render function pattern.</strong> The Server Component is registered as a
+    2-argument function <code>(props, railsContext) =&gt; () =&gt; JSX</code>. React on Rails
+    detects 2+ arguments and treats the function as a <em>render function</em>, passing
+    <code>railsContext</code> (which carries <code>i18nLocale</code>) as the second argument.
+  </li>
+  <li>
+    <strong><code>createIntl</code> from <code>@formatjs/intl</code>.</strong> This is the
+    non-React core of <code>react-intl</code>. It returns the same <code>intl</code> object
+    you'd get from <code>useIntl()</code>, without needing React Context. All formatting
+    (interpolation, pluralization, numbers, dates) works.
+  </li>
+  <li>
+    <strong>Locale from Rails.</strong> The controller has
+    <code>before_action :set_demo_locale</code> that reads <code>params[:locale]</code> and
+    sets <code>I18n.locale</code>. That flows into <code>railsContext.i18nLocale</code>
+    automatically via <code>ReactOnRails::Helper#rails_context</code>.
+  </li>
+</ol>
+
+<h3>Why this is a workaround, not the ideal solution</h3>
+<ul>
+  <li>
+    Only the <strong>top-level registered</strong> Server Component receives
+    <code>railsContext</code>. Nested Server Components would need <code>intl</code> or
+    <code>locale</code> passed as a prop (prop drilling).
+  </li>
+  <li>
+    The render function convention (returning a component function instead of JSX) is a
+    React on Rails convention, not standard React.
+  </li>
+  <li>
+    Translations are hard-coded inline in the component for this demo. In a real app you'd
+    run <code>ReactOnRails::Locales.compile</code> to generate <code>translations.json</code>
+    from your Rails YAML locale files and import it.
+  </li>
+</ul>
+
+<h3>The eventual fix</h3>
+<p>
+  Issue <%= link_to "shakacode/react_on_rails#3081", "https://github.com/shakacode/react_on_rails/issues/3081" %>
+  tracks adding an AsyncLocalStorage-based request store to React on Rails. Once that ships,
+  any Server Component anywhere in the tree will be able to call a framework-provided helper
+  like <code>getLocale()</code> or <code>getTranslations()</code> without being a render function
+  and without prop drilling — matching the developer experience of Next.js's <code>next-intl</code>.
+</p>
+
+<h3>Setup required</h3>
+<p>
+  This demo requires the <code>@formatjs/intl</code> package (the non-React core of
+  <code>react-intl</code>). If you're seeing a missing-module error, install it and rebuild
+  the bundles:
+</p>
+<pre><code>cd react_on_rails_pro/spec/dummy
+pnpm install
+pnpm run build:dev</code></pre>
+
+<h3>Relevant files</h3>
+<ul>
+  <li><code>client/app/ror-auto-load-components/ReactIntlRSCDemo.jsx</code> — the Server Component</li>
+  <li><code>app/controllers/pages_controller.rb</code> — <code>react_intl_rsc_demo</code> action + <code>set_demo_locale</code></li>
+  <li><code>app/views/pages/react_intl_rsc_demo.html.erb</code> — this view</li>
+  <li><code>config/routes.rb</code> — the route</li>
+</ul>
