@@ -4,7 +4,7 @@ This document explains the rendering flow of React Server Components (RSC) in Re
 
 ## Types of Bundles
 
-In a React Server Components project, there are three distinct types of bundles:
+In a React Server Components project, there are three distinct types of bundles, each running in a different environment with different constraints:
 
 ### RSC Bundle (rsc-bundle.js)
 
@@ -12,6 +12,7 @@ In a React Server Components project, there are three distinct types of bundles:
 - Generated using the RSC Webpack Loader which transforms client components into references
 - Used specifically for generating RSC payloads
 - Configured with `react-server` condition to enable RSC-specific code paths that tell the runtime that this bundle is used for RSC payload generation.
+- **Runtime: Full Node.js** -- Node builtins (`path`, `fs`, `stream`) and `require()` work normally
 
 ### Server Bundle (server-bundle.js)
 
@@ -19,6 +20,7 @@ In a React Server Components project, there are three distinct types of bundles:
 - Used for traditional server-side rendering (SSR)
 - Enables HTML generation of any components
 - Does not transform client components into references
+- **Runtime: V8 VM sandbox** -- runs inside `vm.createContext()`, which has no `require()` and lacks many Node.js/browser globals (see [VM Sandbox Constraints](#bundle-architecture-reference) below)
 
 ### Client Bundle
 
@@ -26,6 +28,25 @@ In a React Server Components project, there are three distinct types of bundles:
 - Each file with `'use client'` directive becomes an entry point
 - Code splitting occurs automatically for client components
 - Chunks are loaded on-demand during client component hydration
+- **Runtime: Browser** -- standard browser APIs available, no Node.js APIs
+
+### Bundle Architecture Reference
+
+Understanding the runtime differences between the three bundles is critical for avoiding hard-to-debug errors. The server bundle and RSC bundle look similar in webpack configuration but run in fundamentally different environments:
+
+|                            | Client Bundle            | Server Bundle (SSR)                                                                                                                                   | RSC Bundle            |
+| -------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| **Webpack config**         | `clientWebpackConfig.js` | `serverWebpackConfig.js`                                                                                                                              | `rscWebpackConfig.js` |
+| **Runtime**                | Browser                  | VM sandbox (`vm.createContext`)                                                                                                                       | Full Node.js          |
+| **Node builtins**          | N/A                      | Use `resolve.fallback: false` (NOT `externals`)                                                                                                       | Work normally         |
+| **`require()`**            | N/A                      | **Not available**                                                                                                                                     | Available             |
+| **CSS extraction**         | Yes                      | No (`exportOnlyLocals`)                                                                                                                               | No                    |
+| **Isolated build env var** | `CLIENT_BUNDLE_ONLY`     | `SERVER_BUNDLE_ONLY`                                                                                                                                  | `RSC_BUNDLE_ONLY`     |
+| **Missing globals**        | N/A                      | `MessageChannel`, `performance`, etc. (see [troubleshooting](../../oss/migrating/rsc-troubleshooting.md#node-renderer-vm-context----missing-globals)) | None (full Node.js)   |
+
+**Key pitfall -- `externals` vs `resolve.fallback` in the server bundle:**
+
+The server bundle runs in a VM sandbox that has **no `require()` function**. Webpack's `externals` generates `require('path')` calls in the output, which will crash with `require is not defined`. Instead, use `resolve.fallback: { path: false, fs: false, stream: false }` to tell webpack to provide empty modules for Node builtins. The RSC bundle does not have this constraint because it runs in full Node.js where `require()` is available.
 
 ## React Server Component Rendering Flow
 

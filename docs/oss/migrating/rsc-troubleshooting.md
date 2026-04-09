@@ -8,18 +8,20 @@ This guide covers the most common problems you'll encounter when migrating to Re
 
 When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
 
-| Symptom                                                          | Most Likely Cause                                                            | Section                                                                          |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Build error: _"cannot be passed directly to Client Components"_  | Passing functions or class instances across the server-client boundary       | [Serialization Boundary Issues](#serialization-boundary-issues)                  |
-| Build error: _"needs useState/useEffect"_                        | Using hooks in a Server Component file                                       | [Error Message Catalog](#error-message-catalog)                                  |
-| RSC page downloads unexpectedly large JS chunks                  | Chunk contamination from shared `'use client'` modules                       | [Chunk Contamination](#chunk-contamination)                                      |
-| Component stays a Client Component after removing `'use client'` | Imported by another `'use client'` file, or RSC bundle not rebuilding        | [Accidental Client Components](#accidental-client-components)                    |
-| Hydration mismatch warnings in console                           | Server/client render output differs (timestamps, browser APIs, invalid HTML) | [Hydration Mismatches](#hydration-mismatches)                                    |
-| `ReferenceError: performance is not defined`                     | Node renderer VM context missing globals                                     | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)         |
-| SSR hangs or times out on large pages                            | Stream backpressure deadlock                                                 | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                    |
-| Rails boot error about version mismatch                          | Gem and npm package at different versions                                    | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)    |
-| 422 Unprocessable Entity on form submission                      | Missing CSRF token in fetch request                                          | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions) |
-| Page is blank until all data loads                               | Missing `stream_react_component` or Suspense boundaries                      | [Performance Pitfalls](#performance-pitfalls)                                    |
+| Symptom                                                          | Most Likely Cause                                                              | Section                                                                           |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_  | Passing functions or class instances across the server-client boundary         | [Serialization Boundary Issues](#serialization-boundary-issues)                   |
+| Build error: _"needs useState/useEffect"_                        | Using hooks in a Server Component file                                         | [Error Message Catalog](#error-message-catalog)                                   |
+| RSC page downloads unexpectedly large JS chunks                  | Chunk contamination from shared `'use client'` modules                         | [Chunk Contamination](#chunk-contamination)                                       |
+| Component stays a Client Component after removing `'use client'` | Imported by another `'use client'` file, or RSC bundle not rebuilding          | [Accidental Client Components](#accidental-client-components)                     |
+| Hydration mismatch warnings in console                           | Server/client render output differs (timestamps, browser APIs, invalid HTML)   | [Hydration Mismatches](#hydration-mismatches)                                     |
+| `ReferenceError: performance is not defined`                     | Node renderer VM context missing globals                                       | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
+| `ReferenceError: require is not defined`                         | Server bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback) |
+| `ReferenceError: MessageChannel is not defined`                  | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox   | [MessageChannel Not Defined](#messagechannel-not-defined)                         |
+| SSR hangs or times out on large pages                            | Stream backpressure deadlock                                                   | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                     |
+| Rails boot error about version mismatch                          | Gem and npm package at different versions                                      | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)     |
+| 422 Unprocessable Entity on form submission                      | Missing CSRF token in fetch request                                            | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)  |
+| Page is blank until all data loads                               | Missing `stream_react_component` or Suspense boundaries                        | [Performance Pitfalls](#performance-pitfalls)                                     |
 
 ## Serialization Boundary Issues
 
@@ -731,6 +733,8 @@ end
 | `"Refs cannot be used in Server Components, nor passed to Client Components"`                                                | Using the `ref` prop on any element inside a Server Component -- including on Client Components. The Flight serializer rejects the literal `ref` prop before checking the target type.             | Remove the `ref` prop. Refs are a client-side concept -- if a Client Component needs a ref, it should create one itself with `useRef()`. While `React.createRef()` is callable on the server, the result cannot be attached to any element.                            |
 | `"Both 'react-on-rails' and 'react-on-rails-pro' packages are installed"`                                                    | Both packages installed as separate top-level dependencies, often due to yalc link issues                                                                                                          | Ensure only `react-on-rails-pro` is in your `package.json`; the base package is installed automatically as a dependency. See [Duplicate Package Detection](#duplicate-package-detection)                                                                               |
 | `ReferenceError: performance is not defined`                                                                                 | Node renderer VM context missing the `performance` global. Triggered by `React.lazy()` in dev mode                                                                                                 | Enable `supportModules: true` and add `performance` via `additionalContext`. See [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)                                                                                                              |
+| `ReferenceError: require is not defined`                                                                                     | Server bundle webpack config uses `externals` for Node builtins, generating `require()` calls that fail in VM sandbox                                                                              | Use `resolve.fallback: { path: false, fs: false }` instead of `externals`. See [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback)                                                                                                       |
+| `ReferenceError: MessageChannel is not defined`                                                                              | `react-dom/server.browser` instantiates `MessageChannel` at module load time; VM sandbox lacks this global                                                                                         | Inject a `BannerPlugin` polyfill in the server webpack config. See [MessageChannel Not Defined](#messagechannel-not-defined)                                                                                                                                           |
 | `"global object mismatch"`                                                                                                   | `react-on-rails` and `react-on-rails-pro` resolved from different sources (e.g., npm vs yalc)                                                                                                      | Force consistent resolution with `pnpm.overrides` or `yarn.resolutions`. See [Version Mismatch](#version-mismatch----global-object-mismatch)                                                                                                                           |
 | SSR hangs indefinitely / request timeout on large RSC payloads                                                               | Stream backpressure deadlock when RSC payload exceeds 16 KB                                                                                                                                        | Update to latest React on Rails Pro. See [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                                                                                                                                                                 |
 | `"The 'react-on-rails' package version does not match the gem version"`                                                      | Gem and npm package installed at different versions                                                                                                                                                | Install the npm package version matching your gem. See [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)                                                                                                                                   |
@@ -802,9 +806,11 @@ for the current recommendation. See also
 
 ### Node Renderer VM Context -- Missing Globals
 
-**Symptoms:** Cryptic errors like `ReferenceError: performance is not defined` when rendering Server Components. Often triggered by `React.lazy()` which calls `performance.now()` internally in development mode.
+**Symptoms:** Cryptic errors like `ReferenceError: performance is not defined` or `ReferenceError: require is not defined` when rendering Server Components. Often triggered by `React.lazy()` which calls `performance.now()` internally in development mode.
 
-**Root cause:** The node renderer runs your JavaScript in an isolated V8 VM context (`vm.createContext`). By default, the VM context only includes basic globals. Node.js-specific globals like `performance`, `Buffer`, `TextDecoder`, etc. must be explicitly added.
+**Root cause:** The node renderer runs the **server bundle** in an isolated V8 VM context (`vm.createContext`). By default, the VM context only includes basic globals. Node.js-specific globals like `performance`, `Buffer`, `TextDecoder`, etc. must be explicitly added. Critically, `require()` is also not available in the VM sandbox.
+
+> **Important:** This constraint applies only to the **server bundle** (SSR). The **RSC bundle** runs in full Node.js and does not have these limitations. See the [Bundle Architecture Reference](../../pro/react-server-components/rendering-flow.md#bundle-architecture-reference) for a comparison.
 
 **Fix:** Enable `supportModules` in your node renderer configuration to inject common Node.js globals:
 
@@ -835,6 +841,79 @@ module.exports = {
   },
 };
 ```
+
+#### Handling Node Builtins -- `externals` vs `resolve.fallback`
+
+A common mistake when configuring the server bundle is using webpack `externals` to handle Node builtins like `path`, `fs`, and `stream`. This generates `require('path')` calls in the output -- but the VM sandbox has **no `require` function**, causing `ReferenceError: require is not defined` at runtime.
+
+**Wrong approach (causes `require is not defined`):**
+
+```js
+// DON'T do this in serverWebpackConfig.js
+externals: {
+  path: 'commonjs path',
+  fs: 'commonjs fs',
+  stream: 'commonjs stream',
+}
+```
+
+**Correct approach:**
+
+```js
+// In serverWebpackConfig.js -- tells webpack to provide empty modules
+resolve: {
+  fallback: {
+    path: false,
+    fs: false,
+    stream: false,
+  },
+}
+```
+
+`resolve.fallback: false` tells webpack to replace the module with an empty object at build time, so no `require()` call is generated. The RSC bundle does not need this workaround because it runs in full Node.js where `require()` is available and Node builtins work normally.
+
+### MessageChannel Not Defined
+
+**Symptoms:** `ReferenceError: MessageChannel is not defined` when the server bundle loads. This typically crashes during module initialization, not during rendering.
+
+**Root cause:** `react-dom/server.browser.js` (used for SSR streaming) instantiates `MessageChannel` at **module load time** for React's internal scheduler. The VM sandbox does not provide `MessageChannel` as a global, and `supportModules` does not include it.
+
+**Fix:** Use webpack's `BannerPlugin` to inject a minimal `MessageChannel` polyfill at the top of the server bundle. The polyfill only needs to support `port2.postMessage` triggering `port1.onmessage`, which is all React's scheduler requires:
+
+```js
+// In serverWebpackConfig.js
+const webpack = require('webpack');
+
+const messageChannelPolyfill = `
+if (typeof MessageChannel === 'undefined') {
+  globalThis.MessageChannel = class MessageChannel {
+    constructor() {
+      this.port1 = { onmessage: null };
+      this.port2 = {
+        postMessage: (msg) => {
+          if (this.port1.onmessage) {
+            this.port1.onmessage({ data: msg });
+          }
+        },
+      };
+    }
+  };
+}
+`;
+
+// Add to plugins array
+plugins: [
+  new webpack.BannerPlugin({
+    banner: messageChannelPolyfill,
+    raw: true,
+  }),
+  // ... other plugins
+];
+```
+
+This injects the polyfill as raw JavaScript at the top of the bundle output, ensuring `MessageChannel` is defined before any module code executes. This is necessary because the error occurs at import time, not at render time -- so `additionalContext` (which sets globals on the VM context) may not take effect early enough depending on your bundling setup.
+
+> **Note:** This only affects the server bundle. The RSC bundle runs in full Node.js (which has `MessageChannel` since Node 15), and the client bundle runs in the browser (which has native `MessageChannel`).
 
 ### Version Mismatch -- "Global Object Mismatch"
 

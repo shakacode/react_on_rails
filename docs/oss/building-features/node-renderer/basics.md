@@ -121,6 +121,72 @@ This means a developer running the renderer locally without a password is safe b
 
 See [JS Configuration](./js-configuration.md) for the `host` and `password` options, and [Container Deployment](./container-deployment.md) for architecture-specific guidance.
 
+## CI and Test Environment Setup
+
+Running tests that involve server-side rendering requires the Node Renderer to be running. Without it, tests will silently timeout with `Net::ReadTimeout` -- not crash with a clear error -- making the failure easy to misdiagnose.
+
+### 1. Guard the initializer for test environments
+
+A common mistake is guarding the Node Renderer configuration with `Rails.env.development?`, which excludes the test environment:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+
+# WRONG -- excludes test environment
+if Rails.env.development?
+  ReactOnRailsPro.configure do |config|
+    config.server_renderer = "NodeRenderer"
+  end
+end
+
+# CORRECT -- covers both development and test
+if Rails.env.local?
+  ReactOnRailsPro.configure do |config|
+    config.server_renderer = "NodeRenderer"
+  end
+end
+```
+
+`Rails.env.local?` returns `true` for both `development` and `test` environments (available since Rails 7.1). For older Rails versions, use `Rails.env.development? || Rails.env.test?`.
+
+### 2. Start the renderer in CI
+
+The Node Renderer must be started as a background process before running tests. Add a step to your CI workflow:
+
+```yaml
+# .github/workflows/test.yml (GitHub Actions example)
+- name: Start Node Renderer
+  run: |
+    node client/node-renderer.js &
+    # Wait for the renderer to be ready
+    for i in $(seq 1 30); do
+      if curl -s http://localhost:3800/ > /dev/null 2>&1; then
+        echo "Node Renderer is ready"
+        break
+      fi
+      echo "Waiting for Node Renderer... ($i/30)"
+      sleep 1
+    done
+  env:
+    RENDERER_PASSWORD: ${{ secrets.RENDERER_PASSWORD }}
+    RENDERER_BUNDLE_PATH: ./public/webpack/test
+```
+
+Key points:
+
+- **TCP readiness check**: Poll port 3800 (or your configured port) before running tests. The renderer needs a few seconds to start and load the server bundle.
+- **`RENDERER_PASSWORD`**: Must be set in the CI environment and match the value configured in `react_on_rails_pro.rb`. Add it as a CI secret.
+- **`RENDERER_BUNDLE_PATH`**: Must point to the directory containing your compiled server bundle. Ensure the webpack build step runs before starting the renderer.
+
+### 3. Common CI failures
+
+| Symptom                                   | Cause                          | Fix                                    |
+| ----------------------------------------- | ------------------------------ | -------------------------------------- |
+| All tests timeout with `Net::ReadTimeout` | Node Renderer not running      | Add the renderer start step above      |
+| "Connection refused" errors               | Renderer started but not ready | Add the TCP readiness check loop       |
+| Tests pass locally but fail in CI         | `Rails.env.development?` guard | Change to `Rails.env.local?`           |
+| "Invalid password" errors                 | `RENDERER_PASSWORD` mismatch   | Ensure CI env var matches Rails config |
+
 ## Troubleshooting
 
 - See [Memory Leaks guide](../../../pro/js-memory-leaks.md).

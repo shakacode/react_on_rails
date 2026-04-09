@@ -30,6 +30,52 @@ pnpm add react@~19.0.4 react-dom@~19.0.4 react-on-rails-rsc@~19.0.4
 
 > **React 19.0.4+** is recommended. Earlier 19.0.x versions (19.0.0--19.0.3) have known security vulnerabilities — see the [v16.2.0 release notes](../../oss/upgrading/release-notes/16.2.0.md) for details.
 
+## Pre-Migration: Audit Components for Client API Usage
+
+Before running the generator, audit your existing components to identify which ones use client-side APIs. When RSC is enabled, any component **without** `'use client'` is automatically classified as a React Server Component. Components that use client APIs will break if misclassified.
+
+### What to look for
+
+Components that use any of the following **must** have `'use client'`:
+
+- **React hooks**: `useState`, `useEffect`, `useContext`, `useRef`, `useReducer`, `useCallback`, `useMemo`
+- **React on Rails client APIs**: `ReactOnRails.getStore()`, `ReactOnRails.authenticityToken()`
+- **Redux**: `useSelector`, `useDispatch`, `connect()`, `<Provider>`
+- **Router client APIs**: `StaticRouter`, `useNavigate`, `useLocation`, `useParams`
+- **Event handlers**: `onClick`, `onChange`, `onSubmit`, etc.
+- **Browser APIs**: `window`, `document`, `localStorage`, `fetch` in effects
+
+### The `.server.jsx` naming collision
+
+If your app uses React on Rails' auto-bundling with `.client.jsx` / `.server.jsx` file pairs, be aware of a naming collision:
+
+- In **React on Rails auto-bundling** (pre-RSC), `.server.jsx` means "include this file in the server bundle for SSR." These files typically contain traditional SSR logic using `StaticRouter`, `ReactOnRails.getStore()`, etc.
+- In **React Server Components**, "server component" means a component that runs in the RSC environment with restricted APIs (no hooks, no state, no browser APIs).
+
+**These are completely different concepts.** A `.server.jsx` file is **not** a React Server Component -- it's a file included in the server bundle. Without `'use client'`, the RSC infrastructure will misclassify it as a Server Component, causing runtime errors.
+
+> **Recommended convention:** If you're adding RSC to an app with `.server.jsx` files, consider renaming them to `.ssr.jsx` to avoid confusion. This is optional but reduces cognitive overhead for developers new to the codebase.
+
+### How auto-classification works
+
+When RSC is enabled, React on Rails classifies components at build time:
+
+1. **File has `'use client'`** → registered via `ReactOnRails.register()` → **Client Component**
+2. **File does NOT have `'use client'`** → registered via `registerServerComponent()` → **Server Component**
+
+There is no warning when a component is auto-classified as a server component. If it uses client APIs, it will fail at runtime with errors like "useState is not a function" or "Cannot read properties of undefined."
+
+### Audit checklist
+
+Before proceeding to Step 1:
+
+- [ ] Search your component source files for `useState`, `useEffect`, `useContext`, `useSelector`, `useDispatch`, `ReactOnRails.getStore`
+- [ ] Check all `.server.jsx` files -- these almost certainly need `'use client'`
+- [ ] Check components that use `StaticRouter` or other routing client APIs
+- [ ] Verify no component relies on browser globals (`window`, `document`) without `'use client'`
+
+> **When in doubt, add `'use client'`.** Starting with all components as Client Components is safe and preserves existing behavior. You can remove the directive later when you're ready to convert a component to a Server Component.
+
 ## Step 1: Run the Generator
 
 ```bash
