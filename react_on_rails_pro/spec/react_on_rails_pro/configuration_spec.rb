@@ -163,8 +163,9 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
 
       it "is blank if not provided in the URL in development" do
         allow(ENV).to receive(:[]).and_call_original
-        allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("development")
         allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("development")
+        allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
         allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
 
         ReactOnRailsPro.configure do |config|
@@ -179,10 +180,11 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           allow(ENV).to receive(:[]).and_call_original
           allow(ENV).to receive(:fetch).and_call_original
           allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
         end
 
         it "raises an error if no password is set in production" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -193,7 +195,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         it "raises an error if no password is set in staging" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("staging")
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("staging")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -204,7 +206,31 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         it "raises when RAILS_ENV is unset (fail-closed, matching Node-side behavior)" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return(nil)
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return(nil)
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
+
+        it "raises when NODE_ENV is production even if RAILS_ENV is development" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("development")
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return("production")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.to raise_error(ReactOnRailsPro::Error, /RENDERER_PASSWORD must be set/)
+        end
+
+        it "raises when NODE_ENV is production and RAILS_ENV is unset" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return(nil)
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return("production")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -215,7 +241,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         it "does not raise when password comes from RENDERER_PASSWORD env var in production" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
           allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
 
           expect do
@@ -229,7 +255,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         it "does not raise when password is explicitly set in production" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -240,7 +266,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         it "does not raise when password is embedded in the renderer URL in production" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -251,7 +277,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         it "resolves from ENV when renderer_password is blank in production" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
           allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return("secure-password")
 
           expect do
@@ -266,7 +292,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         it "resolves from URL when renderer_password is blank and URL has embedded password" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -283,10 +309,12 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       context "when using NodeRenderer in development/test environments" do
         before do
           allow(ENV).to receive(:[]).and_call_original
+          allow(ENV).to receive(:fetch).and_call_original
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
         end
 
         it "does not raise in development even without a password" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("development")
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("development")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -297,7 +325,31 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end
 
         it "does not raise in test even without a password" do
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("test")
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("test")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+
+        it "does not raise when both RAILS_ENV and NODE_ENV are development" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("development")
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return("development")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+
+        it "does not raise when RAILS_ENV is test and NODE_ENV is development" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("test")
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return("development")
 
           expect do
             ReactOnRailsPro.configure do |config|
@@ -311,7 +363,9 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       context "when using ExecJS renderer" do
         it "does not raise in production without a password" do
           allow(ENV).to receive(:[]).and_call_original
-          allow(ENV).to receive(:[]).with("RAILS_ENV").and_return("production")
+          allow(ENV).to receive(:fetch).and_call_original
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("production")
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
 
           expect do
             ReactOnRailsPro.configure do |config|
