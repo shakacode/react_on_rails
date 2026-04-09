@@ -388,13 +388,13 @@ export default function ProductPage({ locale, messages, ...props }) {
 
 > **Limitation:** This only works for **pre-formatted strings** — plain text with no interpolation, pluralization, or number/date formatting. React on Rails' build-time locale system converts Rails `%{variable}` placeholders to ICU `{variable}` syntax, so `messages['greeting']` would render the literal text `{name}` instead of a substituted value. For anything beyond plain strings, use `createIntl` or Rails pre-formatting (both described below).
 
-#### Server Components: `createIntl` from FormatJS (recommended)
+#### Server Components: `createIntl` from `react-intl` (recommended)
 
-`react-intl` re-exports `createIntl` from `@formatjs/intl` — a **context-free API** that provides full interpolation, pluralization, and date/number formatting without React Context. This is the recommended approach for i18n in Server Components:
+Import `createIntl` from `react-intl` for a **context-free API** that provides full interpolation, pluralization, and date/number formatting without React Context. This is the recommended approach for i18n in Server Components:
 
 ```jsx
 // ProductPage.jsx -- Server Component
-import { createIntl } from '@formatjs/intl';
+import { createIntl } from 'react-intl';
 import I18nProvider from './I18nProvider';
 
 export default function ProductPage({ locale, messages, ...props }) {
@@ -527,21 +527,23 @@ messages: I18n.t('.').deep_stringify_keys
 messages: I18n.t('product_page').deep_stringify_keys
 ```
 
-### Mistake 5: Using `messages['key']` for translations with placeholders
+### Mistake 3: Using `messages['key']` for translations with placeholders
 
 The build-time locale system converts Rails `%{variable}` placeholders to ICU `{variable}` syntax. Reading these directly from the messages object renders the literal placeholder text:
 
 ```jsx
 // BAD: Renders "Hello, {name}" as literal text
 const greeting = messages['greeting'];
+```
 
+```jsx
 // GOOD: Use createIntl to format with variable substitution
-import { createIntl } from '@formatjs/intl';
+import { createIntl } from 'react-intl';
 const intl = createIntl({ locale, messages });
 const greeting = intl.formatMessage({ id: 'greeting' }, { name: 'John' });
 ```
 
-### Mistake 3: Reading Redux store in Server Components
+### Mistake 4: Reading Redux store in Server Components
 
 Server Components render once on the server and never re-render. They cannot subscribe to store changes:
 
@@ -555,7 +557,7 @@ export default function Dashboard({ user }) {
 
 **Fix:** Keep the component as a Client Component (add `'use client'`), or pass the value from Rails as a prop to a Server Component that doesn't need the Redux store.
 
-### Mistake 4: Creating new QueryClient on every render
+### Mistake 5: Creating new QueryClient on every render
 
 If the `QueryClient` is created without `useState`, React creates a new instance on every render, losing the cache:
 
