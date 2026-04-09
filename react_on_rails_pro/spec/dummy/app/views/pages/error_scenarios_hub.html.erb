@@ -58,8 +58,8 @@
 <div style="padding: 1em; border: 2px solid #4caf50; border-radius: 6px; background: #e8f5e9; margin-bottom: 1.5em;">
   <h3 style="margin-top: 0;">Override Configs (runtime)</h3>
   <p style="margin-top: 0; font-size: 0.9em;">
-    Change values to automatically apply and mutate the global config singletons.
-    Linked "Open page" test pages will use the overridden values.
+    Change values to filter this hub page via query params.
+    The hub displays expected behavior for the selected config combination.
   </p>
 
   <%= form_tag(error_scenarios_hub_path, method: :get, id: "config-override-form",
