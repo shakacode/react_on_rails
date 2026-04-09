@@ -54,6 +54,12 @@
     "./@internal/base/full": {
       "react-server": "./lib/base/full.rsc.js",
       "default": "./lib/base/full.js"
+    },
+    "./@internal/createReactOnRails": "./lib/createReactOnRails.js",
+    "./@internal/capabilities/core": "./lib/capabilities/core.js",
+    "./@internal/capabilities/ssr": {
+      "react-server": "./lib/capabilities/ssr.rsc.js",
+      "default": "./lib/capabilities/ssr.js"
     }
   },
   "peerDependencies": {

@@ -1,108 +1,102 @@
-import { createBaseClientObject, type BaseClientObjectType } from './base/client.ts';
-import { createBaseFullObject } from './base/full.ts';
-import { clientStartup, reactOnRailsPageLoaded } from './clientStartup.ts';
-import { reactOnRailsComponentLoaded } from './ClientRenderer.ts';
-import ComponentRegistry from './ComponentRegistry.ts';
-import StoreRegistry from './StoreRegistry.ts';
-import type { ReactOnRailsInternal, RegisteredComponent, Store, StoreGenerator } from './types/index.ts';
+import type { Registries } from './capabilities/core.ts';
+import type { ReactOnRailsInternal } from './types/index.ts';
 
-type BaseObjectCreator = typeof createBaseClientObject | typeof createBaseFullObject;
+export type { Registries };
+
+// Module-level cache for singleton enforcement and validation
+let cachedObject: ReactOnRailsInternal | null = null;
+let cachedRegistries: Registries | null = null;
 
 /**
- * Core-specific functions that override base stubs and add Pro stubs.
- * Typed explicitly to ensure type safety when mutating the base object.
+ * Assembles the ReactOnRails global object from an array of capabilities.
+ *
+ * Each capability is a partial implementation of ReactOnRailsInternal.
+ * Capabilities are merged in array order (last wins for overlapping keys).
+ *
+ * @param capabilities - Array of capability objects to merge.
+ * @param options.currentGlobal - Current globalThis.ReactOnRails value (for misconfiguration detection).
+ * @param options.startup - Callback invoked once on first initialization, after the global is set.
+ * @param options.registries - The registries used by the core capability (for mixing detection).
  */
-type ReactOnRailsCoreSpecificFunctions = Pick<
-  ReactOnRailsInternal,
-  | 'reactOnRailsPageLoaded'
-  | 'reactOnRailsComponentLoaded'
-  | 'getOrWaitForComponent'
-  | 'getOrWaitForStore'
-  | 'getOrWaitForStoreGenerator'
-  | 'reactOnRailsStoreLoaded'
-  | 'streamServerRenderedReactComponent'
-  | 'serverRenderRSCReactComponent'
->;
-
 export default function createReactOnRails(
-  baseObjectCreator: BaseObjectCreator,
-  currentGlobal: BaseClientObjectType | null = null,
+  capabilities: Partial<ReactOnRailsInternal>[],
+  options: {
+    currentGlobal: ReactOnRailsInternal | null;
+    startup: (() => void) | null;
+    registries: Registries;
+  },
 ): ReactOnRailsInternal {
-  // Create base object with core registries, passing currentGlobal for caching/validation
-  const baseObject = baseObjectCreator(
-    {
-      ComponentRegistry,
-      StoreRegistry,
-    },
-    currentGlobal,
-  );
+  const { currentGlobal, startup, registries } = options;
 
-  // Define core-specific functions with proper types
-  // This object acts as a type-safe specification of what we're adding/overriding on the base object
-  const reactOnRailsCoreSpecificFunctions: ReactOnRailsCoreSpecificFunctions = {
-    // Override base stubs with core implementations
-    reactOnRailsPageLoaded(): Promise<void> {
-      reactOnRailsPageLoaded();
-      return Promise.resolve();
-    },
+  // ===================================================================
+  // VALIDATION — preserved from base/client.ts
+  // ===================================================================
 
-    reactOnRailsComponentLoaded(domId: string): Promise<void> {
-      return reactOnRailsComponentLoaded(domId);
-    },
+  // Webpack misconfiguration detection: currentGlobal is null but we have a cached object.
+  // This indicates webpack's optimization.runtimeChunk is set to "true" or "multiple".
+  if (currentGlobal === null && cachedObject !== null) {
+    throw new Error(`\
+ReactOnRails was already initialized, but a new initialization was attempted without passing the existing global.
+This usually means Webpack's optimization.runtimeChunk is set to "true" or "multiple" instead of "single".
 
-    // Pro-only stubs (throw errors in core package)
-    getOrWaitForComponent(): Promise<RegisteredComponent> {
-      throw new Error('getOrWaitForComponent requires react-on-rails-pro package');
-    },
+Fix: Set optimization.runtimeChunk to "single" in your webpack configuration.
+See: https://github.com/shakacode/react_on_rails/issues/1558`);
+  }
 
-    getOrWaitForStore(): Promise<Store> {
-      throw new Error('getOrWaitForStore requires react-on-rails-pro package');
-    },
+  // Global contamination detection: currentGlobal exists but doesn't match cached object.
+  if (currentGlobal !== null && cachedObject !== null && currentGlobal !== cachedObject) {
+    throw new Error(`\
+ReactOnRails global object mismatch detected.
+The current global ReactOnRails object is different from the one created by this package.
 
-    getOrWaitForStoreGenerator(): Promise<StoreGenerator> {
-      throw new Error('getOrWaitForStoreGenerator requires react-on-rails-pro package');
-    },
+This usually means:
+1. You're mixing react-on-rails (core) with react-on-rails-pro
+2. Another library is interfering with the global ReactOnRails object
 
-    reactOnRailsStoreLoaded(): Promise<void> {
-      throw new Error('reactOnRailsStoreLoaded requires react-on-rails-pro package');
-    },
+Fix: Use only one package (core OR pro) consistently throughout your application.`);
+  }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    streamServerRenderedReactComponent(): any {
-      throw new Error('streamServerRenderedReactComponent requires react-on-rails-pro package');
-    },
+  // Registry mixing detection: different registries indicate core/pro package mixing.
+  if (cachedRegistries !== null) {
+    if (
+      registries.ComponentRegistry !== cachedRegistries.ComponentRegistry ||
+      registries.StoreRegistry !== cachedRegistries.StoreRegistry
+    ) {
+      throw new Error(`\
+Cannot mix react-on-rails (core) with react-on-rails-pro.
+Different registries detected - the packages use incompatible registries.
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    serverRenderRSCReactComponent(): any {
-      throw new Error('serverRenderRSCReactComponent requires react-on-rails-pro package');
-    },
-  };
-
-  // Type assertion is safe here because:
-  // 1. We start with BaseClientObjectType or BaseFullObjectType (from baseObjectCreator)
-  // 2. We add exactly the methods defined in ReactOnRailsCoreSpecificFunctions
-  // 3. ReactOnRailsInternal = Base + ReactOnRailsCoreSpecificFunctions
-  // TypeScript can't track the mutation, but we ensure type safety by explicitly typing
-  // the functions object above
-  const reactOnRails = baseObject as unknown as ReactOnRailsInternal;
-
-  // Assign core-specific functions to the ReactOnRails object using Object.assign
-  // This pattern ensures we add exactly what's defined in the type, nothing more, nothing less
-  Object.assign(reactOnRails, reactOnRailsCoreSpecificFunctions);
-
-  // Assign to global if not already assigned
-  if (!globalThis.ReactOnRails) {
-    globalThis.ReactOnRails = reactOnRails;
-
-    // Reset options to defaults (only on first initialization)
-    reactOnRails.resetOptions();
-
-    // Run client startup (only on first initialization)
-    if (typeof window !== 'undefined') {
-      setTimeout(() => {
-        clientStartup();
-      }, 0);
+Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
     }
+  }
+
+  // Return cached object if already initialized (all validation passed above)
+  if (cachedObject !== null) {
+    return cachedObject;
+  }
+
+  // ===================================================================
+  // ASSEMBLY — merge all capabilities in order
+  // ===================================================================
+
+  const reactOnRails = Object.assign({}, ...capabilities) as ReactOnRailsInternal;
+
+  // Cache the object and registries
+  cachedObject = reactOnRails;
+  cachedRegistries = registries;
+
+  // ===================================================================
+  // GLOBAL ASSIGNMENT — only on first initialization
+  // ===================================================================
+
+  globalThis.ReactOnRails = reactOnRails;
+
+  // Reset options to defaults
+  reactOnRails.resetOptions();
+
+  // Run startup callback
+  if (startup) {
+    startup();
   }
 
   return reactOnRails;

@@ -12,13 +12,15 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import ReactOnRails from './ReactOnRails.full.ts';
-import streamServerRenderedReactComponent from './streamServerRenderedReactComponent.ts';
+import { createSSRCapability } from 'react-on-rails/@internal/capabilities/ssr';
+import { createProStreamingCapability } from './capabilities/proStreaming.ts';
+import createReactOnRailsPro from './createReactOnRailsPro.ts';
 
-// Add Pro server-side streaming functionality
+const currentGlobal = globalThis.ReactOnRails || null;
+const ReactOnRails = createReactOnRailsPro(
+  [createSSRCapability(), createProStreamingCapability()],
+  currentGlobal,
+);
 
-ReactOnRails.streamServerRenderedReactComponent = streamServerRenderedReactComponent;
-
-export * from './ReactOnRails.full.ts';
-// eslint-disable-next-line no-restricted-exports -- see https://github.com/eslint/eslint/issues/15617
-export { default } from './ReactOnRails.full.ts';
+export * from 'react-on-rails/types';
+export default ReactOnRails;

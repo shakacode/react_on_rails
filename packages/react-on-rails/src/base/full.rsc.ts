@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use `capabilities/ssr.rsc.ts` instead. This file is kept for backward compatibility
+ * with older versions of react-on-rails-pro that import from `react-on-rails/@internal/base/full`.
+ */
+
 import { createBaseClientObject, type BaseClientObjectType } from './client.ts';
 import type { BaseFullObjectType, ReactOnRailsFullSpecificFunctions } from './full.ts';
 
