@@ -93,15 +93,27 @@ useEffect(() => {
 
 See [Client vs. Server Rendering](./client-vs-server-rendering.md) for more on handling browser-only code.
 
-## `TextEncoder` / `TextDecoder`
+## Missing Globals in `mini_racer`
 
-When using `mini_racer`, you may encounter:
+The `mini_racer` runtime provides a bare V8 isolate without Node.js globals or Web APIs. Several APIs that React and React on Rails depend on are unavailable:
+
+### `TextEncoder` / `TextDecoder`
+
+React DOM Server (18+) requires `TextEncoder` internally. When using `mini_racer`, you will encounter:
 
 ```text
 ReferenceError: TextEncoder is not defined
 ```
 
-This is because mini_racer's V8 isolate does not include the `TextEncoder` and `TextDecoder` Web APIs. See [this solution](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717) for a polyfill approach.
+See [this solution](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717) for a polyfill approach.
+
+### `Buffer`
+
+Node.js `Buffer` is not available in `mini_racer`. React on Rails uses `Buffer.byteLength` for UTF-8 byte length calculations in its length-prefixed streaming protocol and falls back to a pure JavaScript implementation when `Buffer` is absent. No polyfill is required for this — the fallback is automatic.
+
+### Practical Impact
+
+Because React DOM Server 18+ requires `TextEncoder` (which `mini_racer` does not provide), **`mini_racer` is effectively unsupported for server rendering with React 18 or later** unless you supply your own `TextEncoder` polyfill. If you are using React 18+, consider switching to the Node.js ExecJS runtime or upgrading to the [Node Renderer](../building-features/node-renderer/basics.md).
 
 ## Pool Size Constraints
 
