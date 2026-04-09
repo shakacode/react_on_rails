@@ -24,6 +24,16 @@ module ReactOnRailsPro
       config.after_initialize { ReactOnRailsPro::Engine.log_problematic_compression_middleware_warnings }
     end
 
+    # Override the default rendering strategy with Pro's NodeStrategy and JsCodeBuilder.
+    # Runs after core's initializer since Pro engine loads after core.
+    # Not yet wired into the main rendering path — currently additive only (see issue #2905).
+    initializer "react_on_rails_pro.set_rendering_strategy" do
+      config.after_initialize do
+        ReactOnRails.rendering_strategy = ReactOnRailsPro::RenderingStrategy::NodeStrategy.new
+        ReactOnRails.js_code_builder = ReactOnRailsPro::JsCodeBuilder.new
+      end
+    end
+
     class << self
       def log_license_status
         status = ReactOnRailsPro::LicenseValidator.license_status

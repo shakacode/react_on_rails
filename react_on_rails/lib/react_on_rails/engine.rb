@@ -104,6 +104,15 @@ module ReactOnRails
       ReactOnRails::ServerRenderingPool.reset_pool
     end
 
+    # Set default rendering strategy (ExecJS) unless Pro has already configured one.
+    # Pro's engine runs after this and may override with NodeStrategy.
+    # Not yet wired into the main rendering path — currently additive only (see issue #2905).
+    initializer "react_on_rails.set_default_rendering_strategy" do
+      config.after_initialize do
+        ReactOnRails.rendering_strategy ||= ReactOnRails::RenderingStrategy::ExecJsStrategy.new
+      end
+    end
+
     # Rake tasks are automatically loaded from lib/tasks/*.rake by Rails::Engine
     # No need to explicitly load them here to avoid duplicate loading
   end
