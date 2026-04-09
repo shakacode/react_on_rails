@@ -109,7 +109,7 @@ See [this solution](https://github.com/shakacode/react_on_rails/issues/1457#issu
 
 ### `Buffer`
 
-Node.js `Buffer` is not available in `mini_racer`. React on Rails uses `Buffer.byteLength` for UTF-8 byte length calculations in its length-prefixed streaming protocol and falls back to a pure JavaScript implementation when `Buffer` is absent. No polyfill is required for this — the fallback is automatic.
+Node.js `Buffer` is not available in `mini_racer`. The React on Rails OSS package does not use `Buffer` in its ExecJS rendering path, so this is unlikely to cause errors for most users. If your own server-rendered code calls `Buffer` directly, you will need to supply a polyfill.
 
 ### Practical Impact
 

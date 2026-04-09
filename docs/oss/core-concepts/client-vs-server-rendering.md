@@ -8,7 +8,7 @@ Now the server will interpret your JavaScript. The default is to use [ExecJS](ht
 
 Note: if you use the [mini_racer](https://github.com/rubyjs/mini_racer) runtime and run into a `ReferenceError: TextEncoder is not defined` error, see [this comment](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717) for a solution. Since React DOM Server 18+ requires `TextEncoder` (which `mini_racer` does not provide), `mini_racer` is effectively unsupported for server rendering with modern React. Consider using the Node.js ExecJS runtime or upgrading to the Node Renderer.
 
-### Polyfill Requirements for `target: 'web'` Server Bundles
+## Polyfill Requirements for `target: 'web'` Server Bundles
 
 When the server bundle is built with webpack `target: 'web'` (the default for the OSS configuration), webpack 5 does **not** auto-polyfill Node.js globals such as `Buffer`, `TextEncoder`, or `process`. This means:
 
@@ -16,7 +16,7 @@ When the server bundle is built with webpack `target: 'web'` (the default for th
 - **ExecJS with `mini_racer`**: Runs in a bare V8 isolate with none of these globals. The bundle relies on polyfills or fallbacks for any Node.js APIs it uses.
 - **`target: 'node'`**: When using the React on Rails Pro Node Renderer, set `target: 'node'` in your server webpack config. This tells webpack to preserve `require()` calls for Node.js built-ins instead of bundling polyfills.
 
-React on Rails handles `Buffer` internally by falling back to a pure JavaScript UTF-8 byte length calculation when `Buffer` is unavailable. No user-supplied `Buffer` polyfill is required.
+The React on Rails OSS package does not use `Buffer` in its ExecJS rendering path. If your own server-rendered code calls `Buffer` directly, you will need to supply a polyfill.
 
 For the full list of ExecJS constraints, see [ExecJS Limitations](./execjs-limitations.md).
 
