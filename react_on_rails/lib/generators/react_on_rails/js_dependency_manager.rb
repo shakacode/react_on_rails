@@ -52,29 +52,39 @@ module ReactOnRails
     # Include this module in generator classes and call setup_js_dependencies
     # to handle all JS dependency installation via package_json gem.
     module JsDependencyManager
+      # Third-party dependencies are pinned to ^major.0.0 ranges to prevent breaking
+      # changes from uncontrolled major version bumps (e.g., peer dependency conflicts)
+      # while still allowing minor/patch updates. Pre-1.0 packages are left bare since
+      # ^0.x ranges pin to the minor version, which is too narrow.
+      # Exception: SWC deps are pinned to match Shakapacker's own version constraints
+      # (swc-loader@^0.2.0 is pre-1.0 but deliberately pinned for Shakapacker compat).
+      #
+      # Update these pins deliberately when adopting a new major version.
+
       # Core React dependencies required for React on Rails
       # Note: @babel/preset-react is handled separately in BABEL_REACT_DEPENDENCIES
       # and is added only when SWC is not the active transpiler.
       REACT_DEPENDENCIES = %w[
-        react
-        react-dom
-        prop-types
+        react@^19.0.0
+        react-dom@^19.0.0
+        prop-types@^15.0.0
       ].freeze
 
       # Babel preset needed by the generated babel.config.js for non-SWC setups.
       BABEL_REACT_DEPENDENCIES = %w[
-        @babel/preset-react
+        @babel/preset-react@^7.0.0
       ].freeze
 
       # CSS processing dependencies for webpack
       CSS_DEPENDENCIES = %w[
-        css-loader
-        css-minimizer-webpack-plugin
-        mini-css-extract-plugin
-        style-loader
+        css-loader@^7.0.0
+        css-minimizer-webpack-plugin@^8.0.0
+        mini-css-extract-plugin@^2.0.0
+        style-loader@^4.0.0
       ].freeze
 
       # Development-only dependencies for hot reloading (Webpack)
+      # Both packages are pre-1.0, so left bare (see pinning note above).
       DEV_DEPENDENCIES = %w[
         @pmmmwh/react-refresh-webpack-plugin
         react-refresh
@@ -82,14 +92,15 @@ module ReactOnRails
 
       # Rspack core dependencies (only installed when --rspack flag is used)
       RSPACK_DEPENDENCIES = %w[
-        @rspack/core
-        rspack-manifest-plugin
+        @rspack/core@^1.0.0
+        rspack-manifest-plugin@^5.0.0
       ].freeze
 
       # Rspack development dependencies for hot reloading
+      # react-refresh is pre-1.0, so left bare (see pinning note above).
       RSPACK_DEV_DEPENDENCIES = %w[
-        @rspack/cli
-        @rspack/plugin-react-refresh
+        @rspack/cli@^1.0.0
+        @rspack/plugin-react-refresh@^1.0.0
         react-refresh
       ].freeze
 
@@ -100,16 +111,17 @@ module ReactOnRails
       # - If users choose javascript_transpiler: 'babel', they should manually add @babel/preset-typescript
       #   and configure it in their babel.config.js
       TYPESCRIPT_DEPENDENCIES = %w[
-        typescript
-        @types/react
-        @types/react-dom
+        typescript@^6.0.0
+        @types/react@^19.0.0
+        @types/react-dom@^19.0.0
       ].freeze
 
       # SWC transpiler dependencies (for Shakapacker 9.3.0+ default transpiler)
       # SWC is ~20x faster than Babel and is the default for new Shakapacker installations
+      # Version ranges match Shakapacker's own constraints.
       SWC_DEPENDENCIES = %w[
-        @swc/core
-        swc-loader
+        @swc/core@^1.3.0
+        swc-loader@^0.2.0
       ].freeze
 
       # React on Rails Pro dependencies (only installed when --pro or --rsc flag is used)
@@ -222,7 +234,8 @@ module ReactOnRails
         # RSC requires React 19.0.x specifically (not 19.1.x or later)
         # Pin to ~19.0.4 to allow patch updates while staying within 19.0.x
         react_deps = if respond_to?(:use_rsc?) && use_rsc?
-                       ["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}", "prop-types"]
+                       ["react@#{RSC_REACT_VERSION_RANGE}", "react-dom@#{RSC_REACT_VERSION_RANGE}",
+                        "prop-types@^15.0.0"]
                      else
                        REACT_DEPENDENCIES
                      end
