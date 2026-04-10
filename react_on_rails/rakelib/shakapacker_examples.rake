@@ -96,6 +96,26 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
   end
 
+  # Pins webpack to avoid version 5.106.0+ which breaks SSR with ExecJS.
+  # Webpack 5.106.0 adds Reflect.defineProperty calls for anonymous default exports
+  # that cause "ReferenceError: __WEBPACK_DEFAULT_EXPORT__ is not defined" during SSR.
+  def pin_webpack_version(dir)
+    package_json_path = File.join(dir, "package.json")
+    return unless File.exist?(package_json_path)
+
+    begin
+      package_json = JSON.parse(File.read(package_json_path))
+    rescue JSON::ParserError => e
+      puts "  ERROR: Failed to parse #{package_json_path}: #{e.message}"
+      raise
+    end
+
+    overrides = package_json["overrides"] ||= {}
+    overrides["webpack"] = ">=5.0.0 <5.106.0"
+    puts "  Pinning webpack to <5.106.0 to avoid SSR compatibility issue"
+    File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
+  end
+
   # Updates React-related dependencies to a specific version
   def update_react_dependencies(deps, react_version)
     return unless deps
