@@ -69,7 +69,7 @@
     "terser-webpack-plugin": "5",
     "turbolinks": "^5.2.0",
     "url-loader": "^4.1.1",
-    "webpack": ">=5.0.0 <5.106.0",
+    "webpack": ">=5.76.0 <5.106.0",
     "webpack-assets-manifest": "5",
     "webpack-manifest-plugin": "^2.0.4",
     "webpack-merge": "5"

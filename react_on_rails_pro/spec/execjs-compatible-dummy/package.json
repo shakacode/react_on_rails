@@ -33,7 +33,7 @@
     "shakapacker": "9.6.1",
     "style-loader": "^4.0.0",
     "terser-webpack-plugin": "5",
-    "webpack": ">=5.0.0 <5.106.0",
+    "webpack": ">=5.76.0 <5.106.0",
     "webpack-assets-manifest": "5",
     "webpack-cli": "^6.0.1",
     "webpack-merge": "5"
