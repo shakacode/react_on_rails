@@ -290,7 +290,7 @@ def base_server_webpack_content
         }
       });
 
-      serverWebpackConfig.devtool = 'eval';
+      serverWebpackConfig.devtool = 'cheap-module-source-map';
 
       // If using the default 'web', then libraries like Emotion and loadable-components
       // break with SSR. The fix is to use a node renderer and change the target.
