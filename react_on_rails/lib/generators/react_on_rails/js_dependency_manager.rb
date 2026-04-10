@@ -91,16 +91,19 @@ module ReactOnRails
       ].freeze
 
       # Rspack core dependencies (only installed when --rspack flag is used)
+      # @rspack/core uses ^2.0.0-0 (with -0 prerelease suffix) to include RC/beta prereleases
+      # of 2.0.0 until the stable 2.0.0 release lands.
       RSPACK_DEPENDENCIES = %w[
-        @rspack/core@^1.0.0
+        @rspack/core@^2.0.0-0
         rspack-manifest-plugin@^5.0.0
       ].freeze
 
       # Rspack development dependencies for hot reloading
       # react-refresh is pre-1.0, so left bare (see pinning note above).
+      # @rspack/cli uses ^2.0.0-0 to match @rspack/core's prerelease range.
       RSPACK_DEV_DEPENDENCIES = %w[
-        @rspack/cli@^1.0.0
-        @rspack/plugin-react-refresh@^1.0.0
+        @rspack/cli@^2.0.0-0
+        @rspack/plugin-react-refresh@^2.0.0
         react-refresh
       ].freeze
 
