@@ -61,7 +61,7 @@ module ReactOnRails
         return false if attempt_pro_gem_auto_install
 
         context_line = pro_gem_requirement_context_line
-        prerelease_note = rsc_pro_prerelease_note
+        prerelease_note = rsc_prerelease_note
 
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
@@ -94,20 +94,17 @@ module ReactOnRails
       end
 
       def pro_requirement_flag
-        return "--rsc-pro" if use_rsc_pro_mode?
         return "--rsc" if options[:rsc]
 
         "--pro"
       end
 
-      def rsc_pro_prerelease_note
-        return "" unless use_rsc_pro_mode?
-        return "" unless Gem::Version.new(ReactOnRails::VERSION).prerelease?
+      def rsc_prerelease_note
+        return "" unless use_rsc?
+        return "" unless prerelease_ror_version?
 
         "Note: #{PRO_GEM_NAME} #{ReactOnRails::VERSION} may not be published yet. " \
           "If you are testing from source, use a local Gemfile `path:` option."
-      rescue ArgumentError
-        ""
       end
 
       # Attempt to auto-install the Pro gem via bundle add.
@@ -537,11 +534,18 @@ module ReactOnRails
       end
 
       def pro_gem_version_requirement
-        # RSC Pro uses exact pinning so the Pro gem version always matches the
-        # paired RSC package version generated in the same run.
-        return ReactOnRails::VERSION if use_rsc_pro_mode?
+        # Prerelease gem versions need an exact pin: Bundler's pessimistic operator
+        # (~>) does not match prerelease versions, so a stable range would fail to
+        # install during prerelease cycles.
+        return ReactOnRails::VERSION if prerelease_ror_version?
 
         "~> #{recommended_pro_gem_version}"
+      end
+
+      def prerelease_ror_version?
+        Gem::Version.new(ReactOnRails::VERSION).prerelease?
+      rescue ArgumentError
+        false
       end
 
       # Keep manual fallback pinned to the latest stable release (drop pre-release suffixes like .rc.N).

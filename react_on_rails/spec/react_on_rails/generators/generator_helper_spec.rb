@@ -203,29 +203,26 @@ RSpec.describe GeneratorHelper, type: :generator do
     end
   end
 
-  describe "RSC Pro mode helpers" do
-    it "enables rsc-pro mode for explicit --rsc-pro flag" do
-      allow(self).to receive(:options).and_return({ rsc_pro: true, rsc: false, pro: false })
+  describe "Pro/RSC flag helpers" do
+    it "treats --rsc as implying Pro" do
+      allow(self).to receive(:options).and_return({ rsc: true, pro: false })
 
-      expect(use_rsc_pro_mode?).to be(true)
       expect(use_rsc?).to be(true)
       expect(use_pro?).to be(true)
     end
 
-    it "enables rsc-pro mode when --rsc and --pro are both set" do
-      allow(self).to receive(:options).and_return({ rsc_pro: false, rsc: true, pro: true })
+    it "enables Pro without RSC for --pro alone" do
+      allow(self).to receive(:options).and_return({ rsc: false, pro: true })
 
-      expect(use_rsc_pro_mode?).to be(true)
-      expect(use_rsc?).to be(true)
-      expect(use_pro?).to be(true)
-    end
-
-    it "does not enable rsc-pro mode for standalone --pro" do
-      allow(self).to receive(:options).and_return({ rsc_pro: false, rsc: false, pro: true })
-
-      expect(use_rsc_pro_mode?).to be(false)
       expect(use_rsc?).to be(false)
       expect(use_pro?).to be(true)
+    end
+
+    it "does not enable Pro or RSC for a plain install" do
+      allow(self).to receive(:options).and_return({ rsc: false, pro: false })
+
+      expect(use_rsc?).to be_falsey
+      expect(use_pro?).to be_falsey
     end
   end
 
