@@ -110,8 +110,11 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       raise
     end
 
-    overrides = package_json["overrides"] ||= {}
-    overrides["webpack"] = ">=5.0.0 <5.106.0"
+    # Pin webpack in devDependencies to avoid the broken 5.106.0 release.
+    # We pin here rather than in overrides because overrides conflict with
+    # direct dependencies added by shakapacker:install.
+    dev_deps = package_json["devDependencies"] ||= {}
+    dev_deps["webpack"] = ">=5.0.0 <5.106.0"
     puts "  Pinning webpack to <5.106.0 to avoid SSR compatibility issue"
     File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
   end
