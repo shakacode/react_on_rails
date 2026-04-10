@@ -19,3 +19,7 @@ misc/updating-dependencies
 misc/credits
 misc/articles
 misc/tips
+
+# Decision Guide deep-dive companions (published as supporting material, linked from comparing-react-on-rails-to-alternatives.md — see #3065)
+getting-started/comparison-with-alternatives
+getting-started/nextjs-with-separate-rails-backend

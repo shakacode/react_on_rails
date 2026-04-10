@@ -41,22 +41,35 @@ echo ""
 FAILED_JOBS=()
 PRO_DEPS_READY=false
 
-# Helper function to run a job
+# Helper function to run a job.
+# Supports two call forms for backward compat with existing callers:
+#   Legacy:  run_job "Job Name" "shell command string"   (uses eval)
+#   Argv:    run_job "Job Name" cmd arg1 arg2 ...         (no eval, safer)
+# New callers should prefer the argv form, especially when passing variables.
 run_job() {
   local job_name="$1"
-  local command="$2"
+  shift
 
   echo -e "${BLUE}▶ Running: $job_name${NC}"
-  if eval "$command"; then
-    echo -e "${GREEN}✓ $job_name passed${NC}"
-    echo ""
-    return 0
+  if [ $# -eq 1 ]; then
+    # Legacy single-string form
+    if eval "$1"; then
+      echo -e "${GREEN}✓ $job_name passed${NC}"
+      echo ""
+      return 0
+    fi
   else
-    echo -e "${RED}✗ $job_name failed${NC}"
-    echo ""
-    FAILED_JOBS+=("$job_name")
-    return 1
+    # Argv form — no eval, no shell re-parsing
+    if "$@"; then
+      echo -e "${GREEN}✓ $job_name passed${NC}"
+      echo ""
+      return 0
+    fi
   fi
+  echo -e "${RED}✗ $job_name failed${NC}"
+  echo ""
+  FAILED_JOBS+=("$job_name")
+  return 1
 }
 
 # Detect changes unless --all is specified
@@ -85,7 +98,7 @@ if [ "$RUN_ALL" = false ]; then
 
       if [ "$DOCS_ONLY" = "true" ]; then
         # Even for docs-only changes, verify new docs have sidebar entries
-        run_job "Docs Sidebar Check" "script/check-docs-sidebar '$BASE_REF'"
+        run_job "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
         echo -e "${GREEN}No further CI needed for documentation-only changes!${NC}"
         if [ ${#FAILED_JOBS[@]} -gt 0 ]; then
           exit 1
@@ -100,7 +113,7 @@ if [ "$RUN_ALL" = false ]; then
       echo ""
 
       if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
-        run_job "Docs Sidebar Check" "script/check-docs-sidebar '$BASE_REF'"
+        run_job "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
         echo -e "${GREEN}No further CI needed for documentation-only changes!${NC}"
         if [ ${#FAILED_JOBS[@]} -gt 0 ]; then
           exit 1
@@ -125,7 +138,7 @@ if [ "$RUN_ALL" = false ]; then
     echo ""
 
     if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
-      run_job "Docs Sidebar Check" "script/check-docs-sidebar '$BASE_REF'"
+      run_job "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
       echo -e "${GREEN}No further CI needed for documentation-only changes!${NC}"
       if [ ${#FAILED_JOBS[@]} -gt 0 ]; then
         exit 1
@@ -190,7 +203,7 @@ if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
 fi
 
 # Always run the docs sidebar check (fast, no dependencies needed)
-run_job "Docs Sidebar Check" "script/check-docs-sidebar '$BASE_REF'"
+run_job "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
 
 # Run linting
 if [ "$RUN_LINT" = true ]; then

@@ -35,17 +35,29 @@ fi
 if [[ "$BASE_REF" == origin/* ]]; then
   BASE_BRANCH="${BASE_REF#origin/}"
   if ! git fetch origin "$BASE_BRANCH" --depth=50 2>/dev/null; then
-    echo -e "${YELLOW}Warning: Failed to fetch $BASE_REF, using local ref${NC}"
+    echo -e "${RED}Error: Failed to fetch $BASE_REF${NC}" >&2
+    echo "Please check your network connection and try again." >&2
+    exit 1
   fi
 fi
 
-# Get newly added doc files (committed changes only — diff-filter=A means added)
-ADDED_FILES=$(git diff --name-only --diff-filter=A "$BASE_REF"..."$CURRENT_REF" 2>/dev/null || echo "")
+# Validate that the base ref exists
+if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+  echo -e "${RED}Error: Base ref '$BASE_REF' does not exist${NC}" >&2
+  exit 1
+fi
 
-# For local development, also include untracked files
+# Get newly added or renamed doc files (diff-filter=AR covers both)
+ADDED_FILES=$(git diff --name-only --diff-filter=AR "$BASE_REF"..."$CURRENT_REF") || {
+  echo -e "${RED}Error: git diff failed for $BASE_REF...$CURRENT_REF${NC}" >&2
+  exit 1
+}
+
+# For local development, also include uncommitted (staged + unstaged) and untracked files
 if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
+  UNCOMMITTED=$(git diff --name-only HEAD 2>/dev/null || echo "")
   UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || echo "")
-  ADDED_FILES=$(printf "%s\n%s" "$ADDED_FILES" "$UNTRACKED" | sort -u | grep -v '^$' || echo "")
+  ADDED_FILES=$(printf "%s\n%s\n%s" "$ADDED_FILES" "$UNCOMMITTED" "$UNTRACKED" | sort -u | grep -v '^$' || echo "")
 fi
 
 # Filter to published doc files only (docs/oss/** and docs/pro/**)
