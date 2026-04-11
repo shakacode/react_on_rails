@@ -31,19 +31,23 @@ if [ ! -f "$SIDEBAR_FILE" ]; then
   exit 1
 fi
 
-# Fetch the base ref if it's a remote ref
+# Best-effort fetch of a remote base ref. If we are offline but already have
+# the ref cached locally, we can still do a correct comparison against that
+# cached copy — the real invariant we care about is "base ref resolves
+# locally", checked via `git rev-parse --verify` below. Fetch failures are
+# therefore not fatal on their own; the hard gate is the verify step.
 if [[ "$BASE_REF" == origin/* ]]; then
   BASE_BRANCH="${BASE_REF#origin/}"
-  if ! git fetch origin "$BASE_BRANCH" --depth=50 2>/dev/null; then
-    echo -e "${RED}Error: Failed to fetch $BASE_REF${NC}" >&2
-    echo "Please check your network connection and try again." >&2
-    exit 1
-  fi
+  git fetch origin "$BASE_BRANCH" --depth=50 2>/dev/null || true
 fi
 
-# Validate that the base ref exists
+# Hard gate: the base ref must be resolvable locally, whether from the fetch
+# above or from a pre-existing cached ref. This catches bad/unknown refs
+# (typos, deleted branches, first-run without any origin data) regardless of
+# whether the fetch succeeded.
 if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
-  echo -e "${RED}Error: Base ref '$BASE_REF' does not exist${NC}" >&2
+  echo -e "${RED}Error: Base ref '$BASE_REF' does not exist locally${NC}" >&2
+  echo "If you are offline, run 'git fetch origin' when you are next online." >&2
   exit 1
 fi
 
@@ -77,8 +81,11 @@ echo ""
 declare -A EXCLUSION_MAP
 if [ -f "$EXCLUSIONS_FILE" ]; then
   while IFS= read -r line; do
-    # Strip inline comments and trailing whitespace
+    # Strip inline comments, then leading and trailing whitespace.
+    # Leading whitespace matters: an entry like ` doc-id` would otherwise be
+    # stored verbatim and never match a lookup for `doc-id`.
     line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
     line="${line%"${line##*[![:space:]]}"}"
     # Skip blank lines
     [ -z "$line" ] && continue
