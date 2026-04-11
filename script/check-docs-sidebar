@@ -53,9 +53,11 @@ ADDED_FILES=$(git diff --name-only --diff-filter=AR "$BASE_REF"..."$CURRENT_REF"
   exit 1
 }
 
-# For local development, also include uncommitted (staged + unstaged) and untracked files
+# For local development, also include uncommitted (staged + unstaged) and untracked files.
+# Use --diff-filter=AR to match the committed-diff filter above — otherwise plain edits to
+# existing docs (which are not new additions) would trigger false failures locally.
 if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
-  UNCOMMITTED=$(git diff --name-only HEAD 2>/dev/null || echo "")
+  UNCOMMITTED=$(git diff --name-only --diff-filter=AR HEAD 2>/dev/null || echo "")
   UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || echo "")
   ADDED_FILES=$(printf "%s\n%s\n%s" "$ADDED_FILES" "$UNCOMMITTED" "$UNTRACKED" | sort -u | grep -v '^$' || echo "")
 fi
