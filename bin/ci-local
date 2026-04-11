@@ -110,11 +110,10 @@ if [ "$RUN_ALL" = false ]; then
 
       if [ "$DOCS_ONLY" = "true" ]; then
         # Even for docs-only changes, verify new docs have sidebar entries
+        # set -euo pipefail will exit with 1 if the sidebar check fails;
+        # reaching the next line means the check passed.
         run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
         echo -e "${GREEN}No further CI needed for documentation-only changes!${NC}"
-        if [ ${#FAILED_JOBS[@]} -gt 0 ]; then
-          exit 1
-        fi
         exit 0
       fi
     else
@@ -125,11 +124,10 @@ if [ "$RUN_ALL" = false ]; then
       echo ""
 
       if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
+        # set -euo pipefail will exit with 1 if the sidebar check fails;
+        # reaching the next line means the check passed.
         run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
         echo -e "${GREEN}No further CI needed for documentation-only changes!${NC}"
-        if [ ${#FAILED_JOBS[@]} -gt 0 ]; then
-          exit 1
-        fi
         exit 0
       fi
 
@@ -150,11 +148,10 @@ if [ "$RUN_ALL" = false ]; then
     echo ""
 
     if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
+      # set -euo pipefail will exit with 1 if the sidebar check fails;
+      # reaching the next line means the check passed.
       run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
       echo -e "${GREEN}No further CI needed for documentation-only changes!${NC}"
-      if [ ${#FAILED_JOBS[@]} -gt 0 ]; then
-        exit 1
-      fi
       exit 0
     fi
 
