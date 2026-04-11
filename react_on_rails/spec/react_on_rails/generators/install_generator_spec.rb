@@ -668,6 +668,8 @@ describe InstallGenerator, type: :generator do
       assert_file "bin/switch-bundler" do |content|
         # Version pins are present in the constants
         expect(content).to include("@rspack/core@^2.0.0-0")
+        expect(content).to include("@rspack/cli@^2.0.0-0")
+        expect(content).to include("@rspack/plugin-react-refresh@^2.0.0")
         expect(content).to include("webpack@^5.0.0")
         # Version-stripping regex is used for package.json key deletion
         expect(content).to include('dep[%r{\A(@[^/]+/[^@]+|[^@]+)}]')
