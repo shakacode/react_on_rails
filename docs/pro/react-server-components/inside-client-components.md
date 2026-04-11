@@ -1,324 +1,404 @@
-# Using React Server Components Inside Client Components
+# Embedding Server Components in Client Components
 
-React on Rails now supports rendering React Server Components (RSC) directly inside React Client Components. This guide explains how to use this feature effectively in your applications.
+React doesn't normally allow a client component to directly render a server component. React on Rails Pro provides a way around this using the `RSCRoute` component, which lets you embed server components inside client component trees. This guide covers when to use it, how it works, the complete setup, and the patterns for routing, error handling, and performance.
 
-## Overview
+## When to use this feature
 
-React Server Components provide several benefits.However, React traditionally doesn't allow server components to be directly rendered inside client components. This feature bypasses that limitation.
+Use this feature when a `'use client'` component needs to render server components at some point in its tree. The most common case is **client-side routing with server-rendered routes** — for example, a React Router app where some routes are server components that fetch data on the server.
 
-> [!IMPORTANT]
-> This feature should be used judiciously. It's best suited for server components whose props change very rarely, such as router routes. **Do not** use this with components whose props change frequently as it triggers HTTP requests to the server on each re-render.
+**You probably don't need this feature if:**
 
-## Basic Usage
+- Your server component is the top-level component rendered by Rails. Use `registerServerComponent` directly. See [Create a React Server Component](./create-without-ssr.md).
+- The server component's props change frequently. Every unique combination of `componentName` and props triggers an HTTP request for a fresh RSC payload, so this is not a good fit for components whose props change on every keystroke, interval, or animation frame.
 
-### Before
+## How it works
 
-Previously, server components could only be embedded inside client components if passed as a prop from a parent server component:
+When React on Rails Pro encounters `<RSCRoute componentName="Dashboard" componentProps={{ userId: 42 }} />` inside a client component, it does **not** look up a client-side implementation of `Dashboard`. Instead, it references the server component by name and relies on the framework to deliver its RSC payload:
 
-```tsx
-// Parent Server Component
-export default function Parent() {
-  return (
-    <ClientComponent>
-      <ServerComponent />
-    </ClientComponent>
-  );
-}
+1. **During server-side rendering**, the server renders `Dashboard` alongside the client component tree and embeds its RSC payload directly in the HTML response. When the browser hydrates, `RSCRoute` reads the embedded payload — no extra HTTP request.
+2. **During client-side navigation**, when `RSCRoute` appears in the tree for the first time (e.g., the user navigates to a new route), the client fetches the RSC payload from the server over HTTP and renders it.
+3. **When props change**, a new HTTP request is made for each unique combination of `componentName` and props. Identical combinations are cached (see [Performance and caching behavior](#performance-and-caching-behavior)).
+
+For this to work, the client component tree must be wrapped with `wrapServerComponentRenderer`, which provides the context `RSCRoute` relies on internally. You never need to create an `RSCProvider` yourself — wrapping with `wrapServerComponentRenderer` (or using `registerServerComponent` directly) sets it up automatically.
+
+## Walkthrough: A router with server component routes
+
+This walkthrough builds a client-side router where some routes are server components that fetch data on the server. Let's build an app with two routes: a `Dashboard` and a `Profile`, each rendered as a server component.
+
+### 1. Create the server components
+
+Server components are regular React components **without** a `'use client'` directive. They can be `async` and access server-only resources.
+
+```jsx
+// components/Dashboard.jsx (no 'use client' — this is a server component)
+const Dashboard = async ({ userId }) => {
+  const user = await fetchUser(userId);
+  return <div>Welcome back, {user.name}</div>;
+};
+export default Dashboard;
 ```
 
-### After
-
-Now, you can render server components directly inside client components using the `RSCRoute` component:
-
-```tsx
-'use client';
-import RSCRoute from 'react-on-rails-pro/RSCRoute';
-
-export default function ClientComponent() {
-  return (
-    <div>
-      <RSCRoute componentName="ServerComponent" componentProps={{ user }} />
-    </div>
-  );
-}
-```
-
-## Setup Steps
-
-### 1. Register your server components
-
-Register your server components in your Server and RSC bundles:
-
-```tsx
-// packs/server_bundle.tsx
-import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
-import MyServerComponent from './components/MyServerComponent';
-import AnotherServerComponent from './components/AnotherServerComponent';
-
-// Server bundle: pass an object mapping names to components
-registerServerComponent({
-  MyServerComponent,
-  AnotherServerComponent,
-});
-```
-
-> [!WARNING]
-> **`registerServerComponent` has different signatures per bundle.** This is an intentional design choice, not a bug:
->
-> - **Server/RSC bundle:** `registerServerComponent({ Name: Component })` — takes an object mapping names to component implementations (the component code is bundled on the server).
-> - **Client bundle:** `registerServerComponent('Name1', 'Name2')` — takes component name strings directly (the component code is **not** bundled on the client; only the name is registered for RSC payload fetching).
->
-> See [Creating a React Server Component Page](./create-without-ssr.md) for complete examples of both signatures.
-
-> [!NOTE]
-> Server components only need to be registered in the client bundle if they will be rendered directly in Rails views using the `stream_react_component` helper. If you're only using server components inside client components via `RSCRoute`, you can skip client bundle registration entirely. In this case, it's enough to register the server component in the server and RSC bundles.
-
-### 2. Create your client component
-
-Create a client component that uses `RSCRoute` to render server components:
-
-```tsx
-// components/MyClientComponent.tsx
-'use client';
-import { useState } from 'react';
-import RSCRoute from 'react-on-rails-pro/RSCRoute';
-
-export default function MyClientComponent({ user }) {
+```jsx
+// components/Profile.jsx
+const Profile = async ({ userId }) => {
+  const user = await fetchUser(userId);
   return (
     <div>
-      <h1>Hello from Client Component</h1>
-      <RSCRoute componentName="MyServerComponent" componentProps={{ user }} />
+      <h1>{user.name}</h1>
+      <p>{user.bio}</p>
     </div>
   );
-}
+};
+export default Profile;
 ```
 
-### 3. Wrap your client component
+### 2. Create the client component that uses `RSCRoute`
 
-Create client and server versions of your component wrapped with `wrapServerComponentRenderer`:
-
-#### Client version:
+This is a `'use client'` component. It references server components **by name** via `RSCRoute` — it does not import them.
 
 ```tsx
-// components/MyClientComponent.client.tsx
-'use client';
-import ReactOnRails from 'react-on-rails-pro';
-import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/client';
-import MyClientComponent from './MyClientComponent';
-
-const WrappedComponent = wrapServerComponentRenderer(MyClientComponent);
-
-ReactOnRails.register({
-  MyClientComponent: WrappedComponent,
-});
-```
-
-#### Server version:
-
-```tsx
-// components/MyClientComponent.server.tsx
-import ReactOnRails from 'react-on-rails-pro';
-import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/server';
-import MyClientComponent from './MyClientComponent';
-
-const WrappedComponent = wrapServerComponentRenderer(MyClientComponent);
-
-ReactOnRails.register({
-  MyClientComponent: WrappedComponent,
-});
-```
-
-### 4. Use in Rails view
-
-```erb
-<%= stream_react_component('MyClientComponent', props: { user: current_user.as_json }, prerender: true) %>
-```
-
-> [!NOTE]
-> You must use `stream_react_component` rather than `react_component` for server components or client components that use server components.
-
-## Use Cases and Examples
-
-### ❌ Bad Example - Frequently Changing Props
-
-```tsx
-'use client';
-import { useState } from 'react';
-import RSCRoute from 'react-on-rails-pro/RSCRoute';
-
-export default function ClientComponent() {
-  const [count, setCount] = useState(0);
-
-  return (
-    <div>
-      <button onClick={() => setCount(count + 1)}>Increment</button>
-      <label>Count: {count}</label>
-      {/* BAD EXAMPLE: Server Component props change with each button click */}
-      <RSCRoute componentName="ServerComponent" componentProps={{ count }} />
-    </div>
-  );
-}
-```
-
-> [!WARNING]
-> This implementation will make a server request on every state change, significantly impacting performance.
-
-### ✅ Good Example - Router Integration
-
-```tsx
-'use client';
+// components/AppRouter.tsx
 import { Routes, Route, Link } from 'react-router-dom';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
-import AnotherClientComponent from './AnotherClientComponent';
 
-export default function AppRouter({ user }) {
+export default function AppRouter({ userId }) {
   return (
     <>
       <nav>
-        <Link to="/">Home</Link>
-        <Link to="/about">About</Link>
-        <Link to="/client-component">Client Component</Link>
+        <Link to="/dashboard">Dashboard</Link>
+        <Link to="/profile">Profile</Link>
       </nav>
       <Routes>
-        {/* Mix client and server components in your router */}
-        <Route path="/client-component" element={<AnotherClientComponent />} />
-        {/* GOOD EXAMPLE: Server Component props rarely change */}
-        <Route path="/about" element={<RSCRoute componentName="About" componentProps={{ user }} />} />
-        <Route path="/" element={<RSCRoute componentName="Home" componentProps={{ user }} />} />
+        <Route
+          path="/dashboard"
+          element={<RSCRoute componentName="Dashboard" componentProps={{ userId }} />}
+        />
+        <Route
+          path="/profile"
+          element={<RSCRoute componentName="Profile" componentProps={{ userId }} />}
+        />
       </Routes>
     </>
   );
 }
 ```
 
-## Advanced Usage
+Notice that `AppRouter.tsx` imports `RSCRoute` but does **not** import `Dashboard` or `Profile`. The server components' code stays on the server — only their names travel to the client.
 
-### Nested Routes with Server Components
+### 3. Wrap the client component for both bundles
 
-The framework supports nesting client and server components to arbitrary depth:
+`RSCRoute` needs context that is set up by `wrapServerComponentRenderer`. You need two wrapper files — one for client-side hydration and one for server-side rendering — **both with `'use client'`**.
+
+```tsx
+// components/AppRouter.client.tsx
+'use client';
+import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/client';
+import { BrowserRouter } from 'react-router-dom';
+import AppRouter from './AppRouter';
+
+export default wrapServerComponentRenderer((props) => (
+  <BrowserRouter>
+    <AppRouter {...props} />
+  </BrowserRouter>
+));
+```
+
+```tsx
+// components/AppRouter.server.tsx
+'use client';
+import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/server';
+import { StaticRouter } from 'react-router-dom/server';
+import type { RailsContext } from 'react-on-rails-pro';
+import AppRouter from './AppRouter';
+
+function ServerAppRouter(props: object, railsContext: RailsContext) {
+  const path = new URL(railsContext.href).pathname;
+  return () => (
+    <StaticRouter location={path}>
+      <AppRouter {...props} />
+    </StaticRouter>
+  );
+}
+
+export default wrapServerComponentRenderer(ServerAppRouter);
+```
+
+The server wrapper uses `StaticRouter` with the current URL derived from `railsContext` because the router needs to know which route to render during SSR. The client wrapper uses `BrowserRouter` for normal client-side navigation.
+
+### 4. Register the components
+
+If you're **not** using `auto_load_bundle`, you need to register the components manually in both bundles. The wrapped `AppRouter` is registered with `ReactOnRails.register`, and the server components referenced by `RSCRoute` are registered with `registerServerComponent`.
+
+On the client side, follow the [manual bundle splitting pattern](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#manual-bundle-splitting-pre-auto-bundling-pattern) — one pack file per component so each view only loads the code it needs:
+
+```tsx
+// packs/client/AppRouter.tsx
+import ReactOnRails from 'react-on-rails-pro';
+import AppRouter from '../../components/AppRouter.client';
+
+ReactOnRails.register({ AppRouter });
+```
+
+```tsx
+// packs/client/Dashboard.tsx
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+registerServerComponent('Dashboard');
+```
+
+```tsx
+// packs/client/Profile.tsx
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+registerServerComponent('Profile');
+```
+
+On the server side, one aggregated entry file registers everything:
+
+```tsx
+// packs/server-bundle.tsx
+import ReactOnRails from 'react-on-rails-pro';
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+import AppRouter from '../components/AppRouter.server';
+import Dashboard from '../components/Dashboard';
+import Profile from '../components/Profile';
+
+ReactOnRails.register({ AppRouter });
+registerServerComponent({ Dashboard, Profile });
+```
+
+Notice the two different shapes of `registerServerComponent`:
+
+- The **server bundle** takes an object (`{ Dashboard, Profile }`) because the actual component code needs to be bundled into the server.
+- The **client bundle** takes names as strings (`'Dashboard'`, `'Profile'`) because the client only needs a placeholder — the server component code stays on the server.
+
+For the full reference on the two signatures and how auto-bundling handles them, see [Auto-Bundling with React Server Components](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#auto-bundling-with-react-server-components).
+
+If you **are** using `auto_load_bundle`, you can skip the registration files entirely. See [Auto-bundling with server components](#auto-bundling-with-server-components) below.
+
+### 5. Render from the Rails view
+
+Use `stream_react_component` to render the wrapped component:
+
+```erb
+<%= stream_react_component("AppRouter", props: { userId: current_user.id }) %>
+```
+
+> [!IMPORTANT]
+> You **must** use `stream_react_component`, not `react_component`, whenever the component tree uses `RSCRoute`. The server variant of `wrapServerComponentRenderer` will throw a descriptive error if you use `react_component`.
+
+That's the complete setup. The rest of this guide covers how to simplify registration with auto-bundling, understand performance and caching, handle errors, and apply common patterns.
+
+## Auto-bundling with server components
+
+If you enable `auto_load_bundle: true`, React on Rails generates the registration code for you based on the `'use client'` directive and file naming. For the complete story on how auto-bundling classifies components, how it produces client packs and server bundle files, and the rules for using `.client.tsx` / `.server.tsx` variants with RSC, see the canonical reference: [Auto-Bundling with React Server Components](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#auto-bundling-with-react-server-components).
+
+This section covers only what's specific to the `RSCRoute` + `wrapServerComponentRenderer` pattern from this walkthrough.
+
+### File layout for this walkthrough
+
+The auto-bundle directory holds the files you want auto-bundling to **register as entry points** — the components you actually render from Rails views via `react_component` or `stream_react_component`, plus the server components rendered by `RSCRoute` (they also need to be registered so the framework can fetch their RSC payloads by name). In this walkthrough, the entry points are the wrapped variants `AppRouter.client.tsx` and `AppRouter.server.tsx` (not the raw `AppRouter.tsx`), because they are what you want registered under the name `"AppRouter"` in each bundle, plus the server components `Dashboard.jsx` and `Profile.jsx`, which are referenced by name from `RSCRoute`. The raw `AppRouter.tsx` is just implementation code imported by those wrappers, so it lives outside the auto-bundle directory regardless of its filename:
+
+```text
+client/app/
+├── components/
+│   └── AppRouter.tsx                         # implementation only — imported by the wrappers, not an entry point
+└── ror-auto-load-components/
+    ├── AppRouter.client.tsx                  # 'use client' — entry point, wraps with wrapServerComponentRenderer/client
+    ├── AppRouter.server.tsx                  # 'use client' — entry point, wraps with wrapServerComponentRenderer/server
+    ├── Dashboard.jsx                         # server component entry point (no 'use client')
+    └── Profile.jsx                           # server component entry point (no 'use client')
+```
+
+The wrappers import the raw `AppRouter` from `../../components/AppRouter`. Since that file isn't in the scanned directory, auto-bundling never sees it as its own entry point — it's pulled in transitively as part of the wrapped variants' bundles.
+
+### What auto-bundling does and doesn't handle
+
+Auto-bundling takes care of the **registration** layer: it generates the per-component client packs (using `ReactOnRails.register` for the wrapped `AppRouter` and `registerServerComponent` for `Dashboard` / `Profile`) and adds everything to the aggregated server bundle file. You don't need to write `packs/client-bundle.tsx` or modify `packs/server-bundle.tsx` for these components.
+
+Auto-bundling does **not** handle **wrapping**. You must still author `AppRouter.client.tsx` and `AppRouter.server.tsx` yourself with `wrapServerComponentRenderer` as shown in [Step 3 of the walkthrough](#3-wrap-the-client-component-for-both-bundles). The generator uses whatever you export from those files as the "AppRouter" component in each bundle.
+
+> [!IMPORTANT]
+> The `.server.tsx` / `.client.tsx` variants here are legitimate because both wrappers are **client components** (both start with `'use client'`) that happen to use different imports for client-side vs server-side rendering. **Do not** apply the `.client` / `.server` suffixes to the actual server components referenced by `RSCRoute` (`Dashboard.jsx`, `Profile.jsx`). Server components have no client-side variant — their code never runs in the browser. See [the RSC variant rules](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#when-to-use-client--server-variants-with-rsc) for details.
+
+## Performance and caching behavior
+
+Understanding how RSC payloads are fetched and cached is critical to using this feature effectively.
+
+### Server-side rendering (initial page load)
+
+When the page is server-rendered, the RSC payloads for all `RSCRoute` components on that page are generated during SSR and embedded directly in the HTML response. When the browser hydrates, `RSCRoute` reads the embedded payload — **no extra network round-trip**.
+
+### Client-side navigation
+
+When a user navigates client-side and a new `RSCRoute` enters the tree, the client makes an HTTP request to fetch the RSC payload from the server. The request URL is derived from the `rsc_payload_generation_url_path` configuration plus the component name and props.
+
+### Caching
+
+RSC payloads are cached in memory by a key of `componentName` + `JSON.stringify(componentProps)`. This means:
+
+- **Identical props** → cached, no new request.
+- **Different props** → new request.
+- Object identity doesn't matter — the cache compares the serialized JSON.
+
+### Why the "rarely changing props" rule exists
+
+Because every unique prop combination triggers a new HTTP request, `RSCRoute` is a poor fit for components whose props change on every re-render. The router use case works well because route changes are discrete events — the props for each route are stable across navigations.
+
+**Bad example — don't do this:**
+
+```tsx
+'use client';
+import { useState } from 'react';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+
+export default function Counter() {
+  const [count, setCount] = useState(0);
+  return (
+    <div>
+      <button onClick={() => setCount(count + 1)}>Increment</button>
+      {/* BAD: every click triggers a new HTTP request */}
+      <RSCRoute componentName="ServerCounter" componentProps={{ count }} />
+    </div>
+  );
+}
+```
+
+## Error handling
+
+When a server component fetch fails (e.g., network hiccup, server crash, transient error), `RSCRoute` throws a `ServerComponentFetchError` that you can catch with a React error boundary. You can then use the `useRSC` hook to manually refetch the component without a full page reload.
+
+```tsx
+'use client';
+import { ErrorBoundary } from 'react-error-boundary';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
+import { useRSC } from 'react-on-rails-pro/RSCProvider';
+import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError';
+
+function RetryFallback({ error, resetErrorBoundary }) {
+  const { refetchComponent } = useRSC();
+
+  if (isServerComponentFetchError(error)) {
+    const { serverComponentName, serverComponentProps } = error;
+    return (
+      <div>
+        <p>Failed to load {serverComponentName}.</p>
+        <button
+          onClick={() => {
+            refetchComponent(serverComponentName, serverComponentProps)
+              .catch((err) => console.error('Retry failed:', err))
+              .finally(() => resetErrorBoundary());
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Not a server component fetch error — let a higher boundary handle it
+  throw error;
+}
+
+export default function ProfilePage({ userId }) {
+  return (
+    <ErrorBoundary FallbackComponent={RetryFallback}>
+      <RSCRoute componentName="Profile" componentProps={{ userId }} />
+    </ErrorBoundary>
+  );
+}
+```
+
+> [!NOTE]
+> `useRSC` is available anywhere inside a tree set up by `wrapServerComponentRenderer` or `registerServerComponent` (including the auto-bundled versions). You never need to create an `RSCProvider` manually — the context is always set up for you.
+
+## Common patterns
+
+### Nested routes
+
+You can nest client and server components to arbitrary depth:
 
 ```tsx
 'use client';
 import { Routes, Route } from 'react-router-dom';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
-import ServerRouteLayout from './ServerRouteLayout';
-import ClientRouteLayout from './ClientRouteLayout';
+import ClientSettings from './ClientSettings';
 
 export default function AppRouter() {
   return (
     <Routes>
-      <Route path="/main-server-route" element={<ServerRouteLayout />}>
-        <Route path="/server-subroute" element={<RSCRoute componentName="MyServerComponent" />} />
-        <Route path="/client-subroute" element={<ClientSubcomponent />} />
-      </Route>
-      <Route path="/main-client-route" element={<ClientRouteLayout />}>
-        <Route path="/client-subroute" element={<ClientSubcomponent />} />
-        <Route path="/server-subroute" element={<RSCRoute componentName="MyServerComponent" />} />
+      <Route path="/admin" element={<RSCRoute componentName="AdminLayout" />}>
+        <Route path="users" element={<RSCRoute componentName="UserList" />} />
+        <Route path="settings" element={<ClientSettings />} />
       </Route>
     </Routes>
   );
 }
 ```
 
-### Using `Outlet` in Server Components
+### Using `Outlet` in server components
 
-To use React Router's `Outlet` in server components, create a client version:
+React Router's `Outlet` is a client component (it uses context). To use it inside a server component, re-export it as a client component:
 
 ```tsx
-// ./components/Outlet.tsx
+// components/Outlet.tsx
 'use client';
 export { Outlet as default } from 'react-router-dom';
 ```
 
-Then use it in your server components:
+Then use it in your server component:
 
-```tsx
-// ./components/ServerRouteLayout.tsx
+```jsx
+// components/AdminLayout.jsx (server component)
 import Outlet from './Outlet';
 
-export default function ServerRouteLayout() {
+export default function AdminLayout() {
   return (
     <div>
-      <h1>Server Route Layout</h1>
+      <h1>Admin</h1>
       <Outlet />
     </div>
   );
 }
 ```
 
-## Auto-Loading Bundles
+### `Suspense` for loading states
 
-If you're using the `auto_load_bundle: true` option in your React on Rails configuration, you don't need to manually register components using `ReactOnRails.register`. However, you still need to:
-
-1. Create both client and server wrappers for your components
-2. Properly import the environment-specific implementations of `wrapServerComponentRenderer`
-
-## Component Lifecycle
-
-When using server components inside client components:
-
-1. **During Initial SSR**:
-   - The server component is rendered on the server
-   - Its payload is embedded directly in the HTML response
-   - No additional HTTP requests are needed for hydration
-
-2. **During Client Navigation**:
-   - When a user navigates to a new route client-side
-   - The client makes an HTTP request to fetch the server component payload
-   - The route is rendered with the fetched server component
-
-3. **During State Changes**:
-   - If a server component's props change, a new HTTP request is made
-   - The component is re-rendered with the new props
-   - This is why you should avoid frequently changing props
-
-## Performance Considerations
-
-- Page responsiveness is improved because RSC payloads are embedded in the HTML and no additional HTTP requests are needed for hydration
-- Client navigation to new routes with server components requires an HTTP request
-- Avoid changing server component props frequently
-- Consider using suspense boundaries for loading states during navigation
-
-## Common Patterns
-
-### Using a Loading State
+Wrap `RSCRoute` in `Suspense` to show a loading indicator while the RSC payload is being fetched. This is relevant for client-side navigation — during SSR, the payload is already embedded in the HTML.
 
 ```tsx
 'use client';
 import { Suspense } from 'react';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
-export default function ClientComponent({ user }) {
+export default function Page({ user }) {
   return (
-    <div>
-      <Suspense fallback={<div>Loading server component...</div>}>
-        <RSCRoute componentName="ServerComponent" componentProps={{ user }} />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div>Loading…</div>}>
+      <RSCRoute componentName="SlowServerComponent" componentProps={{ user }} />
+    </Suspense>
   );
 }
 ```
 
-### Conditional Rendering
+### Conditional rendering
+
+When a server component becomes visible for the first time on the client, it triggers an HTTP request to fetch the RSC payload. Wrap it in `Suspense` to handle the loading state:
 
 ```tsx
 'use client';
-import { useState } from 'react';
-import { Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
-export default function ClientComponent({ user }) {
-  const [showServerComponent, setShowServerComponent] = useState(false);
-
+export default function DetailsPanel({ id }) {
+  const [isOpen, setIsOpen] = useState(false);
   return (
     <div>
-      <button onClick={() => setShowServerComponent(!showServerComponent)}>
-        {showServerComponent ? 'Hide' : 'Show'} Server Component
+      <button onClick={() => setIsOpen(!isOpen)}>
+        {isOpen ? 'Hide' : 'Show'} details
       </button>
-
-      {showServerComponent && (
-        <Suspense fallback={<div>Loading...</div>}>
-          <RSCRoute componentName="ServerComponent" componentProps={{ user }} />
+      {isOpen && (
+        <Suspense fallback={<div>Loading details…</div>}>
+          <RSCRoute componentName="Details" componentProps={{ id }} />
         </Suspense>
       )}
     </div>
@@ -326,17 +406,38 @@ export default function ClientComponent({ user }) {
 }
 ```
 
-> [!NOTE]
-> When conditionally rendering server components, an HTTP request will be made when the component becomes visible.
+## API reference
 
-## Best Practices
+Each API below is exported as the default export of its module — import them using default-import syntax.
 
-1. **Use for rarely changing components**: Server components are ideal for routes, layouts, and content that doesn't change frequently.
+| API | Import | Purpose |
+| --- | --- | --- |
+| `RSCRoute` | `react-on-rails-pro/RSCRoute` | Renders a server component inside a client component. Props: `componentName: string`, `componentProps: object`. |
+| `wrapServerComponentRenderer` (client) | `react-on-rails-pro/wrapServerComponentRenderer/client` | Wraps a `'use client'` component for client-side hydration. Provides the context `RSCRoute` needs internally. The wrapped result must be registered with `ReactOnRails.register` unless you use auto-bundling. |
+| `wrapServerComponentRenderer` (server) | `react-on-rails-pro/wrapServerComponentRenderer/server` | Same as above, for server-side rendering. The wrapped function receives `railsContext` as its second argument. |
+| `registerServerComponent` (client) | `react-on-rails-pro/registerServerComponent/client` | Registers server component placeholders in the client bundle. Takes names as strings: `registerServerComponent('A', 'B')`. The client fetches the RSC payload from the server or uses the payload already embedded in the HTML. |
+| `registerServerComponent` (server) | `react-on-rails-pro/registerServerComponent/server` | Registers server components in the server bundle. Takes an object: `registerServerComponent({ A, B })`. |
+| `useRSC` | `react-on-rails-pro/RSCProvider` | Hook providing `refetchComponent(name, props)` for manual refetch and error recovery. Available anywhere inside a tree set up by `wrapServerComponentRenderer` or `registerServerComponent`. |
+| `isServerComponentFetchError` | `react-on-rails-pro/ServerComponentFetchError` | Type guard to check if an error came from a failed server component fetch. The error has `serverComponentName` and `serverComponentProps` fields. |
 
-2. **Always wrap in Suspense**: Server components may load asynchronously, especially after client navigation.
+## Troubleshooting
 
-3. **Pass stable props**: Avoid passing state variables that change frequently as props to server components.
+**Error: "Component 'X' is registered as a server component but is being rendered with the react_component helper"**
 
-4. **Use for data-heavy components**: Components that need to fetch data from databases or APIs are good candidates for server components.
+You're using `react_component` in the Rails view when you should be using `stream_react_component`. `RSCRoute` requires streaming to work. Change the helper and try again.
 
-By following these guidelines, you can effectively leverage React Server Components while maintaining optimal performance.
+**Empty content where the server component should appear**
+
+Check the browser's network tab — is the request to `/rsc_payload/:componentName` succeeding? If not:
+
+- Make sure the server component is registered in your server bundle with `registerServerComponent({ ComponentName })`.
+- Make sure `rsc_payload_route` is mounted in `config/routes.rb`.
+- Make sure the component name in `<RSCRoute componentName="…" />` matches the registration exactly.
+
+**`useRSC` returns `undefined` or throws**
+
+The component calling `useRSC` is not inside a tree set up by `wrapServerComponentRenderer` or `registerServerComponent`. Make sure you registered the `.client.tsx` / `.server.tsx` variants (not the raw client component), or that auto-bundling is picking them up correctly.
+
+**The bundler complains about importing a server component from a client component**
+
+You should never import a server component directly from a client component. Reference it by name with `<RSCRoute componentName="…" />` instead.

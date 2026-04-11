@@ -388,7 +388,7 @@ Do the same for any component files imported in your `server-bundle.js`.
 
 ### Pattern B: Auto-bundling (single file per component)
 
-If you use `auto_load_bundle` with a `components_subdirectory`, each component has a file in that directory:
+If you use `auto_load_bundle` with a `components_subdirectory`, each component has a file in that directory. Once you start migrating components to Server Components, auto-bundling will automatically switch each component's registration between `ReactOnRails.register` and `registerServerComponent` based on whether the file starts with `'use client'`. For the complete reference, see [Auto-Bundling with React Server Components](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#auto-bundling-with-react-server-components).
 
 ```text
 app/javascript/src/
