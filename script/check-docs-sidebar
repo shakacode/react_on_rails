@@ -93,8 +93,11 @@ if [ -f "$EXCLUSIONS_FILE" ]; then
   done < "$EXCLUSIONS_FILE"
 fi
 
-# Read sidebar file once
-SIDEBAR_CONTENT=$(cat "$SIDEBAR_FILE")
+# Read sidebar file once and strip out line comments so a quoted doc ID inside
+# a `// comment` (e.g. `// TODO: re-add 'foo'`) cannot satisfy the grep below.
+# Block comments `/* ... */` are not handled; the convention in this file is
+# single-line comments only.
+SIDEBAR_CONTENT=$(grep -v '^[[:space:]]*//' "$SIDEBAR_FILE")
 
 MISSING=()
 CHECKED=0

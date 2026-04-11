@@ -214,8 +214,14 @@ if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo ""
 fi
 
-# Always run the docs sidebar check (fast, no dependencies needed)
-run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
+# Always run the docs sidebar check (fast, no dependencies needed).
+# `|| true` keeps a sidebar failure from aborting the rest of bin/ci-local via
+# `set -euo pipefail` — the failure is still tracked inside run_job_argv via
+# FAILED_JOBS and reported by the summary block at the end of the script.
+# This is the only `run_job_*` call at the top level of the main path (all
+# others are inside `if "$RUN_X" = true` gates), so adding the guard here
+# gives contributors a complete failure report from a single local run.
+run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF" || true
 
 # Run linting
 if [ "$RUN_LINT" = true ]; then
