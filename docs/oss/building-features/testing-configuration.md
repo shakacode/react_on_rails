@@ -517,7 +517,8 @@ If you prefer to manually share output paths instead of using automatic detectio
    bundle exec rspec # Terminal 2
    ```
 
-> **Warning:** Do not share output paths with `bin/dev` (HMR mode) — HMR manifests will cause test failures.
+> [!WARNING]
+> Do not share output paths with `bin/dev` (HMR mode) — HMR manifests will cause test failures.
 
 ### Caching Strategies
 
