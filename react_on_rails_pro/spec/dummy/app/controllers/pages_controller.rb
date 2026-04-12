@@ -24,6 +24,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     rsc_component_error non_existing_react_component
     non_existing_stream_react_component non_existing_rsc_payload
     stream_error_demo stream_shell_error_demo
+    server_side_log_throw server_router
   ]
 
   before_action :data
@@ -277,6 +278,11 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   # Temporarily applies config overrides from query params for the duration of a single request.
   # Restores original values in the ensure block so global state is not permanently mutated.
+  #
+  # NOTE: This mutates global configuration singletons (ReactOnRails.configuration,
+  # ReactOnRailsPro.configuration). In a multi-threaded server like Puma, concurrent requests
+  # can observe mutated values during the window between apply and restore. This is acceptable
+  # for a single-threaded dev/test dummy app but should NOT be replicated in production code.
   def with_config_overrides
     originals = save_error_config
     apply_error_config_overrides
@@ -294,15 +300,16 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   end
 
   def apply_error_config_overrides
-    bool = ActiveModel::Type::Boolean.new
     if params.key?(:raise_on_prerender_error)
-      ReactOnRails.configuration.raise_on_prerender_error = bool.cast(params[:raise_on_prerender_error])
+      ReactOnRails.configuration.raise_on_prerender_error = error_hub_config_value(:raise_on_prerender_error, nil)
     end
-    ReactOnRailsPro.configuration.throw_js_errors = bool.cast(params[:throw_js_errors]) if params.key?(:throw_js_errors)
+    if params.key?(:throw_js_errors)
+      ReactOnRailsPro.configuration.throw_js_errors = error_hub_config_value(:throw_js_errors, nil)
+    end
     return unless params.key?(:raise_non_shell_server_rendering_errors)
 
     ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors =
-      bool.cast(params[:raise_non_shell_server_rendering_errors])
+      error_hub_config_value(:raise_non_shell_server_rendering_errors, nil)
   end
 
   def restore_error_config(originals)
@@ -311,8 +318,8 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors = originals[:raise_non_shell]
   end
 
-  # Returns a request-local override when the error hub query string includes one.
-  # This keeps the demo pages accurate without mutating the shared config singleton.
+  # Casts a query param to boolean. Used by both the error hub view (to display current
+  # config state without mutation) and apply_error_config_overrides (to mutate config).
   def error_hub_config_value(key, default)
     value = params[key]
     return default if value.blank?
