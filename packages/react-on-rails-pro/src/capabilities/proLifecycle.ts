@@ -1,5 +1,3 @@
-/* eslint-disable import/prefer-default-export -- named export for consistency with capability API */
-
 /*
  * Copyright (c) 2025 Shakacode LLC
  *
@@ -21,6 +19,12 @@ import {
   hydrateAllStores,
 } from '../ClientSideRenderer.ts';
 
+/** Shared implementation used by both the capability object and proClientStartup. */
+export async function reactOnRailsPageLoaded(): Promise<void> {
+  debugTurbolinks('reactOnRailsPageLoaded [PRO]');
+  await Promise.all([hydrateAllStores(), renderOrHydrateAllComponents()]);
+}
+
 /**
  * Pro lifecycle capability.
  * Overrides core lifecycle with Pro implementations that support hydration
@@ -28,10 +32,7 @@ import {
  */
 export function createProLifecycleCapability() {
   return {
-    async reactOnRailsPageLoaded(): Promise<void> {
-      debugTurbolinks('reactOnRailsPageLoaded [PRO]');
-      await Promise.all([hydrateAllStores(), renderOrHydrateAllComponents()]);
-    },
+    reactOnRailsPageLoaded,
 
     reactOnRailsComponentLoaded(domId: string): Promise<void> {
       return renderOrHydrateComponent(domId);

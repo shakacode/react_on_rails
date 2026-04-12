@@ -18,17 +18,11 @@ import { getRailsContext } from 'react-on-rails/context';
 import { onPageLoaded, onPageUnloaded } from 'react-on-rails/pageLifecycle';
 import { debugTurbolinks } from 'react-on-rails/turbolinksUtils';
 import {
-  renderOrHydrateAllComponents,
-  hydrateAllStores,
   renderOrHydrateCompleteComponents,
   hydrateCompleteStores,
   unmountAll,
 } from './ClientSideRenderer.ts';
-
-async function reactOnRailsPageLoaded() {
-  debugTurbolinks('reactOnRailsPageLoaded [PRO]');
-  await Promise.all([hydrateAllStores(), renderOrHydrateAllComponents()]);
-}
+import { reactOnRailsPageLoaded } from './capabilities/proLifecycle.ts';
 
 function reactOnRailsPageUnloaded(): void {
   debugTurbolinks('reactOnRailsPageUnloaded [PRO]');
