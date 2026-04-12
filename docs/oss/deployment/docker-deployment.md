@@ -277,7 +277,8 @@ spec:
 - **Secrets**: Use Kubernetes Secrets with `secretKeyRef` (as shown above) rather than hardcoding values directly in the `env` section. Never commit secret values to your manifest files.
 - **Migrations**: Run migrations as a Kubernetes Job or init container before the Deployment rolls out:
 
-  > **Warning:** With `replicas > 1`, each pod's init container runs concurrently. Prefer a Kubernetes Job for migrations unless every migration is idempotent.
+  > [!WARNING]
+  > With `replicas > 1`, each pod's init container runs concurrently. Prefer a Kubernetes Job for migrations unless every migration is idempotent.
 
   ```yaml
   initContainers:
