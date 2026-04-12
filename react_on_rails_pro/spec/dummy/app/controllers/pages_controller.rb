@@ -19,6 +19,13 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     session[:something_useful] = "REALLY USEFUL"
   end
 
+  around_action :with_config_overrides, only: %i[
+    ssr_shell_error ssr_async_error ssr_sync_error ssr_async_prop_error
+    rsc_component_error non_existing_react_component
+    non_existing_stream_react_component non_existing_rsc_payload
+    stream_error_demo stream_shell_error_demo
+  ]
+
   before_action :data
 
   before_action :initialize_shared_store, only: %i[client_side_hello_world_shared_store_controller
@@ -41,9 +48,6 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
   end
 
   def reset_error_configs
-    ReactOnRails.configuration.raise_on_prerender_error = Rails.env.development?
-    ReactOnRailsPro.configuration.throw_js_errors = false
-    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors = false
     redirect_to error_scenarios_hub_path
   end
 
@@ -269,6 +273,42 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     Rails.logger.info msg
     render_to_string(template: "/pages/pro/serialize_props",
                      locals: { name: PROPS_NAME }, formats: :json)
+  end
+
+  # Temporarily applies config overrides from query params for the duration of a single request.
+  # Restores original values in the ensure block so global state is not permanently mutated.
+  def with_config_overrides
+    originals = save_error_config
+    apply_error_config_overrides
+    yield
+  ensure
+    restore_error_config(originals)
+  end
+
+  def save_error_config
+    {
+      raise_on_prerender_error: ReactOnRails.configuration.raise_on_prerender_error,
+      throw_js_errors: ReactOnRailsPro.configuration.throw_js_errors,
+      raise_non_shell: ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors
+    }
+  end
+
+  def apply_error_config_overrides
+    bool = ActiveModel::Type::Boolean.new
+    if params.key?(:raise_on_prerender_error)
+      ReactOnRails.configuration.raise_on_prerender_error = bool.cast(params[:raise_on_prerender_error])
+    end
+    ReactOnRailsPro.configuration.throw_js_errors = bool.cast(params[:throw_js_errors]) if params.key?(:throw_js_errors)
+    return unless params.key?(:raise_non_shell_server_rendering_errors)
+
+    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors =
+      bool.cast(params[:raise_non_shell_server_rendering_errors])
+  end
+
+  def restore_error_config(originals)
+    ReactOnRails.configuration.raise_on_prerender_error = originals[:raise_on_prerender_error]
+    ReactOnRailsPro.configuration.throw_js_errors = originals[:throw_js_errors]
+    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors = originals[:raise_non_shell]
   end
 
   # Returns a request-local override when the error hub query string includes one.
