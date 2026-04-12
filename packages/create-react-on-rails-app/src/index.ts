@@ -27,6 +27,11 @@ async function run(appName: string, rawOpts: Record<string, unknown>): Promise<v
     packageManager = detectPackageManager() ?? 'npm';
   }
 
+  if (rawOpts.standard && (rawOpts.pro || rawOpts.rsc)) {
+    logError('--standard cannot be combined with --pro or --rsc.');
+    process.exit(1);
+  }
+
   let pro = Boolean(rawOpts.pro);
   let rsc = Boolean(rawOpts.rsc);
 

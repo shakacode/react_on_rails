@@ -19,7 +19,7 @@
  *   <metadata JSON>\t<content byte length hex>\n<raw content bytes>
  *
  * Uses Node.js Buffer APIs for performance:
- * - Buffer.concat instead of manual Uint8Array copy (avoids O(n^2) accumulation)
+ * - Buffer.concat (C++ memcpy) instead of manual Uint8Array copy for faster constant-factor concatenation
  * - Buffer.indexOf (C++ implementation) instead of JS-level byte scanning
  * - Buffer.toString() instead of TextDecoder
  *
@@ -59,10 +59,10 @@ export default class NodeLengthPrefixedStreamParser {
             );
           }
           const lenHex = header.toString('utf8', tabIdx + 1);
-          this.contentLen = parseInt(lenHex, 16);
-          if (Number.isNaN(this.contentLen) || this.contentLen < 0) {
+          if (!/^[\da-f]+$/i.test(lenHex)) {
             throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
           }
+          this.contentLen = parseInt(lenHex, 16);
           this.state = 'content';
         } else {
           canExtract = false;
@@ -73,8 +73,11 @@ export default class NodeLengthPrefixedStreamParser {
         // Strip protocol-internal payloadType before passing to consumers
         const metadata = { ...this.metadata };
         delete metadata.payloadType;
-        onChunk(content, metadata);
+        // Reset state before callback so re-entrant feed() or thrown errors see consistent state
         this.state = 'header';
+        this.contentLen = 0;
+        this.metadata = {};
+        onChunk(content, metadata);
       } else {
         canExtract = false;
       }
