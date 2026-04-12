@@ -10,6 +10,9 @@ const currentGlobal = globalThis.ReactOnRails || null;
 
 const ReactOnRails = createReactOnRails([createCoreCapability(registries), createLifecycleCapability()], {
   currentGlobal,
+  // Defer startup to the next tick so all synchronous <script> tags finish evaluating
+  // before we scan the DOM for components. Pro's proClientStartup runs synchronously
+  // because streaming hydration needs to attach listeners before the first paint.
   startup: typeof window !== 'undefined' ? () => setTimeout(() => clientStartup(), 0) : null,
   registries,
 });

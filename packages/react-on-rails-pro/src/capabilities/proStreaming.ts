@@ -1,3 +1,5 @@
+/* eslint-disable import/prefer-default-export -- named export for consistency with capability API */
+
 /*
  * Copyright (c) 2025 Shakacode LLC
  *
@@ -15,8 +17,6 @@
 import type { Readable } from 'stream';
 import type { RenderParams } from 'react-on-rails/types';
 import streamServerRenderedReactComponent from '../streamServerRenderedReactComponent.ts';
-
-/* eslint-disable import/prefer-default-export -- named export for consistency with capability API */
 
 /**
  * Pro streaming capability.

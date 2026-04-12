@@ -45,12 +45,24 @@ See: https://github.com/shakacode/react_on_rails/issues/1558`);
 
   // Cross-runtime detection: another bundle/runtime already initialized the global,
   // but this module instance hasn't cached anything yet.
+  // In development with HMR/fast-refresh, webpack invalidates the module cache
+  // (resetting cachedObject to null) while globalThis.ReactOnRails persists from the
+  // previous load. The old base/client.ts code handled this gracefully by returning
+  // the existing global. We preserve that behavior in development and only throw in
+  // production where this genuinely indicates misconfiguration (multiple runtimes or
+  // mixed core/pro bundles).
   if (currentGlobal !== null && cachedObject === null) {
-    throw new Error(`\
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(`\
 ReactOnRails was already initialized by another bundle or runtime instance.
 This usually means multiple webpack runtimes or mixed core/pro bundles were loaded on the same page.
 
 Fix: Ensure only one ReactOnRails bundle initializes per page, and set optimization.runtimeChunk to "single".`);
+    }
+    // In development (HMR), accept the pre-existing global and re-cache it.
+    cachedObject = currentGlobal;
+    cachedRegistries = registries;
+    return cachedObject;
   }
 
   // Global contamination detection: currentGlobal exists but doesn't match cached object.
