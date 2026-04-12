@@ -106,6 +106,16 @@ describe ReactOnRails::RenderRequest do
       expect(parsed["railsEnv"]).to eq("test")
       expect(parsed["rorVersion"]).to eq("16.0.0")
     end
+
+    context "when rails_context is already a JSON string" do
+      let(:rails_context) { '{"railsEnv":"test"}' }
+
+      it "raises ArgumentError to prevent double-encoding" do
+        expect { render_request.rails_context_json }.to raise_error(
+          ArgumentError, /must be a Hash, got String/
+        )
+      end
+    end
   end
 
   describe "#to_js" do

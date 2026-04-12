@@ -39,6 +39,10 @@ module ReactOnRails
     end
 
     def rails_context_json
+      if rails_context.is_a?(String)
+        raise ArgumentError, "rails_context must be a Hash, got String (possible double-encoding)"
+      end
+
       rails_context.to_json
     end
 
