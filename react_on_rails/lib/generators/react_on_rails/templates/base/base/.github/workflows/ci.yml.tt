@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main] # Change to match your default branch (e.g., master)
   pull_request:
-    branches: [main]
+    branches: [main] # Change to match your default branch (e.g., master)
 
 jobs:
   test:
@@ -22,7 +22,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
+<%- unless config[:package_manager] == 'bun' -%>
+          cache: "<%= config[:package_manager] %>"
+<%- end -%>
 
+<%- if config[:package_manager] == 'bun' -%>
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+<%- end -%>
       - name: Install JS dependencies
         run: <%= config[:package_manager] %> install
 
@@ -38,6 +46,7 @@ jobs:
           NODE_ENV: test
 
       - name: Run tests
+        # Replace with `bin/rails test` if you use Minitest
         run: bundle exec rspec
         env:
           RAILS_ENV: test

@@ -7,6 +7,7 @@ shared_examples "scaffold_ci_and_scripts" do
       expect(content).to include("actions/checkout@v4")
       expect(content).to include("ruby/setup-ruby@v1")
       expect(content).to include("actions/setup-node@v4")
+      expect(content).to include("cache:")
     end
   end
 

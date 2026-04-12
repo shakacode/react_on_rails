@@ -2,6 +2,7 @@
 
 require "rainbow"
 
+# rubocop:disable Metrics/ModuleLength
 module GeneratorMessages
   PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
                      "\n       #{Rainbow('https://reactonrails.com/docs/pro/upgrading-to-pro/').cyan.underline}".freeze
@@ -9,6 +10,12 @@ module GeneratorMessages
 
   # rubocop:disable Metrics/ClassLength
   class << self
+    attr_writer :ci_workflow_generated
+
+    def ci_workflow_generated?
+      @ci_workflow_generated == true
+    end
+
     def output
       @output ||= []
     end
@@ -43,6 +50,7 @@ module GeneratorMessages
 
     def clear
       @output = []
+      @ci_workflow_generated = false
     end
 
     def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", pro: false,
@@ -130,19 +138,26 @@ module GeneratorMessages
     private
 
     def build_ci_section
+      package_manager = detect_package_manager
+      ci_status = if ci_workflow_generated?
+                    "A GitHub Actions workflow has been generated at .github/workflows/ci.yml."
+                  else
+                    "A GitHub Actions workflow is available at .github/workflows/ci.yml."
+                  end
+
       <<~CI
 
 
         🔄 CI / BUILD ORDERING:
         ─────────────────────────────────────────────────────────────────────────
         JavaScript bundles must be built before running Rails tests.
-        A GitHub Actions workflow has been generated at .github/workflows/ci.yml.
+        #{ci_status}
 
         To build bundles manually before tests:
         #{Rainbow('RAILS_ENV=test NODE_ENV=test bin/shakapacker').cyan}
 
         Or use the generated package.json script:
-        #{Rainbow('npm run build:test').cyan}
+        #{Rainbow("#{package_manager} run build:test").cyan}
       CI
     end
 
@@ -249,3 +264,4 @@ module GeneratorMessages
   end
   # rubocop:enable Metrics/ClassLength
 end
+# rubocop:enable Metrics/ModuleLength

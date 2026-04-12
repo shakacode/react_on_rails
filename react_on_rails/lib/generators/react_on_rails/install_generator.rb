@@ -254,6 +254,8 @@ module ReactOnRails
       end
 
       def add_ci_workflow
+        return if options[:pretend]
+
         ci_path = ".github/workflows/ci.yml"
         if File.exist?(File.join(destination_root, ci_path))
           say_status :skip, "#{ci_path} already exists", :yellow
@@ -265,9 +267,10 @@ module ReactOnRails
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
                  { package_manager: package_manager })
         say "✅ Created #{ci_path}", :green
+        GeneratorMessages.ci_workflow_generated = true
       end
 
-      def add_package_json_scripts
+      def add_package_json_scripts # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
         return if options[:pretend]
 
         package_json_path = File.join(destination_root, "package.json")
@@ -276,11 +279,19 @@ module ReactOnRails
         content = JSON.parse(File.read(package_json_path))
         scripts = content["scripts"] ||= {}
 
+        scripts_added = []
+        scripts_added << "build" unless scripts.key?("build")
+        scripts_added << "build:test" unless scripts.key?("build:test")
+
         scripts["build"] ||= "RAILS_ENV=${RAILS_ENV:-development} NODE_ENV=${NODE_ENV:-development} bin/shakapacker"
         scripts["build:test"] ||= "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
 
-        File.write(package_json_path, "#{JSON.pretty_generate(content)}\n")
-        say "📝 Added build scripts to package.json", :yellow
+        if scripts_added.any?
+          File.write(package_json_path, "#{JSON.pretty_generate(content)}\n")
+          say "📝 Added build scripts (#{scripts_added.join(', ')}) to package.json", :yellow
+        else
+          say_status :skip, "build scripts already present in package.json", :yellow
+        end
       rescue JSON::ParserError => e
         GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
       rescue StandardError => e
