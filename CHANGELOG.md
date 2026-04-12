@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Fixed
+
+- **Doctor accepts TypeScript server bundle entrypoints**: `react_on_rails:doctor` now resolves common source entrypoint suffixes (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`) before warning that the server bundle is missing, preventing false positives when apps use `server-bundle.ts`. [PR 3111](https://github.com/shakacode/react_on_rails/pull/3111) by [justin808](https://github.com/justin808).
+
 ### [16.6.0] - 2026-04-09
 
 #### Removed
