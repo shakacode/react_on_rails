@@ -83,6 +83,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.start(:development, nil, route: "/", open_browser_once: true)
     end
 
+    it "schedules an explicit browser open when --open-browser is passed" do
+      expect(described_class).to receive(:schedule_browser_open).with(3000, route: "/", once: false, explicit: true)
+      expect(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager).with("Procfile.dev")
+
+      described_class.start(:development, nil, route: "/", open_browser: true)
+    end
+
     it "starts production-like mode" do
       env = { "NODE_ENV" => "production" }
       argv = ["bundle", "exec", "rails", "assets:precompile"]
@@ -293,6 +300,86 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect(described_class).to receive(:open_browser).with("http://localhost:3000").and_return(true)
 
       described_class.send(:schedule_browser_open, 3000, route: "/", once: true)
+    end
+  end
+
+  describe ".browser_auto_open_allowed?" do
+    it "returns true when explicit is true, even in CI" do
+      ENV["CI"] = "1"
+      expect(described_class.send(:browser_auto_open_allowed?, explicit: true)).to be true
+    ensure
+      ENV.delete("CI")
+    end
+
+    it "returns false in CI when explicit is false" do
+      ENV["CI"] = "1"
+      expect(described_class.send(:browser_auto_open_allowed?, explicit: false)).to be false
+    ensure
+      ENV.delete("CI")
+    end
+  end
+
+  describe "WSL detection" do
+    around do |example|
+      saved = ENV.to_h.slice("WSL_DISTRO_NAME", "WSLENV")
+      ENV.delete("WSL_DISTRO_NAME")
+      ENV.delete("WSLENV")
+      example.run
+    ensure
+      saved.each { |k, v| ENV[k] = v }
+      (%w[WSL_DISTRO_NAME WSLENV] - saved.keys).each { |k| ENV.delete(k) }
+    end
+
+    it "detects WSL when WSL_DISTRO_NAME is set" do
+      ENV["WSL_DISTRO_NAME"] = "Ubuntu"
+      expect(described_class.send(:wsl?)).to be true
+    end
+
+    it "detects WSL when WSLENV is set" do
+      ENV["WSLENV"] = "USERPROFILE"
+      expect(described_class.send(:wsl?)).to be true
+    end
+
+    it "returns false when neither WSL variable is set" do
+      expect(described_class.send(:wsl?)).to be false
+    end
+
+    it "returns wslview on WSL when available" do
+      ENV["WSL_DISTRO_NAME"] = "Ubuntu"
+      allow(described_class).to receive(:command_available?).and_return(false)
+      allow(described_class).to receive(:command_available?).with("wslview").and_return(true)
+
+      expect(described_class.send(:linux_browser_command)).to eq(["wslview"])
+    end
+
+    it "falls back to wsl-open on WSL when wslview is unavailable" do
+      ENV["WSL_DISTRO_NAME"] = "Ubuntu"
+      allow(described_class).to receive(:command_available?).and_return(false)
+      allow(described_class).to receive(:command_available?).with("wsl-open").and_return(true)
+
+      expect(described_class.send(:linux_browser_command)).to eq(["wsl-open"])
+    end
+
+    it "falls back to xdg-open on WSL when neither WSL launcher is available" do
+      ENV["WSL_DISTRO_NAME"] = "Ubuntu"
+      allow(described_class).to receive(:command_available?).and_return(false)
+      allow(described_class).to receive(:command_available?).with("xdg-open").and_return(true)
+
+      expect(described_class.send(:linux_browser_command)).to eq(["xdg-open"])
+    end
+
+    it "returns nil on WSL when no launcher is available" do
+      ENV["WSL_DISTRO_NAME"] = "Ubuntu"
+      allow(described_class).to receive(:command_available?).and_return(false)
+
+      expect(described_class.send(:linux_browser_command)).to be_nil
+    end
+
+    it "returns xdg-open on non-WSL Linux" do
+      allow(described_class).to receive(:command_available?).and_return(false)
+      allow(described_class).to receive(:command_available?).with("xdg-open").and_return(true)
+
+      expect(described_class.send(:linux_browser_command)).to eq(["xdg-open"])
     end
   end
 

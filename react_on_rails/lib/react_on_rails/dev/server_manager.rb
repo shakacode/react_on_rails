@@ -894,7 +894,8 @@ module ReactOnRails
               marker_state = prepare_browser_open_once_marker(once)
               if marker_state != :already_opened && !open_browser(url)
                 clear_browser_open_once_marker_if_claimed(marker_state)
-                warn("[react_on_rails] Could not open browser automatically. Visit #{url} manually.")
+                hint = wsl? ? " On WSL, install wslu (for wslview) or wsl-open." : ""
+                warn("[react_on_rails] Could not open browser automatically.#{hint} Visit #{url} manually.")
               end
             end
           rescue StandardError => e
@@ -932,9 +933,12 @@ module ReactOnRails
         end
 
         # Connection-level exceptions expected while the server is still booting.
+        # Includes EOFError (premature close), Errno::EPIPE (dropped mid-request),
+        # and Errno::EAFNOSUPPORT (IPv6 disabled) which are transient during startup.
         LOCALHOST_CONNECT_ERRORS = [
           Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EHOSTUNREACH,
           Errno::ENETUNREACH, Errno::ETIMEDOUT, Errno::EADDRNOTAVAIL,
+          Errno::EAFNOSUPPORT, Errno::EPIPE, EOFError,
           SocketError, Net::OpenTimeout, Net::ReadTimeout
         ].freeze
         private_constant :LOCALHOST_CONNECT_ERRORS
@@ -953,11 +957,7 @@ module ReactOnRails
 
         def open_browser(url)
           command = browser_command
-          unless command
-            hint = wsl? ? " On WSL, install wslu (for wslview) or wsl-open." : ""
-            warn("[react_on_rails] No browser launcher found for this platform.#{hint}")
-            return false
-          end
+          return false unless command
 
           system(*command, url, out: File::NULL, err: File::NULL)
         rescue StandardError
@@ -992,6 +992,9 @@ module ReactOnRails
         end
 
         def wsl?
+          # WSL_DISTRO_NAME is the authoritative indicator (set by the WSL kernel).
+          # WSLENV is a weaker signal — it can appear in non-WSL contexts (e.g. Docker
+          # images that inherit a Windows host env) but is included as a fallback.
           ENV.key?("WSL_DISTRO_NAME") || ENV.key?("WSLENV")
         end
 
