@@ -112,11 +112,10 @@ See [this solution](https://github.com/shakacode/react_on_rails/issues/1457#issu
 Node.js `Buffer` is not available in `mini_racer`. The React on Rails OSS package does not use `Buffer` in its ExecJS rendering path, so this is unlikely to cause errors for most users. If your own server-rendered code calls `Buffer` directly, you can polyfill it by installing the [`buffer`](https://www.npmjs.com/package/buffer) npm package and adding a `ProvidePlugin` entry to your server webpack config:
 
 ```js
-// in your server webpack config
+// in your server webpack config — add to the existing plugins array
 const { ProvidePlugin } = require('webpack');
-module.exports = {
-  plugins: [new ProvidePlugin({ Buffer: ['buffer', 'Buffer'] })],
-};
+
+serverWebpackConfig.plugins.push(new ProvidePlugin({ Buffer: ['buffer', 'Buffer'] }));
 ```
 
 ### Practical Impact

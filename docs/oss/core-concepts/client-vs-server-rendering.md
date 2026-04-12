@@ -6,7 +6,7 @@ In most cases, you should use the `prerender: false` (default behavior) with the
 
 Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. ExecJS auto-detects the best available runtime, preferring mini_racer and Bun over Node.js when installed. You can override the runtime with the `EXECJS_RUNTIME` environment variable. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes. For details on ExecJS constraints with timers, async, and browser APIs, see [ExecJS Limitations](./execjs-limitations.md).
 
-> **Warning:** Since React DOM Server 18+ requires `TextEncoder` (which `mini_racer` does not provide), `mini_racer` is effectively unsupported for server rendering with modern React. Consider using the Node.js ExecJS runtime or upgrading to the [Node Renderer](./execjs-limitations.md#migrating-to-the-node-renderer). If you are on an older React version and need a `TextEncoder` polyfill, see [this comment](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717).
+> **Warning:** Since React DOM Server 18+ requires `TextEncoder` (which `mini_racer` does not provide), `mini_racer` is effectively unsupported for server rendering with modern React. Consider using the Node.js ExecJS runtime or upgrading to the [Node Renderer](./execjs-limitations.md#migrating-to-the-node-renderer). If you cannot switch runtimes immediately and need a temporary `TextEncoder` polyfill, see [this comment](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717).
 
 ## Polyfill Requirements for `target: 'web'` Server Bundles
 
