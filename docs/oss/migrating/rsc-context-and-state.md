@@ -353,7 +353,11 @@ If your React components also need the theme value, pass it as a prop:
 
 ### i18n Provider
 
-Internationalization in React on Rails typically uses Rails I18n on the server side and a client-side library (like `react-intl` or `i18next`) for Client Components. Pass translations from Rails as props:
+Internationalization in React on Rails typically uses Rails I18n on the server side and `react-intl` for Client Components. The challenge with RSC is that `react-intl`'s `useIntl()` hook and `<FormattedMessage>` component require React Context, which is unavailable in Server Components.
+
+> **Two i18n systems:** React on Rails has a [build-time locale system](../building-features/i18n.md) (`config.i18n_dir`) that compiles Rails YAML translations into JSON/JS files with flat dot-separated keys (e.g., `"product.title"`). The controller-props approach below passes translations at request time with whatever key structure you choose. Both are valid — see the comparison below.
+
+#### Passing translations from Rails
 
 ```ruby
 # app/controllers/application_controller.rb
@@ -368,6 +372,74 @@ def i18n_props
   }
 end
 ```
+
+#### Server Components: plain string lookup (limited)
+
+The simplest approach is to read translation values directly from the messages object:
+
+```jsx
+// ProductPage.jsx -- Server Component
+export default function ProductPage({ locale, messages, ...props }) {
+  const title = messages['title'];
+
+  return <h1>{title}</h1>;
+}
+```
+
+> **Limitation:** This only works for **pre-formatted strings** — plain text with no interpolation, pluralization, or number/date formatting. React on Rails' build-time locale system converts Rails `%{variable}` placeholders to ICU `{variable}` syntax, so `messages['greeting']` would render the literal text `{name}` instead of a substituted value. For anything beyond plain strings, use `createIntl` or Rails pre-formatting (both described below).
+
+#### Server Components: `createIntl` from `react-intl` (recommended)
+
+Import `createIntl` from `react-intl` for a **context-free API** that provides full interpolation, pluralization, and date/number formatting without React Context. This is the recommended approach for i18n in Server Components:
+
+```jsx
+// ProductPage.jsx -- Server Component
+import { createIntl, createIntlCache } from 'react-intl';
+import I18nProvider from './I18nProvider';
+
+// Module-level cache — safe because it only caches Intl constructors, not request data
+const cache = createIntlCache();
+
+export default function ProductPage({ locale, messages, ...props }) {
+  const intl = createIntl({ locale, messages }, cache);
+
+  return (
+    <div>
+      {/* Full formatting works in Server Components */}
+      <h1>{intl.formatMessage({ id: 'greeting' }, { name: props.userName })}</h1>
+      <p>{intl.formatNumber(props.price, { style: 'currency', currency: 'USD' })}</p>
+      <p>{intl.formatMessage({ id: 'items_count' }, { count: props.itemCount })}</p>
+
+      <I18nProvider locale={locale} messages={messages}>
+        <InteractiveFilters /> {/* Client Component can use useIntl() */}
+      </I18nProvider>
+    </div>
+  );
+}
+```
+
+> **Note:** `createIntl` is a plain function call — no hooks, no Context, no `'use client'` needed. The `createIntlCache()` call avoids recreating expensive `Intl.NumberFormat` / `Intl.DateTimeFormat` instances on every request. The cache stores only `Intl` constructor instances keyed by format options — no locale data, messages, or user-specific information — so it is safe to share at module scope across all concurrent requests for the lifetime of the Node.js process.
+
+#### Alternative: Rails pre-formatting
+
+Instead of formatting on the client, let Rails compute interpolation and pluralization before passing translations as props. This keeps Server Components simple at the cost of less flexible client-side formatting:
+
+```ruby
+def i18n_props
+  {
+    locale: I18n.locale.to_s,
+    # Pre-format with variables — Server Components receive ready-to-render strings
+    greeting: I18n.t('greeting', name: current_user.name),
+    items_count: I18n.t('items_count', count: @cart.item_count),
+    # Pass raw messages for Client Components that need dynamic formatting
+    messages: I18n.t('product_page').deep_stringify_keys,
+  }
+end
+```
+
+#### Client Components: `IntlProvider` + `useIntl()`
+
+Client Components use the standard `react-intl` Context pattern:
 
 ```jsx
 // I18nProvider.jsx
@@ -385,25 +457,6 @@ export default function I18nProvider({ locale, messages, children }) {
 ```
 
 ```jsx
-// ProductPage.jsx -- Server Component
-import I18nProvider from './I18nProvider';
-
-export default function ProductPage({ locale, messages, ...props }) {
-  // Server Components can use the translations object directly
-  const title = messages['title'];
-
-  return (
-    <div>
-      <h1>{title}</h1>
-      <I18nProvider locale={locale} messages={messages}>
-        <InteractiveFilters /> {/* Client Component can use useIntl() */}
-      </I18nProvider>
-    </div>
-  );
-}
-```
-
-```jsx
 // InteractiveFilters.jsx -- Client Component
 'use client';
 
@@ -414,6 +467,15 @@ export default function InteractiveFilters() {
   return <button>{intl.formatMessage({ id: 'filters.apply' })}</button>;
 }
 ```
+
+#### Build-time vs controller-props: when to use each
+
+| Approach                       | Source                     | Key format                      | Best for                                                                                |
+| ------------------------------ | -------------------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
+| Build-time (`config.i18n_dir`) | YAML → compiled JSON/JS    | Flat: `"product.title"`         | Static translations shared across pages; client-side `react-intl` with `defineMessages` |
+| Controller-props (`I18n.t`)    | Rails I18n at request time | Flat (required by `createIntl`) | Page-specific translations; pre-formatted strings with variables; RSC `createIntl`      |
+
+Both can be used together — for example, build-time translations for the client bundle and controller-props for Server Component content. See the [Internationalization guide](../building-features/i18n.md) for build-time setup details.
 
 ## Common Mistakes
 
@@ -468,7 +530,24 @@ messages: I18n.t('.').deep_stringify_keys
 messages: I18n.t('product_page').deep_stringify_keys
 ```
 
-### Mistake 3: Reading Redux store in Server Components
+### Mistake 3: Using `messages['key']` for translations with placeholders
+
+The build-time locale system converts Rails `%{variable}` placeholders to ICU `{variable}` syntax. Reading these directly from the messages object renders the literal placeholder text:
+
+```jsx
+// BAD: Renders "Hello, {name}" as literal text
+const greeting = messages['greeting'];
+```
+
+```jsx
+// GOOD: Use createIntl to format with variable substitution
+import { createIntl, createIntlCache } from 'react-intl';
+const cache = createIntlCache();
+const intl = createIntl({ locale, messages }, cache);
+const greeting = intl.formatMessage({ id: 'greeting' }, { name: 'John' });
+```
+
+### Mistake 4: Reading Redux store in Server Components
 
 Server Components render once on the server and never re-render. They cannot subscribe to store changes:
 
@@ -482,7 +561,7 @@ export default function Dashboard({ user }) {
 
 **Fix:** Keep the component as a Client Component (add `'use client'`), or pass the value from Rails as a prop to a Server Component that doesn't need the Redux store.
 
-### Mistake 4: Creating new QueryClient on every render
+### Mistake 5: Creating new QueryClient on every render
 
 If the `QueryClient` is created without `useState`, React creates a new instance on every render, losing the cache:
 
