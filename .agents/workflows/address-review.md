@@ -112,6 +112,7 @@ Execution flow when terminal access is available:
    - If a claim is wrong, classify it as `SKIPPED` and say why.
    - Preserve comment IDs and thread IDs for later replies and thread resolution.
    - Treat actionable review summary bodies as normal feedback to classify (`MUST-FIX`/`DISCUSS` as appropriate); skip only boilerplate or status-only summaries.
+   - **Claim verification**: Before finalizing `MUST-FIX` classification, verify the reviewer's factual claims against the actual codebase. If the code already handles the concern, or the reviewer's claim is based on outdated context, downgrade to `DISCUSS` and note the discrepancy. If you have access to AI-powered codebase search tools (e.g., Greptile), use them to cross-reference claims for additional confidence.
    - Track only `MUST-FIX` items as your working checklist.
    - Use one checklist entry per must-fix item or deduplicated issue.
    - Use the subject format: `"{file}:{line} - {comment_summary} (@{username})"`.
@@ -152,6 +153,8 @@ Execution flow when terminal access is available:
      `gh api graphql -f query='mutation($threadId:ID!) { resolveReviewThread(input:{threadId:$threadId}) { thread { id isResolved } } }' -f threadId="<THREAD_ID>"`
    - Do not resolve anything still in progress or uncertain.
    - Ask for push confirmation before running `git push`.
+   - **Parallel fixes**: When there are 2+ items to fix that touch different files with no logical dependencies, process them in parallel if your environment supports concurrent execution (e.g., sub-agents, background tasks). Items in the same file or with cross-file dependencies must be fixed sequentially. After parallel fixes complete, verify no conflicts exist between the changes.
+   - **Self-review gate**: After making all code changes but before committing, review the diff for issues introduced by the fixes themselves. Check for correctness bugs, style violations, and inconsistencies with surrounding code. Fix critical issues immediately. This prevents new review cycles caused by the fixes. If you have access to a code-review agent or tool, use it; otherwise, do a manual diff review.
 
 9. Create follow-up issue (when `f+i` or `m` is chosen):
    - Use `gh issue create --repo "${REPO}"` with title "Follow-up: Review feedback from PR #N"

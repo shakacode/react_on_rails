@@ -151,6 +151,18 @@ Triage rules:
 - Preserve the original review comment ID and thread ID when available so the command can reply to the correct place and resolve the correct thread later.
 - Treat actionable review summary bodies as normal feedback to classify (`MUST-FIX`/`DISCUSS` as appropriate); skip only boilerplate or status-only summaries.
 
+**Greptile claim verification:**
+
+When Greptile MCP tools are available (`mcp__plugin_greptile_greptile__*`), cross-reference reviewer claims against Greptile's codebase analysis before finalizing triage classifications:
+
+1. For each reviewer comment that asserts a factual claim about the codebase (e.g., "this function doesn't handle null", "this breaks the existing API contract"), query Greptile to verify the claim:
+   - Use `search_greptile_comments` to find prior Greptile analysis of the same code area
+   - Use `search_custom_context` to check project-specific context that may confirm or contradict the claim
+2. If Greptile's analysis contradicts the reviewer's claim or confirms the current code is correct, downgrade from `MUST-FIX` to `DISCUSS` and note the discrepancy (e.g., "Greptile analysis suggests current handling is correct — reviewer claim needs verification").
+3. If Greptile's analysis corroborates the reviewer's claim, keep the `MUST-FIX` classification with higher confidence.
+4. If Greptile has no relevant data, fall back to local verification only.
+5. Do not block triage on Greptile availability — if the tools are not configured or the API fails, proceed with local verification alone.
+
 ## Step 6: Create Todo List
 
 Create a task list with TodoWrite containing **only the `MUST-FIX` items**:
@@ -249,6 +261,32 @@ Users can chain actions: e.g., `f+i` then `r7-9`. After the first action complet
 When addressing items, after completing each selected item (whether `MUST-FIX` or `DISCUSS`), reply to the original review comment explaining how it was addressed.
 If the user selects `DISCUSS` items to address, treat them the same as `MUST-FIX`: make the code change, reply, and resolve the thread.
 If the user selects skipped/declined items for rationale replies, post those replies too.
+
+**Parallel sub-agents for independent fixes:**
+
+When there are 2+ items to fix that touch different files with no logical dependencies between them, use the Task tool to spawn parallel sub-agents for faster execution:
+
+1. Group items by file path. Items in different files with no cross-file dependencies (e.g., a type change in file A that affects callers in file B) are independent.
+2. For each independent group, spawn a sub-agent via the Task tool with:
+   - The full review comment text and context
+   - The file path and line number
+   - Instructions to make the specific fix and run any relevant file-level checks
+   - A reminder not to modify files outside the assigned scope
+3. After all sub-agents complete, verify there are no conflicts between their changes (e.g., two agents editing the same shared import or config file).
+4. If conflicts exist, resolve them sequentially before proceeding.
+5. Items that touch the same file or have logical dependencies must be fixed sequentially, not in parallel.
+6. If only 1 item needs fixing or all items are in the same file, skip parallel dispatch and fix sequentially as before.
+
+**Self-review gate before pushing:**
+
+After making all code changes but before committing, run a self-review on the diff to prevent new review cycles caused by the fixes themselves:
+
+1. Use the Task tool to launch a code-review sub-agent (e.g., `pr-review-toolkit:code-reviewer` if available, or a general-purpose review agent) against the uncommitted changes (`git diff`).
+2. The self-review should check for: correctness bugs introduced by the fixes, style violations against project standards (CLAUDE.md, linter rules), missing error handling, and inconsistencies with surrounding code.
+3. If the self-review finds critical issues (bugs, security problems, or clear correctness errors), fix them immediately before committing. These are issues that would likely trigger a new review round.
+4. If the self-review finds only minor issues (style nits, naming suggestions), note them but proceed — do not block the push for optional improvements.
+5. If the self-review catches and fixes additional issues, mention this in the commit message (e.g., "also fixed: null check in adjacent error path caught by self-review").
+6. Skip the self-review gate for non-code actions (rationale replies, follow-up issue creation, thread resolution).
 
 **For issue comments (general PR comments):**
 
