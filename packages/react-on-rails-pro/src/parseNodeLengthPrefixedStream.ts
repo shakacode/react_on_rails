@@ -60,7 +60,7 @@ export default class NodeLengthPrefixedStreamParser {
           }
           const lenHex = header.toString('utf8', tabIdx + 1);
           this.contentLen = parseInt(lenHex, 16);
-          if (Number.isNaN(this.contentLen)) {
+          if (Number.isNaN(this.contentLen) || this.contentLen < 0) {
             throw new Error(`Invalid content length hex: ${JSON.stringify(lenHex)}`);
           }
           this.state = 'content';
