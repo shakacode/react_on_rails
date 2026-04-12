@@ -300,6 +300,16 @@ RSpec.describe ReactOnRails::Doctor do
           path = doctor.send(:determine_server_bundle_path)
           expect(path).to eq("client/app/packs/server-bundle.js")
         end
+
+        it "accepts a TypeScript server bundle source file when the configured filename is .js" do
+          allow(File).to receive(:exist?).and_call_original
+          allow(File).to receive(:exist?).with("client/app/packs/server-bundle.js").and_return(false)
+          allow(File).to receive(:exist?).with("client/app/packs/server-bundle.ts").and_return(true)
+
+          path = doctor.send(:determine_server_bundle_path)
+
+          expect(path).to eq("client/app/packs/server-bundle.ts")
+        end
       end
 
       context "when Shakapacker gem is available with absolute paths" do

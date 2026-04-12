@@ -55,6 +55,7 @@ module ReactOnRails
     MINITEST_HELPER_FILE = "test/test_helper.rb"
     DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
+    SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose
@@ -1535,11 +1536,12 @@ module ReactOnRails
         source_entry_path = source_entry_path.sub("#{source_path}/", "")
       end
 
-      File.join(source_path, source_entry_path, bundle_filename)
+      bundle_path = File.join(source_path, source_entry_path, bundle_filename)
+      resolve_server_bundle_source_path(bundle_path)
     rescue LoadError, StandardError
       # Handle missing Shakapacker gem or other configuration errors
       bundle_filename = server_bundle_filename
-      "app/javascript/packs/#{bundle_filename}"
+      resolve_server_bundle_source_path("app/javascript/packs/#{bundle_filename}")
     end
 
     def server_bundle_filename
@@ -1560,6 +1562,27 @@ module ReactOnRails
 
       # Default filename
       "server-bundle.js"
+    end
+
+    def resolve_server_bundle_source_path(bundle_path)
+      return bundle_path if File.exist?(bundle_path)
+
+      base_path = bundle_path.sub(%r{\.[^./]+\z}, "")
+
+      candidate_extensions = server_bundle_source_extensions_for(bundle_path)
+      candidate_extensions.each do |extension|
+        candidate_path = "#{base_path}#{extension}"
+        return candidate_path if File.exist?(candidate_path)
+      end
+
+      bundle_path
+    end
+
+    def server_bundle_source_extensions_for(bundle_path)
+      extension = File.extname(bundle_path)
+      return SERVER_BUNDLE_SOURCE_EXTENSIONS if extension.empty?
+
+      ([extension] + SERVER_BUNDLE_SOURCE_EXTENSIONS).uniq
     end
 
     def exit_with_status
@@ -1612,6 +1635,7 @@ module ReactOnRails
         if (prerender_set || uses_prerender) && !server_bundle_set
           checker.add_warning("  ⚠️  Server rendering is enabled but server_bundle_js_file is not configured")
           checker.add_info("  💡 Set config.server_bundle_js_file = 'server-bundle.js' to enable SSR")
+          checker.add_info("  💡 Source entrypoint can use .js/.jsx/.ts/.tsx suffixes")
           checker.add_info("  💡 See: https://reactonrails.com/docs/core-concepts/react-server-rendering/")
         elsif server_bundle_set && !prerender_set && !uses_prerender
           checker.add_info("  ℹ️  server_bundle_js_file is configured but prerender doesn't appear to be used")
