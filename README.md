@@ -137,9 +137,39 @@ Some advanced features require a React on Rails Pro subscription. See
 
 ## Supporters
 
-Thanks to [JetBrains](https://jb.gg/OpenSource), [Scout](https://scoutapp.com),
-[Control Plane](https://shakacode.controlplane.com),
-[BrowserStack](https://www.browserstack.com),
-[Honeybadger](https://www.honeybadger.io), and
-[CodeRabbit](https://coderabbit.ai) for supporting ShakaCode's open-source
-work.
+Thanks to the companies supporting ShakaCode's open-source work.
+
+<p>
+  <a href="https://jb.gg/OpenSource">
+    <img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.png" alt="JetBrains" height="28">
+  </a>
+  <a href="https://scoutapp.com">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/4244251/184881147-0d077438-3978-40da-ace9-4f650d2efe2e.png">
+      <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/4244251/184881152-9f2d8fba-88ac-4ba6-873b-22387f8711c5.png">
+      <img alt="Scout" src="https://user-images.githubusercontent.com/4244251/184881152-9f2d8fba-88ac-4ba6-873b-22387f8711c5.png" height="28">
+    </picture>
+  </a>
+  <a href="https://shakacode.controlplane.com">
+    <picture>
+      <img alt="Control Plane" src="https://github.com/shakacode/.github/assets/20628911/90babd87-62c4-4de3-baa4-3d78ef4bec25" height="28">
+    </picture>
+  </a>
+  <a href="https://www.browserstack.com">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/4244251/184881122-407dcc29-df78-4b20-a9ad-f597b56f6cdb.png">
+      <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/4244251/184881129-e1edf4b7-3ae1-4ea8-9e6d-3595cf01609e.png">
+      <img alt="BrowserStack" src="https://user-images.githubusercontent.com/4244251/184881129-e1edf4b7-3ae1-4ea8-9e6d-3595cf01609e.png" height="28">
+    </picture>
+  </a>
+  <a href="https://www.honeybadger.io">
+    <img src="https://user-images.githubusercontent.com/4244251/184881133-79ee9c3c-8165-4852-958e-31687b9536f4.png" alt="Honeybadger" height="28">
+  </a>
+  <a href="https://coderabbit.ai">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://victorious-bubble-f69a016683.media.strapiapp.com/White_Typemark_7229870ac5.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://victorious-bubble-f69a016683.media.strapiapp.com/Orange_Typemark_7958cfa790.svg">
+      <img alt="CodeRabbit" src="https://victorious-bubble-f69a016683.media.strapiapp.com/Orange_Typemark_7958cfa790.svg" height="28">
+    </picture>
+  </a>
+</p>
