@@ -694,6 +694,7 @@ describe RscGenerator, type: :generator do
       it "rscWebpackConfig.js passes true to skip RSCWebpackPlugin in RSC bundle" do
         assert_file "config/rspack/rscWebpackConfig.js" do |content|
           expect(content).to include("serverWebpackConfig(true)")
+          expect(content).not_to match(/new\s+RSCWebpackPlugin/)
         end
       end
 
