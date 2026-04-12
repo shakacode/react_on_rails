@@ -114,6 +114,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     # We pin here rather than in overrides because overrides conflict with
     # direct dependencies added by shakapacker:install.
     dev_deps = package_json["devDependencies"] ||= {}
+    # TODO: Remove this pin once webpack 5.106.x SSR regression is resolved upstream.
     dev_deps["webpack"] = ">=5.0.0 <5.106.0"
     puts "  Pinning webpack to <5.106.0 to avoid SSR compatibility issue"
     File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
@@ -180,6 +181,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
   def install_example_node_dependencies(example_type)
     pin_shakapacker_npm_version(example_type.dir)
     pin_react_on_rails_to_local_package(example_type.dir)
+    pin_webpack_version(example_type.dir)
 
     if example_type.pinned_react_version?
       # Use --legacy-peer-deps to avoid peer dependency conflicts when

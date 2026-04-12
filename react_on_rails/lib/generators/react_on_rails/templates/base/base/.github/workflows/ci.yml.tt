@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main] # Change to match your default branch (e.g., master)
+    branches: [main, master]
   pull_request:
-    branches: [main] # Change to match your default branch (e.g., master)
+    branches: [main, master]
 
 jobs:
   test:
@@ -26,6 +26,11 @@ jobs:
           cache: "<%= config[:package_manager] %>"
 <%- end -%>
 
+<%- if config[:package_manager] == 'pnpm' -%>
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+<%- end -%>
 <%- if config[:package_manager] == 'bun' -%>
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -35,6 +40,8 @@ jobs:
         run: <%= config[:package_manager] %> install
 
       - name: Set up database
+        # If using PostgreSQL or MySQL, add a services block above.
+        # See https://docs.github.com/en/actions/using-containerized-services
         run: bin/rails db:prepare
         env:
           RAILS_ENV: test
