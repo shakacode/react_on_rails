@@ -39,11 +39,9 @@ module ReactOnRails
     end
 
     def rails_context_json
-      if rails_context.is_a?(String)
-        raise ArgumentError, "rails_context must be a Hash, got String (possible double-encoding)"
-      end
+      raise ArgumentError, "rails_context must be a Hash, got #{rails_context.class}" unless rails_context.is_a?(Hash)
 
-      rails_context.to_json
+      rails_context.to_json.gsub("\u2028", '\u2028').gsub("\u2029", '\u2029')
     end
 
     def dom_id

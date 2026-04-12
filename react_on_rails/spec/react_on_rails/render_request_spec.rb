@@ -116,6 +116,28 @@ describe ReactOnRails::RenderRequest do
         )
       end
     end
+
+    context "when rails_context is not a Hash" do
+      let(:rails_context) { [1, 2, 3] }
+
+      it "raises ArgumentError" do
+        expect { render_request.rails_context_json }.to raise_error(
+          ArgumentError, /must be a Hash, got Array/
+        )
+      end
+    end
+
+    context "with unicode line separators" do
+      let(:rails_context) { { text: "hello\u2028world\u2029" } }
+
+      it "escapes unicode line/paragraph separators" do
+        result = render_request.rails_context_json
+        expect(result).not_to include("\u2028")
+        expect(result).not_to include("\u2029")
+        expect(result).to include('\u2028')
+        expect(result).to include('\u2029')
+      end
+    end
   end
 
   describe "#to_js" do
