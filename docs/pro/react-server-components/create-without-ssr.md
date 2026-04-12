@@ -343,7 +343,7 @@ registerServerComponent({
 // client/app/packs/client-bundle.js
 import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
-registerServerComponent({ rscPayloadGenerationUrlPath: 'rsc_payload/' }, 'ReactServerComponentPage');
+registerServerComponent('ReactServerComponentPage');
 ```
 
 As you can see, server components are not registered using the `ReactOnRails.register` function. Instead, we use the `registerServerComponent` function to register the server component. Also, `registerServerComponent` has different options for the client bundle and the server bundle.
