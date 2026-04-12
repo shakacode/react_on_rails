@@ -324,6 +324,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
   describe "WSL detection" do
     around do |example|
+      saved = {}
       saved = ENV.to_h.slice("WSL_DISTRO_NAME", "WSLENV")
       ENV.delete("WSL_DISTRO_NAME")
       ENV.delete("WSLENV")
@@ -1182,7 +1183,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     it "warns when automatic browser opening fails" do
       allow(described_class).to receive(:open_browser).and_return(false)
       expect(described_class).to receive(:warn).with(
-        "[react_on_rails] Could not open browser automatically. Visit http://localhost:3000 manually."
+        a_string_matching(
+          %r{\A\[react_on_rails\] Could not open browser automatically\..* Visit http://localhost:3000 manually\.\z}
+        )
       )
 
       described_class.send(:schedule_browser_open, 3000, route: "/", once: false).join
