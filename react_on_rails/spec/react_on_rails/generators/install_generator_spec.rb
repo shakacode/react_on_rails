@@ -1777,6 +1777,20 @@ describe InstallGenerator, type: :generator do
       end
     end
 
+    it "serverWebpackConfig includes RSCWebpackPlugin import" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to include("RSCWebpackPlugin")
+        expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+      end
+    end
+
+    it "serverWebpackConfig has rscBundle parameter" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        expect(content).to match(/configureServer\s*=\s*\(rscBundle\s*=\s*false\)/)
+        expect(content).to include("if (!rscBundle)")
+      end
+    end
+
     it "sets DEFAULT_ROUTE to hello_server in bin/dev" do
       assert_file "bin/dev" do |content|
         expect(content).to include('DEFAULT_ROUTE = "hello_server"')
