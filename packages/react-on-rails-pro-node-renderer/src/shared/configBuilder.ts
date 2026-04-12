@@ -163,6 +163,10 @@ function runtimeEnvsAllowDevelopmentDefaults() {
   return runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
 }
 
+// Intentionally checks only NODE_ENV, not both NODE_ENV and RAILS_ENV like
+// runtimeEnvsAllowDevelopmentDefaults(). Async operation log replay is a JS
+// debugging concern, not a security boundary — it should key off the JS
+// runtime environment alone.
 function defaultReplayServerAsyncOperationLogs() {
   if (env.REPLAY_SERVER_ASYNC_OPERATION_LOGS != null) {
     return truthy(env.REPLAY_SERVER_ASYNC_OPERATION_LOGS);

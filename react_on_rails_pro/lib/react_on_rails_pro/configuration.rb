@@ -157,6 +157,7 @@ module ReactOnRailsPro
       validate_url
       validate_remote_bundle_cache_adapter
       setup_renderer_password
+      validate_renderer_password_for_production
       setup_assets_to_copy
       setup_execjs_profiler_if_needed
       check_react_on_rails_support_for_rsc
@@ -260,8 +261,6 @@ module ReactOnRailsPro
       # Mirror Node-side defaults: if Rails config and URL are both missing a password,
       # use RENDERER_PASSWORD from env.
       self.renderer_password = ENV.fetch("RENDERER_PASSWORD", nil) if renderer_password.blank?
-
-      validate_renderer_password_for_production
     end
 
     def validate_renderer_password_for_production
@@ -270,12 +269,14 @@ module ReactOnRailsPro
       return if renderer_password.present?
       return unless node_renderer?
 
-      # Fail closed: only skip validation when RAILS_ENV is explicitly set to development or test.
-      # Rails.env defaults to "development" when RAILS_ENV is unset, which would silently skip
-      # validation in misconfigured environments. Checking ENV["RAILS_ENV"] directly matches the
-      # Node-side behavior where an unset environment is treated as production-like.
-      rails_env = ENV["RAILS_ENV"]&.downcase
-      return if rails_env.present? && %w[development test].include?(rails_env)
+      # Fail closed: only skip validation when every present runtime env is explicitly
+      # development or test. This mirrors the Node-side runtimeEnvsAllowDevelopmentDefaults()
+      # which checks both NODE_ENV and RAILS_ENV. Checking NODE_ENV here surfaces
+      # misconfigurations (e.g. NODE_ENV=production + RAILS_ENV=development) at Rails boot
+      # time rather than waiting for the Node renderer to reject the request.
+      runtime_envs = [ENV.fetch("RAILS_ENV", nil), ENV.fetch("NODE_ENV", nil)].compact_blank.map(&:downcase)
+      allowed_envs = %w[development test].freeze
+      return if runtime_envs.any? && runtime_envs.all? { |e| allowed_envs.include?(e) }
 
       raise ReactOnRailsPro::Error, <<~MSG
         RENDERER_PASSWORD must be set in production-like environments (staging, production, etc.)
@@ -304,13 +305,12 @@ module ReactOnRailsPro
 
         If Rails and the Node Renderer disagree about startup behavior, verify both RAILS_ENV and NODE_ENV.
 
-        Environment matrix:
-          development    — password optional (no authentication)
-          test           — password optional (no authentication)
-          (RAILS_ENV unset) — treated as production-like; RENDERER_PASSWORD required
-          staging        — RENDERER_PASSWORD required
-          production     — RENDERER_PASSWORD required
-          (any other)    — RENDERER_PASSWORD required
+        Environment matrix (both RAILS_ENV and NODE_ENV are checked):
+          development/test — password optional when every set env is development or test
+          (both unset)     — treated as production-like; RENDERER_PASSWORD required
+          staging          — RENDERER_PASSWORD required
+          production       — RENDERER_PASSWORD required
+          (mixed envs)     — RENDERER_PASSWORD required (e.g. NODE_ENV=production + RAILS_ENV=development)
       MSG
     end
   end
