@@ -269,7 +269,7 @@ module ReactOnRailsPro
       # which checks both NODE_ENV and RAILS_ENV. Checking NODE_ENV here surfaces
       # misconfigurations (e.g. NODE_ENV=production + RAILS_ENV=development) at Rails boot
       # time rather than waiting for the Node renderer to reject the request.
-      runtime_envs = [ENV.fetch("RAILS_ENV", nil), ENV.fetch("NODE_ENV", nil)].compact.map(&:downcase)
+      runtime_envs = [ENV.fetch("RAILS_ENV", nil), ENV.fetch("NODE_ENV", nil)].compact_blank.map(&:downcase)
       allowed_envs = %w[development test].freeze
       return if runtime_envs.any? && runtime_envs.all? { |e| allowed_envs.include?(e) }
 
@@ -300,13 +300,12 @@ module ReactOnRailsPro
 
         If Rails and the Node Renderer disagree about startup behavior, verify both RAILS_ENV and NODE_ENV.
 
-        Environment matrix:
-          development    — password optional (no authentication)
-          test           — password optional (no authentication)
-          (RAILS_ENV unset) — treated as production-like; RENDERER_PASSWORD required
-          staging        — RENDERER_PASSWORD required
-          production     — RENDERER_PASSWORD required
-          (any other)    — RENDERER_PASSWORD required
+        Environment matrix (both RAILS_ENV and NODE_ENV are checked):
+          development/test — password optional when every set env is development or test
+          (both unset)     — treated as production-like; RENDERER_PASSWORD required
+          staging          — RENDERER_PASSWORD required
+          production       — RENDERER_PASSWORD required
+          (mixed envs)     — RENDERER_PASSWORD required (e.g. NODE_ENV=production + RAILS_ENV=development)
       MSG
     end
   end

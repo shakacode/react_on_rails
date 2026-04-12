@@ -335,6 +335,18 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end.not_to raise_error
         end
 
+        it "does not raise when RAILS_ENV is unset and NODE_ENV is development" do
+          allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return(nil)
+          allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return("development")
+
+          expect do
+            ReactOnRailsPro.configure do |config|
+              config.server_renderer = "NodeRenderer"
+              config.renderer_url = "https://localhost:3800"
+            end
+          end.not_to raise_error
+        end
+
         it "does not raise when both RAILS_ENV and NODE_ENV are development" do
           allow(ENV).to receive(:fetch).with("RAILS_ENV", nil).and_return("development")
           allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return("development")
