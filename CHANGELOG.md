@@ -28,6 +28,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 - **[Pro]** **Removed the `--rsc-pro` install generator flag**: `--rsc` already implies Pro, so the separate mode was unnecessary. Behaviors previously gated on `--rsc-pro` (Pro verification checklist, prerelease install note, exact Pro gem pin on prereleases) now fire on `--rsc` installs. See also [Issue 3104](https://github.com/shakacode/react_on_rails/issues/3104), which tracks unrelated silent-failure bugs in the Pro upgrade automation. [PR 3105](https://github.com/shakacode/react_on_rails/pull/3105) by [ihabadham](https://github.com/ihabadham).
 
+#### Added
+
+- **[Pro]** **Pre-seed renderer cache for Docker builds**: New `react_on_rails_pro:pre_seed_renderer_cache` rake task copies compiled server bundles into the Node Renderer's cache directory structure during Docker image builds, eliminating the 410→retry cold-start latency (200ms–1s+) on the first SSR request after deployment. Supports `RENDERER_SERVER_BUNDLE_CACHE_PATH` env var and RSC bundles. [PR 3123](https://github.com/shakacode/react_on_rails/pull/3123) by [justin808](https://github.com/justin808).
+
 #### Changed
 
 - **[Pro]** **Pro generator now creates the Node Renderer at `renderer/node-renderer.js`**: The canonical location for the Node Renderer entry point is now a dedicated top-level `renderer/` directory instead of `client/`, making it straightforward to exclude from production Docker builds that strip JS sources after bundling. Docs and Pro `spec/dummy` now use the new path consistently. Existing apps are unaffected — the generator skips files that already exist (including a legacy `client/node-renderer.js`). Fixes [Issue 3073](https://github.com/shakacode/react_on_rails/issues/3073). [PR 3165](https://github.com/shakacode/react_on_rails/pull/3165) by [justin808](https://github.com/justin808).

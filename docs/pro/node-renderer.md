@@ -113,6 +113,47 @@ For local development, you can either omit the password entirely (no authenticat
 config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
 ```
 
+## Eliminating Cold-Start Latency in Docker Deployments
+
+When a new container starts, the Node Renderer has an empty bundle cache. The first SSR request triggers a costly 410→retry round-trip where Rails sends the full bundle over HTTP, adding 200ms–1s+ of latency depending on bundle size. In rolling deploys, this affects every new pod.
+
+### Pre-seeding the bundle cache
+
+The `pre_seed_renderer_cache` rake task copies compiled server bundles directly into the renderer's cache directory during your Docker build, so the renderer finds them immediately on startup:
+
+```dockerfile
+# After webpack/assets build step
+RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
+```
+
+This copies the bundle into the renderer's expected directory structure (`<cache>/<bundleHash>/<bundleHash>.js`), including any configured `assets_to_copy` and RSC bundles when RSC support is enabled.
+
+### Configuration
+
+The task resolves the cache directory in the same order as the Node Renderer:
+
+1. `RENDERER_SERVER_BUNDLE_CACHE_PATH` environment variable (preferred)
+2. `RENDERER_BUNDLE_PATH` environment variable (deprecated — emits a warning)
+3. `Rails.root.join(".node-renderer-bundles")` (default)
+
+Set `RENDERER_SERVER_BUNDLE_CACHE_PATH` in your Dockerfile to match the renderer's configuration:
+
+```dockerfile
+ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles
+RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
+```
+
+### Impact
+
+| Scenario                      | Before                                  | After                           |
+| ----------------------------- | --------------------------------------- | ------------------------------- |
+| First request on fresh deploy | 410→retry: 200ms–1s+                    | Direct render: <50ms            |
+| Thundering herd on new pod    | N requests queue behind per-bundle lock | All requests served immediately |
+
+### Pre-seeding the previous bundle for rolling deploys
+
+During a rolling deploy, old Rails instances may still reference the previous bundle hash. To prevent 410→retry for those requests on new renderer instances, you can pre-seed the previous bundle as well. After each deploy, upload the server bundle to an artifact store (e.g., S3) keyed by its hash. During the next build, fetch and place it in the cache directory before starting the renderer.
+
 ## Further Reading
 
 - [Node Renderer basics](../oss/building-features/node-renderer/basics.md) — Architecture and core concepts
