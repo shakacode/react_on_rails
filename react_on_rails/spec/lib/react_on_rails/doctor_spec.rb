@@ -294,6 +294,10 @@ RSpec.describe ReactOnRails::Doctor do
           stub_const("Shakapacker", shakapacker_module)
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
           allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
+          allow(File).to receive(:exist?).and_call_original
+          %w[.js .jsx .ts .tsx .mjs .cjs].each do |extension|
+            allow(File).to receive(:exist?).with("client/app/packs/server-bundle#{extension}").and_return(false)
+          end
         end
 
         it "uses Shakapacker API configuration with relative paths" do
@@ -302,8 +306,6 @@ RSpec.describe ReactOnRails::Doctor do
         end
 
         it "accepts a TypeScript server bundle source file when the configured filename is .js" do
-          allow(File).to receive(:exist?).and_call_original
-          allow(File).to receive(:exist?).with("client/app/packs/server-bundle.js").and_return(false)
           allow(File).to receive(:exist?).with("client/app/packs/server-bundle.ts").and_return(true)
 
           path = doctor.send(:determine_server_bundle_path)

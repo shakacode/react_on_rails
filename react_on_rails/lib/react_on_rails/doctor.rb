@@ -1582,7 +1582,7 @@ module ReactOnRails
       extension = File.extname(bundle_path)
       return SERVER_BUNDLE_SOURCE_EXTENSIONS if extension.empty?
 
-      ([extension] + SERVER_BUNDLE_SOURCE_EXTENSIONS).uniq
+      SERVER_BUNDLE_SOURCE_EXTENSIONS.reject { |candidate_extension| candidate_extension == extension }
     end
 
     def exit_with_status
@@ -1635,7 +1635,6 @@ module ReactOnRails
         if (prerender_set || uses_prerender) && !server_bundle_set
           checker.add_warning("  ⚠️  Server rendering is enabled but server_bundle_js_file is not configured")
           checker.add_info("  💡 Set config.server_bundle_js_file = 'server-bundle.js' to enable SSR")
-          checker.add_info("  💡 Source entrypoint can use .js/.jsx/.ts/.tsx suffixes")
           checker.add_info("  💡 See: https://reactonrails.com/docs/core-concepts/react-server-rendering/")
         elsif server_bundle_set && !prerender_set && !uses_prerender
           checker.add_info("  ℹ️  server_bundle_js_file is configured but prerender doesn't appear to be used")
