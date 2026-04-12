@@ -55,6 +55,7 @@ adding meta-tags to a page. It is exactly like react_component except for the fo
 2. Your JavaScript Render-Function for server rendering must return an Object with a `renderedHtml` property containing `componentHtml` and any other keys.
 3. Your view code must expect an object and not a string.
 4. Cannot be used with renderer functions (3-parameter functions) — these are client-only.
+5. The `immediate_hydration` option is no longer supported — if passed, it will be ignored with a deprecation warning.
 
 Here is an example of ERB view code:
 
