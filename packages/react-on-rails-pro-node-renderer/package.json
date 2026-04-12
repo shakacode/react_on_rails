@@ -1,6 +1,6 @@
 {
   "name": "react-on-rails-pro-node-renderer",
-  "version": "16.5.1",
+  "version": "16.6.0",
   "protocolVersion": "2.0.0",
   "description": "React on Rails Pro Node Renderer for server-side rendering",
   "main": "lib/ReactOnRailsProNodeRenderer.js",
@@ -91,7 +91,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shakacode/react_on_rails.git"
+    "url": "git+https://github.com/shakacode/react_on_rails.git",
+    "directory": "packages/react-on-rails-pro-node-renderer"
   },
   "keywords": [
     "react",
@@ -106,7 +107,7 @@
   "bugs": {
     "url": "https://github.com/shakacode/react_on_rails/issues"
   },
-  "homepage": "https://github.com/shakacode/react_on_rails/tree/main/packages/react-on-rails-pro-node-renderer#readme",
+  "homepage": "https://reactonrails.com/docs/pro/node-renderer/",
   "jest": {
     "clearMocks": true,
     "moduleNameMapper": {

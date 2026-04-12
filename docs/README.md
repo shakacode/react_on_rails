@@ -23,8 +23,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 ### Evaluating Rails + React options
 
 - [Examples and migration references](https://reactonrails.com/examples)
-- [Compare with alternatives (narrative overview)](./oss/getting-started/comparing-react-on-rails-to-alternatives.md)
-- [Detailed feature matrix and benchmarks](./oss/getting-started/comparison-with-alternatives.md)
+- [Compare with alternatives](./oss/getting-started/comparing-react-on-rails-to-alternatives.md) — decision guide covering Hotwire, Inertia, Next.js, and more
 - [Migrate from react-rails](./oss/migrating/migrating-from-react-rails.md)
 - [Published migration example repo (Rails 7)](https://github.com/shakacode/react-on-rails-migration-example)
 
@@ -39,7 +38,7 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 
 ## Pro features
 
-Start at [React on Rails Pro](./pro/home-pro.md) for the canonical Pro route map, then choose the feature family you need:
+Start at [React on Rails Pro](./pro/react-on-rails-pro.md) for the canonical Pro route map, then choose the feature family you need:
 
 - [React Server Components](./pro/react-server-components/tutorial.md) - RSC tutorial and deep dive
 - [Streaming SSR](./pro/streaming-ssr.md) - Progressive server rendering

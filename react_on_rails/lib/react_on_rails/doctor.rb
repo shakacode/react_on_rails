@@ -2,10 +2,12 @@
 
 require "json"
 require "erb"
+require "stringio"
 require "yaml"
 require_relative "utils"
 require_relative "config_path_resolver"
 require_relative "version_syntax_converter"
+require_relative "version_synchronizer"
 require_relative "system_checker"
 
 begin
@@ -141,10 +143,13 @@ module ReactOnRails
     end
 
     def check_react_on_rails_versions
-      # Use system_checker for comprehensive package validation instead of duplicating
+      # Auto-fix first so subsequent checks reflect the repaired state and
+      # don't leave stale errors that cause exit(1) despite a successful fix.
+      auto_fix_versions if fix
+
       checker.check_react_on_rails_packages
-      check_version_wildcards
       check_pro_package_consistency
+      check_version_wildcards
     end
 
     def check_packages
@@ -515,19 +520,87 @@ module ReactOnRails
 
       begin
         content = File.read(gemfile_path)
-        react_line = content.lines.find { |line| line.match(/^\s*gem\s+['"]react_on_rails['"]/) }
-
-        if react_line
-          if /['"][~^]/.match?(react_line)
-            checker.add_warning("⚠️  Gemfile uses wildcard version pattern (~, ^) for react_on_rails")
-          elsif />=\s*/.match?(react_line)
-            checker.add_warning("⚠️  Gemfile uses version range (>=) for react_on_rails")
-          else
-            checker.add_success("✅ Gemfile uses exact version for react_on_rails")
-          end
-        end
+        check_gem_wildcard_for(content, "react_on_rails")
+        check_gem_wildcard_for(content, "react_on_rails_pro") if ReactOnRails::Utils.react_on_rails_pro?
       rescue StandardError
         # Ignore errors reading Gemfile
+      end
+    end
+
+    def check_gem_wildcard_for(gemfile_content, gem_name)
+      lines = gemfile_content.lines
+      line_index = lines.index { |line| line.match(/^\s*gem\s+['"]#{gem_name}['"]/) }
+      return unless line_index
+
+      react_line = build_gem_declaration_line(lines, line_index)
+
+      # Skip path/git/github gems — these are development configurations where version checks don't apply
+      return if react_line.match?(/\b(?:path|git|github):\s/)
+
+      version_match = react_line.match(/gem\s+['"]#{gem_name}['"]\s*,\s*['"]([^'"]+)['"]/) ||
+                      react_line.match(/gem\s+['"]#{gem_name}['"][^#\n]*\bversion:\s*['"]([^'"]+)['"]/)
+      return report_missing_gem_version(gem_name) unless version_match
+
+      exact = begin
+        Gem::Requirement.new(version_match[1]).exact?
+      rescue Gem::Requirement::BadRequirementError
+        false
+      end
+
+      if exact
+        checker.add_success("✅ Gemfile uses exact version for #{gem_name}")
+      else
+        report_non_exact_gem_version(gem_name)
+      end
+    end
+
+    def build_gem_declaration_line(lines, line_index)
+      declaration = lines[line_index]
+      look_ahead = line_index + 1
+
+      # Keep joining while the previous segment ends with a comma; skip blank/comment-only continuation lines.
+      while declaration.sub(/#[^\n]*\z/, "").rstrip.end_with?(",") && lines[look_ahead]
+        next_line = lines[look_ahead]
+        look_ahead += 1
+        next if next_line.strip.empty? || next_line.strip.start_with?("#")
+
+        declaration = "#{declaration.chomp.sub(/#[^\n]*\z/, '').rstrip} #{next_line.strip}"
+      end
+
+      declaration
+    end
+
+    def report_missing_gem_version(gem_name)
+      version = gem_expected_version(gem_name)
+      checker.add_error(<<~MSG.strip)
+        🚫 Gemfile specifies no version for #{gem_name}.
+
+        React on Rails requires exact version pinning. Without a version constraint,
+        bundler may install any version and it can drift from the npm package.
+
+        Fix: Use an exact version in your Gemfile:
+          gem '#{gem_name}', '#{version}'
+      MSG
+    end
+
+    def report_non_exact_gem_version(gem_name)
+      version = gem_expected_version(gem_name)
+      checker.add_error(<<~MSG.strip)
+        🚫 Gemfile uses a non-exact version constraint for #{gem_name}.
+
+        React on Rails requires exact version matching between the gem and npm package.
+        Non-exact constraints can cause the gem and npm package to drift apart.
+
+        Fix: Use an exact version in your Gemfile:
+          gem '#{gem_name}', '#{version}'
+      MSG
+    end
+
+    def gem_expected_version(gem_name)
+      if gem_name == "react_on_rails_pro"
+        ReactOnRails::Utils.react_on_rails_pro_version
+      else
+        ReactOnRails::VERSION
       end
     end
 
@@ -537,20 +610,156 @@ module ReactOnRails
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
-        all_deps = package_json["dependencies"]&.merge(package_json["devDependencies"] || {}) || {}
+        packages = ["react-on-rails"]
+        if ReactOnRails::Utils.react_on_rails_pro?
+          packages << "react-on-rails-pro"
+          packages << "react-on-rails-pro-node-renderer"
+        end
 
-        npm_version = all_deps["react-on-rails"]
-        if npm_version
-          if /[~^]/.match?(npm_version)
-            checker.add_warning("⚠️  package.json uses wildcard version pattern (~, ^) for react-on-rails")
-          else
-            checker.add_success("✅ package.json uses exact version for react-on-rails")
+        packages.each do |package_name|
+          ReactOnRails::VersionSynchronizer::PACKAGE_SECTIONS.each do |section|
+            deps = package_json[section] || {}
+            next unless deps.key?(package_name)
+
+            check_npm_wildcard_for(deps, package_name)
+            break # only report once per package (avoid duplicates if listed in multiple sections)
           end
         end
       rescue JSON::ParserError
         # Ignore JSON parsing errors
       rescue StandardError
         # Ignore other errors
+      end
+    end
+
+    def check_npm_wildcard_for(all_deps, package_name)
+      npm_version = all_deps[package_name]
+      return unless npm_version
+
+      # Skip workspace/local-link specs
+      return if npm_version.match?(/\A(?:workspace:|file:|link:)/)
+
+      # Handle npm alias syntax (e.g., npm:@scope/pkg@^16.5.0) — check the embedded version
+      if npm_version.start_with?(ReactOnRails::VersionSynchronizer::NPM_ALIAS_PREFIX)
+        return check_npm_alias_version(npm_version, package_name)
+      end
+
+      if ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(npm_version)
+        checker.add_success("✅ package.json uses exact version for #{package_name}")
+      else
+        install_cmd = install_exact_command_for(package_name)
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json uses a non-exact version for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          Non-exact constraints (~ ^ >= * ranges) will cause a runtime error on app startup.
+
+          Fix: #{install_cmd}
+          Or run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      end
+    end
+
+    def check_npm_alias_version(npm_version, package_name)
+      expected_version = expected_npm_version_for(package_name)
+      install_cmd = install_exact_command_for(package_name)
+      at_index = npm_version.rindex("@")
+      unless at_index && at_index > ReactOnRails::VersionSynchronizer::NPM_ALIAS_PREFIX.length
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json uses an npm alias without a parseable version for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          npm alias specs must include an exact trailing version.
+
+          Fix: #{install_cmd}
+          Run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+        return
+      end
+
+      alias_version = npm_version[(at_index + 1)..]
+      exact_alias = ReactOnRails::VersionSynchronizer::EXACT_VERSION_REGEX.match?(alias_version)
+
+      if exact_alias && alias_version == expected_version
+        checker.add_success("✅ package.json uses exact version for #{package_name}")
+      elsif exact_alias
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json npm alias version mismatch for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          Expected exact version: #{expected_version}
+
+          Fix: #{install_cmd}
+          Run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      else
+        checker.add_error(<<~MSG.strip)
+          🚫 package.json uses a non-exact version in npm alias for #{package_name}: #{npm_version}
+
+          React on Rails requires exact version matching between the gem and npm package.
+          Non-exact constraints (~ ^ >= * ranges) will cause a runtime error on app startup.
+
+          Fix: #{install_cmd}
+          Run: bundle exec rake react_on_rails:sync_versions WRITE=true
+        MSG
+      end
+    end
+
+    def expected_npm_version_for(package_name)
+      gem_version = if %w[react-on-rails-pro react-on-rails-pro-node-renderer].include?(package_name)
+                      ReactOnRails::Utils.react_on_rails_pro_version
+                    else
+                      ReactOnRails::VERSION
+                    end
+      ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(gem_version)
+    end
+
+    def install_exact_command_for(package_name)
+      ReactOnRails::Utils.package_manager_install_exact_command(package_name, expected_npm_version_for(package_name))
+    end
+
+    def auto_fix_versions
+      package_json_path = resolved_package_json_path
+      return unless File.exist?(package_json_path)
+
+      synchronizer = ReactOnRails::VersionSynchronizer.new(package_json_path: package_json_path, io: StringIO.new)
+      result = synchronizer.sync(write: true)
+
+      report_sync_changes(result)
+      report_skipped_specs(result)
+      if result.changes.any?
+        checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      end
+    rescue StandardError => e
+      checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
+    end
+
+    def report_sync_changes(result)
+      if result.changes.any?
+        checker.add_success("  ✅ FIX=true: Synced package.json versions (#{result.changes.length} update(s))")
+        result.changes.each do |change|
+          checker.add_info("    #{change[:section]}.#{change[:package]}: #{change[:from]} -> #{change[:to]}")
+        end
+        checker.add_info("  ℹ️  Run your package manager install command to update the lockfile.")
+      elsif result.unsupported_specs.any? || result.missing_source_specs.any?
+        checker.add_warning("  ⚠️  FIX=true: Some package.json specs could not be auto-synced")
+      else
+        checker.add_info("  ℹ️  FIX=true: No package.json version changes needed")
+      end
+    end
+
+    def report_skipped_specs(result)
+      result.unsupported_specs.each do |spec|
+        checker.add_warning(
+          "  ⚠️  FIX=true: Skipped unsupported spec " \
+          "#{spec[:section]}.#{spec[:package]}: #{spec[:version]}"
+        )
+      end
+      result.missing_source_specs.each do |spec|
+        checker.add_warning(
+          "  ⚠️  FIX=true: Skipped #{spec[:section]}.#{spec[:package]} " \
+          "(#{spec[:source]} gem not loaded)"
+        )
       end
     end
 
@@ -896,7 +1105,7 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
-    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
     def analyze_performance_config(content, runtime_config = nil)
       checker.add_info("\n⚡ Performance & Loading:")
 
@@ -937,14 +1146,6 @@ module ReactOnRails
         checker.add_info("  auto_load_bundle: #{auto_load_match[1]}") if auto_load_match
       end
 
-      # Deprecated immediate_hydration setting
-      immediate_hydration_match = content.match(/config\.immediate_hydration\s*=\s*([^\s\n,]+)/)
-      if immediate_hydration_match
-        checker.add_warning("  ⚠️  immediate_hydration: #{immediate_hydration_match[1]} (DEPRECATED)")
-        checker.add_info("    💡 This setting is no longer used. Immediate hydration is now automatic for Pro users.")
-        checker.add_info("    💡 Remove this line from your config/initializers/react_on_rails.rb file.")
-      end
-
       # Component registry timeout
       if runtime_config
         # Default is 5000 ms; only report explicit non-default override.
@@ -955,7 +1156,7 @@ module ReactOnRails
         checker.add_info("  component_registry_timeout: #{timeout_match[1]}ms") if timeout_match
       end
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
     def analyze_development_config(content, runtime_config = nil)
@@ -2731,10 +2932,10 @@ module ReactOnRails
           The RSC bundle needs to be built separately from client/server bundles.
 
           If using Procfile.dev, add:
-            rsc-bundle: RSC_BUNDLE_ONLY=yes bin/shakapacker --watch
+            rsc-bundle: RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 
           If using a custom process manager, ensure the RSC bundle is built with
-          the RSC_BUNDLE_ONLY=yes environment variable.
+          the RSC_BUNDLE_ONLY=true environment variable.
         MSG
       end
     end

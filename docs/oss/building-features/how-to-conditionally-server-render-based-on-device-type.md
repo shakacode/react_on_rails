@@ -1,3 +1,7 @@
+---
+slug: conditional-server-rendering
+---
+
 # How to conditionally render server side based on the device type
 
 In general, we want to use CSS to do mobile responsive layouts.

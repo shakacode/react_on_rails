@@ -16,35 +16,43 @@ The generated home page links to the example pages, the key files React on Rails
 and follow-on docs for OSS vs Pro, React Server Components, and the marketplace demo.
 The generated app also includes a step-by-step git history so you can inspect each major scaffold phase with `git log --oneline --reverse`.
 
-This creates a TypeScript app by default. For JavaScript, use `--template javascript`.
-For React on Rails Pro without RSC, add `--pro`. The CLI installs `react_on_rails_pro`
-automatically and keeps the generated SSR example at `/hello_world`.
-For React Server Components (RSC), add `--rsc`. The CLI installs `react_on_rails_pro`
-automatically and the home page links to `/hello_server`.
-`--rsc` requires `react_on_rails_pro` to be installable in your environment
+When no `--pro` or `--rsc` flag is given, the CLI prompts you to choose a setup mode:
+
+1. **Standard** — open-source React on Rails with SSR
+2. **Pro** — adds Node.js server rendering (requires `react_on_rails_pro`)
+3. **RSC** — React Server Components (requires `react_on_rails_pro`) _(recommended, default)_
+
+The default choice is RSC. Press Enter to accept it, or type `1` or `2` to pick a different mode.
+In non-interactive environments (CI, pipes), standard mode is used automatically.
+
+To skip the prompt, pass `--standard`, `--pro`, or `--rsc` explicitly.
+All mode flags support JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
+`--pro` and `--rsc` require `react_on_rails_pro` to be installable in your environment
 ([Pro setup docs](../../pro/installation.md)).
-`--pro` and `--rsc` support both JavaScript (`.jsx`) and TypeScript (`.tsx`) templates.
 
 ## Options
 
 ```bash
+# Prompts for mode (Standard / Pro / RSC), defaults to RSC
+npx create-react-on-rails-app my-app
+
+# Skip prompt — use RSC directly
+npx create-react-on-rails-app my-app --rsc
+
+# Skip prompt — use Pro directly
+npx create-react-on-rails-app my-app --pro
+
+# Skip prompt — use Standard (open-source) directly
+npx create-react-on-rails-app my-app --standard
+
 # JavaScript instead of TypeScript
 npx create-react-on-rails-app my-app --template javascript
 
 # Use Rspack for ~20x faster builds
 npx create-react-on-rails-app my-app --rspack
 
-# Generate React on Rails Pro setup
-npx create-react-on-rails-app my-app --pro
-
-# Generate React Server Components setup (includes react_on_rails_pro)
-npx create-react-on-rails-app my-app --rsc
-
 # Specify package manager
 npx create-react-on-rails-app my-app --package-manager pnpm
-
-# Combine options
-npx create-react-on-rails-app my-app --rspack --package-manager pnpm
 
 # Combine RSC with Rspack
 npx create-react-on-rails-app my-app --rspack --rsc
@@ -56,9 +64,12 @@ npx create-react-on-rails-app my-app --rspack --rsc
 | ---------------------------- | -------------------------------------------------------------- | ------------- |
 | `-t, --template <type>`      | `javascript` or `typescript`                                   | `typescript`  |
 | `--rspack`                   | Use Rspack instead of Webpack (~20x faster)                    | `false`       |
+| `--standard`                 | Use open-source React on Rails (skip prompt)                   | `false`       |
 | `--pro`                      | Enable React on Rails Pro (requires `react_on_rails_pro`)      | `false`       |
 | `--rsc`                      | Enable React Server Components (requires `react_on_rails_pro`) | `false`       |
 | `-p, --package-manager <pm>` | `npm` or `pnpm`                                                | auto-detected |
+
+When none of `--standard`, `--pro`, or `--rsc` is given, the CLI prompts interactively in TTY environments (default: RSC). In non-TTY environments (CI, pipes, redirected output), standard mode is used automatically.
 
 ## What It Does
 

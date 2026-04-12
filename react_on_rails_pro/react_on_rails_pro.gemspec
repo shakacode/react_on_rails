@@ -16,9 +16,14 @@ Gem::Specification.new do |s|
 
   s.summary       = "Rails with react server rendering with webpack. Performance helpers"
   s.description   = "See README.md"
-  s.homepage      = "https://github.com/shakacode/react_on_rails_pro"
+  s.homepage      = "https://reactonrails.com/docs/pro/"
   s.license       = "UNLICENSED"
   s.metadata["rubygems_mfa_required"] = "true"
+  s.metadata["bug_tracker_uri"] = "https://github.com/shakacode/react_on_rails/issues"
+  s.metadata["changelog_uri"] = "https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md"
+  s.metadata["documentation_uri"] = "https://reactonrails.com/docs/pro/"
+  s.metadata["homepage_uri"] = "https://reactonrails.com/docs/pro/"
+  s.metadata["source_code_uri"] = "https://github.com/shakacode/react_on_rails/tree/main/react_on_rails_pro"
 
   s.files = Dir.chdir(__dir__) do
     `git ls-files -z`.split("\x0").reject do |f|
@@ -32,14 +37,14 @@ Gem::Specification.new do |s|
   s.required_ruby_version = ">= 3.0"
 
   s.add_runtime_dependency "addressable"
+  s.add_runtime_dependency "async", ">= 2.29"
   s.add_runtime_dependency "connection_pool"
   s.add_runtime_dependency "execjs", "~> 2.9"
-  s.add_runtime_dependency "httpx", "~> 1.5"
   # Needed to avoid this bug at httpx versions >= 1.6.0:
   #   https://github.com/HoneyryderChuck/httpx/issues/118
   s.add_runtime_dependency "http-2", ">= 1.1.1"
+  s.add_runtime_dependency "httpx", "~> 1.5"
   s.add_runtime_dependency "jwt", "~> 2.7"
-  s.add_runtime_dependency "async", ">= 2.29"
   s.add_runtime_dependency "rainbow"
   s.add_runtime_dependency "react_on_rails", ReactOnRails::VERSION
   s.add_development_dependency "bundler"

@@ -153,7 +153,7 @@ ${smartTrim(renderingRequest)}`);
 
     if (isReadableStream(result)) {
       const newStreamAfterHandlingError = handleStreamError(result, (error) => {
-        const msg = formatExceptionMessage(renderingRequest, error, 'Error in a rendering stream');
+        const msg = formatExceptionMessage({ renderingRequest }, error, 'Error in a rendering stream');
         errorReporter.message(msg);
       });
       return newStreamAfterHandlingError;
@@ -172,7 +172,7 @@ ${smartTrim(result)}`);
 
     return result;
   } catch (exception) {
-    const exceptionMessage = formatExceptionMessage(renderingRequest, exception);
+    const exceptionMessage = formatExceptionMessage({ renderingRequest }, exception);
     log.debug('Caught exception in rendering request: %s', exceptionMessage);
     return Promise.resolve({ exceptionMessage });
   }

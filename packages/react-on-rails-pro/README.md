@@ -1,6 +1,6 @@
 # react-on-rails-pro
 
-The client-side JavaScript package for [React on Rails Pro](https://github.com/shakacode/react_on_rails). This package **replaces** the base `react-on-rails` package and re-exports everything from it, plus Pro-exclusive features like React Server Components support.
+The client-side JavaScript package for [React on Rails Pro](https://reactonrails.com/docs/pro/). This package **replaces** the base `react-on-rails` package and re-exports everything from it, plus Pro-exclusive features like React Server Components support.
 
 ## Installation
 
@@ -13,6 +13,8 @@ pnpm add react-on-rails-pro
 ```
 
 **Important:** When using the `react_on_rails_pro` Ruby gem, you **must** use this package (`react-on-rails-pro`) instead of `react-on-rails`. If the Pro gem detects the base `react-on-rails` npm package at runtime, it will raise an error.
+
+React on Rails Pro is free to evaluate in development, CI/CD, and staging. A paid license is required only for production deployments.
 
 ## Usage
 
@@ -90,7 +92,8 @@ See the [full installation guide](https://reactonrails.com/docs/pro/installation
 - [Installation Guide](https://reactonrails.com/docs/pro/installation)
 - [Configuration Reference](https://reactonrails.com/docs/configuration/configuration-pro)
 - [React Server Components Tutorial](https://reactonrails.com/docs/pro/react-server-components/tutorial)
-- [React on Rails Pro Overview](https://pro.reactonrails.com/)
+- [Upgrade from OSS to Pro](https://reactonrails.com/docs/pro/upgrading-to-pro/)
+- [React on Rails Pro Overview](https://reactonrails.com/docs/pro/)
 
 ## License
 

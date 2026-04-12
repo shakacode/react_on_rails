@@ -14,7 +14,7 @@
     "create-react-class": "^15.6.3",
     "jquery": "^3.5.1",
     "jquery-ujs": "^1.2.2",
-    "lodash": "^4.17.23",
+    "lodash": "^4.18.1",
     "mini-css-extract-plugin": "^2.4.4",
     "node-libs-browser": "^2.2.1",
     "null-loader": "^4.0.0",

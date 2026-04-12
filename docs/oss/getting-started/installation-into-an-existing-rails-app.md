@@ -1,6 +1,13 @@
+---
+slug: existing-rails-app
+---
+
 # Install into an Existing Rails App
 
 Use this path when you already have a Rails application and want React on Rails to generate the missing integration files for you.
+
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user has an existing Rails app and wants to add React. For new apps, use [Quick Start](./quick-start.md). If the app still uses Webpacker, expect a two-step migration (Webpacker → Shakapacker → React on Rails). Rails 7+ is recommended.
 
 ## Preflight
 
@@ -16,21 +23,21 @@ bundle add shakapacker --strict
 bundle add react_on_rails --strict
 ```
 
-React on Rails installs the matching `react-on-rails` JavaScript package during the generator run, so you do not need to pre-install it in `package.json` unless you want to pin everything manually ahead of time.
+React on Rails attempts to install the matching `react-on-rails` JavaScript package during the generator run. In some existing apps, dependency installation can fail (or required package-manager tooling may be unavailable), and the generator prints manual install commands. Run those commands before starting the app.
 
 ### Optional: pin exact gem and npm versions yourself
 
-If you manage versions manually, keep the Ruby gem and npm package on the same release. Pre-release gems use dots while npm uses hyphens.
+If you manage versions manually, keep the Ruby gem and npm package on the same release. Pre-release gems use dots while npm uses hyphens. Replace `VERSION` below with the latest version from [the CHANGELOG](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md).
 
 ```ruby
-gem "react_on_rails", "16.4.0"
+gem "react_on_rails", "VERSION"
 ```
 
 ```bash
-npm install react-on-rails@16.4.0 --save-exact
-# or: yarn add react-on-rails@16.4.0 --exact
-# or: pnpm add react-on-rails@16.4.0 --save-exact
-# or: bun add react-on-rails@16.4.0 --exact
+npm install react-on-rails@VERSION --save-exact
+# or: yarn add react-on-rails@VERSION --exact
+# or: pnpm add react-on-rails@VERSION --save-exact
+# or: bun add react-on-rails@VERSION --exact
 ```
 
 ## 2. Run the generator
@@ -42,6 +49,20 @@ bundle exec rails generate react_on_rails:install --typescript
 TypeScript is the recommended default for new integrations. If you want JavaScript instead, omit `--typescript`.
 
 For generator options such as `--rspack`, `--pro`, or `--rsc`, see the [generator details](../api-reference/generator-details.md).
+
+If the generator reports dependency-install warnings (for example, `JavaScript dependencies installation failed ...` followed by `Please run manually:`), run your package manager install and then compile once before starting the app:
+
+```bash
+# pick one package manager
+npm install
+# or: pnpm install
+# or: yarn install
+# or: bun install
+
+bundle exec rails shakapacker:compile
+```
+
+If you are migrating from `react-rails`, also run the compatibility checklist in [Migrate from react-rails](../migrating/migrating-from-react-rails.md#legacy-compatibility-fixes-that-often-make-migration-one-shot).
 
 ## 3. Start the app
 

@@ -20,6 +20,31 @@ module ReactOnRails
     include ReactOnRails::ProHelper
 
     COMPONENT_HTML_KEY = "componentHtml"
+    IMMEDIATE_HYDRATION_WARNING_MUTEX = Mutex.new
+
+    class << self
+      def warn_removed_immediate_hydration_option(helper_name)
+        should_warn = IMMEDIATE_HYDRATION_WARNING_MUTEX.synchronize do
+          @removed_immediate_hydration_warnings ||= {}
+          next false if @removed_immediate_hydration_warnings[helper_name]
+
+          @removed_immediate_hydration_warnings[helper_name] = true
+        end
+
+        return unless should_warn
+
+        Rails.logger.warn(
+          "[React on Rails] `immediate_hydration:` is no longer supported on #{helper_name}. Remove this option."
+        )
+      end
+
+      # :nodoc:
+      def reset_removed_immediate_hydration_warnings!
+        IMMEDIATE_HYDRATION_WARNING_MUTEX.synchronize do
+          @removed_immediate_hydration_warnings = {}
+        end
+      end
+    end
 
     # react_component_name: can be a React function or class component or a "Render-Function".
     # "Render-Functions" differ from a React function in that they take two parameters, the
@@ -57,6 +82,11 @@ module ReactOnRails
     # random_dom_id can be set to override the default from the config/initializers. That's only
     # used if you have multiple instance of the same component on the Rails view.
     def react_component(component_name, options = {})
+      if options.key?(:immediate_hydration)
+        ReactOnRails::Helper.warn_removed_immediate_hydration_option("react_component")
+        options.delete(:immediate_hydration)
+      end
+
       internal_result = internal_react_component(component_name, options)
       server_rendered_html = internal_result[:result]["html"]
       console_script = internal_result[:result]["consoleReplayScript"]
@@ -113,6 +143,11 @@ module ReactOnRails
     #    <%= react_helmet_app["componentHtml"] %>
     #
     def react_component_hash(component_name, options = {})
+      if options.key?(:immediate_hydration)
+        ReactOnRails::Helper.warn_removed_immediate_hydration_option("react_component_hash")
+        options.delete(:immediate_hydration)
+      end
+
       options[:prerender] = true
 
       internal_result = internal_react_component(component_name, options)
@@ -156,24 +191,29 @@ module ReactOnRails
     # props: Ruby Hash or JSON string which contains the properties to pass to the redux store.
     # Options
     #    defer: false -- pass as true if you wish to render this below your component.
-    #    immediate_hydration: nil -- React on Rails Pro (licensed) feature. When nil (default), Pro users
-    #                        get immediate hydration, non-Pro users don't. Can be explicitly overridden.
     #    auto_load_bundle: nil -- If true, automatically loads the generated pack for this store.
     #                      Defaults to ReactOnRails.configuration.auto_load_bundle if not specified.
     #                      Requires config.stores_subdirectory to be set (e.g., "ror_stores").
     #                      Store files should be placed in directories matching this name, e.g.:
     #                        app/javascript/bundles/ror_stores/commentsStore.js
     #                      The store file must export default a store generator function.
-    def redux_store(store_name, props: {}, defer: false, immediate_hydration: nil, auto_load_bundle: nil)
-      immediate_hydration = ReactOnRails::Utils.normalize_immediate_hydration(immediate_hydration, store_name, "Store")
+    def redux_store(store_name, props: {}, defer: false, auto_load_bundle: nil, **rest)
+      immediate_hydration_present = rest.key?(:immediate_hydration)
+      unknown_keys = rest.keys - [:immediate_hydration]
+      if unknown_keys.any?
+        plural = unknown_keys.one? ? "" : "s"
+        unknown_options = unknown_keys.map { |key| ":#{key}" }.join(", ")
+        raise ArgumentError, "unknown keyword#{plural}: #{unknown_options}"
+      end
+
+      ReactOnRails::Helper.warn_removed_immediate_hydration_option("redux_store") if immediate_hydration_present
 
       # Auto-load store pack if configured
       should_auto_load = auto_load_bundle.nil? ? ReactOnRails.configuration.auto_load_bundle : auto_load_bundle
       load_pack_for_generated_store(store_name, explicit_auto_load: auto_load_bundle == true) if should_auto_load
 
       redux_store_data = { store_name: store_name,
-                           props: props,
-                           immediate_hydration: immediate_hydration }
+                           props: props }
       if defer
         registered_stores_defer_render << redux_store_data
         "YOU SHOULD NOT SEE THIS ON YOUR VIEW -- Uses as a code block, like <% redux_store %> " \

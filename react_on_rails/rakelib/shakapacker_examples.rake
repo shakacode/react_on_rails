@@ -64,6 +64,38 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     fallback_match&.[](1)
   end
 
+  def local_react_on_rails_package_ref(dir)
+    package_dir = File.expand_path("../packages/react-on-rails", gem_root)
+    relative_package_dir = Pathname(package_dir).relative_path_from(Pathname(dir)).to_s
+    "file:#{relative_package_dir}"
+  end
+
+  # Makes generated examples use the local monorepo package for react-on-rails.
+  # This ensures CI validates the package code in this branch rather than a
+  # potentially stale published npm version.
+  def pin_react_on_rails_to_local_package(dir)
+    package_json_path = File.join(dir, "package.json")
+    return unless File.exist?(package_json_path)
+
+    begin
+      package_json = JSON.parse(File.read(package_json_path))
+    rescue JSON::ParserError => e
+      puts "  ERROR: Failed to parse #{package_json_path}: #{e.message}"
+      raise
+    end
+
+    deps = package_json["dependencies"]
+    return unless deps&.key?("react-on-rails")
+
+    local_package_ref = local_react_on_rails_package_ref(dir)
+
+    return if deps["react-on-rails"] == local_package_ref
+
+    puts "  Pinning react-on-rails npm dependency from #{deps['react-on-rails']} to #{local_package_ref}"
+    deps["react-on-rails"] = local_package_ref
+    File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")
+  end
+
   # Updates React-related dependencies to a specific version
   def update_react_dependencies(deps, react_version)
     return unless deps
@@ -115,6 +147,37 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     puts "    React: #{react_version}"
   end
 
+  def install_local_react_on_rails_package(dir, legacy_peer_deps: false)
+    legacy_peer_deps_flag = legacy_peer_deps ? "--legacy-peer-deps " : ""
+    sh_in_dir(dir,
+              "npm install react-on-rails@#{local_react_on_rails_package_ref(dir)} " \
+              "#{legacy_peer_deps_flag}--install-links")
+  end
+
+  def install_example_node_dependencies(example_type)
+    pin_shakapacker_npm_version(example_type.dir)
+    pin_react_on_rails_to_local_package(example_type.dir)
+
+    if example_type.pinned_react_version?
+      # Use --legacy-peer-deps to avoid peer dependency conflicts when
+      # react-on-rails expects newer React versions.
+      sh_in_dir(example_type.dir, "npm install --legacy-peer-deps --install-links")
+      # Explicit re-install is required because npm install --install-links does not
+      # reliably copy a file: dependency that was just pinned in the same session.
+      install_local_react_on_rails_package(example_type.dir, legacy_peer_deps: true)
+      # Regenerate Shakapacker binstubs after downgrading from 9.x to 8.2.x
+      # The binstub format may differ between major versions.
+      unbundled_sh_in_dir(example_type.dir, "bundle exec rake shakapacker:binstubs")
+    else
+      # Use --install-links to copy file: dependencies instead of symlinking,
+      # preventing duplicate React instances from webpack resolving through symlinks.
+      sh_in_dir(example_type.dir, "npm install --install-links")
+      # Explicit re-install is required because npm install --install-links does not
+      # reliably copy a file: dependency that was just pinned in the same session.
+      install_local_react_on_rails_package(example_type.dir)
+    end
+  end
+
   # Define tasks for each example type
   ExampleType.all[:shakapacker_examples].each do |example_type| # rubocop:disable Metrics/BlockLength
     relative_gem_root = Pathname(gem_root).relative_path_from(Pathname(example_type.dir))
@@ -158,29 +221,9 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
         apply_react_version(example_type.dir, example_type.react_version_string)
         # Re-run bundle install to ensure dependencies are resolved correctly
         bundle_install_in(example_type.dir)
-        # Pin the npm shakapacker version to exactly match the installed gem version.
-        # shakapacker:install may add "^X.Y.Z" to package.json, which allows npm to
-        # resolve a newer minor version (e.g., 9.6.0 when gem is 9.5.0), causing
-        # Shakapacker's gem/npm version consistency check to fail.
-        pin_shakapacker_npm_version(example_type.dir)
-        # Use --legacy-peer-deps to avoid peer dependency conflicts when
-        # react-on-rails expects newer React versions
-        # Use --install-links to copy file: dependencies instead of symlinking,
-        # preventing duplicate React instances from webpack resolving through symlinks
-        sh_in_dir(example_type.dir, "npm install --legacy-peer-deps --install-links")
-        # Regenerate Shakapacker binstubs after downgrading from 9.x to 8.2.x
-        # The binstub format may differ between major versions
-        unbundled_sh_in_dir(example_type.dir, "bundle exec rake shakapacker:binstubs")
-      else
-        # Pin the npm shakapacker version to exactly match the installed gem version.
-        # shakapacker:install may add "^X.Y.Z" to package.json, which allows npm to
-        # resolve a newer minor version (e.g., 9.6.0 when gem is 9.5.0), causing
-        # Shakapacker's gem/npm version consistency check to fail.
-        pin_shakapacker_npm_version(example_type.dir)
-        # Use --install-links to copy file: dependencies instead of symlinking,
-        # preventing duplicate React instances from webpack resolving through symlinks
-        sh_in_dir(example_type.dir, "npm install --install-links")
       end
+      # Pin npm package versions and install node dependencies for generated example.
+      install_example_node_dependencies(example_type)
       # Generate the component packs after running the generator to ensure all
       # auto-bundled components have corresponding pack files created.
       # Use unbundled_sh_in_dir to ensure we're using the generated app's Gemfile

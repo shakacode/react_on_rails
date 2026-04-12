@@ -49,25 +49,35 @@ export interface ResponseResult {
   stream?: Readable;
 }
 
-export function errorResponseResult(msg: string, tracingContext?: TracingContext): ResponseResult {
-  errorReporter.message(msg, tracingContext);
+const NO_CACHE_HEADERS = { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' } as const;
+
+export function badRequestResponseResult(msg: string): ResponseResult {
   return {
-    headers: { 'Cache-Control': 'no-cache, no-store, max-age=0, must-revalidate' },
+    headers: NO_CACHE_HEADERS,
     status: 400,
     data: msg,
   };
 }
 
+export function errorResponseResult(msg: string, tracingContext?: TracingContext): ResponseResult {
+  errorReporter.message(msg, tracingContext);
+  return badRequestResponseResult(msg);
+}
+
+export type RequestInfo = { renderingRequest: string } | { label: string; content: string };
 /**
- * @param renderingRequest The JavaScript code which threw an error
+ * @param request Either a rendering request (auto-labeled) or a { label, content } pair
  * @param error The error that was thrown (typed as `unknown` to minimize casts in `catch`)
  * @param context Optional context to include in the error message
  */
-export function formatExceptionMessage(renderingRequest: string, error: unknown, context?: string) {
+export function formatExceptionMessage(request: RequestInfo, error: unknown, context?: string) {
+  const label = 'renderingRequest' in request ? 'JS code for rendering request was:' : request.label;
+  const content = 'renderingRequest' in request ? request.renderingRequest : request.content;
+
   return `${context ? `\nContext:\n${context}\n` : ''}
-JS code for rendering request was:
-${smartTrim(renderingRequest)}
-    
+${label}
+${smartTrim(content)}
+
 EXCEPTION MESSAGE:
 ${(error as Error).message || error}
 

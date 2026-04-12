@@ -142,6 +142,13 @@ function logLevel(level: string): LevelWithSilent {
   }
 }
 
+function validatePort(port: number): string | null {
+  if (!Number.isInteger(port) || !Number.isFinite(port) || port < 0 || port > 65535) {
+    return `RENDERER_PORT must be an integer between 0 and 65535. Received: ${String(port)}`;
+  }
+  return null;
+}
+
 function normalizedRuntimeEnvs() {
   return [env.RAILS_ENV, env.NODE_ENV]
     .filter((value): value is string => Boolean(value))
@@ -156,6 +163,10 @@ function runtimeEnvsAllowDevelopmentDefaults() {
   return runtimeEnvs.length > 0 && runtimeEnvs.every((value) => value === 'development' || value === 'test');
 }
 
+// Intentionally checks only NODE_ENV, not both NODE_ENV and RAILS_ENV like
+// runtimeEnvsAllowDevelopmentDefaults(). Async operation log replay is a JS
+// debugging concern, not a security boundary — it should key off the JS
+// runtime environment alone.
 function defaultReplayServerAsyncOperationLogs() {
   if (env.REPLAY_SERVER_ASYNC_OPERATION_LOGS != null) {
     return truthy(env.REPLAY_SERVER_ASYNC_OPERATION_LOGS);
@@ -379,6 +390,17 @@ export function buildConfig(providedUserConfig?: Partial<Config>): Config {
       config!.port = parseInt(val, 10);
     }
   });
+
+  // Coerce port to a number — user configs frequently pass env-derived strings
+  // (e.g. `port: env.RENDERER_PORT || 3800` yields the string "3800").
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-conversion -- runtime value may be string despite the type
+  config.port = Number(config.port);
+
+  const portValidationError = validatePort(config.port);
+  if (portValidationError) {
+    log.error(portValidationError);
+    process.exit(1);
+  }
 
   if (
     'honeybadgerApiKey' in config ||

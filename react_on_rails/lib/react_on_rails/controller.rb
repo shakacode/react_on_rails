@@ -9,16 +9,22 @@ module ReactOnRails
     #             JavaScript code.
     # props: Named parameter props which is a Ruby Hash or JSON string which contains the properties
     #        to pass to the redux store.
-    # immediate_hydration: React on Rails Pro (licensed) feature. When nil (default), Pro users get
-    #                      immediate hydration, non-Pro users don't. Can be explicitly overridden.
     #
     # Be sure to include view helper `redux_store_hydration_data` at the end of your layout or view
     # or else there will be no client side hydration of your stores.
-    def redux_store(store_name, props: {}, immediate_hydration: nil)
-      immediate_hydration = ReactOnRails::Utils.normalize_immediate_hydration(immediate_hydration, store_name, "Store")
+    def redux_store(store_name, props: {}, **rest)
+      immediate_hydration_present = rest.key?(:immediate_hydration)
+      unknown_keys = rest.keys - [:immediate_hydration]
+      if unknown_keys.any?
+        plural = unknown_keys.one? ? "" : "s"
+        unknown_options = unknown_keys.map { |key| ":#{key}" }.join(", ")
+        raise ArgumentError, "unknown keyword#{plural}: #{unknown_options}"
+      end
+
+      ReactOnRails::Helper.warn_removed_immediate_hydration_option("redux_store") if immediate_hydration_present
+
       redux_store_data = { store_name: store_name,
-                           props: props,
-                           immediate_hydration: immediate_hydration }
+                           props: props }
       @registered_stores_defer_render ||= []
       @registered_stores_defer_render << redux_store_data
     end

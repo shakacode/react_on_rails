@@ -96,5 +96,7 @@ module ReactOnRailsPro
     def validate_remote_bundle_cache_adapter: () -> void
 
     def setup_renderer_password: () -> void
+
+    def validate_renderer_password_for_production: () -> void
   end
 end

@@ -5,6 +5,14 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 // - building-features/rails-webpacker-react-integration-options
 // - deployment/troubleshooting-when-using-webpacker
 // - misc/asset-pipeline
+//
+// Contributing/Resources pages (linked from introduction.md instead of sidebar):
+// - misc/doctrine
+// - misc/style
+// - misc/updating-dependencies
+// - misc/credits
+// - misc/articles
+// - misc/tips
 
 const sidebars: SidebarsConfig = {
   docsSidebar: [
@@ -23,15 +31,7 @@ const sidebars: SidebarsConfig = {
         'getting-started/using-react-on-rails',
         'getting-started/oss-vs-pro',
         'getting-started/pro-quick-start',
-        {
-          type: 'category',
-          label: 'Compare Alternatives',
-          items: [
-            'getting-started/comparison-with-alternatives',
-            'getting-started/comparing-react-on-rails-to-alternatives',
-          ],
-        },
-        'getting-started/nextjs-with-separate-rails-backend',
+        'getting-started/comparing-react-on-rails-to-alternatives',
         'getting-started/common-issues',
       ],
     },
@@ -227,22 +227,6 @@ const sidebars: SidebarsConfig = {
               ],
             },
           ],
-        },
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Contributing',
-      link: { type: 'generated-index', title: 'Contributing' },
-      items: [
-        'misc/doctrine',
-        'misc/style',
-        'misc/updating-dependencies',
-        'misc/credits',
-        {
-          type: 'category',
-          label: 'Resources',
-          items: ['misc/articles', 'misc/tips'],
         },
       ],
     },

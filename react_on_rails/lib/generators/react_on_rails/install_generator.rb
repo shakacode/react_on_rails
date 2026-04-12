@@ -57,13 +57,21 @@ module ReactOnRails
       class_option :pro,
                    type: :boolean,
                    default: false,
-                   desc: "Install React on Rails Pro with Node Renderer. Default: false"
+                   desc: "Install React on Rails Pro with Node Renderer. " \
+                         "Combined with --rsc, uses --rsc-pro mode. Default: false"
 
       # --rsc
       class_option :rsc,
                    type: :boolean,
                    default: false,
-                   desc: "Install React Server Components support (includes Pro). Default: false"
+                   desc: "Install React Server Components support (includes Pro). " \
+                         "Combined with --pro, uses --rsc-pro mode. Default: false"
+
+      # --rsc-pro
+      class_option :rsc_pro,
+                   type: :boolean,
+                   default: false,
+                   desc: "Install first-class Pro RSC mode with matched Pro/RSC defaults. Default: false"
 
       # Hidden option: allows tests (and advanced users) to signal that Shakapacker
       # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
@@ -88,6 +96,8 @@ module ReactOnRails
       # Removed: --skip-shakapacker-install (Shakapacker is now a required dependency)
 
       SHAKAPACKER_YML_PATH = "config/shakapacker.yml"
+      HELLO_WORLD_ROUTE = "hello_world"
+      HELLO_SERVER_ROUTE = "hello_server"
       # Matches the stock `bin/dev` written by Rails 8.x. Rails 7.1 commonly
       # generated a foreman-based shell script instead, which stock_rails_bin_dev?
       # also recognizes so the React on Rails template can replace either variant.
@@ -190,7 +200,7 @@ module ReactOnRails
         # --pretend/--force/--skip must be forwarded explicitly at each boundary.
         invoke "react_on_rails:base", [],
                { typescript: options.typescript?, redux: options.redux?, rspack: options.rspack?,
-                 pro: options.pro?, rsc: options.rsc?, new_app: options.new_app?,
+                 pro: use_pro?, rsc: use_rsc?, new_app: options.new_app?,
                  shakapacker_just_installed: shakapacker_just_installed?,
                  force: options[:force], skip: options[:skip], pretend: options[:pretend] }
 
@@ -202,7 +212,7 @@ module ReactOnRails
           invoke "react_on_rails:react_with_redux", [], { typescript: options.typescript?,
                                                           invoked_by_install: true,
                                                           new_app: options.new_app?,
-                                                          rsc: options.rsc?,
+                                                          rsc: use_rsc?,
                                                           force: options[:force], skip: options[:skip],
                                                           pretend: options[:pretend] }
         elsif !use_rsc?
@@ -274,11 +284,12 @@ module ReactOnRails
         # it on a clean worktree. On a dirty tree, use the read-only pro_gem_installed?
         # check to catch a missing gem without triggering auto-install.
         if has_worktree_issues && use_pro? && !pro_gem_installed?
+          required_flag = pro_requirement_flag
           GeneratorMessages.add_error(<<~MSG.strip)
-            🚫 react_on_rails_pro gem is required for #{options[:rsc] ? '--rsc' : '--pro'} but is not installed.
+            🚫 react_on_rails_pro gem is required for #{required_flag} but is not installed.
             Auto-install was skipped because the worktree has uncommitted changes.
             Please add it manually:
-              gem 'react_on_rails_pro', '~> #{recommended_pro_gem_version}'
+              gem 'react_on_rails_pro', '#{pro_gem_version_requirement}'
             Then run: bundle install
           MSG
           return false
@@ -382,7 +393,7 @@ module ReactOnRails
         if preserve_existing_bin_dev?
           if use_rsc? && !options.redux? && !options.new_app?
             say_status :warn,
-                       'Custom bin/dev detected: update DEFAULT_ROUTE to "hello_server" manually for --rsc',
+                       "Custom bin/dev detected: update DEFAULT_ROUTE to \"#{HELLO_SERVER_ROUTE}\" manually for --rsc",
                        :yellow
           end
         else
@@ -463,10 +474,10 @@ module ReactOnRails
         # Determine what route and component will be created by the generator
         if use_rsc? && !options.redux?
           # RSC without Redux: HelloServer replaces HelloWorld
-          route = "hello_server"
+          route = HELLO_SERVER_ROUTE
           component_name = "HelloServer"
         else
-          route = "hello_world"
+          route = HELLO_WORLD_ROUTE
           component_name = options.redux? ? "HelloWorldApp" : "HelloWorld"
         end
 
@@ -478,6 +489,7 @@ module ReactOnRails
                                      shakapacker_just_installed: shakapacker_just_installed?,
                                      landing_page: options.new_app? && new_app_root_route_available?
                                    ))
+        GeneratorMessages.add_info(rsc_pro_verification_message) if use_rsc_pro_mode?
       end
 
       def shakapacker_setup_incomplete?
@@ -491,13 +503,26 @@ module ReactOnRails
         flags << "--typescript" if options.typescript?
         flags << "--rspack" if options.rspack?
 
-        if use_rsc?
+        if use_rsc_pro_mode?
+          flags << "--rsc-pro"
+        elsif options.rsc?
           flags << "--rsc"
         elsif options.pro?
           flags << "--pro"
         end
 
         ["rails generate react_on_rails:install", *flags].join(" ")
+      end
+
+      def rsc_pro_verification_message
+        <<~MSG
+
+          🔎 RSC Pro Verification:
+          ─────────────────────────────────────────────────────────────────────────
+          1. Start all processes: #{Rainbow('bin/dev').cyan}
+          2. Visit: #{Rainbow("http://localhost:<port>/#{HELLO_SERVER_ROUTE}").cyan.underline}
+          3. Confirm the page streams and the Like button hydrates on click.
+        MSG
       end
 
       def recovery_working_tree_lines

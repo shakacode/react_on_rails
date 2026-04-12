@@ -70,33 +70,51 @@ module ReactOnRails
         next unless dependencies.is_a?(Hash)
 
         PACKAGE_VERSION_SOURCES.each do |package_name, source_key|
-          next unless dependencies.key?(package_name)
-
-          current_version = dependencies[package_name]
-          parsed_spec = parse_supported_spec(current_version)
-          unless parsed_spec
-            unsupported_specs << { section: section, package: package_name, version: current_version }
-            next
-          end
-
-          expected_version = expected_versions[source_key]
-          if expected_version.nil?
-            missing_source_specs << { section: section, package: package_name, source: source_key }
-            next
-          end
-          normalized_current_version = converter.rubygem_to_npm(parsed_spec[:version])
-          next if normalized_current_version == expected_version
-
-          changes << {
-            section: section,
-            package: package_name,
-            from: current_version,
-            to: rewritten_spec(parsed_spec, expected_version)
-          }
+          process_package_dependency(section: section,
+                                     dependencies: dependencies,
+                                     package_name: package_name,
+                                     source_key: source_key,
+                                     expected_versions: expected_versions,
+                                     changes: changes,
+                                     unsupported_specs: unsupported_specs,
+                                     missing_source_specs: missing_source_specs)
         end
       end
 
       [changes, unsupported_specs, missing_source_specs]
+    end
+
+    def process_package_dependency(section:, dependencies:, package_name:, source_key:, expected_versions:, changes:,
+                                   unsupported_specs:, missing_source_specs:)
+      return unless dependencies.key?(package_name)
+
+      current_version = dependencies[package_name]
+      parsed_spec = parse_supported_spec(current_version)
+      unless parsed_spec
+        unsupported_specs << { section: section, package: package_name, version: current_version }
+        return
+      end
+
+      expected_version = expected_versions[source_key]
+      unless expected_version
+        missing_source_specs << { section: section, package: package_name, source: source_key }
+        return
+      end
+
+      if parsed_spec[:lower_bound] && expected_below_lower_bound?(expected_version, parsed_spec[:lower_bound])
+        unsupported_specs << { section: section, package: package_name, version: current_version }
+        return
+      end
+
+      normalized_current_version = converter.rubygem_to_npm(parsed_spec[:version])
+      return if normalized_current_version == expected_version && parsed_spec[:exact]
+
+      changes << {
+        section: section,
+        package: package_name,
+        from: current_version,
+        to: rewritten_spec(parsed_spec, expected_version)
+      }
     end
 
     def expected_package_versions
@@ -146,18 +164,77 @@ module ReactOnRails
       version.is_a?(String) && version.match?(EXACT_VERSION_REGEX)
     end
 
-    def parse_supported_spec(version_spec)
-      return { version: version_spec, prefix: nil } if exact_version?(version_spec)
-      return unless version_spec.is_a?(String) && version_spec.start_with?(NPM_ALIAS_PREFIX)
+    # Strips forward-looking semver range prefixes (^, ~, >=, =) and returns the bare version.
+    # Excludes bare > (strict greater-than), < and <= because pinning >X.Y.Z to exactly X.Y.Z
+    # would contradict the user's explicit exclusion of that version.
+    def strip_range_prefix(version_spec)
+      return nil unless version_spec.is_a?(String)
 
+      stripped = version_spec.sub(/\A(?:\^|~|>=|=)\s*/, "")
+      return stripped if stripped != version_spec && exact_version?(stripped)
+
+      nil
+    end
+
+    def parse_supported_spec(version_spec)
+      return { version: version_spec, prefix: nil, exact: true, lower_bound: nil } if exact_version?(version_spec)
+
+      # Handle npm alias syntax: npm:@scope/pkg@version
+      if version_spec.is_a?(String) && version_spec.start_with?(NPM_ALIAS_PREFIX)
+        return parse_npm_alias_spec(version_spec)
+      end
+
+      # Handle range prefixes: ^16.5.0, ~16.5.0, >=16.5.0, etc.
+      stripped = strip_range_prefix(version_spec)
+      if stripped
+        return {
+          version: stripped,
+          prefix: nil,
+          exact: false,
+          lower_bound: greater_or_equal_lower_bound(version_spec)
+        }
+      end
+
+      nil
+    end
+
+    def parse_npm_alias_spec(version_spec)
       at_index = version_spec.rindex("@")
-      # Ensure at least one package-name character appears after "npm:" and before the version separator.
-      return unless at_index && at_index > NPM_ALIAS_PREFIX.length
+      return nil unless at_index && at_index > NPM_ALIAS_PREFIX.length
 
       alias_version = version_spec[(at_index + 1)..]
-      return unless exact_version?(alias_version)
+      prefix = version_spec[0..at_index]
+      return { version: alias_version, prefix: prefix, exact: true, lower_bound: nil } if exact_version?(alias_version)
 
-      { version: alias_version, prefix: version_spec[0..at_index] }
+      # Try stripping range prefix from alias version (e.g., npm:@scope/pkg@^16.5.0)
+      stripped = strip_range_prefix(alias_version)
+      if stripped
+        return {
+          version: stripped,
+          prefix: prefix,
+          exact: false,
+          lower_bound: greater_or_equal_lower_bound(alias_version)
+        }
+      end
+
+      nil
+    end
+
+    def greater_or_equal_lower_bound(version_spec)
+      return nil unless version_spec.is_a?(String)
+
+      stripped = version_spec.sub(/\A>=\s*/, "")
+      return nil if stripped == version_spec
+
+      stripped if exact_version?(stripped)
+    end
+
+    def expected_below_lower_bound?(expected_version, lower_bound)
+      expected_rubygem = converter.npm_to_rubygem(expected_version)
+      lower_bound_rubygem = converter.npm_to_rubygem(lower_bound)
+      Gem::Version.new(expected_rubygem) < Gem::Version.new(lower_bound_rubygem)
+    rescue ArgumentError
+      false
     end
 
     def rewritten_spec(parsed_spec, expected_version)

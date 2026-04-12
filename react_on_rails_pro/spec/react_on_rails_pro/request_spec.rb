@@ -177,7 +177,26 @@ describe ReactOnRailsPro::Request do
       expect(mocked_block).not_to have_received(:call)
     end
 
-    (400..499).step(20).each do |status_code|
+    it "raises a renderer bad request error when server returns status code 400" do
+      mocked_block = mock_block
+
+      mock_streaming_response(render_full_url, ReactOnRailsPro::STATUS_BAD_REQUEST) do |yielder|
+        yielder.call("Invalid \"renderingRequest\" field in render request.")
+      end
+
+      stream = described_class.render_code_as_stream("/render", "console.log('Hello, world!');",
+                                                     is_rsc_payload: false)
+      expect do
+        stream.each_chunk(&mocked_block.block)
+      end.to raise_error(
+        ReactOnRailsPro::Error,
+        /Renderer rejected malformed request or hit an unhandled VM error: 400:\n/
+      )
+
+      expect(mocked_block).not_to have_received(:call)
+    end
+
+    (420..499).step(20).each do |status_code|
       it "raises an error when server returns error with status code #{status_code}" do
         mocked_block = mock_block
 

@@ -404,7 +404,8 @@ For elements that intentionally differ between server and client:
 
 This suppresses the warning for **this element only** (not its descendants) and does not fix the mismatch -- use it only for non-critical content. If child elements also differ, each needs its own `suppressHydrationWarning`.
 
-> **Warning:** The `if (!mounted) return null` pattern causes **Cumulative Layout Shift (CLS)** -- the element occupies no space on first paint, then pops in after hydration. Only use it for small, positionally stable UI elements (icon buttons, toggles). For anything that affects page layout, read the preference from a server-readable cookie to render the correct value on first paint (see the [Theme Provider](rsc-context-and-state.md#theme-provider-no-flash-of-wrong-theme) section), or use `suppressHydrationWarning` on non-layout-critical elements.
+> [!WARNING]
+> The `if (!mounted) return null` pattern causes **Cumulative Layout Shift (CLS)** -- the element occupies no space on first paint, then pops in after hydration. Only use it for small, positionally stable UI elements (icon buttons, toggles). For anything that affects page layout, read the preference from a server-readable cookie to render the correct value on first paint (see the [Theme Provider](rsc-context-and-state.md#theme-provider-no-flash-of-wrong-theme) section), or use `suppressHydrationWarning` on non-layout-critical elements.
 
 ## Error Boundary Limitations
 
@@ -909,18 +910,18 @@ Package: 16.3.0
 
 This happens when you upgrade the gem (e.g., `bundle update react_on_rails`) without upgrading the npm package, or vice versa. Both must be the same version.
 
-**Fix:** Install the npm package version that matches your gem:
+**Fix:** Install the npm package version that matches your gem. Replace `VERSION` with the version shown in the error message (e.g., the `Gem:` line):
 
 ```bash
 # Check your gem version
 bundle show react_on_rails
 
 # Install the matching npm package (use your package manager)
-yarn add react-on-rails@16.4.0 --exact
+yarn add react-on-rails@VERSION --exact
 # or
-pnpm add react-on-rails@16.4.0 --save-exact
+pnpm add react-on-rails@VERSION --save-exact
 # or
-npm install react-on-rails@16.4.0 --save-exact
+npm install react-on-rails@VERSION --save-exact
 ```
 
 **Symptom 2 -- Non-exact version:**
@@ -934,12 +935,12 @@ Detected: ^16.4.0
 
 React on Rails does not allow semver ranges (`^`, `~`, `>`, `<`, `*`) or special tags (`latest`, `next`, `beta`) in `package.json`. The version must be an exact match.
 
-**Fix:** Remove the range operator and pin to the exact version:
+**Fix:** Remove the range operator and pin to the exact version shown in the `Gem:` line:
 
 ```json
 {
   "dependencies": {
-    "react-on-rails": "16.4.0"
+    "react-on-rails": "VERSION"
   }
 }
 ```
@@ -952,10 +953,10 @@ React on Rails does not allow semver ranges (`^`, `~`, `>`, `<`, `*`) or special
 
 If you have the `react_on_rails_pro` gem in your Gemfile, you must use the `react-on-rails-pro` npm package, not `react-on-rails`.
 
-**Fix:** Replace the base package with the Pro package:
+**Fix:** Replace the base package with the Pro package. Replace `VERSION` with the gem version from the `Gem:` line in the error message:
 
 ```bash
-yarn remove react-on-rails && yarn add react-on-rails-pro@16.4.0 --exact
+yarn remove react-on-rails && yarn add react-on-rails-pro@VERSION --exact
 ```
 
 **Symptom 4 -- Pro package without Pro gem:**

@@ -25,6 +25,10 @@ pre-commit:
       run: bin/lefthook/prettier-format all-changed
       stage_fixed: true
 
+    markdown-links:
+      glob: "{*.md,**/*.md}"
+      run: bin/lefthook/markdown-link-lint all-changed --offline
+
     trailing-newlines:
       run: bin/lefthook/check-trailing-newlines all-changed
       stage_fixed: true
@@ -33,3 +37,6 @@ pre-push:
   commands:
     branch-lint:
       run: bin/lefthook/ruby-lint branch
+
+    markdown-links:
+      run: bin/lefthook/markdown-link-lint branch

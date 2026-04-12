@@ -1,6 +1,6 @@
 # Node Renderer JavaScript Configuration
 
-> **Pro Feature** — Available with [React on Rails Pro](../../../pro/home-pro.md).
+> **Pro Feature** — Available with [React on Rails Pro](../../../pro/react-on-rails-pro.md).
 > Free or very low cost for startups and small companies. [Upgrade or licensing details →](../../../pro/upgrading-to-pro.md#try-pro-risk-free)
 
 You can configure the node-renderer entirely with ENV values from your own launch file or
@@ -18,8 +18,8 @@ available default ENV values if you wire them into your own launch script.
 1. **port** (default: `process.env.RENDERER_PORT || 3800`) - The port the renderer should listen to.
    [On Heroku](https://devcenter.heroku.com/articles/dyno-startup-behavior#port-binding-of-web-dynos) or [ControlPlane](https://docs.controlplane.com/reference/workload/containers#port-variable) you may want to use `process.env.PORT`.
 1. **host** (default: `process.env.RENDERER_HOST || 'localhost'`) - The host/IP address the renderer should bind to.
-   Set it to `0.0.0.0` for containerized environments where external health checks need to reach the server.
-   **Security caution:** binding `host` to `0.0.0.0` exposes the renderer on all network interfaces. Use this only behind private networking, firewall/ALB rules, or with `password` authentication enabled. If those protections are not in place, keep `host` on `localhost`/loopback.
+   The default of `localhost` keeps the renderer reachable only from the local machine (or the same Kubernetes pod network namespace), following the same secure-by-default approach as PostgreSQL. Set to `0.0.0.0` only when the renderer must be reachable across a network boundary (e.g., separate container workloads in Docker Compose or Kubernetes).
+   **Security caution:** The renderer executes JavaScript sent to it via `vm.runInContext()`, making it a remote code execution service by design. The Node.js `vm` module is [not a security boundary](https://nodejs.org/api/vm.html#vm-executing-javascript). Binding to `0.0.0.0` without `password` authentication exposes this to anyone on the network. Only bind to `0.0.0.0` behind private networking or firewall rules, and always set `password` when the renderer is network-accessible. See [Network Security](./basics.md#network-security) for details.
 1. **logLevel** (default: `process.env.RENDERER_LOG_LEVEL || 'info'`) - The renderer log level. Set it to `silent` to turn logging off.
    [Available levels](https://getpino.io/#/docs/api?id=levels): `{ fatal: 60, error: 50, warn: 40, info: 30, debug: 20, trace: 10 }`. `silent` can be used as well.
 1. **logHttpLevel** (default: `process.env.RENDERER_LOG_HTTP_LEVEL || 'error'`) - The HTTP server log level (same allowed values as `logLevel`).

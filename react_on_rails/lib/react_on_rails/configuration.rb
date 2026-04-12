@@ -94,51 +94,6 @@ module ReactOnRails
                   :server_bundle_output_path, :enforce_private_server_bundles,
                   :check_database_on_dev_start
 
-    # Class instance variable and mutex to track if deprecation warning has been shown
-    # Using mutex to ensure thread-safety in multi-threaded environments
-    @immediate_hydration_warned = false
-    @immediate_hydration_mutex = Mutex.new
-
-    class << self
-      attr_accessor :immediate_hydration_warned, :immediate_hydration_mutex
-    end
-
-    # Deprecated: immediate_hydration configuration has been removed
-    def immediate_hydration=(value)
-      warned = false
-      self.class.immediate_hydration_mutex.synchronize do
-        warned = self.class.immediate_hydration_warned
-        self.class.immediate_hydration_warned = true unless warned
-      end
-
-      return if warned
-
-      Rails.logger.warn <<~WARNING
-        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
-        Immediate hydration is now automatically enabled for React on Rails Pro users.
-        Please remove 'config.immediate_hydration = #{value}' from your config/initializers/react_on_rails.rb file.
-        See CHANGELOG.md for migration instructions.
-      WARNING
-    end
-
-    def immediate_hydration
-      warned = false
-      self.class.immediate_hydration_mutex.synchronize do
-        warned = self.class.immediate_hydration_warned
-        self.class.immediate_hydration_warned = true unless warned
-      end
-
-      return nil if warned
-
-      Rails.logger.warn <<~WARNING
-        [REACT ON RAILS] The 'config.immediate_hydration' configuration option is deprecated and no longer used.
-        Immediate hydration is now automatically enabled for React on Rails Pro users.
-        Please remove any references to 'config.immediate_hydration' from your config/initializers/react_on_rails.rb file.
-        See CHANGELOG.md for migration instructions.
-      WARNING
-      nil
-    end
-
     # rubocop:disable Metrics/AbcSize
     def initialize(node_modules_location: nil, server_bundle_js_file: nil, prerender: nil,
                    replay_console: nil, make_generated_server_bundle_the_entrypoint: nil,
@@ -257,12 +212,14 @@ module ReactOnRails
         Rails.logger.warn("**WARNING** #{msg}")
         self.generated_component_packs_loading_strategy = :sync
       elsif generated_component_packs_loading_strategy == :async
-        raise ReactOnRails::Error, "**ERROR** #{msg}"
+        raise ReactOnRails::Error, "**ERROR** #{msg}\n\n#{ReactOnRails::DOCTOR_RECOMMENDATION}"
       end
 
       return if %i[async defer sync].include?(generated_component_packs_loading_strategy)
 
-      raise ReactOnRails::Error, "generated_component_packs_loading_strategy must be either :async, :defer, or :sync"
+      raise ReactOnRails::Error,
+            "generated_component_packs_loading_strategy must be either :async, :defer, or :sync. " \
+            "#{ReactOnRails::DOCTOR_RECOMMENDATION}"
     end
 
     def validate_enforce_private_server_bundles
@@ -272,7 +229,8 @@ module ReactOnRails
       if server_bundle_output_path.nil?
         raise ReactOnRails::Error, "enforce_private_server_bundles is set to true, but " \
                                    "server_bundle_output_path is nil. Please set server_bundle_output_path " \
-                                   "to a directory outside of the public directory."
+                                   "to a directory outside of the public directory. " \
+                                   "#{ReactOnRails::DOCTOR_RECOMMENDATION}"
       end
 
       # Check if server_bundle_output_path is inside public directory
@@ -286,7 +244,8 @@ module ReactOnRails
 
       raise ReactOnRails::Error, "enforce_private_server_bundles is set to true, but " \
                                  "server_bundle_output_path (#{server_bundle_output_path}) is inside " \
-                                 "the public directory. Please set it to a directory outside of public."
+                                 "the public directory. Please set it to a directory outside of public. " \
+                                 "#{ReactOnRails::DOCTOR_RECOMMENDATION}"
     end
 
     # Auto-detect server_bundle_output_path from Shakapacker 9.0+ private_output_path
@@ -401,6 +360,8 @@ module ReactOnRails
           that does not match the value for public_output_path specified in
           shakapacker.yml = #{packer_public_output_path}. You should remove the configuration
           value for "generated_assets_dir" from your config/initializers/react_on_rails.rb file.
+
+          #{ReactOnRails::DOCTOR_RECOMMENDATION}
         MSG
         raise ReactOnRails::Error, msg
       end
@@ -465,7 +426,9 @@ module ReactOnRails
       msg = <<~MSG
         **ERROR** ReactOnRails: auto_load_bundle is set to true, yet components_subdirectory is not configured.\
         Please set components_subdirectory to the desired directory.  For more information, please see \
-        https://reactonrails.com/docs/core-concepts/auto-bundling-file-system-based-automated-bundle-generation/
+        https://reactonrails.com/docs/core-concepts/auto-bundling/
+
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
 
       raise ReactOnRails::Error, msg
@@ -482,6 +445,7 @@ module ReactOnRails
         Alternatively, remove the config/react_on_rails.rb config.build_production_command and the
         default bin/shakapacker script will be used for assets:precompile.
 
+        #{ReactOnRails::DOCTOR_RECOMMENDATION}
       MSG
     end
   end

@@ -374,7 +374,7 @@ rm -rf public/webpack/test
 
 ```ruby
 # Gemfile
-gem "react_on_rails", "16.4.0"  # Not in a specific group
+gem "react_on_rails"  # Not in a specific group
 
 # Or explicitly in test group:
 group :test do
@@ -517,7 +517,8 @@ If you prefer to manually share output paths instead of using automatic detectio
    bundle exec rspec # Terminal 2
    ```
 
-> **Warning:** Do not share output paths with `bin/dev` (HMR mode) — HMR manifests will cause test failures.
+> [!WARNING]
+> Do not share output paths with `bin/dev` (HMR mode) — HMR manifests will cause test failures.
 
 ### Caching Strategies
 

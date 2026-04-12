@@ -2,6 +2,9 @@
 
 > **Get your first React component running in Rails in 15 minutes**
 
+> [!NOTE]
+> **Summary for AI agents:** Use this page when the user wants the shortest path to a working React on Rails install in a new Rails app. For adding React to an existing app, use [Install into an Existing Rails App](./installation-into-an-existing-rails-app.md) instead. For a guided walkthrough, use the [Tutorial](./tutorial.md).
+
 This guide will have you rendering React components in your Rails app as quickly as possible. We'll skip the theory for now and focus on getting something working.
 
 ## ✅ Prerequisites
@@ -37,6 +40,17 @@ bin/rails generate react_on_rails:install --typescript
 
 # For JavaScript instead of TypeScript, omit --typescript
 # bin/rails generate react_on_rails:install
+```
+
+If the generator reports dependency-install warnings (for example, `JavaScript dependencies installation failed ...`), run your package manager install and compile once before moving on:
+
+```bash
+npm install
+# or: pnpm install
+# or: yarn install
+# or: bun install
+
+bundle exec rails shakapacker:compile
 ```
 
 Take a look at the files created by the generator.
@@ -194,7 +208,7 @@ Now that you have React on Rails working, here's what to explore next:
 ### Go Pro
 
 :::tip Pro Upgrade
-Start at [React on Rails Pro](../../pro/home-pro.md) for the canonical route map. From there you can jump to the [upgrade guide](../../pro/upgrading-to-pro.md), [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Free to evaluate — no license needed for development.
+Start at [React on Rails Pro](../../pro/react-on-rails-pro.md) for the canonical route map. From there you can jump to the [upgrade guide](../../pro/upgrading-to-pro.md), [React Server Components](../../pro/react-server-components/tutorial.md), [streaming SSR](../../pro/streaming-ssr.md), [fragment caching](../../pro/fragment-caching.md), and the [Node renderer](../../pro/node-renderer.md). Free to evaluate — no license needed for development.
 :::
 
 - **[OSS vs Pro comparison](./oss-vs-pro.md)** - See what Pro adds
