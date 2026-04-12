@@ -43,6 +43,16 @@ Fix: Set optimization.runtimeChunk to "single" in your webpack configuration.
 See: https://github.com/shakacode/react_on_rails/issues/1558`);
   }
 
+  // Cross-runtime detection: another bundle/runtime already initialized the global,
+  // but this module instance hasn't cached anything yet.
+  if (currentGlobal !== null && cachedObject === null) {
+    throw new Error(`\
+ReactOnRails was already initialized by another bundle or runtime instance.
+This usually means multiple webpack runtimes or mixed core/pro bundles were loaded on the same page.
+
+Fix: Ensure only one ReactOnRails bundle initializes per page, and set optimization.runtimeChunk to "single".`);
+  }
+
   // Global contamination detection: currentGlobal exists but doesn't match cached object.
   if (currentGlobal !== null && cachedObject !== null && currentGlobal !== cachedObject) {
     throw new Error(`\
@@ -70,8 +80,11 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
     }
   }
 
-  // Return cached object if already initialized (all validation passed above)
+  // Return cached object if already initialized (all validation passed above).
+  // Merge new capabilities onto the existing object so that a second entrypoint
+  // (e.g., full/node after client) can layer additional methods (SSR, streaming, RSC).
   if (cachedObject !== null) {
+    Object.assign(cachedObject, ...capabilities);
     return cachedObject;
   }
 

@@ -211,5 +211,57 @@ export function createCoreCapability(registries: Registries) {
         hydrate,
       );
     },
+
+    // ===================================================================
+    // SSR STUBS — overridden by createSSRCapability() in full/node bundles
+    // ===================================================================
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    serverRenderReactComponent(...args: any[]): any {
+      void args;
+      throw new Error(
+        'serverRenderReactComponent is not available in the client bundle. Import "react-on-rails" server-side.',
+      );
+    },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    handleError(...args: any[]): any {
+      void args;
+      throw new Error(
+        'handleError is not available in the client bundle. Import "react-on-rails" server-side.',
+      );
+    },
+
+    // ===================================================================
+    // PRO STUBS — overridden by Pro capabilities in react-on-rails-pro
+    // ===================================================================
+
+    getOrWaitForComponent(): Promise<RegisteredComponent> {
+      throw new Error('getOrWaitForComponent requires the react-on-rails-pro package.');
+    },
+
+    getOrWaitForStore(): Promise<Store> {
+      throw new Error('getOrWaitForStore requires the react-on-rails-pro package.');
+    },
+
+    getOrWaitForStoreGenerator(): Promise<StoreGenerator> {
+      throw new Error('getOrWaitForStoreGenerator requires the react-on-rails-pro package.');
+    },
+
+    reactOnRailsStoreLoaded(): Promise<void> {
+      throw new Error('reactOnRailsStoreLoaded requires the react-on-rails-pro package.');
+    },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    streamServerRenderedReactComponent(...args: any[]): any {
+      void args;
+      throw new Error('streamServerRenderedReactComponent requires the react-on-rails-pro package.');
+    },
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    serverRenderRSCReactComponent(...args: any[]): any {
+      void args;
+      throw new Error('serverRenderRSCReactComponent requires the react-on-rails-pro package.');
+    },
   };
 }
