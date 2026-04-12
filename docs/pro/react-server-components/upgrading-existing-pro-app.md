@@ -38,7 +38,7 @@ Before running the generator, audit your existing components to identify which o
 
 Components that use any of the following **must** have `'use client'`:
 
-- **React hooks**: `useState`, `useEffect`, `useContext`, `useRef`, `useReducer`, `useCallback`, `useMemo`
+- **React hooks**: `useState`, `useEffect`, `useContext`, `useRef`, `useReducer`, `useCallback`, `useMemo`, `useTransition`, `useDeferredValue`, `useId`, `useOptimistic`, `useFormStatus`
 - **React on Rails client APIs**: `ReactOnRails.getStore()`, `ReactOnRails.authenticityToken()`
 - **Redux**: `useSelector`, `useDispatch`, `connect()`, `<Provider>`
 - **Router client APIs**: `useNavigate`, `useLocation`, `useParams`
@@ -55,7 +55,7 @@ If your app uses React on Rails' auto-bundling with `.client.jsx` / `.server.jsx
 
 **These are completely different concepts.** A `.server.jsx` file is **not** a React Server Component -- it's a file included in the server bundle. Without `'use client'`, the RSC infrastructure will misclassify it as a Server Component, causing runtime errors.
 
-> **Recommended convention:** If you're adding RSC to an app with `.server.jsx` files, consider renaming them to `.ssr.jsx` to avoid confusion. This is optional but reduces cognitive overhead for developers new to the codebase.
+> **Important:** Do **not** rename `.server.jsx` files to `.ssr.jsx` — React on Rails' auto-bundling relies on the `.server.` suffix to detect server-bundle entries (`Dir.glob("*.server.*")` in `packs_generator.rb`). Renaming would silently drop the file from server bundle registration. Instead, add `'use client'` to these files so the RSC infrastructure classifies them correctly while preserving auto-bundling behavior.
 
 ### How auto-classification works
 
@@ -70,7 +70,7 @@ There is no warning when a component is auto-classified as a server component. I
 
 Before proceeding to Step 1:
 
-- [ ] Search your component source files for `useState`, `useEffect`, `useContext`, `useSelector`, `useDispatch`, `ReactOnRails.getStore`
+- [ ] Search your component source files for `useState`, `useEffect`, `useContext`, `useSelector`, `useDispatch`, `useTransition`, `useDeferredValue`, `useNavigate`, `useLocation`, `useParams`, `ReactOnRails.getStore`
 - [ ] Check all `.server.jsx` files -- these almost certainly need `'use client'`
 - [ ] Check components that use `StaticRouter` (SSR wrapper, not a client API — but the file likely uses other client APIs)
 - [ ] Verify no component relies on browser globals (`window`, `document`) without `'use client'`

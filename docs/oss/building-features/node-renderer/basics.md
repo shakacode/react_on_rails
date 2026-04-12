@@ -155,26 +155,31 @@ The Node Renderer must be started as a background process before running tests. 
 
 ```yaml
 # .github/workflows/test.yml (GitHub Actions example)
-- name: Start Node Renderer
-  run: |
-    node client/node-renderer.js &
-    # Wait for the renderer to be ready
-    for i in $(seq 1 30); do
-      if curl -s http://localhost:3800/ > /dev/null 2>&1; then
-        echo "Node Renderer is ready"
-        break
-      fi
-      echo "Waiting for Node Renderer... ($i/30)"
-      sleep 1
-    done
-    # Fail fast if renderer never became ready
-    if ! curl -s http://localhost:3800/ > /dev/null 2>&1; then
-      echo "Node Renderer failed to start in time" >&2
-      exit 1
-    fi
-  env:
-    RENDERER_PASSWORD: ${{ secrets.RENDERER_PASSWORD }}
-    RENDERER_BUNDLE_PATH: ./public/webpack/test
+jobs:
+  test:
+    env:
+      # Job-level: both the renderer and Rails test steps need this
+      RENDERER_PASSWORD: ${{ secrets.RENDERER_PASSWORD }}
+    steps:
+      - name: Start Node Renderer
+        run: |
+          node client/node-renderer.js &
+          # Wait for the renderer to be ready (--max-time 2 prevents hangs if port is open but process is stalled)
+          for i in $(seq 1 30); do
+            if curl -s --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
+              echo "Node Renderer is ready"
+              break
+            fi
+            echo "Waiting for Node Renderer... ($i/30)"
+            sleep 1
+          done
+          # Fail fast if renderer never became ready
+          if ! curl -s --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
+            echo "Node Renderer failed to start in time" >&2
+            exit 1
+          fi
+        env:
+          RENDERER_BUNDLE_PATH: ./public/webpack/test
 ```
 
 Key points:
