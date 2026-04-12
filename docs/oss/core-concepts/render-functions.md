@@ -242,17 +242,17 @@ This helper accepts render-functions that return objects with a `renderedHtml` p
 
 This table shows which component/return types are valid with each Ruby helper:
 
-| Return Type                                                  | `react_component`      | `react_component_hash`                                            | `stream_react_component` (Pro) |
-| ------------------------------------------------------------ | ---------------------- | ----------------------------------------------------------------- | ------------------------------ |
-| React component (function/class)                             | ✅                     | ❌                                                                | ✅                             |
-| Render function → React component                            | ✅                     | ❌                                                                | ✅                             |
-| Render function → `{ renderedHtml: string }`                 | ✅                     | ❌                                                                | ❌                             |
-| Render function → `{ renderedHtml: ReactElement }`           | ✅ (prerender only)    | ❌                                                                | ❌                             |
-| Render function → `{ renderedHtml: { componentHtml, ... } }` | ❌                     | ✅                                                                | ❌                             |
-| Render function → Promise (compatible return shape)          | ✅ (Pro Node renderer) | ✅ (Pro Node renderer, must resolve to hash with `componentHtml`) | ❌                             |
-| Renderer function (3 params)                                 | ✅ (client-only)       | ❌                                                                | ❌                             |
+| Return Type                                                  | `react_component`      | `react_component_hash`                                            | `stream_react_component` (Pro)                        |
+| ------------------------------------------------------------ | ---------------------- | ----------------------------------------------------------------- | ----------------------------------------------------- |
+| React component (function/class)                             | ✅                     | ❌                                                                | ✅                                                    |
+| Render function → React component                            | ✅                     | ❌                                                                | ✅                                                    |
+| Render function → `{ renderedHtml: string }`                 | ✅                     | ❌                                                                | ❌                                                    |
+| Render function → `{ renderedHtml: ReactElement }`           | ✅ (prerender only)    | ❌                                                                | ❌                                                    |
+| Render function → `{ renderedHtml: { componentHtml, ... } }` | ❌                     | ✅                                                                | ❌                                                    |
+| Render function → Promise (compatible return shape)          | ✅ (Pro Node renderer) | ✅ (Pro Node renderer, must resolve to hash with `componentHtml`) | ✅ (Pro Node renderer, must resolve to React element) |
+| Renderer function (3 params)                                 | ✅ (client-only)       | ❌                                                                | ❌                                                    |
 
-> **Note:** ❌ means the combination silently produces incorrect output, not that it throws an error. For example, `react_component` with a hash result JSON-stringifies the object into HTML, and `react_component_hash` with a plain component returns empty/wrong values for the hash keys.
+> **Note:** ❌ means the combination raises a `ReactOnRails::Error` at runtime. For example, `react_component` with a hash result raises `"Use react_component_hash (not react_component)..."`, and `react_component_hash` with a non-hash result raises `"Render-Function... expected to return an Object"`. These mismatches are caught server-side, not silent.
 
 **Key constraints:**
 
