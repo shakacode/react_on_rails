@@ -77,19 +77,18 @@ fi
 echo "Checking new docs against $SIDEBAR_FILE..."
 echo ""
 
-# Load exclusions into an associative array for O(1) lookup
-declare -A EXCLUSION_MAP
+# Load exclusions into a newline-separated string for grep lookup.
+# Avoids `declare -A` which requires bash 4+ (macOS ships bash 3.2).
+EXCLUSION_LIST=""
 if [ -f "$EXCLUSIONS_FILE" ]; then
   while IFS= read -r line; do
     # Strip inline comments, then leading and trailing whitespace.
-    # Leading whitespace matters: an entry like ` doc-id` would otherwise be
-    # stored verbatim and never match a lookup for `doc-id`.
     line="${line%%#*}"
     line="${line#"${line%%[![:space:]]*}"}"
     line="${line%"${line##*[![:space:]]}"}"
     # Skip blank lines
     [ -z "$line" ] && continue
-    EXCLUSION_MAP["$line"]=1
+    EXCLUSION_LIST="${EXCLUSION_LIST}${line}"$'\n'
   done < "$EXCLUSIONS_FILE"
 fi
 
@@ -102,6 +101,7 @@ SIDEBAR_CONTENT=$(grep -v '^[[:space:]]*//' "$SIDEBAR_FILE" | sed 's|[[:space:]]
 
 MISSING=()
 CHECKED=0
+EXCLUDED=0
 
 while IFS= read -r file; do
   [ -z "$file" ] && continue
@@ -119,7 +119,8 @@ while IFS= read -r file; do
   DOC_ID="${DOC_ID%.mdx}"
 
   # Check exclusion list
-  if [ "${EXCLUSION_MAP[$DOC_ID]+_}" ]; then
+  if printf '%s' "$EXCLUSION_LIST" | grep -qxF "$DOC_ID"; then
+    EXCLUDED=$((EXCLUDED + 1))
     echo -e "  ${YELLOW}⊘${NC} $DOC_ID  ${YELLOW}(excluded)${NC}"
     continue
   fi
@@ -138,7 +139,11 @@ done <<< "$DOC_FILES"
 echo ""
 
 if [ ${#MISSING[@]} -eq 0 ]; then
-  echo -e "${GREEN}✓ All $CHECKED new doc(s) have sidebar entries${NC}"
+  if [ "$EXCLUDED" -gt 0 ]; then
+    echo -e "${GREEN}✓ All $CHECKED new doc(s) accounted for ($((CHECKED - EXCLUDED)) in sidebar, $EXCLUDED excluded)${NC}"
+  else
+    echo -e "${GREEN}✓ All $CHECKED new doc(s) have sidebar entries${NC}"
+  fi
   exit 0
 else
   echo -e "${RED}✗ ${#MISSING[@]} doc(s) missing from docs/sidebars.ts:${NC}"
