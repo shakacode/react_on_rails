@@ -10,7 +10,7 @@ Now the server will interpret your JavaScript. The default is to use [ExecJS](ht
 
 ## Polyfill Requirements for `target: 'web'` Server Bundles
 
-When the server bundle is built with webpack `target: 'web'` (the default for the OSS configuration), webpack 5 does **not** auto-polyfill Node.js globals such as `Buffer` or `TextEncoder`. Note that while `process.env.NODE_ENV` is still substituted at build time via `DefinePlugin`, the full `process` object is not available. This means:
+When the server bundle is built with webpack `target: 'web'` (the default for the OSS configuration), webpack 5 does **not** auto-polyfill Node.js-specific globals such as `Buffer` (webpack 4 did this automatically; webpack 5 does not). Additionally, Web APIs like `TextEncoder` are absent in `mini_racer`'s bare V8 isolate regardless of webpack target. Note that while `process.env.NODE_ENV` is still substituted at build time via `DefinePlugin`, the full `process` object is not available. This means:
 
 - **ExecJS with Node.js runtime**: Works because Node.js provides these globals natively, regardless of the webpack target.
 - **ExecJS with `mini_racer`**: Runs in a bare V8 isolate with none of these globals. The bundle relies on polyfills or fallbacks for any Node.js APIs it uses.
