@@ -66,7 +66,7 @@ registerServerComponent({
 > **`registerServerComponent` has different signatures per bundle.** This is an intentional design choice, not a bug:
 >
 > - **Server/RSC bundle:** `registerServerComponent({ Name: Component })` — takes an object mapping names to component implementations (the component code is bundled on the server).
-> - **Client bundle:** `registerServerComponent({ rscPayloadGenerationUrlPath: '...' }, 'Name1', 'Name2')` — takes an options object followed by component name strings (the component code is **not** bundled on the client; only the name is registered for RSC payload fetching).
+> - **Client bundle:** `registerServerComponent('Name1', 'Name2')` — takes component name strings directly (the component code is **not** bundled on the client; only the name is registered for RSC payload fetching).
 >
 > See [Creating a React Server Component Page](./create-without-ssr.md) for complete examples of both signatures.
 

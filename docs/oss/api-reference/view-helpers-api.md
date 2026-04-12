@@ -160,7 +160,7 @@ Progressive server-side rendering using React 18+ streaming with `renderToPipeab
 - Better perceived performance
 
 > [!IMPORTANT]
-> `stream_react_component` always forces `prerender: true` and `immediate_hydration: true`, even if you pass different values. It only works with React components or render functions that return React components — it does not support render functions returning `{ renderedHtml }` objects.
+> `stream_react_component` always forces `prerender: true`, even if you pass a different value. The `immediate_hydration` option is no longer supported and will be ignored with a warning if passed. It only works with React components or render functions that return React components — it does not support render functions returning `{ renderedHtml }` objects.
 
 See the [Streaming Server Rendering guide](../building-features/streaming-server-rendering.md) for usage details.
 

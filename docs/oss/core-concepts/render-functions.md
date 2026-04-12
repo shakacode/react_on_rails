@@ -242,20 +242,20 @@ This helper accepts render-functions that return objects with a `renderedHtml` p
 
 This table shows which component/return types are valid with each Ruby helper:
 
-| Return Type                                                  | `react_component`      | `react_component_hash` | `stream_react_component` (Pro) |
-| ------------------------------------------------------------ | ---------------------- | ---------------------- | ------------------------------ |
-| React component (function/class)                             | ✅                     | ❌                     | ✅                             |
-| Render function → React component                            | ✅                     | ❌                     | ✅                             |
-| Render function → `{ renderedHtml: string }`                 | ✅                     | ❌                     | ❌                             |
-| Render function → `{ renderedHtml: ReactElement }`           | ✅ (prerender only)    | ❌                     | ❌                             |
-| Render function → `{ renderedHtml: { componentHtml, ... } }` | ❌                     | ✅                     | ❌                             |
-| Render function → Promise (any)                              | ✅ (Pro Node renderer) | ✅ (Pro Node renderer) | ❌                             |
-| Renderer function (3 params)                                 | ✅ (client-only)       | ❌                     | ❌                             |
+| Return Type                                                  | `react_component`      | `react_component_hash`                                            | `stream_react_component` (Pro) |
+| ------------------------------------------------------------ | ---------------------- | ----------------------------------------------------------------- | ------------------------------ |
+| React component (function/class)                             | ✅                     | ❌                                                                | ✅                             |
+| Render function → React component                            | ✅                     | ❌                                                                | ✅                             |
+| Render function → `{ renderedHtml: string }`                 | ✅                     | ❌                                                                | ❌                             |
+| Render function → `{ renderedHtml: ReactElement }`           | ✅ (prerender only)    | ❌                                                                | ❌                             |
+| Render function → `{ renderedHtml: { componentHtml, ... } }` | ❌                     | ✅                                                                | ❌                             |
+| Render function → Promise (compatible return shape)          | ✅ (Pro Node renderer) | ✅ (Pro Node renderer, must resolve to hash with `componentHtml`) | ❌                             |
+| Renderer function (3 params)                                 | ✅ (client-only)       | ❌                                                                | ❌                             |
 
 **Key constraints:**
 
 - **`react_component_hash`** always forces `prerender: true` — it cannot be used for client-only rendering.
-- **`stream_react_component`** (Pro) always forces `prerender: true` and `immediate_hydration: true`.
+- **`stream_react_component`** (Pro) always forces `prerender: true`. The `immediate_hydration` option is no longer supported and will be ignored with a warning if passed.
 - **Renderer functions** (3 parameters) are client-only — they call `ReactDOM.render`/`hydrate` directly, so server rendering with them throws an error.
 - **Async render functions** (returning Promises) require the Pro Node renderer. With ExecJS, they silently return `'{}'`.
 
