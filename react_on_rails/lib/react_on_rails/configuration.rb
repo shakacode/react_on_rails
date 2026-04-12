@@ -30,7 +30,7 @@ module ReactOnRails
   # Replaces runtime react_on_rails_pro? checks (see issue #2905).
   # Not yet wired into the main rendering path — currently additive only.
   def self.rendering_strategy
-    @rendering_strategy
+    @rendering_strategy ||= ReactOnRails::RenderingStrategy::ExecJsStrategy.new
   end
 
   def self.rendering_strategy=(strategy)
