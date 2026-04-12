@@ -1,0 +1,38 @@
+name: Check Docs Sidebar
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/oss/**'
+      - 'docs/pro/**'
+      - 'docs/sidebars.ts'
+      - 'docs/.sidebar-exclusions'
+      - 'script/check-docs-sidebar'
+      - '.github/workflows/check-docs-sidebar.yml'
+  pull_request:
+    paths:
+      - 'docs/oss/**'
+      - 'docs/pro/**'
+      - 'docs/sidebars.ts'
+      - 'docs/.sidebar-exclusions'
+      - 'script/check-docs-sidebar'
+      - '.github/workflows/check-docs-sidebar.yml'
+  workflow_dispatch:
+
+jobs:
+  check-sidebar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check new docs have sidebar entries
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}
+        run: script/check-docs-sidebar "$BASE_REF"
