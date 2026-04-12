@@ -138,6 +138,8 @@ module GeneratorMessages
     private
 
     def build_ci_section
+      return "" unless ci_workflow_generated? || File.exist?(File.join(Dir.pwd, ".github/workflows/ci.yml"))
+
       package_manager = detect_package_manager
       ci_status = if ci_workflow_generated?
                     "A GitHub Actions workflow has been generated at .github/workflows/ci.yml."

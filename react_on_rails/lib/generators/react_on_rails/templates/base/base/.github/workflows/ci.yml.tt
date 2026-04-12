@@ -18,14 +18,6 @@ jobs:
         with:
           bundler-cache: true
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "lts/*"
-<%- unless config[:package_manager] == 'bun' -%>
-          cache: "<%= config[:package_manager] %>"
-<%- end -%>
-
 <%- if config[:package_manager] == 'pnpm' -%>
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -36,6 +28,19 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
 <%- end -%>
+<%- if config[:package_manager] == 'yarn' -%>
+      - name: Enable Corepack
+        run: corepack enable
+
+<%- end -%>
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+<%- unless config[:package_manager] == 'bun' -%>
+          cache: "<%= config[:package_manager] %>"
+<%- end -%>
+
       - name: Install JS dependencies
         run: <%= config[:package_manager] %> install
 

@@ -294,7 +294,7 @@ module ReactOnRails
         end
       rescue JSON::ParserError => e
         GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
-      rescue StandardError => e
+      rescue Errno::EACCES, Errno::ENOENT => e
         GeneratorMessages.add_warning("⚠️  Failed to add build scripts to package.json: #{e.message}")
       end
 
