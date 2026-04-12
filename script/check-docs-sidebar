@@ -62,9 +62,8 @@ ADDED_FILES=$(git diff --name-only --diff-filter=AR "$BASE_REF"..."$CURRENT_REF"
 # WIP drafts are intentionally excluded to avoid surprising contributors who keep
 # work-in-progress docs in-tree without intending to land them yet.
 if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
-  UNCOMMITTED=$(git diff --name-only --diff-filter=AR HEAD 2>/dev/null || echo "")
   STAGED_NEW=$(git diff --cached --name-only --diff-filter=AR 2>/dev/null || echo "")
-  ADDED_FILES=$(printf "%s\n%s\n%s" "$ADDED_FILES" "$UNCOMMITTED" "$STAGED_NEW" | sort -u | grep -v '^$' || echo "")
+  ADDED_FILES=$(printf "%s\n%s" "$ADDED_FILES" "$STAGED_NEW" | sort -u | grep -v '^$' || echo "")
 fi
 
 # Filter to published doc files only (docs/oss/** and docs/pro/**)
