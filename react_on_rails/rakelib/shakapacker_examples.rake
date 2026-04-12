@@ -162,6 +162,8 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       # Use --legacy-peer-deps to avoid peer dependency conflicts when
       # react-on-rails expects newer React versions.
       sh_in_dir(example_type.dir, "npm install --legacy-peer-deps --install-links")
+      # Explicit re-install is required because npm install --install-links does not
+      # reliably copy a file: dependency that was just pinned in the same session.
       install_local_react_on_rails_package(example_type.dir, legacy_peer_deps: true)
       # Regenerate Shakapacker binstubs after downgrading from 9.x to 8.2.x
       # The binstub format may differ between major versions.
@@ -170,6 +172,8 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       # Use --install-links to copy file: dependencies instead of symlinking,
       # preventing duplicate React instances from webpack resolving through symlinks.
       sh_in_dir(example_type.dir, "npm install --install-links")
+      # Explicit re-install is required because npm install --install-links does not
+      # reliably copy a file: dependency that was just pinned in the same session.
       install_local_react_on_rails_package(example_type.dir)
     end
   end
