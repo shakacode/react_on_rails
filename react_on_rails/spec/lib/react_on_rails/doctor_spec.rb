@@ -1691,6 +1691,53 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "#check_bin_dev_launcher_setup" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    def write_project_file(path, content)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
+
+    it "warns instead of erroring when the generated launcher is missing" do
+      doctor.send(:check_bin_dev_launcher_setup)
+
+      error_messages = checker.messages.select { |msg| msg[:type] == :error }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+      expect(error_messages).to be_empty
+      expect(warning_messages).to include(a_string_including("Official React on Rails bin/dev launcher not found"))
+      expect(info_messages).to include(a_string_including("rails generate react_on_rails:install"))
+    end
+
+    it "acknowledges custom launchers when bin/dev is missing" do
+      write_project_file("dev", <<~SH)
+        #!/usr/bin/env bash
+        bundle exec overmind start -f Procfile
+      SH
+      write_project_file("Procfile", <<~PROCFILE)
+        web: bundle exec rails server
+        assets: bin/shakapacker --watch
+      PROCFILE
+
+      doctor.send(:check_bin_dev_launcher_setup)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+      expect(info_messages).to include(a_string_including("Custom launcher detected"))
+      expect(info_messages).to include(a_string_including("./dev"))
+      expect(info_messages).to include(a_string_including("Procfile"))
+    end
+  end
+
   describe "server bundle path Shakapacker integration" do
     let(:doctor) { described_class.new }
     let(:checker) { doctor.instance_variable_get(:@checker) }

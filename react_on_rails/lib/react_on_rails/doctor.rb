@@ -56,6 +56,7 @@ module ReactOnRails
     DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
+    CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev Procfile].freeze
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose
@@ -1428,7 +1429,9 @@ module ReactOnRails
       bin_dev_path = "bin/dev"
 
       unless File.exist?(bin_dev_path)
-        checker.add_error("  🚫 bin/dev script not found")
+        checker.add_warning("  ⚠️  Official React on Rails bin/dev launcher not found")
+        report_custom_launcher_guidance
+        checker.add_info("    💡 Generate the official launcher with: rails generate react_on_rails:install")
         return
       end
 
@@ -1466,6 +1469,24 @@ module ReactOnRails
         checker.add_success("  ✅ All Launcher Procfiles available")
       else
         checker.add_info("  💡 Run: rails generate react_on_rails:install")
+      end
+    end
+
+    def report_custom_launcher_guidance
+      custom_launcher_paths = detected_custom_launcher_paths
+      return if custom_launcher_paths.empty?
+
+      checker.add_info(
+        "    ℹ️  Custom launcher detected (#{custom_launcher_paths.join(', ')}). " \
+        "This is OK if your project intentionally manages its own dev workflow."
+      )
+    end
+
+    def detected_custom_launcher_paths
+      CUSTOM_LAUNCHER_INDICATOR_FILES.filter_map do |path|
+        next unless File.exist?(path)
+
+        path == "dev" ? "./dev" : path
       end
     end
 
