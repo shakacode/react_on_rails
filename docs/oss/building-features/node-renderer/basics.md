@@ -164,9 +164,11 @@ jobs:
       - name: Start Node Renderer
         run: |
           node client/node-renderer.js &
-          # Wait for the renderer to be ready (--max-time 2 prevents hangs if port is open but process is stalled)
+          # Wait for the renderer to be ready.
+          # The renderer uses cleartext HTTP/2 (h2c), so use --http2-prior-knowledge for the probe.
+          # --max-time 2 prevents hangs if the port is open but the process is stalled.
           for i in $(seq 1 30); do
-            if curl -s --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
+            if curl -s --http2-prior-knowledge --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
               echo "Node Renderer is ready"
               break
             fi
@@ -174,19 +176,17 @@ jobs:
             sleep 1
           done
           # Fail fast if renderer never became ready
-          if ! curl -s --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
+          if ! curl -s --http2-prior-knowledge --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
             echo "Node Renderer failed to start in time" >&2
             exit 1
           fi
-        env:
-          RENDERER_BUNDLE_PATH: ./public/webpack/test
 ```
 
 Key points:
 
-- **TCP readiness check**: Poll port 3800 (or your configured port) before running tests. The renderer needs a few seconds to start and load the server bundle.
+- **Readiness check**: Poll port 3800 (or your configured port) before running tests. The renderer uses **cleartext HTTP/2 (h2c)**, so the `curl` probe must include `--http2-prior-knowledge`. Without it, `curl` sends an HTTP/1.1 request that the h2c server rejects.
 - **`RENDERER_PASSWORD`**: Must be set in the CI environment and match the value configured in `react_on_rails_pro.rb`. Add it as a CI secret. **Important:** Declare this at the job level (not just the renderer step) so Rails can also read it when running tests.
-- **`RENDERER_BUNDLE_PATH`**: Must point to the directory containing your compiled server bundle. Ensure the webpack build step runs before starting the renderer.
+- **Bundle pre-staging**: You do **not** need to set a bundle path env var for the renderer. In CI, run `rake react_on_rails_pro:pre_stage_bundle_for_node_renderer` after the webpack build and before starting the renderer — this symlinks the compiled bundle into the renderer's cache directory, eliminating the first-request upload latency. For remote renderers, use `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` instead.
 
 ### 3. Common CI failures
 
