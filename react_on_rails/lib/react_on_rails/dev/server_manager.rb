@@ -894,7 +894,13 @@ module ReactOnRails
               marker_state = prepare_browser_open_once_marker(once)
               if marker_state != :already_opened && !open_browser(url)
                 clear_browser_open_once_marker_if_claimed(marker_state)
-                hint = ENV.key?("WSL_DISTRO_NAME") ? " On WSL, install wslu (for wslview), wsl-open, or xdg-open." : ""
+                hint = if wsl?
+                         " On WSL, install wslu (for wslview), wsl-open, or xdg-open."
+                       elsif RbConfig::CONFIG["host_os"].include?("linux")
+                         " Install xdg-utils (provides xdg-open) to enable automatic browser opening."
+                       else
+                         ""
+                       end
                 warn("[react_on_rails] Could not open browser automatically.#{hint} Visit #{url} manually.")
               end
             end
@@ -988,10 +994,6 @@ module ReactOnRails
 
           return ["xdg-open"] if command_available?("xdg-open")
 
-          unless wsl?
-            warn("[react_on_rails] No browser launcher found. " \
-                 "Install xdg-utils (provides xdg-open) to enable automatic browser opening.")
-          end
           nil
         end
 

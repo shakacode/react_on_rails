@@ -304,18 +304,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   end
 
   describe ".browser_auto_open_allowed?" do
+    around do |example|
+      original_ci = ENV.fetch("CI", nil)
+      example.run
+    ensure
+      original_ci.nil? ? ENV.delete("CI") : ENV["CI"] = original_ci
+    end
+
     it "returns true when explicit is true, even in CI" do
       ENV["CI"] = "1"
       expect(described_class.send(:browser_auto_open_allowed?, explicit: true)).to be true
-    ensure
-      ENV.delete("CI")
     end
 
     it "returns false in CI when explicit is false" do
       ENV["CI"] = "1"
       expect(described_class.send(:browser_auto_open_allowed?, explicit: false)).to be false
-    ensure
-      ENV.delete("CI")
     end
   end
 
