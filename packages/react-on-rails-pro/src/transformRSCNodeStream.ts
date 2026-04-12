@@ -14,7 +14,6 @@
 
 import { Readable, Transform } from 'stream';
 import safePipe from './safePipe.ts';
-import NodeLengthPrefixedStreamParser from './parseNodeLengthPrefixedStream.ts';
 
 /**
  * Transforms an RSC Node.js stream for server-side processing.
@@ -31,14 +30,25 @@ import NodeLengthPrefixedStreamParser from './parseNodeLengthPrefixedStream.ts';
  * @returns A transformed stream compatible with React's SSR runtime
  */
 export default function transformRSCStream(stream: NodeJS.ReadableStream): NodeJS.ReadableStream {
-  const parser = new NodeLengthPrefixedStreamParser();
+  const decoder = new TextDecoder();
+  let lastIncompleteChunk = '';
 
   const htmlExtractor = new Transform({
-    transform(chunk: Buffer, _, callback) {
+    transform(oneOrMoreChunks, _, callback) {
       try {
-        parser.feed(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk), (content) => {
-          this.push(content);
-        });
+        const decodedChunk = lastIncompleteChunk + decoder.decode(oneOrMoreChunks as Uint8Array);
+        const separateChunks = decodedChunk.split('\n').filter((chunk) => chunk.trim() !== '');
+
+        if (!decodedChunk.endsWith('\n')) {
+          lastIncompleteChunk = separateChunks.pop() ?? '';
+        } else {
+          lastIncompleteChunk = '';
+        }
+
+        for (const chunk of separateChunks) {
+          const parsedData = JSON.parse(chunk) as { html: string };
+          this.push(parsedData.html);
+        }
         callback();
       } catch (error) {
         callback(error as Error);

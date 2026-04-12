@@ -18,7 +18,6 @@ import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import { createRSCPayloadKey } from './utils.ts';
 import RSCRequestTracker from './RSCRequestTracker.ts';
 import safePipe from './safePipe.ts';
-import NodeLengthPrefixedStreamParser from './parseNodeLengthPrefixedStream.ts';
 
 // In JavaScript, when an escape sequence with a backslash (\) is followed by a character
 // that isn't a recognized escape character, the backslash is ignored, and the character
@@ -90,6 +89,7 @@ export default function injectRSCPayload(
   safePipe(pipeableHtmlStream, htmlStream, (err) => {
     resultStream.emit('error', err);
   });
+  const decoder = new TextDecoder();
   let rscPromise: Promise<void> | null = null;
 
   // ========================================
@@ -252,28 +252,14 @@ export default function injectRSCPayload(
         const initializationScript = createRSCPayloadInitializationScript(rscPayloadKey, sanitizedNonce);
         rscInitializationBuffers.push(Buffer.from(initializationScript));
 
-        // Process RSC payload stream asynchronously.
-        // The stream uses the length-prefixed protocol: metadata\tcontent_len\ncontent.
-        // We push raw Flight data to the client array (single JSON.stringify, like Next.js)
-        // and emit console replay as a separate <script> tag.
+        // Process RSC payload stream asynchronously
         rscPromises.push(
           (async () => {
-            const parser = new NodeLengthPrefixedStreamParser();
             for await (const chunk of stream ?? []) {
-              const chunkBuf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-              parser.feed(chunkBuf, (content, metadata) => {
-                const flightData = content.toString('utf8');
-                const payloadScript = createRSCPayloadChunk(flightData, rscPayloadKey, sanitizedNonce);
-                rscPayloadBuffers.push(Buffer.from(payloadScript));
-
-                // Emit console replay as a separate <script> tag (not inside the payload)
-                const consoleScript = metadata.consoleReplayScript as string;
-                if (consoleScript) {
-                  rscPayloadBuffers.push(Buffer.from(createScriptTag(consoleScript, sanitizedNonce)));
-                }
-
-                scheduleFlush();
-              });
+              const decodedChunk = typeof chunk === 'string' ? chunk : decoder.decode(chunk);
+              const payloadScript = createRSCPayloadChunk(decodedChunk, rscPayloadKey, sanitizedNonce);
+              rscPayloadBuffers.push(Buffer.from(payloadScript));
+              scheduleFlush();
             }
           })(),
         );
