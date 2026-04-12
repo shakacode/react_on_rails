@@ -81,10 +81,12 @@ Fix: Use only react-on-rails OR react-on-rails-pro, not both.`);
   }
 
   // Return cached object if already initialized (all validation passed above).
-  // Merge new capabilities onto the existing object so that a second entrypoint
-  // (e.g., full/node after client) can layer additional methods (SSR, streaming, RSC).
+  // Merge only additive capabilities onto the existing object.
+  // The first capability is the core baseline, which includes client/pro stubs.
+  // Re-applying it during a later initialization can downgrade already-added methods
+  // (e.g., SSR/streaming/RSC) back to stubs.
   if (cachedObject !== null) {
-    Object.assign(cachedObject, ...capabilities);
+    Object.assign(cachedObject, ...capabilities.slice(1));
     return cachedObject;
   }
 
