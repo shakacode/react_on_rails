@@ -323,6 +323,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   end
 
   describe "WSL detection" do
+    saved = {}
+
     around do |example|
       saved = {}
       saved = ENV.to_h.slice("WSL_DISTRO_NAME", "WSLENV")

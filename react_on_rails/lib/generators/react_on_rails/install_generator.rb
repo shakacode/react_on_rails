@@ -409,7 +409,8 @@ module ReactOnRails
           return
         end
 
-        # Make these and only these files executable
+        # Make these and only these files executable. Use destination_root so
+        # chmod remains correct even if an earlier generator step changed Dir.pwd.
         files_to_become_executable = bin_scripts_to_chmod(template_bin_path)
         File.chmod(0o755, *files_to_become_executable)
       end
@@ -444,7 +445,7 @@ module ReactOnRails
       def bin_scripts_to_chmod(template_bin_path)
         files = Dir.children(template_bin_path).reject { |filename| filename == "dev" }
         files << "dev" unless preserve_existing_bin_dev?
-        files.map { |filename| "bin/#{filename}" }
+        files.map { |filename| File.join(destination_root, "bin/#{filename}") }
       end
 
       def default_bin_dev_route
