@@ -1732,6 +1732,17 @@ RSpec.describe ReactOnRails::Doctor do
       expect(error_messages).to be_empty
       expect(info_messages).to include(a_string_including("Custom launcher detected"))
       expect(info_messages).to include(a_string_including("./dev"))
+      expect(info_messages).to include(a_string_including("To use the official launcher instead"))
+    end
+
+    it "does not detect a dev/ directory as a custom launcher" do
+      FileUtils.mkdir_p("dev")
+
+      doctor.send(:check_bin_dev_launcher_setup)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+      expect(info_messages).not_to include(a_string_including("Custom launcher detected"))
     end
 
     it "skips Procfile checks for custom projects via check_bin_dev_launcher" do

@@ -1432,8 +1432,16 @@ module ReactOnRails
 
       unless File.exist?(bin_dev_path)
         checker.add_warning("  ⚠️  Official React on Rails bin/dev launcher not found")
-        report_custom_launcher_guidance
-        checker.add_info("    💡 Generate the official launcher with: rails generate react_on_rails:install")
+        custom_launchers = detected_custom_launcher_paths
+        if custom_launchers.any?
+          checker.add_info(
+            "    ℹ️  Custom launcher detected (#{custom_launchers.join(', ')}). " \
+            "This is OK if your project intentionally manages its own dev workflow."
+          )
+          checker.add_info("    💡 To use the official launcher instead, run: rails generate react_on_rails:install")
+        else
+          checker.add_info("    💡 Generate the official launcher with: rails generate react_on_rails:install")
+        end
         return false
       end
 
@@ -1476,19 +1484,9 @@ module ReactOnRails
       end
     end
 
-    def report_custom_launcher_guidance
-      custom_launcher_paths = detected_custom_launcher_paths
-      return if custom_launcher_paths.empty?
-
-      checker.add_info(
-        "    ℹ️  Custom launcher detected (#{custom_launcher_paths.join(', ')}). " \
-        "This is OK if your project intentionally manages its own dev workflow."
-      )
-    end
-
     def detected_custom_launcher_paths
       CUSTOM_LAUNCHER_INDICATOR_FILES.filter_map do |path|
-        next unless File.exist?(path)
+        next unless File.file?(path)
 
         path == "dev" ? "./dev" : path
       end
