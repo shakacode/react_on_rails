@@ -81,7 +81,7 @@ echo ""
 # Avoids `declare -A` which requires bash 4+ (macOS ships bash 3.2).
 EXCLUSION_LIST=""
 if [ -f "$EXCLUSIONS_FILE" ]; then
-  while IFS= read -r line; do
+  while IFS= read -r line || [ -n "$line" ]; do
     # Strip inline comments, then leading and trailing whitespace.
     line="${line%%#*}"
     line="${line#"${line%%[![:space:]]*}"}"
