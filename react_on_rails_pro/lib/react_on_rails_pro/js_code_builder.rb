@@ -76,10 +76,10 @@ module ReactOnRailsPro
     end
 
     def render_call_section(render_request)
-      render_function_name = resolve_render_function_name(render_request)
+      render_function_js_expr = resolve_render_function_js_expr(render_request)
 
       <<~JS.chomp
-        return ReactOnRails[#{render_function_name}]({
+        return ReactOnRails[#{render_function_js_expr}]({
           name: componentName,
           domNodeId: #{render_request.dom_id.to_json},
           props: usedProps,
@@ -101,7 +101,9 @@ module ReactOnRailsPro
       ReactOnRailsPro.configuration.enable_rsc_support && render_request.streaming?
     end
 
-    def resolve_render_function_name(render_request)
+    # Returns a JavaScript expression for the render function name.
+    # For RSC streaming, this is a ternary expression (not a simple string literal).
+    def resolve_render_function_js_expr(render_request)
       if rsc_streaming?(render_request)
         "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
       else

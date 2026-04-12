@@ -3,6 +3,9 @@
 require_relative "rendering_strategy/exec_js_strategy"
 
 module ReactOnRails
+  # @abstract Include this module and implement all instance methods in your
+  #   concrete strategy class. Methods are instance methods, not class methods.
+  #
   # Strategy interface for server-side rendering. Concrete strategies implement
   # the rendering pipeline (JS execution, caching, streaming) for a specific
   # runtime (ExecJS, Node renderer, etc.).

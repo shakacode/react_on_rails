@@ -24,6 +24,10 @@ module ReactOnRails
   def self.configure
     yield(configuration)
     configuration.setup_config_values
+    # Reset strategy and builder so they pick up any new configuration.
+    # Pro engine initializers re-set these after configure runs.
+    @rendering_strategy = nil
+    @js_code_builder = nil
   end
 
   # Rendering strategy configured at boot time by engine initializers.
