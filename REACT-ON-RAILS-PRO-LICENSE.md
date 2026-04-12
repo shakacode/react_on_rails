@@ -41,7 +41,24 @@ Free, royalty-free use is permitted for:
 - personal/hobby projects not used in production;
 - demo apps showcasing coding techniques.
 
-**Note:** This clause does **not** permit any Production Use by any entity (commercial, non-profit, or individual). All Production Use requires a paid subscription under this Agreement.
+**Note:** This clause does **not** permit any Production Use by any entity (commercial, non-profit, or individual). All Production Use requires a paid subscription under this Agreement, except as provided in Section 4.1.
+
+---
+
+## 4.1 Open-Source Project License (Complimentary)
+
+ShakaCode may, at its sole discretion, issue a complimentary "oss" license to an Organization that meets **all** of the following criteria:
+
+1. The Organization deploys the Software as part of a project whose source code is publicly available under an [OSI-approved license](https://opensource.org/licenses).
+2. The Organization's annual revenue (or total funding received, if pre-revenue) does not exceed USD $1,000,000.
+3. The Organization applies by emailing [justin@shakacode.com](mailto:justin@shakacode.com) and provides truthful information about the project and Organization.
+
+**Terms of complimentary oss licenses:**
+
+- The attribution requirement in Section 6 applies and may not be waived.
+- Complimentary licenses are granted for a fixed term (typically one year) and may be renewed upon request.
+- ShakaCode reserves the right to revoke a complimentary license at any time if the Organization no longer meets the eligibility criteria or violates this Agreement.
+- All other terms of this Agreement apply, including Sections 5, 9, and 12.
 
 ---
 
