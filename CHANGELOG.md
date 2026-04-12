@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **[Pro]** **Pre-seed renderer cache for Docker builds**: New `react_on_rails_pro:pre_seed_renderer_cache` rake task copies compiled server bundles into the Node Renderer's cache directory structure during Docker image builds, eliminating the 410→retry cold-start latency (200ms–1s+) on the first SSR request after deployment. Supports `RENDERER_SERVER_BUNDLE_CACHE_PATH` env var and RSC bundles. [PR 3123](https://github.com/shakacode/react_on_rails/pull/3123) by [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **Doctor accepts TypeScript server bundle entrypoints**: `react_on_rails:doctor` now resolves common source entrypoint suffixes (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`) before warning that the server bundle is missing, preventing false positives when apps use `server-bundle.ts`. [PR 3111](https://github.com/shakacode/react_on_rails/pull/3111) by [justin808](https://github.com/justin808).

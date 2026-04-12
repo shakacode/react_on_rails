@@ -8,6 +8,11 @@ namespace :react_on_rails_pro do
     ReactOnRailsPro::PrepareNodeRenderBundles.call
   end
 
+  desc "Pre-seed renderer bundle cache for Docker builds (copy, not symlink)"
+  task pre_seed_renderer_cache: :environment do
+    ReactOnRailsPro::PreSeedRendererCache.call
+  end
+
   desc "Copy assets to remote node-renderer"
   task copy_assets_to_remote_vm_renderer: :environment do
     puts "[ReactOnRailsPro] Copying assets to remote node-renderer #{ReactOnRailsPro.configuration.renderer_url}"
