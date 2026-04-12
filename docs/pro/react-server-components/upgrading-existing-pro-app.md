@@ -38,7 +38,8 @@ Before running the generator, audit your existing components to identify which o
 
 Components that use any of the following **must** have `'use client'`:
 
-- **React hooks**: `useState`, `useEffect`, `useContext`, `useRef`, `useReducer`, `useCallback`, `useMemo`, `useTransition`, `useDeferredValue`, `useId`, `useOptimistic`, `useFormStatus`
+- **React hooks** (`import { ... } from 'react'`): `useState`, `useEffect`, `useContext`, `useRef`, `useReducer`, `useCallback`, `useMemo`, `useTransition`, `useDeferredValue`, `useId`, `useOptimistic`
+- **React DOM hooks** (`import { ... } from 'react-dom'`): `useFormStatus`
 - **React on Rails client APIs**: `ReactOnRails.getStore()`, `ReactOnRails.authenticityToken()`
 - **Redux**: `useSelector`, `useDispatch`, `connect()`, `<Provider>`
 - **Router client APIs**: `useNavigate`, `useLocation`, `useParams`

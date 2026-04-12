@@ -914,9 +914,10 @@ plugins: [
 ```
 
 This injects the polyfill as raw JavaScript at the top of the bundle output, ensuring `MessageChannel` is defined before any module code executes.
-Alternatively, you can add `MessageChannel` via `additionalContext` in the renderer config — both approaches work. The `BannerPlugin` method is useful when you prefer the polyfill to live alongside the webpack configuration that needs it.
 
-> **Scheduler semantics note:** React's scheduler expects `MessageChannel` to deliver messages asynchronously (as a macrotask). The polyfill above delivers messages synchronously, which works for current SSR streaming scenarios. If you encounter recursive stack-overflow errors during deeply-nested renders, use the `additionalContext` approach with Node.js' native `MessageChannel` instead, which provides correct async scheduling.
+**Recommended approach:** Use `additionalContext` in the renderer config to inject Node.js' native `MessageChannel` into the VM sandbox. This provides correct async scheduling (macrotask delivery), which React's scheduler depends on. The `BannerPlugin` polyfill above delivers messages synchronously — this works for current SSR streaming scenarios but may cause subtle rendering bugs if React yields mid-render and re-enters the scheduler.
+
+> **When to use the `BannerPlugin` polyfill:** Use it only when the renderer config's `additionalContext` is not accessible (e.g., in a build-only setup without renderer config control). If you encounter recursive stack-overflow errors or unexpected rendering behavior with the synchronous polyfill, switch to the `additionalContext` approach.
 
 > **Note:** This only affects the server bundle. The RSC bundle runs in full Node.js (which has `MessageChannel` since Node 15), and the client bundle runs in the browser (which has native `MessageChannel`).
 
