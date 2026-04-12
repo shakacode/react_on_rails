@@ -141,7 +141,7 @@ Thanks to the companies supporting ShakaCode's open-source work.
 
 <p>
   <a href="https://jb.gg/OpenSource">
-    <img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.png" alt="JetBrains" height="44">
+    <img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.png" alt="JetBrains" height="36">
   </a>
   <a href="https://scoutapp.com">
     <picture>
@@ -169,7 +169,7 @@ Thanks to the companies supporting ShakaCode's open-source work.
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://victorious-bubble-f69a016683.media.strapiapp.com/White_Typemark_7229870ac5.svg">
       <source media="(prefers-color-scheme: light)" srcset="https://victorious-bubble-f69a016683.media.strapiapp.com/Orange_Typemark_7958cfa790.svg">
-      <img alt="CodeRabbit" src="https://victorious-bubble-f69a016683.media.strapiapp.com/Orange_Typemark_7958cfa790.svg" height="44">
+      <img alt="CodeRabbit" src="https://victorious-bubble-f69a016683.media.strapiapp.com/Orange_Typemark_7958cfa790.svg" height="36">
     </picture>
   </a>
 </p>
