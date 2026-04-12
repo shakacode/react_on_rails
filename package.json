@@ -126,7 +126,7 @@
       "ajv overrides were intentionally excluded: ajv v8 breaks webpack's schema-utils/ajv-keywords.",
       "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files.",
       "webpack: 5.106.0 breaks ExecJS SSR (anonymous default export codegen bug).",
-      "Upstream fix: webpack/webpack#20796 — remove webpack override once a patched version ships."
+      "Upstream fix: webpack/webpack#20796 — update override upper bound once a patched webpack ships, then run pnpm install to regenerate the lockfile."
     ],
     "overrides": {
       "react": "$react",
