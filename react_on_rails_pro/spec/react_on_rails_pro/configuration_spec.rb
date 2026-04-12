@@ -310,6 +310,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         before do
           allow(ENV).to receive(:[]).and_call_original
           allow(ENV).to receive(:fetch).and_call_original
+          allow(ENV).to receive(:fetch).with("RENDERER_PASSWORD", nil).and_return(nil)
           allow(ENV).to receive(:fetch).with("NODE_ENV", nil).and_return(nil)
         end
 
