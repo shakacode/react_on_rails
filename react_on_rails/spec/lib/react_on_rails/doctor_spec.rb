@@ -294,11 +294,23 @@ RSpec.describe ReactOnRails::Doctor do
           stub_const("Shakapacker", shakapacker_module)
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
           allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
+          allow(File).to receive(:exist?).and_call_original
+          %w[.js .jsx .ts .tsx .mjs .cjs].each do |extension|
+            allow(File).to receive(:exist?).with("client/app/packs/server-bundle#{extension}").and_return(false)
+          end
         end
 
         it "uses Shakapacker API configuration with relative paths" do
           path = doctor.send(:determine_server_bundle_path)
           expect(path).to eq("client/app/packs/server-bundle.js")
+        end
+
+        it "accepts a TypeScript server bundle source file when the configured filename is .js" do
+          allow(File).to receive(:exist?).with("client/app/packs/server-bundle.ts").and_return(true)
+
+          path = doctor.send(:determine_server_bundle_path)
+
+          expect(path).to eq("client/app/packs/server-bundle.ts")
         end
       end
 
@@ -315,6 +327,10 @@ RSpec.describe ReactOnRails::Doctor do
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
           allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
           allow(Dir).to receive(:pwd).and_return(rails_root)
+          allow(File).to receive(:exist?).and_call_original
+          %w[.js .jsx .ts .tsx .mjs .cjs].each do |ext|
+            allow(File).to receive(:exist?).with("client/app/packs/server-bundle#{ext}").and_return(false)
+          end
         end
 
         it "converts absolute paths to relative paths" do
@@ -336,6 +352,10 @@ RSpec.describe ReactOnRails::Doctor do
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
           allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
           allow(Dir).to receive(:pwd).and_return(rails_root)
+          allow(File).to receive(:exist?).and_call_original
+          %w[.js .jsx .ts .tsx .mjs .cjs].each do |ext|
+            allow(File).to receive(:exist?).with("client/app/packs/server-bundle#{ext}").and_return(false)
+          end
         end
 
         it "handles nested absolute paths correctly" do
@@ -348,11 +368,23 @@ RSpec.describe ReactOnRails::Doctor do
         before do
           allow(doctor).to receive(:require).with("shakapacker").and_raise(LoadError)
           allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
+          allow(File).to receive(:exist?).and_call_original
+          %w[.js .jsx .ts .tsx .mjs .cjs].each do |ext|
+            allow(File).to receive(:exist?).with("app/javascript/packs/server-bundle#{ext}").and_return(false)
+          end
         end
 
         it "uses default path" do
           path = doctor.send(:determine_server_bundle_path)
           expect(path).to eq("app/javascript/packs/server-bundle.js")
+        end
+
+        it "accepts a TypeScript server bundle source file" do
+          allow(File).to receive(:exist?).with("app/javascript/packs/server-bundle.ts").and_return(true)
+
+          path = doctor.send(:determine_server_bundle_path)
+
+          expect(path).to eq("app/javascript/packs/server-bundle.ts")
         end
       end
     end
