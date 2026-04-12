@@ -14,6 +14,14 @@ pnpm add react-on-rails
 
 **Using React on Rails Pro?** Install [`react-on-rails-pro`](https://www.npmjs.com/package/react-on-rails-pro) instead. The Pro package re-exports everything from this package plus Pro-exclusive features. The `react_on_rails_pro` gem requires the Pro npm package.
 
+## Need More Than OSS?
+
+If you want React Server Components, streaming SSR, fragment caching, or faster Node-based SSR, try [`react-on-rails-pro`](https://www.npmjs.com/package/react-on-rails-pro). It is free to evaluate in development, CI/CD, and staging; production licenses are required only for production deployments.
+
+- [Compare OSS vs Pro](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
+- [Pro quick start](https://reactonrails.com/docs/getting-started/pro-quick-start/)
+- [React on Rails Pro overview](https://reactonrails.com/docs/pro/)
+
 ## Quick Start
 
 ### Register Components

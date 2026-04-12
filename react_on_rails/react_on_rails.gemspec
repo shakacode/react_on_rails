@@ -13,8 +13,16 @@ Gem::Specification.new do |s|
 
   s.summary       = "Rails with react server rendering with webpack. "
   s.description   = "See README.md"
-  s.homepage      = "https://github.com/shakacode/react_on_rails"
+  s.homepage      = "https://reactonrails.com/docs/"
   s.license       = "MIT"
+  s.metadata = {
+    "bug_tracker_uri" => "https://github.com/shakacode/react_on_rails/issues",
+    "changelog_uri" => "https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md",
+    "documentation_uri" => "https://reactonrails.com/docs/",
+    "homepage_uri" => "https://reactonrails.com/docs/",
+    "rubygems_mfa_required" => "true",
+    "source_code_uri" => "https://github.com/shakacode/react_on_rails/tree/main/react_on_rails"
+  }
 
   s.files = Dir.chdir(__dir__) do
     `git ls-files -z`.split("\x0").reject do |f|
@@ -37,12 +45,14 @@ Gem::Specification.new do |s|
   s.add_dependency "shakapacker", ">= 6.0"
 
   s.add_development_dependency "gem-release"
-  s.post_install_message = '
---------------------------------------------------------------------------------
-Checkout https://pro.reactonrails.com for information about
-"React on Rails Pro" which includes a gem for better performance, via caching helpers, and our
-node rendering server, support for React 19, and much more.
---------------------------------------------------------------------------------
-'
+  s.post_install_message = <<~MESSAGE
+    --------------------------------------------------------------------------------
+    Need React Server Components, streaming SSR, caching, or faster Node-based SSR?
+    React on Rails Pro is free to try in development, CI/CD, and staging.
+    Compare OSS vs Pro: https://reactonrails.com/docs/getting-started/oss-vs-pro/
+    Pro quick start: https://reactonrails.com/docs/getting-started/pro-quick-start/
+    Contact ShakaCode: https://www.shakacode.com/contact/
+    --------------------------------------------------------------------------------
+  MESSAGE
 end
 # rubocop:enable Metrics/BlockLength
