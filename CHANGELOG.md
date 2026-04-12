@@ -27,7 +27,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Fixed
 
 - **Doctor accepts TypeScript server bundle entrypoints**: `react_on_rails:doctor` now resolves common source entrypoint suffixes (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`) before warning that the server bundle is missing, preventing false positives when apps use `server-bundle.ts`. [PR 3111](https://github.com/shakacode/react_on_rails/pull/3111) by [justin808](https://github.com/justin808).
-- **Doctor no longer fails custom projects for a missing generated `bin/dev`**: `react_on_rails:doctor` now downgrades a missing official React on Rails `bin/dev` launcher from an error to a warning and adds explicit guidance when a custom `./dev` or `Procfile` workflow is detected, so custom projects can pass diagnostics when their development setup is intentional. Fixes [Issue 3103](https://github.com/shakacode/react_on_rails/issues/3103). PR attribution pending.
+- **Doctor no longer fails custom projects for a missing generated `bin/dev`**: `react_on_rails:doctor` now downgrades a missing official React on Rails `bin/dev` launcher from an error to a warning and adds explicit guidance when a custom `./dev` or `Procfile.dev` workflow is detected, so custom projects can pass diagnostics when their development setup is intentional. Fixes [Issue 3103](https://github.com/shakacode/react_on_rails/issues/3103). [PR #3117](https://github.com/shakacode/react_on_rails/pull/3117) by [justin808](https://github.com/justin808).
 
 ### [16.6.0] - 2026-04-09
 

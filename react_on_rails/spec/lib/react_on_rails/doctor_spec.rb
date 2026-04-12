@@ -1721,20 +1721,39 @@ RSpec.describe ReactOnRails::Doctor do
     it "acknowledges custom launchers when bin/dev is missing" do
       write_project_file("dev", <<~SH)
         #!/usr/bin/env bash
-        bundle exec overmind start -f Procfile
+        bundle exec overmind start -f Procfile.dev
       SH
-      write_project_file("Procfile", <<~PROCFILE)
+      write_project_file("Procfile.dev", <<~PROCFILE)
         web: bundle exec rails server
         assets: bin/shakapacker --watch
       PROCFILE
 
       doctor.send(:check_bin_dev_launcher_setup)
 
+      error_messages = checker.messages.select { |msg| msg[:type] == :error }
       info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
 
+      expect(error_messages).to be_empty
       expect(info_messages).to include(a_string_including("Custom launcher detected"))
       expect(info_messages).to include(a_string_including("./dev"))
-      expect(info_messages).to include(a_string_including("Procfile"))
+      expect(info_messages).to include(a_string_including("Procfile.dev"))
+    end
+
+    it "skips Procfile checks for custom projects via check_bin_dev_launcher" do
+      write_project_file("dev", <<~SH)
+        #!/usr/bin/env bash
+        bundle exec overmind start -f Procfile.dev
+      SH
+
+      doctor.send(:check_bin_dev_launcher)
+
+      all_messages = checker.messages.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+
+      expect(warning_messages).not_to include(a_string_including("Missing Procfile.dev"))
+      expect(warning_messages).not_to include(a_string_including("Missing Procfile.dev-static-assets"))
+      expect(warning_messages).not_to include(a_string_including("Missing Procfile.dev-prod-assets"))
+      expect(all_messages).not_to include(a_string_including("Launcher Procfiles"))
     end
   end
 

@@ -56,7 +56,7 @@ module ReactOnRails
     DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
-    CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev Procfile].freeze
+    CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev Procfile.dev].freeze
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose
@@ -182,7 +182,7 @@ module ReactOnRails
 
     def check_bin_dev_launcher
       checker.add_info("🚀 bin/dev Launcher:")
-      check_bin_dev_launcher_setup
+      return unless check_bin_dev_launcher_setup
 
       checker.add_info("\n📄 Launcher Procfiles:")
       check_launcher_procfiles
@@ -1425,6 +1425,8 @@ module ReactOnRails
       checker.add_info("  • Modern React patterns recommended")
     end
 
+    # Returns true if bin/dev exists, false otherwise.
+    # Used by check_bin_dev_launcher to decide whether to check Procfiles.
     def check_bin_dev_launcher_setup
       bin_dev_path = "bin/dev"
 
@@ -1432,7 +1434,7 @@ module ReactOnRails
         checker.add_warning("  ⚠️  Official React on Rails bin/dev launcher not found")
         report_custom_launcher_guidance
         checker.add_info("    💡 Generate the official launcher with: rails generate react_on_rails:install")
-        return
+        return false
       end
 
       content = File.read(bin_dev_path)
@@ -1445,6 +1447,8 @@ module ReactOnRails
         checker.add_warning("  ⚠️  bin/dev exists but doesn't use ReactOnRails Launcher")
         checker.add_info("    💡 Consider upgrading: rails generate react_on_rails:install")
       end
+
+      true
     end
 
     def check_launcher_procfiles
