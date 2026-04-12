@@ -185,7 +185,7 @@ For a practical example of route organization, see the [routes configuration fil
 
 When using React Router's `<Navigate>` component with server-side rendering, be aware of the following behavior:
 
-- **During SSR, `<Navigate>` is a no-op.** It renders `null` and logs a warning in development mode. No redirect is performed on the server — Rails still sends the full response with whatever HTML was rendered.
+- **During SSR, `<Navigate>` is a no-op.** It renders `null` because `useEffect` does not fire on the server. No redirect is performed — Rails still sends the full response with whatever HTML was rendered.
 - **The redirect only fires on the client** via `useEffect`, which runs after hydration. This means:
   - Users briefly see the SSR content before being redirected (content flash).
   - Search engines see the original page content, not a redirect — there is no HTTP 301/302 status code.

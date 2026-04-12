@@ -27,7 +27,7 @@ The best source of docs is the `interface ReactOnRails` in [types/index.ts](http
  *
  * Component detection: React on Rails distinguishes between component types by parameter count:
  * - 0-1 params: Regular React component (function or class)
- * - 2 params (or `.renderFunction = true`): Render-Function — called with (props, railsContext),
+ * - 2 params, or any function with `.renderFunction = true`: Render-Function — called with (props, railsContext),
  *   returns a React component, `{ renderedHtml }` object, or Promise (Pro Node renderer only)
  * - 3 params: Renderer function — called with (props, railsContext, domNodeId),
  *   responsible for calling ReactDOM.render/hydrate directly (client-only)

@@ -123,8 +123,8 @@ const MyComponent = async (props, _railsContext) => {
 
 ### 8. Redirect Information (Legacy)
 
-> [!WARNING]
-> **Legacy feature from React Router v3/v4.** The `redirectLocation` and `routeError` return types are vestiges of older React Router integrations. They have significant limitations:
+> [!NOTE]
+> **`redirectLocation` and `routeError` have significant limitations.** These fields originated from React Router v3/v4 integrations but are still supported at the runtime level. Be aware of:
 >
 > - `redirectLocation` does **not** trigger an actual server-side redirect — Rails still returns the same response with an empty `<div>`. The redirect only takes effect once the client-side router renders.
 > - `routeError` only triggers `raise_on_prerender_error` behavior (if enabled) — it does not produce a user-facing error page.
@@ -163,7 +163,7 @@ Take a look at [serverRenderReactComponent.test.ts](https://github.com/shakacode
    - This merge requires your original `props:` to be a Ruby `Hash` or a JSON string representing an object.
    - The merge handles symbol vs. string key coexistence: if `clientProps` contains a string key `"foo"` and the original props contain a symbol key `:foo`, the merge updates the existing symbol key rather than creating a duplicate. An error is raised if both string and symbol versions of the same key exist in the original props.
 
-5. **Server render result detection is broad** - React on Rails treats any object containing a `renderedHtml`, `redirectLocation`, `routeError`, or `error` key as a server render result (not a React component). This means returning an object with an `error` key from a render function triggers server-render-hash processing, which may be surprising.
+5. **Server render result detection is broad** - React on Rails treats any object containing a `renderedHtml`, `redirectLocation`, `routeError`, or `error` key as a server render result (not a React component). This means returning an object with an `error` key from a render function triggers server-render-hash processing — the `error` value is then treated as an exception descriptor, which can trigger `raise_on_prerender_error` behavior if enabled. This may be surprising if you intended `error` as a regular data field.
 
 6. **Don't return JSX directly from render functions** - Render functions should return a React component (function or class), not a React element (JSX). Returning JSX directly causes React Hooks to break silently. A deprecation warning is logged but the code currently still works for backward compatibility.
 
@@ -251,6 +251,8 @@ This table shows which component/return types are valid with each Ruby helper:
 | Render function → `{ renderedHtml: { componentHtml, ... } }` | ❌                     | ✅                                                                | ❌                             |
 | Render function → Promise (compatible return shape)          | ✅ (Pro Node renderer) | ✅ (Pro Node renderer, must resolve to hash with `componentHtml`) | ❌                             |
 | Renderer function (3 params)                                 | ✅ (client-only)       | ❌                                                                | ❌                             |
+
+> **Note:** ❌ means the combination silently produces incorrect output, not that it throws an error. For example, `react_component` with a hash result JSON-stringifies the object into HTML, and `react_component_hash` with a plain component returns empty/wrong values for the hash keys.
 
 **Key constraints:**
 
