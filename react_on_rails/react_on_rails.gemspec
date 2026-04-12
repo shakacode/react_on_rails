@@ -51,7 +51,7 @@ Gem::Specification.new do |s|
     React on Rails Pro is free to try in development, CI/CD, and staging.
     Compare OSS vs Pro: https://reactonrails.com/docs/getting-started/oss-vs-pro/
     Pro quick start: https://reactonrails.com/docs/getting-started/pro-quick-start/
-    Contact ShakaCode: justin@shakacode.com
+    Contact ShakaCode: https://www.shakacode.com/contact/
     --------------------------------------------------------------------------------
   MESSAGE
 end
