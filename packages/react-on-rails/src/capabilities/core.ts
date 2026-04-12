@@ -65,38 +65,32 @@ export function createCoreCapability(registries: Registries) {
     },
 
     setOptions(newOptions: Partial<ReactOnRailsOptions>): void {
-      if (typeof newOptions.traceTurbolinks !== 'undefined') {
-        this.options.traceTurbolinks = newOptions.traceTurbolinks;
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.traceTurbolinks;
+      const { traceTurbolinks, turbo, debugMode, logComponentRegistration, ...rest } = newOptions;
+
+      if (typeof traceTurbolinks !== 'undefined') {
+        this.options.traceTurbolinks = traceTurbolinks;
       }
 
-      if (typeof newOptions.turbo !== 'undefined') {
-        this.options.turbo = newOptions.turbo;
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.turbo;
+      if (typeof turbo !== 'undefined') {
+        this.options.turbo = turbo;
       }
 
-      if (typeof newOptions.debugMode !== 'undefined') {
-        this.options.debugMode = newOptions.debugMode;
-        if (newOptions.debugMode) {
+      if (typeof debugMode !== 'undefined') {
+        this.options.debugMode = debugMode;
+        if (debugMode) {
           console.log('[ReactOnRails] Debug mode enabled');
         }
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.debugMode;
       }
 
-      if (typeof newOptions.logComponentRegistration !== 'undefined') {
-        this.options.logComponentRegistration = newOptions.logComponentRegistration;
-        if (newOptions.logComponentRegistration) {
+      if (typeof logComponentRegistration !== 'undefined') {
+        this.options.logComponentRegistration = logComponentRegistration;
+        if (logComponentRegistration) {
           console.log('[ReactOnRails] Component registration logging enabled');
         }
-        // eslint-disable-next-line no-param-reassign
-        delete newOptions.logComponentRegistration;
       }
 
-      if (Object.keys(newOptions).length > 0) {
-        throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(newOptions)}`);
+      if (Object.keys(rest).length > 0) {
+        throw new Error(`Invalid options passed to ReactOnRails.options: ${JSON.stringify(rest)}`);
       }
     },
 
