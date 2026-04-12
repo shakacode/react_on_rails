@@ -41,7 +41,8 @@ Components that use any of the following **must** have `'use client'`:
 - **React hooks**: `useState`, `useEffect`, `useContext`, `useRef`, `useReducer`, `useCallback`, `useMemo`
 - **React on Rails client APIs**: `ReactOnRails.getStore()`, `ReactOnRails.authenticityToken()`
 - **Redux**: `useSelector`, `useDispatch`, `connect()`, `<Provider>`
-- **Router client APIs**: `StaticRouter`, `useNavigate`, `useLocation`, `useParams`
+- **Router client APIs**: `useNavigate`, `useLocation`, `useParams`
+- **SSR entry-point files** using `StaticRouter`: these are SSR wrappers, not RSC server components — see the `.server.jsx` naming collision below
 - **Event handlers**: `onClick`, `onChange`, `onSubmit`, etc.
 - **Browser APIs**: `window`, `document`, `localStorage`, `fetch` in effects
 
@@ -71,7 +72,7 @@ Before proceeding to Step 1:
 
 - [ ] Search your component source files for `useState`, `useEffect`, `useContext`, `useSelector`, `useDispatch`, `ReactOnRails.getStore`
 - [ ] Check all `.server.jsx` files -- these almost certainly need `'use client'`
-- [ ] Check components that use `StaticRouter` or other routing client APIs
+- [ ] Check components that use `StaticRouter` (SSR wrapper, not a client API — but the file likely uses other client APIs)
 - [ ] Verify no component relies on browser globals (`window`, `document`) without `'use client'`
 
 > **When in doubt, add `'use client'`.** Starting with all components as Client Components is safe and preserves existing behavior. You can remove the directive later when you're ready to convert a component to a Server Component.

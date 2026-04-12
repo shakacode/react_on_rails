@@ -167,6 +167,11 @@ The Node Renderer must be started as a background process before running tests. 
       echo "Waiting for Node Renderer... ($i/30)"
       sleep 1
     done
+    # Fail fast if renderer never became ready
+    if ! curl -s http://localhost:3800/ > /dev/null 2>&1; then
+      echo "Node Renderer failed to start in time" >&2
+      exit 1
+    fi
   env:
     RENDERER_PASSWORD: ${{ secrets.RENDERER_PASSWORD }}
     RENDERER_BUNDLE_PATH: ./public/webpack/test
@@ -175,7 +180,7 @@ The Node Renderer must be started as a background process before running tests. 
 Key points:
 
 - **TCP readiness check**: Poll port 3800 (or your configured port) before running tests. The renderer needs a few seconds to start and load the server bundle.
-- **`RENDERER_PASSWORD`**: Must be set in the CI environment and match the value configured in `react_on_rails_pro.rb`. Add it as a CI secret.
+- **`RENDERER_PASSWORD`**: Must be set in the CI environment and match the value configured in `react_on_rails_pro.rb`. Add it as a CI secret. **Important:** Declare this at the job level (not just the renderer step) so Rails can also read it when running tests.
 - **`RENDERER_BUNDLE_PATH`**: Must point to the directory containing your compiled server bundle. Ensure the webpack build step runs before starting the renderer.
 
 ### 3. Common CI failures

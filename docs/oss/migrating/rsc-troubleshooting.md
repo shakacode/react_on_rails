@@ -844,7 +844,9 @@ module.exports = {
 
 #### Handling Node Builtins -- `externals` vs `resolve.fallback`
 
-A common mistake when configuring the server bundle is using webpack `externals` to handle Node builtins like `path`, `fs`, and `stream`. This generates `require('path')` calls in the output -- but the VM sandbox has **no `require` function**, causing `ReferenceError: require is not defined` at runtime.
+A common mistake when configuring the server bundle is using webpack `externals` to handle Node builtins like `path`, `fs`, and `stream`. This generates `require('path')` calls in the output -- but the VM sandbox has **no `require` function** by default, causing `ReferenceError: require is not defined` at runtime.
+
+> **Note:** If you have `supportModules` or `additionalContext` enabled in your renderer configuration, the renderer wraps the bundle in a module wrapper and injects `require` into the VM. In that case, `externals` will work. The guidance below applies to the default configuration without these options.
 
 **Wrong approach (causes `require is not defined`):**
 
@@ -870,7 +872,7 @@ resolve: {
 }
 ```
 
-`resolve.fallback: false` tells webpack to replace the module with an empty object at build time, so no `require()` call is generated. The RSC bundle does not need this workaround because it runs in full Node.js where `require()` is available and Node builtins work normally.
+`resolve.fallback: false` tells webpack to omit the module at build time — no fallback shim is bundled and no `require()` call is emitted. The RSC bundle does not need this workaround because it runs in full Node.js where `require()` is available and Node builtins work normally.
 
 ### MessageChannel Not Defined
 
@@ -911,7 +913,8 @@ plugins: [
 ];
 ```
 
-This injects the polyfill as raw JavaScript at the top of the bundle output, ensuring `MessageChannel` is defined before any module code executes. This is necessary because the error occurs at import time, not at render time -- so `additionalContext` (which sets globals on the VM context) may not take effect early enough depending on your bundling setup.
+This injects the polyfill as raw JavaScript at the top of the bundle output, ensuring `MessageChannel` is defined before any module code executes.
+Alternatively, you can add `MessageChannel` via `additionalContext` in the renderer config — both approaches work. The `BannerPlugin` method is useful when you prefer the polyfill to live alongside the webpack configuration that needs it.
 
 > **Note:** This only affects the server bundle. The RSC bundle runs in full Node.js (which has `MessageChannel` since Node 15), and the client bundle runs in the browser (which has native `MessageChannel`).
 
