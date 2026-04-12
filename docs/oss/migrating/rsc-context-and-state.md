@@ -418,7 +418,7 @@ export default function ProductPage({ locale, messages, ...props }) {
 }
 ```
 
-> **Note:** `createIntl` is a plain function call — no hooks, no Context, no `'use client'` needed. The `createIntlCache()` call avoids recreating expensive `Intl.NumberFormat` / `Intl.DateTimeFormat` instances on every request. The cache stores only `Intl` constructor results (no request data), so it is safe to share at module scope.
+> **Note:** `createIntl` is a plain function call — no hooks, no Context, no `'use client'` needed. The `createIntlCache()` call avoids recreating expensive `Intl.NumberFormat` / `Intl.DateTimeFormat` instances on every request. The cache stores only `Intl` constructor instances keyed by format options — no locale data, messages, or user-specific information — so it is safe to share at module scope across all concurrent requests for the lifetime of the Node.js process.
 
 #### Alternative: Rails pre-formatting
 
@@ -470,10 +470,10 @@ export default function InteractiveFilters() {
 
 #### Build-time vs controller-props: when to use each
 
-| Approach                       | Source                     | Key format                   | Best for                                                                                |
-| ------------------------------ | -------------------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
-| Build-time (`config.i18n_dir`) | YAML → compiled JSON/JS    | Flat: `"product.title"`      | Static translations shared across pages; client-side `react-intl` with `defineMessages` |
-| Controller-props (`I18n.t`)    | Rails I18n at request time | Your choice (flat or nested) | Page-specific translations; pre-formatted strings with variables; RSC `createIntl`      |
+| Approach                       | Source                     | Key format                      | Best for                                                                                |
+| ------------------------------ | -------------------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
+| Build-time (`config.i18n_dir`) | YAML → compiled JSON/JS    | Flat: `"product.title"`         | Static translations shared across pages; client-side `react-intl` with `defineMessages` |
+| Controller-props (`I18n.t`)    | Rails I18n at request time | Flat (required by `createIntl`) | Page-specific translations; pre-formatted strings with variables; RSC `createIntl`      |
 
 Both can be used together — for example, build-time translations for the client bundle and controller-props for Server Component content. See the [Internationalization guide](../building-features/i18n.md) for build-time setup details.
 
@@ -541,8 +541,9 @@ const greeting = messages['greeting'];
 
 ```jsx
 // GOOD: Use createIntl to format with variable substitution
-import { createIntl } from 'react-intl';
-const intl = createIntl({ locale, messages });
+import { createIntl, createIntlCache } from 'react-intl';
+const cache = createIntlCache();
+const intl = createIntl({ locale, messages }, cache);
 const greeting = intl.formatMessage({ id: 'greeting' }, { name: 'John' });
 ```
 
