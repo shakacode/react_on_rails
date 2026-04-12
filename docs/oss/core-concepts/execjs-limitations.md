@@ -99,7 +99,7 @@ The `mini_racer` runtime provides a bare V8 isolate without Node.js globals or W
 
 ### `TextEncoder` / `TextDecoder`
 
-React DOM Server (18+) requires `TextEncoder` internally. When using `mini_racer`, you will encounter:
+`mini_racer`'s V8 isolate does not include the `TextEncoder` or `TextDecoder` Web APIs. React DOM Server (18+) requires `TextEncoder` internally, so when using `mini_racer` you will encounter:
 
 ```text
 ReferenceError: TextEncoder is not defined

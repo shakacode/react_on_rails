@@ -6,7 +6,7 @@ In most cases, you should use the `prerender: false` (default behavior) with the
 
 Now the server will interpret your JavaScript. The default is to use [ExecJS](https://github.com/rails/execjs) and pass the resulting HTML to the client. ExecJS auto-detects the best available runtime, preferring mini_racer and Bun over Node.js when installed. You can override the runtime with the `EXECJS_RUNTIME` environment variable. See the [ExecJS readme](https://github.com/rails/execjs/blob/master/README.md) for all available runtimes. For details on ExecJS constraints with timers, async, and browser APIs, see [ExecJS Limitations](./execjs-limitations.md).
 
-Note: if you use the [mini_racer](https://github.com/rubyjs/mini_racer) runtime and run into a `ReferenceError: TextEncoder is not defined` error, see [this comment](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717) for a solution. Since React DOM Server 18+ requires `TextEncoder` (which `mini_racer` does not provide), `mini_racer` is effectively unsupported for server rendering with modern React. Consider using the Node.js ExecJS runtime or upgrading to the Node Renderer.
+> **Warning:** Since React DOM Server 18+ requires `TextEncoder` (which `mini_racer` does not provide), `mini_racer` is effectively unsupported for server rendering with modern React. Consider using the Node.js ExecJS runtime or upgrading to the [Node Renderer](./execjs-limitations.md#migrating-to-the-node-renderer). If you are on an older React version and need a `TextEncoder` polyfill, see [this comment](https://github.com/shakacode/react_on_rails/issues/1457#issuecomment-1165026717).
 
 ## Polyfill Requirements for `target: 'web'` Server Bundles
 
@@ -14,7 +14,7 @@ When the server bundle is built with webpack `target: 'web'` (the default for th
 
 - **ExecJS with Node.js runtime**: Works because Node.js provides these globals natively, regardless of the webpack target.
 - **ExecJS with `mini_racer`**: Runs in a bare V8 isolate with none of these globals. The bundle relies on polyfills or fallbacks for any Node.js APIs it uses.
-- **`target: 'node'`**: When using the React on Rails Pro Node Renderer, set `target: 'node'` in your server webpack config. This tells webpack to preserve `require()` calls for Node.js built-ins instead of bundling polyfills.
+- **`target: 'node'`**: When using the React on Rails Pro Node Renderer, set `target: 'node'` in your server webpack config. This tells webpack to treat Node.js built-ins as externals, resolving them at runtime from the Node.js process rather than attempting to bundle or polyfill them.
 
 The React on Rails OSS package does not use `Buffer` in its ExecJS rendering path. If your own server-rendered code calls `Buffer` directly, you will need to supply a polyfill.
 
