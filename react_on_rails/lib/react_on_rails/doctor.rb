@@ -56,7 +56,7 @@ module ReactOnRails
     DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
-    CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev Procfile.dev].freeze
+    CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose

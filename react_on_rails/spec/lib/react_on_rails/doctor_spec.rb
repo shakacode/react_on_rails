@@ -1723,10 +1723,6 @@ RSpec.describe ReactOnRails::Doctor do
         #!/usr/bin/env bash
         bundle exec overmind start -f Procfile.dev
       SH
-      write_project_file("Procfile.dev", <<~PROCFILE)
-        web: bundle exec rails server
-        assets: bin/shakapacker --watch
-      PROCFILE
 
       doctor.send(:check_bin_dev_launcher_setup)
 
@@ -1736,7 +1732,6 @@ RSpec.describe ReactOnRails::Doctor do
       expect(error_messages).to be_empty
       expect(info_messages).to include(a_string_including("Custom launcher detected"))
       expect(info_messages).to include(a_string_including("./dev"))
-      expect(info_messages).to include(a_string_including("Procfile.dev"))
     end
 
     it "skips Procfile checks for custom projects via check_bin_dev_launcher" do
