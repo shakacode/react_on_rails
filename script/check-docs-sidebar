@@ -57,13 +57,14 @@ ADDED_FILES=$(git diff --name-only --diff-filter=AR "$BASE_REF"..."$CURRENT_REF"
   exit 1
 }
 
-# For local development, also include uncommitted (staged + unstaged) and untracked files.
-# Use --diff-filter=AR to match the committed-diff filter above — otherwise plain edits to
-# existing docs (which are not new additions) would trigger false failures locally.
+# For local development, also include staged new/renamed files so the check catches
+# additions before they are committed.  Only staged files are included — untracked
+# WIP drafts are intentionally excluded to avoid surprising contributors who keep
+# work-in-progress docs in-tree without intending to land them yet.
 if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
   UNCOMMITTED=$(git diff --name-only --diff-filter=AR HEAD 2>/dev/null || echo "")
-  UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || echo "")
-  ADDED_FILES=$(printf "%s\n%s\n%s" "$ADDED_FILES" "$UNCOMMITTED" "$UNTRACKED" | sort -u | grep -v '^$' || echo "")
+  STAGED_NEW=$(git diff --cached --name-only --diff-filter=AR 2>/dev/null || echo "")
+  ADDED_FILES=$(printf "%s\n%s\n%s" "$ADDED_FILES" "$UNCOMMITTED" "$STAGED_NEW" | sort -u | grep -v '^$' || echo "")
 fi
 
 # Filter to published doc files only (docs/oss/** and docs/pro/**)
@@ -93,11 +94,12 @@ if [ -f "$EXCLUSIONS_FILE" ]; then
   done < "$EXCLUSIONS_FILE"
 fi
 
-# Read sidebar file once and strip out line comments so a quoted doc ID inside
-# a `// comment` (e.g. `// TODO: re-add 'foo'`) cannot satisfy the grep below.
+# Read sidebar file once and strip comments so a quoted doc ID inside a comment
+# (e.g. `// TODO: re-add 'foo'` or `'x', // restore 'foo'`) cannot satisfy the
+# grep below.  First remove full-line // comments, then strip inline // tails.
 # Block comments `/* ... */` are not handled; the convention in this file is
 # single-line comments only.
-SIDEBAR_CONTENT=$(grep -v '^[[:space:]]*//' "$SIDEBAR_FILE")
+SIDEBAR_CONTENT=$(grep -v '^[[:space:]]*//' "$SIDEBAR_FILE" | sed 's|[[:space:]]//.*||')
 
 MISSING=()
 CHECKED=0
