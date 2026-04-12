@@ -666,6 +666,9 @@ describe RscGenerator, type: :generator do
 
     # Rspack RSC compatibility — verifies that the generated RSC config uses
     # bundler-agnostic patterns that work with both webpack and Rspack runtimes.
+    # Some assertions below overlap with the "RSC webpack config transforms" block
+    # above but use more specific matchers (e.g. verifying the `false` value, not
+    # just the key name). The duplication is intentional.
     # See: https://github.com/shakacode/react_on_rails/issues/1828
 
     describe "Rspack RSC runtime compatibility" do
@@ -678,7 +681,7 @@ describe RscGenerator, type: :generator do
 
       it "rscWebpackConfig.js aliases react-dom/server to false for RSC bundle" do
         assert_file "config/rspack/rscWebpackConfig.js" do |content|
-          expect(content).to include("react-dom/server")
+          expect(content).to include("'react-dom/server': false")
         end
       end
 
@@ -701,7 +704,7 @@ describe RscGenerator, type: :generator do
         end
       end
 
-      it "rscWebpackConfig.js handles both function-based (SWC) and array-based (Babel) loader chains" do
+      it "rscWebpackConfig.js contains conditional loader-chain handling for function-based and array-based rule.use" do
         assert_file "config/rspack/rscWebpackConfig.js" do |content|
           # Must handle both loader styles since Rspack projects often use SWC
           expect(content).to include("typeof rule.use === 'function'")
@@ -709,10 +712,10 @@ describe RscGenerator, type: :generator do
         end
       end
 
-      it "serverWebpackConfig.js uses bundler-agnostic require for LimitChunkCountPlugin" do
+      it "serverWebpackConfig.js (from Pro generator) uses bundler-agnostic LimitChunkCountPlugin" do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
-          # Verify the server config uses the bundler variable (not hardcoded webpack)
-          # for plugin instantiation — critical for Rspack compatibility
+          # This content comes from the Pro generator, not the RSC generator.
+          # Verified here to ensure the full Rspack server config is bundler-agnostic.
           expect(content).to include("bundler.optimize.LimitChunkCountPlugin")
         end
       end
