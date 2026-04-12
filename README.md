@@ -38,7 +38,7 @@ React on Rails is maintained by [ShakaCode](https://www.shakacode.com).
 - [Documentation home](https://reactonrails.com/docs/)
 - [Quick Start](https://reactonrails.com/docs/getting-started/quick-start/)
 - [Create a new app](https://reactonrails.com/docs/getting-started/create-react-on-rails-app/)
-- [Install into an existing Rails app](https://reactonrails.com/docs/getting-started/installation-into-an-existing-rails-app/)
+- [Install into an existing Rails app](https://reactonrails.com/docs/getting-started/existing-rails-app/)
 - [Examples](https://reactonrails.com/examples/)
 - [Compare OSS and Pro](https://reactonrails.com/docs/getting-started/oss-vs-pro/)
 - [Compare with alternatives](https://reactonrails.com/docs/getting-started/comparison-with-alternatives/)
