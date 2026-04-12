@@ -394,11 +394,14 @@ Import `createIntl` from `react-intl` for a **context-free API** that provides f
 
 ```jsx
 // ProductPage.jsx -- Server Component
-import { createIntl } from 'react-intl';
+import { createIntl, createIntlCache } from 'react-intl';
 import I18nProvider from './I18nProvider';
 
+// Module-level cache — safe because it only caches Intl constructors, not request data
+const cache = createIntlCache();
+
 export default function ProductPage({ locale, messages, ...props }) {
-  const intl = createIntl({ locale, messages });
+  const intl = createIntl({ locale, messages }, cache);
 
   return (
     <div>
@@ -415,7 +418,7 @@ export default function ProductPage({ locale, messages, ...props }) {
 }
 ```
 
-> **Note:** `createIntl` is a plain function call — no hooks, no Context, no `'use client'` needed. It creates a new `intl` object per call, which is fine for Server Components since they render once per request.
+> **Note:** `createIntl` is a plain function call — no hooks, no Context, no `'use client'` needed. The `createIntlCache()` call avoids recreating expensive `Intl.NumberFormat` / `Intl.DateTimeFormat` instances on every request. The cache stores only `Intl` constructor results (no request data), so it is safe to share at module scope.
 
 #### Alternative: Rails pre-formatting
 
