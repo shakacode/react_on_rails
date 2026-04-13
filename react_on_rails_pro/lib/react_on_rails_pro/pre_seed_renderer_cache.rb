@@ -39,15 +39,7 @@ module ReactOnRailsPro
     end
 
     def self.resolve_cache_dir
-      if ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"].present?
-        ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"]
-      elsif ENV["RENDERER_BUNDLE_PATH"].present?
-        warn "[ReactOnRailsPro] RENDERER_BUNDLE_PATH is deprecated. " \
-             "Use RENDERER_SERVER_BUNDLE_CACHE_PATH instead."
-        ENV["RENDERER_BUNDLE_PATH"]
-      else
-        Rails.root.join(".node-renderer-bundles").to_s
-      end
+      ReactOnRailsPro::Utils.resolve_renderer_cache_dir
     end
     private_class_method :resolve_cache_dir
 
