@@ -33,7 +33,7 @@ These are stable references you can inspect today:
 
 These show how narrow, app-by-app migration slices look in real repositories:
 
-Snapshot verified on April 12, 2026. These external PR links may later point to merged or closed PRs. When one of them changes state, update the row status or move it into the published examples list.
+These are point-in-time references. External PR links may later point to merged or closed PRs, and each row notes when it was last verified. When one of them changes state, update the row status or move it into the published examples list.
 
 | Repo                                                                                                                | Current Integration                | First Slice                            | Status                                                                                                                   | Evidence so far                                                                                                                                                              |
 | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -99,7 +99,7 @@ Use maintainability notes when that is the honest win. Do not force a weak bench
 
 ## Later research lanes
 
-The current PR wave is intentionally narrow. After that, the next high-signal lanes are:
+The examples in this page are intentionally narrow first slices. After those land, the next useful lanes are:
 
 1. Large Rails + React monoliths on `vite_rails`, once a genuinely narrow maintainers-first slice exists
 2. Institutionally credible `react-rails` apps that are still small enough for a one-mount PR
