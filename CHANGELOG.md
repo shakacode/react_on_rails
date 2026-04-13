@@ -26,7 +26,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Added
 
-- **[Pro]** **Pre-seed renderer cache for Docker builds**: New `react_on_rails_pro:pre_seed_renderer_cache` rake task copies compiled server bundles into the Node Renderer's cache directory structure during Docker image builds, eliminating the 410→retry cold-start latency (200ms–1s+) on the first SSR request after deployment. Supports `RENDERER_SERVER_BUNDLE_CACHE_PATH` env var and RSC bundles. [PR 3123](https://github.com/shakacode/react_on_rails/pull/3123) by [justin808](https://github.com/justin808).
+- **[Pro]** **Pre-seed renderer cache for Docker builds**: New `react_on_rails_pro:pre_seed_renderer_cache` rake task copies compiled server bundles into the Node Renderer's cache directory structure during Docker image builds, eliminating the 410→retry cold-start latency (200ms–1s+) on the first SSR request after deployment. Supports `RENDERER_SERVER_BUNDLE_CACHE_PATH` env var and RSC bundles. [PR 3124](https://github.com/shakacode/react_on_rails/pull/3124) by [justin808](https://github.com/justin808).
 
 #### Fixed
 

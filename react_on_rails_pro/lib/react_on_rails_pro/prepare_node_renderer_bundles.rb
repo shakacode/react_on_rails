@@ -13,11 +13,22 @@ module ReactOnRailsPro
       puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"
     end
 
+    def self.resolve_dest_path
+      if ENV["RENDERER_BUNDLE_PATH"].present?
+        warn "[ReactOnRailsPro] RENDERER_BUNDLE_PATH is deprecated. " \
+             "Use RENDERER_SERVER_BUNDLE_CACHE_PATH instead."
+      end
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"].presence ||
+        ENV["RENDERER_BUNDLE_PATH"].presence ||
+        Rails.root.join(".node-renderer-bundles").to_s
+    end
+    private_class_method :resolve_dest_path
+
     def self.call
       # TODO: temporarily hardcoding tmp/bundles directory. renderer and rails should read from a Yaml file
       src_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
       renderer_bundle_file_name = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool.renderer_bundle_file_name
-      dest_path = ENV["RENDERER_BUNDLE_PATH"].presence || Rails.root.join(".node-renderer-bundles").to_s
+      dest_path = resolve_dest_path
       bundle_dest_path = File.join(dest_path, renderer_bundle_file_name.to_s).to_s
       puts "[ReactOnRailsPro] Symlinking assets to local node-renderer, path #{dest_path}"
       mkdir_p(dest_path)

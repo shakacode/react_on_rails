@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "fileutils"
+
 module ReactOnRailsPro
   # Pre-seeds the Node Renderer bundle cache by copying compiled server bundles
   # into the renderer's expected directory structure. Designed for Docker builds
@@ -16,6 +18,7 @@ module ReactOnRailsPro
 
       # Pre-seed server bundle
       server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
+      validate_bundle_exists!(server_bundle_path)
       server_bundle_hash = pool.server_bundle_hash
       seed_bundle(server_bundle_path, server_bundle_hash, cache_dir)
 
@@ -29,6 +32,7 @@ module ReactOnRailsPro
       return unless ReactOnRailsPro.configuration.enable_rsc_support
 
       rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
+      validate_bundle_exists!(rsc_bundle_path)
       rsc_bundle_hash = pool.rsc_bundle_hash
       seed_bundle(rsc_bundle_path, rsc_bundle_hash, cache_dir)
       copy_assets(assets, File.join(cache_dir, rsc_bundle_hash.to_s))
@@ -47,12 +51,15 @@ module ReactOnRailsPro
     end
     private_class_method :resolve_cache_dir
 
-    def self.seed_bundle(src_path, bundle_hash, cache_dir)
-      unless File.exist?(src_path)
-        raise ReactOnRailsPro::Error, "Bundle not found at #{src_path}. " \
-                                      "Please build your bundles before pre-seeding the renderer cache."
-      end
+    def self.validate_bundle_exists!(path)
+      return if File.exist?(path)
 
+      raise ReactOnRailsPro::Error, "Bundle not found at #{path}. " \
+                                    "Please build your bundles before pre-seeding the renderer cache."
+    end
+    private_class_method :validate_bundle_exists!
+
+    def self.seed_bundle(src_path, bundle_hash, cache_dir)
       bundle_dir = File.join(cache_dir, bundle_hash.to_s)
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
       FileUtils.mkdir_p(bundle_dir)
