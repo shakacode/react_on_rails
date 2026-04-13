@@ -183,8 +183,11 @@ module ReactOnRailsPro
       if ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"].present?
         ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"]
       elsif ENV["RENDERER_BUNDLE_PATH"].present?
-        warn "[ReactOnRailsPro] RENDERER_BUNDLE_PATH is deprecated. " \
-             "Use RENDERER_SERVER_BUNDLE_CACHE_PATH instead."
+        unless @renderer_bundle_path_deprecation_warned
+          warn "[ReactOnRailsPro] RENDERER_BUNDLE_PATH is deprecated. " \
+               "Use RENDERER_SERVER_BUNDLE_CACHE_PATH instead."
+          @renderer_bundle_path_deprecation_warned = true
+        end
         ENV["RENDERER_BUNDLE_PATH"]
       else
         Rails.root.join(".node-renderer-bundles").to_s

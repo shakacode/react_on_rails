@@ -2,6 +2,7 @@
 
 require "rails_helper"
 
+# Spec lives under spec/dummy/spec/ because it requires the dummy Rails environment (Rails.root, webpack paths).
 describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePath,RSpec/SpecFilePathFormat
   let(:asset_filename) { "loadable-stats2.json" }
   let(:asset_filename2) { "loadable-stats3.json" }
@@ -35,9 +36,10 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     # Ensure clean state
     FileUtils.rm_rf(cache_dir)
 
-    # Clear env vars
+    # Clear env vars and deprecation warning guard
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
+    ReactOnRailsPro::Utils.instance_variable_set(:@renderer_bundle_path_deprecation_warned, nil)
   end
 
   after do
