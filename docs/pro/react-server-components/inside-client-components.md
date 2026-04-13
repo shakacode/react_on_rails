@@ -129,6 +129,9 @@ The server wrapper uses `StaticRouter` with the current URL derived from `railsC
 
 If you're **not** using `auto_load_bundle`, you need to register the components manually. The wrapped `AppRouter` is registered with `ReactOnRails.register` in both the client and server bundles. The server components referenced by `RSCRoute` are registered with `registerServerComponent` in the client and server bundles — plus they must be imported in the RSC bundle (the RSC webpack config handles this automatically via the RSC loader; see [Create a React Server Component](./create-without-ssr.md) for the RSC bundle setup).
 
+> [!NOTE]
+> Server components only need client-bundle registration if they will also be rendered directly from Rails views via `stream_react_component`. If a server component is **only** used via `RSCRoute` inside a client component (as `Dashboard` and `Profile` are in this walkthrough), you can skip its client-bundle registration. The walkthrough registers them as a safe default.
+
 On the client side, follow the [manual bundle splitting pattern](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#manual-bundle-splitting-pre-auto-bundling-pattern) — one pack file per component so each view only loads the code it needs:
 
 ```tsx

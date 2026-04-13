@@ -63,7 +63,7 @@ The Ruby helper you use in your Rails view must be compatible with the component
 | **Render Function returning `{ renderedHtml: string }`** | ✅ Works | ❌ Raises — string is not a hash with `componentHtml` | ❌ Raises — streaming does not support server render hashes |
 | **Render Function returning `{ renderedHtml: ReactElement }`** | ✅ Works (calls `renderToString` on the element) | ❌ Raises — element is not a hash with `componentHtml` | ❌ Raises — streaming does not support server render hashes |
 | **Render Function returning a server-render hash** (`{ renderedHtml: { componentHtml, ... } }`) | ⚠️ Raises — tells you to use `react_component_hash` | ✅ Works (the designed use case) | ❌ Raises — streaming does not support server render hashes |
-| **Async Render Function** (returns a Promise) | ✅ Works with Pro Node renderer. ❌ ExecJS silently returns empty output — see [Async functions and ExecJS](#async-functions-and-execjs). | ✅ Same — Pro Node renderer only | ✅ Only if the promise resolves to a React component. Promises resolving to strings or server-render hashes are rejected — streaming does not support server render hashes. |
+| **Async Render Function** (returns a Promise) | ✅ Works with Pro Node renderer. ❌ ExecJS silently returns empty output — see [Async functions and ExecJS](#async-functions-and-execjs). | ✅ Only if the promise resolves to a server-render hash with `componentHtml`. Pro Node renderer only. | ✅ Only if the promise resolves to a React component. Promises resolving to strings or server-render hashes are rejected — streaming does not support server render hashes. |
 | **Renderer Function** (3 params) | ✅ Works with `prerender: false` (client-only). ❌ Throws with `prerender: true` — renderer functions cannot run on the server. | ❌ Raises — `react_component_hash` forces `prerender: true`, which is incompatible with renderer functions | ❌ Raises — streaming requires server rendering |
 
 **Key takeaways:**
@@ -113,7 +113,7 @@ const MyComponent = (props, _railsContext) => {
 
 ### 3. Objects with `renderedHtml` as a React element
 
-This is the supported way to return JSX from a render function: wrap it in `{ renderedHtml: ... }`. React on Rails will call `renderToString` on the element and use the result as the server-rendered HTML. Unlike [returning a React element directly](#1-react-components), this form is fully supported and hooks work correctly.
+This is the supported way to return JSX from a render function: wrap it in `{ renderedHtml: ... }`. React on Rails will call `renderToString` on the element and use the result as the server-rendered HTML. Unlike [returning a React element directly](#1-react-components), this form correctly satisfies React's Rules of Hooks — the element is rendered in a normal component tree context, so hooks that are SSR-compatible (e.g., `useState`, `useContext`) work as expected during server rendering.
 
 > **React 19 Alternative:** For metadata use cases (titles, meta tags), consider using [React 19 Native Metadata](../building-features/react-19-native-metadata.md) instead of this pattern. React 19 hoists `<title>`, `<meta>`, and `<link>` to `<head>` automatically, eliminating the need for server-side hash render-functions.
 
@@ -188,6 +188,8 @@ const MyComponent = async (props, _railsContext) => {
 >
 > - `redirectLocation` does **not** trigger an actual server-side HTTP redirect — Rails still returns the full response with an empty `<div>`. The redirect only takes effect once the client-side router renders.
 > - `routeError` only triggers `raise_on_prerender_error` behavior (if enabled) — it does not produce a user-facing error page.
+> - Modern React Router v6 Declarative Mode (`StaticRouter`) has no mechanism to produce these values.
+> - React Router v6 Data Mode (`createStaticHandler`) handles redirects via `Response` objects, not these fields.
 >
 > **Modern alternatives:**
 >
