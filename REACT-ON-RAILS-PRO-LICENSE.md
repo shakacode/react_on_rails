@@ -1,6 +1,6 @@
 # ShakaCode React on Rails Pro – End User License Agreement (EULA)
 
-_Version 2.1 — 2025-09-25_  
+_Version 2.2 — 2026-04-12_  
 © 2015–2025 ShakaCode, LLC. All rights reserved.
 
 ---
@@ -13,6 +13,7 @@ _Version 2.1 — 2025-09-25_
   - classroom instruction, tutorials, workshops, coursework
   - recorded demos, livestreams, or videos
   - personal/hobby experiments not offered as a service
+- **Complimentary OSS License** – a license issued under Section 4.1 at no charge to a qualifying open-source Organization.
 
 ---
 
@@ -43,9 +44,7 @@ Free, royalty-free use is permitted for:
 
 **Note:** This clause does **not** permit any Production Use by any entity (commercial, non-profit, or individual). All Production Use requires a paid subscription under this Agreement, except as provided in Section 4.1.
 
----
-
-## 4.1 Open-Source Project License (Complimentary)
+**4.1 Open-Source Project License (Complimentary)**
 
 ShakaCode may, at its sole discretion, issue a complimentary "oss" license to an Organization that meets **all** of the following criteria:
 
@@ -56,9 +55,9 @@ ShakaCode may, at its sole discretion, issue a complimentary "oss" license to an
 **Terms of complimentary oss licenses:**
 
 - The attribution requirement in Section 6 applies and may not be waived.
-- Complimentary licenses are granted for a fixed term (typically one year) and may be renewed upon request.
-- ShakaCode reserves the right to revoke a complimentary license at any time if the Organization no longer meets the eligibility criteria or violates this Agreement.
-- All other terms of this Agreement apply, including Sections 5, 9, and 12.
+- Complimentary OSS Licenses are granted for a fixed term of one (1) year from the date of issuance and may be renewed upon request.
+- ShakaCode may revoke a Complimentary OSS License (i) immediately upon written notice if the Organization violates this Agreement, or (ii) on thirty (30) days' written notice if the Organization no longer meets the eligibility criteria.
+- All other terms of this Agreement apply (including Sections 5, 7, 9, and 12), subject to the modifications for Complimentary OSS Licenses in Section 7.
 
 ---
 
@@ -91,8 +90,8 @@ The Organization may not remove or obfuscate this attribution.
 ## 7. Fees; Term; Termination
 
 Fees and billing terms are as agreed in the applicable order (e.g., GitHub Sponsors subscription or annual invoice).  
-The license remains active only while fees are paid. ShakaCode may suspend or terminate for non-payment or material breach.  
-Upon termination or lapse, the Organization must immediately cease use and remove the Software (including derivatives) from all Production systems and repositories, except for non-commercial uses explicitly permitted in Section 4.
+For paid subscriptions, the license remains active only while fees are paid. ShakaCode may suspend or terminate for non-payment or material breach. Complimentary OSS Licenses remain active for the term specified in the grant, subject to the revocation terms in Section 4.1.  
+Upon termination, lapse, or revocation, the Organization must immediately cease use and remove the Software (including derivatives) from all Production systems and repositories, except for (a) non-commercial uses explicitly permitted in Section 4, or (b) Complimentary OSS Licenses revoked under Section 4.1(ii) for eligibility changes, in which case the Organization has thirty (30) days from written notice to comply.
 
 ---
 
