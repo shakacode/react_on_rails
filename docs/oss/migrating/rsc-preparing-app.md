@@ -388,7 +388,7 @@ Do the same for any component files imported in your `server-bundle.js`.
 
 ### Pattern B: Auto-bundling (single file per component)
 
-If you use `auto_load_bundle` with a `components_subdirectory`, each component has a file in that directory:
+If you use `auto_load_bundle` with a `components_subdirectory`, each component has a file in that directory. Once you start migrating components to Server Components, auto-bundling will automatically switch each component's registration between `ReactOnRails.register` and `registerServerComponent` based on whether the file starts with `'use client'`. For the complete reference, see [Auto-Bundling with React Server Components](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#auto-bundling-with-react-server-components).
 
 ```text
 app/javascript/src/
@@ -545,7 +545,7 @@ In each view, replace `react_component` with `stream_react_component`:
                             reviews: { only: [:id, :text, :rating] } }) }) %>
 ```
 
-`stream_react_component` automatically sets `prerender: true` and enables `immediate_hydration` for optimal selective hydration. The component renders identically -- the difference is that the response is now streamed, which will matter when you start adding Suspense boundaries and async Server Components.
+`stream_react_component` automatically sets `prerender: true`. The component renders identically — the difference is that the response is now streamed, which will matter when you start adding Suspense boundaries and async Server Components. React on Rails Pro automatically hydrates components early (before `DOMContentLoaded`), so selective hydration works out of the box.
 
 ### 6c. Update script loading in layouts (recommended)
 

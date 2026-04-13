@@ -137,26 +137,37 @@ Your layout would contain:
   <%= stylesheet_pack_tag 'application' %>
 ```
 
-Now suppose you want to use bundle splitting to minimize unnecessary javascript loaded on each page, you would put each of your components in the `packs` directory.
+#### Manual bundle splitting (pre-auto-bundling pattern)
+
+The single-pack approach above loads **every** component's JavaScript on **every** page, even pages that only render one or two components. To avoid shipping unused code, you can split the bundle manually by giving each component its own pack file. Each pack file imports one component and registers it — webpack treats each pack as a separate entry point and produces a separate bundle.
 
 ```text
-app/javascript:
-  └── packs:                   # sets up webpack entries
-  │   └── FooComponentOne.jsx  # Internally uses ReactOnRails.register
-  │   └── BarComponentOne.jsx  # Internally uses ReactOnRails.register
-  │   └── BarComponentTwo.jsx  # Internally uses ReactOnRails.register
-  └── src:                     # any directory name is fine. Referenced files need to be under source_path
-  │   └── Foo
-  │   │   └── ...
-  │   └── Bar
-  │   │   └── ...
-  └── stylesheets:
-  │   └── my_styles.css
-  └── images:
-      └── logo.svg
+app/javascript/
+├── packs/                        # each file here is a webpack entry point
+│   ├── FooComponentOne.jsx       # imports FooComponentOne, calls ReactOnRails.register({ FooComponentOne })
+│   ├── BarComponentOne.jsx       # imports BarComponentOne, calls ReactOnRails.register({ BarComponentOne })
+│   └── BarComponentTwo.jsx       # imports BarComponentTwo, calls ReactOnRails.register({ BarComponentTwo })
+└── src/                          # shared source; any directory name works as long as it's under source_path
+    ├── Foo/
+    │   └── FooComponentOne.jsx   # the actual component implementation
+    └── Bar/
+        ├── BarComponentOne.jsx
+        └── BarComponentTwo.jsx
 ```
 
-The tricky part is to figure out which bundles to load on any Rails view. [Shakapacker's `append_stylesheet_pack_tag` and `append_javascript_pack_tag` view helpers](https://github.com/shakacode/shakapacker#view-helper-append_javascript_pack_tag-and-append_stylesheet_pack_tag) enables Rails views to specify needed bundles for use by layout's call to `javascript_pack_tag` and `stylesheet_pack_tag`.
+Each pack file is typically a one-liner that imports the component and registers it:
+
+```jsx
+// app/javascript/packs/FooComponentOne.jsx
+import ReactOnRails from 'react-on-rails';
+import FooComponentOne from '../src/Foo/FooComponentOne';
+
+ReactOnRails.register({ FooComponentOne });
+```
+
+The tricky part with this manual approach is telling each Rails view which bundles to load. [Shakapacker's `append_javascript_pack_tag` and `append_stylesheet_pack_tag` view helpers](https://github.com/shakacode/shakapacker#view-helper-append_javascript_pack_tag-and-append_stylesheet_pack_tag) let each view declare the packs it needs, which the layout's `javascript_pack_tag` and `stylesheet_pack_tag` calls then render.
+
+Auto-bundling (described in the next section) automates both steps: it generates these per-component pack files for you, and the `react_component` view helper automatically appends the right pack tags at render time.
 
 #### Solution
 
@@ -498,9 +509,6 @@ _Screenshots show browser dev tools network analysis demonstrating the dramatic 
 
 If server rendering is enabled, the component will be registered for usage both in server and client rendering. To have separate definitions for client and server rendering, name the component files `ComponentName.server.jsx` and `ComponentName.client.jsx`. The `ComponentName.server.jsx` file will be used for server rendering and the `ComponentName.client.jsx` file for client rendering. If you don't want the component rendered on the server, you should only have the `ComponentName.client.jsx` file.
 
-> [!IMPORTANT]
-> **Not related to React Server Components.** The `.client.` and `.server.` file suffixes control **which webpack bundle** imports the file (client bundle vs. server bundle for SSR) — a React on Rails auto-bundling concept that predates React Server Components. If you are using React Server Components (Pro feature), RSC classification is controlled separately by the `'use client'` directive; a `.server.jsx` file is NOT automatically a React Server Component. See the [RSC glossary](../../pro/react-server-components/glossary.md) for details. These suffixes only make sense for client components, as server components exist only in the RSC bundle.
-
 > Example (dummy app): paired files such as [`ReduxApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReduxApp.client.jsx) and [`ReduxApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/ReduxApp.server.jsx), and [`RouterApp.client.jsx`](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/RouterApp.client.jsx) and [`RouterApp.server.jsx`](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails/spec/dummy/client/app/startup/RouterApp.server.jsx).
 
 Once generated, all server entrypoints will be imported into a file named `[ReactOnRails.configuration.server_bundle_js_file]-generated.js`, which in turn will be imported into a source file named the same as `ReactOnRails.configuration.server_bundle_js_file`. If your server bundling logic is such that your server bundle source entrypoint is not named the same as your `ReactOnRails.configuration.server_bundle_js_file` and changing it would be difficult, please let us know.
@@ -508,8 +516,124 @@ Once generated, all server entrypoints will be imported into a file named `[Reac
 > [!IMPORTANT]
 > When specifying separate definitions for client and server rendering, you need to delete the generalized `ComponentName.jsx` file.
 
-> [!WARNING]
-> Components with `.server.jsx`/`.client.jsx` suffixes should not be rendered through `RSCRoute` or registered with `registerServerComponent`. These suffixes are designed for traditional server-side rendering where separate client and server bundles exist. Using them with RSC not only adds unnecessary overhead but can also cause the wrong variant (the server version) to load in the browser. See [troubleshooting item #8](#8-component-with-serverclient-variants-used-with-rsc) and [issue #2509](https://github.com/shakacode/react_on_rails/issues/2509).
+> [!IMPORTANT]
+> **Not related to React Server Components.** The `.client.` and `.server.` file suffixes control **which webpack bundle** imports the file — a React on Rails auto-bundling concept that predates React Server Components. If you are using RSC, classification of a component as a server component is controlled separately by the `'use client'` directive, and the rules for using these suffixes with RSC are covered in [Auto-Bundling with React Server Components](#auto-bundling-with-react-server-components) below.
+
+### Auto-Bundling with React Server Components
+
+> **Pro Feature.** React Server Components (RSC) require [React on Rails Pro](../../pro/react-server-components/index.md) with the Node renderer. This section assumes you already have RSC enabled in your project — see [Create a React Server Component](../../pro/react-server-components/create-without-ssr.md) and [Preparing your app for RSC](../migrating/rsc-preparing-app.md) for setup.
+
+When React Server Components are enabled, the auto-bundling system understands two kinds of components and chooses the correct registration function for each:
+
+- **Server Components** — files **without** a `'use client'` directive at the top. Their code runs only on the server; their output is serialized to an RSC payload.
+- **Client Components** — files **with** a `'use client'` directive at the top. Their code runs in the browser (and during SSR) and hydrates as normal React components.
+
+The presence or absence of `'use client'` is the **only** signal the generator uses to classify a file as a server or client component. File suffixes (`.client.jsx` / `.server.jsx`) have a different meaning (see [below](#when-to-use-client--server-variants-with-rsc)).
+
+#### How the packs generator classifies components
+
+For every file inside `components_subdirectory`, the generator:
+
+1. Reads the file contents and checks for a `'use client'` directive on the first non-comment line.
+2. If the directive is present → generates a client-bundle pack that imports the component and calls `ReactOnRails.register({ ComponentName })`, and imports the component into the aggregated server bundle with `ReactOnRails.register({ ComponentName })`.
+3. If the directive is absent → generates a client-bundle pack that calls `registerServerComponent("ComponentName")` (without importing the component), and imports the component into the aggregated server bundle with `registerServerComponent({ ComponentName })`.
+
+You don't call `registerServerComponent` yourself when using auto-bundling — the generator writes these calls for you based on the classification above.
+
+> [!IMPORTANT]
+> If you forget the `'use client'` directive on a component that needs it, the generator classifies the file as a Server Component and wires it up with `registerServerComponent`. The packs generator does scan for common client-side patterns (hooks like `useState`, `useEffect`; event handlers like `onClick`, `onChange`; class components extending `React.Component`) and logs a warning if it detects them in a file classified as a Server Component. However, not all client-only code triggers this heuristic — always double-check that client components start with `'use client'`.
+
+#### The two `registerServerComponent` signatures
+
+`registerServerComponent` has two different shapes depending on which bundle you import it from:
+
+| Bundle | Import | Signature | Why |
+| --- | --- | --- | --- |
+| Client | `react-on-rails-pro/registerServerComponent/client` | `registerServerComponent(...names: string[])` | Takes only component names because the server component's code stays on the server. The client fetches the RSC payload when the component renders (or uses the payload already embedded in the HTML if the page was server-rendered). |
+| Server | `react-on-rails-pro/registerServerComponent/server` | `registerServerComponent(components: { [name]: Component })` | Takes an object with the actual component references because the code needs to be bundled into the server and RSC bundles for RSC payload generation. |
+
+Auto-bundling uses both forms under the hood: the per-component client packs use the client form, and the aggregated server bundle file uses the server form.
+
+#### File layout for RSC projects
+
+A typical `components_subdirectory` for an RSC-enabled project mixes server and client components in the same directory:
+
+```text
+app/javascript/src/
+└── ror_components/
+    ├── Dashboard.jsx                  # Server Component (no 'use client')
+    ├── Profile.jsx                    # Server Component (no 'use client')
+    ├── LikeButton.jsx                 # Client Component ('use client' at top)
+    └── CommentForm.jsx                # Client Component ('use client' at top)
+```
+
+Each file produces its own generated pack, and pages only load the packs for the components they render. You don't need to separate server and client components into subdirectories — the `'use client'` directive is the classifier, not the location.
+
+#### What the generator produces
+
+For the layout above, running `bin/rails react_on_rails:generate_packs` produces:
+
+**Per-component client packs** (one webpack entry point each):
+
+```js
+// packs/generated/Dashboard.js  (server component — no component import)
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
+
+registerServerComponent('Dashboard');
+```
+
+```js
+// packs/generated/LikeButton.js  (client component — imported and registered normally)
+import ReactOnRails from 'react-on-rails-pro/client';
+import LikeButton from '../../ror_components/LikeButton.jsx';
+
+ReactOnRails.register({ LikeButton });
+```
+
+Because each is a separate entry point, a view that calls `react_component("LikeButton", ...)` only loads the `LikeButton` pack; it never loads the `Dashboard` pack or any code for server components it doesn't render.
+
+**Aggregated server bundle file** (one file for all components):
+
+```js
+// generated/server-bundle-generated.js
+import ReactOnRails from 'react-on-rails-pro';
+import Dashboard from '../ror_components/Dashboard.jsx';
+import Profile from '../ror_components/Profile.jsx';
+import LikeButton from '../ror_components/LikeButton.jsx';
+import CommentForm from '../ror_components/CommentForm.jsx';
+import registerServerComponent from 'react-on-rails-pro/registerServerComponent/server';
+
+registerServerComponent({ Dashboard, Profile });
+ReactOnRails.register({ LikeButton, CommentForm });
+```
+
+Your existing `packs/server-bundle.js` entry file doesn't need manual changes — the packs generator adds one import line at the top pointing to the aggregated file:
+
+```js
+// packs/server-bundle.js
+import './../generated/server-bundle-generated.js'; // added by react_on_rails:generate_packs
+// ... your own custom server-side code continues here
+```
+
+#### When to use `.client` / `.server` variants with RSC
+
+The `.client.jsx` / `.server.jsx` suffixes that auto-bundling supports for splitting client components into separate client-side and server-side rendering definitions are **unrelated** to the `'use client'` directive. The suffixes control **which webpack bundle imports the file**; the directive controls **whether the file is a React Server Component**. These are orthogonal concepts.
+
+**Rules for using variants with RSC:**
+
+1. **Never apply `.client` / `.server` suffixes to actual server components.** A server component's code exists only in the RSC bundle — there is no client-side version to split. `Dashboard.jsx` should stay as `Dashboard.jsx`, not become `Dashboard.client.jsx` or `Dashboard.server.jsx`. Using these suffixes on a server component causes the wrong variant (the server one) to be loaded in the browser via the client manifest. See [troubleshooting item #8](#8-component-with-serverclient-variants-used-with-rsc).
+
+2. **Use variants only for client components that need different client-side vs server-side rendering logic** — for example, a client component that uses `BrowserRouter` in the browser and `StaticRouter` during SSR. In that case, both `.client.tsx` and `.server.tsx` must start with `'use client'`, since both are client components (they just use different imports).
+
+3. **Use variants for the `wrapServerComponentRenderer` wrapper pattern.** When a client component contains `RSCRoute` and needs to be wrapped with `wrapServerComponentRenderer`, the wrappers are authored as `.client.tsx` and `.server.tsx` variants. See [Embedding Server Components in Client Components](../../pro/react-server-components/inside-client-components.md) for the full walkthrough.
+
+#### Related RSC documentation
+
+- [Create a React Server Component](../../pro/react-server-components/create-without-ssr.md) — step-by-step tutorial for setting up RSC and authoring your first server component.
+- [Preparing your app for RSC](../migrating/rsc-preparing-app.md) — infrastructure setup when migrating an existing app to RSC.
+- [RSC Component Patterns](../migrating/rsc-component-patterns.md) — migration patterns for restructuring your component tree as you adopt RSC.
+- [Embedding Server Components in Client Components](../../pro/react-server-components/inside-client-components.md) — the `RSCRoute` + `wrapServerComponentRenderer` pattern for rendering server components inside a client component tree.
+- [RSC Troubleshooting](../migrating/rsc-troubleshooting.md) — common errors and fixes.
 
 ### Transpiled Languages (ReScript, Reason, etc.)
 
@@ -789,6 +913,8 @@ config.auto_load_bundle = false
 #### 8. Component with `.server/.client` variants used with RSC
 
 **Problem**: A component with `.server.jsx`/`.client.jsx` file variants is rendered through `RSCRoute` or registered with `registerServerComponent`. This adds unnecessary overhead and can cause the wrong variant (the server version) to load in the browser — the RSC bundle imports the `.server.jsx` file and its chunk reference propagates through the client manifest to the browser.
+
+See [When to use `.client` / `.server` variants with RSC](#when-to-use-client--server-variants-with-rsc) for the full rules on when these suffixes are and aren't appropriate in an RSC project.
 
 **Solution depends on the component's intended role:**
 
