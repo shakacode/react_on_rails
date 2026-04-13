@@ -33,6 +33,8 @@ These are stable references you can inspect today:
 
 These show how narrow, app-by-app migration slices look in real repositories:
 
+Last verified on April 12, 2026. Draft PR states may change after that date.
+
 | Repo                                                                                                                | Current Integration                | First Slice                            | Status                                                                                         | Evidence so far                                                                                                               |
 | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | [`EFForg/action-center-platform`](https://github.com/EFForg/action-center-platform)                                 | `react-rails`                      | Admin topics page                      | [Draft PR #975](https://github.com/EFForg/action-center-platform/pull/975)                     | Local benchmark note: warm request median `6.11ms -> 5.04ms`; estimated total JS bytes `2,179,067 -> 1,636,265` for the slice |
@@ -56,7 +58,7 @@ This is usually the cleanest migration path. The main changes are:
 
 This is more of an asset and entrypoint migration than a component rewrite.
 
-The biggest changes are:
+The primary changes are:
 
 1. Replace Vite layout tags and entrypoints
 2. Move component registration into the React on Rails / Shakapacker flow
