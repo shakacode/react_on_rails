@@ -2,6 +2,10 @@
 
 This guide is for Rails apps that currently use `vite_rails` with React and want to move to React on Rails.
 
+If you want repo-shaped references before touching your own app, start with
+[Example Migrations](./example-migrations.md) and then come back here for the
+mechanics.
+
 ## When this migration makes sense
 
 React on Rails is a better fit when you want one or more of these:

@@ -2,6 +2,10 @@
 
 This migration is easiest when the app is already on a modern Rails + Shakapacker baseline.
 
+If you want repo-shaped references before touching your own app, start with
+[Example Migrations](./example-migrations.md) and then come back here for the
+mechanics.
+
 ## Choose a first slice
 
 Pick a small first slice before you touch the whole app:
