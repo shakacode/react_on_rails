@@ -18,7 +18,7 @@ The best examples are:
 1. Real Rails applications, not toy demos
 2. Small PRs that convert one page, mount point, or component boundary
 3. Honest about blockers such as old lockfiles, native gems, or custom frontend bridges
-4. Measured with before-and-after notes instead of marketing claims
+4. Measured with before-and-after performance or maintainability notes instead of marketing claims
 
 ## Current public references
 
@@ -33,12 +33,14 @@ These are stable references you can inspect today:
 
 These show how narrow, app-by-app migration slices look in real repositories:
 
-| Repo                                                                                                                | Current Integration                | First Slice                            | Status                                                                                         |
-| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [`EFForg/action-center-platform`](https://github.com/EFForg/action-center-platform)                                 | `react-rails`                      | Admin topics page                      | [Draft PR #975](https://github.com/EFForg/action-center-platform/pull/975)                     |
-| [`thewca/worldcubeassociation.org`](https://github.com/thewca/worldcubeassociation.org)                             | `react-rails`                      | Disclaimer page mount                  | [Draft PR #14010](https://github.com/thewca/worldcubeassociation.org/pull/14010)               |
-| [`demarche-numerique/demarche.numerique.gouv.fr`](https://github.com/demarche-numerique/demarche.numerique.gouv.fr) | `vite_rails` + custom React bridge | `SelectProcedureDropDownListComponent` | [Draft PR #12954](https://github.com/demarche-numerique/demarche.numerique.gouv.fr/pull/12954) |
-| [`GSA/search-gov`](https://github.com/GSA/search-gov)                                                               | `react-rails` + Shakapacker        | Search results shell split             | [Draft PR #2010](https://github.com/GSA/search-gov/pull/2010)                                  |
+| Repo                                                                                                                | Current Integration                | First Slice                            | Status                                                                                         | Evidence so far                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| [`EFForg/action-center-platform`](https://github.com/EFForg/action-center-platform)                                 | `react-rails`                      | Admin topics page                      | [Draft PR #975](https://github.com/EFForg/action-center-platform/pull/975)                     | Local benchmark note: warm request median `6.11ms -> 5.04ms`; estimated total JS bytes `2,179,067 -> 1,636,265` for the slice |
+| [`thewca/worldcubeassociation.org`](https://github.com/thewca/worldcubeassociation.org)                             | `react-rails`                      | Disclaimer page mount                  | [Draft PR #14010](https://github.com/thewca/worldcubeassociation.org/pull/14010)               | Maintainability note: one legacy Rails page now has a React on Rails path that stays separate from `next-frontend/`           |
+| [`demarche-numerique/demarche.numerique.gouv.fr`](https://github.com/demarche-numerique/demarche.numerique.gouv.fr) | `vite_rails` + custom React bridge | `SelectProcedureDropDownListComponent` | [Draft PR #12954](https://github.com/demarche-numerique/demarche.numerique.gouv.fr/pull/12954) | Maintainability note: replaced a custom `coldwired/react` mount contract with a documented React on Rails helper path         |
+| [`GSA/search-gov`](https://github.com/GSA/search-gov)                                                               | `react-rails` + Shakapacker        | Search results shell split             | [Draft PR #2010](https://github.com/GSA/search-gov/pull/2010)                                  | Maintainability note: split SERP chrome into smaller mounts; public PR is green on `jest`, `rspec`, and `cucumber`            |
+
+These PRs are still in progress. The useful part is the scope and the evidence, not whether they are already merged.
 
 ## Example categories
 
@@ -70,11 +72,11 @@ The safest approach is:
 2. Replace one helper-backed component boundary first
 3. Treat the wrapper removal as a later step
 
-## What to compare before and after
+## What counts as proof
 
-For each example, compare the same route on the baseline branch and the migration branch.
+Not every good migration example is performance-first.
 
-At minimum, record:
+When the change is performance-first, compare the same route on the baseline branch and the migration branch. At minimum, record:
 
 1. Response timing
 2. HTML size
@@ -83,6 +85,23 @@ At minimum, record:
 5. Hydration warnings or client boot errors
 
 If possible, also record browser metrics such as FCP, LCP, CLS, and TBT or INP.
+
+When the change is maintainability-first, record:
+
+1. The custom bridge, oversized mount, or repo-specific contract that existed before the migration
+2. The standardized React on Rails helper or smaller boundary that replaced it
+3. What got easier to review, test, or evolve afterward
+4. The validation that supports the claim
+
+Use maintainability notes when that is the honest win. Do not force a weak benchmark onto an example whose real value is simpler ownership or a narrower integration boundary.
+
+## Later targets worth watching
+
+The current PR wave is intentionally narrow. After that, the next high-signal targets are:
+
+1. [`mastodon/mastodon`](https://github.com/mastodon/mastodon) and [`gitlabhq/gitlabhq`](https://github.com/gitlabhq/gitlabhq) as whale targets
+2. [`thecartercenter/nemo`](https://github.com/thecartercenter/nemo) as a smaller institutionally credible `react-rails` target
+3. [`Codeminer42/cm42-central`](https://github.com/Codeminer42/cm42-central) and [`broadinstitute/single_cell_portal_core`](https://github.com/broadinstitute/single_cell_portal_core) as modern `vite_rails` examples
 
 ## How to use these examples
 
