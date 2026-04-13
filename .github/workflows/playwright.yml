@@ -6,10 +6,7 @@ permissions:
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'AGENTS_USER_GUIDE.md'
-      - 'llms.txt'
-      - 'llms-full.txt'
+    # Always trigger on main; docs-only detection handles skipping heavy jobs
   workflow_dispatch:
 
 jobs:
