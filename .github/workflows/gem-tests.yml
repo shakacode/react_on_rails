@@ -82,13 +82,16 @@ jobs:
       - id: set-matrix
         run: |
           # Determine if we should run full matrix (main or full-ci label)
+          # Each Ruby version / dependency level is split into two shards:
+          #   generators – spec/react_on_rails/generators (heavy filesystem I/O)
+          #   unit       – everything else under spec/react_on_rails
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
              [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
-            # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
+            # Full matrix: test both latest and minimum supported versions × 2 shards
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"generators"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"unit"}]}' >> $GITHUB_OUTPUT
           else
-            # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
+            # PR matrix: test only latest versions for fast feedback × 2 shards
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"}]}' >> $GITHUB_OUTPUT
           fi
 
   rspec-package-tests:
@@ -148,14 +151,20 @@ jobs:
         run: |
           echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Run rspec tests
-        run: cd react_on_rails && bundle exec rspec spec/react_on_rails
+        run: |
+          cd react_on_rails
+          if [ "${{ matrix.shard }}" = "generators" ]; then
+            bundle exec rspec spec/react_on_rails/generators
+          else
+            bundle exec rspec spec/react_on_rails --exclude-pattern "**/generators/**"
+          fi
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
-          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.shard }}
           path: ~/rspec
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: main-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.shard }}
           path: log/test.log
