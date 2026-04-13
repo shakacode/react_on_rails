@@ -39,7 +39,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     # Clear env vars and deprecation warning guard
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
-    ReactOnRailsPro::Utils.instance_variable_set(:@renderer_bundle_path_deprecation_warned, nil)
+    ReactOnRailsPro::Utils.reset_renderer_bundle_path_deprecation_warned!
   end
 
   after do
@@ -84,6 +84,21 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
 
   context "when server bundle doesn't exist" do
     before { FileUtils.rm_f(server_bundle_path) }
+
+    it "raises an error" do
+      expect { described_class.call }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)
+    end
+  end
+
+  context "when RSC bundle doesn't exist but RSC support is enabled" do
+    before do
+      allow(ReactOnRailsPro.configuration).to receive_messages(enable_rsc_support: true, assets_to_copy: nil)
+      allow(ReactOnRailsPro::Utils).to receive_messages(
+        rsc_bundle_js_file_path: "/nonexistent/rsc-bundle.js",
+        react_client_manifest_file_path: "/nonexistent/manifest.json",
+        react_server_client_manifest_file_path: "/nonexistent/server-manifest.json"
+      )
+    end
 
     it "raises an error" do
       expect { described_class.call }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)

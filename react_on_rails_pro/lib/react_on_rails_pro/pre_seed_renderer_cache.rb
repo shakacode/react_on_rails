@@ -14,6 +14,7 @@ module ReactOnRailsPro
   class PreSeedRendererCache
     def self.call
       cache_dir = resolve_cache_dir
+      puts "[ReactOnRailsPro] Pre-seeding renderer cache in: #{cache_dir}"
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
       # Pre-seed server bundle
