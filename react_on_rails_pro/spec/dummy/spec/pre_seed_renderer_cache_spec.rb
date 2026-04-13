@@ -109,13 +109,28 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
   end
 
   context "when RSC bundle doesn't exist but RSC support is enabled" do
+    let(:client_manifest_path) { path_in_webpack_folder("react-client-manifest.json") }
+    let(:server_client_manifest_path) { path_in_webpack_folder("react-server-client-manifest.json") }
+
     before do
       allow(ReactOnRailsPro.configuration).to receive_messages(enable_rsc_support: true, assets_to_copy: nil)
+      # Manifests must point to real files so copy_assets doesn't raise "Required RSC asset not found"
+      # before we reach validate_bundle_exists! for the RSC bundle.
+      File.write(client_manifest_path, "{}")
+      File.write(server_client_manifest_path, "{}")
       allow(ReactOnRailsPro::Utils).to receive_messages(
         rsc_bundle_js_file_path: "/nonexistent/rsc-bundle.js",
-        react_client_manifest_file_path: "/nonexistent/manifest.json",
-        react_server_client_manifest_file_path: "/nonexistent/server-manifest.json"
+        react_client_manifest_file_path: client_manifest_path,
+        react_server_client_manifest_file_path: server_client_manifest_path
       )
+
+      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      allow(pool).to receive(:rsc_bundle_hash).and_return("rsc-hash")
+    end
+
+    after do
+      FileUtils.rm_f(client_manifest_path)
+      FileUtils.rm_f(server_client_manifest_path)
     end
 
     it "raises an error" do
