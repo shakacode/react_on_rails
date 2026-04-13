@@ -1,4 +1,4 @@
-## Example Migrations
+# Example Migrations
 
 Teams evaluating React on Rails are usually not starting from a blank Rails app.
 
@@ -33,7 +33,7 @@ These are stable references you can inspect today:
 
 These show how narrow, app-by-app migration slices look in real repositories:
 
-Last verified on April 12, 2026. Draft PR states may change after that date.
+Snapshot verified on April 12, 2026. These external PR links may later point to merged or closed PRs.
 
 | Repo                                                                                                                | Current Integration                | First Slice                            | Status                                                                                         | Evidence so far                                                                                                               |
 | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -97,13 +97,13 @@ When the change is maintainability-first, record:
 
 Use maintainability notes when that is the honest win. Do not force a weak benchmark onto an example whose real value is simpler ownership or a narrower integration boundary.
 
-## Later targets worth watching
+## Later research lanes
 
-The current PR wave is intentionally narrow. After that, the next high-signal targets are:
+The current PR wave is intentionally narrow. After that, the next high-signal lanes are:
 
-1. [`mastodon/mastodon`](https://github.com/mastodon/mastodon) and [`gitlabhq/gitlabhq`](https://github.com/gitlabhq/gitlabhq) as whale targets
-2. [`thecartercenter/nemo`](https://github.com/thecartercenter/nemo) as a smaller institutionally credible `react-rails` target
-3. [`Codeminer42/cm42-central`](https://github.com/Codeminer42/cm42-central) and [`broadinstitute/single_cell_portal_core`](https://github.com/broadinstitute/single_cell_portal_core) as modern `vite_rails` examples
+1. Large Rails + React monoliths on `vite_rails`, once a genuinely narrow maintainers-first slice exists
+2. Institutionally credible `react-rails` apps that are still small enough for a one-mount PR
+3. Modern `vite_rails` apps where one Rails-owned island or helper-backed boundary can move before broader asset changes
 
 ## How to use these examples
 
