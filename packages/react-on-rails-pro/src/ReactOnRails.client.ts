@@ -12,11 +12,10 @@
  * https://github.com/shakacode/react_on_rails/blob/master/REACT-ON-RAILS-PRO-LICENSE.md
  */
 
-import { createBaseClientObject } from 'react-on-rails/@internal/base/client';
 import createReactOnRailsPro from './createReactOnRailsPro.ts';
 
 const currentGlobal = globalThis.ReactOnRails || null;
-const ReactOnRails = createReactOnRailsPro(createBaseClientObject, currentGlobal);
+const ReactOnRails = createReactOnRailsPro([], currentGlobal);
 
 export * from 'react-on-rails/types';
 export default ReactOnRails;
