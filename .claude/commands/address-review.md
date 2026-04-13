@@ -156,9 +156,9 @@ Triage rules:
 When Greptile MCP tools are available (`mcp__plugin_greptile_greptile__*`), cross-reference reviewer claims against Greptile's codebase analysis before finalizing triage classifications:
 
 1. For each reviewer comment that asserts a factual claim about the codebase (e.g., "this function doesn't handle null", "this breaks the existing API contract"), query Greptile to verify the claim:
-   - Use `search_greptile_comments` to find prior Greptile analysis of the same code area
-   - Use `search_custom_context` to check project-specific context that may confirm or contradict the claim
-2. If Greptile's analysis contradicts the reviewer's claim or confirms the current code is correct, downgrade from `MUST-FIX` to `DISCUSS` and note the discrepancy (e.g., "Greptile analysis suggests current handling is correct — reviewer claim needs verification").
+   - Use `mcp__plugin_greptile_greptile__search_greptile_comments` to find prior Greptile analysis of the same code area
+   - Use `mcp__plugin_greptile_greptile__search_custom_context` to check project-specific context that may confirm or contradict the claim
+2. If Greptile's analysis clearly contradicts the reviewer's claim and local code inspection confirms the code already handles the concern, classify as `SKIPPED` per the existing triage rule (claim is demonstrably wrong). If the analysis is inconclusive or only partially contradicts the claim, downgrade to `DISCUSS` and note the discrepancy (e.g., "Greptile analysis suggests current handling may be correct — needs verification").
 3. If Greptile's analysis corroborates the reviewer's claim, keep the `MUST-FIX` classification with higher confidence.
 4. If Greptile has no relevant data, fall back to local verification only.
 5. Do not block triage on Greptile availability — if the tools are not configured or the API fails, proceed with local verification alone.
@@ -272,10 +272,12 @@ When there are 2+ items to fix that touch different files with no logical depend
    - The file path and line number
    - Instructions to make the specific fix and run any relevant file-level checks
    - A reminder not to modify files outside the assigned scope
-3. After all sub-agents complete, verify there are no conflicts between their changes (e.g., two agents editing the same shared import or config file).
+   - An explicit instruction **not to commit** the changes — leave all modifications unstaged so the orchestrator can run the self-review gate on the combined diff before committing
+3. After all sub-agents complete, verify there are no conflicts between their changes by checking whether any sub-agents touched the same files (e.g., `git diff --name-only` to list changed files, then check for overlaps).
 4. If conflicts exist, resolve them sequentially before proceeding.
-5. Items that touch the same file or have logical dependencies must be fixed sequentially, not in parallel.
-6. If only 1 item needs fixing or all items are in the same file, skip parallel dispatch and fix sequentially as before.
+5. If a sub-agent fails (crashes, hits a tool error, or produces an incorrect edit), fall back to fixing that item sequentially in the parent agent before proceeding.
+6. Items that touch the same file or have logical dependencies must be fixed sequentially, not in parallel.
+7. If only 1 item needs fixing or all items are in the same file, skip parallel dispatch and fix sequentially as before.
 
 **Self-review gate before pushing:**
 
