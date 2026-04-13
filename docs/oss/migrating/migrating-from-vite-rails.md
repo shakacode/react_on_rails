@@ -38,6 +38,12 @@ Do the migration in a branch and keep the Vite setup working until the new React
 
 For anything beyond a tiny app, prefer a route-by-route cutover instead of a big-bang rewrite.
 
+If the app uses `vite_rails` plus a custom Rails-side React wrapper, the first credible PR may be maintainability-first rather than a full Vite removal. In that case:
+
+1. Replace one helper-backed component or boundary with React on Rails first.
+2. Keep Vite in place for the rest of the app until the narrow slice has parity.
+3. Treat Vite removal as a later step, not as the proof point itself.
+
 ## 1. Add React on Rails and Shakapacker
 
 ```bash
