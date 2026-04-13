@@ -557,7 +557,7 @@ module ReactOnRails
       end
 
       def fallback_package_manager
-        package_manager = GeneratorMessages.detect_package_manager
+        package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
         return package_manager if GeneratorMessages.supported_package_manager?(package_manager)
 
         "npm"

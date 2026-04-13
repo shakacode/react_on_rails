@@ -111,30 +111,30 @@ describe GeneratorMessages do
 
     it "returns bun when bun.lock exists" do
       allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-      allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lock").and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(true)
 
       expect(described_class.detect_package_manager).to eq("bun")
     end
 
     it "returns bun when bun.lockb exists" do
       allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-      allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lock").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lockb").and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lockb")).and_return(true)
 
       expect(described_class.detect_package_manager).to eq("bun")
     end
 
     it "returns npm when package-lock.json exists" do
       allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-      allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lock").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lockb").and_return(false)
-      allow(File).to receive(:exist?).with("package-lock.json").and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lockb")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package-lock.json")).and_return(true)
 
       expect(described_class.detect_package_manager).to eq("npm")
     end

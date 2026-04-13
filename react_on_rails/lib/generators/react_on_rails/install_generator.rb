@@ -263,7 +263,7 @@ module ReactOnRails
         end
 
         say "📝 Generating CI workflow...", :yellow
-        package_manager = GeneratorMessages.detect_package_manager
+        package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
                  { package_manager: package_manager })
         say "✅ Created #{ci_path}", :green
@@ -534,7 +534,8 @@ module ReactOnRails
                                      pro: use_pro?,
                                      rsc: use_rsc?,
                                      shakapacker_just_installed: shakapacker_just_installed?,
-                                     landing_page: options.new_app? && new_app_root_route_available?
+                                     landing_page: options.new_app? && new_app_root_route_available?,
+                                     app_root: destination_root
                                    ))
         GeneratorMessages.add_info(rsc_pro_verification_message) if use_rsc_pro_mode?
       end
@@ -590,7 +591,7 @@ module ReactOnRails
       end
 
       def incomplete_installation_message
-        package_install_step = "#{GeneratorMessages.detect_package_manager} install"
+        package_install_step = "#{GeneratorMessages.detect_package_manager(app_root: destination_root)} install"
 
         <<~MSG
 

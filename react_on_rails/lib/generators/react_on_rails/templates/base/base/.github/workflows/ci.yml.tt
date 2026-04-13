@@ -58,7 +58,7 @@ jobs:
           NODE_ENV: test
 
       - name: Run tests
-        # Replace with `bin/rails test` if you use Minitest
-        run: bundle exec rspec
+        # If using RSpec, replace with: bundle exec rspec
+        run: bin/rails test
         env:
           RAILS_ENV: test

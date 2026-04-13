@@ -54,12 +54,14 @@ module GeneratorMessages
     end
 
     def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", pro: false,
-                                           rsc: false, shakapacker_just_installed: false, landing_page: false)
+                                           rsc: false, shakapacker_just_installed: false, landing_page: false,
+                                           app_root: Dir.pwd)
       process_manager_section = build_process_manager_section
-      testing_section = build_testing_section
-      ci_section = build_ci_section
-      package_manager = detect_package_manager
-      shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed)
+      testing_section = build_testing_section(app_root: app_root)
+      ci_section = build_ci_section(app_root: app_root)
+      package_manager = detect_package_manager(app_root: app_root)
+      shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed,
+                                                            app_root: app_root)
       render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
       render_label = build_render_label(route: route, rsc: rsc)
       normalized_route = route.to_s.sub(%r{\A/+}, "")
@@ -112,21 +114,22 @@ module GeneratorMessages
       MSG
     end
 
-    # Uses relative lockfile paths resolved against Dir.pwd, so callers must invoke
-    # this while the current working directory is the target Rails app root.
-    def detect_package_manager
+    # Detects the package manager from environment or lockfiles.
+    # Pass app_root: to resolve lockfile paths against a specific directory
+    # (e.g. destination_root in generators) instead of Dir.pwd.
+    def detect_package_manager(app_root: Dir.pwd)
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
       return env_package_manager if supported_package_manager?(env_package_manager)
 
       # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
-      detect_package_manager_from_lockfiles || "npm"
+      detect_package_manager_from_lockfiles(app_root: app_root) || "npm"
     end
 
-    def detect_package_manager_from_lockfiles
-      return "yarn" if File.exist?("yarn.lock")
-      return "pnpm" if File.exist?("pnpm-lock.yaml")
-      return "bun" if File.exist?("bun.lock") || File.exist?("bun.lockb")
-      return "npm" if File.exist?("package-lock.json")
+    def detect_package_manager_from_lockfiles(app_root: Dir.pwd)
+      return "yarn" if File.exist?(File.join(app_root, "yarn.lock"))
+      return "pnpm" if File.exist?(File.join(app_root, "pnpm-lock.yaml"))
+      return "bun" if File.exist?(File.join(app_root, "bun.lock")) || File.exist?(File.join(app_root, "bun.lockb"))
+      return "npm" if File.exist?(File.join(app_root, "package-lock.json"))
 
       nil
     end
@@ -137,10 +140,10 @@ module GeneratorMessages
 
     private
 
-    def build_ci_section
-      return "" unless ci_workflow_generated? || File.exist?(File.join(Dir.pwd, ".github/workflows/ci.yml"))
+    def build_ci_section(app_root: Dir.pwd)
+      return "" unless ci_workflow_generated? || File.exist?(File.join(app_root, ".github/workflows/ci.yml"))
 
-      package_manager = detect_package_manager
+      package_manager = detect_package_manager(app_root: app_root)
       ci_status = if ci_workflow_generated?
                     "A GitHub Actions workflow has been generated at .github/workflows/ci.yml."
                   else
@@ -195,8 +198,9 @@ module GeneratorMessages
       end
     end
 
-    def build_testing_section
-      return "" if File.exist?("spec/rails_helper.rb") || File.exist?("spec/spec_helper.rb")
+    def build_testing_section(app_root: Dir.pwd)
+      return "" if File.exist?(File.join(app_root, "spec/rails_helper.rb")) ||
+                   File.exist?(File.join(app_root, "spec/spec_helper.rb"))
 
       <<~TESTING
 
@@ -218,8 +222,8 @@ module GeneratorMessages
       end
     end
 
-    def build_shakapacker_status_section(shakapacker_just_installed: false)
-      version_warning = check_shakapacker_version_warning
+    def build_shakapacker_status_section(shakapacker_just_installed: false, app_root: Dir.pwd)
+      version_warning = check_shakapacker_version_warning(app_root: app_root)
       if shakapacker_just_installed
         base = <<~SHAKAPACKER
 
@@ -230,17 +234,19 @@ module GeneratorMessages
           #{Rainbow('✓ Webpack integration configured').green}
         SHAKAPACKER
         base.chomp + version_warning
-      elsif File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
+      elsif File.exist?(File.join(app_root,
+                                  "bin/shakapacker")) && File.exist?(File.join(app_root, "bin/shakapacker-dev-server"))
         "\n📦 #{Rainbow('Shakapacker already configured ✓').green}#{version_warning}"
       else
         "\n📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}#{version_warning}"
       end
     end
 
-    def check_shakapacker_version_warning
-      return "" unless File.exist?("Gemfile.lock")
+    def check_shakapacker_version_warning(app_root: Dir.pwd)
+      gemfile_lock = File.join(app_root, "Gemfile.lock")
+      return "" unless File.exist?(gemfile_lock)
 
-      shakapacker_match = File.read("Gemfile.lock").match(/shakapacker \((\d+\.\d+\.\d+)\)/)
+      shakapacker_match = File.read(gemfile_lock).match(/shakapacker \((\d+\.\d+\.\d+)\)/)
       return "" unless shakapacker_match
 
       version = shakapacker_match[1]
