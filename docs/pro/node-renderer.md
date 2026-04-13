@@ -130,11 +130,11 @@ This copies the bundle into the renderer's expected directory structure (`<cache
 
 ### Configuration
 
-The task resolves the cache directory in the same order as the Node Renderer:
+The task resolves the cache directory using the same env-var precedence as the Node Renderer:
 
 1. `RENDERER_SERVER_BUNDLE_CACHE_PATH` environment variable (preferred)
 2. `RENDERER_BUNDLE_PATH` environment variable (deprecated — emits a warning)
-3. `Rails.root.join(".node-renderer-bundles")` (default)
+3. `Rails.root.join(".node-renderer-bundles")` (Rails-side default when env vars are unset)
 
 Set `RENDERER_SERVER_BUNDLE_CACHE_PATH` in your Dockerfile to match the renderer's configuration:
 

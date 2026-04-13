@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "set"
 
 module ReactOnRailsPro
   # Pre-seeds the Node Renderer bundle cache by copying compiled server bundles
@@ -26,7 +27,9 @@ module ReactOnRailsPro
       # Collect assets to copy
       assets = collect_assets
 
-      # Copy assets into the server bundle directory
+      # Copy assets (including RSC manifests) into the server bundle directory.
+      # The Node Renderer serves manifests from whichever bundle dir it loaded,
+      # so both server and RSC dirs need the manifests present.
       copy_assets(assets, File.join(cache_dir, server_bundle_hash.to_s))
 
       # Pre-seed RSC bundle if enabled
@@ -73,14 +76,28 @@ module ReactOnRailsPro
     end
     private_class_method :collect_assets
 
+    # RSC manifests are required when RSC is enabled — a missing manifest would cause
+    # the renderer to fail at runtime with a hard-to-diagnose error. User-configured
+    # assets_to_copy are optional and only produce a warning.
     def self.copy_assets(assets, bundle_dir)
+      rsc_required = Set.new
+      if ReactOnRailsPro.configuration.enable_rsc_support
+        rsc_required << File.basename(ReactOnRailsPro::Utils.react_client_manifest_file_path.to_s)
+        rsc_required << File.basename(ReactOnRailsPro::Utils.react_server_client_manifest_file_path.to_s)
+      end
+
       assets.each do |asset_path|
+        basename = File.basename(asset_path.to_s)
         unless File.exist?(asset_path.to_s)
+          if rsc_required.include?(basename)
+            raise ReactOnRailsPro::Error, "Required RSC asset not found: #{asset_path}. " \
+                                          "Build your bundles before pre-seeding the renderer cache."
+          end
           warn "[ReactOnRailsPro] Asset not found #{asset_path}"
           next
         end
 
-        dest = File.join(bundle_dir, File.basename(asset_path.to_s))
+        dest = File.join(bundle_dir, basename)
         FileUtils.cp(asset_path.to_s, dest)
         puts "[ReactOnRailsPro] Copied asset: #{dest}"
       end
