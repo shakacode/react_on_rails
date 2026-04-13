@@ -37,7 +37,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
-<%- unless config[:package_manager] == 'bun' -%>
+<%- if %w[yarn pnpm].include?(config[:package_manager]) -%>
           cache: "<%= config[:package_manager] %>"
 <%- end -%>
 

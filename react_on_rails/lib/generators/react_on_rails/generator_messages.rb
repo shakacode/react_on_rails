@@ -234,12 +234,16 @@ module GeneratorMessages
           #{Rainbow('✓ Webpack integration configured').green}
         SHAKAPACKER
         base.chomp + version_warning
-      elsif File.exist?(File.join(app_root,
-                                  "bin/shakapacker")) && File.exist?(File.join(app_root, "bin/shakapacker-dev-server"))
+      elsif shakapacker_binstubs_present?(app_root)
         "\n📦 #{Rainbow('Shakapacker already configured ✓').green}#{version_warning}"
       else
         "\n📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}#{version_warning}"
       end
+    end
+
+    def shakapacker_binstubs_present?(app_root)
+      File.exist?(File.join(app_root, "bin/shakapacker")) &&
+        File.exist?(File.join(app_root, "bin/shakapacker-dev-server"))
     end
 
     def check_shakapacker_version_warning(app_root: Dir.pwd)

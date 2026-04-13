@@ -163,6 +163,7 @@ module ReactOnRails
 
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
+          add_package_json_scripts
           add_ci_workflow
           add_bin_scripts
           add_post_install_message
@@ -226,7 +227,6 @@ module ReactOnRails
         end
 
         setup_react_dependencies
-        add_package_json_scripts
         ensure_jsx_in_js_compatibility
 
         # Invoke standalone Pro/RSC generators when flags are used
@@ -271,7 +271,7 @@ module ReactOnRails
         GeneratorMessages.ci_workflow_generated = true
       end
 
-      def add_package_json_scripts # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      def add_package_json_scripts
         return if options[:pretend]
 
         package_json_path = File.join(destination_root, "package.json")
@@ -281,11 +281,8 @@ module ReactOnRails
         scripts = content["scripts"] ||= {}
 
         scripts_added = []
-        scripts_added << "build" unless scripts.key?("build")
-        scripts_added << "build:test" unless scripts.key?("build:test")
-
-        scripts["build"] ||= "RAILS_ENV=${RAILS_ENV:-development} NODE_ENV=${NODE_ENV:-development} bin/shakapacker"
-        scripts["build:test"] ||= "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+        add_build_script(scripts, scripts_added)
+        add_build_test_script(scripts, scripts_added)
 
         if scripts_added.any?
           File.write(package_json_path, "#{JSON.pretty_generate(content)}\n")
@@ -297,6 +294,20 @@ module ReactOnRails
         GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
       rescue Errno::EACCES, Errno::ENOENT => e
         GeneratorMessages.add_warning("⚠️  Failed to add build scripts to package.json: #{e.message}")
+      end
+
+      def add_build_script(scripts, scripts_added)
+        return if scripts.key?("build")
+
+        scripts["build"] = "RAILS_ENV=${RAILS_ENV:-development} NODE_ENV=${NODE_ENV:-development} bin/shakapacker"
+        scripts_added << "build"
+      end
+
+      def add_build_test_script(scripts, scripts_added)
+        return if scripts.key?("build:test")
+
+        scripts["build:test"] = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+        scripts_added << "build:test"
       end
 
       def ensure_jsx_in_js_compatibility
