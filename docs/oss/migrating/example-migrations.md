@@ -29,20 +29,18 @@ These are stable references you can inspect today:
 1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails)
 2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example)
 
-### Public migration PRs in progress
+### In-progress migration work
 
-These show how narrow, app-by-app migration slices look in real repositories. They are point-in-time references: external PR links may later point to merged or closed PRs, and each row notes when it was last verified.
+In-progress third-party migration PRs are tracked in the
+[example-migrations meta issue](https://github.com/shakacode/react_on_rails/issues/3125)
+instead of this docs page.
 
-> Maintainer note: check each linked PR before any docs release. Move merged or closed PRs into the published examples list above, and consider removing rows that have gone stale for multiple months.
+That keeps the public docs focused on durable references while the meta issue can
+carry working notes about draft PRs, maintainer coordination, blockers, and proof
+artifacts that may change quickly.
 
-| Repo                                                                                                                | Current Integration                | First Slice                            | Status                                                                                                                   | Evidence so far                                                                                                                                                                               |
-| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`EFForg/action-center-platform`](https://github.com/EFForg/action-center-platform)                                 | `react-rails`                      | Admin topics page                      | [Draft PR #975](https://github.com/EFForg/action-center-platform/pull/975) _(verified Apr 12, 2026)_                     | Contributor-local benchmark note, not a controlled public benchmark: warm request time and total JS weight both decreased for this slice; see the draft PR for the contributor's measurements |
-| [`thewca/worldcubeassociation.org`](https://github.com/thewca/worldcubeassociation.org)                             | `react-rails`                      | Disclaimer page mount                  | [Draft PR #14010](https://github.com/thewca/worldcubeassociation.org/pull/14010) _(verified Apr 12, 2026)_               | Maintainability note: one legacy Rails page now has a React on Rails path that stays separate from `next-frontend/`                                                                           |
-| [`demarche-numerique/demarche.numerique.gouv.fr`](https://github.com/demarche-numerique/demarche.numerique.gouv.fr) | `vite_rails` + custom React bridge | `SelectProcedureDropDownListComponent` | [Draft PR #12954](https://github.com/demarche-numerique/demarche.numerique.gouv.fr/pull/12954) _(verified Apr 12, 2026)_ | Maintainability note: replaced a custom `coldwired/react` mount contract with a documented React on Rails helper path                                                                         |
-| [`GSA/search-gov`](https://github.com/GSA/search-gov)                                                               | `react-rails` + Shakapacker        | Search results shell split             | [Draft PR #2010](https://github.com/GSA/search-gov/pull/2010) _(verified Apr 12, 2026)_                                  | Maintainability note: split SERP chrome into smaller mounts; public PR is green on `jest`, `rspec`, and `cucumber`                                                                            |
-
-These PRs are still in progress. The useful part is the scope and the evidence, not whether they are already merged.
+When a public migration becomes a stable reference, add it to the published example
+list above with a short proof note.
 
 ## Example categories
 
