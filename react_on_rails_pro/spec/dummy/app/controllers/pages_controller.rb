@@ -19,6 +19,14 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     session[:something_useful] = "REALLY USEFUL"
   end
 
+  around_action :with_config_overrides, only: %i[
+    ssr_shell_error ssr_async_error ssr_sync_error ssr_async_prop_error
+    rsc_component_error non_existing_react_component
+    non_existing_stream_react_component non_existing_rsc_payload
+    stream_error_demo stream_shell_error_demo
+    server_side_log_throw server_router
+  ]
+
   before_action :data
 
   before_action :initialize_shared_store, only: %i[client_side_hello_world_shared_store_controller
@@ -34,6 +42,46 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   def cached_react_helmet
     render "/pages/pro/cached_react_helmet"
+  end
+
+  def error_scenarios_hub
+    render "/pages/error_scenarios_hub"
+  end
+
+  def reset_error_configs
+    redirect_to error_scenarios_hub_path
+  end
+
+  def ssr_shell_error
+    stream_view_containing_react_components(template: "/pages/ssr_shell_error")
+  end
+
+  def ssr_async_error
+    stream_view_containing_react_components(template: "/pages/ssr_async_error")
+  end
+
+  def ssr_sync_error
+    stream_view_containing_react_components(template: "/pages/ssr_sync_error")
+  end
+
+  def ssr_async_prop_error
+    stream_view_containing_react_components(template: "/pages/ssr_async_prop_error")
+  end
+
+  def rsc_component_error
+    stream_view_containing_react_components(template: "/pages/rsc_component_error")
+  end
+
+  def non_existing_react_component
+    render "/pages/non_existing_react_component"
+  end
+
+  def non_existing_stream_react_component
+    stream_view_containing_react_components(template: "/pages/non_existing_stream_react_component")
+  end
+
+  def non_existing_rsc_payload
+    stream_view_containing_react_components(template: "/pages/non_existing_rsc_payload")
   end
 
   def stream_error_demo
@@ -213,7 +261,7 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
 
   # See files in spec/dummy/app/views/pages
 
-  helper_method :calc_slow_app_props_server_render
+  helper_method :calc_slow_app_props_server_render, :error_hub_config_value
 
   private
 
@@ -226,6 +274,57 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     Rails.logger.info msg
     render_to_string(template: "/pages/pro/serialize_props",
                      locals: { name: PROPS_NAME }, formats: :json)
+  end
+
+  # Temporarily applies config overrides from query params for the duration of a single request.
+  # Restores original values in the ensure block so global state is not permanently mutated.
+  #
+  # NOTE: This mutates global configuration singletons (ReactOnRails.configuration,
+  # ReactOnRailsPro.configuration). In a multi-threaded server like Puma, concurrent requests
+  # can observe mutated values during the window between apply and restore. This is acceptable
+  # for a single-threaded dev/test dummy app but should NOT be replicated in production code.
+  def with_config_overrides
+    originals = save_error_config
+    apply_error_config_overrides
+    yield
+  ensure
+    restore_error_config(originals)
+  end
+
+  def save_error_config
+    {
+      raise_on_prerender_error: ReactOnRails.configuration.raise_on_prerender_error,
+      throw_js_errors: ReactOnRailsPro.configuration.throw_js_errors,
+      raise_non_shell: ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors
+    }
+  end
+
+  def apply_error_config_overrides
+    if params.key?(:raise_on_prerender_error)
+      ReactOnRails.configuration.raise_on_prerender_error = error_hub_config_value(:raise_on_prerender_error, nil)
+    end
+    if params.key?(:throw_js_errors)
+      ReactOnRailsPro.configuration.throw_js_errors = error_hub_config_value(:throw_js_errors, nil)
+    end
+    return unless params.key?(:raise_non_shell_server_rendering_errors)
+
+    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors =
+      error_hub_config_value(:raise_non_shell_server_rendering_errors, nil)
+  end
+
+  def restore_error_config(originals)
+    ReactOnRails.configuration.raise_on_prerender_error = originals[:raise_on_prerender_error]
+    ReactOnRailsPro.configuration.throw_js_errors = originals[:throw_js_errors]
+    ReactOnRailsPro.configuration.raise_non_shell_server_rendering_errors = originals[:raise_non_shell]
+  end
+
+  # Casts a query param to boolean. Used by both the error hub view (to display current
+  # config state without mutation) and apply_error_config_overrides (to mutate config).
+  def error_hub_config_value(key, default)
+    value = params[key]
+    return default if value.blank?
+
+    ActiveModel::Type::Boolean.new.cast(value)
   end
 
   def initialize_shared_store
