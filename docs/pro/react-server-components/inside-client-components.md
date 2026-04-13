@@ -54,7 +54,7 @@ export default Profile;
 
 ### 2. Create the client component that uses `RSCRoute`
 
-This is a `'use client'` component. It references server components **by name** via `RSCRoute` — it does not import them.
+This component references server components **by name** via `RSCRoute` — it does not import them. It doesn't need a `'use client'` directive itself because it's imported by the wrapper files (Step 3), which declare the client boundary.
 
 ```tsx
 // components/AppRouter.tsx
@@ -127,7 +127,7 @@ The server wrapper uses `StaticRouter` with the current URL derived from `railsC
 
 ### 4. Register the components
 
-If you're **not** using `auto_load_bundle`, you need to register the components manually in both bundles. The wrapped `AppRouter` is registered with `ReactOnRails.register`, and the server components referenced by `RSCRoute` are registered with `registerServerComponent`.
+If you're **not** using `auto_load_bundle`, you need to register the components manually. The wrapped `AppRouter` is registered with `ReactOnRails.register` in both the client and server bundles. The server components referenced by `RSCRoute` are registered with `registerServerComponent` in the client and server bundles — plus they must be imported in the RSC bundle (the RSC webpack config handles this automatically via the RSC loader; see [Create a React Server Component](./create-without-ssr.md) for the RSC bundle setup).
 
 On the client side, follow the [manual bundle splitting pattern](../../oss/core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#manual-bundle-splitting-pre-auto-bundling-pattern) — one pack file per component so each view only loads the code it needs:
 

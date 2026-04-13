@@ -10,7 +10,7 @@ Before diving into render-functions, it helps to know the three kinds of values 
 | --- | --- | --- | --- | --- |
 | **React Component** | `(props) => JSX` or class component | Yes | Yes | `Function.length <= 1` and no `renderFunction` flag |
 | **Render Function** | `(props, railsContext) => ...` | Yes | Yes | `Function.length >= 2` **or** `fn.renderFunction === true` |
-| **Renderer Function** | `(props, railsContext, domNodeId) => void` | **No — throws** | Yes | `Function.length === 3` (render function with 3 params) |
+| **Renderer Function** | `(props, railsContext, domNodeId) => void` | **No — throws** | Yes | A render function (detected first) with exactly `Function.length === 3` |
 
 A few important points about the detection:
 
@@ -183,10 +183,20 @@ const MyComponent = async (props, _railsContext) => {
 
 ### 8. Redirect Information (Legacy)
 
-> [!NOTE]
-> React on Rails does not perform actual page redirections. Instead, it returns an empty component and relies on the front end to handle the redirection when the router is rendered. The `redirectLocation` property is logged in the console and ignored by the server renderer. If the `routeError` property is not null or undefined, it is logged and will cause Ruby to throw a `ReactOnRails::PrerenderError` if the `raise_on_prerender_error` configuration is enabled.
+> [!WARNING]
+> **These fields have significant limitations.** They originated from React Router v3/v4 integrations but are still supported at the runtime level:
+>
+> - `redirectLocation` does **not** trigger an actual server-side HTTP redirect — Rails still returns the full response with an empty `<div>`. The redirect only takes effect once the client-side router renders.
+> - `routeError` only triggers `raise_on_prerender_error` behavior (if enabled) — it does not produce a user-facing error page.
+>
+> **Modern alternatives:**
+>
+> - For redirects during SSR, handle them in your Rails controller (e.g., check auth before rendering and call `redirect_to`).
+> - For client-side redirects, use React Router's `<Navigate to="/path" />` (note: this is a [no-op during SSR](../building-features/react-router.md#navigate-component-ssr-behavior)).
+> - For route errors, use React Router's `errorElement` or an `ErrorBoundary`.
 
 ```jsx
+// Legacy pattern — prefer modern alternatives above
 const MyComponent = (props, _railsContext) => {
   return {
     redirectLocation: { pathname: '/new-path', search: '' },

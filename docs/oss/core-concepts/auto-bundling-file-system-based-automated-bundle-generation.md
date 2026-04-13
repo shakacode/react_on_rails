@@ -541,7 +541,7 @@ For every file inside `components_subdirectory`, the generator:
 You don't call `registerServerComponent` yourself when using auto-bundling — the generator writes these calls for you based on the classification above.
 
 > [!IMPORTANT]
-> There is no warning if you forget the `'use client'` directive on a component that needs it. The generator will silently classify the file as a Server Component and wire it up with `registerServerComponent`, and the component will fail at runtime (often with an obscure error) because it tries to use hooks or browser APIs on the server. Always double-check that client components start with `'use client'`.
+> If you forget the `'use client'` directive on a component that needs it, the generator classifies the file as a Server Component and wires it up with `registerServerComponent`. The packs generator does scan for common client-side patterns (hooks like `useState`, `useEffect`; event handlers like `onClick`, `onChange`; class components extending `React.Component`) and logs a warning if it detects them in a file classified as a Server Component. However, not all client-only code triggers this heuristic — always double-check that client components start with `'use client'`.
 
 #### The two `registerServerComponent` signatures
 
