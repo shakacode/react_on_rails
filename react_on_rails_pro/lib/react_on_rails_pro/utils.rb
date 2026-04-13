@@ -194,6 +194,10 @@ module ReactOnRailsPro
       end
     end
 
+    def self.reset_renderer_bundle_path_deprecation_warned!
+      @renderer_bundle_path_deprecation_warned = nil
+    end
+
     def self.mine_type_from_file_name(filename)
       extension = File.extname(filename)
       Rack::Mime.mime_type(extension)
