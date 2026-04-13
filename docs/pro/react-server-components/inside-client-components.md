@@ -408,27 +408,27 @@ export default function DetailsPanel({ id }) {
 
 ## API reference
 
-Each API below is exported as the default export of its module — import them using default-import syntax.
+Unless noted otherwise, each API below is a default export — use default-import syntax.
 
-| API | Import | Purpose |
-| --- | --- | --- |
-| `RSCRoute` | `react-on-rails-pro/RSCRoute` | Renders a server component inside a client component. Props: `componentName: string`, `componentProps: object`. |
-| `wrapServerComponentRenderer` (client) | `react-on-rails-pro/wrapServerComponentRenderer/client` | Wraps a `'use client'` component for client-side hydration. Provides the context `RSCRoute` needs internally. The wrapped result must be registered with `ReactOnRails.register` unless you use auto-bundling. |
-| `wrapServerComponentRenderer` (server) | `react-on-rails-pro/wrapServerComponentRenderer/server` | Same as above, for server-side rendering. The wrapped function receives `railsContext` as its second argument. |
-| `registerServerComponent` (client) | `react-on-rails-pro/registerServerComponent/client` | Registers server component placeholders in the client bundle. Takes names as strings: `registerServerComponent('A', 'B')`. The client fetches the RSC payload from the server or uses the payload already embedded in the HTML. |
-| `registerServerComponent` (server) | `react-on-rails-pro/registerServerComponent/server` | Registers server components in the server bundle. Takes an object: `registerServerComponent({ A, B })`. |
-| `useRSC` | `react-on-rails-pro/RSCProvider` | Hook providing `refetchComponent(name, props)` for manual refetch and error recovery. Available anywhere inside a tree set up by `wrapServerComponentRenderer` or `registerServerComponent`. |
-| `isServerComponentFetchError` | `react-on-rails-pro/ServerComponentFetchError` | Type guard to check if an error came from a failed server component fetch. The error has `serverComponentName` and `serverComponentProps` fields. |
+| API | Import | Export type | Purpose |
+| --- | --- | --- | --- |
+| `RSCRoute` | `react-on-rails-pro/RSCRoute` | Default | Renders a server component inside a client component. Props: `componentName: string`, `componentProps: object`. |
+| `wrapServerComponentRenderer` (client) | `react-on-rails-pro/wrapServerComponentRenderer/client` | Default | Wraps a `'use client'` component for client-side hydration. Provides the context `RSCRoute` needs internally. The wrapped result must be registered with `ReactOnRails.register` unless you use auto-bundling. |
+| `wrapServerComponentRenderer` (server) | `react-on-rails-pro/wrapServerComponentRenderer/server` | Default | Same as above, for server-side rendering. The wrapped function receives `railsContext` as its second argument. |
+| `registerServerComponent` (client) | `react-on-rails-pro/registerServerComponent/client` | Default | Registers server component placeholders in the client bundle. Takes names as strings: `registerServerComponent('A', 'B')`. The client fetches the RSC payload from the server or uses the payload already embedded in the HTML. |
+| `registerServerComponent` (server) | `react-on-rails-pro/registerServerComponent/server` | Default | Registers server components in the server bundle. Takes an object: `registerServerComponent({ A, B })`. |
+| `useRSC` | `import { useRSC } from 'react-on-rails-pro/RSCProvider'` | **Named** | Hook providing `refetchComponent(name, props)` for manual refetch and error recovery. Available anywhere inside a tree set up by `wrapServerComponentRenderer` or `registerServerComponent`. |
+| `isServerComponentFetchError` | `import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError'` | **Named** | Type guard to check if an error came from a failed server component fetch. The error has `serverComponentName` and `serverComponentProps` fields. |
 
 ## Troubleshooting
 
 **Error: "Component 'X' is registered as a server component but is being rendered with the react_component helper"**
 
-You're using `react_component` in the Rails view when you should be using `stream_react_component`. `RSCRoute` requires streaming to work. Change the helper and try again.
+This error occurs when using `react_component` with `prerender: true` (or the default prerender setting). The server-side `wrapServerComponentRenderer` requires streaming capabilities that only `stream_react_component` provides. Either switch to `stream_react_component`, or if you don't need SSR, use `react_component` with `prerender: false` — RSCRoute will fetch the RSC payload over HTTP on the client side.
 
 **Empty content where the server component should appear**
 
-Check the browser's network tab — is the request to `/rsc_payload/:componentName` succeeding? If not:
+Check the browser's network tab — is the request to your RSC payload endpoint (derived from `rsc_payload_generation_url_path` config, default `/rsc_payload/:componentName`) succeeding? If not:
 
 - Make sure the server component is registered in your server bundle with `registerServerComponent({ ComponentName })`.
 - Make sure `rsc_payload_route` is mounted in `config/routes.rb`.

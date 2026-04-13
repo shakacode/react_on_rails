@@ -40,6 +40,7 @@ HelloHash.renderFunction = true;
 
 // Renderer Function — 3 params, handles hydration itself, CLIENT ONLY
 const LazyHydrate = (props, railsContext, domNodeId) => {
+  // whenVisible is a hypothetical helper that resolves when the element scrolls into view
   whenVisible(domNodeId).then(() => {
     const root = document.getElementById(domNodeId);
     ReactDOM.hydrateRoot(root, <HelloMessage {...props} />);
@@ -59,8 +60,9 @@ The Ruby helper you use in your Rails view must be compatible with the component
 | --- | --- | --- | --- |
 | **React Component** (plain function / class) | ✅ Works (client-side rendering or SSR) | ❌ Raises — the helper requires a hash return, not a component | ✅ Works (streaming SSR) |
 | **Render Function returning a React component** | ✅ Works | ❌ Raises — must return a hash, not a component | ✅ Works |
-| **Render Function returning a string (`renderedHtml`)** | ✅ Works | ❌ Raises — string is not a hash | ✅ Works |
-| **Render Function returning a server-render hash** (`{ renderedHtml: { componentHtml, ... } }`) | ⚠️ Raises — tells you to use `react_component_hash` | ✅ Works (the designed use case) | ⚠️ Raises — streaming expects component output, not a hash |
+| **Render Function returning `{ renderedHtml: string }`** | ✅ Works | ❌ Raises — string is not a hash with `componentHtml` | ❌ Raises — streaming does not support server render hashes |
+| **Render Function returning `{ renderedHtml: ReactElement }`** | ✅ Works (calls `renderToString` on the element) | ❌ Raises — element is not a hash with `componentHtml` | ❌ Raises — streaming does not support server render hashes |
+| **Render Function returning a server-render hash** (`{ renderedHtml: { componentHtml, ... } }`) | ⚠️ Raises — tells you to use `react_component_hash` | ✅ Works (the designed use case) | ❌ Raises — streaming does not support server render hashes |
 | **Async Render Function** (returns a Promise) | ✅ Works with Pro Node renderer. ❌ ExecJS silently returns empty output — see [Async functions and ExecJS](#async-functions-and-execjs). | ✅ Same — Pro Node renderer only | ✅ Works (streaming SSR is Pro) |
 | **Renderer Function** (3 params) | ✅ Works with `prerender: false` (client-only). ❌ Throws with `prerender: true` — renderer functions cannot run on the server. | ❌ Raises — `react_component_hash` forces `prerender: true`, which is incompatible with renderer functions | ❌ Raises — streaming requires server rendering |
 
@@ -203,7 +205,7 @@ Take a look at [serverRenderReactComponent.test.ts](https://github.com/shakacode
 
 3. **Which object keys trigger "server render hash" processing** — React on Rails treats a returned object as a server render hash if it contains **any** of these keys: `renderedHtml`, `redirectLocation`, `routeError`, or `error`. If none of those keys are present, the object is passed through unchanged (which typically fails validation elsewhere).
    > [!WARNING]
-   > **The `error` key is a landmine.** If your render function accidentally returns `{ error: someError }` — for example from a `try/catch` block — the framework routes it through server-render-hash handling, which can produce confusing results (empty HTML output, `hasErrors: true`, a possible `PrerenderError` depending on `raise_on_prerender_error`). If you want to signal failure, throw an error instead of returning one in a plain object.
+   > **The `error` key is a landmine.** If your render function accidentally returns `{ error: someError }` — for example from a `try/catch` block — the framework routes it through server-render-hash handling, which produces **empty HTML output** (because `renderedHtml` is missing). Note that `hasErrors` is *not* set — only `routeError` sets the error flag, so no `PrerenderError` is raised regardless of `raise_on_prerender_error`. If you want to signal failure, throw an error instead of returning one in a plain object.
 
 4. **Async Functions Support Server Render Hashes** - When using the React on Rails Pro Node renderer, async render-functions can return React components, strings, or full server render hashes, including `clientProps`, `redirectLocation`, and `routeError`. See [8. Redirect Information (Legacy)](#8-redirect-information-legacy).
 
@@ -275,9 +277,9 @@ This helper accepts render-functions that return objects with a `renderedHtml` p
 
 #### Requirements
 
-- The render function MUST return an object
-- The object MUST include a `componentHtml` key
-- All other keys are optional and can be accessed in your Rails view
+- The render function MUST return an object with shape `{ renderedHtml: { componentHtml, ...otherKeys } }`
+- The `renderedHtml` object MUST include a `componentHtml` key — missing it raises `ReactOnRails::Error`
+- All other keys inside `renderedHtml` are optional and can be accessed in your Rails view as `result["keyName"]`
 
 ## Examples with Appropriate Helper Methods
 

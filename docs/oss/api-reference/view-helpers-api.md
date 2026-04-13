@@ -40,7 +40,7 @@ Uncommonly used options:
 - **options if prerender (server rendering) is true:**
   - **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   - **logging_on_server:** Default is true. True will log JS console messages and errors to the server.
-  - **raise_on_prerender_error:** Default is `Rails.env.development?` (true in development, false in production). True will throw an error on the server side rendering. Your controller will have to handle the error.
+  - **raise_on_prerender_error:** Default is `Rails.env.development?` (true in development, false in production). True will throw an error on server-side rendering. Your controller will have to handle the error.
   - **`clientProps` merge behavior:** If a prerender result includes `clientProps`, React on Rails merges them into the generated client hydration props payload (`props.merge(clientProps)`). The original `props:` value must be a Ruby Hash or a JSON string representing an object.
 
 ---
