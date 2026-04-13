@@ -125,6 +125,65 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
   end
 
+  context "when RSC support is enabled" do
+    let(:rsc_bundle_path) { Rails.root.join("public", "webpack", "production", "rsc-bundle.js").to_s }
+    let(:rsc_bundle_hash) { "rsc-bundle-hash-xyz789" }
+    let(:client_manifest_path) { path_in_webpack_folder("react-client-manifest.json") }
+    let(:server_client_manifest_path) { path_in_webpack_folder("react-server-client-manifest.json") }
+
+    before do
+      dbl_configuration = instance_double(ReactOnRailsPro::Configuration,
+                                          server_renderer: "NodeRenderer",
+                                          renderer_password: "myPassword1",
+                                          renderer_url: "http://localhost:3800",
+                                          renderer_request_retry_limit: 5,
+                                          enable_rsc_support: true,
+                                          assets_to_copy: nil)
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(dbl_configuration)
+      allow(ReactOnRailsPro::Utils).to receive_messages(
+        rsc_bundle_js_file_path: rsc_bundle_path,
+        react_client_manifest_file_path: client_manifest_path,
+        react_server_client_manifest_file_path: server_client_manifest_path
+      )
+
+      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      allow(pool).to receive(:rsc_bundle_hash).and_return(rsc_bundle_hash)
+
+      FileUtils.mkdir_p(File.dirname(rsc_bundle_path))
+      File.write(rsc_bundle_path, "// rsc bundle content")
+      File.write(client_manifest_path, "{}")
+      File.write(server_client_manifest_path, "{}")
+    end
+
+    after do
+      FileUtils.rm_f(rsc_bundle_path)
+      FileUtils.rm_f(client_manifest_path)
+      FileUtils.rm_f(server_client_manifest_path)
+    end
+
+    it "pre-seeds both server and RSC bundle directories" do
+      described_class.call
+
+      server_dest = File.join(cache_dir, bundle_hash, "#{bundle_hash}.js")
+      rsc_dest = File.join(cache_dir, rsc_bundle_hash, "#{rsc_bundle_hash}.js")
+      expect(File.exist?(server_dest)).to be(true)
+      expect(File.exist?(rsc_dest)).to be(true)
+      expect(File.read(rsc_dest)).to eq("// rsc bundle content")
+    end
+
+    it "copies RSC manifest assets into both bundle directories" do
+      described_class.call
+
+      server_dir = File.join(cache_dir, bundle_hash)
+      rsc_dir = File.join(cache_dir, rsc_bundle_hash)
+
+      expect(File.exist?(File.join(server_dir, "react-client-manifest.json"))).to be(true)
+      expect(File.exist?(File.join(server_dir, "react-server-client-manifest.json"))).to be(true)
+      expect(File.exist?(File.join(rsc_dir, "react-client-manifest.json"))).to be(true)
+      expect(File.exist?(File.join(rsc_dir, "react-server-client-manifest.json"))).to be(true)
+    end
+  end
+
   def path_in_webpack_folder(filename)
     Rails.root.join("public", "webpack", "production", filename)
   end
