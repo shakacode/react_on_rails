@@ -14,13 +14,7 @@ module ReactOnRailsPro
     end
 
     def self.resolve_dest_path
-      if ENV["RENDERER_BUNDLE_PATH"].present?
-        warn "[ReactOnRailsPro] RENDERER_BUNDLE_PATH is deprecated. " \
-             "Use RENDERER_SERVER_BUNDLE_CACHE_PATH instead."
-      end
-      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"].presence ||
-        ENV["RENDERER_BUNDLE_PATH"].presence ||
-        Rails.root.join(".node-renderer-bundles").to_s
+      ReactOnRailsPro::Utils.resolve_renderer_cache_dir
     end
     private_class_method :resolve_dest_path
 
