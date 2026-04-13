@@ -666,7 +666,7 @@ module ReactOnRails
       end
 
       def home_page_pro_note_for_oss_app
-        "You can evaluate React on Rails Pro without a license while deciding whether it fits your app."
+        "Review the Pro docs and upgrade guide first, then enable it with the appropriate license when you're ready."
       end
 
       def preferred_rspec_helper_file
