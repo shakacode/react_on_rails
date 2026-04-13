@@ -90,17 +90,50 @@ env:
   RAILS_MIN_THREADS: ${{ github.event.inputs.rails_threads || 3 }}
 
 jobs:
+  detect-changes:
+    permissions:
+      contents: read
+      actions: read
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+          persist-credentials: false
+      - name: Detect relevant changes
+        id: detect
+        run: |
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
+          script/ci-changes-detector "$BASE_REF"
+        shell: bash
+      - name: Guard docs-only main pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/ensure-main-docs-safety
+        with:
+          docs-only: ${{ steps.detect.outputs.docs_only }}
+          previous-sha: ${{ github.event.before }}
+
   benchmark:
+    needs: detect-changes
     # Run on: push to main, workflow_dispatch, or PRs with 'benchmark' label.
     # The 'full-ci' label is intentionally excluded — it controls test workflows,
     # not benchmarks. Use the dedicated 'benchmark' label to trigger perf runs on PRs.
     # See https://bencher.dev/docs/how-to/github-actions/#pull-requests for the extra pull_request condition
+    # Skip docs-only pushes to main to avoid wasting CI resources on non-code changes.
     if: |
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
-        contains(github.event.pull_request.labels.*.name, 'benchmark')
+      !(
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        needs.detect-changes.outputs.docs_only == 'true'
+      ) && (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(github.event.pull_request.labels.*.name, 'benchmark')
+        )
       )
     runs-on: ubuntu-latest
     permissions:

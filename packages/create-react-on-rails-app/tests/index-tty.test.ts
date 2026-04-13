@@ -1,7 +1,7 @@
 import { promptForMode } from '../src/prompt';
 import { validateAll } from '../src/validators';
 import { createApp, validateAppName } from '../src/create-app';
-import { detectPackageManager, logInfo } from '../src/utils';
+import { detectPackageManager, logError, logInfo } from '../src/utils';
 
 jest.mock('../src/prompt');
 jest.mock('../src/validators');
@@ -22,6 +22,7 @@ const mockedValidateAppName = jest.mocked(validateAppName);
 const mockedCreateApp = jest.mocked(createApp);
 const mockedDetectPackageManager = jest.mocked(detectPackageManager);
 const mockedLogInfo = jest.mocked(logInfo);
+const mockedLogError = jest.mocked(logError);
 
 function setupMocks() {
   mockedValidateAppName.mockReturnValue({ success: true });
@@ -118,5 +119,23 @@ describe('TTY detection branching in run()', () => {
     await loadIndex();
 
     expect(mockedPromptForMode).not.toHaveBeenCalled();
+  });
+
+  it('exits with error when --standard is combined with --pro', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--standard', '--pro'];
+
+    await loadIndex();
+
+    expect(mockedLogError).toHaveBeenCalledWith('--standard cannot be combined with --pro or --rsc.');
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
+  it('exits with error when --standard is combined with --rsc', async () => {
+    process.argv = ['node', 'create-react-on-rails-app', 'my-app', '--standard', '--rsc'];
+
+    await loadIndex();
+
+    expect(mockedLogError).toHaveBeenCalledWith('--standard cannot be combined with --pro or --rsc.');
+    expect(process.exit).toHaveBeenCalledWith(1);
   });
 });
