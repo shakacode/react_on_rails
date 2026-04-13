@@ -85,7 +85,8 @@ jobs:
           #   generators – spec/react_on_rails/generators (heavy filesystem I/O)
           #   unit       – everything else under spec/react_on_rails
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
-             [[ "${{ steps.check-label.outputs.result }}" == "true" ]]; then
+             [[ "${{ steps.check-label.outputs.result }}" == "true" ]] || \
+             [[ "${{ inputs.force_run }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions × 2 shards
             echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"generators"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"unit"}]}' >> $GITHUB_OUTPUT
           else
