@@ -16,6 +16,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
+          # ruby-version: "3.3"  # Uncomment and set if you don't have a .ruby-version file
           bundler-cache: true
 
 <%- if config[:package_manager] == 'pnpm' -%>
@@ -37,7 +38,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
-<%- if %w[yarn pnpm].include?(config[:package_manager]) -%>
+<%- if %w[yarn pnpm npm].include?(config[:package_manager]) -%>
           cache: "<%= config[:package_manager] %>"
 <%- end -%>
 

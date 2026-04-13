@@ -150,6 +150,13 @@ module GeneratorMessages
                     "A GitHub Actions workflow is available at .github/workflows/ci.yml."
                   end
 
+      build_test_hint = if File.exist?(File.join(app_root, "package.json"))
+                          "\n\nOr use the generated package.json script:\n" \
+                            "#{Rainbow("#{package_manager} run build:test").cyan}"
+                        else
+                          ""
+                        end
+
       <<~CI
 
 
@@ -159,10 +166,7 @@ module GeneratorMessages
         #{ci_status}
 
         To build bundles manually before tests:
-        #{Rainbow('RAILS_ENV=test NODE_ENV=test bin/shakapacker').cyan}
-
-        Or use the generated package.json script:
-        #{Rainbow("#{package_manager} run build:test").cyan}
+        #{Rainbow('RAILS_ENV=test NODE_ENV=test bin/shakapacker').cyan}#{build_test_hint}
       CI
     end
 

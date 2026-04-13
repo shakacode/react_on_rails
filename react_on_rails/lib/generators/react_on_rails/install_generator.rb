@@ -257,7 +257,7 @@ module ReactOnRails
         return if options[:pretend]
 
         ci_path = ".github/workflows/ci.yml"
-        if File.exist?(File.join(destination_root, ci_path))
+        if File.exist?(File.join(destination_root, ci_path)) && !options[:force]
           say_status :skip, "#{ci_path} already exists", :yellow
           return
         end
