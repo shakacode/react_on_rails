@@ -1,7 +1,7 @@
 # ShakaCode React on Rails Pro – End User License Agreement (EULA)
 
 _Version 2.2 — 2026-04-12_  
-© 2015–2025 ShakaCode, LLC. All rights reserved.
+© 2015–2026 ShakaCode, LLC. All rights reserved.
 
 ---
 
@@ -52,7 +52,7 @@ ShakaCode may, at its sole discretion, issue a complimentary "oss" license to an
 2. The Organization's annual revenue (or total funding received, if pre-revenue) does not exceed USD $1,000,000.
 3. The Organization applies by emailing [justin@shakacode.com](mailto:justin@shakacode.com) and provides truthful information about the project and Organization.
 
-**Terms of complimentary oss licenses:**
+**Terms of Complimentary OSS Licenses:**
 
 - The attribution requirement in Section 6 applies and may not be waived.
 - Complimentary OSS Licenses are granted for a fixed term of one (1) year from the date of issuance and may be renewed upon request.
@@ -71,7 +71,7 @@ The Organization shall not:
 4. **circumvent, bypass, modify, disable, or tamper with any license validation mechanisms, license checks, or authentication systems;**
 5. **reverse engineer, decompile, or disassemble the Software for the purpose of circumventing license restrictions;**
 6. **create, use, or distribute any tools, scripts, patches, or modifications designed to enable unauthorized use of Pro features;**
-7. **attempt to access or use Pro features without a valid, active subscription.**
+7. **attempt to access or use Pro features without a valid, active license (including a Complimentary OSS License) or subscription.**
 
 ---
 
