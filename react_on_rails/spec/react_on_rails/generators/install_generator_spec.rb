@@ -1895,6 +1895,21 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when Active Record is absent (no config/database.yml)" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        # Remove the database.yml that simulate_existing_rails_files creates
+        FileUtils.rm_f(File.join(destination_root, "config/database.yml"))
+      end
+    end
+
+    it "CI workflow omits db:prepare step" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).not_to include("db:prepare")
+      end
+    end
+  end
+
   context "when Procfile.dev already contains RSC watcher" do
     let(:install_generator) { described_class.new([], { rsc: true }) }
 

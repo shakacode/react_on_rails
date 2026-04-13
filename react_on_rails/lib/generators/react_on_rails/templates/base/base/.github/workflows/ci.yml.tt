@@ -44,6 +44,7 @@ jobs:
       - name: Install JS dependencies
         run: <%= config[:package_manager] %> install
 
+<%- if config[:has_active_record] -%>
       - name: Set up database
         # If using PostgreSQL or MySQL, add a services block above.
         # See https://docs.github.com/en/actions/using-containerized-services
@@ -51,6 +52,7 @@ jobs:
         env:
           RAILS_ENV: test
 
+<%- end -%>
       - name: Build JavaScript bundles
         run: bin/shakapacker
         env:

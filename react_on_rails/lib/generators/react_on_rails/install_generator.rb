@@ -264,8 +264,9 @@ module ReactOnRails
 
         say "📝 Generating CI workflow...", :yellow
         package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
+        has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
-                 { package_manager: package_manager })
+                 { package_manager: package_manager, has_active_record: has_active_record })
         say "✅ Created #{ci_path}", :green
         GeneratorMessages.ci_workflow_generated = true
       end

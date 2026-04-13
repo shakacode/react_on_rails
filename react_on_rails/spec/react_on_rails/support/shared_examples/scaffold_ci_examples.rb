@@ -11,6 +11,12 @@ shared_examples "scaffold_ci_and_scripts" do
     end
   end
 
+  it "CI workflow includes db:prepare when Active Record is present" do
+    assert_file ".github/workflows/ci.yml" do |content|
+      expect(content).to include("db:prepare")
+    end
+  end
+
   it "CI workflow builds JS bundles before running tests" do
     assert_file ".github/workflows/ci.yml" do |content|
       build_step_pos = content.index("Build JavaScript bundles")

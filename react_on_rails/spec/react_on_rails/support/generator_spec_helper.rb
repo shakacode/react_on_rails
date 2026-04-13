@@ -27,6 +27,7 @@ def simulate_existing_rails_files(options)
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb",
                          "module Gentest\nclass Application < Rails::Application\nend\nend)")
+  simulate_existing_file("config/database.yml", "test:\n  adapter: sqlite3\n  database: db/test.sqlite3\n")
 
   return unless options.fetch(:spec, true)
 
