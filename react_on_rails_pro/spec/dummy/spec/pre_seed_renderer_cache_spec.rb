@@ -42,6 +42,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
 
   after do
     FileUtils.rm_rf(cache_dir)
+    FileUtils.rm_f(server_bundle_path)
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
   end
@@ -119,6 +120,25 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
 
     it "uses the deprecated env var with a warning" do
       expect { described_class.call }.to output(/RENDERER_BUNDLE_PATH is deprecated/).to_stderr
+
+      dest_file = File.join(custom_cache_dir, bundle_hash, "#{bundle_hash}.js")
+      expect(File.exist?(dest_file)).to be(true)
+    end
+  end
+
+  context "when both RENDERER_SERVER_BUNDLE_CACHE_PATH and RENDERER_BUNDLE_PATH are set" do
+    let(:custom_cache_dir) { Dir.mktmpdir("renderer-cache-test") }
+
+    before do
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = custom_cache_dir
+      ENV["RENDERER_BUNDLE_PATH"] = "/some/old/path"
+      allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(nil)
+    end
+
+    after { FileUtils.rm_rf(custom_cache_dir) }
+
+    it "uses the preferred env var and emits no deprecation warning" do
+      expect { described_class.call }.not_to output(/deprecated/).to_stderr
 
       dest_file = File.join(custom_cache_dir, bundle_hash, "#{bundle_hash}.js")
       expect(File.exist?(dest_file)).to be(true)
