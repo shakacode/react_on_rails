@@ -31,16 +31,16 @@ These are stable references you can inspect today:
 
 ### Public migration PRs in progress
 
-These show how narrow, app-by-app migration slices look in real repositories:
+These show how narrow, app-by-app migration slices look in real repositories. They are point-in-time references: external PR links may later point to merged or closed PRs, and each row notes when it was last verified.
 
-These are point-in-time references. External PR links may later point to merged or closed PRs, and each row notes when it was last verified. When one of them changes state, update the row status or move it into the published examples list.
+> Maintainer note: check each linked PR before any docs release. Move merged or closed PRs into the published examples list above, and consider removing rows that have gone stale for multiple months.
 
-| Repo                                                                                                                | Current Integration                | First Slice                            | Status                                                                                                                   | Evidence so far                                                                                                                                                              |
-| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`EFForg/action-center-platform`](https://github.com/EFForg/action-center-platform)                                 | `react-rails`                      | Admin topics page                      | [Draft PR #975](https://github.com/EFForg/action-center-platform/pull/975) _(verified Apr 12, 2026)_                     | Contributor-local benchmark note, not a controlled public benchmark: warm request median `6.11ms -> 5.04ms`; estimated total JS bytes `2,179,067 -> 1,636,265` for the slice |
-| [`thewca/worldcubeassociation.org`](https://github.com/thewca/worldcubeassociation.org)                             | `react-rails`                      | Disclaimer page mount                  | [Draft PR #14010](https://github.com/thewca/worldcubeassociation.org/pull/14010) _(verified Apr 12, 2026)_               | Maintainability note: one legacy Rails page now has a React on Rails path that stays separate from `next-frontend/`                                                          |
-| [`demarche-numerique/demarche.numerique.gouv.fr`](https://github.com/demarche-numerique/demarche.numerique.gouv.fr) | `vite_rails` + custom React bridge | `SelectProcedureDropDownListComponent` | [Draft PR #12954](https://github.com/demarche-numerique/demarche.numerique.gouv.fr/pull/12954) _(verified Apr 12, 2026)_ | Maintainability note: replaced a custom `coldwired/react` mount contract with a documented React on Rails helper path                                                        |
-| [`GSA/search-gov`](https://github.com/GSA/search-gov)                                                               | `react-rails` + Shakapacker        | Search results shell split             | [Draft PR #2010](https://github.com/GSA/search-gov/pull/2010) _(verified Apr 12, 2026)_                                  | Maintainability note: split SERP chrome into smaller mounts; public PR is green on `jest`, `rspec`, and `cucumber`                                                           |
+| Repo                                                                                                                | Current Integration                | First Slice                            | Status                                                                                                                   | Evidence so far                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`EFForg/action-center-platform`](https://github.com/EFForg/action-center-platform)                                 | `react-rails`                      | Admin topics page                      | [Draft PR #975](https://github.com/EFForg/action-center-platform/pull/975) _(verified Apr 12, 2026)_                     | Contributor-local benchmark note, not a controlled public benchmark: warm request time and total JS weight both decreased for this slice; see the draft PR for the contributor's measurements |
+| [`thewca/worldcubeassociation.org`](https://github.com/thewca/worldcubeassociation.org)                             | `react-rails`                      | Disclaimer page mount                  | [Draft PR #14010](https://github.com/thewca/worldcubeassociation.org/pull/14010) _(verified Apr 12, 2026)_               | Maintainability note: one legacy Rails page now has a React on Rails path that stays separate from `next-frontend/`                                                                           |
+| [`demarche-numerique/demarche.numerique.gouv.fr`](https://github.com/demarche-numerique/demarche.numerique.gouv.fr) | `vite_rails` + custom React bridge | `SelectProcedureDropDownListComponent` | [Draft PR #12954](https://github.com/demarche-numerique/demarche.numerique.gouv.fr/pull/12954) _(verified Apr 12, 2026)_ | Maintainability note: replaced a custom `coldwired/react` mount contract with a documented React on Rails helper path                                                                         |
+| [`GSA/search-gov`](https://github.com/GSA/search-gov)                                                               | `react-rails` + Shakapacker        | Search results shell split             | [Draft PR #2010](https://github.com/GSA/search-gov/pull/2010) _(verified Apr 12, 2026)_                                  | Maintainability note: split SERP chrome into smaller mounts; public PR is green on `jest`, `rspec`, and `cucumber`                                                                            |
 
 These PRs are still in progress. The useful part is the scope and the evidence, not whether they are already merged.
 
@@ -97,13 +97,20 @@ When the change is maintainability-first, record:
 
 Use maintainability notes when that is the honest win. Do not force a weak benchmark onto an example whose real value is simpler ownership or a narrower integration boundary.
 
-## Later research lanes
+## Contribute an example
 
-The examples in this page are intentionally narrow first slices. After those land, the next useful lanes are:
+If your migration could help other teams evaluate React on Rails, open an issue or PR that adds it here and include:
 
-1. Large Rails + React monoliths on `vite_rails`, once a genuinely narrow maintainers-first slice exists
-2. Institutionally credible `react-rails` apps that are still small enough for a one-mount PR
-3. Modern `vite_rails` apps where one Rails-owned island or helper-backed boundary can move before broader asset changes
+1. The integration you started from, such as `react-rails`, `vite_rails`, or a custom helper
+2. The first slice you picked and why it was small enough to review
+3. The proof you captured, whether that was performance, maintainability, or both
+4. The validation you ran locally or in CI
+
+The most useful next examples are:
+
+1. `react-rails` apps that migrate one Rails-owned mount at a time
+2. Modern `vite_rails` apps where one Rails-owned island can move before a broader asset rewrite
+3. Upgrades from older `react_on_rails` versions to current maintained defaults
 
 ## How to use these examples
 
