@@ -3,14 +3,14 @@ module ReactOnRails
     attr_reader component_name: String
     attr_reader props: Hash[untyped, untyped] | String
     attr_reader rails_context: Hash[untyped, untyped]
-    attr_reader store_initializations: String
+    attr_reader store_initializations: String?
     attr_reader render_options: untyped
 
     def initialize: (
       component_name: String,
       props: Hash[untyped, untyped] | String,
       rails_context: Hash[untyped, untyped],
-      store_initializations: String,
+      store_initializations: String?,
       render_options: untyped
     ) -> void
 
