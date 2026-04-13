@@ -61,14 +61,17 @@ end
 
 # Expects an array of strings, such as "--redux"
 def run_generator_test_with_args(args, options = {})
+  force = options.delete(:force) { true }
   prepare_destination # this completely wipes the `destination` directory
   simulate_existing_rails_files(options)
   simulate_npm_files(options)
   yield if block_given?
 
+  extra_args = ["--ignore-warnings"]
+  extra_args << (force ? "--force" : "--skip")
   Dir.chdir(destination_root) do
     # WARNING: std out is swallowed from running the generator during tests
-    run_generator(args + ["--ignore-warnings", "--force"])
+    run_generator(args + extra_args)
   end
 end
 

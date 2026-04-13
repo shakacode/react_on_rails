@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "json"
 require "rainbow"
 
 # rubocop:disable Metrics/ModuleLength
@@ -10,12 +11,6 @@ module GeneratorMessages
 
   # rubocop:disable Metrics/ClassLength
   class << self
-    attr_writer :ci_workflow_generated
-
-    def ci_workflow_generated?
-      @ci_workflow_generated == true
-    end
-
     def output
       @output ||= []
     end
@@ -50,15 +45,14 @@ module GeneratorMessages
 
     def clear
       @output = []
-      @ci_workflow_generated = false
     end
 
     def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", pro: false,
                                            rsc: false, shakapacker_just_installed: false, landing_page: false,
-                                           app_root: Dir.pwd)
+                                           ci_workflow_generated: false, app_root: Dir.pwd)
       process_manager_section = build_process_manager_section
       testing_section = build_testing_section(app_root: app_root)
-      ci_section = build_ci_section(app_root: app_root)
+      ci_section = build_ci_section(app_root: app_root, ci_workflow_generated: ci_workflow_generated)
       package_manager = detect_package_manager(app_root: app_root)
       shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed,
                                                             app_root: app_root)
@@ -140,17 +134,17 @@ module GeneratorMessages
 
     private
 
-    def build_ci_section(app_root: Dir.pwd)
-      return "" unless ci_workflow_generated? || File.exist?(File.join(app_root, ".github/workflows/ci.yml"))
+    def build_ci_section(app_root: Dir.pwd, ci_workflow_generated: false)
+      return "" unless ci_workflow_generated || File.exist?(File.join(app_root, ".github/workflows/ci.yml"))
 
       package_manager = detect_package_manager(app_root: app_root)
-      ci_status = if ci_workflow_generated?
+      ci_status = if ci_workflow_generated
                     "A GitHub Actions workflow has been generated at .github/workflows/ci.yml."
                   else
                     "A GitHub Actions workflow is available at .github/workflows/ci.yml."
                   end
 
-      build_test_hint = if File.exist?(File.join(app_root, "package.json"))
+      build_test_hint = if package_json_has_script?(app_root, "build:test")
                           "\n\nOr use the generated package.json script:\n" \
                             "#{Rainbow("#{package_manager} run build:test").cyan}"
                         else
@@ -168,6 +162,16 @@ module GeneratorMessages
         To build bundles manually before tests:
         #{Rainbow('RAILS_ENV=test NODE_ENV=test bin/shakapacker').cyan}#{build_test_hint}
       CI
+    end
+
+    def package_json_has_script?(app_root, script_name)
+      package_json_path = File.join(app_root, "package.json")
+      return false unless File.exist?(package_json_path)
+
+      content = JSON.parse(File.read(package_json_path))
+      content.dig("scripts", script_name) ? true : false
+    rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
+      false
     end
 
     def build_render_example(component_name:, route:, rsc:)

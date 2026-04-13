@@ -1888,7 +1888,7 @@ describe InstallGenerator, type: :generator do
 
   context "when .github/workflows/ci.yml already exists" do
     before(:all) do
-      run_generator_test_with_args(%w[], package_json: true) do
+      run_generator_test_with_args(%w[], package_json: true, force: false) do
         simulate_existing_dir(".github/workflows")
         simulate_existing_file(".github/workflows/ci.yml", "# custom CI\n")
       end

@@ -271,7 +271,7 @@ module ReactOnRails
                  { package_manager: package_manager, has_active_record: has_active_record,
                    has_rspec: has_rspec })
         say "✅ Created #{ci_path}", :green
-        GeneratorMessages.ci_workflow_generated = true
+        @ci_workflow_generated = true
       end
 
       def add_package_json_scripts
@@ -280,7 +280,8 @@ module ReactOnRails
         package_json_path = File.join(destination_root, "package.json")
         return unless File.exist?(package_json_path)
 
-        content = JSON.parse(File.read(package_json_path))
+        original_text = File.read(package_json_path)
+        content = JSON.parse(original_text)
         scripts = content["scripts"] ||= {}
 
         scripts_added = []
@@ -288,7 +289,8 @@ module ReactOnRails
         add_build_test_script(scripts, scripts_added)
 
         if scripts_added.any?
-          File.write(package_json_path, "#{JSON.pretty_generate(content)}\n")
+          indent = original_text[/^(\s+)"/m, 1] || "  "
+          File.write(package_json_path, "#{JSON.pretty_generate(content, indent: indent)}\n")
           say "📝 Added build scripts (#{scripts_added.join(', ')}) to package.json", :yellow
         else
           say_status :skip, "build scripts already present in package.json", :yellow
@@ -302,7 +304,7 @@ module ReactOnRails
       def add_build_script(scripts, scripts_added)
         return if scripts.key?("build")
 
-        scripts["build"] = "RAILS_ENV=${RAILS_ENV:-development} NODE_ENV=${NODE_ENV:-development} bin/shakapacker"
+        scripts["build"] = "RAILS_ENV=development NODE_ENV=development bin/shakapacker"
         scripts_added << "build"
       end
 
@@ -550,6 +552,7 @@ module ReactOnRails
                                      rsc: use_rsc?,
                                      shakapacker_just_installed: shakapacker_just_installed?,
                                      landing_page: options.new_app? && new_app_root_route_available?,
+                                     ci_workflow_generated: @ci_workflow_generated == true,
                                      app_root: destination_root
                                    ))
         GeneratorMessages.add_info(rsc_pro_verification_message) if use_rsc_pro_mode?
