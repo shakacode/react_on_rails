@@ -71,12 +71,6 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
-      - name: Guard docs-only main pushes
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: ./.github/actions/ensure-main-docs-safety
-        with:
-          docs-only: ${{ steps.detect.outputs.docs_only }}
-          previous-sha: ${{ github.event.before }}
       - name: Set gem tests matrix
         id: set-matrix
         run: |
@@ -93,6 +87,12 @@ jobs:
             # PR matrix: test only latest versions for fast feedback × 2 shards
             echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"}]}' >> $GITHUB_OUTPUT
           fi
+      - name: Guard docs-only main pushes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: ./.github/actions/ensure-main-docs-safety
+        with:
+          docs-only: ${{ steps.detect.outputs.docs_only }}
+          previous-sha: ${{ github.event.before }}
 
   rspec-package-tests:
     needs: detect-changes
