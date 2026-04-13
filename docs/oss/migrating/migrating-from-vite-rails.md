@@ -180,3 +180,5 @@ one reasonable React on Rails target is:
 - Turbo usage, if your app already uses it
 
 The migration is mostly about asset/build integration, mounting strategy, and optional SSR capability.
+
+For additional real-world migration references and active public PRs, see [Example Migrations](./example-migrations.md).

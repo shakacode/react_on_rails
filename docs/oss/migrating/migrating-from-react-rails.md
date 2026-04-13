@@ -128,6 +128,8 @@ You can also check [react-rails-to-react-on-rails](https://github.com/shakacode/
 
 For a more recent Rails 7-era migration example (published under ShakaCode), see [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example), based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example).
 
+For additional real-world migration references and active public PRs, see [Example Migrations](./example-migrations.md).
+
 ## Practical checklist for Webpacker-era apps
 
 If your app looks like this:
