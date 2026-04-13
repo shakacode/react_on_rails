@@ -19,6 +19,13 @@ module ReactOnRails
     protected
 
     # Returns an array of JS code sections. Override in subclasses to add/reorder sections.
+    #
+    # == JS variable contract
+    # props_section, render_call_section, and wrap_in_iife share JS variable names:
+    # - props_section declares a variable (base: `props`) used by render_call_section
+    # - wrap_in_iife may introduce IIFE parameters that shadow or supply those variables
+    # When overriding any one of these methods, verify the JS variables still align.
+    # See ReactOnRailsPro::JsCodeBuilder for an example that changes all three.
     def build_sections(render_request)
       [
         rails_context_section(render_request),

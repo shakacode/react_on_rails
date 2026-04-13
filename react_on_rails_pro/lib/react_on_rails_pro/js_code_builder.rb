@@ -71,6 +71,13 @@ module ReactOnRailsPro
       pre_hook.presence
     end
 
+    # == JS variable contract (see base class build_sections for details)
+    # These three methods are coupled by JS variable names:
+    # - wrap_in_iife introduces `componentName` and `props` as IIFE default parameters
+    # - props_section declares `usedProps` (falls back to render_request.props_string
+    #   when `props` IIFE param is undefined, i.e. normal invocation)
+    # - render_call_section references both `componentName` and `usedProps`
+    # Overriding any one without the others will produce broken JavaScript.
     def props_section(render_request)
       "var usedProps = typeof props === 'undefined' ? #{render_request.props_string} : props;"
     end
