@@ -1,4 +1,4 @@
-## Migrate From react-rails
+# Migrate From react-rails
 
 This migration is easiest when the app is already on a modern Rails + Shakapacker baseline.
 
