@@ -151,9 +151,11 @@ jobs:
         run: |
           echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Run rspec tests
+        env:
+          SHARD: ${{ matrix.shard }}
         run: |
           cd react_on_rails
-          if [ "${{ matrix.shard }}" = "generators" ]; then
+          if [[ "$SHARD" = "generators" ]]; then
             bundle exec rspec spec/react_on_rails/generators
           else
             bundle exec rspec spec/react_on_rails --exclude-pattern "**/generators/**"
