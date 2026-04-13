@@ -15,7 +15,7 @@ Before diving into render-functions, it helps to know the three kinds of values 
 A few important points about the detection:
 
 - **The detection is based on `Function.length`** (the number of declared parameters). Destructured parameters count as 1 — `({ name }) => ...` has length 1.
-- **Render functions return** a React component, a React element, a server-render hash object, or a promise that resolves to one of those. See [Types of Render-Function Return Values](#types-of-render-function-return-values) below.
+- **Render functions return** a React component, a React element, a server-render hash object, or a promise that resolves to one of those. See [Types of Render-Functions and Their Return Values](#types-of-render-functions-and-their-return-values) below.
 - **Renderer functions do not return anything meaningful.** They take control of mounting/hydration themselves by calling `ReactDOM.hydrateRoot` / `createRoot` against `domNodeId`. Because there is no DOM on the server, **registering a renderer function and then server-rendering it throws a descriptive error**. Renderer functions are strictly client-side.
 - **`fn.renderFunction = true` is an escape hatch** for render functions that don't need `railsContext` but still want to be treated as render functions (e.g., so they can return a hash). Without the flag, a one-parameter function is classified as a regular React component.
 
@@ -63,7 +63,7 @@ The Ruby helper you use in your Rails view must be compatible with the component
 | **Render Function returning `{ renderedHtml: string }`** | ✅ Works | ❌ Raises — string is not a hash with `componentHtml` | ❌ Raises — streaming does not support server render hashes |
 | **Render Function returning `{ renderedHtml: ReactElement }`** | ✅ Works (calls `renderToString` on the element) | ❌ Raises — element is not a hash with `componentHtml` | ❌ Raises — streaming does not support server render hashes |
 | **Render Function returning a server-render hash** (`{ renderedHtml: { componentHtml, ... } }`) | ⚠️ Raises — tells you to use `react_component_hash` | ✅ Works (the designed use case) | ❌ Raises — streaming does not support server render hashes |
-| **Async Render Function** (returns a Promise) | ✅ Works with Pro Node renderer. ❌ ExecJS silently returns empty output — see [Async functions and ExecJS](#async-functions-and-execjs). | ✅ Same — Pro Node renderer only | ✅ Works (streaming SSR is Pro) |
+| **Async Render Function** (returns a Promise) | ✅ Works with Pro Node renderer. ❌ ExecJS silently returns empty output — see [Async functions and ExecJS](#async-functions-and-execjs). | ✅ Same — Pro Node renderer only | ✅ Only if the promise resolves to a React component. Promises resolving to strings or server-render hashes are rejected — streaming does not support server render hashes. |
 | **Renderer Function** (3 params) | ✅ Works with `prerender: false` (client-only). ❌ Throws with `prerender: true` — renderer functions cannot run on the server. | ❌ Raises — `react_component_hash` forces `prerender: true`, which is incompatible with renderer functions | ❌ Raises — streaming requires server rendering |
 
 **Key takeaways:**
@@ -274,6 +274,7 @@ This helper accepts render-functions that return objects with a `renderedHtml` p
 
 - Simple component rendering
 - Client-side only rendering (always uses server rendering)
+- Renderer functions (3-parameter functions) — these are client-only and incompatible with forced server rendering
 
 #### Requirements
 
@@ -423,7 +424,7 @@ ReactOnRails.register({ AsyncReactComponent });
 <%= react_component("AsyncReactComponent", props: { dataUrl: "/api/data" }) %>
 ```
 
-### Return Type 8: Redirect Object
+### Return Type 8: Redirect Object (Legacy)
 
 ```jsx
 const RedirectComponent = (props, railsContext) => {

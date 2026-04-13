@@ -112,7 +112,7 @@ import type { RailsContext } from 'react-on-rails-pro';
 import AppRouter from './AppRouter';
 
 function ServerAppRouter(props: object, railsContext: RailsContext) {
-  const path = new URL(railsContext.href).pathname;
+  const path = railsContext.pathname;
   return () => (
     <StaticRouter location={path}>
       <AppRouter {...props} />

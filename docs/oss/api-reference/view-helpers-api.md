@@ -159,6 +159,9 @@ Progressive server-side rendering using React 18+ streaming with `renderToPipeab
 
 See the [Streaming Server Rendering guide](../building-features/streaming-server-rendering.md) for usage details.
 
+> [!IMPORTANT]
+> `stream_react_component` always forces `prerender: true` — passing `prerender: false` has no effect. It only supports React components and render functions that return React components; render functions returning a `{ renderedHtml }` hash are incompatible (see [compatibility matrix](../core-concepts/render-functions.md#compatibility-matrix-component-types-and-ruby-helpers)).
+
 ### rsc_payload_react_component
 
 Renders React Server Component (RSC) payloads in NDJSON format for client-side consumption. Used in conjunction with RSC support to enable:
