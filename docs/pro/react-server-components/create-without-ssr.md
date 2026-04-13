@@ -346,20 +346,12 @@ import registerServerComponent from 'react-on-rails-pro/registerServerComponent/
 registerServerComponent('ReactServerComponentPage');
 ```
 
-As you can see, server components are not registered using the `ReactOnRails.register` function. Instead, we use the `registerServerComponent` function to register the server component. Also, `registerServerComponent` has different options for the client bundle and the server bundle.
+Server components are not registered using `ReactOnRails.register`. Instead, use `registerServerComponent`, which has different signatures for each bundle:
 
-- For the server bundle, the component itself is passed to the `registerServerComponent` function, so the component is bundled into the server bundle.
-- For the client bundle, we pass the component name as an argument to the `registerServerComponent` function, so the component is not bundled into the client bundle.
+- **Server bundle**: Takes an object with the actual component references (e.g., `{ ReactServerComponentPage }`), so the component code is bundled into the server bundle.
+- **Client bundle**: Takes component names as strings (e.g., `'ReactServerComponentPage'`). The actual component code is **not** included in the client bundle. Instead, when the component needs to render, the client fetches the RSC payload from the server. If the page was server-rendered, the RSC payload is already embedded in the HTML, so no extra request is needed.
 
-As you can see at [How React Server Components work](how-react-server-components-work.md):
-
-- Server components are rendered on the client using the rsc payload not the component itself.
-
-And as you can see at [React Server Components Rendering Flow](./rendering-flow.md):
-
-- In the future, the server bundle will use the RSC payload to render the server component on the server side as well.
-
-The `rscPayloadGenerationUrlPath` option will be explained in detail later in this document. For now, just know that it specifies the base URL path for React Server Component requests.
+See [How React Server Components work](how-react-server-components-work.md) and [React Server Components Rendering Flow](./rendering-flow.md) for more details on how RSC payloads are generated and consumed.
 
 ## Add the React Server Component Rendering URL Path to the Rails Routes
 
@@ -399,6 +391,8 @@ Create a new file `app/views/pages/react_server_component_without_ssr.html.erb`:
 
 <h1>React Server Component without SSR</h1>
 ```
+
+> **Note:** This tutorial uses `react_component` with `prerender: false` for client-side-only rendering. To enable server-side rendering with streaming, use `stream_react_component` instead. See [Server-Side Rendering](./server-side-rendering.md) for details.
 
 ## Run the Development Server
 

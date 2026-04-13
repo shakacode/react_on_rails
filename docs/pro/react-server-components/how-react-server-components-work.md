@@ -222,21 +222,7 @@ Rails.application.routes.draw do
 end
 ```
 
-In this case, ensure you pass the correct path to `registerServerComponent` function in the client bundle.
-
-```js
-// client/app/packs/client-bundle.js
-import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
-
-registerServerComponent(
-  {
-    rscPayloadGenerationUrlPath: 'flight-payload',
-  },
-  'ReactServerComponentPage',
-);
-```
-
-Or if you enabled the `auto_load_bundle` option to make React on Rails automatically register react components, you can pass the path to the `rsc_payload_generation_url_path` config in React on Rails Pro configuration.
+If you customize the route path, ensure the `rsc_payload_generation_url_path` config matches:
 
 ```ruby
 # config/initializers/react_on_rails.rb
