@@ -60,7 +60,6 @@ jobs:
           NODE_ENV: test
 
       - name: Run tests
-        # If using RSpec, replace with: bundle exec rspec
-        run: bin/rails test
+        run: <%= config[:has_rspec] ? "bundle exec rspec" : "bin/rails test" %>
         env:
           RAILS_ENV: test

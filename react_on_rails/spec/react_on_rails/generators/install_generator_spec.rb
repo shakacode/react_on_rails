@@ -348,6 +348,13 @@ describe InstallGenerator, type: :generator do
       expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_MINITEST_TO_COMPILE_ASSETS
       assert_file("test/test_helper.rb") { |contents| expect(contents).to match(expected) }
     end
+
+    it "CI workflow uses bin/rails test when RSpec is absent" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("bin/rails test")
+        expect(content).not_to include("bundle exec rspec")
+      end
+    end
   end
 
   context "with both rspec and minitest helpers present" do

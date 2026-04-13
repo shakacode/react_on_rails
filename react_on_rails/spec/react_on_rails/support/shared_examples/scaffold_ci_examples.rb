@@ -34,6 +34,13 @@ shared_examples "scaffold_ci_and_scripts" do
     end
   end
 
+  it "CI workflow detects RSpec and uses bundle exec rspec" do
+    assert_file ".github/workflows/ci.yml" do |content|
+      expect(content).to include("bundle exec rspec")
+      expect(content).not_to include("bin/rails test")
+    end
+  end
+
   it "adds build scripts to package.json" do
     assert_file "package.json" do |content|
       package_json = JSON.parse(content)
