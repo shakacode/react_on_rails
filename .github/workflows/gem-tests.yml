@@ -44,6 +44,7 @@ jobs:
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,21 +77,15 @@ jobs:
         with:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
-
-  setup-gem-tests-matrix:
-    needs: detect-changes
-    runs-on: ubuntu-22.04
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
+      - name: Set gem tests matrix
+        id: set-matrix
         run: |
           # Determine if we should run full matrix (main or full-ci label)
           # Each Ruby version / dependency level is split into two shards:
           #   generators – spec/react_on_rails/generators (heavy filesystem I/O)
           #   unit       – everything else under spec/react_on_rails
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
+             [[ "${{ steps.check-label.outputs.result }}" == "true" ]]; then
             # Full matrix: test both latest and minimum supported versions × 2 shards
             echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"generators"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"unit"}]}' >> $GITHUB_OUTPUT
           else
@@ -99,7 +94,7 @@ jobs:
           fi
 
   rspec-package-tests:
-    needs: [detect-changes, setup-gem-tests-matrix]
+    needs: detect-changes
     # Skip only if: main push AND docs-only changes
     # Otherwise run if: on main OR Ruby tests needed
     # This allows docs-only commits to skip heavy jobs while ensuring full CI on main for code changes
@@ -114,7 +109,7 @@ jobs:
       )
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup-gem-tests-matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
