@@ -121,6 +121,82 @@ This means a developer running the renderer locally without a password is safe b
 
 See [JS Configuration](./js-configuration.md) for the `host` and `password` options, and [Container Deployment](./container-deployment.md) for architecture-specific guidance.
 
+## CI and Test Environment Setup
+
+Running tests that involve server-side rendering requires the Node Renderer to be running. Without it, tests will silently timeout with `Net::ReadTimeout` -- not crash with a clear error -- making the failure easy to misdiagnose.
+
+### 1. Guard the initializer for test environments
+
+A common mistake is guarding the Node Renderer configuration with `Rails.env.development?`, which excludes the test environment:
+
+```ruby
+# config/initializers/react_on_rails_pro.rb
+
+# WRONG -- excludes test environment
+if Rails.env.development?
+  ReactOnRailsPro.configure do |config|
+    config.server_renderer = "NodeRenderer"
+  end
+end
+
+# CORRECT -- covers both development and test
+if Rails.env.local?
+  ReactOnRailsPro.configure do |config|
+    config.server_renderer = "NodeRenderer"
+  end
+end
+```
+
+`Rails.env.local?` returns `true` for both `development` and `test` environments (available since Rails 7.1). For older Rails versions, use `Rails.env.development? || Rails.env.test?`.
+
+### 2. Start the renderer in CI
+
+The Node Renderer must be started as a background process before running tests. Add a step to your CI workflow:
+
+```yaml
+# .github/workflows/test.yml (GitHub Actions example)
+jobs:
+  test:
+    env:
+      # Job-level: both the renderer and Rails test steps need this
+      RENDERER_PASSWORD: ${{ secrets.RENDERER_PASSWORD }}
+    steps:
+      - name: Start Node Renderer
+        run: |
+          node client/node-renderer.js &
+          # Wait for the renderer to be ready.
+          # The renderer uses cleartext HTTP/2 (h2c), so use --http2-prior-knowledge for the probe.
+          # --max-time 2 prevents hangs if the port is open but the process is stalled.
+          for i in $(seq 1 30); do
+            if curl -s --http2-prior-knowledge --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
+              echo "Node Renderer is ready"
+              break
+            fi
+            echo "Waiting for Node Renderer... ($i/30)"
+            sleep 1
+          done
+          # Fail fast if renderer never became ready
+          if ! curl -s --http2-prior-knowledge --max-time 2 http://localhost:3800/ > /dev/null 2>&1; then
+            echo "Node Renderer failed to start in time" >&2
+            exit 1
+          fi
+```
+
+Key points:
+
+- **Readiness check**: Poll port 3800 (or your configured port) before running tests. The renderer uses **cleartext HTTP/2 (h2c)**, so the `curl` probe must include `--http2-prior-knowledge`. Without it, `curl` sends an HTTP/1.1 request that the h2c server rejects.
+- **`RENDERER_PASSWORD`**: Must be set in the CI environment and match the value configured in `react_on_rails_pro.rb`. Add it as a CI secret. **Important:** Declare this at the job level (not just the renderer step) so Rails can also read it when running tests.
+- **Bundle pre-staging**: You do **not** need to set a bundle path env var for the renderer. In CI, run `rake react_on_rails_pro:pre_stage_bundle_for_node_renderer` after the webpack build and before starting the renderer — this symlinks the compiled bundle into the renderer's cache directory, eliminating the first-request upload latency. For remote renderers, use `rake react_on_rails_pro:copy_assets_to_remote_vm_renderer` instead.
+
+### 3. Common CI failures
+
+| Symptom                                   | Cause                          | Fix                                    |
+| ----------------------------------------- | ------------------------------ | -------------------------------------- |
+| All tests timeout with `Net::ReadTimeout` | Node Renderer not running      | Add the renderer start step above      |
+| "Connection refused" errors               | Renderer started but not ready | Add the TCP readiness check loop       |
+| Tests pass locally but fail in CI         | `Rails.env.development?` guard | Change to `Rails.env.local?`           |
+| "Invalid password" errors                 | `RENDERER_PASSWORD` mismatch   | Ensure CI env var matches Rails config |
+
 ## Troubleshooting
 
 - See [Memory Leaks guide](../../../pro/js-memory-leaks.md).
