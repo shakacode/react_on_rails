@@ -47,6 +47,9 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
           <li>
             <Link to={`${basePath}/server-component-with-retry`}>Server Component with Retry</Link>
           </li>
+          <li>
+            <Link to={`${basePath}/deterministic-rsc-error`}>Deterministic RSC Error</Link>
+          </li>
         </ul>
       </nav>
       <Suspense fallback={<div>Loading Page...</div>}>
@@ -83,6 +86,10 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             element={<RSCRoute componentName="AsyncComponentsTreeForTesting" componentProps={props} />}
           />
           <Route path={`${basePath}/server-component-with-retry`} element={<ServerComponentWithRetry />} />
+          <Route
+            path={`${basePath}/deterministic-rsc-error`}
+            element={<RSCRoute componentName="DeterministicRSCErrorComponent" componentProps={{}} />}
+          />
         </Routes>
       </Suspense>
     </ErrorBoundary>
