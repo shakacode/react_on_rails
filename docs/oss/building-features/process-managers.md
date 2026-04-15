@@ -371,6 +371,57 @@ SHAKAPACKER_DEV_SERVER_PORT=3036
 
 When `PORT` or `SHAKAPACKER_DEV_SERVER_PORT` are set, auto-detection is skipped entirely.
 
+### Coding Agent / CI Integration
+
+When using coding agent tools that run multiple workspaces concurrently
+([Conductor.build](https://conductor.build), OpenAI Codex, Quad Code, etc.),
+set `REACT_ON_RAILS_BASE_PORT` to derive all service ports from a single value.
+This eliminates the need for per-worktree `.env` files.
+
+`bin/dev` assigns ports using fixed offsets from the base:
+
+| Service             | Offset | Example (base=4000) |
+| ------------------- | ------ | ------------------- |
+| Rails server        | +0     | 4000                |
+| Webpack dev server  | +1     | 4001                |
+| Node renderer (Pro) | +2     | 4002                |
+| _(reserved)_        | +3–+9  | 4003–4009           |
+
+When a base port is detected, `bin/dev` also sets `RENDERER_PORT` and
+`REACT_RENDERER_URL` automatically so the Pro Node Renderer and Rails
+initializer agree on the port without any additional configuration.
+
+**Recognized environment variables** (checked in order):
+
+1. `REACT_ON_RAILS_BASE_PORT` — the canonical base port variable; any tool can set this.
+2. `CONDUCTOR_PORT` — set automatically by [Conductor.build](https://conductor.build).
+
+**Priority chain:** base port > explicit per-service env vars (`PORT`, etc.) > auto-detect free ports.
+
+**Example: setting the base port in a tool's configuration:**
+
+```sh
+# In your agent tool's workspace setup or .env
+REACT_ON_RAILS_BASE_PORT=4000
+```
+
+### Manual Worktree Port Setup (Pro)
+
+If you use the [Node Renderer](./node-renderer/basics.md) (React on Rails Pro) with manual
+worktrees (no base port), you need to configure the renderer port in addition to the standard
+Rails and webpack ports:
+
+```sh
+# .env in each worktree
+PORT=3001
+SHAKAPACKER_DEV_SERVER_PORT=3036
+RENDERER_PORT=3801
+REACT_RENDERER_URL=http://localhost:3801
+```
+
+The renderer port must match on both sides: `RENDERER_PORT` is read by the Node process and
+`REACT_RENDERER_URL` is read by the Rails-side Pro initializer.
+
 ## See Also
 
 - [HMR and Hot Reloading](./hmr-and-hot-reloading-with-the-webpack-dev-server.md)

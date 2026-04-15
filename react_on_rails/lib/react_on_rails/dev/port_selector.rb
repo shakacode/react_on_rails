@@ -5,17 +5,47 @@ require "socket"
 module ReactOnRails
   module Dev
     class PortSelector
-      DEFAULT_RAILS_PORT   = 3000
-      DEFAULT_WEBPACK_PORT = 3035
-      MAX_ATTEMPTS         = 100
+      DEFAULT_RAILS_PORT    = 3000
+      DEFAULT_WEBPACK_PORT  = 3035
+      DEFAULT_RENDERER_PORT = 3800
+      MAX_ATTEMPTS          = 100
+
+      # Offsets from the base port when REACT_ON_RAILS_BASE_PORT (or a recognized
+      # tool-specific equivalent like CONDUCTOR_PORT) is set. The base port block
+      # is typically 10 consecutive ports allocated per workspace.
+      BASE_PORT_RAILS_OFFSET    = 0
+      BASE_PORT_WEBPACK_OFFSET  = 1
+      BASE_PORT_RENDERER_OFFSET = 2
+
+      # Env vars checked (in order) for a base port value.
+      BASE_PORT_ENV_VARS = %w[REACT_ON_RAILS_BASE_PORT CONDUCTOR_PORT].freeze
 
       class NoPortAvailable < StandardError; end
 
       class << self
-        # Returns { rails: Integer, webpack: Integer }.
-        # Respects existing ENV['PORT'] / ENV['SHAKAPACKER_DEV_SERVER_PORT'].
-        # Probes for free ports when either or both env vars are unset.
+        # Returns { rails: Integer, webpack: Integer, renderer: Integer|nil }.
+        #
+        # Priority:
+        #   1. Base port (REACT_ON_RAILS_BASE_PORT or CONDUCTOR_PORT) — all ports
+        #      derived deterministically from the base; no probing.
+        #   2. Explicit per-service env vars (PORT, SHAKAPACKER_DEV_SERVER_PORT).
+        #   3. Auto-detect free ports starting from defaults.
+        #
+        # The :renderer key is populated only when a base port is set (it is a
+        # Pro-only service and does not participate in auto-detection).
         def select_ports
+          bp = base_port
+          if bp
+            ports = {
+              rails: bp + BASE_PORT_RAILS_OFFSET,
+              webpack: bp + BASE_PORT_WEBPACK_OFFSET,
+              renderer: bp + BASE_PORT_RENDERER_OFFSET
+            }
+            puts "Base port #{bp} detected. Using Rails :#{ports[:rails]}, " \
+                 "webpack :#{ports[:webpack]}, renderer :#{ports[:renderer]}"
+            return ports
+          end
+
           rails_port   = explicit_rails_port
           webpack_port = explicit_webpack_port
 
@@ -30,7 +60,7 @@ module ReactOnRails
             puts "Default ports in use. Using Rails :#{rails_port}, webpack :#{webpack_port}"
           end
 
-          { rails: rails_port, webpack: webpack_port }
+          { rails: rails_port, webpack: webpack_port, renderer: nil }
         end
 
         # Public so it can be stubbed in tests.
@@ -64,6 +94,14 @@ module ReactOnRails
         end
 
         private
+
+        def base_port
+          BASE_PORT_ENV_VARS.each do |var|
+            val = ENV[var]&.to_i
+            return val if val&.between?(1, 65_535)
+          end
+          nil
+        end
 
         def explicit_rails_port
           ENV["PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }

@@ -272,7 +272,7 @@ module ReactOnRails
             ⚠️  Procfile.dev not found. Skipping Node Renderer process addition.
 
             You'll need to add the Node Renderer to your process manager manually:
-              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
+              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
           MSG
           return
         end
@@ -296,7 +296,7 @@ module ReactOnRails
         node_renderer_line = <<~PROCFILE
 
           # React on Rails Pro - Node Renderer for SSR
-          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
+          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js
         PROCFILE
 
         append_to_file("Procfile.dev", node_renderer_line)

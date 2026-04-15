@@ -837,6 +837,10 @@ module ReactOnRails
           selected = PortSelector.select_ports
           ENV["PORT"] ||= selected[:rails].to_s
           ENV["SHAKAPACKER_DEV_SERVER_PORT"] ||= selected[:webpack].to_s
+          if selected[:renderer]
+            ENV["RENDERER_PORT"] ||= selected[:renderer].to_s
+            ENV["REACT_RENDERER_URL"] ||= "http://localhost:#{selected[:renderer]}"
+          end
         rescue PortSelector::NoPortAvailable => e
           warn e.message
           exit 1

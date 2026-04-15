@@ -6,6 +6,88 @@ require "socket"
 
 RSpec.describe ReactOnRails::Dev::PortSelector do
   describe ".select_ports" do
+    context "when REACT_ON_RAILS_BASE_PORT is set" do
+      around do |example|
+        old = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "5000"
+        example.run
+        ENV["REACT_ON_RAILS_BASE_PORT"] = old
+      end
+
+      it "derives Rails port from base + 0" do
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(5000)
+      end
+
+      it "derives webpack port from base + 1" do
+        result = described_class.select_ports
+        expect(result[:webpack]).to eq(5001)
+      end
+
+      it "derives renderer port from base + 2" do
+        result = described_class.select_ports
+        expect(result[:renderer]).to eq(5002)
+      end
+
+      it "does not probe for free ports" do
+        expect(described_class).not_to receive(:port_available?)
+        described_class.select_ports
+      end
+
+      it "prints a base port message" do
+        expect { described_class.select_ports }.to output(/Base port 5000 detected/).to_stdout
+      end
+    end
+
+    context "when CONDUCTOR_PORT is set (without REACT_ON_RAILS_BASE_PORT)" do
+      around do |example|
+        old = ENV.fetch("CONDUCTOR_PORT", nil)
+        ENV["CONDUCTOR_PORT"] = "6000"
+        example.run
+        ENV["CONDUCTOR_PORT"] = old
+      end
+
+      it "derives all ports from CONDUCTOR_PORT" do
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(6000)
+        expect(result[:webpack]).to eq(6001)
+        expect(result[:renderer]).to eq(6002)
+      end
+    end
+
+    context "when both REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT are set" do
+      around do |example|
+        old_base = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
+        old_conductor = ENV.fetch("CONDUCTOR_PORT", nil)
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "5000"
+        ENV["CONDUCTOR_PORT"] = "6000"
+        example.run
+        ENV["REACT_ON_RAILS_BASE_PORT"] = old_base
+        ENV["CONDUCTOR_PORT"] = old_conductor
+      end
+
+      it "prefers REACT_ON_RAILS_BASE_PORT over CONDUCTOR_PORT" do
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(5000)
+      end
+    end
+
+    context "when base port is out of range" do
+      around do |example|
+        old = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "99999"
+        example.run
+        ENV["REACT_ON_RAILS_BASE_PORT"] = old
+      end
+
+      it "falls back to normal auto-detection" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(3000)
+        expect(result[:renderer]).to be_nil
+      end
+    end
+
     context "when default ports are free" do
       it "returns the default Rails port 3000" do
         allow(described_class).to receive(:port_available?).and_return(true)
@@ -17,6 +99,12 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         allow(described_class).to receive(:port_available?).and_return(true)
         result = described_class.select_ports
         expect(result[:webpack]).to eq(3035)
+      end
+
+      it "returns nil for renderer port" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        result = described_class.select_ports
+        expect(result[:renderer]).to be_nil
       end
 
       it "does not print a shift message" do
