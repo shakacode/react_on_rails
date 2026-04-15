@@ -8,15 +8,11 @@ import {
 
 type PageLifecycleCallback = () => void | Promise<void>;
 type PageState = 'load' | 'unload' | 'initial';
-type NavigationStrategy = 'none' | 'turbo' | 'turbolinks5' | 'turbolinks2';
 
 const pageLoadedCallbacks = new Set<PageLifecycleCallback>();
 const pageUnloadedCallbacks = new Set<PageLifecycleCallback>();
 
 let currentPageState: PageState = 'initial';
-let areNavigationListenersInstalled = false;
-let initialPageLoadReadyHandler: (() => void) | null = null;
-let initialPageLoadCompleteHandler: (() => void) | null = null;
 
 function runPageLoadedCallbacks(): void {
   currentPageState = 'load';
@@ -32,88 +28,34 @@ function runPageUnloadedCallbacks(): void {
   });
 }
 
-function getNavigationStrategy(): NavigationStrategy {
-  if (turboInstalled()) {
-    return 'turbo';
-  }
-
-  if (turbolinksInstalled() && turbolinksSupported()) {
-    return turbolinksVersion5() ? 'turbolinks5' : 'turbolinks2';
-  }
-
-  return 'none';
-}
-
-function ensureNavigationListenersInstalled(): NavigationStrategy {
-  const navigationStrategy = getNavigationStrategy();
-  if (areNavigationListenersInstalled) {
-    return navigationStrategy;
-  }
-
-  areNavigationListenersInstalled = true;
-
+function setupPageNavigationListeners(): void {
   // Install listeners when running on the client (browser).
   // We must check for navigation libraries AFTER the document is loaded because we load the
   // Webpack bundles first.
-  if (navigationStrategy === 'none') {
+  const hasNavigationLibrary = (turbolinksInstalled() && turbolinksSupported()) || turboInstalled();
+  if (!hasNavigationLibrary) {
     debugTurbolinks('NO NAVIGATION LIBRARY: running page loaded callbacks immediately');
-  } else if (navigationStrategy === 'turbo') {
+    runPageLoadedCallbacks();
+    return;
+  }
+
+  if (turboInstalled()) {
     debugTurbolinks('TURBO DETECTED: adding event listeners for turbo:before-render and turbo:render.');
     document.addEventListener('turbo:before-render', runPageUnloadedCallbacks);
     document.addEventListener('turbo:render', runPageLoadedCallbacks);
-  } else if (navigationStrategy === 'turbolinks5') {
+    runPageLoadedCallbacks();
+  } else if (turbolinksVersion5()) {
     debugTurbolinks(
       'TURBOLINKS 5 DETECTED: adding event listeners for turbolinks:before-render and turbolinks:render.',
     );
     document.addEventListener('turbolinks:before-render', runPageUnloadedCallbacks);
     document.addEventListener('turbolinks:render', runPageLoadedCallbacks);
+    runPageLoadedCallbacks();
   } else {
     debugTurbolinks('TURBOLINKS 2 DETECTED: adding event listeners for page:before-unload and page:change.');
     document.addEventListener('page:before-unload', runPageUnloadedCallbacks);
     document.addEventListener('page:change', runPageLoadedCallbacks);
   }
-
-  return navigationStrategy;
-}
-
-function cleanupInitialPageLoadListeners(): void {
-  if (initialPageLoadReadyHandler) {
-    document.removeEventListener('DOMContentLoaded', initialPageLoadReadyHandler);
-    initialPageLoadReadyHandler = null;
-  }
-
-  if (initialPageLoadCompleteHandler) {
-    document.removeEventListener('readystatechange', initialPageLoadCompleteHandler);
-    initialPageLoadCompleteHandler = null;
-  }
-}
-
-function handleAutomaticInitialPageLoad(): void {
-  if (currentPageState !== 'initial') {
-    cleanupInitialPageLoadListeners();
-    ensureNavigationListenersInstalled();
-    return;
-  }
-
-  cleanupInitialPageLoadListeners();
-  const navigationStrategy = ensureNavigationListenersInstalled();
-  if (navigationStrategy !== 'turbolinks2') {
-    runPageLoadedCallbacks();
-  }
-}
-
-export function consumeInitialPageLoadIfNeeded(): boolean {
-  if (currentPageState !== 'initial') {
-    return false;
-  }
-
-  if (document.readyState === 'complete') {
-    cleanupInitialPageLoadListeners();
-    ensureNavigationListenersInstalled();
-  }
-
-  runPageLoadedCallbacks();
-  return true;
 }
 
 let isPageLifecycleInitialized = false;
@@ -138,22 +80,37 @@ function initializePageEventListeners(): void {
   // hydrate components as their HTML and bundles arrive, but this page lifecycle still powers the
   // fallback page-load sweep. See pageLifecycle.test.js for regression coverage of both cases.
   if (document.readyState === 'complete') {
-    handleAutomaticInitialPageLoad();
+    setupPageNavigationListeners();
   } else {
-    initialPageLoadReadyHandler = (): void => {
-      handleAutomaticInitialPageLoad();
+    let isSetupComplete = false;
+    let setupPageNavigationListenersOnce: () => void;
+    let setupPageNavigationListenersOnComplete: () => void;
+
+    const cleanupListeners = (): void => {
+      document.removeEventListener('DOMContentLoaded', setupPageNavigationListenersOnce);
+      document.removeEventListener('readystatechange', setupPageNavigationListenersOnComplete);
     };
 
-    initialPageLoadCompleteHandler = (): void => {
+    setupPageNavigationListenersOnce = (): void => {
+      if (isSetupComplete) {
+        return;
+      }
+
+      isSetupComplete = true;
+      cleanupListeners();
+      setupPageNavigationListeners();
+    };
+
+    setupPageNavigationListenersOnComplete = (): void => {
       if (document.readyState === 'complete') {
-        handleAutomaticInitialPageLoad();
+        setupPageNavigationListenersOnce();
       }
     };
 
-    document.addEventListener('DOMContentLoaded', initialPageLoadReadyHandler);
+    document.addEventListener('DOMContentLoaded', setupPageNavigationListenersOnce);
 
     if (document.readyState === 'interactive') {
-      document.addEventListener('readystatechange', initialPageLoadCompleteHandler);
+      document.addEventListener('readystatechange', setupPageNavigationListenersOnComplete);
     }
   }
 }
