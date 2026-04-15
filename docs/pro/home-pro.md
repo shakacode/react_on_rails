@@ -1,3 +1,8 @@
+---
+unlisted: true
+description: Compatibility stub — use the React on Rails Pro landing page instead.
+---
+
 # React on Rails Pro Home
 
 This route is kept for compatibility with older docs links.
