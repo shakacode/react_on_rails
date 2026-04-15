@@ -4,6 +4,8 @@ require "rails_helper"
 
 # Spec lives under spec/dummy/spec/ because it requires the dummy Rails environment (Rails.root, webpack paths).
 describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePath,RSpec/SpecFilePathFormat
+  subject(:pre_seed_cache) { described_class.call }
+
   let(:asset_filename) { "loadable-stats2.json" }
   let(:asset_filename2) { "loadable-stats3.json" }
   let(:fixture_path) { File.expand_path("./spec/fixtures/#{asset_filename}") }
@@ -45,6 +47,8 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
   after do
     FileUtils.rm_rf(cache_dir)
     FileUtils.rm_f(server_bundle_path)
+    FileUtils.rm_f(path_in_webpack_folder(asset_filename))
+    FileUtils.rm_f(path_in_webpack_folder(asset_filename2))
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
   end
@@ -56,7 +60,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
 
     it "copies server bundle into subdirectory structure" do
-      described_class.call
+      pre_seed_cache
 
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
       expect(File.exist?(dest_file)).to be(true)
@@ -66,7 +70,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
 
     it "copies assets into the bundle subdirectory" do
-      described_class.call
+      pre_seed_cache
 
       expect(File.exist?(File.join(bundle_dir, asset_filename))).to be(true)
       expect(File.exist?(File.join(bundle_dir, asset_filename2))).to be(true)
@@ -78,7 +82,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       first_asset_path = path_in_webpack_folder(asset_filename)
       FileUtils.rm_f(first_asset_path)
 
-      expect { described_class.call }.to output(/Asset not found #{Regexp.escape(first_asset_path.to_s)}/).to_stderr
+      expect { pre_seed_cache }.to output(/Asset not found #{Regexp.escape(first_asset_path.to_s)}/).to_stderr
     end
   end
 
@@ -86,7 +90,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     before { FileUtils.rm_f(server_bundle_path) }
 
     it "raises an error" do
-      expect { described_class.call }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)
+      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)
     end
   end
 
@@ -104,7 +108,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
 
     it "raises an error for missing required RSC assets" do
-      expect { described_class.call }.to raise_error(ReactOnRailsPro::Error, /Required RSC asset not found/)
+      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /Required RSC asset not found/)
     end
   end
 
@@ -134,7 +138,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
 
     it "raises an error" do
-      expect { described_class.call }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)
+      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)
     end
   end
 
@@ -150,7 +154,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     after { FileUtils.rm_rf(custom_cache_dir) }
 
     it "uses the env var path" do
-      described_class.call
+      pre_seed_cache
 
       dest_file = File.join(custom_cache_dir, bundle_hash, "#{bundle_hash}.js")
       expect(File.exist?(dest_file)).to be(true)
@@ -169,7 +173,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     after { FileUtils.rm_rf(custom_cache_dir) }
 
     it "uses the deprecated env var with a warning" do
-      expect { described_class.call }.to output(/RENDERER_BUNDLE_PATH is deprecated/).to_stderr
+      expect { pre_seed_cache }.to output(/RENDERER_BUNDLE_PATH is deprecated/).to_stderr
 
       dest_file = File.join(custom_cache_dir, bundle_hash, "#{bundle_hash}.js")
       expect(File.exist?(dest_file)).to be(true)
@@ -188,7 +192,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     after { FileUtils.rm_rf(custom_cache_dir) }
 
     it "uses the preferred env var and emits no deprecation warning" do
-      expect { described_class.call }.not_to output(/deprecated/).to_stderr
+      expect { pre_seed_cache }.not_to output(/deprecated/).to_stderr
 
       dest_file = File.join(custom_cache_dir, bundle_hash, "#{bundle_hash}.js")
       expect(File.exist?(dest_file)).to be(true)
@@ -232,7 +236,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
 
     it "pre-seeds both server and RSC bundle directories" do
-      described_class.call
+      pre_seed_cache
 
       server_dest = File.join(cache_dir, bundle_hash, "#{bundle_hash}.js")
       rsc_dest = File.join(cache_dir, rsc_bundle_hash, "#{rsc_bundle_hash}.js")
@@ -242,7 +246,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
 
     it "copies RSC manifest assets into both bundle directories" do
-      described_class.call
+      pre_seed_cache
 
       server_dir = File.join(cache_dir, bundle_hash)
       rsc_dir = File.join(cache_dir, rsc_bundle_hash)
