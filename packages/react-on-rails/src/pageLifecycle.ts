@@ -82,35 +82,17 @@ function initializePageEventListeners(): void {
   if (document.readyState === 'complete') {
     setupPageNavigationListeners();
   } else {
-    let isSetupComplete = false;
-    let setupPageNavigationListenersOnce: () => void;
-    let setupPageNavigationListenersOnComplete: () => void;
-
-    const cleanupListeners = (): void => {
-      document.removeEventListener('DOMContentLoaded', setupPageNavigationListenersOnce);
-      document.removeEventListener('readystatechange', setupPageNavigationListenersOnComplete);
-    };
-
-    setupPageNavigationListenersOnce = (): void => {
-      if (isSetupComplete) {
-        return;
-      }
-
-      isSetupComplete = true;
-      cleanupListeners();
+    const initialPageLoadHandler = (event: Event): void => {
+      if (event.type === 'readystatechange' && document.readyState !== 'complete') return;
+      document.removeEventListener('DOMContentLoaded', initialPageLoadHandler);
+      document.removeEventListener('readystatechange', initialPageLoadHandler);
       setupPageNavigationListeners();
     };
 
-    setupPageNavigationListenersOnComplete = (): void => {
-      if (document.readyState === 'complete') {
-        setupPageNavigationListenersOnce();
-      }
-    };
-
-    document.addEventListener('DOMContentLoaded', setupPageNavigationListenersOnce);
+    document.addEventListener('DOMContentLoaded', initialPageLoadHandler);
 
     if (document.readyState === 'interactive') {
-      document.addEventListener('readystatechange', setupPageNavigationListenersOnComplete);
+      document.addEventListener('readystatechange', initialPageLoadHandler);
     }
   }
 }

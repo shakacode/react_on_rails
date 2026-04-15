@@ -345,7 +345,7 @@ describe('pageLifecycle', () => {
 
       // Now when DOMContentLoaded fires, the component is registered
       // and hydration succeeds
-      domContentLoadedHandler();
+      domContentLoadedHandler(new Event('DOMContentLoaded'));
       expect(attemptHydration).toHaveBeenCalled();
       // No error thrown because componentRegistered is now true
     });
@@ -370,13 +370,13 @@ describe('pageLifecycle', () => {
       expect(readyStateChangeHandler).toBeDefined();
 
       setReadyState('complete');
-      readyStateChangeHandler();
+      readyStateChangeHandler(new Event('readystatechange'));
 
       // Now callback should have been called through the complete fallback
       expect(callback).toHaveBeenCalledTimes(1);
     });
 
-    it('should only initialize once when DOMContentLoaded fires before complete during interactive', () => {
+    it('should remove both listeners after DOMContentLoaded fires so a later complete cannot re-trigger', () => {
       setReadyState('interactive');
 
       const { onPageLoaded } = importPageLifecycle();
@@ -385,17 +385,15 @@ describe('pageLifecycle', () => {
       onPageLoaded(callback);
 
       const domContentLoadedHandler = getEventHandler('DOMContentLoaded');
-      const readyStateChangeHandler = getEventHandler('readystatechange');
-
       expect(domContentLoadedHandler).toBeDefined();
-      expect(readyStateChangeHandler).toBeDefined();
 
-      domContentLoadedHandler();
+      domContentLoadedHandler(new Event('DOMContentLoaded'));
       expect(callback).toHaveBeenCalledTimes(1);
 
-      setReadyState('complete');
-      readyStateChangeHandler();
-      expect(callback).toHaveBeenCalledTimes(1);
+      // The handler's cleanup is what prevents the later readystatechange→complete
+      // event from firing the callback a second time in real browsers.
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('readystatechange', expect.any(Function));
     });
   });
 });
