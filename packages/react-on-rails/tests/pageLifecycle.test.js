@@ -31,6 +31,9 @@ describe('pageLifecycle', () => {
   // eslint-disable-next-line global-require
   const importPageLifecycle = () => require('../src/pageLifecycle.ts');
 
+  const getEventHandler = (eventName) =>
+    addEventListenerSpy.mock.calls.find((call) => call[0] === eventName)?.[1];
+
   // Helper function to create navigation library mock
   const createNavigationMock = (overrides = {}) => ({
     debugTurbolinks: jest.fn(),
@@ -81,7 +84,7 @@ describe('pageLifecycle', () => {
     expect(addEventListenerSpy).not.toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
   });
 
-  it('should wait for DOMContentLoaded when when document.readyState is "interactive"', () => {
+  it('should wait for DOMContentLoaded when document.readyState is "interactive"', () => {
     setReadyState('interactive');
     const callback = jest.fn();
     const { onPageLoaded } = importPageLifecycle();
@@ -92,6 +95,7 @@ describe('pageLifecycle', () => {
     expect(callback).not.toHaveBeenCalled();
     // Verify that a DOMContentLoaded listener was added when readyState is 'interactive'
     expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
+    expect(addEventListenerSpy).toHaveBeenCalledWith('readystatechange', expect.any(Function));
   });
 
   it('should wait for DOMContentLoaded when document.readyState is "loading"', () => {
@@ -272,8 +276,10 @@ describe('pageLifecycle', () => {
     // - It tries to hydrate components BEFORE step 5 completes
     // - ComponentRegistry.get() throws "Could not find component registered with name"
     //
-    // The fix: Use `readyState === 'complete'` to ensure we wait for DOMContentLoaded
-    // (which fires AFTER deferred scripts execute)
+    // The fix: do not initialize immediately during `interactive`.
+    // Wait for DOMContentLoaded (which fires AFTER deferred scripts execute),
+    // and separately recover on the later `complete` transition only if
+    // DOMContentLoaded was already missed before startup ran.
 
     it('should NOT call callbacks immediately when readyState is "interactive" because deferred scripts may not have executed', () => {
       // Simulate the state right after HTML parsing completes but before deferred scripts run
@@ -285,9 +291,9 @@ describe('pageLifecycle', () => {
       const hydrateComponentCallback = jest.fn();
       onPageLoaded(hydrateComponentCallback);
 
-      // CRITICAL: With the correct implementation (readyState === 'complete'),
-      // the callback should NOT be called immediately when readyState is 'interactive'.
-      // This gives deferred scripts time to execute and register components.
+      // CRITICAL: With the correct implementation, the callback should NOT be
+      // called immediately when readyState is 'interactive'. This gives deferred
+      // scripts time to execute and register components before hydration runs.
       expect(hydrateComponentCallback).not.toHaveBeenCalled();
 
       // Instead, a DOMContentLoaded listener should be added
@@ -324,7 +330,7 @@ describe('pageLifecycle', () => {
 
       onPageLoaded(attemptHydration);
 
-      // With correct implementation: callback not called yet, so no error
+      // With the correct implementation: callback not called yet, so no error
       expect(attemptHydration).not.toHaveBeenCalled();
 
       // Simulate deferred script executing (this happens before DOMContentLoaded)
@@ -344,7 +350,7 @@ describe('pageLifecycle', () => {
       // No error thrown because componentRegistered is now true
     });
 
-    it('should handle the case where readyState transitions from interactive to complete', () => {
+    it('should recover when DOMContentLoaded was already missed during interactive by waiting for complete', () => {
       // Start in 'interactive' state (HTML parsed, deferred scripts may be running)
       setReadyState('interactive');
 
@@ -356,17 +362,39 @@ describe('pageLifecycle', () => {
       // Callback should not be called immediately at 'interactive'
       expect(callback).not.toHaveBeenCalled();
       expect(addEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
+      expect(addEventListenerSpy).toHaveBeenCalledWith('readystatechange', expect.any(Function));
 
-      // Get the DOMContentLoaded handler
-      const domContentLoadedHandler = addEventListenerSpy.mock.calls.find(
-        (call) => call[0] === 'DOMContentLoaded',
-      )?.[1];
+      // Simulate the case where DOMContentLoaded already fired before startup installed its listener.
+      // The later transition to complete should still recover initialization.
+      const readyStateChangeHandler = getEventHandler('readystatechange');
+      expect(readyStateChangeHandler).toBeDefined();
 
-      // Simulate state transition: deferred scripts complete, then DOMContentLoaded fires
       setReadyState('complete');
-      domContentLoadedHandler();
+      readyStateChangeHandler();
 
-      // Now callback should have been called
+      // Now callback should have been called through the complete fallback
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it('should only initialize once when DOMContentLoaded fires before complete during interactive', () => {
+      setReadyState('interactive');
+
+      const { onPageLoaded } = importPageLifecycle();
+      const callback = jest.fn();
+
+      onPageLoaded(callback);
+
+      const domContentLoadedHandler = getEventHandler('DOMContentLoaded');
+      const readyStateChangeHandler = getEventHandler('readystatechange');
+
+      expect(domContentLoadedHandler).toBeDefined();
+      expect(readyStateChangeHandler).toBeDefined();
+
+      domContentLoadedHandler();
+      expect(callback).toHaveBeenCalledTimes(1);
+
+      setReadyState('complete');
+      readyStateChangeHandler();
       expect(callback).toHaveBeenCalledTimes(1);
     });
   });
