@@ -73,10 +73,7 @@ export default function AppRouter({ userId }) {
           path="/dashboard"
           element={<RSCRoute componentName="Dashboard" componentProps={{ userId }} />}
         />
-        <Route
-          path="/profile"
-          element={<RSCRoute componentName="Profile" componentProps={{ userId }} />}
-        />
+        <Route path="/profile" element={<RSCRoute componentName="Profile" componentProps={{ userId }} />} />
       </Routes>
     </>
   );
@@ -396,9 +393,7 @@ export default function DetailsPanel({ id }) {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <div>
-      <button onClick={() => setIsOpen(!isOpen)}>
-        {isOpen ? 'Hide' : 'Show'} details
-      </button>
+      <button onClick={() => setIsOpen(!isOpen)}>{isOpen ? 'Hide' : 'Show'} details</button>
       {isOpen && (
         <Suspense fallback={<div>Loading details…</div>}>
           <RSCRoute componentName="Details" componentProps={{ id }} />
@@ -413,15 +408,15 @@ export default function DetailsPanel({ id }) {
 
 Unless noted otherwise, each API below is a default export — use default-import syntax.
 
-| API | Import | Export type | Purpose |
-| --- | --- | --- | --- |
-| `RSCRoute` | `react-on-rails-pro/RSCRoute` | Default | Renders a server component inside a client component. Props: `componentName: string`, `componentProps: object`. |
-| `wrapServerComponentRenderer` (client) | `react-on-rails-pro/wrapServerComponentRenderer/client` | Default | Wraps a `'use client'` component for client-side hydration. Provides the context `RSCRoute` needs internally. The wrapped result must be registered with `ReactOnRails.register` unless you use auto-bundling. |
-| `wrapServerComponentRenderer` (server) | `react-on-rails-pro/wrapServerComponentRenderer/server` | Default | Same as above, for server-side rendering. The wrapped function receives `railsContext` as its second argument. |
-| `registerServerComponent` (client) | `react-on-rails-pro/registerServerComponent/client` | Default | Registers server component placeholders in the client bundle. Takes names as strings: `registerServerComponent('A', 'B')`. The client fetches the RSC payload from the server or uses the payload already embedded in the HTML. |
-| `registerServerComponent` (server) | `react-on-rails-pro/registerServerComponent/server` | Default | Registers server components in the server bundle. Takes an object: `registerServerComponent({ A, B })`. |
-| `useRSC` | `import { useRSC } from 'react-on-rails-pro/RSCProvider'` | **Named** | Hook providing `refetchComponent(name, props)` for manual refetch and error recovery. Available anywhere inside a tree set up by `wrapServerComponentRenderer` or `registerServerComponent`. |
-| `isServerComponentFetchError` | `import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError'` | **Named** | Type guard to check if an error came from a failed server component fetch. The error has `serverComponentName` and `serverComponentProps` fields. |
+| API                                    | Import                                                                                       | Export type | Purpose                                                                                                                                                                                                                         |
+| -------------------------------------- | -------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RSCRoute`                             | `react-on-rails-pro/RSCRoute`                                                                | Default     | Renders a server component inside a client component. Props: `componentName: string`, `componentProps: object`.                                                                                                                 |
+| `wrapServerComponentRenderer` (client) | `react-on-rails-pro/wrapServerComponentRenderer/client`                                      | Default     | Wraps a `'use client'` component for client-side hydration. Provides the context `RSCRoute` needs internally. The wrapped result must be registered with `ReactOnRails.register` unless you use auto-bundling.                  |
+| `wrapServerComponentRenderer` (server) | `react-on-rails-pro/wrapServerComponentRenderer/server`                                      | Default     | Same as above, for server-side rendering. The wrapped function receives `railsContext` as its second argument.                                                                                                                  |
+| `registerServerComponent` (client)     | `react-on-rails-pro/registerServerComponent/client`                                          | Default     | Registers server component placeholders in the client bundle. Takes names as strings: `registerServerComponent('A', 'B')`. The client fetches the RSC payload from the server or uses the payload already embedded in the HTML. |
+| `registerServerComponent` (server)     | `react-on-rails-pro/registerServerComponent/server`                                          | Default     | Registers server components in the server bundle. Takes an object: `registerServerComponent({ A, B })`.                                                                                                                         |
+| `useRSC`                               | `import { useRSC } from 'react-on-rails-pro/RSCProvider'`                                    | **Named**   | Hook providing `refetchComponent(name, props)` for manual refetch and error recovery. Available anywhere inside a tree set up by `wrapServerComponentRenderer` or `registerServerComponent`.                                    |
+| `isServerComponentFetchError`          | `import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError'` | **Named**   | Type guard to check if an error came from a failed server component fetch. The error has `serverComponentName` and `serverComponentProps` fields.                                                                               |
 
 ## Troubleshooting
 

@@ -547,10 +547,10 @@ You don't call `registerServerComponent` yourself when using auto-bundling — t
 
 `registerServerComponent` has two different shapes depending on which bundle you import it from:
 
-| Bundle | Import | Signature | Why |
-| --- | --- | --- | --- |
-| Client | `react-on-rails-pro/registerServerComponent/client` | `registerServerComponent(...names: string[])` | Takes only component names because the server component's code stays on the server. The client fetches the RSC payload when the component renders (or uses the payload already embedded in the HTML if the page was server-rendered). |
-| Server | `react-on-rails-pro/registerServerComponent/server` | `registerServerComponent(components: { [name]: Component })` | Takes an object with the actual component references because the code needs to be bundled into the server and RSC bundles for RSC payload generation. |
+| Bundle | Import                                              | Signature                                                    | Why                                                                                                                                                                                                                                   |
+| ------ | --------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client | `react-on-rails-pro/registerServerComponent/client` | `registerServerComponent(...names: string[])`                | Takes only component names because the server component's code stays on the server. The client fetches the RSC payload when the component renders (or uses the payload already embedded in the HTML if the page was server-rendered). |
+| Server | `react-on-rails-pro/registerServerComponent/server` | `registerServerComponent(components: { [name]: Component })` | Takes an object with the actual component references because the code needs to be bundled into the server and RSC bundles for RSC payload generation.                                                                                 |
 
 Auto-bundling uses both forms under the hood: the per-component client packs use the client form, and the aggregated server bundle file uses the server form.
 
