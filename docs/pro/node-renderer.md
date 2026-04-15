@@ -128,9 +128,11 @@ RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 
 This copies the bundle into the renderer's expected directory structure (`<cache>/<bundleHash>/<bundleHash>.js`), including any configured `assets_to_copy` and RSC bundles when RSC support is enabled.
 
+This is the preferred path for Docker and other image-build workflows. React on Rails Pro has long supported runtime bundle uploads and the older `react_on_rails_pro:pre_stage_bundle_for_node_renderer` task for same-filesystem deployments; `pre_seed_renderer_cache` is the copy-based variant that fits immutable artifacts while using the same bundle-hash cache layout.
+
 ### Configuration
 
-The task resolves the cache directory using the same env-var precedence as the Node Renderer:
+The task follows the same environment-variable precedence as the Node Renderer, while the default fallback can differ between Ruby and standalone Node environments:
 
 1. `RENDERER_SERVER_BUNDLE_CACHE_PATH` environment variable (preferred)
 2. `RENDERER_BUNDLE_PATH` environment variable (deprecated — emits a warning)
@@ -150,9 +152,18 @@ RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 | First request on fresh deploy | 410→retry: 200ms–1s+                    | Direct render: <50ms            |
 | Thundering herd on new pod    | N requests queue behind per-bundle lock | All requests served immediately |
 
-### Pre-seeding the previous bundle for rolling deploys
+### Rolling deploys: seed current and previous bundle hashes
 
-During a rolling deploy, old Rails instances may still reference the previous bundle hash. To prevent 410→retry for those requests on new renderer instances, you can pre-seed the previous bundle as well. After each deploy, upload the server bundle to an artifact store (e.g., S3) keyed by its hash. During the next build, fetch and place it in the cache directory before starting the renderer.
+During a rolling deploy, new renderer instances can receive requests for both the current deployed bundle hash and the previous hash while old Rails instances drain. Treat this as a two-hash cache-seeding problem, not a single-file problem.
+
+At startup, aim to have the cache contain:
+
+- the current server bundle hash
+- the previous server bundle hash
+- the current and previous RSC bundle hashes as well, if RSC support is enabled
+- any required copied assets and RSC manifests in each seeded hash directory
+
+`pre_seed_renderer_cache` seeds the current locally built bundle outputs. For the previous deployed hash, the most practical approach is to publish bundle artifacts keyed by hash after each successful deploy, then fetch the previous hash artifact during the next build and place it into the same `<cache>/<bundleHash>/...` layout before boot.
 
 ## Further Reading
 

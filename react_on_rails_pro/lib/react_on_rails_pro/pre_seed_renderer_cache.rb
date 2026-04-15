@@ -9,9 +9,9 @@ module ReactOnRailsPro
   # where the bundle can be baked into the image, eliminating the 410→retry
   # cold-start latency on first SSR request after deployment.
   #
-  # Unlike PrepareNodeRenderBundles (which creates symlinks for local/CI use),
-  # this class copies files and uses the subdirectory structure the renderer
-  # expects: <cache>/<bundleHash>/<bundleHash>.js
+  # Unlike PrepareNodeRenderBundles (which stages the same cache layout via
+  # symlinks for same-filesystem workflows), this class copies files so the
+  # cache can be baked into an image or other immutable artifact.
   class PreSeedRendererCache
     def self.call
       cache_dir = resolve_cache_dir
@@ -72,7 +72,7 @@ module ReactOnRailsPro
         assets << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
       end
 
-      assets.compact
+      assets.compact_blank
     end
     private_class_method :collect_assets
 

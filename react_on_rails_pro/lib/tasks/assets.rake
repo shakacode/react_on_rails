@@ -3,12 +3,12 @@
 require "active_support"
 
 namespace :react_on_rails_pro do
-  desc "Copy assets to local node-renderer"
+  desc "Pre-stage renderer cache locally via symlinks (legacy same-filesystem workflow)"
   task pre_stage_bundle_for_node_renderer: :environment do
     ReactOnRailsPro::PrepareNodeRenderBundles.call
   end
 
-  desc "Pre-seed renderer bundle cache for Docker builds (copy, not symlink)"
+  desc "Pre-seed renderer cache for Docker/image builds via copies"
   task pre_seed_renderer_cache: :environment do
     ReactOnRailsPro::PreSeedRendererCache.call
   end
