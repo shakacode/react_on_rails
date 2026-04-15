@@ -553,102 +553,109 @@ jobs:
           BOUNDARY=0.95
           MAX_SAMPLE=64
 
-          # Set branch and start-point based on event type
+          # Set branch and start-point based on event type.
+          # Main pushes don't need --start-point because main IS the base
+          # branch — thresholds are defined inline via --threshold-* args.
+          # Feature branches (PRs, dispatch) use --start-point to clone
+          # thresholds from main and pin the comparison baseline.
           if [ "${{ github.event_name }}" = "push" ]; then
             BRANCH="main"
-            START_POINT="main"
-            START_POINT_HASH="${{ github.event.before }}"
-            EXTRA_ARGS=""
+            START_POINT_ARGS=""
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             BRANCH="$GITHUB_HEAD_REF"
-            START_POINT="$GITHUB_BASE_REF"
-            START_POINT_HASH="${{ github.event.pull_request.base.sha }}"
-            EXTRA_ARGS="--start-point-reset"
+            START_POINT_ARGS="--start-point $GITHUB_BASE_REF --start-point-hash ${{ github.event.pull_request.base.sha }} --start-point-clone-thresholds --start-point-reset"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # Get merge-base from GitHub API (avoids needing deep fetch)
-            # See: https://stackoverflow.com/a/74710919
             BRANCH="${{ github.ref_name }}"
-            START_POINT="main"
-            START_POINT_HASH=$(gh api "repos/${{ github.repository }}/compare/main...$BRANCH" --jq '.merge_base_commit.sha' || true)
-
-            if [ -n "$START_POINT_HASH" ]; then
-              echo "Found merge-base via API: $START_POINT_HASH"
+            if [ "$BRANCH" = "main" ]; then
+              START_POINT_ARGS=""
             else
-              echo "⚠️ Could not find merge-base with main via GitHub API, continuing without it"
+              # Get merge-base from GitHub API (avoids needing deep fetch)
+              # See: https://stackoverflow.com/a/74710919
+              START_POINT_HASH=$(gh api "repos/${{ github.repository }}/compare/main...$BRANCH" --jq '.merge_base_commit.sha' || true)
+              if [ -n "$START_POINT_HASH" ]; then
+                echo "Found merge-base via API: $START_POINT_HASH"
+                START_POINT_ARGS="--start-point main --start-point-hash $START_POINT_HASH --start-point-clone-thresholds"
+              else
+                echo "⚠️ Could not find merge-base with main via GitHub API, continuing without hash"
+                START_POINT_ARGS="--start-point main --start-point-clone-thresholds"
+              fi
             fi
-            EXTRA_ARGS=""
           else
             echo "❌ ERROR: Unexpected event type: ${{ github.event_name }}"
             exit 1
           fi
 
-          # Run bencher and capture HTML output (stdout) while letting stderr go to a file
-          # so we can distinguish missing baselines (404) from actual regression alerts.
-          # Use set +e to capture exit code without failing immediately.
+          # Wrap bencher run in a function so we can retry with different
+          # start-point args if the pinned hash isn't found in Bencher.
+          run_bencher() {
+            local sp_args="$1"
+            # shellcheck disable=SC2086
+            bencher run \
+              --project react-on-rails-t8a9ncxo \
+              --token '${{ secrets.BENCHER_API_TOKEN }}' \
+              --branch "$BRANCH" \
+              $sp_args \
+              --testbed github-actions \
+              --adapter json \
+              --file bench_results/benchmark.json \
+              --err \
+              --quiet \
+              --format html \
+              --threshold-measure rps \
+              --threshold-test t_test \
+              --threshold-max-sample-size $MAX_SAMPLE \
+              --threshold-lower-boundary $BOUNDARY \
+              --threshold-upper-boundary _ \
+              --threshold-measure p50_latency \
+              --threshold-test t_test \
+              --threshold-max-sample-size $MAX_SAMPLE \
+              --threshold-lower-boundary _ \
+              --threshold-upper-boundary $BOUNDARY \
+              --threshold-measure p90_latency \
+              --threshold-test t_test \
+              --threshold-max-sample-size $MAX_SAMPLE \
+              --threshold-lower-boundary _ \
+              --threshold-upper-boundary $BOUNDARY \
+              --threshold-measure p99_latency \
+              --threshold-test t_test \
+              --threshold-max-sample-size $MAX_SAMPLE \
+              --threshold-lower-boundary _ \
+              --threshold-upper-boundary $BOUNDARY \
+              --threshold-measure failed_pct \
+              --threshold-test t_test \
+              --threshold-max-sample-size $MAX_SAMPLE \
+              --threshold-lower-boundary _ \
+              --threshold-upper-boundary $BOUNDARY
+          }
+
+          # Run bencher and capture HTML output (stdout) while letting stderr
+          # go to a file so we can inspect failure reasons.
           BENCHER_STDERR=$(mktemp)
           trap 'rm -f "$BENCHER_STDERR"' EXIT
           set +e
-          bencher run \
-            --project react-on-rails-t8a9ncxo \
-            --token '${{ secrets.BENCHER_API_TOKEN }}' \
-            --branch "$BRANCH" \
-            --start-point "$START_POINT" \
-            --start-point-hash "$START_POINT_HASH" \
-            --start-point-clone-thresholds \
-            --testbed github-actions \
-            --adapter json \
-            --file bench_results/benchmark.json \
-            --err \
-            --quiet \
-            --format html \
-            --threshold-measure rps \
-            --threshold-test t_test \
-            --threshold-max-sample-size $MAX_SAMPLE \
-            --threshold-lower-boundary $BOUNDARY \
-            --threshold-upper-boundary _ \
-            --threshold-measure p50_latency \
-            --threshold-test t_test \
-            --threshold-max-sample-size $MAX_SAMPLE \
-            --threshold-lower-boundary _ \
-            --threshold-upper-boundary $BOUNDARY \
-            --threshold-measure p90_latency \
-            --threshold-test t_test \
-            --threshold-max-sample-size $MAX_SAMPLE \
-            --threshold-lower-boundary _ \
-            --threshold-upper-boundary $BOUNDARY \
-            --threshold-measure p99_latency \
-            --threshold-test t_test \
-            --threshold-max-sample-size $MAX_SAMPLE \
-            --threshold-lower-boundary _ \
-            --threshold-upper-boundary $BOUNDARY \
-            --threshold-measure failed_pct \
-            --threshold-test t_test \
-            --threshold-max-sample-size $MAX_SAMPLE \
-            --threshold-lower-boundary _ \
-            --threshold-upper-boundary $BOUNDARY \
-            $EXTRA_ARGS > bench_results/bencher_report.html 2>"$BENCHER_STDERR"
+          run_bencher "$START_POINT_ARGS" > bench_results/bencher_report.html 2>"$BENCHER_STDERR"
           BENCHER_EXIT_CODE=$?
           set -e
 
           # Print stderr for visibility in logs
           cat "$BENCHER_STDERR" >&2
 
-          # If bencher failed due to missing baseline data (404 Not Found) and there
-          # are no regression alerts, treat as a warning instead of failing the workflow.
-          # This commonly happens when the PR base commit was a docs-only change
-          # skipped by paths-ignore, so no benchmark data exists in Bencher.
-          #
-          # Safety checks before overriding exit code:
-          #   1. stderr must contain "404 Not Found" (HTTP status from Bencher API)
-          #   2. stderr must NOT contain regression indicators ("alert", "threshold",
-          #      or "boundary") to avoid suppressing actual performance regressions
-          if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "404 Not Found" "$BENCHER_STDERR" && ! grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
-            echo "⚠️ Bencher baseline not found for start-point hash '$START_POINT_HASH' — this is expected when the base commit was not benchmarked (e.g., docs-only changes skipped by paths-ignore)"
-            echo "⚠️ Benchmark data was collected but regression comparison is unavailable for this run"
-            echo "📋 Bencher stderr output:"
-            cat "$BENCHER_STDERR"
-            echo "::warning::Bencher baseline not found for start-point hash '$START_POINT_HASH' — regression comparison unavailable for this run"
-            BENCHER_EXIT_CODE=0
+          # If bencher failed because the start-point hash doesn't exist in
+          # Bencher (e.g., the base commit was a docs-only change skipped by
+          # paths-ignore), retry without --start-point-hash so the report
+          # still gets stored using the latest available baseline.
+          if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -q "Head Version" "$BENCHER_STDERR" && grep -q "not found" "$BENCHER_STDERR"; then
+            RETRY_ARGS=$(echo "$START_POINT_ARGS" | sed 's/--start-point-hash [^ ]*//')
+            if [ "$RETRY_ARGS" != "$START_POINT_ARGS" ]; then
+              echo ""
+              echo "⚠️ Start-point hash not found in Bencher — retrying without --start-point-hash (will use latest baseline)"
+              echo "::warning::Start-point hash not found in Bencher — falling back to latest baseline for comparison"
+              set +e
+              run_bencher "$RETRY_ARGS" > bench_results/bencher_report.html 2>"$BENCHER_STDERR"
+              BENCHER_EXIT_CODE=$?
+              set -e
+              cat "$BENCHER_STDERR" >&2
+            fi
           fi
           rm -f "$BENCHER_STDERR"
 
