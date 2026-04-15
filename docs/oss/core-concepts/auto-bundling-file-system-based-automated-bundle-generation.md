@@ -87,7 +87,7 @@ We recommend committing this import statement to your version control system.
 
 #### Background
 
-If the `shakapacker.yml` file is configured as instructed [here](https://github.com/shakacode/shakapacker#configuration-and-code), with the following configurations
+If the `shakapacker.yml` file is configured as instructed in the [Shakapacker configuration guide](https://github.com/shakacode/shakapacker#configuration-and-code), with the following configurations
 
 ```yml
 default: &default

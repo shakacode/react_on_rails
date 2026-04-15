@@ -28,7 +28,7 @@ Uncommonly used options:
 
   > If your render function returns a hash with multiple HTML strings (e.g., `{ renderedHtml: { componentHtml, title, metaTags } }`), `react_component` raises a `ReactOnRails::Error` telling you to use [`react_component_hash`](#react_component_hash) instead. `react_component` is for rendering a single HTML result; `react_component_hash` is for rendering multiple HTML strings to place in different parts of the page.
 
-  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](../configuration/README.md).
+  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described in the [configuration documentation](../configuration/README.md).
 
 - **general options:**
   - **props:** Ruby Hash which contains the properties to pass to the React object, or a JSON string. If you pass a string, we'll escape it for you.
