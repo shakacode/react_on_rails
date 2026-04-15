@@ -25,8 +25,11 @@ Uncommonly used options:
 ```
 
 - **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape `{ renderedHtml, clientProps?, redirectLocation?, routeError? }`), or a "renderer function" that manually renders a React component to the DOM (client-side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
+
   > If your render function returns a hash with multiple HTML strings (e.g., `{ renderedHtml: { componentHtml, title, metaTags } }`), `react_component` raises a `ReactOnRails::Error` telling you to use [`react_component_hash`](#react_component_hash) instead. `react_component` is for rendering a single HTML result; `react_component_hash` is for rendering multiple HTML strings to place in different parts of the page.
-  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](../configuration/README.md).
+
+  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described in the [configuration documentation](../configuration/README.md).
+
 - **general options:**
   - **props:** Ruby Hash which contains the properties to pass to the React object, or a JSON string. If you pass a string, we'll escape it for you.
   - **prerender:** enable server-side rendering of a component. Set to false when debugging!
