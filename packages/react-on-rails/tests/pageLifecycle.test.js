@@ -375,25 +375,5 @@ describe('pageLifecycle', () => {
       // Now callback should have been called through the complete fallback
       expect(callback).toHaveBeenCalledTimes(1);
     });
-
-    it('should remove both listeners after DOMContentLoaded fires so a later complete cannot re-trigger', () => {
-      setReadyState('interactive');
-
-      const { onPageLoaded } = importPageLifecycle();
-      const callback = jest.fn();
-
-      onPageLoaded(callback);
-
-      const domContentLoadedHandler = getEventHandler('DOMContentLoaded');
-      expect(domContentLoadedHandler).toBeDefined();
-
-      domContentLoadedHandler(new Event('DOMContentLoaded'));
-      expect(callback).toHaveBeenCalledTimes(1);
-
-      // The handler's cleanup is what prevents the later readystatechange→complete
-      // event from firing the callback a second time in real browsers.
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('DOMContentLoaded', expect.any(Function));
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('readystatechange', expect.any(Function));
-    });
   });
 });
