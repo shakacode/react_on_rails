@@ -32,7 +32,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Changed
 
-- **Rspack install scaffolding now targets Rspack v2**: `react_on_rails:install --rspack` and `bin/switch-bundler` now generate the Rspack v2 package line (`@rspack/core@^2.0.0-0`, `@rspack/cli@^2.0.0-0`, `@rspack/plugin-react-refresh@^2.0.0`) while keeping `rspack-manifest-plugin@^5.0.0`, which is already compatible. The `-0` prerelease suffix on `@rspack/core` and `@rspack/cli` keeps RC builds installable until stable 2.0.0 lands. Closes [Issue 3082](https://github.com/shakacode/react_on_rails/issues/3082). [PR 3084](https://github.com/shakacode/react_on_rails/pull/3084) by [justin808](https://github.com/justin808).
+- **Rspack install scaffolding now targets Rspack v2**: `react_on_rails:install --rspack` and `bin/switch-bundler` now generate the Rspack v2 package line (`@rspack/core@^2.0.0-0`, `@rspack/cli@^2.0.0-0`, `@rspack/plugin-react-refresh@^2.0.0`) while keeping `rspack-manifest-plugin@^5.0.0`, which is already compatible. Closes [Issue 3082](https://github.com/shakacode/react_on_rails/issues/3082). [PR 3084](https://github.com/shakacode/react_on_rails/pull/3084) by [justin808](https://github.com/justin808).
 
 ### [16.6.0] - 2026-04-09
 
