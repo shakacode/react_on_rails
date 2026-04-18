@@ -3,14 +3,18 @@
 require "json"
 require "rainbow"
 
-# rubocop:disable Metrics/ModuleLength
+require_relative "generator_messages/ci_section"
+require_relative "generator_messages/shakapacker_status_section"
+
 module GeneratorMessages
   PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
                      "\n       #{Rainbow('https://reactonrails.com/docs/pro/upgrading-to-pro/').cyan.underline}".freeze
   SUPPORTED_PACKAGE_MANAGERS = %w[npm pnpm yarn bun].freeze
 
-  # rubocop:disable Metrics/ClassLength
   class << self
+    include CiSection
+    include ShakapackerStatusSection
+
     def output
       @output ||= []
     end
@@ -108,15 +112,35 @@ module GeneratorMessages
       MSG
     end
 
-    # Detects the package manager from environment or lockfiles.
-    # Pass app_root: to resolve lockfile paths against a specific directory
+    # Detects the package manager in priority order:
+    # 1. REACT_ON_RAILS_PACKAGE_MANAGER env variable
+    # 2. packageManager field in package.json (Corepack standard)
+    # 3. Lockfile on disk
+    # 4. Falls back to "npm" (Shakapacker 8.x default)
+    #
+    # Pass app_root: to resolve paths against a specific directory
     # (e.g. destination_root in generators) instead of Dir.pwd.
     def detect_package_manager(app_root: Dir.pwd)
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
       return env_package_manager if supported_package_manager?(env_package_manager)
 
-      # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
-      detect_package_manager_from_lockfiles(app_root: app_root) || "npm"
+      detect_package_manager_from_package_json(app_root: app_root) ||
+        detect_package_manager_from_lockfiles(app_root: app_root) ||
+        "npm"
+    end
+
+    def detect_package_manager_from_package_json(app_root: Dir.pwd)
+      package_json_path = File.join(app_root, "package.json")
+      return nil unless File.exist?(package_json_path)
+
+      content = JSON.parse(File.read(package_json_path))
+      declared = content["packageManager"]
+      return nil unless declared.is_a?(String)
+
+      name = declared.split("@").first&.strip&.downcase
+      supported_package_manager?(name) ? name : nil
+    rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
+      nil
     end
 
     def detect_package_manager_from_lockfiles(app_root: Dir.pwd)
@@ -133,46 +157,6 @@ module GeneratorMessages
     end
 
     private
-
-    def build_ci_section(app_root: Dir.pwd, ci_workflow_generated: false)
-      return "" unless ci_workflow_generated || File.exist?(File.join(app_root, ".github/workflows/ci.yml"))
-
-      package_manager = detect_package_manager(app_root: app_root)
-      ci_status = if ci_workflow_generated
-                    "A GitHub Actions workflow has been generated at .github/workflows/ci.yml."
-                  else
-                    "A GitHub Actions workflow is available at .github/workflows/ci.yml."
-                  end
-
-      build_test_hint = if package_json_has_script?(app_root, "build:test")
-                          "\n\nOr use the generated package.json script:\n" \
-                            "#{Rainbow("#{package_manager} run build:test").cyan}"
-                        else
-                          ""
-                        end
-
-      <<~CI
-
-
-        🔄 CI / BUILD ORDERING:
-        ─────────────────────────────────────────────────────────────────────────
-        JavaScript bundles must be built before running Rails tests.
-        #{ci_status}
-
-        To build bundles manually before tests:
-        #{Rainbow('RAILS_ENV=test NODE_ENV=test bin/shakapacker').cyan}#{build_test_hint}
-      CI
-    end
-
-    def package_json_has_script?(app_root, script_name)
-      package_json_path = File.join(app_root, "package.json")
-      return false unless File.exist?(package_json_path)
-
-      content = JSON.parse(File.read(package_json_path))
-      content.dig("scripts", script_name) ? true : false
-    rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
-      false
-    end
 
     def build_render_example(component_name:, route:, rsc:)
       if rsc
@@ -229,59 +213,5 @@ module GeneratorMessages
         "foreman"
       end
     end
-
-    def build_shakapacker_status_section(shakapacker_just_installed: false, app_root: Dir.pwd)
-      version_warning = check_shakapacker_version_warning(app_root: app_root)
-      if shakapacker_just_installed
-        base = <<~SHAKAPACKER
-
-          📦 SHAKAPACKER SETUP:
-          ─────────────────────────────────────────────────────────────────────────
-          #{Rainbow('✓ Added to Gemfile automatically').green}
-          #{Rainbow('✓ Installer ran successfully').green}
-          #{Rainbow('✓ Webpack integration configured').green}
-        SHAKAPACKER
-        base.chomp + version_warning
-      elsif shakapacker_binstubs_present?(app_root)
-        "\n📦 #{Rainbow('Shakapacker already configured ✓').green}#{version_warning}"
-      else
-        "\n📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}#{version_warning}"
-      end
-    end
-
-    def shakapacker_binstubs_present?(app_root)
-      File.exist?(File.join(app_root, "bin/shakapacker")) &&
-        File.exist?(File.join(app_root, "bin/shakapacker-dev-server"))
-    end
-
-    def check_shakapacker_version_warning(app_root: Dir.pwd)
-      gemfile_lock = File.join(app_root, "Gemfile.lock")
-      return "" unless File.exist?(gemfile_lock)
-
-      shakapacker_match = File.read(gemfile_lock).match(/shakapacker \((\d+\.\d+\.\d+)\)/)
-      return "" unless shakapacker_match
-
-      version = shakapacker_match[1]
-      if version.split(".").first.to_i < 8
-        <<~WARNING
-
-          ⚠️  #{Rainbow('IMPORTANT: Upgrade Recommended').yellow.bold}
-          ─────────────────────────────────────────────────────────────────────────
-          You are using Shakapacker #{version}. React on Rails v15+ works best with
-          Shakapacker 8.0+ for optimal Hot Module Replacement and build performance.
-
-          To upgrade: #{Rainbow('bundle update shakapacker').cyan}
-
-          Learn more: #{Rainbow('https://github.com/shakacode/shakapacker').cyan.underline}
-        WARNING
-      else
-        ""
-      end
-    rescue StandardError
-      # If version detection fails, don't show a warning to avoid noise
-      ""
-    end
   end
-  # rubocop:enable Metrics/ClassLength
 end
-# rubocop:enable Metrics/ModuleLength

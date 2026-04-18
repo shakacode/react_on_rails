@@ -262,7 +262,6 @@ module ReactOnRails
           return
         end
 
-        say "📝 Generating CI workflow...", :yellow
         package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
         has_lockfile = !GeneratorMessages.detect_package_manager_from_lockfiles(app_root: destination_root).nil?
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
@@ -271,7 +270,6 @@ module ReactOnRails
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
                  { package_manager: package_manager, has_lockfile: has_lockfile,
                    has_active_record: has_active_record, has_rspec: has_rspec })
-        say "✅ Created #{ci_path}", :green
         @ci_workflow_generated = true
       end
 
@@ -290,7 +288,7 @@ module ReactOnRails
         add_build_test_script(scripts, scripts_added)
 
         if scripts_added.any?
-          indent = original_text[/^(\s+)"/m, 1] || "  "
+          indent = original_text[/\A\{\n(\s+)/, 1] || "  "
           File.write(package_json_path, "#{JSON.pretty_generate(content, indent: indent)}\n")
           say "📝 Added build scripts (#{scripts_added.join(', ')}) to package.json", :yellow
         else
