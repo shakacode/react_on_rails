@@ -62,7 +62,7 @@ jobs:
               echo "curl to GitHub API failed; using pinned fallback $fallback_version"
               actionlint_version="$fallback_version"
             fi
-            echo "actionlint_version=\"$actionlint_version\"" >> "$GITHUB_OUTPUT"
+            echo "actionlint_version=$actionlint_version" >> "$GITHUB_OUTPUT"
           fi
       - name: Setup Actionlint
         if: steps.check-workflows.outputs.changed == 'true'
