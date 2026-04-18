@@ -10,8 +10,6 @@ module ReactOnRailsPro
   # restores. The staged layout matches the renderer's runtime cache contract:
   # <cache>/<bundleHash>/<bundleHash>.js
   class PrepareNodeRenderBundles
-    extend FileUtils
-
     def self.make_relative_symlink(source, destination)
       destination_dir = Pathname.new(destination).dirname
       FileUtils.mkdir_p(destination_dir)
@@ -39,8 +37,7 @@ module ReactOnRailsPro
       assets = RendererCacheHelpers.collect_assets
       rsc_required_paths = RendererCacheHelpers.required_rsc_asset_paths
 
-      RendererCacheHelpers.bundle_sources(pool).each do |src_bundle_path, bundle_hash|
-        RendererCacheHelpers.validate_bundle_exists!(src_bundle_path, "pre-staging")
+      RendererCacheHelpers.bundle_sources(pool, "pre-staging").each do |src_bundle_path, bundle_hash|
         bundle_dir = File.join(cache_dir, bundle_hash.to_s)
         bundle_dest_path = File.join(bundle_dir, "#{bundle_hash}.js")
         make_relative_symlink(src_bundle_path, bundle_dest_path)
@@ -50,10 +47,11 @@ module ReactOnRailsPro
 
     # Required assets are matched by expanded path rather than basename so a
     # same-named unrelated entry in assets_to_copy cannot trigger a false-
-    # positive "required" error.
+    # positive "required" error. Expand against Rails.root to match how
+    # RendererCacheHelpers.required_rsc_asset_paths builds its Set.
     def self.symlink_assets(assets, bundle_dir, rsc_required_paths)
       assets.each do |asset_path|
-        expanded = File.expand_path(asset_path.to_s)
+        expanded = File.expand_path(asset_path.to_s, Rails.root)
         unless File.exist?(expanded)
           if rsc_required_paths.include?(expanded)
             raise ReactOnRailsPro::Error, "Required RSC asset not found: #{asset_path}. " \

@@ -96,6 +96,23 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
     end
   end
 
+  # Regression: bundle existence must be validated before pool.server_bundle_hash
+  # is invoked, since the hash computation calls File.mtime / Digest::MD5.file on
+  # the bundle path and would otherwise leak a raw Errno::ENOENT.
+  context "when server bundle doesn't exist and server_bundle_hash is not stubbed" do
+    before do
+      FileUtils.rm_f(server_bundle_path)
+      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      allow(pool).to receive(:server_bundle_hash).and_call_original
+      pool.instance_variable_set(:@server_bundle_hash, nil)
+      ReactOnRailsPro::Utils.instance_variable_set(:@bundle_hash, nil)
+    end
+
+    it "raises ReactOnRailsPro::Error rather than a raw Errno::ENOENT" do
+      expect { pre_stage_cache }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)
+    end
+  end
+
   context "with RENDERER_SERVER_BUNDLE_CACHE_PATH env var" do
     let(:custom_cache_dir) { Dir.mktmpdir("renderer-cache-test") }
 
@@ -113,6 +130,24 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       expect(File.exist?(dest_file)).to be(true)
       expect(File.symlink?(dest_file)).to be(true)
       expect(File.realpath(dest_file)).to eq(server_bundle_path)
+    end
+  end
+
+  context "with deprecated RENDERER_BUNDLE_PATH env var" do
+    let(:custom_cache_dir) { Dir.mktmpdir("renderer-cache-test") }
+
+    before do
+      ENV["RENDERER_BUNDLE_PATH"] = custom_cache_dir
+      allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(nil)
+    end
+
+    after { FileUtils.rm_rf(custom_cache_dir) }
+
+    it "uses the deprecated env var with a warning" do
+      expect { pre_stage_cache }.to output(/RENDERER_BUNDLE_PATH is deprecated/).to_stderr
+
+      dest_file = File.join(custom_cache_dir, bundle_hash, "#{bundle_hash}.js")
+      expect(File.exist?(dest_file)).to be(true)
     end
   end
 
