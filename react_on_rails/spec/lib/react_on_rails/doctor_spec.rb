@@ -2646,10 +2646,10 @@ RSpec.describe ReactOnRails::Doctor do
 
       before { ENV["PREVIOUS_BUNDLE_HASHES"] = "abc,def" }
 
-      it "surfaces the env override" do
+      it "warns that both are required" do
         doctor.send(:check_rolling_deploy_adapter)
-        info = checker.messages.select { |m| m[:type] == :info }
-        expect(info.any? do |m|
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? do |m|
                  m[:content].include?("PREVIOUS_BUNDLE_HASHES") && m[:content].include?("abc,def")
                end).to be(true)
       end

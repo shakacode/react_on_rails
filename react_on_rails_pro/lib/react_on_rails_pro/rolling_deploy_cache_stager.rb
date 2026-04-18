@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "pathname"
+require "timeout"
 
 module ReactOnRailsPro
   # Seeds previous deploy bundle hashes into the Node Renderer cache so that
@@ -14,18 +16,24 @@ module ReactOnRailsPro
   #
   # Retrieval:
   #   * rolling_deploy_adapter#fetch(hash) must return a Hash with keys
-  #     :server_bundle (String path), :rsc_bundle (String path or nil),
-  #     and :assets (Array<String>). Returns nil if the bundle is unavailable.
+  #     :bundle (String path to the bundle file) and :assets (Array<String>
+  #     of companion asset file paths). Returns nil if the bundle is
+  #     unavailable.
   #
-  # Missing previous bundles degrade gracefully (warn + continue) because the
-  # runtime 410-retry path is still a valid fallback — a failed rolling-deploy
-  # seed is less catastrophic than a failed *current* bundle seed.
+  # Protocol model: each hash is one bundle's cache entry. Adapters
+  # advertise separate hashes for server and RSC bundles; the stager
+  # stages each hash at <cache>/<hash>/<hash>.js independently.
+  #
+  # Missing previous bundles degrade gracefully (warn + continue) because
+  # the runtime 410-retry path is still a valid fallback — a failed
+  # rolling-deploy seed is less catastrophic than a failed *current*
+  # bundle seed.
   module RollingDeployCacheStager
-    module_function
+    FETCH_TIMEOUT_SECONDS = 30
 
-    def call(cache_dir:, current_hashes:, mode:)
+    def self.call(cache_dir:, current_hashes:, mode:)
       adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
-      return if adapter.nil? && ENV["PREVIOUS_BUNDLE_HASHES"].to_s.empty?
+      return handle_missing_adapter unless adapter
 
       hashes = resolve_previous_hashes(adapter, current_hashes)
       if hashes.empty?
@@ -37,7 +45,20 @@ module ReactOnRailsPro
       hashes.each { |hash| seed_previous_hash(adapter, hash, cache_dir, mode) }
     end
 
-    def resolve_previous_hashes(adapter, current_hashes)
+    def self.handle_missing_adapter
+      env_override = ENV["PREVIOUS_BUNDLE_HASHES"].to_s.strip
+      return if env_override.empty?
+
+      # PREVIOUS_BUNDLE_HASHES overrides *discovery*; the adapter is still required
+      # to fetch the actual bundle files. Refuse to proceed rather than raise a raw
+      # NoMethodError on the nil adapter.
+      warn "[ReactOnRailsPro] PREVIOUS_BUNDLE_HASHES=#{env_override.inspect} is set but no " \
+           "rolling_deploy_adapter is configured. Rolling-deploy seeding requires both. " \
+           "Set config.rolling_deploy_adapter to enable. Skipping previous-hash seeding."
+    end
+    private_class_method :handle_missing_adapter
+
+    def self.resolve_previous_hashes(adapter, current_hashes)
       explicit = ENV["PREVIOUS_BUNDLE_HASHES"].to_s.split(",").map(&:strip).reject(&:empty?)
       hashes = explicit.any? ? explicit : fetch_hashes_from_adapter(adapter)
       # Deduplicate against the hashes we just staged so we don't re-fetch the current build.
@@ -45,31 +66,21 @@ module ReactOnRailsPro
     end
     private_class_method :resolve_previous_hashes
 
-    def fetch_hashes_from_adapter(adapter)
-      return [] if adapter.nil?
-
+    def self.fetch_hashes_from_adapter(adapter)
       Array(adapter.previous_bundle_hashes)
     rescue StandardError => e
-      warn "[ReactOnRailsPro] rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: #{e.message}. " \
-           "Skipping previous-hash seeding."
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: " \
+           "#{e.message}. Skipping previous-hash seeding."
       []
     end
     private_class_method :fetch_hashes_from_adapter
 
-    def seed_previous_hash(adapter, hash, cache_dir, mode)
+    def self.seed_previous_hash(adapter, hash, cache_dir, mode)
       payload = fetch_payload(adapter, hash)
       return if payload.nil?
 
       bundle_dir = File.join(cache_dir, hash)
-      stage_file(payload[:server_bundle], File.join(bundle_dir, "#{hash}.js"), mode)
-
-      if payload[:rsc_bundle]
-        # The RSC bundle has its own hash subdirectory at runtime; but for rolling
-        # deploys the adapter returns the RSC bundle associated with this hash so we
-        # drop it next to the server bundle. Adapters that key RSC separately should
-        # emit the RSC hash via previous_bundle_hashes.
-        stage_file(payload[:rsc_bundle], File.join(bundle_dir, File.basename(payload[:rsc_bundle])), mode)
-      end
+      stage_file(payload[:bundle], File.join(bundle_dir, "#{hash}.js"), mode)
 
       Array(payload[:assets]).each do |asset_path|
         stage_file(asset_path, File.join(bundle_dir, File.basename(asset_path)), mode)
@@ -80,25 +91,29 @@ module ReactOnRailsPro
     end
     private_class_method :seed_previous_hash
 
-    def fetch_payload(adapter, hash)
-      payload = adapter.fetch(hash)
+    def self.fetch_payload(adapter, hash)
+      payload = Timeout.timeout(FETCH_TIMEOUT_SECONDS) { adapter.fetch(hash) }
       if payload.nil?
         warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned nil. " \
              "Runtime 410-retry path remains available as fallback."
         return nil
       end
 
-      unless payload[:server_bundle] && File.exist?(payload[:server_bundle])
+      unless payload[:bundle] && File.exist?(payload[:bundle])
         warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned payload without " \
-             "a valid :server_bundle path. Skipping this hash."
+             "a valid :bundle path. Skipping this hash."
         return nil
       end
 
       payload
+    rescue Timeout::Error
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) timed out after " \
+           "#{FETCH_TIMEOUT_SECONDS}s. Skipping this hash."
+      nil
     end
     private_class_method :fetch_payload
 
-    def stage_file(src, dest, mode)
+    def self.stage_file(src, dest, mode)
       FileUtils.mkdir_p(File.dirname(dest))
       FileUtils.rm_f(dest)
 
@@ -106,10 +121,25 @@ module ReactOnRailsPro
         FileUtils.cp(src, dest)
         puts "[ReactOnRailsPro] Seeded (copy) previous bundle file: #{dest}"
       else
-        File.symlink(File.expand_path(src), dest)
-        puts "[ReactOnRailsPro] Seeded (symlink) previous bundle file: #{dest}"
+        make_relative_symlink(src, dest)
       end
     end
     private_class_method :stage_file
+
+    # Mirrors PreSeedRendererCache.make_relative_symlink so previous-hash
+    # symlinks have identical properties (relative path, realpath-canonicalized)
+    # to current-hash symlinks.
+    def self.make_relative_symlink(source, destination)
+      destination_dir = Pathname.new(destination).dirname
+      source_path = Pathname.new(source).realpath
+      relative_source_path = source_path.relative_path_from(destination_dir.realpath)
+      File.symlink(relative_source_path, destination)
+      puts "[ReactOnRailsPro] Seeded (symlink) previous bundle file: #{relative_source_path} -> #{destination}"
+    rescue Errno::ENOENT => e
+      raise ReactOnRailsPro::Error,
+            "Could not resolve real path for symlink source #{source} (#{e.message}). " \
+            "The file may have been removed or be a dangling symlink."
+    end
+    private_class_method :make_relative_symlink
   end
 end

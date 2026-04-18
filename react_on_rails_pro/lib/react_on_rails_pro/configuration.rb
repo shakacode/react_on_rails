@@ -263,7 +263,7 @@ module ReactOnRailsPro
       end
 
       %i[previous_bundle_hashes fetch upload].each do |method_name|
-        next if rolling_deploy_adapter.methods.include?(method_name)
+        next if rolling_deploy_adapter.respond_to?(method_name)
 
         raise ReactOnRailsPro::Error,
               "config.rolling_deploy_adapter must define class method ##{method_name}. " \

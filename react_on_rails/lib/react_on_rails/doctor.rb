@@ -2888,9 +2888,11 @@ module ReactOnRails
       if adapter.nil?
         env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
         if env_override && !env_override.empty?
-          checker.add_info(
-            "ℹ️  PREVIOUS_BUNDLE_HASHES=#{env_override.inspect} set but no rolling_deploy_adapter " \
-            "configured — env override will be used."
+          checker.add_warning(
+            "⚠️  PREVIOUS_BUNDLE_HASHES=#{env_override.inspect} is set but no rolling_deploy_adapter " \
+            "is configured. Rolling-deploy seeding needs both — the env var overrides *discovery* " \
+            "but the adapter is still required to fetch bundle files. " \
+            "Set config.rolling_deploy_adapter or unset PREVIOUS_BUNDLE_HASHES."
           )
         else
           checker.add_info("ℹ️  No rolling_deploy_adapter configured (rolling-deploy seeding disabled).")
@@ -2906,7 +2908,7 @@ module ReactOnRails
     end
 
     def report_adapter_protocol(adapter)
-      missing = ROLLING_DEPLOY_REQUIRED_METHODS.reject { |m| adapter.methods.include?(m) }
+      missing = ROLLING_DEPLOY_REQUIRED_METHODS.reject { |m| adapter.respond_to?(m) }
       if missing.empty?
         checker.add_success(
           "✅ rolling_deploy_adapter responds to all required methods " \

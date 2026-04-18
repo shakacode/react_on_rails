@@ -28,6 +28,8 @@ If the renderer handles a request for bundle `abc` but reads the **new** build's
 
 ## Protocol
 
+Each **bundle hash** is a single cache entry. A deploy that has both a server bundle and an RSC bundle contributes **two** hashes — `server_bundle_hash` and `rsc_bundle_hash`. The protocol is opaque about which kind of bundle a hash represents; the adapter just stores and retrieves files keyed by hash.
+
 Your adapter must define three class methods:
 
 ```ruby
@@ -35,26 +37,39 @@ module MyRollingDeployAdapter
   # Discovery. Called during pre-seeding to determine which historical
   # hashes to fetch. Typically hits the running deployment's /_health
   # endpoint or reads a manifest file in the artifact store.
+  #
+  # When RSC is enabled, this should return BOTH the server and RSC
+  # hashes for each deploy you want to seed — the stager treats every
+  # hash as an independent cache entry at <cache>/<hash>/<hash>.js.
+  #
   # @return [Array<String>] ordered list of recent bundle hashes.
   # @return [] to disable previous-bundle seeding on this build.
   def self.previous_bundle_hashes
     # ...
   end
 
-  # Retrieval. Given a bundle hash, fetch the bundle + its companion
-  # assets to local disk and return their paths.
-  # @return [Hash, nil] Hash with :server_bundle (required), :rsc_bundle
-  #   (optional), :assets (Array<String>). nil if unavailable — pre-seeding
-  #   logs a warning and continues.
+  # Retrieval. Given a bundle hash, fetch the bundle file + its
+  # companion assets to local disk and return their paths.
+  #
+  # @return [Hash, nil] Hash with keys :bundle (String path to the
+  #   bundle file, required) and :assets (Array<String> of companion
+  #   asset paths like loadable-stats.json / RSC manifests). nil if
+  #   the bundle is unavailable — pre-seeding logs a warning and
+  #   continues.
+  #
+  # Fetch is wrapped in Timeout.timeout(30s) to protect pre-seeding
+  # and assets:precompile from hanging on slow external stores.
   def self.fetch(bundle_hash)
     # ...
   end
 
   # Publication. Called automatically after assets:precompile in
   # production-like environments when the adapter is configured.
-  # Uploads the current build's bundle + assets keyed by hash so
-  # future deploys can retrieve them. Errors are warned, not raised.
-  def self.upload(bundle_hash, server_bundle:, rsc_bundle: nil, assets:)
+  # Uploads one bundle + its companion assets keyed by that bundle's
+  # hash. When RSC is enabled, upload is called twice per deploy:
+  # once with server_bundle_hash, once with rsc_bundle_hash.
+  # Errors are warned per-hash, not raised.
+  def self.upload(bundle_hash, bundle:, assets:)
     # ...
   end
 end
@@ -73,7 +88,7 @@ For CI and testing, set `PREVIOUS_BUNDLE_HASHES` as a comma-separated list to sk
 PREVIOUS_BUNDLE_HASHES=abc123,def456 rake react_on_rails_pro:pre_seed_renderer_cache
 ```
 
-This runs the adapter's `fetch(hash)` for each listed hash but skips discovery.
+This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. The adapter is still required to fetch the actual bundle files; setting the env var without configuring `config.rolling_deploy_adapter` produces a warning and skips seeding.
 
 ## Edge cases and error handling
 
@@ -93,7 +108,10 @@ These are copy-pasteable starting points. Adapt to your infrastructure.
 
 ### S3
 
-Publish bundles + companion assets under `s3://<bucket>/bundles/<hash>/`. A manifest file at `bundles/_manifest.json` tracks the rolling list of recent hashes.
+Stores each bundle + its companion assets under `s3://<bucket>/bundles/<hash>/bundle.js` + `s3://<bucket>/bundles/<hash>/<asset>`. A manifest file at `bundles/_manifest.json` tracks the rolling list of recent hashes.
+
+> [!NOTE]
+> The manifest update is a read-modify-write cycle with no native concurrency guard. Concurrent deploys can lose entries (last writer wins). For strict safety, use S3 conditional writes (`If-Match` with ETag) or a small coordination layer (e.g., a deploy-level mutex, or a database row with optimistic locking). The pattern below is intentionally simple and sufficient when deploys are serialized.
 
 ```ruby
 require "aws-sdk-s3"
@@ -101,13 +119,19 @@ require "fileutils"
 require "json"
 
 class S3RollingDeployAdapter
-  BUCKET = ENV.fetch("ROLLING_DEPLOY_BUCKET")
+  # Lazy accessors — env vars are read when first used, not at require time.
+  # This avoids KeyError at class-load when the bucket isn't configured
+  # in dev/test/CI environments that don't use the adapter.
+  def self.bucket
+    ENV.fetch("ROLLING_DEPLOY_BUCKET")
+  end
+
   PREFIX = "bundles"
   MANIFEST_KEY = "#{PREFIX}/_manifest.json".freeze
-  RETENTION = 3
+  RETENTION = 6 # keep last ~3 deploys' worth (2 hashes per deploy when RSC is enabled)
 
   def self.previous_bundle_hashes
-    resp = s3.get_object(bucket: BUCKET, key: MANIFEST_KEY)
+    resp = s3.get_object(bucket: bucket, key: MANIFEST_KEY)
     JSON.parse(resp.body.read).fetch("hashes", []).last(RETENTION)
   rescue Aws::S3::Errors::NoSuchKey
     []
@@ -117,8 +141,7 @@ class S3RollingDeployAdapter
     dir = Rails.root.join("tmp/rolling-deploy", hash)
     FileUtils.mkdir_p(dir)
     {
-      server_bundle: download_to(dir, "server-bundle.js", hash),
-      rsc_bundle: download_optional(dir, "rsc-bundle.js", hash),
+      bundle: download_to(dir, "bundle.js", hash),
       assets: %w[loadable-stats.json react-client-manifest.json react-server-client-manifest.json]
               .map { |name| download_optional(dir, name, hash) }
               .compact
@@ -127,9 +150,8 @@ class S3RollingDeployAdapter
     nil
   end
 
-  def self.upload(hash, server_bundle:, rsc_bundle: nil, assets:)
-    put("#{PREFIX}/#{hash}/server-bundle.js", server_bundle)
-    put("#{PREFIX}/#{hash}/rsc-bundle.js", rsc_bundle) if rsc_bundle
+  def self.upload(hash, bundle:, assets:)
+    put("#{PREFIX}/#{hash}/bundle.js", bundle)
     assets.each { |path| put("#{PREFIX}/#{hash}/#{File.basename(path)}", path) }
     update_manifest!(hash)
   end
@@ -142,7 +164,7 @@ class S3RollingDeployAdapter
 
   def self.download_to(dir, name, hash)
     path = dir.join(name).to_s
-    s3.get_object(bucket: BUCKET, key: "#{PREFIX}/#{hash}/#{name}", response_target: path)
+    s3.get_object(bucket: bucket, key: "#{PREFIX}/#{hash}/#{name}", response_target: path)
     path
   end
 
@@ -153,16 +175,16 @@ class S3RollingDeployAdapter
   end
 
   def self.put(key, path)
-    File.open(path, "rb") { |body| s3.put_object(bucket: BUCKET, key: key, body: body) }
+    File.open(path, "rb") { |body| s3.put_object(bucket: bucket, key: key, body: body) }
   end
 
   def self.update_manifest!(hash)
     hashes = previous_bundle_hashes
     hashes << hash unless hashes.include?(hash)
     s3.put_object(
-      bucket: BUCKET,
+      bucket: bucket,
       key: MANIFEST_KEY,
-      body: JSON.generate(hashes: hashes.last(RETENTION + 1))
+      body: JSON.generate(hashes: hashes.last(RETENTION + 2))
     )
   end
 end
@@ -172,30 +194,49 @@ end
 
 Uses `cpln` CLI to pull the previous deployment's image layer and extract cache contents. `upload` is a no-op — the image itself is the artifact.
 
+The deploy pipeline is expected to set two env vars on the running workload: `REACT_ON_RAILS_BUNDLE_HASH` (server bundle hash) and, when RSC is enabled, `REACT_ON_RAILS_RSC_BUNDLE_HASH`. Both are returned from `previous_bundle_hashes` so the stager can seed each independently.
+
+Uses `Open3.capture2e` with array-form arguments rather than shell interpolation to avoid injection via env-var contents.
+
 ```ruby
+require "json"
+require "open3"
+require "fileutils"
+
 class ControlPlaneRollingDeployAdapter
-  GVC = ENV.fetch("CPLN_GVC")
-  WORKLOAD = ENV.fetch("CPLN_RAILS_WORKLOAD")
+  # Lazy accessors — see S3 adapter note on KeyError at require time.
+  def self.gvc
+    ENV.fetch("CPLN_GVC")
+  end
+
+  def self.workload
+    ENV.fetch("CPLN_RAILS_WORKLOAD")
+  end
 
   def self.previous_bundle_hashes
-    output = `cpln workload get #{WORKLOAD} --gvc #{GVC} -o json`
+    output, status = Open3.capture2e("cpln", "workload", "get", workload, "--gvc", gvc, "-o", "json")
+    return [] unless status.success?
+
     env = JSON.parse(output).dig("spec", "containers", 0, "env") || []
-    hash = env.find { |e| e["name"] == "REACT_ON_RAILS_BUNDLE_HASH" }&.dig("value")
-    hash ? [hash] : []
+    %w[REACT_ON_RAILS_BUNDLE_HASH REACT_ON_RAILS_RSC_BUNDLE_HASH]
+      .map { |name| env.find { |e| e["name"] == name }&.dig("value") }
+      .compact
   end
 
   def self.fetch(hash)
-    image = "#{GVC}/app-#{hash}"
-    tmp = Rails.root.join("tmp/rolling-deploy", hash)
+    image = "#{gvc}/app-#{hash}"
+    tmp = Rails.root.join("tmp/rolling-deploy", hash).to_s
     FileUtils.mkdir_p(tmp)
-    # Extract cache dir contents from the previous image layer:
-    system("cpln image pull #{image} --output #{tmp}") or return nil
-    { server_bundle: tmp.join("server-bundle.js").to_s,
-      rsc_bundle: File.exist?(tmp.join("rsc-bundle.js")) ? tmp.join("rsc-bundle.js").to_s : nil,
-      assets: Dir[tmp.join("*.json")] }
+    _out, status = Open3.capture2e("cpln", "image", "pull", image, "--output", tmp)
+    return nil unless status.success?
+
+    bundle = Dir[File.join(tmp, "*.js")].first
+    return nil unless bundle
+
+    { bundle: bundle, assets: Dir[File.join(tmp, "*.json")] }
   end
 
-  def self.upload(_hash, server_bundle:, rsc_bundle: nil, assets:)
+  def self.upload(_hash, bundle:, assets:)
     # No-op: the Docker image IS the artifact. The next build pulls
     # via `cpln image pull`.
   end
@@ -226,16 +267,14 @@ class FilesystemRollingDeployAdapter
     dir = root.join(hash)
     return nil unless dir.directory?
 
-    { server_bundle: dir.join("server-bundle.js").to_s,
-      rsc_bundle: (dir.join("rsc-bundle.js").to_s if dir.join("rsc-bundle.js").exist?),
+    { bundle: dir.join("bundle.js").to_s,
       assets: Dir[dir.join("*.json")] }
   end
 
-  def self.upload(hash, server_bundle:, rsc_bundle: nil, assets:)
+  def self.upload(hash, bundle:, assets:)
     dir = root.join(hash)
     FileUtils.mkdir_p(dir)
-    FileUtils.cp(server_bundle, dir.join("server-bundle.js"))
-    FileUtils.cp(rsc_bundle, dir.join("rsc-bundle.js")) if rsc_bundle
+    FileUtils.cp(bundle, dir.join("bundle.js"))
     assets.each { |p| FileUtils.cp(p, dir.join(File.basename(p))) }
     hashes = (previous_bundle_hashes + [hash]).uniq
     root.join("_manifest.json").write(JSON.generate(hashes: hashes))
