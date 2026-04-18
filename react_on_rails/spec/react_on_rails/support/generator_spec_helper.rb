@@ -27,6 +27,9 @@ def simulate_existing_rails_files(options)
   simulate_existing_file("config/routes.rb", "Rails.application.routes.draw do\nend\n")
   simulate_existing_file("config/application.rb",
                          "module Gentest\nclass Application < Rails::Application\nend\nend)")
+  # Shared baseline: database.yml is present by default so has_active_record == true and the
+  # generated CI workflow includes db:prepare. Contexts that need Active Record to be absent
+  # must remove this file explicitly (see "Active Record is absent" context).
   simulate_existing_file("config/database.yml", "test:\n  adapter: sqlite3\n  database: db/test.sqlite3\n")
 
   return unless options.fetch(:spec, true)

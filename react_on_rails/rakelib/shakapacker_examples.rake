@@ -117,7 +117,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
     target_version = ">=5.0.0 <5.106.0"
     return if dev_deps["webpack"] == target_version
 
-    # TODO: Remove this pin once webpack 5.106.x SSR regression is resolved upstream.
+    # TODO(#3166): Remove this pin once webpack 5.106.x SSR regression is resolved upstream.
     dev_deps["webpack"] = target_version
     puts "  Pinning webpack to <5.106.0 to avoid SSR compatibility issue"
     File.write(package_json_path, "#{JSON.pretty_generate(package_json)}\n")

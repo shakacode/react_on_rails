@@ -305,7 +305,7 @@ module ReactOnRails
 
         updated_text = inject_scripts_into_package_json(original_text, scripts_to_add, existing_scripts)
         File.write(package_json_path, updated_text)
-        say "📝 Added build scripts (#{scripts_to_add.keys.join(', ')}) to package.json", :yellow
+        say_status :append, "📝 Added build scripts (#{scripts_to_add.keys.join(', ')}) to package.json", :yellow
       rescue JSON::ParserError => e
         GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
       rescue Errno::EACCES, Errno::ENOENT => e
@@ -316,6 +316,10 @@ module ReactOnRails
       # package.json, so Prettier-formatted files only see the added lines in the diff.
       # Falls back to a structured rewrite when the "scripts" key is absent or when the
       # scripts object can't be located unambiguously (e.g. malformed JSON).
+      #
+      # Relies on the JSON invariant that `"scripts": {` cannot appear unescaped inside a
+      # preceding string value — in valid JSON the `"` characters are escaped as `\"`, so
+      # the regex can never falsely match a substring nested in a string literal.
       def inject_scripts_into_package_json(original_text, scripts_to_add, existing_scripts)
         opener = original_text.match(/"scripts"\s*:\s*\{/m)
         return rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts) unless opener
@@ -330,7 +334,7 @@ module ReactOnRails
         # rebuilt scripts block lines up under "scripts" instead of being emitted at column 0.
         object_indent = original_text[/\n([ \t]*)"scripts"/, 1] || "  "
         entry_indent = inner[/\n([ \t]+)"/, 1] || "#{object_indent}  "
-        new_entries = scripts_to_add.map { |key, value| %(#{entry_indent}"#{key}": #{value.to_json}) }
+        new_entries = scripts_to_add.map { |key, value| %(#{entry_indent}#{key.to_json}: #{value.to_json}) }
 
         rebuilt_inner =
           if existing_scripts.any?
