@@ -333,7 +333,7 @@ With Shakapacker ≥ 8.2.0, using `async: true` provides the best performance:
 
 1. **Before Shakapacker 8.2.0**: Use `defer: false` for streaming pages
 2. **Shakapacker ≥ 8.2.0**: Migrate to `async: true` for all pages (streaming and non-streaming)
-3. **Use React on Rails Pro**: Pro hydrates components early for optimal Time to Interactive (see section below)
+3. **Early Hydration (Pro)**: Pro hydrates components early for optimal Time to Interactive — no additional configuration needed (see section below)
 
 ## Early Hydration (Pro)
 
