@@ -30,7 +30,7 @@ Behavior rules:
   - the PR URL plus exported comment data, or
   - the output of the required `gh api` commands.
 - Do not auto-fix everything. Stop after triage and wait for my selection.
-- Default to real issues only, not optional polish.
+- Default to real issues only, and surface polish as `OPTIONAL` so I can opt into it.
 - For full-PR scans, default to feedback after the latest PR summary comment whose body contains `<!-- address-review-summary -->`.
 - If I say `check all reviews`, ignore that cutoff and rescan the full PR history.
 - If I give a specific review URL or specific issue-comment URL, fetch that exact target even if it predates the latest summary comment.
@@ -96,8 +96,9 @@ Execution flow when terminal access is available:
    - Do not create standalone triage items from comments where `in_reply_to_id` is set, but use reply text as the latest thread context when it updates or narrows the unresolved concern.
    - When `REVIEW_CUTOFF_AT` is set, evaluate unresolved review threads by their latest activity timestamp, not only by the top-level comment timestamp.
    - Keep bot comments by default, but deduplicate duplicates and skip status-only bot posts.
-   - Focus on correctness bugs, regressions, security issues, missing tests that hide bugs, and clear adjacent-code inconsistencies.
-   - Skip style nits, speculative suggestions, documentation nits, changelog wording, duplicate comments, and "could consider" feedback unless I ask for polish work.
+   - Focus on correctness bugs, regressions, security issues, missing tests that hide bugs, and clear adjacent-code inconsistencies as must-fix.
+   - Treat style nits, speculative suggestions, documentation/comment/naming requests, changelog wording, test-shape preferences, and "could consider" feedback as `OPTIONAL` (not `SKIPPED`) so I can opt into them.
+   - Reserve `SKIPPED` for duplicate comments, factually incorrect suggestions, status posts, acknowledgments, and non-actionable summaries.
    - If the API returns 404, tell me the PR or comment does not exist.
    - If the API returns 403, tell me to check `gh auth status`.
    - If nothing is returned after cutoff filtering, tell me no new review feedback was found since the last summary comment and mention `check all reviews`.
@@ -106,7 +107,8 @@ Execution flow when terminal access is available:
 6. Triage every remaining comment:
    - `MUST-FIX`: correctness bugs, regressions, security issues, missing tests that could hide a bug, and clear inconsistencies with adjacent code that would likely block merge.
    - `DISCUSS`: reasonable scope-expanding suggestions, architectural opinions, and comments that need a decision.
-   - `SKIPPED`: style preferences, documentation nits, comment requests, test-shape preferences, speculative suggestions, changelog wording, duplicate comments, status posts, non-actionable summaries, and factually incorrect suggestions.
+   - `OPTIONAL`: nits, style preferences, documentation/comment/naming suggestions, test-shape preferences, speculative "consider" suggestions, and changelog polish — items that would genuinely improve the PR but are not blockers. Default to this tier when a comment is well-intentioned and applicable but not required for merge.
+   - `SKIPPED`: duplicate comments, factually incorrect suggestions, status posts, acknowledgments, and non-actionable summaries. Reserved for feedback that does not warrant a code change or a rationale reply — if a comment has any useful signal, prefer `OPTIONAL`.
    - Deduplicate overlapping comments before classifying them.
    - Verify reviewer claims locally before calling something `MUST-FIX`.
    - If a claim is wrong, classify it as `SKIPPED` and say why.
@@ -117,33 +119,40 @@ Execution flow when terminal access is available:
    - Use one checklist entry per must-fix item or deduplicated issue.
    - Use the subject format: `"{file}:{line} - {comment_summary} (@{username})"`.
    - For general comments, extract the must-fix action from the body.
+   - Each `MUST-FIX` checklist entry must include a **Recommendation** section with a concrete fix sketch — specific file/line, code snippet, or approach — the user can act on directly. Before finalizing the recommendation, read the current code around the cited location so the suggestion matches what's actually there. If the reviewer's claim needs inspection before a safe fix can be proposed, make the Recommendation the verification step ("Confirm X by reading Y, then guard against Z"), not a guessed patch.
 
 7. Present triage and quick-action menu:
    - Use a single numbering sequence across all categories.
-   - Show counts for `MUST-FIX`, `DISCUSS`, and `SKIPPED`.
+   - Show counts for `MUST-FIX`, `DISCUSS`, `OPTIONAL`, and `SKIPPED`.
+   - List each `MUST-FIX` item with its `Recommendation:` sketch on an indented line. List each `OPTIONAL` item with a short reason describing the potential improvement.
    - After the triage list, present this quick-action menu:
      ```
      Quick actions:
-      f     — Fix must-fix items, then confirm whether to reply/resolve skipped items before deciding discuss items
-      f+i   — Fix must-fix + create follow-up issue for discuss/non-trivial skipped items
+      f     — Fix must-fix items, then prompt for optional/discuss handling and skipped rationale replies
+      f+i   — Fix must-fix + create follow-up issue for discuss/optional items (and non-trivial skipped items)
+      f+o   — Fix must-fix + address all optional items inline in the same PR
       d     — Discuss specific items before deciding (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
-      r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
-      m     — Skip code changes + create follow-up issue for must-fix/discuss/non-trivial skipped items
+      o     — Address specific optional items inline (e.g., "o6,7"). Bare "o" presents all OPTIONAL items for selection.
+      r     — Reply with rationale to items (e.g., "r3,5", "r7-9", "r all skipped", "r all optional", "r all discuss"); add `+ resolve` to also resolve threads
+      m     — Skip code changes + create follow-up issue for must-fix/discuss/optional items (and non-trivial skipped items)
 
-     Or pick items by number: "1,2", "all must-fix", "1,3-5"
+     Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
      ```
-   - Support range syntax: `N-M` expands to individual items (e.g., `3-5` → `3,4,5`).
+   - Support range syntax: `N-M` expands to individual items (e.g., `3-5` → `3,4,5`). Ranges work everywhere: item selection, `d`, `o`, and `r`.
    - If a range is malformed, reversed, or out of bounds, show a validation message and ask the user to retry (do not silently coerce it).
+   - Dynamic menu: generate `f`, `f+i`, and `f+o` descriptions using actual item numbers and deferred targets from the current triage set. Only show `f+o` and `o` when there is at least one `OPTIONAL` item. When there are no `DISCUSS`, `OPTIONAL`, or `SKIPPED` items, only show `f` and direct item selection.
    - Do not edit code yet.
    - Do not post the PR summary checkpoint yet. Post it only after a chosen action reaches a stable stopping point so the summary reflects the new baseline.
 
 8. Execute the chosen action:
-   - **`f`**: Fix all must-fix items (if none exist, skip fix phase). If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow. Then reply/resolve addressed must-fix threads. If skipped items exist, ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d`, `f+i`, or `r all discuss + resolve`).
-   - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss and non-trivial skipped items; still reply/resolve trivial skipped items that are excluded from the follow-up issue. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient. If there are no deferred items, skip issue creation and behave like `f`. No additional commit is needed unless later steps introduce local changes.
-   - **`d`**: Present requested items with full context, ask for a decision on each. Bare `d` presents all DISCUSS items. Approved → fix like must-fix (use the same commit/push-before-reply ordering as `f` when code changes occur). Declined → optionally reply with rationale.
-   - **`r`**: Post rationale replies only for `SKIPPED`/`DISCUSS` items. Do not resolve threads unless the user explicitly asks to resolve them. If selection includes any `MUST-FIX` item (including `r all must-fix`), direct the user to `f` or explicit deferral (`f+i`/`m`) instead of replying.
-   - **`m`**: Create a follow-up issue for deferred items, reply in the original location for each deferred item (review-comment replies for inline comments; issue comments for general/review-summary comments), and resolve `DISCUSS`/`SKIPPED` threads when threads exist. Keep deferred `MUST-FIX` threads open by default unless the user explicitly asks to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
-   - **Direct selection** (e.g., "1,2", "all must-fix", "1,3-5"): Address only selected items; if code changes were made, commit/push with confirmation before replying/resolving; then ask about remaining items.
+   - **`f`**: Fix all must-fix items (if none exist, skip fix phase). If local changes exist, commit, ask for push confirmation, then push; if no local changes, skip commit/push and continue decision flow. Then reply/resolve addressed must-fix threads. If `OPTIONAL` items exist, present them and prompt me to choose: `o <nums>` to address inline, `f+i` to defer to a follow-up issue, or `r all optional + resolve` to decline and close (do not auto-address or auto-resolve optional items in `f`). If skipped items exist, ask for explicit confirmation before posting rationale replies/resolving skipped threads. Keep discuss items for an explicit follow-up decision (`d`, `f+i`, or `r all discuss + resolve`). Tell me the PR is merge-ready after `DISCUSS` items are resolved or explicitly deferred; `OPTIONAL` items do not block merge-readiness.
+   - **`f+i`**: Same must-fix handling as `f`, plus create a follow-up GitHub issue bundling discuss, optional, and non-trivial skipped items (in distinct sections); still reply/resolve trivial skipped items that are excluded from the follow-up issue. For general PR comments and review summary bodies (which have no thread), the reply alone is sufficient. If there are no deferred items, skip issue creation and behave like `f`. No additional commit is needed unless later steps introduce local changes.
+   - **`f+o`**: Same must-fix handling as `f`, plus address all `OPTIONAL` items inline in the same PR (make the code change, reply, resolve each thread). If optional fixes require a separate commit to keep the must-fix commit atomic, commit them and ask for push confirmation before pushing the additional commit. Then handle `DISCUSS` and `SKIPPED` items using `f`'s prompts for those tiers (skip the optional-items prompt; optional is already done). Tell me the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred. If there are zero `OPTIONAL` items, behave like `f` and note that `f+o` had nothing additional to do.
+   - **`d`**: Present requested items with full context, ask for a decision on each. Bare `d` presents all DISCUSS items. Approved → fix like must-fix (use the same commit/push-before-reply ordering as `f` when code changes occur). Declined → optionally reply with rationale. Note: `d` only accepts `DISCUSS` item numbers — for `OPTIONAL` items, use `o` instead.
+   - **`o`**: Present requested items with full context. Bare `o` presents all `OPTIONAL` items for selection. For each selected optional item, treat it the same as a must-fix: make the code change, run relevant checks, reply, and resolve the thread. Use the same commit/push-before-reply ordering as `f`. For optional items I decline, offer a rationale reply via `r <nums>`.
+   - **`r`**: Post rationale replies only for `SKIPPED`/`OPTIONAL`/`DISCUSS` items. Do not resolve threads unless I explicitly ask to resolve them. If selection includes any `MUST-FIX` item (including `r all must-fix`), direct me to `f` or explicit deferral (`f+i`/`m`) instead of replying.
+   - **`m`**: Create a follow-up issue for deferred items, reply in the original location for each deferred item (review-comment replies for inline comments; issue comments for general/review-summary comments), and resolve `DISCUSS`/`OPTIONAL`/`SKIPPED` threads when threads exist. Keep deferred `MUST-FIX` threads open by default unless I explicitly ask to close them. If any `MUST-FIX` items are deferred, signal that the PR is **not merge-ready** without an override decision.
+   - **Direct selection** (e.g., "1,2", "all must-fix", "all optional", "1,3-5"): Address only selected items; if code changes were made, commit/push with confirmation before replying/resolving; then ask about remaining items.
    - Users can chain actions (e.g., `f+i` then `r7-9`).
    - Reply to each addressed review comment:
      - Issue comments: `gh api repos/${REPO}/issues/{PR_NUMBER}/comments -X POST -f body="<response>"`
@@ -158,17 +167,18 @@ Execution flow when terminal access is available:
 
 9. Create follow-up issue (when `f+i` or `m` is chosen):
    - Use `gh issue create --repo "${REPO}"` with title "Follow-up: Review feedback from PR #N"
-   - For `f+i`, include discuss items and non-trivial skipped items (must-fix is already addressed)
-   - For `m`, include deferred must-fix items, discuss items, and non-trivial skipped items
-   - Keep issue body structure consistent: use an optional `### Must-fix items (deferred)` section (for `m` only), then `### Discuss items`, then `### Skipped items (non-trivial)`, plus the original PR link at the bottom
+   - For `f+i`, include discuss items, optional items, and non-trivial skipped items (must-fix is already addressed)
+   - For `m`, include deferred must-fix items, discuss items, optional items, and non-trivial skipped items
+   - Keep issue body structure consistent: use an optional `### Must-fix items (deferred)` section (for `m` only), then `### Discuss items`, then `### Optional items`, then `### Skipped items (non-trivial)`, plus the original PR link at the bottom
    - Omit any section heading whose content bucket is empty
    - Reference the issue in thread replies
    - Return the issue URL
 
 10. Post a PR summary comment:
-   - After any chosen action or completed action chain (`f`, `f+i`, `d`, `r`, `m`, or direct item selection), post a consolidated general PR comment that becomes the next default review cutoff.
+   - After any chosen action or completed action chain (`f`, `f+i`, `f+o`, `d`, `o`, `r`, `m`, or direct item selection), post a consolidated general PR comment that becomes the next default review cutoff.
    - Include the exact marker `<!-- address-review-summary -->` on its own line near the top.
    - Use a `Mattered` section for `MUST-FIX` and `DISCUSS` items, including whether each item was addressed, deferred, or left pending by user choice.
+   - Use an `Optional` section listing `OPTIONAL` items and whether they were addressed inline, deferred to a follow-up issue, or declined.
    - Use a `Skipped` section for `SKIPPED` items with short reasons.
    - Mention any follow-up issue URL that was created.
    - Mention whether the run used the default cutoff or the explicit `check all reviews` override.
@@ -177,11 +187,12 @@ Execution flow when terminal access is available:
    - Post it with: `gh api repos/${REPO}/issues/{PR_NUMBER}/comments -X POST --input <summary_body_file>`
 
 11. Merge-ready signal:
-   - After `f`, tell me the PR is merge-ready only when no `DISCUSS` items remain unresolved
+   - After `f`, tell me the PR is merge-ready after `DISCUSS` items are resolved or explicitly deferred. `OPTIONAL` items do not block merge-readiness.
    - After `f+i`, tell me the PR is merge-ready
+   - After `f+o`, tell me the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred
    - After `m`, only tell me the PR is merge-ready when no must-fix items were deferred; otherwise explicitly say it is not merge-ready
-   - After direct selection, do not signal merge-ready automatically; first evaluate remaining `MUST-FIX`/`DISCUSS` items and ask whether to continue with `f`, `f+i`, `d`, `r`, or `m`
-   - After `d` or `r`, if unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready automatically; re-offer `f`, `f+i`, `d`, `r`, or `m`
+   - After direct selection, do not signal merge-ready automatically; first evaluate remaining `MUST-FIX`/`DISCUSS` items and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`. Unresolved `OPTIONAL` items do not block the merge-ready signal.
+   - After `d`, `o`, or `r`, if unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready automatically; re-offer `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`. Unresolved `OPTIONAL` items do not block the merge-ready signal.
    - Show the follow-up issue URL if one was created
    - Do not auto-merge
 
@@ -189,20 +200,26 @@ Output format for the triage:
 
 MUST-FIX (count):
 1. item
+   Recommendation: concrete fix sketch
 
 DISCUSS (count):
 2. item
    Reason: short explanation
 
+OPTIONAL (count):
+3. item - short reason describing the potential improvement
+
 SKIPPED (count):
-3. item - short reason
+4. item - short reason
 
 Quick actions:
-  f     — Fix #N, then confirm whether to reply/resolve skipped items before deciding discuss items
-  f+i   — Fix #N, create follow-up issue for discuss/non-trivial skipped items, reply/resolve trivial skipped rest
+  f     — Fix #N, then prompt for optional/discuss handling and skipped rationale replies
+  f+i   — Fix #N, create follow-up issue for discuss/optional/non-trivial skipped items, reply/resolve trivial skipped rest
+  f+o   — Fix #N plus address all optional items inline
   d     — Discuss specific items (e.g., "d2,4"). Bare "d" presents all DISCUSS items.
-  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all discuss"); add `+ resolve` to also resolve threads
-  m     — No code changes, create follow-up issue for must-fix/discuss/non-trivial skipped items
+  o     — Address specific optional items inline (e.g., "o6,7"). Bare "o" presents all OPTIONAL items.
+  r     — Reply with rationale (e.g., "r3,5", "r3-5", "r all skipped", "r all optional", "r all discuss"); add `+ resolve` to also resolve threads
+  m     — No code changes, create follow-up issue for must-fix/discuss/optional/non-trivial skipped items
 
-Or pick items by number: "1,2", "all must-fix", "1,3-5"
+Or pick items by number: "1,2", "all must-fix", "all optional", "1,3-5"
 ````

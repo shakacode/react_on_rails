@@ -221,8 +221,8 @@ Do not post the PR summary checkpoint during this triage-only phase. Post it onl
 5. If `OPTIONAL` items exist, present them and prompt the user to choose: `o <nums>` to address inline, `f+i` to defer to a follow-up issue, or `r all optional + resolve` to decline and close. Do not auto-address or auto-resolve optional items in `f`.
 6. If `SKIPPED` items exist, ask for explicit confirmation before posting rationale replies and resolving those threads (for example: "Reply/resolve 3 skipped items? y/n"). Default is no replies unless the user opts in.
 7. Do **not** auto-resolve `DISCUSS` items in `f`; after must-fix work, re-present discuss items and prompt the user to choose `d` (discuss), `f+i` (create follow-up issue), or `r all discuss + resolve`. If `f` starts with zero `MUST-FIX` items, show the optional/discuss decision menus immediately.
-8. Tell the user the PR is merge-ready only after `OPTIONAL` items are addressed/deferred/declined and `DISCUSS` items are resolved or explicitly deferred.
-9. If any `OPTIONAL` or `DISCUSS` items remain, explicitly prompt with the next action (for example: "OPTIONAL items remain - use `o` to address inline, `f+i` to defer, or `r all optional + resolve` to decline. DISCUSS items remain - use `d` to review, `f+i` to defer to a follow-up issue, or `r all discuss + resolve` to decline and close.").
+8. Tell the user the PR is merge-ready after `DISCUSS` items are resolved or explicitly deferred. `OPTIONAL` items do not block merge-readiness; they are surfaced in step 5 for the user to opt into.
+9. If any `DISCUSS` items remain, explicitly prompt with the next action (for example: "DISCUSS items remain - use `d` to review, `f+i` to defer to a follow-up issue, or `r all discuss + resolve` to decline and close."). If any `OPTIONAL` items remain unaddressed, mention them but do not block merge-readiness.
 
 ### Action `f+i` — Fix, follow-up issue, and merge-ready
 
@@ -239,13 +239,13 @@ Do not post the PR summary checkpoint during this triage-only phase. Post it onl
 1. Address all `MUST-FIX` items as in `f` (self-review gate, commit, push confirmation).
 2. Address all `OPTIONAL` items inline in the same PR: make the code change, reply, and resolve the thread for each. Treat each optional item the same as a selected must-fix once `f+o` is chosen.
 3. If optional fixes require a separate commit (e.g., to keep the must-fix commit atomic), commit them and ask for push confirmation before pushing the additional commit.
-4. Handle `DISCUSS` and `SKIPPED` items using the same prompts as `f`.
+4. Handle `DISCUSS` and `SKIPPED` items using `f` steps 6–7 (skip step 5; optional items are already addressed above).
 5. Tell the user the PR is merge-ready once all selected work is pushed and `DISCUSS` items are resolved or explicitly deferred.
 6. If there are zero `OPTIONAL` items, behave like `f` and note that `f+o` had nothing additional to do.
 
 ### Action `d` — Discuss items
 
-Present the requested items with full context and ask the user for a decision on each. If the user enters bare `d` with no item numbers, present all `DISCUSS` items. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). For approved items that produce local changes, use the same commit/push-before-reply ordering as action `f`. After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items.
+Present the requested items with full context and ask the user for a decision on each. If the user enters bare `d` with no item numbers, present all `DISCUSS` items. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). For approved items that produce local changes, use the same commit/push-before-reply ordering as action `f`. After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items. Note: `d` only accepts `DISCUSS` item numbers — for `OPTIONAL` items, use `o` instead.
 
 ### Action `o` — Address optional items inline
 
@@ -493,8 +493,8 @@ Deferred MUST-FIX threads remain open by default.
 PR is NOT merge-ready because must-fix items were deferred.
 ```
 
-If the action was direct item selection and unresolved `MUST-FIX`/`DISCUSS`/`OPTIONAL` items remain, do not signal merge-ready. Re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`.
-If the action was `d`, `o`, or `r` and unresolved `MUST-FIX`/`DISCUSS`/`OPTIONAL` items remain, do not signal merge-ready; re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`.
+If the action was direct item selection and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready. Re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`. Unresolved `OPTIONAL` items do not block the merge-ready signal.
+If the action was `d`, `o`, or `r` and unresolved `MUST-FIX`/`DISCUSS` items remain, do not signal merge-ready; re-offer the quick-action menu and ask whether to continue with `f`, `f+i`, `f+o`, `d`, `o`, `r`, or `m`. Unresolved `OPTIONAL` items do not block the merge-ready signal.
 
 Do not automatically merge. Signal readiness (or non-readiness) and let the user decide.
 
