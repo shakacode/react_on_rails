@@ -88,6 +88,40 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       end
     end
 
+    context "when base port would push derived renderer port above 65535" do
+      around do |example|
+        old = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
+        # 65_534 + BASE_PORT_RENDERER_OFFSET (2) = 65_536, which is invalid.
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "65534"
+        example.run
+        ENV["REACT_ON_RAILS_BASE_PORT"] = old
+      end
+
+      it "falls back to normal auto-detection instead of deriving an invalid port" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(3000)
+        expect(result[:renderer]).to be_nil
+      end
+    end
+
+    context "when base port is at the maximum safe value" do
+      around do |example|
+        old = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
+        ENV["REACT_ON_RAILS_BASE_PORT"] = described_class::MAX_BASE_PORT.to_s
+        example.run
+        ENV["REACT_ON_RAILS_BASE_PORT"] = old
+      end
+
+      it "derives all three ports within the valid TCP range" do
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(described_class::MAX_BASE_PORT)
+        expect(result[:webpack]).to eq(described_class::MAX_BASE_PORT + 1)
+        expect(result[:renderer]).to eq(described_class::MAX_BASE_PORT + 2)
+        expect(result[:renderer]).to be <= 65_535
+      end
+    end
+
     context "when default ports are free" do
       it "returns the default Rails port 3000" do
         allow(described_class).to receive(:port_available?).and_return(true)

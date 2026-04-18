@@ -14,7 +14,12 @@ module ReactOnRails
       # before entering the block and pass them explicitly to system().
       # This follows the same pattern used by Rails' bundle_command (railties),
       # Spring's process spawning, and this codebase's own PackGenerator.
-      ENV_KEYS_TO_PRESERVE = %w[PORT SHAKAPACKER_DEV_SERVER_PORT].freeze
+      ENV_KEYS_TO_PRESERVE = %w[
+        PORT
+        SHAKAPACKER_DEV_SERVER_PORT
+        RENDERER_PORT
+        REACT_RENDERER_URL
+      ].freeze
 
       class << self
         # Check if a process is available and usable in the current execution context

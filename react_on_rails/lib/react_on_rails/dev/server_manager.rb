@@ -835,15 +835,34 @@ module ReactOnRails
 
         def configure_ports
           selected = PortSelector.select_ports
-          ENV["PORT"] ||= selected[:rails].to_s
-          ENV["SHAKAPACKER_DEV_SERVER_PORT"] ||= selected[:webpack].to_s
           if selected[:renderer]
-            ENV["RENDERER_PORT"] ||= selected[:renderer].to_s
-            ENV["REACT_RENDERER_URL"] ||= "http://localhost:#{selected[:renderer]}"
+            apply_base_port_env(selected)
+          else
+            apply_explicit_port_env(selected)
           end
         rescue PortSelector::NoPortAvailable => e
           warn e.message
           exit 1
+        end
+
+        # Base port is active. Priority: base port > explicit per-service env vars.
+        # Assign unconditionally so the effective ports match the "Base port
+        # detected..." log line even when PORT/RENDERER_PORT were pre-set.
+        def apply_base_port_env(selected)
+          ENV["PORT"] = selected[:rails].to_s
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
+          ENV["RENDERER_PORT"] = selected[:renderer].to_s
+          ENV["REACT_RENDERER_URL"] = "http://localhost:#{selected[:renderer]}"
+        end
+
+        def apply_explicit_port_env(selected)
+          ENV["PORT"] ||= selected[:rails].to_s
+          ENV["SHAKAPACKER_DEV_SERVER_PORT"] ||= selected[:webpack].to_s
+          # Non-base-port worktree: if a user set RENDERER_PORT explicitly but
+          # not REACT_RENDERER_URL, keep them in sync so Rails reaches the right port.
+          return unless ENV["RENDERER_PORT"] && !ENV["REACT_RENDERER_URL"]
+
+          ENV["REACT_RENDERER_URL"] = "http://localhost:#{ENV.fetch('RENDERER_PORT')}"
         end
 
         def procfile_port(procfile)

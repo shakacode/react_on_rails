@@ -5,10 +5,9 @@ require "socket"
 module ReactOnRails
   module Dev
     class PortSelector
-      DEFAULT_RAILS_PORT    = 3000
-      DEFAULT_WEBPACK_PORT  = 3035
-      DEFAULT_RENDERER_PORT = 3800
-      MAX_ATTEMPTS          = 100
+      DEFAULT_RAILS_PORT   = 3000
+      DEFAULT_WEBPACK_PORT = 3035
+      MAX_ATTEMPTS         = 100
 
       # Offsets from the base port when REACT_ON_RAILS_BASE_PORT (or a recognized
       # tool-specific equivalent like CONDUCTOR_PORT) is set. The base port block
@@ -16,6 +15,7 @@ module ReactOnRails
       BASE_PORT_RAILS_OFFSET    = 0
       BASE_PORT_WEBPACK_OFFSET  = 1
       BASE_PORT_RENDERER_OFFSET = 2
+      MAX_BASE_PORT = 65_535 - BASE_PORT_RENDERER_OFFSET
 
       # Env vars checked (in order) for a base port value.
       BASE_PORT_ENV_VARS = %w[REACT_ON_RAILS_BASE_PORT CONDUCTOR_PORT].freeze
@@ -96,9 +96,11 @@ module ReactOnRails
         private
 
         def base_port
+          # Upper bound accounts for the largest derived offset so base + N stays
+          # within the valid TCP port range (1..65_535).
           BASE_PORT_ENV_VARS.each do |var|
             val = ENV[var]&.to_i
-            return val if val&.between?(1, 65_535)
+            return val if val&.between?(1, MAX_BASE_PORT)
           end
           nil
         end

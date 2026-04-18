@@ -261,6 +261,73 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect { described_class.start(:development) }.not_to raise_error
       end
     end
+
+    context "when configuring ports with a base port active" do
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 5000, webpack: 5001, renderer: 5002 })
+      end
+
+      around do |example|
+        keys = %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL]
+        old = keys.to_h { |k| [k, ENV.fetch(k, nil)] }
+        keys.each { |k| ENV.delete(k) }
+        example.run
+      ensure
+        old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
+      end
+
+      it "overrides a pre-existing PORT with the base-derived Rails port" do
+        ENV["PORT"] = "3000"
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("5000")
+      end
+
+      it "overrides a pre-existing SHAKAPACKER_DEV_SERVER_PORT with the base-derived webpack port" do
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "3035"
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("5001")
+      end
+
+      it "overrides pre-existing RENDERER_PORT and REACT_RENDERER_URL with base-derived values" do
+        ENV["RENDERER_PORT"] = "3800"
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("5002")
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:5002")
+      end
+    end
+
+    context "when RENDERER_PORT is set explicitly without a base port" do
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil })
+      end
+
+      around do |example|
+        keys = %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL]
+        old = keys.to_h { |k| [k, ENV.fetch(k, nil)] }
+        keys.each { |k| ENV.delete(k) }
+        example.run
+      ensure
+        old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
+      end
+
+      it "derives REACT_RENDERER_URL from the explicit RENDERER_PORT" do
+        ENV["RENDERER_PORT"] = "3801"
+        described_class.start(:development)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3801")
+      end
+
+      it "leaves a pre-existing REACT_RENDERER_URL untouched" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3801"
+        described_class.start(:development)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://renderer.internal:3801")
+      end
+    end
   end
 
   describe "browser auto-open readiness" do
