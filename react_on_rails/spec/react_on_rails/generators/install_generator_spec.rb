@@ -1316,7 +1316,7 @@ describe InstallGenerator, type: :generator do
     end
 
     it "creates node-renderer.js bootstrap file" do
-      assert_file "client/node-renderer.js" do |content|
+      assert_file "renderer/node-renderer.js" do |content|
         expect(content).to include("reactOnRailsProNodeRenderer")
         expect(content).to include("require('react-on-rails-pro-node-renderer')")
         expect(content).to include("serverBundleCachePath")
@@ -1332,7 +1332,7 @@ describe InstallGenerator, type: :generator do
       assert_file "Procfile.dev" do |content|
         expect(content).to include("node-renderer:")
         expect(content).to include("RENDERER_PORT=3800")
-        expect(content).to include("node client/node-renderer.js")
+        expect(content).to include("node renderer/node-renderer.js")
       end
     end
 
@@ -1497,13 +1497,13 @@ describe InstallGenerator, type: :generator do
   context "when node-renderer.js already exists" do
     before(:all) do
       run_generator_test_with_args(%w[--pro], package_json: true) do
-        simulate_existing_dir("client")
-        simulate_existing_file("client/node-renderer.js", "// existing node-renderer\n")
+        simulate_existing_dir("renderer")
+        simulate_existing_file("renderer/node-renderer.js", "// existing node-renderer\n")
       end
     end
 
     it "does not overwrite existing node-renderer.js" do
-      assert_file "client/node-renderer.js" do |content|
+      assert_file "renderer/node-renderer.js" do |content|
         expect(content).to include("// existing node-renderer")
         expect(content).not_to include("reactOnRailsProNodeRenderer")
       end
@@ -1550,7 +1550,7 @@ describe InstallGenerator, type: :generator do
     include_examples "rsc_common_files"
 
     it "creates node-renderer.js" do
-      assert_file "client/node-renderer.js" do |content|
+      assert_file "renderer/node-renderer.js" do |content|
         expect(content).to include("reactOnRailsProNodeRenderer")
         expect(content).to include("require('react-on-rails-pro-node-renderer')")
       end
@@ -1733,7 +1733,7 @@ describe InstallGenerator, type: :generator do
     end
 
     it "creates node-renderer.js" do
-      assert_file "client/node-renderer.js" do |content|
+      assert_file "renderer/node-renderer.js" do |content|
         expect(content).to include("reactOnRailsProNodeRenderer")
         expect(content).to include("require('react-on-rails-pro-node-renderer')")
       end

@@ -33,7 +33,7 @@ module ReactOnRails
       #
       # Creates:
       # - config/initializers/react_on_rails_pro.rb
-      # - client/node-renderer.js
+      # - renderer/node-renderer.js
       # - Procfile.dev entry for node-renderer
       #
       # @note NPM dependencies are handled separately by JsDependencyManager
@@ -211,7 +211,7 @@ module ReactOnRails
       end
 
       def create_node_renderer
-        node_renderer_path = "client/node-renderer.js"
+        node_renderer_path = "renderer/node-renderer.js"
 
         if File.exist?(File.join(destination_root, node_renderer_path))
           say "ℹ️  #{node_renderer_path} already exists, skipping", :yellow
@@ -220,10 +220,9 @@ module ReactOnRails
 
         say "📝 Creating Node Renderer bootstrap...", :yellow
 
-        # Ensure client directory exists
-        FileUtils.mkdir_p(File.join(destination_root, "client"))
+        FileUtils.mkdir_p(File.join(destination_root, "renderer"))
 
-        template_path = "templates/pro/base/client/node-renderer.js"
+        template_path = "templates/pro/base/renderer/node-renderer.js"
         copy_file(template_path, node_renderer_path)
 
         say "✅ Created #{node_renderer_path}", :green
@@ -237,7 +236,7 @@ module ReactOnRails
             ⚠️  Procfile.dev not found. Skipping Node Renderer process addition.
 
             You'll need to add the Node Renderer to your process manager manually:
-              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js
+              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
           MSG
           return
         end
@@ -252,7 +251,7 @@ module ReactOnRails
         node_renderer_line = <<~PROCFILE
 
           # React on Rails Pro - Node Renderer for SSR
-          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js
+          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
         PROCFILE
 
         append_to_file("Procfile.dev", node_renderer_line)

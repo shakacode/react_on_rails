@@ -58,12 +58,12 @@ Deprecated options:
 
 ### Testing example:
 
-[spec/dummy/client/node-renderer.js](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/client/node-renderer.js)
+[spec/dummy/renderer/node-renderer.js](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/renderer/node-renderer.js)
 
 ### Simple example:
 
-Create a file `client/node-renderer.js`. The generator uses this filename and CommonJS syntax so
-the file runs directly with `node client/node-renderer.js` without extra ESM configuration.
+Create a file `renderer/node-renderer.js`. The generator uses this filename and CommonJS syntax so
+the file runs directly with `node renderer/node-renderer.js` without extra ESM configuration.
 
 ```js
 const path = require('path');
@@ -94,7 +94,7 @@ And add a root-level script to the `scripts` section of your `package.json`
 
 ```json
   "scripts": {
-    "node-renderer": "node client/node-renderer.js"
+    "node-renderer": "node renderer/node-renderer.js"
   },
 ```
 
@@ -113,7 +113,7 @@ For advanced use cases, you can customize the Fastify server instance by importi
 When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
 
 The advanced examples below use ES modules for readability. If you want this file to keep running
-as `node client/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
+as `node renderer/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
 example above or switch the file to `.mjs` or `"type": "module"`.
 
 ```js

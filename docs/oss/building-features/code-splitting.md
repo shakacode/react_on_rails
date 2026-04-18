@@ -252,7 +252,7 @@ in your webpack configuration. That turns off the polyfills for things like `__d
 
 ### Node Renderer
 
-In your `node-renderer.js` file which runs node renderer, you need to specify `supportModules` options as follows:
+In your `renderer/node-renderer.js` file which runs node renderer, you need to specify `supportModules` options as follows:
 
 ```js
 const path = require('path');

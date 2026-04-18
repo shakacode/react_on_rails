@@ -27,7 +27,7 @@ See the [Memory Leaks guide](../../../pro/js-memory-leaks.md) for common leak pa
 
 **node-renderer** is a standalone Node application to serve React SSR requests from a **Rails** client. You don't need any **Ruby** code to setup and launch it. You can configure with the command line or with a launch file.
 
-> **Generator shortcut:** Running `rails generate react_on_rails:install --pro` (or `rails generate react_on_rails:pro` for existing apps) automatically creates `client/node-renderer.js`, adds the Node Renderer process to `Procfile.dev`, and installs the required npm packages. See [Installation](../../../pro/installation.md) for details. The manual setup below is for apps that need custom configuration.
+> **Generator shortcut:** Running `rails generate react_on_rails:install --pro` (or `rails generate react_on_rails:pro` for existing apps) automatically creates `renderer/node-renderer.js`, adds the Node Renderer process to `Procfile.dev`, and installs the required npm packages. See [Installation](../../../pro/installation.md) for details. The manual setup below is for apps that need custom configuration.
 
 ## Simple Command Line for node-renderer
 
@@ -65,7 +65,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    # or: yarn add react-on-rails-pro-node-renderer
    # or: bun add react-on-rails-pro-node-renderer
    ```
-4. Configure a JavaScript file that will launch the rendering server per the docs in [Node Renderer JavaScript Configuration](./js-configuration.md). For example, create a file `node-renderer.js`. Here is a simple example that uses all the defaults except for serverBundleCachePath:
+4. Configure a JavaScript file that will launch the rendering server per the docs in [Node Renderer JavaScript Configuration](./js-configuration.md). For example, create a file `renderer/node-renderer.js`. Here is a simple example that uses all the defaults except for serverBundleCachePath:
 
    ```javascript
    import path from 'path';
@@ -78,7 +78,7 @@ For the most control over the setup, create a JavaScript file to start the NodeR
    reactOnRailsProNodeRenderer(config);
    ```
 
-5. Now you can launch your renderer server with `node node-renderer.js`. You will probably add a script to your `package.json`.
+5. Now you can launch your renderer server with `node renderer/node-renderer.js`. You will probably add a script to your `package.json`.
 6. You can use a command line argument of `-p SOME_PORT` to override any configured or ENV value for the port.
 
 ## Setup Rails Application
@@ -163,7 +163,7 @@ jobs:
     steps:
       - name: Start Node Renderer
         run: |
-          node client/node-renderer.js &
+          node renderer/node-renderer.js &
           # Wait for the renderer to be ready.
           # The renderer uses cleartext HTTP/2 (h2c), so use --http2-prior-knowledge for the probe.
           # --max-time 2 prevents hangs if the port is open but the process is stalled.
