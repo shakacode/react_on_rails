@@ -65,6 +65,10 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "prints a base port message" do
         expect { described_class.select_ports }.to output(/Base port 5000 detected/).to_stdout
       end
+
+      it "names the source env var in the base port log line" do
+        expect { described_class.select_ports }.to output(/via REACT_ON_RAILS_BASE_PORT/).to_stdout
+      end
     end
 
     context "when CONDUCTOR_PORT is set (without REACT_ON_RAILS_BASE_PORT)" do
@@ -80,6 +84,10 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         expect(result[:rails]).to eq(6000)
         expect(result[:webpack]).to eq(6001)
         expect(result[:renderer]).to eq(6002)
+      end
+
+      it "names CONDUCTOR_PORT as the source in the base port log line" do
+        expect { described_class.select_ports }.to output(/via CONDUCTOR_PORT/).to_stdout
       end
     end
 
@@ -210,6 +218,39 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
           expect(result[:rails]).to eq(3000)
           expect(result[:renderer]).to be_nil
         end.to output(/not a valid integer/).to_stderr
+      end
+    end
+
+    context "when CONDUCTOR_PORT alone holds an invalid value" do
+      around do |example|
+        ENV["CONDUCTOR_PORT"] = "not-a-number"
+        example.run
+      end
+
+      it "warns and falls back to auto-detection (mirrors REACT_ON_RAILS_BASE_PORT invalid handling)" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        expect do
+          result = described_class.select_ports
+          expect(result[:rails]).to eq(3000)
+          expect(result[:renderer]).to be_nil
+          expect(result[:base_port_mode]).to be(false)
+        end.to output(/CONDUCTOR_PORT.*not a valid integer/).to_stderr
+      end
+    end
+
+    context "when CONDUCTOR_PORT is out of range" do
+      around do |example|
+        ENV["CONDUCTOR_PORT"] = "70000"
+        example.run
+      end
+
+      it "warns and falls back to auto-detection" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        expect do
+          result = described_class.select_ports
+          expect(result[:rails]).to eq(3000)
+          expect(result[:base_port_mode]).to be(false)
+        end.to output(/CONDUCTOR_PORT.*out of range/).to_stderr
       end
     end
 

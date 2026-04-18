@@ -21,7 +21,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   shared_context "with clean port env" do
     around do |example|
       old = {}
-      %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL].each do |k|
+      # REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT must be cleared too: if either
+      # is set in the developer's shell (common inside a Conductor workspace),
+      # the real PortSelector.select_ports enters base-port mode, and any test
+      # that doesn't stub select_ports will see unexpected port assignments.
+      # Mirrors port_selector_spec.rb's outer `around`.
+      %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL
+         REACT_ON_RAILS_BASE_PORT CONDUCTOR_PORT].each do |k|
         old[k] = ENV.fetch(k, nil)
         ENV.delete(k)
       end

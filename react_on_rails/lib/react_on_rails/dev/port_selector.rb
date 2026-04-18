@@ -49,7 +49,7 @@ module ReactOnRails
         # Pro-only service and does not participate in auto-detection).
         # :base_port_mode is true only in case 1.
         def select_ports
-          bp = base_port
+          bp, source = base_port_with_source
           if bp
             ports = {
               rails: bp + BASE_PORT_RAILS_OFFSET,
@@ -57,7 +57,7 @@ module ReactOnRails
               renderer: bp + BASE_PORT_RENDERER_OFFSET,
               base_port_mode: true
             }
-            puts "Base port #{bp} detected. Using Rails :#{ports[:rails]}, " \
+            puts "Base port #{bp} detected via #{source}. Using Rails :#{ports[:rails]}, " \
                  "webpack :#{ports[:webpack]}, renderer :#{ports[:renderer]}"
             warn_if_derived_ports_in_use(bp, ports)
             return ports
@@ -123,7 +123,11 @@ module ReactOnRails
           end
         end
 
-        def base_port
+        # Returns [val, source_var] when a valid base port env var is set,
+        # otherwise nil. The source var is included so callers can surface it
+        # in user-facing log lines (helpful when CONDUCTOR_PORT vs.
+        # REACT_ON_RAILS_BASE_PORT activated base-port mode).
+        def base_port_with_source
           # Upper bound accounts for the largest derived offset so base + N stays
           # within the valid TCP port range (1..65_535).
           BASE_PORT_ENV_VARS.each_with_index do |var, idx|
@@ -146,7 +150,7 @@ module ReactOnRails
                    "(1..#{PRIVILEGED_PORT_MAX}); binding will fail without root."
             end
 
-            return val
+            return [val, var]
           end
           nil
         end
