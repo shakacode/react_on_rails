@@ -58,7 +58,7 @@ Deprecated options:
 
 ### Testing example:
 
-[react_on_rails_pro/spec/dummy/renderer/node-renderer.js](../../../../react_on_rails_pro/spec/dummy/renderer/node-renderer.js)
+[react_on_rails_pro/spec/dummy/renderer/node-renderer.js](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/renderer/node-renderer.js)
 
 ### Simple example:
 

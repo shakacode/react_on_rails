@@ -212,9 +212,16 @@ module ReactOnRails
 
       def create_node_renderer
         node_renderer_path = "renderer/node-renderer.js"
+        legacy_node_renderer_path = "client/node-renderer.js"
 
         if File.exist?(File.join(destination_root, node_renderer_path))
           say "ℹ️  #{node_renderer_path} already exists, skipping", :yellow
+          return
+        end
+
+        if File.exist?(File.join(destination_root, legacy_node_renderer_path))
+          say "ℹ️  #{legacy_node_renderer_path} detected, keeping existing renderer; " \
+              "to migrate, move it to #{node_renderer_path} and update Procfile.dev", :yellow
           return
         end
 

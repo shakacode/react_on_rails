@@ -1223,6 +1223,37 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  context "when prerequisites are met and a legacy client/node-renderer.js exists" do
+    let(:legacy_renderer_content) { "// customized legacy renderer\n" }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_base_webpack_files
+      simulate_existing_file("client/node-renderer.js", legacy_renderer_content)
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not create renderer/node-renderer.js" do
+      expect(File.exist?(File.join(destination_root, "renderer/node-renderer.js"))).to be false
+    end
+
+    it "preserves the legacy client/node-renderer.js" do
+      expect(File.read(File.join(destination_root, "client/node-renderer.js"))).to eq(legacy_renderer_content)
+    end
+  end
+
   context "when server webpack has only libraryTarget uncommented" do
     before do
       prepare_destination
