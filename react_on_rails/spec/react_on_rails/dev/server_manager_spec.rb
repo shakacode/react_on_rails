@@ -266,7 +266,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       before do
         mock_system_calls
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
-          .and_return({ rails: 5000, webpack: 5001, renderer: 5002 })
+          .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
       end
 
       around do |example|

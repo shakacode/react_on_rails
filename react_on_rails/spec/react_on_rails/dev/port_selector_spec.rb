@@ -19,7 +19,10 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
     end
     example.run
   ensure
-    saved.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
+    # `saved` is assigned on the first line above and cannot fail, but guard with
+    # `&.` so the ensure remains correct even if a future change moves the
+    # assignment below something that can raise.
+    saved&.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
   end
 
   describe ".select_ports" do
@@ -28,6 +31,9 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         ENV["REACT_ON_RAILS_BASE_PORT"] = "5000"
         example.run
       end
+
+      # Keep derived-port warnings out of tests that don't specifically assert them.
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "derives Rails port from base + 0" do
         result = described_class.select_ports
@@ -44,9 +50,16 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         expect(result[:renderer]).to eq(5002)
       end
 
-      it "does not probe for free ports" do
-        expect(described_class).not_to receive(:port_available?)
-        described_class.select_ports
+      it "sets base_port_mode: true on the returned hash" do
+        result = described_class.select_ports
+        expect(result[:base_port_mode]).to be(true)
+      end
+
+      it "returns derived ports even when they are already in use (deterministic)" do
+        allow(described_class).to receive(:port_available?).and_return(false)
+        result = nil
+        expect { result = described_class.select_ports }.to output(/already in use/).to_stderr
+        expect(result).to include(rails: 5000, webpack: 5001, renderer: 5002)
       end
 
       it "prints a base port message" do
@@ -59,6 +72,8 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         ENV["CONDUCTOR_PORT"] = "6000"
         example.run
       end
+
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "derives all ports from CONDUCTOR_PORT" do
         result = described_class.select_ports
@@ -74,6 +89,8 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         ENV["CONDUCTOR_PORT"] = "6000"
         example.run
       end
+
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "prefers REACT_ON_RAILS_BASE_PORT over CONDUCTOR_PORT" do
         result = described_class.select_ports
@@ -135,6 +152,8 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         ENV["REACT_ON_RAILS_BASE_PORT"] = described_class::MAX_BASE_PORT.to_s
         example.run
       end
+
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "derives all three ports within the valid TCP range" do
         result = described_class.select_ports

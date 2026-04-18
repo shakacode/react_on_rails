@@ -30,7 +30,8 @@ module ReactOnRails
       class NoPortAvailable < StandardError; end
 
       class << self
-        # Returns { rails: Integer, webpack: Integer, renderer: Integer|nil }.
+        # Returns { rails: Integer, webpack: Integer, renderer: Integer|nil,
+        #           base_port_mode: Boolean }.
         #
         # Priority:
         #   1. Base port (REACT_ON_RAILS_BASE_PORT or CONDUCTOR_PORT) — all ports
@@ -40,16 +41,19 @@ module ReactOnRails
         #
         # The :renderer key is populated only when a base port is set (it is a
         # Pro-only service and does not participate in auto-detection).
+        # :base_port_mode is true only in case 1.
         def select_ports
           bp = base_port
           if bp
             ports = {
               rails: bp + BASE_PORT_RAILS_OFFSET,
               webpack: bp + BASE_PORT_WEBPACK_OFFSET,
-              renderer: bp + BASE_PORT_RENDERER_OFFSET
+              renderer: bp + BASE_PORT_RENDERER_OFFSET,
+              base_port_mode: true
             }
             puts "Base port #{bp} detected. Using Rails :#{ports[:rails]}, " \
                  "webpack :#{ports[:webpack]}, renderer :#{ports[:renderer]}"
+            warn_if_derived_ports_in_use(bp, ports)
             return ports
           end
 
@@ -67,7 +71,7 @@ module ReactOnRails
             puts "Default ports in use. Using Rails :#{rails_port}, webpack :#{webpack_port}"
           end
 
-          { rails: rails_port, webpack: webpack_port, renderer: nil }
+          { rails: rails_port, webpack: webpack_port, renderer: nil, base_port_mode: false }
         end
 
         # Public so it can be stubbed in tests.
@@ -101,6 +105,17 @@ module ReactOnRails
         end
 
         private
+
+        # Advisory: surface early conflicts when a base port's derived ports are
+        # already bound (e.g. two worktrees share a base). Does not fail — the
+        # actual bind at server start gives the definitive error.
+        def warn_if_derived_ports_in_use(base, ports)
+          %i[rails webpack renderer].each do |role|
+            p = ports[role]
+            warn "WARNING: port #{p} (#{role}, derived from base #{base}) is already in use." \
+              unless port_available?(p)
+          end
+        end
 
         def base_port
           # Upper bound accounts for the largest derived offset so base + N stays

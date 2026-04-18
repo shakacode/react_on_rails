@@ -836,7 +836,7 @@ module ReactOnRails
 
         def configure_ports
           selected = PortSelector.select_ports
-          if selected[:renderer]
+          if selected[:base_port_mode]
             apply_base_port_env(selected)
           else
             apply_explicit_port_env(selected)
