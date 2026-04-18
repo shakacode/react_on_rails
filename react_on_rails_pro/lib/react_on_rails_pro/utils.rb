@@ -179,14 +179,19 @@ module ReactOnRailsPro
       }
     end
 
+    RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX = Mutex.new
+    private_constant :RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX
+
     def self.resolve_renderer_cache_dir
       if ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"].present?
         ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"]
       elsif ENV["RENDERER_BUNDLE_PATH"].present?
-        unless @renderer_bundle_path_deprecation_warned
-          warn "[ReactOnRailsPro] RENDERER_BUNDLE_PATH is deprecated. " \
-               "Use RENDERER_SERVER_BUNDLE_CACHE_PATH instead."
-          @renderer_bundle_path_deprecation_warned = true
+        RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize do
+          unless @renderer_bundle_path_deprecation_warned
+            warn "[ReactOnRailsPro] RENDERER_BUNDLE_PATH is deprecated. " \
+                 "Use RENDERER_SERVER_BUNDLE_CACHE_PATH instead."
+            @renderer_bundle_path_deprecation_warned = true
+          end
         end
         ENV["RENDERER_BUNDLE_PATH"]
       else
@@ -198,7 +203,9 @@ module ReactOnRailsPro
     # specs can exercise both the "warning fires" and "warning suppressed" paths
     # without leaking state between examples.
     def self.reset_renderer_bundle_path_deprecation_warned!
-      @renderer_bundle_path_deprecation_warned = nil
+      RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize do
+        @renderer_bundle_path_deprecation_warned = nil
+      end
     end
 
     def self.mine_type_from_file_name(filename)

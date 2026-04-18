@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
-require "set"
+require "react_on_rails_pro/renderer_cache_helpers"
 
 module ReactOnRailsPro
   # Pre-seeds the Node Renderer bundle cache by copying compiled server bundles
@@ -18,42 +18,22 @@ module ReactOnRailsPro
       puts "[ReactOnRailsPro] Pre-seeding renderer cache in: #{cache_dir}"
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
-      # Pre-seed server bundle
-      server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
-      validate_bundle_exists!(server_bundle_path)
-      server_bundle_hash = pool.server_bundle_hash
-      seed_bundle(server_bundle_path, server_bundle_hash, cache_dir)
+      assets = RendererCacheHelpers.collect_assets
+      rsc_required_paths = RendererCacheHelpers.required_rsc_asset_paths
 
-      # Collect assets to copy
-      assets = collect_assets
-
-      # Copy assets (including RSC manifests) into the server bundle directory.
-      # The Node Renderer serves manifests from whichever bundle dir it loaded,
-      # so both server and RSC dirs need the manifests present.
-      copy_assets(assets, File.join(cache_dir, server_bundle_hash.to_s))
-
-      # Pre-seed RSC bundle if enabled
-      return unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
-      validate_bundle_exists!(rsc_bundle_path)
-      rsc_bundle_hash = pool.rsc_bundle_hash
-      seed_bundle(rsc_bundle_path, rsc_bundle_hash, cache_dir)
-      copy_assets(assets, File.join(cache_dir, rsc_bundle_hash.to_s))
+      RendererCacheHelpers.bundle_sources(pool).each do |src_bundle_path, bundle_hash|
+        RendererCacheHelpers.validate_bundle_exists!(src_bundle_path, "pre-seeding")
+        seed_bundle(src_bundle_path, bundle_hash, cache_dir)
+        # The Node Renderer serves manifests from whichever bundle dir it loaded,
+        # so both server and RSC dirs need the manifests present.
+        copy_assets(assets, File.join(cache_dir, bundle_hash.to_s), rsc_required_paths)
+      end
     end
 
     def self.resolve_cache_dir
       ReactOnRailsPro::Utils.resolve_renderer_cache_dir
     end
     private_class_method :resolve_cache_dir
-
-    def self.validate_bundle_exists!(path)
-      return if File.exist?(path)
-
-      raise ReactOnRailsPro::Error, "Bundle not found at #{path}. " \
-                                    "Please build your bundles before pre-seeding the renderer cache."
-    end
-    private_class_method :validate_bundle_exists!
 
     def self.seed_bundle(src_path, bundle_hash, cache_dir)
       bundle_dir = File.join(cache_dir, bundle_hash.to_s)
@@ -64,26 +44,12 @@ module ReactOnRailsPro
     end
     private_class_method :seed_bundle
 
-    def self.collect_assets
-      assets = Array(ReactOnRailsPro.configuration.assets_to_copy).dup
-
-      if ReactOnRailsPro.configuration.enable_rsc_support
-        assets << ReactOnRailsPro::Utils.react_client_manifest_file_path
-        assets << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
-      end
-
-      assets.compact_blank
-    end
-    private_class_method :collect_assets
-
     # RSC manifests are required when RSC is enabled — a missing manifest would cause
     # the renderer to fail at runtime with a hard-to-diagnose error. User-configured
     # assets_to_copy are optional and only produce a warning. Required assets are
     # matched by expanded path rather than basename so a same-named unrelated entry
     # in assets_to_copy cannot trigger a false-positive "required" error.
-    def self.copy_assets(assets, bundle_dir)
-      rsc_required_paths = required_rsc_asset_paths
-
+    def self.copy_assets(assets, bundle_dir, rsc_required_paths)
       assets.each do |asset_path|
         expanded = File.expand_path(asset_path.to_s)
         unless File.exist?(expanded)
@@ -101,17 +67,5 @@ module ReactOnRailsPro
       end
     end
     private_class_method :copy_assets
-
-    def self.required_rsc_asset_paths
-      return Set.new unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      Set.new(
-        [
-          File.expand_path(ReactOnRailsPro::Utils.react_client_manifest_file_path.to_s),
-          File.expand_path(ReactOnRailsPro::Utils.react_server_client_manifest_file_path.to_s)
-        ]
-      )
-    end
-    private_class_method :required_rsc_asset_paths
   end
 end

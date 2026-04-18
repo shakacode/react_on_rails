@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
+require "fileutils"
 require "pathname"
-require "set"
+require "react_on_rails_pro/renderer_cache_helpers"
 
 module ReactOnRailsPro
   # Pre-stages the Node Renderer cache via symlinks for same-filesystem workflows
@@ -35,57 +36,22 @@ module ReactOnRailsPro
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
       puts "[ReactOnRailsPro] Pre-staging renderer cache via symlinks at: #{cache_dir}"
 
-      assets = collect_assets
-      bundle_sources.each do |src_bundle_path, bundle_hash_method|
-        validate_bundle_exists!(src_bundle_path)
-        bundle_hash = pool.public_send(bundle_hash_method)
+      assets = RendererCacheHelpers.collect_assets
+      rsc_required_paths = RendererCacheHelpers.required_rsc_asset_paths
+
+      RendererCacheHelpers.bundle_sources(pool).each do |src_bundle_path, bundle_hash|
+        RendererCacheHelpers.validate_bundle_exists!(src_bundle_path, "pre-staging")
         bundle_dir = File.join(cache_dir, bundle_hash.to_s)
         bundle_dest_path = File.join(bundle_dir, "#{bundle_hash}.js")
         make_relative_symlink(src_bundle_path, bundle_dest_path)
-        symlink_assets(assets, bundle_dir)
+        symlink_assets(assets, bundle_dir, rsc_required_paths)
       end
     end
-
-    def self.bundle_sources
-      sources = [[ReactOnRails::Utils.server_bundle_js_file_path, :server_bundle_hash]]
-
-      return sources unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      sources << [ReactOnRailsPro::Utils.rsc_bundle_js_file_path, :rsc_bundle_hash]
-      sources
-    end
-    private_class_method :bundle_sources
-
-    def self.collect_assets
-      assets = Array(ReactOnRailsPro.configuration.assets_to_copy).dup
-
-      if ReactOnRailsPro.configuration.enable_rsc_support
-        assets << ReactOnRailsPro::Utils.react_client_manifest_file_path
-        assets << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
-      end
-
-      assets.compact_blank
-    end
-    private_class_method :collect_assets
-
-    def self.required_rsc_asset_paths
-      return Set.new unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      Set.new(
-        [
-          File.expand_path(ReactOnRailsPro::Utils.react_client_manifest_file_path.to_s),
-          File.expand_path(ReactOnRailsPro::Utils.react_server_client_manifest_file_path.to_s)
-        ]
-      )
-    end
-    private_class_method :required_rsc_asset_paths
 
     # Required assets are matched by expanded path rather than basename so a
     # same-named unrelated entry in assets_to_copy cannot trigger a false-
     # positive "required" error.
-    def self.symlink_assets(assets, bundle_dir)
-      rsc_required_paths = required_rsc_asset_paths
-
+    def self.symlink_assets(assets, bundle_dir, rsc_required_paths)
       assets.each do |asset_path|
         expanded = File.expand_path(asset_path.to_s)
         unless File.exist?(expanded)
@@ -102,13 +68,5 @@ module ReactOnRailsPro
       end
     end
     private_class_method :symlink_assets
-
-    def self.validate_bundle_exists!(path)
-      return if File.exist?(path)
-
-      raise ReactOnRailsPro::Error, "Bundle not found at #{path}. " \
-                                    "Please build your bundles before pre-staging the renderer cache."
-    end
-    private_class_method :validate_bundle_exists!
   end
 end
