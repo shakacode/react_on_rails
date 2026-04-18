@@ -270,9 +270,11 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       around do |example|
-        keys = %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL]
-        old = keys.to_h { |k| [k, ENV.fetch(k, nil)] }
-        keys.each { |k| ENV.delete(k) }
+        old = {}
+        %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL].each do |k|
+          old[k] = ENV.fetch(k, nil)
+          ENV.delete(k)
+        end
         example.run
       ensure
         old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
@@ -307,9 +309,11 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       around do |example|
-        keys = %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL]
-        old = keys.to_h { |k| [k, ENV.fetch(k, nil)] }
-        keys.each { |k| ENV.delete(k) }
+        old = {}
+        %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL].each do |k|
+          old[k] = ENV.fetch(k, nil)
+          ENV.delete(k)
+        end
         example.run
       ensure
         old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
@@ -326,6 +330,19 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3801"
         described_class.start(:development)
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://renderer.internal:3801")
+      end
+
+      it "warns when RENDERER_PORT and REACT_RENDERER_URL disagree" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=3801 does not match REACT_RENDERER_URL=http://localhost:3800}).to_stderr
+      end
+
+      it "does not warn when RENDERER_PORT appears inside REACT_RENDERER_URL" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3801"
+        expect { described_class.start(:development) }.not_to output(/does not match/).to_stderr
       end
     end
   end

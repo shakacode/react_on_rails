@@ -99,8 +99,16 @@ module ReactOnRails
           # Upper bound accounts for the largest derived offset so base + N stays
           # within the valid TCP port range (1..65_535).
           BASE_PORT_ENV_VARS.each do |var|
-            val = ENV[var]&.to_i
-            return val if val&.between?(1, MAX_BASE_PORT)
+            raw = ENV.fetch(var, nil)
+            next if raw.nil? || raw.empty?
+
+            unless raw.match?(/\A\d+\z/)
+              warn "WARNING: #{var}=#{raw.inspect} is not a valid integer; ignoring."
+              next
+            end
+
+            val = raw.to_i
+            return val if val.between?(1, MAX_BASE_PORT)
           end
           nil
         end

@@ -858,11 +858,23 @@ module ReactOnRails
         def apply_explicit_port_env(selected)
           ENV["PORT"] ||= selected[:rails].to_s
           ENV["SHAKAPACKER_DEV_SERVER_PORT"] ||= selected[:webpack].to_s
-          # Non-base-port worktree: if a user set RENDERER_PORT explicitly but
-          # not REACT_RENDERER_URL, keep them in sync so Rails reaches the right port.
-          return unless ENV["RENDERER_PORT"] && !ENV["REACT_RENDERER_URL"]
+          sync_renderer_port_and_url
+        end
 
-          ENV["REACT_RENDERER_URL"] = "http://localhost:#{ENV.fetch('RENDERER_PORT')}"
+        def sync_renderer_port_and_url
+          port = ENV.fetch("RENDERER_PORT", nil)
+          url = ENV.fetch("REACT_RENDERER_URL", nil)
+          return if port.nil? || port.empty?
+
+          if url.nil? || url.empty?
+            # Only RENDERER_PORT set: derive the URL so Rails reaches the right port.
+            ENV["REACT_RENDERER_URL"] = "http://localhost:#{port}"
+          elsif !url.include?(":#{port}")
+            # Both set but inconsistent — SSR will silently break otherwise.
+            warn "WARNING: RENDERER_PORT=#{port} does not match REACT_RENDERER_URL=#{url}; " \
+                 "Rails will use REACT_RENDERER_URL to reach the renderer. " \
+                 "Unset one of them or ensure they agree."
+          end
         end
 
         def procfile_port(procfile)

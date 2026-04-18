@@ -5,13 +5,28 @@ require "react_on_rails/dev/port_selector"
 require "socket"
 
 RSpec.describe ReactOnRails::Dev::PortSelector do
+  # Every test in this file must start from a clean slate for the env vars
+  # that influence port selection; otherwise a value leaked from the outer
+  # shell (e.g. a developer running specs inside a Conductor workspace, or an
+  # agent that set REACT_ON_RAILS_BASE_PORT) can silently change what
+  # `select_ports` returns and cause tests to fail. Individual contexts set
+  # the vars they actually want under test inside their own `around` blocks.
+  around do |example|
+    saved = {}
+    %w[REACT_ON_RAILS_BASE_PORT CONDUCTOR_PORT PORT SHAKAPACKER_DEV_SERVER_PORT].each do |k|
+      saved[k] = ENV.fetch(k, nil)
+      ENV.delete(k)
+    end
+    example.run
+  ensure
+    saved.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
+  end
+
   describe ".select_ports" do
     context "when REACT_ON_RAILS_BASE_PORT is set" do
       around do |example|
-        old = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
         ENV["REACT_ON_RAILS_BASE_PORT"] = "5000"
         example.run
-        ENV["REACT_ON_RAILS_BASE_PORT"] = old
       end
 
       it "derives Rails port from base + 0" do
@@ -41,10 +56,8 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when CONDUCTOR_PORT is set (without REACT_ON_RAILS_BASE_PORT)" do
       around do |example|
-        old = ENV.fetch("CONDUCTOR_PORT", nil)
         ENV["CONDUCTOR_PORT"] = "6000"
         example.run
-        ENV["CONDUCTOR_PORT"] = old
       end
 
       it "derives all ports from CONDUCTOR_PORT" do
@@ -57,13 +70,9 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when both REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT are set" do
       around do |example|
-        old_base = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
-        old_conductor = ENV.fetch("CONDUCTOR_PORT", nil)
         ENV["REACT_ON_RAILS_BASE_PORT"] = "5000"
         ENV["CONDUCTOR_PORT"] = "6000"
         example.run
-        ENV["REACT_ON_RAILS_BASE_PORT"] = old_base
-        ENV["CONDUCTOR_PORT"] = old_conductor
       end
 
       it "prefers REACT_ON_RAILS_BASE_PORT over CONDUCTOR_PORT" do
@@ -74,10 +83,8 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when base port is out of range" do
       around do |example|
-        old = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
         ENV["REACT_ON_RAILS_BASE_PORT"] = "99999"
         example.run
-        ENV["REACT_ON_RAILS_BASE_PORT"] = old
       end
 
       it "falls back to normal auto-detection" do
@@ -90,11 +97,9 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when base port would push derived renderer port above 65535" do
       around do |example|
-        old = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
         # 65_534 + BASE_PORT_RENDERER_OFFSET (2) = 65_536, which is invalid.
         ENV["REACT_ON_RAILS_BASE_PORT"] = "65534"
         example.run
-        ENV["REACT_ON_RAILS_BASE_PORT"] = old
       end
 
       it "falls back to normal auto-detection instead of deriving an invalid port" do
@@ -107,10 +112,8 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when base port is at the maximum safe value" do
       around do |example|
-        old = ENV.fetch("REACT_ON_RAILS_BASE_PORT", nil)
         ENV["REACT_ON_RAILS_BASE_PORT"] = described_class::MAX_BASE_PORT.to_s
         example.run
-        ENV["REACT_ON_RAILS_BASE_PORT"] = old
       end
 
       it "derives all three ports within the valid TCP range" do
@@ -119,6 +122,22 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         expect(result[:webpack]).to eq(described_class::MAX_BASE_PORT + 1)
         expect(result[:renderer]).to eq(described_class::MAX_BASE_PORT + 2)
         expect(result[:renderer]).to be <= 65_535
+      end
+    end
+
+    context "when base port env var is not a valid integer" do
+      around do |example|
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "400O" # letter O, not zero
+        example.run
+      end
+
+      it "warns and falls back to auto-detection instead of silently parsing as 400" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        expect do
+          result = described_class.select_ports
+          expect(result[:rails]).to eq(3000)
+          expect(result[:renderer]).to be_nil
+        end.to output(/not a valid integer/).to_stderr
       end
     end
 
@@ -183,10 +202,8 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when ENV['PORT'] is already set" do
       around do |example|
-        old = ENV.fetch("PORT", nil)
         ENV["PORT"] = "4000"
         example.run
-        ENV["PORT"] = old
       end
 
       it "respects the existing PORT env var" do
@@ -222,10 +239,8 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when ENV['SHAKAPACKER_DEV_SERVER_PORT'] is already set" do
       around do |example|
-        old = ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)
         ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "4035"
         example.run
-        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = old
       end
 
       it "respects the existing SHAKAPACKER_DEV_SERVER_PORT env var" do
@@ -261,13 +276,9 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when both PORT and SHAKAPACKER_DEV_SERVER_PORT are set" do
       around do |example|
-        old_port = ENV.fetch("PORT", nil)
-        old_wp   = ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)
         ENV["PORT"] = "4000"
         ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "4035"
         example.run
-        ENV["PORT"] = old_port
-        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = old_wp
       end
 
       it "returns both explicit ports" do
@@ -291,10 +302,8 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
     context "when PORT contains an out-of-range value" do
       around do |example|
-        old = ENV.fetch("PORT", nil)
         ENV["PORT"] = "99999"
         example.run
-        ENV["PORT"] = old
       end
 
       it "treats out-of-range PORT as unset and falls back to auto-detection" do
