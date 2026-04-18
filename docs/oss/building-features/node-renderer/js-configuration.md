@@ -35,8 +35,8 @@ available default ENV values if you wire them into your own launch script.
 1. **maxDebugSnippetLength** (default: 1000) - If the rendering request is longer than this, it will be truncated in exception and logging messages.
 1. **supportModules** - (default: `env.RENDERER_SUPPORT_MODULES || null`) - If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS global objects and functions that get added to the VM context:
    `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, performance, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
-   This option is required to equal `true` if you want to use loadable components.
    `performance` is included so React 19's development build can call `performance.now()` from `React.lazy` without throwing `ReferenceError: performance is not defined`.
+   This option is required to equal `true` if you want to use loadable components.
    Setting this value to false causes the NodeRenderer to behave like ExecJS.
    See also `stubTimers`.
 1. **additionalContext** - (default: `null`) - additionalContext enables you to specify additional NodeJS objects (usually from https://nodejs.org/api/globals.html) to add to the VM context in addition to our `supportModules` defaults.
