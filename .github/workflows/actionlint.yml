@@ -51,6 +51,7 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
             # Pinned fallback used when the GitHub API call fails (rate limit / outage)
             # so the cache key stays stable and the download step still has a version to pin to.
+            echo "::warning::GitHub API unavailable; falling back to pinned actionlint $fallback_version. Consider updating this pin."
             fallback_version="v1.7.7"
             if response=$(curl -sf -H "Authorization: token ${{ github.token }}" https://api.github.com/repos/rhysd/actionlint/releases/latest); then
               actionlint_version=$(echo "$response" | jq -r .tag_name)
