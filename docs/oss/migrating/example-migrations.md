@@ -72,28 +72,40 @@ The safest approach is:
 2. Replace one helper-backed component boundary first
 3. Treat the wrapper removal as a later step
 
-## What counts as proof
+## Minimum acceptable evidence
 
-Not every good migration example is performance-first.
+Every example migration PR listed on this page must carry proof a reader can inspect without local setup. Pick one of the two lanes below based on the honest win for the slice. Do not force a weak benchmark onto a maintainability-first example.
 
-When the change is performance-first, compare the same route on the baseline branch and the migration branch. At minimum, record:
+### Performance-first lane
 
-1. Response timing
-2. HTML size
-3. Route JavaScript bytes
-4. Number of JS assets needed for the route
-5. Hydration warnings or client boot errors
+Required for every performance-first example PR:
 
-If possible, also record browser metrics such as FCP, LCP, CLS, and TBT or INP.
+1. **Baseline and target** named explicitly: the commit SHA or branch on the baseline (pre-migration) side and the migration side, plus the route or mount point being compared
+2. **Response timing** on the same route, same environment, same warmup protocol, reported as a median over a stated sample size
+3. **HTML size** for the rendered route
+4. **Route JavaScript bytes** shipped to the browser for that route
+5. **Number of JS assets** needed for the route
+6. **Hydration warnings or client boot errors** observed, or an explicit "none" with how that was checked
 
-When the change is maintainability-first, record:
+Recommended when the environment allows: FCP, LCP, CLS, and TBT or INP.
 
-1. The custom bridge, oversized mount, or repo-specific contract that existed before the migration
-2. The standardized React on Rails helper or smaller boundary that replaced it
-3. What got easier to review, test, or evolve afterward
-4. The validation that supports the claim
+### Maintainability-first lane
 
-Use maintainability notes when that is the honest win. Do not force a weak benchmark onto an example whose real value is simpler ownership or a narrower integration boundary.
+Required for every maintainability-first example PR:
+
+1. **Before contract**: the specific custom bridge, oversized mount, or repo-specific helper that existed before the migration, named with file paths
+2. **After contract**: the React on Rails helper or smaller boundary that replaced it, named with file paths
+3. **What got easier**: one concrete reviewable, testable, or evolvable improvement, not a general claim
+4. **Validation**: the test, lint, compile, or runner step that confirms the new boundary works, linked or quoted from the PR
+
+### Where the evidence must live
+
+Proof that only exists in a local note is not proof for this page. It must be:
+
+1. In the PR description of the public migration PR, or
+2. In a linked gist, doc, or issue comment that anyone can read without credentials
+
+The [example-migrations meta issue](https://github.com/shakacode/react_on_rails/issues/3125) is the right place for working notes while a PR is still in flight. Once the migration lands or stabilizes, move the proof into the migration PR description or a linked writeup, then this page can add it as a stable reference.
 
 ## Contribute an example
 
