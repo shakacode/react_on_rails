@@ -10,7 +10,8 @@ They already have one of these:
 
 Some teams also arrive from Inertia-first apps. We treat those as a separate
 architecture case study because they are usually broader page-shell migrations,
-not narrow React mount migrations.
+not narrow React mount migrations. If that is your starting point, begin with
+[Compare with alternatives](../getting-started/comparing-react-on-rails-to-alternatives.md).
 
 This page tracks practical migration references for those cases.
 
