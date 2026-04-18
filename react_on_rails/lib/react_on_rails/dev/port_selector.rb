@@ -17,14 +17,20 @@ module ReactOnRails
       BASE_PORT_RENDERER_OFFSET = 2
       MAX_BASE_PORT = 65_535 - BASE_PORT_RENDERER_OFFSET
 
+      # Ports 1..1023 are privileged on Linux/macOS and require root to bind.
+      PRIVILEGED_PORT_MAX = 1023
+
       # Env vars checked (in order) for a base port value.
       #
-      # CONDUCTOR_PORT is treated as the first port of a block that
-      # Conductor.build allocates to the workspace (typically 10 consecutive
-      # ports); webpack and renderer are derived at +1 and +2 from that base.
-      # If a future Conductor release changes this contract (e.g. sets
-      # CONDUCTOR_PORT to the final Rails port rather than a block base),
-      # the offset arithmetic below will need to be revisited.
+      # CONDUCTOR_PORT is an empirical interpretation based on Conductor.build
+      # (https://conductor.build) allocating a block of consecutive ports per
+      # workspace and exposing the block base via this env var. This contract
+      # is not in a public Conductor API; if a future release changes the
+      # meaning (e.g. CONDUCTOR_PORT becomes the Rails port itself rather than
+      # a block base), the derived offsets below will land on the wrong ports.
+      #
+      # Escape hatch: REACT_ON_RAILS_BASE_PORT takes precedence, so users can
+      # override the CONDUCTOR_PORT interpretation without code changes.
       BASE_PORT_ENV_VARS = %w[REACT_ON_RAILS_BASE_PORT CONDUCTOR_PORT].freeze
 
       class NoPortAvailable < StandardError; end
@@ -111,9 +117,9 @@ module ReactOnRails
         # actual bind at server start gives the definitive error.
         def warn_if_derived_ports_in_use(base, ports)
           %i[rails webpack renderer].each do |role|
-            p = ports[role]
-            warn "WARNING: port #{p} (#{role}, derived from base #{base}) is already in use." \
-              unless port_available?(p)
+            port_num = ports[role]
+            warn "WARNING: port #{port_num} (#{role}, derived from base #{base}) is already in use." \
+              unless port_available?(port_num)
           end
         end
 
@@ -133,6 +139,11 @@ module ReactOnRails
             unless val.between?(1, MAX_BASE_PORT)
               warn "WARNING: #{var}=#{raw.inspect} is out of range (1..#{MAX_BASE_PORT}); ignoring."
               next
+            end
+
+            if val <= PRIVILEGED_PORT_MAX
+              warn "WARNING: #{var}=#{raw.inspect} is in the privileged range " \
+                   "(1..#{PRIVILEGED_PORT_MAX}); binding will fail without root."
             end
 
             return val

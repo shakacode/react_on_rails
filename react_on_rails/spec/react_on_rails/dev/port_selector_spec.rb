@@ -130,6 +130,39 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       end
     end
 
+    context "when base port is in the privileged range (1..1023)" do
+      around do |example|
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "80"
+        example.run
+      end
+
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
+
+      it "still returns the derived ports (binding is the source of truth)" do
+        result = nil
+        expect { result = described_class.select_ports }.to output(/privileged range/).to_stderr
+        expect(result[:rails]).to eq(80)
+      end
+
+      it "warns that binding will fail without root" do
+        expect { described_class.select_ports }
+          .to output(/privileged range \(1\.\.1023\); binding will fail without root/).to_stderr
+      end
+    end
+
+    context "when base port is just above the privileged range" do
+      around do |example|
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "1024"
+        example.run
+      end
+
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
+
+      it "does not emit the privileged-port warning" do
+        expect { described_class.select_ports }.not_to output(/privileged range/).to_stderr
+      end
+    end
+
     context "when base port would push derived renderer port above 65535" do
       around do |example|
         # 65_534 + BASE_PORT_RENDERER_OFFSET (2) = 65_536, which is invalid.

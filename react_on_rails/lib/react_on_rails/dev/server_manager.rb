@@ -850,22 +850,43 @@ module ReactOnRails
         # Assign unconditionally so the effective ports match the "Base port
         # detected..." log line even when PORT/RENDERER_PORT were pre-set.
         def apply_base_port_env(selected)
+          derived_url = "http://localhost:#{selected[:renderer]}"
+          warn_if_renderer_url_will_be_overridden(derived_url)
           ENV["PORT"] = selected[:rails].to_s
           ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
           ENV["RENDERER_PORT"] = selected[:renderer].to_s
-          ENV["REACT_RENDERER_URL"] = "http://localhost:#{selected[:renderer]}"
+          ENV["REACT_RENDERER_URL"] = derived_url
+        end
+
+        # Base port mode overrides REACT_RENDERER_URL to point at a local
+        # renderer derived from the base port. A pre-existing URL targeting a
+        # remote/custom host (e.g. Docker service name, remote renderer) would
+        # be silently clobbered otherwise — warn so the user notices.
+        def warn_if_renderer_url_will_be_overridden(derived_url)
+          existing = ENV.fetch("REACT_RENDERER_URL", nil)
+          return if existing.nil? || existing.empty? || existing == derived_url
+          return if existing.start_with?("http://localhost:", "http://127.0.0.1:", "http://[::1]:")
+
+          warn "WARNING: Overriding REACT_RENDERER_URL=#{existing} with #{derived_url} " \
+               "because base port mode is active."
         end
 
         def apply_explicit_port_env(selected)
-          ENV["PORT"] ||= selected[:rails].to_s
-          ENV["SHAKAPACKER_DEV_SERVER_PORT"] ||= selected[:webpack].to_s
+          # Use an explicit blank-check (not `||=`) so PORT="" or
+          # SHAKAPACKER_DEV_SERVER_PORT="" falls back to the selected ports.
+          # Otherwise `"".to_i => 0` reaches procfile_port and breaks banners.
+          # Mirrors the pattern in ensure_default_port below.
+          ENV["PORT"] = selected[:rails].to_s if ENV["PORT"].to_s.strip.empty?
+          if ENV["SHAKAPACKER_DEV_SERVER_PORT"].to_s.strip.empty?
+            ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
+          end
           sync_renderer_port_and_url
         end
 
         def sync_renderer_port_and_url
           port = ENV.fetch("RENDERER_PORT", nil)
           url = ENV.fetch("REACT_RENDERER_URL", nil)
-          return if port.nil? || port.empty?
+          return warn_url_without_port(url) if port.nil? || port.empty?
 
           unless port.match?(/\A\d+\z/) && port.to_i.between?(1, 65_535)
             warn "WARNING: RENDERER_PORT=#{port.inspect} is not a valid port (1..65_535); ignoring."
@@ -881,6 +902,17 @@ module ReactOnRails
                  "Rails will use REACT_RENDERER_URL to reach the renderer. " \
                  "Unset one of them or ensure they agree."
           end
+        end
+
+        # URL without a port is a silent misconfig: the node renderer process
+        # binds to the Procfile default (3800) while Rails targets whatever
+        # port is in the URL. Warn so the mismatch is visible.
+        def warn_url_without_port(url)
+          return if url.nil? || url.empty?
+
+          warn "WARNING: REACT_RENDERER_URL=#{url} is set without RENDERER_PORT. " \
+               "The node renderer process may bind to a different port than Rails " \
+               "expects. Set RENDERER_PORT to match the URL port."
         end
 
         # Uses URI.parse so a short port isn't matched as a substring of a
