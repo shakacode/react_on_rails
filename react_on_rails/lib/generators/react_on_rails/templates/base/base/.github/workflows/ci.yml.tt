@@ -29,6 +29,13 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
 <%- end -%>
+<%- if config[:package_manager] == 'yarn' -%>
+      - name: Enable Corepack
+        # Must run before actions/setup-node so its `cache: "yarn"` step
+        # can resolve Yarn Berry's cache directory correctly.
+        run: corepack enable
+
+<%- end -%>
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -37,11 +44,6 @@ jobs:
           cache: "<%= config[:package_manager] %>"
 <%- end -%>
 
-<%- if config[:package_manager] == 'yarn' -%>
-      - name: Enable Corepack
-        run: corepack enable
-
-<%- end -%>
       - name: Install JS dependencies
         run: <%= config[:package_manager] %> install
 

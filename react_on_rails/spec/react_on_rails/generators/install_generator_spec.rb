@@ -1917,6 +1917,26 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when yarn is the detected package manager" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("yarn.lock", "")
+      end
+    end
+
+    # Yarn Berry requires Corepack to be enabled before actions/setup-node so
+    # the `cache: "yarn"` option can resolve Yarn Berry's cache directory.
+    it "runs Enable Corepack before actions/setup-node" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        corepack_pos = content.index("Enable Corepack")
+        setup_node_pos = content.index("actions/setup-node@v4")
+        expect(corepack_pos).not_to be_nil
+        expect(setup_node_pos).not_to be_nil
+        expect(corepack_pos).to be < setup_node_pos
+      end
+    end
+  end
+
   context "when Procfile.dev already contains RSC watcher" do
     let(:install_generator) { described_class.new([], { rsc: true }) }
 

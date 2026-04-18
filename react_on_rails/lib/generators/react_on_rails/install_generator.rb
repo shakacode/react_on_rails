@@ -303,7 +303,7 @@ module ReactOnRails
       def add_build_script(scripts, scripts_added)
         return if scripts.key?("build")
 
-        scripts["build"] = "RAILS_ENV=development NODE_ENV=development bin/shakapacker"
+        scripts["build"] = "bin/shakapacker"
         scripts_added << "build"
       end
 
