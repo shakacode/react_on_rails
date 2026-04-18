@@ -7,6 +7,11 @@ They already have one of these:
 - `react-rails`
 - `vite_rails`
 - a custom Rails-side React helper
+- a legacy asset-pipeline React mount
+
+Some teams also arrive from Inertia-first apps. We treat those as a separate
+architecture case study because they are usually broader page-shell migrations,
+not narrow React mount migrations.
 
 This page tracks practical migration references for those cases.
 
@@ -26,7 +31,7 @@ The best examples are:
 These are stable references you can inspect today:
 
 1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails)
-2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) — based on `ganchdev/react-rails-example`
+2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example)
 
 ### In-progress migration work
 
@@ -83,7 +88,9 @@ When the change is performance-first, compare the same route on the baseline bra
 4. Number of JS assets needed for the route
 5. Hydration warnings or client boot errors
 
-If possible, also record browser metrics such as FCP, LCP, CLS, and TBT or INP.
+If possible, also record browser load metrics such as FCP, LCP, CLS, and TBT,
+plus interaction metrics such as INP. TBT is captured by Lighthouse; INP
+requires field data or a real-user monitoring tool.
 
 When the change is maintainability-first, record:
 
@@ -96,7 +103,7 @@ Use maintainability notes when that is the honest win. Do not force a weak bench
 
 ## Contribute an example
 
-If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new) or PR that adds it here and include:
+If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new) or open a PR that adds it here, and include:
 
 1. The integration you started from, such as `react-rails`, `vite_rails`, or a custom helper
 2. The first slice you picked and why it was small enough to review
@@ -107,8 +114,7 @@ The most useful next examples are:
 
 1. `react-rails` apps that migrate one Rails-owned mount at a time
 2. Modern `vite_rails` apps where one Rails-owned island can move before a broader asset rewrite
-3. Apps with a custom Rails-side React bridge where one helper-backed boundary can be replaced before removing the wrapper
-4. Upgrades from older `react_on_rails` versions to current maintained defaults
+3. Upgrades from older `react_on_rails` versions to current maintained defaults
 
 ## How to use these examples
 
@@ -116,7 +122,5 @@ Use this page together with the specific migration guide that matches your curre
 
 1. [Migrate from `react-rails`](./migrating-from-react-rails.md)
 2. [Migrate from `vite_rails`](./migrating-from-vite-rails.md)
-
-Other migration paths (Webpack → Rspack, Babel → SWC, Rails 5 API-only, AngularJS, RSC) live in the **Migration Guides** sidebar.
 
 The migration guides explain the mechanics. This page shows what those mechanics look like in real repos.
