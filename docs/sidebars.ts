@@ -6,6 +6,9 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 // - deployment/troubleshooting-when-using-webpacker
 // - misc/asset-pipeline
 //
+// URL-compatibility stubs (redirect to a current, live page):
+// - pro/home-pro (→ pro/react-on-rails-pro)
+//
 // Contributing/Resources pages (linked from introduction.md instead of sidebar):
 // - misc/doctrine
 // - misc/style
