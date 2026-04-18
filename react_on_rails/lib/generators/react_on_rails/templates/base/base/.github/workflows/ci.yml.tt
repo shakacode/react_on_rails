@@ -22,6 +22,12 @@ jobs:
 <%- if config[:package_manager] == 'pnpm' -%>
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
+<%- unless config[:package_manager_declared] -%>
+        with:
+          # `pnpm/action-setup` requires a version unless package.json declares
+          # `packageManager`. Remove once you commit `packageManager` to pin per-repo.
+          version: "<%= config[:pnpm_fallback_version] %>"
+<%- end -%>
 
 <%- end -%>
 <%- if config[:package_manager] == 'bun' -%>

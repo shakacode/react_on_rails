@@ -245,6 +245,13 @@ module ReactOnRails
         setup_js_dependencies
       end
 
+      # Pinned when the scaffolded CI workflow has to supply a pnpm version because
+      # `pnpm/action-setup` requires one unless package.json declares `packageManager`.
+      # Matches the major used by this repo's own CI; users with a different setup can
+      # override by committing a `packageManager` field.
+      CI_PNPM_FALLBACK_VERSION = "9"
+      private_constant :CI_PNPM_FALLBACK_VERSION
+
       def add_ci_workflow
         return if options[:pretend]
 
@@ -262,11 +269,17 @@ module ReactOnRails
         # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
         # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
         has_lockfile = GeneratorMessages.lockfile_for_manager?(package_manager, app_root: destination_root)
+        # `pnpm/action-setup@v4` requires an explicit `version:` unless package.json declares
+        # `packageManager`. When pnpm is detected from the lockfile alone, pin a version so the
+        # scaffolded workflow does not fail in the setup step before dependency install.
+        package_manager_declared = GeneratorMessages.package_manager_declared?(app_root: destination_root)
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||
                     File.exist?(File.join(destination_root, "spec/spec_helper.rb"))
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
                  { package_manager: package_manager, has_lockfile: has_lockfile,
+                   package_manager_declared: package_manager_declared,
+                   pnpm_fallback_version: CI_PNPM_FALLBACK_VERSION,
                    has_active_record: has_active_record, has_rspec: has_rspec })
         @ci_workflow_generated = true
       end

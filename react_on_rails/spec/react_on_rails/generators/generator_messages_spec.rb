@@ -246,4 +246,39 @@ describe GeneratorMessages do
       expect(described_class.lockfile_for_manager?(nil)).to be(false)
     end
   end
+
+  describe ".package_manager_declared?" do
+    # Drives the "pin pnpm version in CI scaffold" fix (#3172): the template
+    # only injects `with: version:` when the field is missing and the pnpm
+    # action would otherwise fail on setup.
+    let(:app_root) { Dir.pwd }
+    let(:package_json_path) { File.join(app_root, "package.json") }
+
+    before { allow(File).to receive(:exist?).and_call_original }
+
+    it "returns true when package.json declares a supported packageManager" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm@9.0.0"}')
+      expect(described_class.package_manager_declared?).to be(true)
+    end
+
+    it "returns false when packageManager is absent" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path).and_return('{"name":"app"}')
+      expect(described_class.package_manager_declared?).to be(false)
+    end
+
+    it "returns false when package.json is missing" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(false)
+      expect(described_class.package_manager_declared?).to be(false)
+    end
+
+    it "returns false when packageManager declares an unsupported tool" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"deno@1.0.0"}')
+      expect(described_class.package_manager_declared?).to be(false)
+    end
+  end
 end

@@ -48,6 +48,17 @@ module GeneratorMessages
       nil
     end
 
+    # Returns true when package.json declares a supported packageManager field
+    # (Corepack standard). Used by the CI scaffold to decide whether
+    # `pnpm/action-setup` needs an explicit `version:` — the action only treats
+    # `version` as optional when packageManager is declared.
+    def package_manager_declared?(app_root: Dir.pwd)
+      content = read_package_json(app_root)
+      return false unless content
+
+      !package_manager_from_content(content).nil?
+    end
+
     # Returns true only when a lockfile for the specific package manager exists.
     # Used by the CI scaffold so `cache:` / `<pm> install` never reference a
     # lockfile that is not actually on disk (e.g. `packageManager: pnpm` without

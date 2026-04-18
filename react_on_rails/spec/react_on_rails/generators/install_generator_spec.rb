@@ -2018,6 +2018,43 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("pnpm install --no-frozen-lockfile")
       end
     end
+
+    it "omits the pnpm fallback version when packageManager is declared" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        setup_pos = content.index("uses: pnpm/action-setup@v4")
+        expect(setup_pos).not_to be_nil
+        next_step_pos = content.index("- name: ", setup_pos + 1)
+        pnpm_block = content[setup_pos..next_step_pos]
+        # `pnpm/action-setup` reads the version from `packageManager` when declared,
+        # so the scaffold must not inject a `with: version:` that would override it.
+        expect(pnpm_block).not_to include("version:")
+      end
+    end
+  end
+
+  context "when pnpm is detected from lockfile only (no packageManager field)" do
+    before(:all) do
+      # Existing Shakapacker app: pre-create binaries + config so `ensure_shakapacker_installed`
+      # short-circuits and the `seed_package_manager_in_package_json_from_lockfile!` path
+      # (which would otherwise add `packageManager` to package.json) is skipped.
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("pnpm-lock.yaml", "")
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/shakapacker.yml", "default: &default\n")
+        simulate_existing_file("config/webpack/webpack.config.js", "")
+      end
+    end
+
+    # Issue #3172: pnpm/action-setup@v4 requires `version:` unless packageManager is declared.
+    # Existing Shakapacker apps skip the seeding path, so the CI scaffold has to pin the
+    # version itself or the workflow fails before dependency install.
+    it "pins a pnpm version in the setup step" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("uses: pnpm/action-setup@v4")
+        expect(content).to match(%r{pnpm/action-setup@v4\n\s+with:\n(?:\s+#[^\n]*\n)*\s+version: "\d+"})
+      end
+    end
   end
 
   # Yarn (Berry) on first CI run without a committed lockfile is covered indirectly
