@@ -53,6 +53,14 @@ describe('buildVM and runInVM', () => {
 
       result = await runInVM('typeof process !== "undefined"', uploadedBundlePathForTest());
       expect(result).toBeTruthy();
+
+      // React 19's development build of `React.lazy` calls `performance.now()`,
+      // so `performance` must be available when `supportModules` is enabled.
+      result = await runInVM('typeof performance !== "undefined"', uploadedBundlePathForTest());
+      expect(result).toBeTruthy();
+
+      result = await runInVM('typeof performance.now === "function"', uploadedBundlePathForTest());
+      expect(result).toBeTruthy();
     });
   });
 
