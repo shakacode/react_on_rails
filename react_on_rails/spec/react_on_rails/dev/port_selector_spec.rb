@@ -449,6 +449,40 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         expect(result[:webpack]).to eq(3035)
       end
     end
+
+    # String#to_i would quietly turn "3000abc" into 3000, so the PortSelector
+    # and apply_explicit_port_env paths diverged: PortSelector accepted the
+    # truncated value, apply_explicit_port_env (strict regex) overwrote the
+    # env var. Using the same all-digit check here keeps the two paths aligned.
+    context "when PORT contains a non-numeric value" do
+      around do |example|
+        ENV["PORT"] = "3000abc"
+        example.run
+      end
+
+      it "rejects PORT and falls back to auto-detection" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        result = nil
+        expect { result = described_class.select_ports }
+          .to output(/PORT=.*"3000abc".*not a valid integer/).to_stderr
+        expect(result[:rails]).to eq(3000)
+      end
+    end
+
+    context "when SHAKAPACKER_DEV_SERVER_PORT contains a non-numeric value" do
+      around do |example|
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "3035xyz"
+        example.run
+      end
+
+      it "rejects the value and falls back to auto-detection" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        result = nil
+        expect { result = described_class.select_ports }
+          .to output(/SHAKAPACKER_DEV_SERVER_PORT=.*"3035xyz".*not a valid integer/).to_stderr
+        expect(result[:webpack]).to eq(3035)
+      end
+    end
   end
 
   describe ".port_available?" do

@@ -899,11 +899,24 @@ module ReactOnRails
           # string. PortSelector already rejects invalid values when it returns
           # `selected`, so the Procfile's `${PORT:-3000}` fallback must not see
           # a stale `PORT=99999` or `PORT=abc` that would reach `rails s -p …`.
-          ENV["PORT"] = selected[:rails].to_s unless valid_port_string?(ENV.fetch("PORT", nil))
-          unless valid_port_string?(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil))
-            ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
-          end
+          overwrite_invalid_port_env("PORT", selected[:rails])
+          overwrite_invalid_port_env("SHAKAPACKER_DEV_SERVER_PORT", selected[:webpack])
           sync_renderer_port_and_url
+        end
+
+        # Replace an invalid env value with the derived port, surfacing the
+        # override so a user who set (e.g.) PORT=abc can see why it was ignored.
+        # Silent when the env var is unset or already valid — matching
+        # warn_if_port_will_be_overridden's symmetry for base-port mode.
+        def overwrite_invalid_port_env(var_name, derived_port)
+          existing = ENV.fetch(var_name, nil)
+          return if valid_port_string?(existing)
+
+          unless existing.nil? || existing.strip.empty?
+            warn "WARNING: #{var_name}=#{existing.inspect} is not a valid port; " \
+                 "using #{derived_port}."
+          end
+          ENV[var_name] = derived_port.to_s
         end
 
         def valid_port_string?(value)
@@ -967,14 +980,24 @@ module ReactOnRails
         # longer one (e.g. ":80" inside ":3800"). Malformed URLs fall back to
         # "no mismatch detected" rather than crashing; the warn-path is only
         # advisory.
+        #
+        # Treats a URL without an explicit port as a mismatch: URI.parse would
+        # otherwise return the scheme default (80 for http, 443 for https),
+        # which would silently match `RENDERER_PORT=80` / `=443` — a misconfig
+        # worth flagging rather than hiding.
         def url_port_mismatch?(url, port)
+          return true unless url.match?(%r{://[^/]+:\d+})
+
           URI.parse(url).port != port.to_i
         rescue URI::InvalidURIError
           false
         end
 
         def localhost_renderer_url?(url)
-          %w[localhost 127.0.0.1 ::1].include?(URI.parse(url).host)
+          # Use `.hostname` not `.host`: for IPv6 URLs like `http://[::1]:3800`,
+          # `.host` returns `"[::1]"` (with brackets) while `.hostname` returns
+          # `"::1"` (bracket-stripped), matching the comparison list below.
+          %w[localhost 127.0.0.1 ::1].include?(URI.parse(url).hostname)
         rescue URI::InvalidURIError
           false
         end

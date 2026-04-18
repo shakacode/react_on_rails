@@ -169,11 +169,29 @@ module ReactOnRails
         end
 
         def explicit_rails_port
-          ENV["PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
+          parse_explicit_port_env("PORT")
         end
 
         def explicit_webpack_port
-          ENV["SHAKAPACKER_DEV_SERVER_PORT"]&.to_i&.then { |p| p.between?(1, 65_535) ? p : nil }
+          parse_explicit_port_env("SHAKAPACKER_DEV_SERVER_PORT")
+        end
+
+        # Mirror valid_port_string? in server_manager.rb: require an all-digit
+        # value in the 1..65535 range. `String#to_i` would otherwise truncate
+        # `"3000abc"` to 3000 and silently accept it, diverging from the
+        # stricter validation apply_explicit_port_env uses when it decides
+        # whether to overwrite the env var.
+        def parse_explicit_port_env(var_name)
+          raw = ENV.fetch(var_name, nil)
+          return nil if raw.nil? || raw.strip.empty?
+
+          unless raw.match?(/\A\d+\z/)
+            warn "WARNING: #{var_name}=#{raw.inspect} is not a valid integer; ignoring."
+            return nil
+          end
+
+          n = raw.to_i
+          n.between?(1, 65_535) ? n : nil
         end
       end
     end

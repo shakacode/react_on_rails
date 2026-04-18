@@ -33,7 +33,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
       example.run
     ensure
-      old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
+      # `old` is assigned on the first line of the block and cannot fail, but
+      # guard with `&.` so the ensure stays correct (and CodeQL-clean) if a
+      # future change moves the assignment below something that can raise.
+      old&.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
     end
   end
 
@@ -523,6 +526,92 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .to output(/RENDERER_PORT=.*not a valid port/).to_stderr
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
       end
+    end
+
+    context "with IPv6 localhost REACT_RENDERER_URL" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      # URI.parse("http://[::1]:3800").host returns "[::1]" (with brackets),
+      # while .hostname returns "::1" (bracket-stripped). Using .host here
+      # would make IPv6 localhost URLs silently bypass the localhost-only
+      # advisory paths.
+      it "warns for an IPv6 localhost URL set without RENDERER_PORT" do
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3801"
+        expect { described_class.start(:development) }
+          .to output(/set without RENDERER_PORT/).to_stderr
+      end
+
+      it "clears an IPv6 localhost URL when RENDERER_PORT is invalid" do
+        ENV["RENDERER_PORT"] = "abc"
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3900"
+        expect { described_class.start(:development) }
+          .to output(%r{Clearing REACT_RENDERER_URL=http://\[::1\]:3900}).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+    end
+
+    context "when REACT_RENDERER_URL has no explicit port" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      # URI.parse("http://localhost").port returns the scheme default (80),
+      # which would silently "match" RENDERER_PORT=80 without this check.
+      it "warns about the mismatch when RENDERER_PORT is set and the URL omits a port" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://localhost"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=3801 does not match REACT_RENDERER_URL=http://localhost}).to_stderr
+      end
+
+      it "still flags the mismatch when RENDERER_PORT matches the scheme default" do
+        ENV["RENDERER_PORT"] = "80"
+        ENV["REACT_RENDERER_URL"] = "http://localhost"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=80 does not match REACT_RENDERER_URL=http://localhost}).to_stderr
+      end
+    end
+  end
+
+  describe "invalid PORT / SHAKAPACKER_DEV_SERVER_PORT warnings" do
+    include_context "with clean port env"
+
+    before do
+      allow(ReactOnRails::Dev::PackGenerator).to receive(:generate).with(any_args)
+      allow_any_instance_of(Kernel).to receive(:system).and_return(true)
+      allow_any_instance_of(Kernel).to receive(:exit)
+      allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
+      allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
+      allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
+      allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+    end
+
+    it "warns when overwriting a non-numeric PORT" do
+      ENV["PORT"] = "abc"
+      expect { described_class.start(:development) }
+        .to output(/PORT=.*"abc".*not a valid port; using 3000/).to_stderr
+    end
+
+    it "warns when overwriting a non-numeric SHAKAPACKER_DEV_SERVER_PORT" do
+      ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "xyz"
+      expect { described_class.start(:development) }
+        .to output(/SHAKAPACKER_DEV_SERVER_PORT=.*"xyz".*not a valid port; using 3035/).to_stderr
+    end
+
+    it "does not warn when PORT is unset" do
+      expect { described_class.start(:development) }
+        .not_to output(/PORT=.*not a valid port/).to_stderr
     end
   end
 
