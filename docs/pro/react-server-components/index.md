@@ -37,7 +37,7 @@ Server components can access databases, file systems, and internal APIs directly
 
 ### Real-World Results
 
-Teams that have migrated to RSC have reported dramatic wins — DoorDash's 65% LCP improvement on their homepage, BlogHunch's 30% server-cost reduction, Frigade's 62% client-bundle reduction, and Mux's 50,000-line incremental migration are all documented in [Migration Success Stories](./success-stories.md).
+Teams adopting server-first React architectures have reported dramatic wins — BlogHunch's 30% server-cost reduction, Frigade's 62% client-bundle reduction, and Mux's 50,000-line incremental migration to RSC, plus DoorDash's 65% LCP improvement from an earlier Next.js SSR migration that paved the way for RSC adoption — all documented in [Migration Success Stories](./success-stories.md).
 
 ## Current Support Status
 
