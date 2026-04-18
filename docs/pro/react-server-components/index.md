@@ -35,6 +35,10 @@ React's selective hydration allows client components to become interactive indep
 
 Server components can access databases, file systems, and internal APIs directly without exposing endpoints to the client. This simplifies data fetching and eliminates the need for client-side data fetching libraries in many cases.
 
+### Real-World Results
+
+Teams that have migrated to RSC have reported dramatic wins — DoorDash's 65% LCP improvement on their homepage, BlogHunch's 30% server-cost reduction, Frigade's 62% client-bundle reduction, and Mux's 50,000-line incremental migration are all documented in [Migration Success Stories](./success-stories.md).
+
 ## Current Support Status
 
 Current React on Rails Pro releases provide full RSC support with:
@@ -88,6 +92,7 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the wire format for streaming RSC data
 - [RSC Inside Client Components](./inside-client-components.md) — composing server and client components
 - [Purpose and Benefits](./purpose-and-benefits.md) — waterfall loading patterns, bundle size, and selective hydration
+- [Migration Success Stories](./success-stories.md) — reported results from DoorDash, Mux, Frigade, BlogHunch, and others
 
 ## Related Documentation
 
