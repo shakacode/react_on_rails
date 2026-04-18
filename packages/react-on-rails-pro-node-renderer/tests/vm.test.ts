@@ -73,7 +73,7 @@ describe('buildVM and runInVM', () => {
       await buildVM(uploadedBundlePathForTest());
 
       const result = await runInVM('typeof testString === "undefined"', uploadedBundlePathForTest());
-      expect(result).toBeTruthy();
+      expect(result).toBe('true');
     });
 
     test('available if additionalContext set', async () => {
@@ -84,7 +84,7 @@ describe('buildVM and runInVM', () => {
       await buildVM(uploadedBundlePathForTest());
 
       const result = await runInVM('typeof testString !== "undefined"', uploadedBundlePathForTest());
-      expect(result).toBeTruthy();
+      expect(result).toBe('true');
     });
   });
 
