@@ -923,6 +923,7 @@ module ReactOnRails
             # Delete so the Procfile's `${RENDERER_PORT:-3800}` fallback applies
             # instead of passing the bad value through to the node renderer.
             ENV.delete("RENDERER_PORT")
+            clear_local_renderer_url_after_invalid_port(url)
             return
           end
 
@@ -939,13 +940,27 @@ module ReactOnRails
 
         # URL without a port is a silent misconfig: the node renderer process
         # binds to the Procfile default (3800) while Rails targets whatever
-        # port is in the URL. Warn so the mismatch is visible.
+        # port is in the URL. Warn so the mismatch is visible, but only for
+        # local URLs where this process actually controls the renderer.
         def warn_url_without_port(url)
-          return if url.nil? || url.empty?
+          return if url.nil? || url.empty? || !localhost_renderer_url?(url)
 
           warn "WARNING: REACT_RENDERER_URL=#{url} is set without RENDERER_PORT. " \
                "The node renderer process may bind to a different port than Rails " \
                "expects. Set RENDERER_PORT to match the URL port."
+        end
+
+        # When a local renderer URL is paired with an invalid RENDERER_PORT,
+        # keeping the URL would leave Rails targeting the stale port while the
+        # Procfile falls back to 3800. Clear the URL so the initializer's
+        # default localhost URL matches the renderer's fallback port.
+        def clear_local_renderer_url_after_invalid_port(url)
+          return if url.nil? || url.empty? || !localhost_renderer_url?(url)
+
+          warn "WARNING: Clearing REACT_RENDERER_URL=#{url} because invalid " \
+               "RENDERER_PORT was ignored; falling back to the default " \
+               "localhost renderer port."
+          ENV.delete("REACT_RENDERER_URL")
         end
 
         # Uses URI.parse so a short port isn't matched as a substring of a
@@ -954,6 +969,12 @@ module ReactOnRails
         # advisory.
         def url_port_mismatch?(url, port)
           URI.parse(url).port != port.to_i
+        rescue URI::InvalidURIError
+          false
+        end
+
+        def localhost_renderer_url?(url)
+          %w[localhost 127.0.0.1 ::1].include?(URI.parse(url).host)
         rescue URI::InvalidURIError
           false
         end

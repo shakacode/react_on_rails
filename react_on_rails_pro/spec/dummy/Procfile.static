@@ -5,4 +5,4 @@ rails: bin/rails s -p ${PORT:-3000}
 rails-client-assets: pnpm run build:dev:watch
 
 # Start Node server for server rendering.
-node-renderer: pnpm run node-renderer
+node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node client/node-renderer.js

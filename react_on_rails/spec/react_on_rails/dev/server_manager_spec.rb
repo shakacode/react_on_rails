@@ -45,7 +45,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
     allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
     allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
-      .and_return({ rails: 3000, webpack: 3035 })
+      .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
   end
 
   describe ".start" do
@@ -434,6 +434,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect { described_class.start(:development) }
           .to output(/set without RENDERER_PORT/).to_stderr
       end
+
+      it "does not warn for a remote renderer URL when no local renderer process is being configured" do
+        ENV["REACT_RENDERER_URL"] = "http://renderer:3801"
+        expect { described_class.start(:development) }
+          .not_to output(/set without RENDERER_PORT/).to_stderr
+      end
     end
 
     context "when RENDERER_PORT is set explicitly without a base port" do
@@ -485,6 +491,24 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .to output(/RENDERER_PORT=.*not a valid port \(1\.\.65535\)/).to_stderr
         expect(ENV.fetch("RENDERER_PORT", nil)).to be_nil
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      it "clears a localhost REACT_RENDERER_URL when invalid RENDERER_PORT would otherwise " \
+         "leave Rails on a stale port" do
+        ENV["RENDERER_PORT"] = "abc"
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3900"
+        expect { described_class.start(:development) }
+          .to output(%r{Clearing REACT_RENDERER_URL=http://localhost:3900}).to_stderr
+        expect(ENV.fetch("RENDERER_PORT", nil)).to be_nil
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      it "keeps a remote REACT_RENDERER_URL when invalid RENDERER_PORT is ignored" do
+        ENV["RENDERER_PORT"] = "abc"
+        ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3900"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to be_nil
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://renderer.internal:3900")
       end
 
       it "deletes an out-of-range RENDERER_PORT so the Procfile fallback can apply" do
