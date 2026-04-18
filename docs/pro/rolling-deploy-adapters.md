@@ -158,8 +158,14 @@ class S3RollingDeployAdapter
 
   # -- helpers (private by convention) --
 
+  S3_CLIENT_MUTEX = Mutex.new
+  private_constant :S3_CLIENT_MUTEX
+
+  # Thread-safe memoization. Without the mutex, concurrent callers (e.g. parallel
+  # Sidekiq workers running precompile hooks) could each create a separate client;
+  # only the last survives, and the earlier ones are silently discarded after use.
   def self.s3
-    @s3 ||= Aws::S3::Client.new
+    S3_CLIENT_MUTEX.synchronize { @s3 ||= Aws::S3::Client.new }
   end
 
   def self.download_to(dir, name, hash)
@@ -181,10 +187,13 @@ class S3RollingDeployAdapter
   def self.update_manifest!(hash)
     hashes = previous_bundle_hashes
     hashes << hash unless hashes.include?(hash)
+    # Write and read both trim to RETENTION so the persisted manifest matches
+    # what discovery returns. If you want a soft buffer of historical entries,
+    # increase RETENTION rather than diverging these two trim lengths.
     s3.put_object(
       bucket: bucket,
       key: MANIFEST_KEY,
-      body: JSON.generate(hashes: hashes.last(RETENTION + 2))
+      body: JSON.generate(hashes: hashes.last(RETENTION))
     )
   end
 end
@@ -233,7 +242,12 @@ class ControlPlaneRollingDeployAdapter
     bundle = Dir[File.join(tmp, "*.js")].first
     return nil unless bundle
 
-    { bundle: bundle, assets: Dir[File.join(tmp, "*.json")] }
+    # Explicit allowlist — don't sweep up unrelated JSON files that may be
+    # bundled in the image layer (lock files, health-check payloads, etc.).
+    asset_names = %w[loadable-stats.json react-client-manifest.json react-server-client-manifest.json]
+    assets = asset_names.map { |name| File.join(tmp, name) }.select { |path| File.exist?(path) }
+
+    { bundle: bundle, assets: assets }
   end
 
   def self.upload(_hash, bundle:, assets:)

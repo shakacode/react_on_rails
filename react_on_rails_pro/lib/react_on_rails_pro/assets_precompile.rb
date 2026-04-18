@@ -86,8 +86,22 @@ module ReactOnRailsPro
     def self.publish_current_bundle_if_configured
       adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
       return if adapter.nil?
+      # NodeRendererPool.server_bundle_hash is only available under the NodeRenderer
+      # renderer mode. With ExecJS, skip publication rather than crash.
+      return unless ReactOnRailsPro.configuration.node_renderer?
       return if Rails.env.development? || Rails.env.test?
 
+      publish_bundles(adapter)
+    rescue StandardError => e
+      # Outer rescue catches anything raised by the setup-side calls below
+      # (collect_assets, server_bundle_hash, rsc_bundle_js_file_path). Per the
+      # rolling-deploy contract, a failed upload must degrade the next deploy's
+      # seeding — not fail *this* deploy's assets:precompile.
+      warn "[ReactOnRailsPro] rolling_deploy_adapter publication failed: #{e.class}: #{e.message}. " \
+           "Next deploy's rolling-deploy seeding may degrade; precompile continuing."
+    end
+
+    def self.publish_bundles(adapter)
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
       assets = ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s)
 

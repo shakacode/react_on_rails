@@ -58,8 +58,21 @@ module ReactOnRailsPro
     end
     private_class_method :handle_missing_adapter
 
+    # Bundle hashes are used as directory names under the renderer cache path
+    # (<cache>/<hash>/<hash>.js). Values coming from config.rolling_deploy_adapter
+    # are trusted, but PREVIOUS_BUNDLE_HASHES comes from the environment and
+    # could contain path separators (e.g. "../../etc") that would escape the
+    # cache directory. Reject anything that isn't a safe hash slug.
+    SAFE_HASH_PATTERN = /\A[A-Za-z0-9_\-.]+\z/
+
     def self.resolve_previous_hashes(adapter, current_hashes)
       explicit = ENV["PREVIOUS_BUNDLE_HASHES"].to_s.split(",").map(&:strip).reject(&:empty?)
+      invalid = explicit.grep_v(SAFE_HASH_PATTERN)
+      if invalid.any?
+        warn "[ReactOnRailsPro] PREVIOUS_BUNDLE_HASHES contains invalid hash values (rejected): " \
+             "#{invalid.inspect}. Hashes must match /#{SAFE_HASH_PATTERN.source}/ to prevent path traversal."
+        explicit -= invalid
+      end
       hashes = explicit.any? ? explicit : fetch_hashes_from_adapter(adapter)
       # Deduplicate against the hashes we just staged so we don't re-fetch the current build.
       hashes - Array(current_hashes).map(&:to_s)
@@ -86,8 +99,14 @@ module ReactOnRailsPro
         stage_file(asset_path, File.join(bundle_dir, File.basename(asset_path)), mode)
       end
     rescue StandardError => e
+      # Roll back the entire hash directory. Leaving the bundle file in place
+      # without its companion assets would cause the renderer to find the bundle
+      # (skipping its 410 path) and emit HTML referencing chunks from a manifest
+      # that never got staged — producing hydration failures instead of the clean
+      # 410-retry fallback that we rely on for degradation.
+      FileUtils.rm_rf(File.join(cache_dir, hash))
       warn "[ReactOnRailsPro] Failed to seed previous bundle hash #{hash}: #{e.class}: #{e.message}. " \
-           "Runtime 410-retry path remains available as fallback."
+           "Rolled back partially-staged files. Runtime 410-retry remains the fallback."
     end
     private_class_method :seed_previous_hash
 

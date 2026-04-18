@@ -146,6 +146,43 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when PREVIOUS_BUNDLE_HASHES contains an unsafe path-traversal value" do
+    let(:src_bundle) { source_file("bundle-ok.js") }
+
+    before do
+      ENV["PREVIOUS_BUNDLE_HASHES"] = "../../../etc,safe-hash"
+      allow(adapter).to receive(:previous_bundle_hashes)
+      allow(adapter).to receive(:fetch).with("safe-hash").and_return(bundle: src_bundle, assets: [])
+    end
+
+    it "rejects the unsafe value with a warning and stages only the safe one" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/invalid hash values \(rejected\).*etc/m).to_stderr
+
+      expect(adapter).not_to have_received(:fetch).with("../../../etc")
+      expect(File.exist?(File.join(cache_dir, "safe-hash", "safe-hash.js"))).to be(true)
+    end
+  end
+
+  context "when an asset stage fails mid-way" do
+    let(:src_bundle) { source_file("bundle-partial.js") }
+
+    before do
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["abc123"])
+      allow(adapter).to receive(:fetch).with("abc123").and_return(
+        bundle: src_bundle,
+        assets: ["/nonexistent/loadable-stats.json"]
+      )
+    end
+
+    it "rolls back the entire hash directory so the renderer sees 410, not a bundle without manifests" do
+      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+
+      bundle_dir = File.join(cache_dir, "abc123")
+      expect(File.exist?(bundle_dir)).to be(false)
+    end
+  end
+
   context "when adapter returns payload without :bundle" do
     before do
       allow(adapter).to receive_messages(previous_bundle_hashes: ["bad-hash"])
