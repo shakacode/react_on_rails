@@ -2,13 +2,22 @@
 
 require "rainbow"
 
+require_relative "generator_messages/package_manager_detection"
+require_relative "generator_messages/ci_section"
+require_relative "generator_messages/shakapacker_status_section"
+
 module GeneratorMessages
   PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
                      "\n       #{Rainbow('https://reactonrails.com/docs/pro/upgrading-to-pro/').cyan.underline}".freeze
-  SUPPORTED_PACKAGE_MANAGERS = %w[npm pnpm yarn bun].freeze
+  # Package manager constants and detection helpers live in PackageManagerDetection,
+  # re-exported here for backwards compatibility (external callers use ::SUPPORTED_PACKAGE_MANAGERS).
+  SUPPORTED_PACKAGE_MANAGERS = PackageManagerDetection::SUPPORTED_PACKAGE_MANAGERS
 
-  # rubocop:disable Metrics/ClassLength
   class << self
+    include PackageManagerDetection
+    include CiSection
+    include ShakapackerStatusSection
+
     def output
       @output ||= []
     end
@@ -46,11 +55,14 @@ module GeneratorMessages
     end
 
     def helpful_message_after_installation(component_name: "HelloWorld", route: "hello_world", pro: false,
-                                           rsc: false, shakapacker_just_installed: false, landing_page: false)
+                                           rsc: false, shakapacker_just_installed: false, landing_page: false,
+                                           ci_workflow_generated: false, app_root: Dir.pwd)
       process_manager_section = build_process_manager_section
-      testing_section = build_testing_section
-      package_manager = detect_package_manager
-      shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed)
+      testing_section = build_testing_section(app_root: app_root)
+      ci_section = build_ci_section(app_root: app_root, ci_workflow_generated: ci_workflow_generated)
+      package_manager = detect_package_manager(app_root: app_root)
+      shakapacker_status = build_shakapacker_status_section(shakapacker_just_installed: shakapacker_just_installed,
+                                                            app_root: app_root)
       render_example = build_render_example(component_name: component_name, route: route, rsc: rsc)
       render_label = build_render_label(route: route, rsc: rsc)
       normalized_route = route.to_s.sub(%r{\A/+}, "")
@@ -99,31 +111,8 @@ module GeneratorMessages
         • Documentation: #{Rainbow('https://reactonrails.com/docs/').cyan.underline}
         • Webpack customization: #{Rainbow('https://github.com/shakacode/shakapacker#webpack-configuration').cyan.underline}
 
-        💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}#{pro_hint}
+        💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}#{ci_section}#{pro_hint}
       MSG
-    end
-
-    # Uses relative lockfile paths resolved against Dir.pwd, so callers must invoke
-    # this while the current working directory is the target Rails app root.
-    def detect_package_manager
-      env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
-      return env_package_manager if supported_package_manager?(env_package_manager)
-
-      # Default to npm (Shakapacker 8.x default) - covers package-lock.json and no lockfile
-      detect_package_manager_from_lockfiles || "npm"
-    end
-
-    def detect_package_manager_from_lockfiles
-      return "yarn" if File.exist?("yarn.lock")
-      return "pnpm" if File.exist?("pnpm-lock.yaml")
-      return "bun" if File.exist?("bun.lock") || File.exist?("bun.lockb")
-      return "npm" if File.exist?("package-lock.json")
-
-      nil
-    end
-
-    def supported_package_manager?(package_manager)
-      SUPPORTED_PACKAGE_MANAGERS.include?(package_manager)
     end
 
     private
@@ -160,8 +149,9 @@ module GeneratorMessages
       end
     end
 
-    def build_testing_section
-      return "" if File.exist?("spec/rails_helper.rb") || File.exist?("spec/spec_helper.rb")
+    def build_testing_section(app_root: Dir.pwd)
+      return "" if File.exist?(File.join(app_root, "spec/rails_helper.rb")) ||
+                   File.exist?(File.join(app_root, "spec/spec_helper.rb"))
 
       <<~TESTING
 
@@ -182,52 +172,5 @@ module GeneratorMessages
         "foreman"
       end
     end
-
-    def build_shakapacker_status_section(shakapacker_just_installed: false)
-      version_warning = check_shakapacker_version_warning
-      if shakapacker_just_installed
-        base = <<~SHAKAPACKER
-
-          📦 SHAKAPACKER SETUP:
-          ─────────────────────────────────────────────────────────────────────────
-          #{Rainbow('✓ Added to Gemfile automatically').green}
-          #{Rainbow('✓ Installer ran successfully').green}
-          #{Rainbow('✓ Webpack integration configured').green}
-        SHAKAPACKER
-        base.chomp + version_warning
-      elsif File.exist?("bin/shakapacker") && File.exist?("bin/shakapacker-dev-server")
-        "\n📦 #{Rainbow('Shakapacker already configured ✓').green}#{version_warning}"
-      else
-        "\n📦 #{Rainbow('Shakapacker setup may be incomplete').yellow}#{version_warning}"
-      end
-    end
-
-    def check_shakapacker_version_warning
-      return "" unless File.exist?("Gemfile.lock")
-
-      shakapacker_match = File.read("Gemfile.lock").match(/shakapacker \((\d+\.\d+\.\d+)\)/)
-      return "" unless shakapacker_match
-
-      version = shakapacker_match[1]
-      if version.split(".").first.to_i < 8
-        <<~WARNING
-
-          ⚠️  #{Rainbow('IMPORTANT: Upgrade Recommended').yellow.bold}
-          ─────────────────────────────────────────────────────────────────────────
-          You are using Shakapacker #{version}. React on Rails v15+ works best with
-          Shakapacker 8.0+ for optimal Hot Module Replacement and build performance.
-
-          To upgrade: #{Rainbow('bundle update shakapacker').cyan}
-
-          Learn more: #{Rainbow('https://github.com/shakacode/shakapacker').cyan.underline}
-        WARNING
-      else
-        ""
-      end
-    rescue StandardError
-      # If version detection fails, don't show a warning to avoid noise
-      ""
-    end
   end
-  # rubocop:enable Metrics/ClassLength
 end

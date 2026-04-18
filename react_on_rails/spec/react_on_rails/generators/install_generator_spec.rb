@@ -29,6 +29,7 @@ describe InstallGenerator, type: :generator do
 
     include_examples "base_generator", application_js: true
     include_examples "no_redux_generator"
+    include_examples "scaffold_ci_and_scripts"
 
     it "sets DEFAULT_ROUTE to hello_world in bin/dev" do
       assert_file "bin/dev" do |content|
@@ -346,6 +347,13 @@ describe InstallGenerator, type: :generator do
     it "adds ReactOnRails::TestHelper.ensure_assets_compiled for minitest" do
       expected = ReactOnRails::Generators::BaseGenerator::CONFIGURE_MINITEST_TO_COMPILE_ASSETS
       assert_file("test/test_helper.rb") { |contents| expect(contents).to match(expected) }
+    end
+
+    it "CI workflow uses bin/rails test when RSpec is absent" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("bin/rails test")
+        expect(content).not_to include("bundle exec rspec")
+      end
     end
   end
 
@@ -1548,6 +1556,7 @@ describe InstallGenerator, type: :generator do
     before(:all) { run_generator_test_with_args(%w[--rsc], package_json: true) }
 
     include_examples "rsc_common_files"
+    include_examples "scaffold_ci_and_scripts"
 
     it "creates node-renderer.js" do
       assert_file "client/node-renderer.js" do |content|
@@ -1935,6 +1944,167 @@ describe InstallGenerator, type: :generator do
       end
     end
   end
+
+  context "when .github/workflows/ci.yml already exists" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true, force: false) do
+        simulate_existing_dir(".github/workflows")
+        simulate_existing_file(".github/workflows/ci.yml", "# custom CI\n")
+      end
+    end
+
+    it "does not overwrite existing CI workflow" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("# custom CI")
+        expect(content).not_to include("actions/checkout")
+      end
+    end
+  end
+
+  context "when package.json already defines build and build:test scripts" do
+    before(:all) do
+      existing_package_json = JSON.pretty_generate(
+        "name" => "existing-app",
+        "private" => true,
+        "scripts" => {
+          "build" => "custom-build",
+          "build:test" => "custom-build-test"
+        }
+      )
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("package.json", "#{existing_package_json}\n")
+      end
+    end
+
+    it "preserves the user's existing build and build:test scripts" do
+      assert_file "package.json" do |content|
+        scripts = JSON.parse(content).fetch("scripts", {})
+        expect(scripts["build"]).to eq("custom-build")
+        expect(scripts["build:test"]).to eq("custom-build-test")
+      end
+    end
+  end
+
+  context "when package.json has scripts after other top-level keys" do
+    before(:all) do
+      # Real-world layout: "name", "version", etc. come before "scripts". The
+      # previous indent regex anchored to `\A\{\n` and silently fell back to
+      # column 0 for the closing `}` of the scripts block.
+      existing_package_json = <<~JSON
+        {
+          "name": "existing-app",
+          "version": "0.1.0",
+          "private": true,
+          "scripts": {
+            "lint": "eslint src"
+          },
+          "devDependencies": {}
+        }
+      JSON
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("package.json", existing_package_json)
+      end
+    end
+
+    it "indents the rebuilt scripts block under the surrounding object" do
+      assert_file "package.json" do |content|
+        # The closing `}` of the scripts block must align with two-space indent,
+        # not be emitted at column 0.
+        expect(content).to match(/\n {2}},\n {2}"devDependencies"/)
+        scripts = JSON.parse(content).fetch("scripts", {})
+        expect(scripts.keys).to include("lint", "build", "build:test")
+      end
+    end
+  end
+
+  context "when an existing script value contains a literal `}`" do
+    before(:all) do
+      # `[^}]*` would have matched the `}` inside "lint" and produced invalid JSON.
+      # The brace-depth walker must respect string literals.
+      existing_package_json = <<~JSON
+        {
+          "name": "existing-app",
+          "scripts": {
+            "lint": "eslint '{src,test}/**/*.js'"
+          }
+        }
+      JSON
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("package.json", existing_package_json)
+      end
+    end
+
+    it "produces valid JSON and preserves the brace-containing script value" do
+      assert_file "package.json" do |content|
+        parsed = JSON.parse(content)
+        expect(parsed.fetch("scripts", {})["lint"]).to eq("eslint '{src,test}/**/*.js'")
+        expect(parsed.fetch("scripts", {}).keys).to include("build", "build:test")
+      end
+    end
+  end
+
+  context "when Active Record is absent (no config/database.yml)" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        # Remove the database.yml that simulate_existing_rails_files creates
+        FileUtils.rm_f(File.join(destination_root, "config/database.yml"))
+      end
+    end
+
+    it "CI workflow omits db:prepare step" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).not_to include("db:prepare")
+      end
+    end
+  end
+
+  context "when yarn is the detected package manager" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("yarn.lock", "")
+      end
+    end
+
+    # Yarn Berry requires Corepack to be enabled before actions/setup-node so
+    # the `cache: "yarn"` option can resolve Yarn Berry's cache directory.
+    it "runs Enable Corepack before actions/setup-node" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        corepack_pos = content.index("Enable Corepack")
+        setup_node_pos = content.index("actions/setup-node@v4")
+        expect(corepack_pos).not_to be_nil
+        expect(setup_node_pos).not_to be_nil
+        expect(corepack_pos).to be < setup_node_pos
+      end
+    end
+  end
+
+  context "when packageManager declares pnpm but only yarn.lock exists" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        # User declared pnpm via Corepack but hasn't committed pnpm-lock.yaml yet —
+        # only a stale yarn.lock is on disk. `cache: "pnpm"` would fail setup-node.
+        simulate_existing_file("yarn.lock", "")
+        simulate_existing_file(
+          "package.json",
+          "#{JSON.pretty_generate('name' => 'app', 'packageManager' => 'pnpm@9.0.0')}\n"
+        )
+      end
+    end
+
+    it "omits cache when no lockfile exists for the detected package manager" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).not_to include('cache: "pnpm"')
+        # Falls back to frozen-lockfile-safe install so the workflow still runs.
+        expect(content).to include("pnpm install --no-frozen-lockfile")
+      end
+    end
+  end
+
+  # Yarn (Berry) on first CI run without a committed lockfile is covered indirectly
+  # by the pnpm test above and by unit tests for GeneratorMessages.lockfile_for_manager?.
+  # An end-to-end yarn test is not reliable here because yarn 1.x is globally installed
+  # in the spec environment and `setup_js_dependencies` creates yarn.lock before the
+  # CI template renders, defeating the "no lockfile" scenario.
 
   context "when Procfile.dev already contains RSC watcher" do
     let(:install_generator) { described_class.new([], { rsc: true }) }
