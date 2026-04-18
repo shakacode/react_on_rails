@@ -263,7 +263,9 @@ module ReactOnRails
         end
 
         package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
-        has_lockfile = !GeneratorMessages.detect_package_manager_from_lockfiles(app_root: destination_root).nil?
+        # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
+        # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
+        has_lockfile = GeneratorMessages.lockfile_for_manager?(package_manager, app_root: destination_root)
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||
                     File.exist?(File.join(destination_root, "spec/spec_helper.rb"))
@@ -273,6 +275,11 @@ module ReactOnRails
         @ci_workflow_generated = true
       end
 
+      DEFAULT_PACKAGE_JSON_SCRIPTS = {
+        "build" => "bin/shakapacker",
+        "build:test" => "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+      }.freeze
+
       def add_package_json_scripts
         return if options[:pretend]
 
@@ -280,38 +287,56 @@ module ReactOnRails
         return unless File.exist?(package_json_path)
 
         original_text = File.read(package_json_path)
-        content = JSON.parse(original_text)
-        scripts = content["scripts"] ||= {}
+        existing_scripts = JSON.parse(original_text)["scripts"] || {}
+        scripts_to_add = DEFAULT_PACKAGE_JSON_SCRIPTS.reject { |key, _| existing_scripts.key?(key) }
 
-        scripts_added = []
-        add_build_script(scripts, scripts_added)
-        add_build_test_script(scripts, scripts_added)
-
-        if scripts_added.any?
-          indent = original_text[/\A\{\n(\s+)/, 1] || "  "
-          File.write(package_json_path, "#{JSON.pretty_generate(content, indent: indent)}\n")
-          say "📝 Added build scripts (#{scripts_added.join(', ')}) to package.json", :yellow
-        else
+        if scripts_to_add.empty?
           say_status :skip, "build scripts already present in package.json", :yellow
+          return
         end
+
+        updated_text = inject_scripts_into_package_json(original_text, scripts_to_add, existing_scripts)
+        File.write(package_json_path, updated_text)
+        say "📝 Added build scripts (#{scripts_to_add.keys.join(', ')}) to package.json", :yellow
       rescue JSON::ParserError => e
         GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
       rescue Errno::EACCES, Errno::ENOENT => e
         GeneratorMessages.add_warning("⚠️  Failed to add build scripts to package.json: #{e.message}")
       end
 
-      def add_build_script(scripts, scripts_added)
-        return if scripts.key?("build")
+      # Inserts new entries into the existing "scripts" object without rewriting the rest of
+      # package.json, so Prettier-formatted files only see the added lines in the diff.
+      # Falls back to a structured rewrite when the "scripts" key is absent or when the raw
+      # regex cannot locate the scripts object (e.g. unusual whitespace or nested braces).
+      def inject_scripts_into_package_json(original_text, scripts_to_add, existing_scripts)
+        match = original_text.match(/"scripts"\s*:\s*\{(?<inner>[^}]*)\}/m)
+        return rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts) unless match
 
-        scripts["build"] = "bin/shakapacker"
-        scripts_added << "build"
+        entry_indent = match[:inner][/\n([ \t]+)"/, 1] ||
+                       "#{original_text[/\A\{\n([ \t]+)/, 1] || '  '}  "
+        object_indent = original_text[/\A\{\n([ \t]*)"scripts"/, 1] || ""
+        new_entries = scripts_to_add.map { |key, value| %(#{entry_indent}"#{key}": #{value.to_json}) }
+
+        rebuilt_inner =
+          if existing_scripts.any?
+            trimmed = match[:inner].sub(/\s*\z/, "")
+            separator = trimmed.end_with?(",") ? "" : ","
+            "#{trimmed}#{separator}\n#{new_entries.join(",\n")}\n#{object_indent}"
+          else
+            "\n#{new_entries.join(",\n")}\n#{object_indent}"
+          end
+
+        "#{original_text[0...match.begin(0)]}\"scripts\": {#{rebuilt_inner}}#{original_text[match.end(0)..]}"
       end
 
-      def add_build_test_script(scripts, scripts_added)
-        return if scripts.key?("build:test")
-
-        scripts["build:test"] = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
-        scripts_added << "build:test"
+      # Used only when the "scripts" key is missing entirely or the regex can't locate it.
+      # This path does reformat the whole file, but it's rare — a Rails package.json with
+      # no scripts key at all is unusual.
+      def rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts)
+        content = JSON.parse(original_text)
+        content["scripts"] = existing_scripts.merge(scripts_to_add)
+        indent = original_text[/\A\{\n(\s+)/, 1] || "  "
+        "#{JSON.pretty_generate(content, indent: indent)}\n"
       end
 
       def ensure_jsx_in_js_compatibility

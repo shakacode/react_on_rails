@@ -1902,6 +1902,30 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when package.json already defines build and build:test scripts" do
+    before(:all) do
+      existing_package_json = JSON.pretty_generate(
+        "name" => "existing-app",
+        "private" => true,
+        "scripts" => {
+          "build" => "custom-build",
+          "build:test" => "custom-build-test"
+        }
+      )
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("package.json", "#{existing_package_json}\n")
+      end
+    end
+
+    it "preserves the user's existing build and build:test scripts" do
+      assert_file "package.json" do |content|
+        scripts = JSON.parse(content).fetch("scripts", {})
+        expect(scripts["build"]).to eq("custom-build")
+        expect(scripts["build:test"]).to eq("custom-build-test")
+      end
+    end
+  end
+
   context "when Active Record is absent (no config/database.yml)" do
     before(:all) do
       run_generator_test_with_args(%w[], package_json: true) do
@@ -1936,6 +1960,34 @@ describe InstallGenerator, type: :generator do
       end
     end
   end
+
+  context "when packageManager declares pnpm but only yarn.lock exists" do
+    before(:all) do
+      run_generator_test_with_args(%w[], package_json: true) do
+        # User declared pnpm via Corepack but hasn't committed pnpm-lock.yaml yet —
+        # only a stale yarn.lock is on disk. `cache: "pnpm"` would fail setup-node.
+        simulate_existing_file("yarn.lock", "")
+        simulate_existing_file(
+          "package.json",
+          "#{JSON.pretty_generate('name' => 'app', 'packageManager' => 'pnpm@9.0.0')}\n"
+        )
+      end
+    end
+
+    it "omits cache when no lockfile exists for the detected package manager" do
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).not_to include('cache: "pnpm"')
+        # Falls back to frozen-lockfile-safe install so the workflow still runs.
+        expect(content).to include("pnpm install --no-frozen-lockfile")
+      end
+    end
+  end
+
+  # Yarn (Berry) on first CI run without a committed lockfile is covered indirectly
+  # by the pnpm test above and by unit tests for GeneratorMessages.lockfile_for_manager?.
+  # An end-to-end yarn test is not reliable here because yarn 1.x is globally installed
+  # in the spec environment and `setup_js_dependencies` creates yarn.lock before the
+  # CI template renders, defeating the "no lockfile" scenario.
 
   context "when Procfile.dev already contains RSC watcher" do
     let(:install_generator) { described_class.new([], { rsc: true }) }

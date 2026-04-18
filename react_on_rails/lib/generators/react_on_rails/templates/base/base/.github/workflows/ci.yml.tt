@@ -39,13 +39,22 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
+          # "lts/*" tracks the current Node LTS; consider pinning (e.g. "22") for reproducible builds.
           node-version: "lts/*"
 <%- if config[:has_lockfile] && %w[yarn pnpm npm].include?(config[:package_manager]) -%>
           cache: "<%= config[:package_manager] %>"
 <%- end -%>
 
       - name: Install JS dependencies
+<%- if !config[:has_lockfile] && config[:package_manager] == 'yarn' -%>
+        # Yarn Berry defaults to immutable installs; allow lockfile creation on first CI run.
+        run: yarn install --no-immutable
+<%- elsif !config[:has_lockfile] && config[:package_manager] == 'pnpm' -%>
+        # pnpm defaults to frozen-lockfile in CI; allow lockfile creation on first CI run.
+        run: pnpm install --no-frozen-lockfile
+<%- else -%>
         run: <%= config[:package_manager] %> install
+<%- end -%>
 
 <%- if config[:has_active_record] -%>
       - name: Set up database

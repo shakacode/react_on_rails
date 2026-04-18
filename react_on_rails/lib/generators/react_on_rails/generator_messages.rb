@@ -1,17 +1,20 @@
 # frozen_string_literal: true
 
-require "json"
 require "rainbow"
 
+require_relative "generator_messages/package_manager_detection"
 require_relative "generator_messages/ci_section"
 require_relative "generator_messages/shakapacker_status_section"
 
 module GeneratorMessages
   PRO_UPGRADE_HINT = "\n\n    💎 For RSC, streaming SSR, and 10-100x faster SSR, try React on Rails Pro:" \
                      "\n       #{Rainbow('https://reactonrails.com/docs/pro/upgrading-to-pro/').cyan.underline}".freeze
-  SUPPORTED_PACKAGE_MANAGERS = %w[npm pnpm yarn bun].freeze
+  # Package manager constants and detection helpers live in PackageManagerDetection,
+  # re-exported here for backwards compatibility (external callers use ::SUPPORTED_PACKAGE_MANAGERS).
+  SUPPORTED_PACKAGE_MANAGERS = PackageManagerDetection::SUPPORTED_PACKAGE_MANAGERS
 
   class << self
+    include PackageManagerDetection
     include CiSection
     include ShakapackerStatusSection
 
@@ -110,50 +113,6 @@ module GeneratorMessages
 
         💡 TIP: Run 'bin/dev help' for development server options and troubleshooting#{testing_section}#{ci_section}#{pro_hint}
       MSG
-    end
-
-    # Detects the package manager in priority order:
-    # 1. REACT_ON_RAILS_PACKAGE_MANAGER env variable
-    # 2. packageManager field in package.json (Corepack standard)
-    # 3. Lockfile on disk
-    # 4. Falls back to "npm" (Shakapacker 8.x default)
-    #
-    # Pass app_root: to resolve paths against a specific directory
-    # (e.g. destination_root in generators) instead of Dir.pwd.
-    def detect_package_manager(app_root: Dir.pwd)
-      env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
-      return env_package_manager if supported_package_manager?(env_package_manager)
-
-      detect_package_manager_from_package_json(app_root: app_root) ||
-        detect_package_manager_from_lockfiles(app_root: app_root) ||
-        "npm"
-    end
-
-    def detect_package_manager_from_package_json(app_root: Dir.pwd)
-      package_json_path = File.join(app_root, "package.json")
-      return nil unless File.exist?(package_json_path)
-
-      content = JSON.parse(File.read(package_json_path))
-      declared = content["packageManager"]
-      return nil unless declared.is_a?(String)
-
-      name = declared.split("@").first&.strip&.downcase
-      supported_package_manager?(name) ? name : nil
-    rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
-      nil
-    end
-
-    def detect_package_manager_from_lockfiles(app_root: Dir.pwd)
-      return "yarn" if File.exist?(File.join(app_root, "yarn.lock"))
-      return "pnpm" if File.exist?(File.join(app_root, "pnpm-lock.yaml"))
-      return "bun" if File.exist?(File.join(app_root, "bun.lock")) || File.exist?(File.join(app_root, "bun.lockb"))
-      return "npm" if File.exist?(File.join(app_root, "package-lock.json"))
-
-      nil
-    end
-
-    def supported_package_manager?(package_manager)
-      SUPPORTED_PACKAGE_MANAGERS.include?(package_manager)
     end
 
     private

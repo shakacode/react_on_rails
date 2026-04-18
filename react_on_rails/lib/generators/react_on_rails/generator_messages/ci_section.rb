@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "json"
 require "rainbow"
 
 module GeneratorMessages
@@ -10,14 +9,17 @@ module GeneratorMessages
     def build_ci_section(app_root: Dir.pwd, ci_workflow_generated: false)
       return "" unless ci_workflow_generated || File.exist?(File.join(app_root, ".github/workflows/ci.yml"))
 
-      package_manager = detect_package_manager(app_root: app_root)
+      # Read package.json once and reuse for both package-manager detection and the
+      # build:test script presence check to avoid a second I/O pass.
+      package_json = read_package_json(app_root)
+      package_manager = detect_package_manager(app_root: app_root, package_json: package_json)
       ci_status = if ci_workflow_generated
                     "A GitHub Actions workflow has been generated at .github/workflows/ci.yml."
                   else
                     "A GitHub Actions workflow is available at .github/workflows/ci.yml."
                   end
 
-      build_test_hint = if package_json_has_script?(app_root, "build:test")
+      build_test_hint = if package_json&.dig("scripts", "build:test")
                           "\n\nOr use the generated package.json script:\n" \
                             "#{Rainbow("#{package_manager} run build:test").cyan}"
                         else
@@ -35,16 +37,6 @@ module GeneratorMessages
         To build bundles manually before tests:
         #{Rainbow('RAILS_ENV=test NODE_ENV=test bin/shakapacker').cyan}#{build_test_hint}
       CI
-    end
-
-    def package_json_has_script?(app_root, script_name)
-      package_json_path = File.join(app_root, "package.json")
-      return false unless File.exist?(package_json_path)
-
-      content = JSON.parse(File.read(package_json_path))
-      content.dig("scripts", script_name) ? true : false
-    rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
-      false
     end
   end
 end
