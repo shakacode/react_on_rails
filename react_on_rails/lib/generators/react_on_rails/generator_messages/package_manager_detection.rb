@@ -31,23 +31,6 @@ module GeneratorMessages
       pm_from_json || detect_package_manager_from_lockfiles(app_root: app_root) || "npm"
     end
 
-    def detect_package_manager_from_package_json(app_root: Dir.pwd)
-      content = read_package_json(app_root)
-      content ? package_manager_from_content(content) : nil
-    end
-
-    # Parses package.json once and returns the hash, or nil if the file is missing
-    # or unreadable. Callers that need multiple fields (packageManager, scripts, ...)
-    # should parse once via this helper and pass the result through.
-    def read_package_json(app_root)
-      package_json_path = File.join(app_root, "package.json")
-      return nil unless File.exist?(package_json_path)
-
-      JSON.parse(File.read(package_json_path))
-    rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
-      nil
-    end
-
     def package_manager_from_content(content)
       declared = content["packageManager"]
       return nil unless declared.is_a?(String)
@@ -83,6 +66,29 @@ module GeneratorMessages
 
     def supported_package_manager?(package_manager)
       SUPPORTED_PACKAGE_MANAGERS.include?(package_manager)
+    end
+
+    private
+
+    # Pipeline internals — external callers should go through `detect_package_manager`
+    # (which accepts `package_json:` for the read-once case). Reachable from sibling
+    # sub-modules (e.g. CiSection) via `include` without a receiver; tests use `send`.
+
+    def detect_package_manager_from_package_json(app_root: Dir.pwd)
+      content = read_package_json(app_root)
+      content ? package_manager_from_content(content) : nil
+    end
+
+    # Parses package.json once and returns the hash, or nil if the file is missing
+    # or unreadable. Callers that need multiple fields (packageManager, scripts, ...)
+    # should parse once via this helper and pass the result through.
+    def read_package_json(app_root)
+      package_json_path = File.join(app_root, "package.json")
+      return nil unless File.exist?(package_json_path)
+
+      JSON.parse(File.read(package_json_path))
+    rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
+      nil
     end
   end
 end

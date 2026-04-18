@@ -257,8 +257,12 @@ module ReactOnRails
         return if options[:pretend]
 
         ci_path = ".github/workflows/ci.yml"
+        # Generators may run non-interactively (CI, scripts), so we never want Thor's
+        # `template` to prompt on conflict. Treat any existing workflow as "skip" by
+        # default; users who want to overwrite must pass --force explicitly. --skip
+        # falls into the same path because the desired outcome is identical.
         if File.exist?(File.join(destination_root, ci_path)) && !options[:force]
-          say_status :skip, "#{ci_path} already exists", :yellow
+          say_status :skip, "#{ci_path} already exists (pass --force to overwrite)", :yellow
           return
         end
 
@@ -275,10 +279,14 @@ module ReactOnRails
         @ci_workflow_generated = true
       end
 
+      # NODE_ENV=production ensures Shakapacker emits a minified production bundle;
+      # without it the default is "development" which produces an unminified dev bundle
+      # and is almost never what `npm run build` is expected to do.
       DEFAULT_PACKAGE_JSON_SCRIPTS = {
-        "build" => "bin/shakapacker",
+        "build" => "NODE_ENV=production bin/shakapacker",
         "build:test" => "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
       }.freeze
+      private_constant :DEFAULT_PACKAGE_JSON_SCRIPTS
 
       def add_package_json_scripts
         return if options[:pretend]
@@ -306,27 +314,79 @@ module ReactOnRails
 
       # Inserts new entries into the existing "scripts" object without rewriting the rest of
       # package.json, so Prettier-formatted files only see the added lines in the diff.
-      # Falls back to a structured rewrite when the "scripts" key is absent or when the raw
-      # regex cannot locate the scripts object (e.g. unusual whitespace or nested braces).
+      # Falls back to a structured rewrite when the "scripts" key is absent or when the
+      # scripts object can't be located unambiguously (e.g. malformed JSON).
       def inject_scripts_into_package_json(original_text, scripts_to_add, existing_scripts)
-        match = original_text.match(/"scripts"\s*:\s*\{(?<inner>[^}]*)\}/m)
-        return rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts) unless match
+        opener = original_text.match(/"scripts"\s*:\s*\{/m)
+        return rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts) unless opener
 
-        entry_indent = match[:inner][/\n([ \t]+)"/, 1] ||
-                       "#{original_text[/\A\{\n([ \t]+)/, 1] || '  '}  "
-        object_indent = original_text[/\A\{\n([ \t]*)"scripts"/, 1] || ""
+        inner_start = opener.end(0)
+        inner_end = find_matching_brace(original_text, inner_start)
+        return rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts) unless inner_end
+
+        inner = original_text[inner_start...inner_end]
+        # Detect the indent of the "scripts" key wherever it appears (any object position),
+        # not only when it's the first key. Defaults to two spaces so the closing `}` of the
+        # rebuilt scripts block lines up under "scripts" instead of being emitted at column 0.
+        object_indent = original_text[/\n([ \t]*)"scripts"/, 1] || "  "
+        entry_indent = inner[/\n([ \t]+)"/, 1] || "#{object_indent}  "
         new_entries = scripts_to_add.map { |key, value| %(#{entry_indent}"#{key}": #{value.to_json}) }
 
         rebuilt_inner =
           if existing_scripts.any?
-            trimmed = match[:inner].sub(/\s*\z/, "")
+            trimmed = inner.sub(/\s*\z/, "")
             separator = trimmed.end_with?(",") ? "" : ","
             "#{trimmed}#{separator}\n#{new_entries.join(",\n")}\n#{object_indent}"
           else
             "\n#{new_entries.join(",\n")}\n#{object_indent}"
           end
 
-        "#{original_text[0...match.begin(0)]}\"scripts\": {#{rebuilt_inner}}#{original_text[match.end(0)..]}"
+        "#{original_text[0...opener.begin(0)]}\"scripts\": {#{rebuilt_inner}}#{original_text[(inner_end + 1)..]}"
+      end
+
+      # Returns the index of the `}` that closes the `{` whose body starts at `start`,
+      # or nil if the object is unterminated. Tracks brace depth while stepping through
+      # JSON string literals so `}` characters inside script values (e.g.
+      # "lint": "eslint '{src,test}/**/*.js'") do not match a non-matching brace.
+      def find_matching_brace(text, start)
+        depth = 1
+        i = start
+        while i < text.length
+          case text[i]
+          when '"'
+            i = skip_json_string(text, i)
+            return nil unless i
+          when "{"
+            depth += 1
+            i += 1
+          when "}"
+            depth -= 1
+            return i if depth.zero?
+
+            i += 1
+          else
+            i += 1
+          end
+        end
+        nil
+      end
+
+      # Given an index pointing at the opening `"` of a JSON string, returns the index
+      # just past the closing `"`. Honours `\"` and `\\` escapes. Returns nil if the
+      # string is unterminated.
+      def skip_json_string(text, start)
+        i = start + 1
+        while i < text.length
+          case text[i]
+          when "\\"
+            i += 2
+          when '"'
+            return i + 1
+          else
+            i += 1
+          end
+        end
+        nil
       end
 
       # Used only when the "scripts" key is missing entirely or the regex can't locate it.

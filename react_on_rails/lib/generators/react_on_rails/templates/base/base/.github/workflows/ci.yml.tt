@@ -66,6 +66,7 @@ jobs:
 
 <%- end -%>
       - name: Build JavaScript bundles
+        # Shakapacker default. ViteRuby users: replace with `bin/vite build --mode test`.
         run: bin/shakapacker
         env:
           RAILS_ENV: test

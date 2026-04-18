@@ -1926,6 +1926,64 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when package.json has scripts after other top-level keys" do
+    before(:all) do
+      # Real-world layout: "name", "version", etc. come before "scripts". The
+      # previous indent regex anchored to `\A\{\n` and silently fell back to
+      # column 0 for the closing `}` of the scripts block.
+      existing_package_json = <<~JSON
+        {
+          "name": "existing-app",
+          "version": "0.1.0",
+          "private": true,
+          "scripts": {
+            "lint": "eslint src"
+          },
+          "devDependencies": {}
+        }
+      JSON
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("package.json", existing_package_json)
+      end
+    end
+
+    it "indents the rebuilt scripts block under the surrounding object" do
+      assert_file "package.json" do |content|
+        # The closing `}` of the scripts block must align with two-space indent,
+        # not be emitted at column 0.
+        expect(content).to match(/\n {2}},\n {2}"devDependencies"/)
+        scripts = JSON.parse(content).fetch("scripts", {})
+        expect(scripts.keys).to include("lint", "build", "build:test")
+      end
+    end
+  end
+
+  context "when an existing script value contains a literal `}`" do
+    before(:all) do
+      # `[^}]*` would have matched the `}` inside "lint" and produced invalid JSON.
+      # The brace-depth walker must respect string literals.
+      existing_package_json = <<~JSON
+        {
+          "name": "existing-app",
+          "scripts": {
+            "lint": "eslint '{src,test}/**/*.js'"
+          }
+        }
+      JSON
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("package.json", existing_package_json)
+      end
+    end
+
+    it "produces valid JSON and preserves the brace-containing script value" do
+      assert_file "package.json" do |content|
+        parsed = JSON.parse(content)
+        expect(parsed.fetch("scripts", {})["lint"]).to eq("eslint '{src,test}/**/*.js'")
+        expect(parsed.fetch("scripts", {}).keys).to include("build", "build:test")
+      end
+    end
+  end
+
   context "when Active Record is absent (no config/database.yml)" do
     before(:all) do
       run_generator_test_with_args(%w[], package_json: true) do

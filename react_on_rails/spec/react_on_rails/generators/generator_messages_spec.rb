@@ -162,7 +162,7 @@ describe GeneratorMessages do
       allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
                                    .and_return("not-json")
 
-      expect(described_class.detect_package_manager_from_package_json).to be_nil
+      expect(described_class.send(:detect_package_manager_from_package_json)).to be_nil
     end
 
     it "returns bun when bun.lockb exists" do
