@@ -702,13 +702,12 @@ end
 
 ## Bundle Analysis Tools
 
-| Tool                                | Purpose                                                          |
-| ----------------------------------- | ---------------------------------------------------------------- |
-| **webpack-bundle-analyzer**         | Analyze client bundle composition and module sizes               |
-| **RSC Devtools** (Chrome extension) | Visualize RSC streaming data, server vs client rendering         |
-| **DevConsole**                      | Color-coded component boundaries (green = client, blue = server) |
-| **RSC Parser**                      | Parse the React Flight wire format to inspect the component tree |
-| **`webpack-stats-explorer`**        | Interactive exploration of webpack stats for chunk analysis      |
+| Tool                                                                                                                          | Purpose                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **webpack-bundle-analyzer**                                                                                                   | Analyze client bundle composition and module sizes               |
+| **[RSC Devtools](https://chromewebstore.google.com/detail/rsc-devtools/jcejahepddjnppkhomnidalpnnnemomn)** (Chrome extension) | Visualize RSC streaming data, server vs client rendering         |
+| **[RSC Parser](https://rsc-parser.vercel.app/)**                                                                              | Parse the React Flight wire format to inspect the component tree |
+| **[webpack-stats-explorer](https://github.com/erykpiast/webpack-stats-explorer)**                                             | Interactive exploration of webpack stats for chunk analysis      |
 
 ### Key Metrics to Track
 
