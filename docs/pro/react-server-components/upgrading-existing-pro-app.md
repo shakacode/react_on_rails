@@ -71,7 +71,7 @@ There is no warning when a component is auto-classified as a server component. I
 
 Before proceeding to Step 1:
 
-- [ ] Search your component source files for `useState`, `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useContext`, `useRef`, `useImperativeHandle`, `useReducer`, `useCallback`, `useMemo`, `useTransition`, `useDeferredValue`, `useId`, `useSyncExternalStore`, `useOptimistic`, `useFormStatus`, `useSelector`, `useDispatch`, `useNavigate`, `useLocation`, `useParams`, `ReactOnRails.getStore`, `ReactOnRails.authenticityToken`
+- [ ] Search your component source files for `useState`, `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useContext`, `useRef`, `useImperativeHandle`, `useReducer`, `useCallback`, `useMemo`, `useTransition`, `useDeferredValue`, `useId`, `useSyncExternalStore`, `useOptimistic`, `useFormStatus`, `useSelector`, `useDispatch`, `connect(`, `useNavigate`, `useLocation`, `useParams`, `ReactOnRails.getStore`, `ReactOnRails.authenticityToken`
 - [ ] Check all `.server.jsx` files -- these almost certainly need `'use client'`
 - [ ] Check components that use `StaticRouter` (SSR wrapper, not a client API — but the file likely uses other client APIs)
 - [ ] Verify no component relies on browser globals (`window`, `document`) without `'use client'`

@@ -862,7 +862,7 @@ externals: {
 **Correct approach:**
 
 ```js
-// In serverWebpackConfig.js -- tells webpack to omit these modules (no require() call emitted)
+// In serverWebpackConfig.js -- tells webpack not to polyfill these modules (imports resolve to nothing; no shim bundled)
 resolve: {
   fallback: {
     path: false,
@@ -872,7 +872,7 @@ resolve: {
 }
 ```
 
-`resolve.fallback: false` tells webpack to omit the module at build time — no fallback shim is bundled and no `require()` call is emitted. The RSC bundle does not need this workaround because it runs in full Node.js where `require()` is available and Node builtins work normally.
+`resolve.fallback: false` tells webpack not to provide a polyfill for the module — the import resolves to an empty module at build time and no fallback shim is bundled. The RSC bundle does not need this workaround because it runs in full Node.js where `require()` is available and Node builtins work normally.
 
 ### MessageChannel Not Defined
 
@@ -890,7 +890,11 @@ const config = {
   // ... other options
   additionalContext: { MessageChannel },
 };
+
+module.exports = config; // export from node-renderer.js
 ```
+
+See the [node renderer JS configuration reference](../building-features/node-renderer/js-configuration.md) for where `config` is consumed.
 
 **Fallback:** If you cannot change the renderer config (e.g., a build-only setup without renderer config control), inject a minimal `MessageChannel` polyfill at the top of the server bundle using webpack's `BannerPlugin`. The polyfill only needs to support `port2.postMessage` triggering `port1.onmessage`, which is all React's scheduler requires:
 
