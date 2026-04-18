@@ -191,9 +191,14 @@ module ReactOnRails
           MSG
         end
 
+        # Always include every key (nil when unset) so Process.spawn/system
+        # explicitly unsets it in the child. A non-nil-only hash would let
+        # `with_unbundled_env` restore a pre-Bundler value the parent had
+        # just deleted — e.g. an invalid `RENDERER_PORT=abc` that
+        # PortSelector scrubbed would resurrect in the renderer child.
         def preserve_runtime_env_vars
           ENV_KEYS_TO_PRESERVE.each_with_object({}) do |key, hash|
-            hash[key] = ENV[key] if ENV[key]
+            hash[key] = ENV.fetch(key, nil)
           end
         end
 

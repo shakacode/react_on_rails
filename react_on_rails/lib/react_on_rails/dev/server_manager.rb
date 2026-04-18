@@ -849,6 +849,15 @@ module ReactOnRails
         # Base port is active. Priority: base port > explicit per-service env vars.
         # Assign unconditionally so the effective ports match the "Base port
         # detected..." log line even when PORT/RENDERER_PORT were pre-set.
+        #
+        # Base-port mode is specifically for local, all-in-one dev setups (one
+        # machine running Rails + webpack + node renderer together — typically
+        # worktrees or coding-agent sandboxes). The derived renderer URL is
+        # therefore hard-coded to http://localhost:<port>. If you run the node
+        # renderer on a separate host/container (e.g. Docker `renderer:3800`),
+        # do not use base-port mode — set REACT_RENDERER_URL explicitly and
+        # rely on the explicit-ports path instead. warn_if_renderer_url_will_be_overridden
+        # below surfaces the override whenever a pre-set URL doesn't match.
         def apply_base_port_env(selected)
           derived_url = "http://localhost:#{selected[:renderer]}"
           warn_if_renderer_url_will_be_overridden(derived_url)

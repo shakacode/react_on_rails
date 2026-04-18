@@ -220,6 +220,10 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         example.run
       end
 
+      # Stub so warn_if_derived_ports_in_use does not attempt real TCP probes
+      # on 6000..6002 during tests (matches the pattern above).
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
+
       it "falls through to CONDUCTOR_PORT and activates base port mode" do
         result = described_class.select_ports
         expect(result[:rails]).to eq(6000)
