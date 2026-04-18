@@ -379,4 +379,45 @@ describe ReactOnRailsPro::AssetsPrecompile do
       expect(extracted_file_path.exist?).to be(true)
     end
   end
+
+  describe ".publish_current_bundle_if_configured" do
+    let(:server_bundle) { File.join(Dir.tmpdir, "rolling-deploy-upload-server-bundle.js") }
+    let(:adapter_class) do
+      Class.new do
+        def upload(*); end
+      end
+    end
+    let(:adapter) { instance_double(adapter_class) }
+    let(:env) { ActiveSupport::StringInquirer.new("production") }
+    let(:config) do
+      instance_double(
+        ReactOnRailsPro::Configuration,
+        rolling_deploy_adapter: adapter,
+        node_renderer?: true,
+        enable_rsc_support: false
+      )
+    end
+
+    before do
+      File.write(server_bundle, "// server bundle content")
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(Rails).to receive(:env).and_return(env)
+      allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:collect_assets).and_return([])
+      allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(server_bundle)
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+        .to receive(:server_bundle_hash).and_return("abc123")
+    end
+
+    after do
+      FileUtils.rm_f(server_bundle)
+    end
+
+    it "warns and continues when upload times out" do
+      stub_const("ReactOnRailsPro::AssetsPrecompile::UPLOAD_TIMEOUT_SECONDS", 0.05)
+      allow(adapter).to receive(:upload) { sleep 1 }
+
+      expect { described_class.publish_current_bundle_if_configured }
+        .to output(/rolling_deploy_adapter#upload for abc123 timed out after 0.05s/).to_stderr
+    end
+  end
 end

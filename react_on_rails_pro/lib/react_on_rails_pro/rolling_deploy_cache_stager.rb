@@ -29,6 +29,7 @@ module ReactOnRailsPro
   # rolling-deploy seed is less catastrophic than a failed *current*
   # bundle seed.
   module RollingDeployCacheStager
+    DISCOVERY_TIMEOUT_SECONDS = 10
     FETCH_TIMEOUT_SECONDS = 30
 
     def self.call(cache_dir:, current_hashes:, mode:)
@@ -59,28 +60,31 @@ module ReactOnRailsPro
     private_class_method :handle_missing_adapter
 
     # Bundle hashes are used as directory names under the renderer cache path
-    # (<cache>/<hash>/<hash>.js). Values coming from config.rolling_deploy_adapter
-    # are trusted, but PREVIOUS_BUNDLE_HASHES comes from the environment and
-    # could contain path separators (e.g. "../../etc") that would escape the
-    # cache directory. Reject anything that isn't a safe hash slug.
-    SAFE_HASH_PATTERN = /\A[A-Za-z0-9_\-.]+\z/
+    # (<cache>/<hash>/<hash>.js). Reject path separators and also "." / ".."
+    # so staging and cleanup can never escape the cache root.
+    SAFE_HASH_PATTERN = /\A(?!\.{1,2}\z)[A-Za-z0-9_\-.]+\z/
 
     def self.resolve_previous_hashes(adapter, current_hashes)
       explicit = ENV["PREVIOUS_BUNDLE_HASHES"].to_s.split(",").map(&:strip).reject(&:empty?)
-      invalid = explicit.grep_v(SAFE_HASH_PATTERN)
-      if invalid.any?
-        warn "[ReactOnRailsPro] PREVIOUS_BUNDLE_HASHES contains invalid hash values (rejected): " \
-             "#{invalid.inspect}. Hashes must match /#{SAFE_HASH_PATTERN.source}/ to prevent path traversal."
-        explicit -= invalid
-      end
-      hashes = explicit.any? ? explicit : fetch_hashes_from_adapter(adapter)
+      hashes = if explicit.any?
+                 sanitize_hashes(explicit, source_label: "PREVIOUS_BUNDLE_HASHES")
+               else
+                 sanitize_hashes(
+                   fetch_hashes_from_adapter(adapter),
+                   source_label: "rolling_deploy_adapter#previous_bundle_hashes"
+                 )
+               end
       # Deduplicate against the hashes we just staged so we don't re-fetch the current build.
       hashes - Array(current_hashes).map(&:to_s)
     end
     private_class_method :resolve_previous_hashes
 
     def self.fetch_hashes_from_adapter(adapter)
-      Array(adapter.previous_bundle_hashes)
+      Timeout.timeout(DISCOVERY_TIMEOUT_SECONDS) { Array(adapter.previous_bundle_hashes) }
+    rescue Timeout::Error
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#previous_bundle_hashes timed out after " \
+           "#{DISCOVERY_TIMEOUT_SECONDS}s. Skipping previous-hash seeding."
+      []
     rescue StandardError => e
       warn "[ReactOnRailsPro] rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: " \
            "#{e.message}. Skipping previous-hash seeding."
@@ -89,10 +93,11 @@ module ReactOnRailsPro
     private_class_method :fetch_hashes_from_adapter
 
     def self.seed_previous_hash(adapter, hash, cache_dir, mode)
+      bundle_dir = nil
       payload = fetch_payload(adapter, hash)
       return if payload.nil?
 
-      bundle_dir = File.join(cache_dir, hash)
+      bundle_dir = bundle_directory(cache_dir, hash)
       stage_file(payload[:bundle], File.join(bundle_dir, "#{hash}.js"), mode)
 
       Array(payload[:assets]).each do |asset_path|
@@ -104,7 +109,7 @@ module ReactOnRailsPro
       # (skipping its 410 path) and emit HTML referencing chunks from a manifest
       # that never got staged — producing hydration failures instead of the clean
       # 410-retry fallback that we rely on for degradation.
-      FileUtils.rm_rf(File.join(cache_dir, hash))
+      FileUtils.rm_rf(bundle_dir) if bundle_dir
       warn "[ReactOnRailsPro] Failed to seed previous bundle hash #{hash}: #{e.class}: #{e.message}. " \
            "Rolled back partially-staged files. Runtime 410-retry remains the fallback."
     end
@@ -144,6 +149,31 @@ module ReactOnRailsPro
       end
     end
     private_class_method :stage_file
+
+    def self.sanitize_hashes(hash_values, source_label:)
+      hashes = Array(hash_values).map { |value| value.to_s.strip }.reject(&:empty?)
+      invalid = hashes.grep_v(SAFE_HASH_PATTERN)
+      if invalid.any?
+        warn "[ReactOnRailsPro] #{source_label} returned invalid hash values (rejected): #{invalid.inspect}. " \
+             "Hashes must match /#{SAFE_HASH_PATTERN.source}/ to stay within the renderer cache directory."
+      end
+      hashes - invalid
+    end
+    private_class_method :sanitize_hashes
+
+    def self.bundle_directory(cache_dir, hash)
+      candidate = File.join(cache_dir, hash)
+      normalized_cache_dir = File.expand_path(cache_dir)
+      normalized_candidate = File.expand_path(candidate)
+
+      return normalized_candidate if normalized_candidate == normalized_cache_dir ||
+                                     normalized_candidate.start_with?("#{normalized_cache_dir}/")
+
+      raise ReactOnRailsPro::Error,
+            "Refusing to stage rolling-deploy bundle hash #{hash.inspect} outside renderer cache dir " \
+            "#{normalized_cache_dir.inspect}."
+    end
+    private_class_method :bundle_directory
 
     # Mirrors PreSeedRendererCache.make_relative_symlink so previous-hash
     # symlinks have identical properties (relative path, realpath-canonicalized)

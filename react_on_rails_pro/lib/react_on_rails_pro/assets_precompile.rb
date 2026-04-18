@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
+require "timeout"
+
 module ReactOnRailsPro
   class AssetsPrecompile # rubocop:disable Metrics/ClassLength
     include Singleton
+
+    UPLOAD_TIMEOUT_SECONDS = 120
 
     def remote_bundle_cache_adapter
       unless ReactOnRailsPro.configuration.remote_bundle_cache_adapter.is_a?(Module)
@@ -115,8 +119,13 @@ module ReactOnRailsPro
     end
 
     def self.upload_bundle(adapter, hash, bundle, assets)
-      adapter.upload(hash, bundle: bundle, assets: assets)
+      Timeout.timeout(UPLOAD_TIMEOUT_SECONDS) do
+        adapter.upload(hash, bundle: bundle, assets: assets)
+      end
       puts "[ReactOnRailsPro] Published bundle hash #{hash} via rolling_deploy_adapter"
+    rescue Timeout::Error
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#upload for #{hash} timed out after " \
+           "#{UPLOAD_TIMEOUT_SECONDS}s. Next deploy's rolling-deploy seeding for this hash may degrade."
     rescue StandardError => e
       warn "[ReactOnRailsPro] rolling_deploy_adapter#upload for #{hash} raised #{e.class}: " \
            "#{e.message}. Next deploy's rolling-deploy seeding for this hash may degrade."

@@ -146,11 +146,23 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when adapter#previous_bundle_hashes times out" do
+    before do
+      stub_const("ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS", 0.05)
+      allow(adapter).to receive(:previous_bundle_hashes) { sleep 1 }
+    end
+
+    it "warns and skips seeding rather than blocking" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/previous_bundle_hashes timed out after/).to_stderr
+    end
+  end
+
   context "when PREVIOUS_BUNDLE_HASHES contains an unsafe path-traversal value" do
     let(:src_bundle) { source_file("bundle-ok.js") }
 
     before do
-      ENV["PREVIOUS_BUNDLE_HASHES"] = "../../../etc,safe-hash"
+      ENV["PREVIOUS_BUNDLE_HASHES"] = ".,..,../../../etc,safe-hash"
       allow(adapter).to receive(:previous_bundle_hashes)
       allow(adapter).to receive(:fetch).with("safe-hash").and_return(bundle: src_bundle, assets: [])
     end
@@ -160,6 +172,25 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
         .to output(/invalid hash values \(rejected\).*etc/m).to_stderr
 
       expect(adapter).not_to have_received(:fetch).with("../../../etc")
+      expect(adapter).not_to have_received(:fetch).with(".")
+      expect(adapter).not_to have_received(:fetch).with("..")
+      expect(File.exist?(File.join(cache_dir, "safe-hash", "safe-hash.js"))).to be(true)
+    end
+  end
+
+  context "when adapter returns an unsafe hash" do
+    let(:src_bundle) { source_file("bundle-ok.js") }
+
+    before do
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["..", "safe-hash"])
+      allow(adapter).to receive(:fetch).with("safe-hash").and_return(bundle: src_bundle, assets: [])
+    end
+
+    it "rejects the unsafe adapter hash before any file staging" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/previous_bundle_hashes returned invalid hash values \(rejected\): \["\.\."\]/).to_stderr
+
+      expect(adapter).not_to have_received(:fetch).with("..")
       expect(File.exist?(File.join(cache_dir, "safe-hash", "safe-hash.js"))).to be(true)
     end
   end
