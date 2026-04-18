@@ -228,7 +228,7 @@ module ReactOnRails
         if File.exist?(File.join(destination_root, legacy_node_renderer_path))
           say "ℹ️  #{legacy_node_renderer_path} detected, keeping existing renderer; " \
               "to migrate, move it to #{node_renderer_path} and update any references " \
-              "(e.g. Procfile.dev, Procfile.prod, Docker CMD / command:):", :yellow
+              "(e.g. Procfile.dev, Procfile.prod, Docker CMD / command):", :yellow
           say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node #{node_renderer_path}", :yellow
           return true
         end
@@ -257,8 +257,17 @@ module ReactOnRails
           return
         end
 
-        if File.read(procfile_path).include?("node-renderer:")
+        procfile_content = File.read(procfile_path)
+
+        if procfile_content.include?("node renderer/node-renderer.js")
           say "ℹ️  Node Renderer already in Procfile.dev, skipping", :yellow
+          return
+        end
+
+        if procfile_content.include?("node-renderer:")
+          say "⚠️  Procfile.dev has a node-renderer: entry that doesn't reference " \
+              "renderer/node-renderer.js. Update it manually to:", :yellow
+          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js", :yellow
           return
         end
 
