@@ -653,8 +653,14 @@ jobs:
 
           # Distinguish regression alerts from operational failures (auth/API/network/CLI)
           # so that main can warn-only on the former while still failing hard on the latter.
+          # Match Bencher's actual alert output (e.g., "🚨 2 Alerts", "Alert detected") via
+          # a word-bounded, case-sensitive "Alert[s]" — a bare case-insensitive "alert" would
+          # also match lowercase "alert" in URL paths (e.g., "/v0/.../alerts") or CLI text,
+          # which could misclassify an operational failure as a regression and let main go green.
           BENCHER_HAS_ALERT=0
-          if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
+          if [ $BENCHER_EXIT_CODE -ne 0 ] && \
+             { grep -qE "\bAlerts?\b" "$BENCHER_STDERR" || \
+               grep -qiE "threshold violation|boundary violation" "$BENCHER_STDERR"; }; then
             BENCHER_HAS_ALERT=1
           fi
           rm -f "$BENCHER_STDERR"
