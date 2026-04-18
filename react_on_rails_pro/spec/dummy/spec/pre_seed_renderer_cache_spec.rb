@@ -60,12 +60,25 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
   end
 
   context "when mode is :symlink" do
-    it "symlinks instead of copying" do
+    it "symlinks the bundle instead of copying it" do
       described_class.call(mode: :symlink)
 
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
       expect(File.exist?(dest_file)).to be(true)
       expect(File.symlink?(dest_file)).to be(true)
+    end
+
+    it "symlinks assets rather than copying them" do
+      FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))
+      FileUtils.cp(fixture_path2, path_in_webpack_folder(asset_filename2))
+
+      described_class.call(mode: :symlink)
+
+      first_asset = File.join(bundle_dir, asset_filename)
+      second_asset = File.join(bundle_dir, asset_filename2)
+      expect(File.symlink?(first_asset)).to be(true)
+      expect(File.symlink?(second_asset)).to be(true)
+      expect(File.realpath(first_asset)).to eq(path_in_webpack_folder(asset_filename).to_s)
     end
   end
 
@@ -81,10 +94,12 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
 
     it "does not raise when the preferred env var is set" do
-      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = Dir.mktmpdir("renderer-cache-test")
+      tmpdir = Dir.mktmpdir("renderer-cache-test")
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = tmpdir
       expect { described_class.call(mode: :copy) }.not_to raise_error
     ensure
-      FileUtils.rm_rf(ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", nil))
+      FileUtils.rm_rf(tmpdir) if tmpdir
+      ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     end
 
     it "does not raise in :symlink mode even without an env var" do

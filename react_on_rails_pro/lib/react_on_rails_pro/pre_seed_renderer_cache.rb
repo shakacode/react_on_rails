@@ -69,6 +69,11 @@ module ReactOnRailsPro
         The Node Renderer's default cache directory resolution differs between the Ruby
         and standalone Node environments, so relying on the default in production-like
         deploys can cause pre-seeded bundles to land in a path the renderer never reads.
+
+        If you don't need an immutable artifact (e.g. in CI or same-filesystem deploys),
+        use mode: :symlink instead:
+
+          rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink
       MSG
     end
     private_class_method :enforce_cache_dir_env_var!
@@ -127,10 +132,19 @@ module ReactOnRailsPro
 
       # Canonicalize both sides so paths like /var -> /private/var do not
       # produce broken relative symlinks when the cache dir comes from tmpdir.
+      # Pathname#realpath raises Errno::ENOENT on a dangling symlink or a
+      # path that vanished between File.exist? and here (e.g. webpack output
+      # rotating mid-stage). Surface that as a clear ReactOnRailsPro::Error
+      # rather than a raw system error.
       source_path = Pathname.new(source).realpath
       relative_source_path = source_path.relative_path_from(destination_dir.realpath)
       File.symlink(relative_source_path, destination)
       puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"
+    rescue Errno::ENOENT => e
+      raise ReactOnRailsPro::Error,
+            "Could not resolve real path for symlink source #{source} " \
+            "(#{e.message}). The file may have been removed or may be a dangling symlink. " \
+            "Rebuild your bundles before staging the renderer cache."
     end
     private_class_method :make_relative_symlink
   end

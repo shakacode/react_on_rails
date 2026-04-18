@@ -2748,16 +2748,24 @@ module ReactOnRails
 
       checker.add_warning(<<~MSG.strip)
         ⚠️  Deprecated rake task '#{DEPRECATED_RENDERER_CACHE_TASK}' referenced in:
-        #{matches.map { |p| "  • #{p}" }.join("\n")}
-
-        Replace with:
-          rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink
+        #{matches.map { |p| "  • #{p} → #{renderer_cache_migration_suggestion(p)}" }.join("\n")}
 
         The unified 'pre_seed_renderer_cache' task uses MODE=copy by default (for
         Docker/image builds) and MODE=symlink for same-filesystem workflows.
       MSG
     rescue StandardError => e
       checker.add_warning("⚠️  Could not scan for deprecated renderer-cache task references: #{e.message}")
+    end
+
+    # Dockerfile matches mean the user is building an image, so they want the
+    # copy-mode default (no MODE needed). Procfile/bin scripts mean same-filesystem
+    # runtime staging, which needs the symlink mode.
+    def renderer_cache_migration_suggestion(path)
+      if path.start_with?("Dockerfile")
+        "rake react_on_rails_pro:pre_seed_renderer_cache"
+      else
+        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink"
+      end
     end
 
     # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
