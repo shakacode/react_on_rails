@@ -140,17 +140,14 @@ Both gems ship a view helper named `react_component` that Rails mixes into `Acti
 - `react-rails` (`React::Rails::ViewHelper`) takes positional arguments: `react_component(name, props, html_options)`.
 - `react_on_rails` (`ReactOnRailsHelper` → `ReactOnRails::Helper#react_component`) takes `react_component(name, options = {})` where props are nested under `options[:props]`.
 
-Both gems' engine initializers include their helper module into `ActionView::Base` at boot. Whichever engine initializer runs last has its `react_component` definition appear earlier in the ancestor chain and therefore wins method lookup (reordering files in `app/helpers/` does not change this). Once you add `react_on_rails` to the `Gemfile`, every existing legacy call like:
+Both gems' engine initializers include their helper module into `ActionView::Base` at boot. Whichever engine initializer runs last has its `react_component` definition appear earlier in the ancestor chain and therefore wins method lookup (reordering files in `app/helpers/` does not change this). Once you add `react_on_rails` to the `Gemfile`, every existing legacy call starts resolving to `ReactOnRails::Helper#react_component(name, options = {})`, which behaves differently depending on how many positional arguments you pass. Rails gives no boot-time warning in either case:
 
-```ruby
-react_component "command_bar/CommandBar", props, { camelize_props: false }
-```
-
-starts resolving to `ReactOnRails::Helper#react_component`, which rejects the positional shape and raises `ArgumentError`. Rails gives no boot-time warning; the first request to any un-migrated view will raise `ArgumentError` at render time.
+- **Three or more positional arguments** — e.g. `react_component "command_bar/CommandBar", props, { camelize_props: false }` — raise `ArgumentError` at render time on the first request to any un-migrated view, because the new helper only takes two arguments.
+- **Two positional arguments** — e.g. `react_component "command_bar/CommandBar", props` — are silently accepted. The `props` hash is bound to `options`, but React on Rails reads props only from `options[:props]`, so the component renders with no props instead of failing loudly. This is the more dangerous case: un-migrated views do not error; they just lose their data.
 
 ### Detecting the collision quickly
 
-Before adding the gem, audit existing positional-style calls so you know what needs a shim or a same-PR migration:
+Before adding the gem, audit existing positional-style calls so you know what needs a shim or a same-PR migration. Pay particular attention to two-argument calls, which fail silently rather than raising:
 
 ```bash
 rg -n "react_component\\b" app/views
@@ -158,7 +155,7 @@ rg -n "react_component\\b" app/views
 grep -rEn "react_component\\b" app/views
 ```
 
-Any call that passes props as the second positional argument (rather than `{ props: ... }`) will break as soon as `react_on_rails` is loaded.
+Any call that passes props as the second positional argument (rather than `{ props: ... }`) will break as soon as `react_on_rails` is loaded — either by raising `ArgumentError` (3+ args) or by silently dropping props (2 args).
 
 ### Option A: migrate all call sites in the same PR (recommended)
 
