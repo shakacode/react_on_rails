@@ -29,19 +29,19 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
 <%- end -%>
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+<%- if config[:has_lockfile] && %w[yarn pnpm npm].include?(config[:package_manager]) -%>
+          cache: "<%= config[:package_manager] %>"
+<%- end -%>
+
 <%- if config[:package_manager] == 'yarn' -%>
       - name: Enable Corepack
         run: corepack enable
 
 <%- end -%>
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "lts/*"
-<%- if %w[yarn pnpm npm].include?(config[:package_manager]) -%>
-          cache: "<%= config[:package_manager] %>"
-<%- end -%>
-
       - name: Install JS dependencies
         run: <%= config[:package_manager] %> install
 
