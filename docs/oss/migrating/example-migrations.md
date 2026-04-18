@@ -13,6 +13,10 @@ architecture case study because they are usually broader page-shell migrations,
 not narrow React mount migrations. If that is your starting point, begin with
 [Compare with alternatives](../getting-started/comparing-react-on-rails-to-alternatives.md).
 
+Some teams also arrive from Inertia-first apps. We treat those as a separate
+architecture case study because they are usually broader page-shell migrations,
+not narrow React mount migrations.
+
 This page tracks practical migration references for those cases.
 
 ## What makes a useful migration example
