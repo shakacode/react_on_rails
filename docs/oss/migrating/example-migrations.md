@@ -31,7 +31,7 @@ The best examples are:
 These are stable references you can inspect today:
 
 1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails)
-2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) — based on `ganchdev/react-rails-example`
+2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) — based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example)
 
 ### In-progress migration work
 
