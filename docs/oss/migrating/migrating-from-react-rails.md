@@ -6,7 +6,7 @@ This migration is easiest when the app is already on a modern Rails + Shakapacke
 
 Not every `react-rails` app is a good candidate for a low-friction first migration. Before you start, classify what you have:
 
-- **Rails-owned island mounts on Shakapacker 7+ and Rails 6+.** This is the smoothest path. The generator + the steps below usually get you there with small, localized edits. (Note: `server_bundle_output_path` auto-detection requires Shakapacker 9.0+; on 7–8, set it explicitly in the initializer.)
+- **Rails-owned island mounts on Shakapacker 6+ and Rails 6+.** This is the smoothest path. The generator + the steps below usually get you there with small, localized edits. (Note: `server_bundle_output_path` auto-detection requires Shakapacker 9.0+; on 6–8, set it explicitly in the initializer.)
 - **Webpacker-era apps (`gem "webpacker"`, Webpack 4).** Current React on Rails does not support Webpacker — `react_on_rails doctor` flags it as a removed breaking-change issue, and the gem requires `shakapacker >= 6.0`. You must migrate off Webpacker before installing current React on Rails. See [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) below.
 - **Client-routed SPA shells (Rails is mostly a shell around a React Router / TanStack Router app).** Do not use this as the first migration slice. Treat it as an architecture case study, not a quick first migration. Pick a Rails-owned page that mounts a single component and migrate that slice first.
 
@@ -16,7 +16,7 @@ The wrong first target usually leads to one of two misreadings: teams conclude "
 
 If the app still uses `gem "webpacker"`, the recommended path is:
 
-1. **Migrate to Shakapacker first, as its own PR.** Keep the bundler change separate from the React on Rails change. This makes each step reviewable and isolates any compatibility issues. See the [Shakapacker v6 upgrade guide](https://github.com/shakacode/shakapacker/blob/main/docs/v6_upgrade.md) for the concrete Webpacker → Shakapacker steps.
+1. **Migrate to Shakapacker first, as its own PR.** Keep the bundler change separate from the React on Rails change. This makes each step reviewable and isolates any compatibility issues. See the [Shakapacker v6 upgrade guide](https://github.com/shakacode/shakapacker/blob/v6.6.0/docs/v6_upgrade.md) for the concrete Webpacker → Shakapacker steps.
 2. **Then run the React on Rails install generator** against the Shakapacker-based app.
 
 The generator is not designed to bridge Webpack 4 + Webpacker to current React on Rails defaults for you — it assumes a Shakapacker baseline. If you cannot migrate off Webpacker yet, pin `react_on_rails` to `< 16.0` (v16 is the release that removed Webpacker support) rather than trying to use current React on Rails with Webpacker.
@@ -149,7 +149,7 @@ For a more recent Rails 7-era migration example (published under ShakaCode), see
 
 ## Practical checklist for Webpacker-era apps
 
-See [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) above for the recommended staging. The concrete checklist:
+See [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) above for the recommended staging. The concrete checklist follows.
 
 If your app looks like this:
 

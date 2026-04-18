@@ -22,7 +22,7 @@ Not all `vite_rails` + React apps are the same shape, and the migration effort i
   1. moving Rails back to being view-owner and breaking the SPA into island mounts, or
   2. keeping the SPA shape and just replacing Vite's build integration.
 
-The first is a real product decision and should not be bundled with a bundler/integration change. The second is narrower but rarely a one-PR job either, because SPA shells usually depend on Vite-specific runtime behavior (`import.meta.env`, `import.meta.glob`, Vite plugins with no direct Shakapacker analogue). Note that `import.meta.glob` has no direct Webpack equivalent — it must be replaced with explicit [`require.context`](https://webpack.js.org/guides/dependency-management/#requirecontext) calls, which have a different API (sync vs. async, eager vs. lazy, manual key extraction).
+The first is a real product decision and should not be bundled with a bundler/integration change. The second is narrower but rarely a one-PR job either, because SPA shells usually depend on Vite-specific runtime behavior (`import.meta.env`, `import.meta.glob`, Vite plugins with no direct Shakapacker analogue). Note that `import.meta.glob` has no direct Webpack equivalent — it must be replaced with explicit [`require.context`](https://webpack.js.org/guides/dependency-management/#requirecontext) calls, which use a different API: the glob pattern syntax differs, results are always synchronously resolved, and any lazy loading must be handled through explicit dynamic `import()` calls instead of a built-in lazy mode.
 
 If your app is a SPA shell, do not use it as the first proof of React on Rails adoption. Start with a Rails-owned island somewhere else in the app — even a small one — and migrate that first.
 
