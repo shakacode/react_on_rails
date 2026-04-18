@@ -15,7 +15,7 @@ React Server Components offer significant performance benefits when used correct
 - Improvements in Google Speed Index and Total Blocking Time
 - Server-only dependencies (date-fns, marked, sanitize-html) never ship to the client
 
-Teams that have shipped RSC to production report concrete wins — DoorDash's 65% LCP improvement on the homepage, BlogHunch's 30% server-cost reduction, Frigade's 62% bundle-size cut, and Mux's incremental 50,000-line migration are summarized in [Migration Success Stories](../../pro/react-server-components/success-stories.md).
+Teams adopting server-first React architectures report concrete wins — DoorDash's 65% LCP improvement (from an earlier Next.js SSR migration that paved the way for RSC adoption), BlogHunch's 30% server-cost reduction, Frigade's 62% bundle-size cut, and Mux's incremental 50,000-line RSC migration are summarized in [Migration Success Stories](../../pro/react-server-components/success-stories.md).
 
 However, these benefits require intentional architecture changes. Simply adding `'use client'` everywhere preserves the status quo -- `'use client'` is a [boundary marker, not a component annotation](rsc-component-patterns.md#use-client-marks-a-boundary-not-a-component-type). The guides below walk you through the restructuring needed to capture real gains.
 
