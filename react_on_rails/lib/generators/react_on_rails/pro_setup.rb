@@ -43,8 +43,8 @@ module ReactOnRails
         say set_color("=" * 80, :cyan)
 
         create_pro_initializer
-        create_node_renderer
-        add_pro_to_procfile
+        legacy_renderer_detected = create_node_renderer
+        add_pro_to_procfile unless legacy_renderer_detected
         update_webpack_config_for_pro
 
         say set_color("=" * 80, :cyan)
@@ -210,29 +210,36 @@ module ReactOnRails
         say "✅ Created #{initializer_path}", :green
       end
 
+      # Creates renderer/node-renderer.js unless either the new path or the legacy
+      # client/node-renderer.js already exists.
+      #
+      # @return [Boolean] true when a legacy client/node-renderer.js was detected
+      #   (caller should skip add_pro_to_procfile to avoid pointing Procfile.dev
+      #   at a file that wasn't created); false/nil otherwise.
       def create_node_renderer
         node_renderer_path = "renderer/node-renderer.js"
         legacy_node_renderer_path = "client/node-renderer.js"
 
         if File.exist?(File.join(destination_root, node_renderer_path))
           say "ℹ️  #{node_renderer_path} already exists, skipping", :yellow
-          return
+          return false
         end
 
         if File.exist?(File.join(destination_root, legacy_node_renderer_path))
           say "ℹ️  #{legacy_node_renderer_path} detected, keeping existing renderer; " \
               "to migrate, move it to #{node_renderer_path} and update Procfile.dev", :yellow
-          return
+          return true
         end
 
         say "📝 Creating Node Renderer bootstrap...", :yellow
 
-        FileUtils.mkdir_p(File.join(destination_root, "renderer"))
+        empty_directory("renderer")
 
         template_path = "templates/pro/base/renderer/node-renderer.js"
         copy_file(template_path, node_renderer_path)
 
         say "✅ Created #{node_renderer_path}", :green
+        false
       end
 
       def add_pro_to_procfile

@@ -1252,6 +1252,10 @@ describe ProGenerator, type: :generator do
     it "preserves the legacy client/node-renderer.js" do
       expect(File.read(File.join(destination_root, "client/node-renderer.js"))).to eq(legacy_renderer_content)
     end
+
+    it "does not add a node-renderer entry to Procfile.dev" do
+      expect(File.read(File.join(destination_root, "Procfile.dev"))).not_to include("node-renderer:")
+    end
   end
 
   context "when server webpack has only libraryTarget uncommented" do
