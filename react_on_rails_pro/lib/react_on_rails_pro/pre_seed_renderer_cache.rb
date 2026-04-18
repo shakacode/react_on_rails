@@ -136,7 +136,13 @@ module ReactOnRailsPro
       # path that vanished between File.exist? and here (e.g. webpack output
       # rotating mid-stage). Surface that as a clear ReactOnRailsPro::Error
       # rather than a raw system error.
-      source_path = Pathname.new(source).realpath
+      source_path =
+        begin
+          Pathname.new(source).realpath
+        rescue Errno::ENOENT
+          raise ReactOnRailsPro::Error,
+                "Cannot resolve real path for #{source} — it does not exist or is a dangling symlink."
+        end
       relative_source_path = source_path.relative_path_from(destination_dir.realpath)
       File.symlink(relative_source_path, destination)
       puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"

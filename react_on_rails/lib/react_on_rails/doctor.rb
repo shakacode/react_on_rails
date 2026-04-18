@@ -2738,10 +2738,14 @@ module ReactOnRails
       "bin/release",
       "bin/docker-entrypoint"
     ].freeze
+    RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
 
     def check_deprecated_renderer_cache_task
       matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
-        File.exist?(path) && File.read(path).include?(DEPRECATED_RENDERER_CACHE_TASK)
+        next false unless File.exist?(path)
+        next false if File.size(path) >= RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
+
+        File.read(path).include?(DEPRECATED_RENDERER_CACHE_TASK)
       end
 
       return if matches.empty?
