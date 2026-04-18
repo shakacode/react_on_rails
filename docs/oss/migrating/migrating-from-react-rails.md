@@ -140,7 +140,7 @@ Both gems ship a view helper named `react_component` that Rails mixes into `Acti
 - `react-rails` (`React::Rails::ViewHelper`) takes positional arguments: `react_component(name, props, html_options)`.
 - `react_on_rails` (`ReactOnRailsHelper` → `ReactOnRails::Helper#react_component`) takes `react_component(name, options = {})` where props are nested under `options[:props]`.
 
-Both gems' engine initializers include their helper module into `ActionView::Base` at boot. Whichever engine initializer runs last has its `react_component` definition appear earlier in the ancestor chain and therefore wins method lookup (reordering files in `app/helpers/` does not change this). Once you add `react_on_rails` to the `Gemfile`, every existing legacy call starts resolving to `ReactOnRails::Helper#react_component(name, options = {})`, which behaves differently depending on how many positional arguments you pass. Rails gives no boot-time warning in either case:
+Both gems' engine initializers include their helper module into `ActionView::Base` at boot. Whichever engine initializer runs last has its `react_component` definition appear earlier in the ancestor chain and therefore wins method lookup (reordering files in `app/helpers/` does not change this). In practice `react_on_rails` wins in almost all setups because its engine initializer sorts later alphabetically and is typically added to the `Gemfile` after `react-rails`, but this is an artifact of Gemfile and initializer sort order — do not rely on it to resolve the conflict. Once you add `react_on_rails` to the `Gemfile`, every existing legacy call starts resolving to `ReactOnRails::Helper#react_component(name, options = {})`, which behaves differently depending on how many positional arguments you pass. Rails gives no boot-time warning in either case:
 
 - **Three or more positional arguments** — e.g. `react_component "command_bar/CommandBar", props, { camelize_props: false }` — raise `ArgumentError` at render time on the first request to any un-migrated view, because the new helper only takes two arguments.
 - **Two positional arguments** — e.g. `react_component "command_bar/CommandBar", props` — are silently accepted. The `props` hash is bound to `options`, but React on Rails reads props only from `options[:props]`, so the component renders with no props instead of failing loudly. This is the more dangerous case: un-migrated views do not error; they just lose their data.
@@ -163,7 +163,7 @@ The cleanest path is to update every `react_component` call to the options-hash 
 
 ### Option B: preserve the legacy helper and use an explicit alias
 
-If a single-PR migration is not practical, you can keep `react-rails`'s `react_component` semantics for un-migrated views and introduce a separate helper name for migrated mounts.
+If a single-PR migration is impractical, you can keep `react-rails`'s `react_component` semantics for un-migrated views and introduce a separate helper name for migrated mounts.
 
 Add a helper module that:
 
@@ -215,7 +215,7 @@ Use `react_on_rails_component(...)` in new or migrated views:
 <%= react_on_rails_component("CommandBar", props: { title: "Hi" }, prerender: true) %>
 ```
 
-Leave existing `react_component(...)` calls untouched until you are ready to migrate them. When every call site has been converted, delete the shim and rename `react_on_rails_component` back to `react_component`.
+Leave existing `react_component(...)` calls untouched until you are ready to migrate them. When every call site has been converted, update each migrated call site from `react_on_rails_component(...)` back to `react_component(...)` and delete the shim files (`app/helpers/react_on_rails_coexistence.rb` and `config/initializers/react_on_rails_coexistence.rb`).
 
 ### Known limitations of Option B
 
