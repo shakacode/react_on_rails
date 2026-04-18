@@ -45,7 +45,7 @@ Components that use any of the following **must** have `'use client'`:
 - **Router client APIs**: `useNavigate`, `useLocation`, `useParams`
 - **SSR entry-point files** using `StaticRouter`: these are SSR wrappers, not RSC server components — see the `.server.jsx` naming collision below
 - **Event handlers**: `onClick`, `onChange`, `onSubmit`, etc.
-- **Browser APIs**: `window`, `document`, `localStorage`, `fetch` in effects
+- **Browser APIs**: `window`, `document`, `localStorage` (note: `fetch` is a Node.js global since v18 and works in Server Components — calling it directly in server context is an encouraged RSC pattern; only flag `fetch` if it is called inside a `useEffect`, which is already covered by the hooks list above)
 
 ### The `.server.jsx` naming collision
 
@@ -71,7 +71,7 @@ There is no warning when a component is auto-classified as a server component. I
 
 Before proceeding to Step 1:
 
-- [ ] Search your component source files for `useState`, `useEffect`, `useContext`, `useSelector`, `useDispatch`, `useTransition`, `useDeferredValue`, `useNavigate`, `useLocation`, `useParams`, `ReactOnRails.getStore`
+- [ ] Search your component source files for `useState`, `useEffect`, `useContext`, `useRef`, `useReducer`, `useCallback`, `useMemo`, `useTransition`, `useDeferredValue`, `useId`, `useOptimistic`, `useFormStatus`, `useSelector`, `useDispatch`, `useNavigate`, `useLocation`, `useParams`, `ReactOnRails.getStore`, `ReactOnRails.authenticityToken`
 - [ ] Check all `.server.jsx` files -- these almost certainly need `'use client'`
 - [ ] Check components that use `StaticRouter` (SSR wrapper, not a client API — but the file likely uses other client APIs)
 - [ ] Verify no component relies on browser globals (`window`, `document`) without `'use client'`

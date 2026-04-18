@@ -862,7 +862,7 @@ externals: {
 **Correct approach:**
 
 ```js
-// In serverWebpackConfig.js -- tells webpack to provide empty modules
+// In serverWebpackConfig.js -- tells webpack to omit these modules (no require() call emitted)
 resolve: {
   fallback: {
     path: false,
@@ -880,7 +880,19 @@ resolve: {
 
 **Root cause:** `react-dom/server.browser.js` (used for SSR streaming) instantiates `MessageChannel` at **module load time** for React's internal scheduler. The VM sandbox does not provide `MessageChannel` as a global, and `supportModules` does not include it.
 
-**Fix:** Use webpack's `BannerPlugin` to inject a minimal `MessageChannel` polyfill at the top of the server bundle. The polyfill only needs to support `port2.postMessage` triggering `port1.onmessage`, which is all React's scheduler requires:
+**Fix (recommended):** Use `additionalContext` in the node renderer config to inject Node.js' native `MessageChannel` into the VM sandbox. Node.js has had a native `MessageChannel` since Node 15, and passing it through `additionalContext` gives React's scheduler correct async scheduling (macrotask delivery), which is what it depends on:
+
+```js
+// In your node-renderer.js config
+const { MessageChannel } = require('node:worker_threads');
+
+const config = {
+  // ... other options
+  additionalContext: { MessageChannel },
+};
+```
+
+**Fallback:** If you cannot change the renderer config (e.g., a build-only setup without renderer config control), inject a minimal `MessageChannel` polyfill at the top of the server bundle using webpack's `BannerPlugin`. The polyfill only needs to support `port2.postMessage` triggering `port1.onmessage`, which is all React's scheduler requires:
 
 ```js
 // In serverWebpackConfig.js
@@ -913,9 +925,7 @@ plugins: [
 ];
 ```
 
-This injects the polyfill as raw JavaScript at the top of the bundle output, ensuring `MessageChannel` is defined before any module code executes.
-
-**Recommended approach:** Use `additionalContext` in the renderer config to inject Node.js' native `MessageChannel` into the VM sandbox. This provides correct async scheduling (macrotask delivery), which React's scheduler depends on. The `BannerPlugin` polyfill above delivers messages synchronously — this works for current SSR streaming scenarios but may cause subtle rendering bugs if React yields mid-render and re-enters the scheduler.
+This injects the polyfill as raw JavaScript at the top of the bundle output, ensuring `MessageChannel` is defined before any module code executes. Note: this polyfill delivers messages synchronously, which works for current SSR streaming scenarios but may cause subtle rendering bugs if React yields mid-render and re-enters the scheduler. Prefer the `additionalContext` approach above whenever possible.
 
 > **When to use the `BannerPlugin` polyfill:** Use it only when the renderer config's `additionalContext` is not accessible (e.g., in a build-only setup without renderer config control). If you encounter recursive stack-overflow errors or unexpected rendering behavior with the synchronous polyfill, switch to the `additionalContext` approach.
 
