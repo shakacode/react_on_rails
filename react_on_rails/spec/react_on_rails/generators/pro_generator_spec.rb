@@ -1388,6 +1388,40 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  context "when Procfile.dev has only a commented-out renderer entry" do
+    let(:existing_renderer_content) { "// existing renderer\n" }
+    let(:commented_procfile) do
+      "rails: bin/rails s\n" \
+        "# node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js\n"
+    end
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", commented_procfile)
+      simulate_base_webpack_files
+      simulate_existing_file("renderer/node-renderer.js", existing_renderer_content)
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "adds a live node-renderer entry instead of treating the comment as configured" do
+      procfile = File.read(File.join(destination_root, "Procfile.dev"))
+      expect(procfile.scan(/^[ \t]*node-renderer:/).size).to eq(1)
+      expect(procfile)
+        .to include("node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js")
+    end
+  end
+
   context "when legacy client/node-renderer.js exists and Procfile.dev still launches it" do
     let(:legacy_renderer_content) { "// customized legacy renderer\n" }
     let(:stale_procfile) do
@@ -1421,6 +1455,38 @@ describe ProGenerator, type: :generator do
 
     it "leaves the stale legacy Procfile entry untouched" do
       expect(File.read(File.join(destination_root, "Procfile.dev"))).to eq(stale_procfile)
+    end
+  end
+
+  context "when legacy client/node-renderer.js exists and Procfile.dev only comments the legacy command" do
+    let(:legacy_renderer_content) { "// customized legacy renderer\n" }
+    let(:commented_legacy_procfile) do
+      "rails: bin/rails s\n" \
+        "# node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js\n"
+    end
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", commented_legacy_procfile)
+      simulate_base_webpack_files
+      simulate_existing_file("client/node-renderer.js", legacy_renderer_content)
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not report a stale legacy entry warning for commented lines" do
+      expect(GeneratorMessages.messages.join("\n"))
+        .not_to include("Procfile.dev still launches the legacy client/node-renderer.js")
     end
   end
 

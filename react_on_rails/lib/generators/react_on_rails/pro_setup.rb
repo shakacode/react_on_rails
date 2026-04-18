@@ -210,11 +210,11 @@ module ReactOnRails
         say "✅ Created #{initializer_path}", :green
       end
 
-      # Matches a Procfile.dev command that launches the new renderer entry,
-      # tolerating an optional `./` prefix that a user may have added by hand
+      # Matches active (uncommented) Procfile.dev node-renderer lines, tolerating
+      # an optional `./` prefix that a user may have added by hand
       # (e.g. `node ./renderer/node-renderer.js`).
-      NEW_RENDERER_COMMAND_REGEX = %r{node\s+\.?/?renderer/node-renderer\.js}
-      LEGACY_RENDERER_COMMAND_REGEX = %r{node\s+\.?/?client/node-renderer\.js}
+      NEW_RENDERER_COMMAND_REGEX = %r{^[ \t]*node-renderer:[^\n]*\bnode\s+\.?/?renderer/node-renderer\.js\b}
+      LEGACY_RENDERER_COMMAND_REGEX = %r{^[ \t]*node-renderer:[^\n]*\bnode\s+\.?/?client/node-renderer\.js\b}
 
       # Creates renderer/node-renderer.js unless either the new path or the legacy
       # client/node-renderer.js already exists.
@@ -290,7 +290,7 @@ module ReactOnRails
           return
         end
 
-        if procfile_content.match?(/^node-renderer:/)
+        if procfile_content.match?(/^[ \t]*node-renderer:/)
           say "⚠️  Procfile.dev has a node-renderer: entry that doesn't reference " \
               "renderer/node-renderer.js. Update it manually to:", :yellow
           say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js", :yellow
