@@ -85,7 +85,7 @@ jobs:
             echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"generators"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"unit"}]}' >> $GITHUB_OUTPUT
           else
             # PR matrix: test only latest versions for fast feedback × 2 shards
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"}]}' >> $GITHUB_OUTPUT
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"}]}' >> "$GITHUB_OUTPUT"
           fi
       - name: Guard docs-only main pushes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
