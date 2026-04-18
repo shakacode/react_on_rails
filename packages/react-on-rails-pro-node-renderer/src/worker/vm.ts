@@ -215,8 +215,9 @@ export async function buildVM(filePath: string) {
 
       if (supportModules) {
         // IMPORTANT: When adding anything to this object, update:
-        // 1. docs/node-renderer/js-configuration.md
-        // 2. packages/node-renderer/src/shared/configBuilder.ts
+        // 1. docs/oss/building-features/node-renderer/js-configuration.md
+        // 2. packages/react-on-rails-pro-node-renderer/src/shared/configBuilder.ts (JSDoc on `supportModules`)
+        // 3. docs/oss/migrating/rsc-troubleshooting.md ("Node Renderer VM Context -- Missing Globals")
         extendContext(contextObject, {
           Buffer,
           TextDecoder,
