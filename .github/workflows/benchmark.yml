@@ -650,11 +650,19 @@ jobs:
             echo "::warning::Bencher baseline not found for start-point hash '$START_POINT_HASH' — regression comparison unavailable for this run"
             BENCHER_EXIT_CODE=0
           fi
+
+          # Distinguish regression alerts from operational failures (auth/API/network/CLI)
+          # so that main can warn-only on the former while still failing hard on the latter.
+          BENCHER_HAS_ALERT=0
+          if [ $BENCHER_EXIT_CODE -ne 0 ] && grep -qiE "alert|threshold violation|boundary violation" "$BENCHER_STDERR"; then
+            BENCHER_HAS_ALERT=1
+          fi
           rm -f "$BENCHER_STDERR"
 
-          # Export exit code early so downstream alerting steps (7b/7c) always see it,
-          # even if the post-processing below (step summary, PR comments) fails.
+          # Export exit code and alert flag early so downstream steps (7b/7c/7d) always
+          # see them, even if the post-processing below (step summary, PR comments) fails.
           echo "BENCHER_EXIT_CODE=$BENCHER_EXIT_CODE" >> "$GITHUB_ENV"
+          echo "BENCHER_HAS_ALERT=$BENCHER_HAS_ALERT" >> "$GITHUB_ENV"
 
           # Post report to job summary and PR comment(s) if there's HTML output
           if [ -s bench_results/bencher_report.html ]; then
@@ -703,7 +711,7 @@ jobs:
       # STEP 7b: ALERT ON MAIN REGRESSION
       # ============================================
       - name: Create GitHub Issue for main regression
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0' && env.BENCHER_HAS_ALERT == '1'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -792,14 +800,32 @@ jobs:
       # STEP 7c: WARN ON MAIN REGRESSION
       # ============================================
       # Regressions are surfaced via the Bencher dashboard, the auto-opened tracking
-      # issue (Step 7b), and the job-summary report. Do not fail the workflow: single-run
-      # alerts on GitHub-hosted runners are dominated by environmental noise (alert sets
-      # across consecutive runs have ~0 overlap), so blocking main produces churn without
-      # signal. Re-enable a hard gate once thresholds/sample-size tolerate that noise.
+      # issue (Step 7b), and the job-summary report. Do not fail the workflow on regression
+      # alerts: single-run alerts on GitHub-hosted runners are dominated by environmental
+      # noise (alert sets across consecutive runs have ~0 overlap), so blocking main
+      # produces churn without signal. Re-enable a hard gate once thresholds/sample-size
+      # tolerate that noise. Operational errors (auth/API/network/CLI) are handled in
+      # step 7d and still fail the workflow.
       - name: Warn if Bencher detected regression on main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0' && env.BENCHER_HAS_ALERT == '1'
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          echo "::warning::Bencher flagged a regression on main (exit ${BENCHER_EXIT_CODE:-1}). See tracking issue #3116 and the Bencher dashboard."
+          echo "::warning::Bencher flagged a regression on main (exit ${BENCHER_EXIT_CODE:-1}). See the open regression issue (label: performance-regression), the Bencher dashboard, and the workflow run: ${RUN_URL}"
+
+      # ============================================
+      # STEP 7d: FAIL ON NON-REGRESSION BENCHER ERRORS
+      # ============================================
+      # If bencher exited non-zero but stderr did not contain regression alert
+      # indicators, this is an operational failure (auth/API/network/CLI) rather than
+      # a performance signal. These should still fail the workflow on main so a broken
+      # benchmark pipeline (missing uploads, bad credentials, Bencher outage, etc.) is
+      # not silently hidden behind a warning annotation.
+      - name: Fail on non-regression Bencher error on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0' && env.BENCHER_HAS_ALERT != '1'
+        run: |
+          echo "::error::Bencher exited ${BENCHER_EXIT_CODE:-1} on main with no regression alert in stderr — this indicates an operational failure (auth/API/network/CLI), not a performance regression. Check the logs above."
+          exit 1
 
       # ============================================
       # STEP 8: WORKFLOW COMPLETION
