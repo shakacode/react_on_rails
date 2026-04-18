@@ -11,12 +11,20 @@ require "amazing_print"
 require "pry-byebug"
 
 require "action_controller"
+require "minitest"
 require "rails"
+
+# Prevent Minitest's at_exit runner from parsing RSpec-only CLI args after
+# rails/test_help loads ActiveSupport's autorun hooks.
+# rubocop:disable Style/ClassVars
+Minitest.class_variable_set(:@@installed_at_exit, true) if Minitest.class_variable_defined?(:@@installed_at_exit)
+# rubocop:enable Style/ClassVars
+
 require "rails/test_help"
 Rails.backtrace_cleaner.remove_silencers!
 
 require_relative "simplecov_helper"
-# prevent Test::Unit's AutoRunner from executing during RSpec's rake task
+# Prevent Test::Unit's AutoRunner from executing during RSpec runs.
 Test::Unit.run = true if defined?(Test::Unit) && Test::Unit.respond_to?(:run=)
 
 require "shakapacker"

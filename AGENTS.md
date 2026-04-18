@@ -178,6 +178,7 @@ For small, focused PRs (roughly 5 files changed or fewer and one clear purpose):
 - Use `bundle exec` for Ruby commands
 - Ensure all files end with a newline
 - Let Prettier and RuboCop handle formatting — never format manually
+- When adding docs under `docs/oss/` or `docs/pro/`, also add the doc ID to `docs/sidebars.ts` — CI will fail otherwise. To intentionally exclude a doc from the sidebar, add its ID to `docs/.sidebar-exclusions` with a reason comment.
 
 ### Ask First
 

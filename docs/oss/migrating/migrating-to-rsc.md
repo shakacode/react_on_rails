@@ -106,11 +106,11 @@ Before diving into the React patterns, understand how RSC maps to React on Rails
 
 **Three API changes per component.** Each component you migrate touches three layers:
 
-| Layer           | Before                               | After                                                         |
-| --------------- | ------------------------------------ | ------------------------------------------------------------- |
-| ERB view helper | `react_component("Product", ...)`    | `stream_react_component("Product", ...)`                      |
-| JS registration | `ReactOnRails.register({ Product })` | `registerServerComponent({ Product })` (in all three bundles) |
-| Controller      | Standard Rails controller            | Add `include ReactOnRailsPro::Stream`                         |
+| Layer           | Before                               | After                                                                                                                                                                                               |
+| --------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ERB view helper | `react_component("Product", ...)`    | `stream_react_component("Product", ...)`                                                                                                                                                            |
+| JS registration | `ReactOnRails.register({ Product })` | `registerServerComponent` (signature varies per bundle — see [details](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#the-two-registerservercomponent-signatures)) |
+| Controller      | Standard Rails controller            | Add `include ReactOnRailsPro::Stream`                                                                                                                                                               |
 
 **Three webpack bundles.** RSC requires separate client, server, and RSC bundles. The `registerServerComponent` API behaves differently in each:
 

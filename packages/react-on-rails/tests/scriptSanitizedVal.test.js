@@ -1,6 +1,10 @@
 import scriptSanitizedVal from '../src/scriptSanitizedVal.ts';
 
 describe('scriptSanitizedVal', () => {
+  it('has a stable function name for webpack 5.106.0 compatibility', () => {
+    expect(scriptSanitizedVal.name).toEqual('scriptSanitizedVal');
+  });
+
   it('returns no </script if spaces, uppercase 1', () => {
     const input = '[SERVER] This is a script:"</div>"</script> <script>alert(\'WTF\')</  SCRIPT >';
     const actual = scriptSanitizedVal(input);

@@ -294,11 +294,23 @@ RSpec.describe ReactOnRails::Doctor do
           stub_const("Shakapacker", shakapacker_module)
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
           allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
+          allow(File).to receive(:exist?).and_call_original
+          %w[.js .jsx .ts .tsx .mjs .cjs].each do |extension|
+            allow(File).to receive(:exist?).with("client/app/packs/server-bundle#{extension}").and_return(false)
+          end
         end
 
         it "uses Shakapacker API configuration with relative paths" do
           path = doctor.send(:determine_server_bundle_path)
           expect(path).to eq("client/app/packs/server-bundle.js")
+        end
+
+        it "accepts a TypeScript server bundle source file when the configured filename is .js" do
+          allow(File).to receive(:exist?).with("client/app/packs/server-bundle.ts").and_return(true)
+
+          path = doctor.send(:determine_server_bundle_path)
+
+          expect(path).to eq("client/app/packs/server-bundle.ts")
         end
       end
 
@@ -315,6 +327,10 @@ RSpec.describe ReactOnRails::Doctor do
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
           allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
           allow(Dir).to receive(:pwd).and_return(rails_root)
+          allow(File).to receive(:exist?).and_call_original
+          %w[.js .jsx .ts .tsx .mjs .cjs].each do |ext|
+            allow(File).to receive(:exist?).with("client/app/packs/server-bundle#{ext}").and_return(false)
+          end
         end
 
         it "converts absolute paths to relative paths" do
@@ -336,6 +352,10 @@ RSpec.describe ReactOnRails::Doctor do
           allow(doctor).to receive(:require).with("shakapacker").and_return(true)
           allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
           allow(Dir).to receive(:pwd).and_return(rails_root)
+          allow(File).to receive(:exist?).and_call_original
+          %w[.js .jsx .ts .tsx .mjs .cjs].each do |ext|
+            allow(File).to receive(:exist?).with("client/app/packs/server-bundle#{ext}").and_return(false)
+          end
         end
 
         it "handles nested absolute paths correctly" do
@@ -348,11 +368,23 @@ RSpec.describe ReactOnRails::Doctor do
         before do
           allow(doctor).to receive(:require).with("shakapacker").and_raise(LoadError)
           allow(doctor).to receive(:server_bundle_filename).and_return("server-bundle.js")
+          allow(File).to receive(:exist?).and_call_original
+          %w[.js .jsx .ts .tsx .mjs .cjs].each do |ext|
+            allow(File).to receive(:exist?).with("app/javascript/packs/server-bundle#{ext}").and_return(false)
+          end
         end
 
         it "uses default path" do
           path = doctor.send(:determine_server_bundle_path)
           expect(path).to eq("app/javascript/packs/server-bundle.js")
+        end
+
+        it "accepts a TypeScript server bundle source file" do
+          allow(File).to receive(:exist?).with("app/javascript/packs/server-bundle.ts").and_return(true)
+
+          path = doctor.send(:determine_server_bundle_path)
+
+          expect(path).to eq("app/javascript/packs/server-bundle.ts")
         end
       end
     end
@@ -1656,6 +1688,78 @@ RSpec.describe ReactOnRails::Doctor do
         info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
         expect(info_messages).to include(a_string_including("ExecJS Runtime:"))
       end
+    end
+  end
+
+  describe "#check_bin_dev_launcher_setup" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    around do |example|
+      Dir.mktmpdir do |tmpdir|
+        Dir.chdir(tmpdir) { example.run }
+      end
+    end
+
+    def write_project_file(path, content)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
+
+    it "warns instead of erroring when the generated launcher is missing" do
+      doctor.send(:check_bin_dev_launcher_setup)
+
+      error_messages = checker.messages.select { |msg| msg[:type] == :error }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+      expect(error_messages).to be_empty
+      expect(warning_messages).to include(a_string_including("Official React on Rails bin/dev launcher not found"))
+      expect(info_messages).to include(a_string_including("rails generate react_on_rails:install"))
+    end
+
+    it "acknowledges custom launchers when bin/dev is missing" do
+      write_project_file("dev", <<~SH)
+        #!/usr/bin/env bash
+        bundle exec overmind start -f Procfile.dev
+      SH
+
+      doctor.send(:check_bin_dev_launcher_setup)
+
+      error_messages = checker.messages.select { |msg| msg[:type] == :error }
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+      expect(error_messages).to be_empty
+      expect(info_messages).to include(a_string_including("Custom launcher detected"))
+      expect(info_messages).to include(a_string_including("./dev"))
+      expect(info_messages).to include(a_string_including("To use the official launcher instead"))
+    end
+
+    it "does not detect a dev/ directory as a custom launcher" do
+      FileUtils.mkdir_p("dev")
+
+      doctor.send(:check_bin_dev_launcher_setup)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+
+      expect(info_messages).not_to include(a_string_including("Custom launcher detected"))
+    end
+
+    it "skips Procfile checks for custom projects via check_bin_dev_launcher" do
+      write_project_file("dev", <<~SH)
+        #!/usr/bin/env bash
+        bundle exec overmind start -f Procfile.dev
+      SH
+
+      doctor.send(:check_bin_dev_launcher)
+
+      all_messages = checker.messages.map { |msg| msg[:content] }
+      warning_messages = checker.messages.select { |msg| msg[:type] == :warning }.map { |msg| msg[:content] }
+
+      expect(warning_messages).not_to include(a_string_including("Missing Procfile.dev"))
+      expect(warning_messages).not_to include(a_string_including("Missing Procfile.dev-static-assets"))
+      expect(warning_messages).not_to include(a_string_including("Missing Procfile.dev-prod-assets"))
+      expect(all_messages).not_to include(a_string_including("Launcher Procfiles"))
     end
   end
 

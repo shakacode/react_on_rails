@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use `capabilities/core.ts` instead. This file is kept for backward compatibility
+ * with older versions of react-on-rails-pro that import from `react-on-rails/@internal/base/client`.
+ */
+
 import type { ReactElement } from 'react';
 import type {
   RegisteredComponent,

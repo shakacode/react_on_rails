@@ -188,11 +188,11 @@ Pro-exclusive imports:
 
 ```javascript
 // React Server Components
-import { RSCRoute } from 'react-on-rails-pro/RSCRoute';
+import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
 // Async component loading
-import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
+import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/client';
 ```
 
 See the [React Server Components tutorial](./react-server-components/tutorial.md) for detailed usage.

@@ -55,6 +55,8 @@ module ReactOnRails
     MINITEST_HELPER_FILE = "test/test_helper.rb"
     DEFAULT_BUILD_TEST_COMMAND = 'config.build_test_command = "RAILS_ENV=test bin/shakapacker"'
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
+    SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
+    CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
 
     def initialize(verbose: false, fix: false)
       @verbose = verbose
@@ -180,7 +182,7 @@ module ReactOnRails
 
     def check_bin_dev_launcher
       checker.add_info("🚀 bin/dev Launcher:")
-      check_bin_dev_launcher_setup
+      return unless check_bin_dev_launcher_setup
 
       checker.add_info("\n📄 Launcher Procfiles:")
       check_launcher_procfiles
@@ -1423,12 +1425,24 @@ module ReactOnRails
       checker.add_info("  • Modern React patterns recommended")
     end
 
+    # Returns true if bin/dev exists, false otherwise.
+    # Used by check_bin_dev_launcher to decide whether to check Procfiles.
     def check_bin_dev_launcher_setup
       bin_dev_path = "bin/dev"
 
       unless File.exist?(bin_dev_path)
-        checker.add_error("  🚫 bin/dev script not found")
-        return
+        checker.add_warning("  ⚠️  Official React on Rails bin/dev launcher not found")
+        custom_launchers = detected_custom_launcher_paths
+        if custom_launchers.any?
+          checker.add_info(
+            "    ℹ️  Custom launcher detected (#{custom_launchers.join(', ')}). " \
+            "This is OK if your project intentionally manages its own dev workflow."
+          )
+          checker.add_info("    💡 To use the official launcher instead, run: rails generate react_on_rails:install")
+        else
+          checker.add_info("    💡 Generate the official launcher with: rails generate react_on_rails:install")
+        end
+        return false
       end
 
       content = File.read(bin_dev_path)
@@ -1441,6 +1455,8 @@ module ReactOnRails
         checker.add_warning("  ⚠️  bin/dev exists but doesn't use ReactOnRails Launcher")
         checker.add_info("    💡 Consider upgrading: rails generate react_on_rails:install")
       end
+
+      true
     end
 
     def check_launcher_procfiles
@@ -1465,6 +1481,14 @@ module ReactOnRails
         checker.add_success("  ✅ All Launcher Procfiles available")
       else
         checker.add_info("  💡 Run: rails generate react_on_rails:install")
+      end
+    end
+
+    def detected_custom_launcher_paths
+      CUSTOM_LAUNCHER_INDICATOR_FILES.filter_map do |path|
+        next unless File.file?(path)
+
+        path == "dev" ? "./dev" : path
       end
     end
 
@@ -1535,11 +1559,12 @@ module ReactOnRails
         source_entry_path = source_entry_path.sub("#{source_path}/", "")
       end
 
-      File.join(source_path, source_entry_path, bundle_filename)
+      bundle_path = File.join(source_path, source_entry_path, bundle_filename)
+      resolve_server_bundle_source_path(bundle_path)
     rescue LoadError, StandardError
       # Handle missing Shakapacker gem or other configuration errors
       bundle_filename = server_bundle_filename
-      "app/javascript/packs/#{bundle_filename}"
+      resolve_server_bundle_source_path("app/javascript/packs/#{bundle_filename}")
     end
 
     def server_bundle_filename
@@ -1560,6 +1585,27 @@ module ReactOnRails
 
       # Default filename
       "server-bundle.js"
+    end
+
+    def resolve_server_bundle_source_path(bundle_path)
+      return bundle_path if File.exist?(bundle_path)
+
+      base_path = bundle_path.sub(%r{\.[^./]+\z}, "")
+
+      candidate_extensions = server_bundle_source_extensions_for(bundle_path)
+      candidate_extensions.each do |extension|
+        candidate_path = "#{base_path}#{extension}"
+        return candidate_path if File.exist?(candidate_path)
+      end
+
+      bundle_path
+    end
+
+    def server_bundle_source_extensions_for(bundle_path)
+      extension = File.extname(bundle_path)
+      return SERVER_BUNDLE_SOURCE_EXTENSIONS if extension.empty?
+
+      SERVER_BUNDLE_SOURCE_EXTENSIONS.reject { |candidate_extension| candidate_extension == extension }
     end
 
     def exit_with_status

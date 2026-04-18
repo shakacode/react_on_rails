@@ -37,6 +37,53 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}=== React on Rails Local CI ===${NC}"
 echo ""
 
+# Track failures
+FAILED_JOBS=()
+PRO_DEPS_READY=false
+
+# Internal implementation: runs a shell command string via the shell, so
+# compound commands (e.g. "cd X && make") work. Prefer the argv-based helper
+# run_job_argv below — it avoids shell re-parsing and is safer with variables.
+_run_job_shell() {
+  local job_name="$1"
+  local command="$2"
+  echo -e "${BLUE}▶ Running: $job_name${NC}"
+  if eval "$command"; then
+    echo -e "${GREEN}✓ $job_name passed${NC}"
+    echo ""
+    return 0
+  fi
+  echo -e "${RED}✗ $job_name failed${NC}"
+  echo ""
+  FAILED_JOBS+=("$job_name")
+  return 1
+}
+
+# run_job_argv "Job Name" cmd arg1 arg2 ...
+# Runs the command as a direct argv invocation — no shell re-parsing, no
+# quoting pitfalls, safe with variable expansion. Prefer this over the
+# legacy single-string form whenever possible, especially with variables.
+run_job_argv() {
+  local job_name="$1"
+  shift
+  echo -e "${BLUE}▶ Running: $job_name${NC}"
+  if "$@"; then
+    echo -e "${GREEN}✓ $job_name passed${NC}"
+    echo ""
+    return 0
+  fi
+  echo -e "${RED}✗ $job_name failed${NC}"
+  echo ""
+  FAILED_JOBS+=("$job_name")
+  return 1
+}
+
+# Back-compat: existing legacy callers pass one shell-command string.
+# New code should use run_job_argv for safe argv execution.
+run_job() {
+  _run_job_shell "$@"
+}
+
 # Detect changes unless --all is specified
 if [ "$RUN_ALL" = false ]; then
   echo "Analyzing changes since $BASE_REF..."
@@ -62,7 +109,11 @@ if [ "$RUN_ALL" = false ]; then
       DOCS_ONLY=$(echo "$DETECTOR_JSON" | jq -r '.docs_only // false')
 
       if [ "$DOCS_ONLY" = "true" ]; then
-        echo -e "${GREEN}No CI needed for documentation-only changes!${NC}"
+        # Even for docs-only changes, verify new docs have sidebar entries
+        # set -euo pipefail will exit with 1 if the sidebar check fails;
+        # reaching the next line means the check passed.
+        run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
+        echo -e "${GREEN}No further CI needed for documentation-only changes!${NC}"
         exit 0
       fi
     else
@@ -73,7 +124,10 @@ if [ "$RUN_ALL" = false ]; then
       echo ""
 
       if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
-        echo -e "${GREEN}No CI needed for documentation-only changes!${NC}"
+        # set -euo pipefail will exit with 1 if the sidebar check fails;
+        # reaching the next line means the check passed.
+        run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
+        echo -e "${GREEN}No further CI needed for documentation-only changes!${NC}"
         exit 0
       fi
 
@@ -94,7 +148,10 @@ if [ "$RUN_ALL" = false ]; then
     echo ""
 
     if echo "$DETECTOR_OUTPUT" | grep -q "Documentation-only changes"; then
-      echo -e "${GREEN}No CI needed for documentation-only changes!${NC}"
+      # set -euo pipefail will exit with 1 if the sidebar check fails;
+      # reaching the next line means the check passed.
+      run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF"
+      echo -e "${GREEN}No further CI needed for documentation-only changes!${NC}"
       exit 0
     fi
 
@@ -118,28 +175,6 @@ else
   RUN_PRO_LINT=true
   RUN_PRO_TESTS=true
 fi
-
-# Track failures
-FAILED_JOBS=()
-PRO_DEPS_READY=false
-
-# Helper function to run a job
-run_job() {
-  local job_name="$1"
-  local command="$2"
-
-  echo -e "${BLUE}▶ Running: $job_name${NC}"
-  if eval "$command"; then
-    echo -e "${GREEN}✓ $job_name passed${NC}"
-    echo ""
-    return 0
-  else
-    echo -e "${RED}✗ $job_name failed${NC}"
-    echo ""
-    FAILED_JOBS+=("$job_name")
-    return 1
-  fi
-}
 
 ensure_pro_dependencies() {
   if [ "$PRO_DEPS_READY" = true ]; then
@@ -175,6 +210,15 @@ if [ ! -d "node_modules" ] || [ ! -d "vendor/bundle" ]; then
   echo -e "${GREEN}✓ Dependencies installed${NC}"
   echo ""
 fi
+
+# Always run the docs sidebar check (fast, no dependencies needed).
+# `|| true` keeps a sidebar failure from aborting the rest of bin/ci-local via
+# `set -euo pipefail` — the failure is still tracked inside run_job_argv via
+# FAILED_JOBS and reported by the summary block at the end of the script.
+# This is the only `run_job_*` call at the top level of the main path (all
+# others are inside `if "$RUN_X" = true` gates), so adding the guard here
+# gives contributors a complete failure report from a single local run.
+run_job_argv "Docs Sidebar Check" script/check-docs-sidebar "$BASE_REF" || true
 
 # Run linting
 if [ "$RUN_LINT" = true ]; then

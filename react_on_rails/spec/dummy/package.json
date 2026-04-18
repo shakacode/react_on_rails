@@ -58,7 +58,7 @@
     "swc-loader": "^0.2.6",
     "terser-webpack-plugin": "5.3.1",
     "url-loader": "^4.0.0",
-    "webpack": "^5.104.1",
+    "webpack": ">=5.76.0 <5.106.0",
     "webpack-assets-manifest": "5",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.1",
