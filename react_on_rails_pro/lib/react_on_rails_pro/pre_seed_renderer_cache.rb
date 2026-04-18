@@ -1,47 +1,94 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "pathname"
 require "react_on_rails_pro/renderer_cache_helpers"
 
 module ReactOnRailsPro
-  # Pre-seeds the Node Renderer bundle cache by copying compiled server bundles
-  # into the renderer's expected directory structure. Designed for Docker builds
-  # where the bundle can be baked into the image, eliminating the 410→retry
-  # cold-start latency on first SSR request after deployment.
+  # Stages the Node Renderer bundle cache in the renderer's expected directory
+  # structure (`<cache>/<bundleHash>/<bundleHash>.js`), including any configured
+  # assets_to_copy and, when RSC support is enabled, the RSC bundle and manifests.
   #
-  # Unlike PrepareNodeRenderBundles (which stages the same cache layout via
-  # symlinks for same-filesystem workflows), this class copies files so the
-  # cache can be baked into an image or other immutable artifact.
+  # Supports two modes:
+  #
+  # * `:copy` (default) — copies bundle and assets. Designed for Docker image
+  #   builds where the cache must be baked into an immutable artifact.
+  # * `:symlink` — creates relative symlinks. For same-filesystem workflows
+  #   (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
+  #
+  # Both modes produce the same on-disk cache layout, matching the renderer's
+  # runtime contract. The 410→retry cold-start round-trip on first SSR request
+  # is eliminated when the pre-seeded bundle is present at renderer startup.
   class PreSeedRendererCache
-    def self.call
-      cache_dir = resolve_cache_dir
-      puts "[ReactOnRailsPro] Pre-seeding renderer cache in: #{cache_dir}"
+    VALID_MODES = %i[copy symlink].freeze
+
+    def self.call(mode: :copy)
+      unless VALID_MODES.include?(mode)
+        raise ArgumentError, "mode must be one of #{VALID_MODES.inspect}, got #{mode.inspect}"
+      end
+
+      cache_dir = resolve_cache_dir(mode)
+      puts "[ReactOnRailsPro] Staging renderer cache (mode: #{mode}) in: #{cache_dir}"
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
       assets = RendererCacheHelpers.collect_assets
       rsc_required_paths = RendererCacheHelpers.required_rsc_asset_paths
 
-      RendererCacheHelpers.bundle_sources(pool, "pre-seeding").each do |src_bundle_path, bundle_hash|
-        seed_bundle(src_bundle_path, bundle_hash, cache_dir)
+      RendererCacheHelpers.bundle_sources(pool, action_description(mode)).each do |src_bundle_path, bundle_hash|
+        bundle_dir = File.join(cache_dir, bundle_hash.to_s)
+        stage_bundle(src_bundle_path, bundle_dir, bundle_hash, mode)
         # The Node Renderer serves manifests from whichever bundle dir it loaded,
         # so both server and RSC dirs need the manifests present.
-        copy_assets(assets, File.join(cache_dir, bundle_hash.to_s), rsc_required_paths)
+        stage_assets(assets, bundle_dir, rsc_required_paths, mode)
       end
     end
 
-    def self.resolve_cache_dir
+    def self.resolve_cache_dir(mode)
+      enforce_cache_dir_env_var!(mode)
       ReactOnRailsPro::Utils.resolve_renderer_cache_dir
     end
     private_class_method :resolve_cache_dir
 
-    def self.seed_bundle(src_path, bundle_hash, cache_dir)
-      bundle_dir = File.join(cache_dir, bundle_hash.to_s)
-      dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
-      FileUtils.mkdir_p(bundle_dir)
-      FileUtils.cp(src_path, dest_file)
-      puts "[ReactOnRailsPro] Pre-seeded renderer cache: #{dest_file}"
+    # In copy mode (Docker image builds), silent fallback to Rails.root/.node-renderer-bundles
+    # is a footgun: the renderer process may run from a different cwd and resolve its default
+    # cache directory to a different path (e.g., /tmp/react-on-rails-pro-node-renderer-bundles),
+    # causing pre-seeded bundles to land somewhere the renderer never reads. Require an
+    # explicit env var in non-dev/test environments.
+    def self.enforce_cache_dir_env_var!(mode)
+      return unless mode == :copy
+      return if ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"].present? || ENV["RENDERER_BUNDLE_PATH"].present?
+      return if Rails.env.development? || Rails.env.test?
+
+      raise ReactOnRailsPro::Error, <<~MSG.strip
+        Pre-seeding the renderer cache in copy mode (#{Rails.env}) requires an explicit
+        cache directory. Set RENDERER_SERVER_BUNDLE_CACHE_PATH in your environment, e.g.
+        in your Dockerfile:
+
+          ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles
+
+        The Node Renderer's default cache directory resolution differs between the Ruby
+        and standalone Node environments, so relying on the default in production-like
+        deploys can cause pre-seeded bundles to land in a path the renderer never reads.
+      MSG
     end
-    private_class_method :seed_bundle
+    private_class_method :enforce_cache_dir_env_var!
+
+    def self.action_description(mode)
+      mode == :copy ? "pre-seeding" : "pre-staging"
+    end
+    private_class_method :action_description
+
+    def self.stage_bundle(src_path, bundle_dir, bundle_hash, mode)
+      dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
+      if mode == :copy
+        FileUtils.mkdir_p(bundle_dir)
+        FileUtils.cp(src_path, dest_file)
+        puts "[ReactOnRailsPro] Pre-seeded renderer cache: #{dest_file}"
+      else
+        make_relative_symlink(src_path, dest_file)
+      end
+    end
+    private_class_method :stage_bundle
 
     # RSC manifests are required when RSC is enabled — a missing manifest would cause
     # the renderer to fail at runtime with a hard-to-diagnose error. User-configured
@@ -50,23 +97,41 @@ module ReactOnRailsPro
     # in assets_to_copy cannot trigger a false-positive "required" error. Expand
     # against Rails.root to match how RendererCacheHelpers.required_rsc_asset_paths
     # builds its Set.
-    def self.copy_assets(assets, bundle_dir, rsc_required_paths)
+    def self.stage_assets(assets, bundle_dir, rsc_required_paths, mode)
       assets.each do |asset_path|
         expanded = File.expand_path(asset_path.to_s, Rails.root)
         unless File.exist?(expanded)
           if rsc_required_paths.include?(expanded)
             raise ReactOnRailsPro::Error, "Required RSC asset not found: #{asset_path}. " \
-                                          "Build your bundles before pre-seeding the renderer cache."
+                                          "Build your bundles before #{action_description(mode)} the renderer cache."
           end
           warn "[ReactOnRailsPro] Asset not found #{asset_path}"
           next
         end
 
         dest = File.join(bundle_dir, File.basename(expanded))
-        FileUtils.cp(expanded, dest)
-        puts "[ReactOnRailsPro] Copied asset: #{dest}"
+        if mode == :copy
+          FileUtils.cp(expanded, dest)
+          puts "[ReactOnRailsPro] Copied asset: #{dest}"
+        else
+          make_relative_symlink(expanded, dest)
+        end
       end
     end
-    private_class_method :copy_assets
+    private_class_method :stage_assets
+
+    def self.make_relative_symlink(source, destination)
+      destination_dir = Pathname.new(destination).dirname
+      FileUtils.mkdir_p(destination_dir)
+      FileUtils.rm_f(destination)
+
+      # Canonicalize both sides so paths like /var -> /private/var do not
+      # produce broken relative symlinks when the cache dir comes from tmpdir.
+      source_path = Pathname.new(source).realpath
+      relative_source_path = source_path.relative_path_from(destination_dir.realpath)
+      File.symlink(relative_source_path, destination)
+      puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"
+    end
+    private_class_method :make_relative_symlink
   end
 end

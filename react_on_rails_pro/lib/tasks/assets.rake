@@ -3,14 +3,21 @@
 require "active_support"
 
 namespace :react_on_rails_pro do
-  desc "Pre-stage renderer cache locally via symlinks (legacy same-filesystem workflow)"
-  task pre_stage_bundle_for_node_renderer: :environment do
-    ReactOnRailsPro::PrepareNodeRenderBundles.call
+  desc "Stage the Node Renderer bundle cache. MODE=copy (default; Docker/image builds) " \
+       "or MODE=symlink (dev/CI/same-filesystem deploys)."
+  task pre_seed_renderer_cache: :environment do
+    mode = (ENV["MODE"] || "copy").to_sym
+    ReactOnRailsPro::PreSeedRendererCache.call(mode: mode)
   end
 
-  desc "Pre-seed renderer cache for Docker/image builds via copies"
-  task pre_seed_renderer_cache: :environment do
-    ReactOnRailsPro::PreSeedRendererCache.call
+  # Deprecated alias. Delegates to pre_seed_renderer_cache with MODE=symlink so
+  # existing Procfile/Dockerfile/deploy-script entries keep working during the
+  # deprecation cycle.
+  desc "DEPRECATED: use 'pre_seed_renderer_cache MODE=symlink' instead."
+  task pre_stage_bundle_for_node_renderer: :environment do
+    warn "[ReactOnRailsPro] The 'react_on_rails_pro:pre_stage_bundle_for_node_renderer' rake task " \
+         "is deprecated. Use 'rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink' instead."
+    ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink)
   end
 
   desc "Copy assets to remote node-renderer"

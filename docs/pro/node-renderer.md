@@ -119,16 +119,25 @@ When a new container starts, the Node Renderer has an empty bundle cache. The fi
 
 ### Pre-seeding the bundle cache
 
-The `pre_seed_renderer_cache` rake task copies compiled server bundles directly into the renderer's cache directory during your Docker build, so the renderer finds them immediately on startup:
+The `pre_seed_renderer_cache` rake task stages compiled server bundles directly into the renderer's cache directory, so the renderer finds them immediately on startup.
+
+It supports two modes, both producing the same on-disk cache layout (`<cache>/<bundleHash>/<bundleHash>.js`):
+
+- **`MODE=copy`** (default) — copies files. Use in Docker/image builds so the cache is baked into an immutable artifact.
+- **`MODE=symlink`** — creates relative symlinks. For same-filesystem workflows (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
 
 ```dockerfile
-# After webpack/assets build step
+# After webpack/assets build step (Docker image build)
+ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles
 RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache
 ```
 
-This copies the bundle into the renderer's expected directory structure (`<cache>/<bundleHash>/<bundleHash>.js`), including any configured `assets_to_copy` and RSC bundles when RSC support is enabled.
+Both modes stage the server bundle, any configured `assets_to_copy`, and (when RSC is enabled) the RSC bundle and its companion manifests.
 
-This is the preferred path for Docker and other image-build workflows. React on Rails Pro has long supported runtime bundle uploads and the older `react_on_rails_pro:pre_stage_bundle_for_node_renderer` task for same-filesystem deployments; `pre_seed_renderer_cache` is the copy-based variant that fits immutable artifacts while using the same bundle-hash cache layout.
+The `pre_seed_renderer_cache` task is also invoked automatically at the end of `assets:precompile` with `MODE=symlink`, so the local/CI/Heroku path has zero new configuration.
+
+> [!NOTE]
+> The older `react_on_rails_pro:pre_stage_bundle_for_node_renderer` rake task and `ReactOnRailsPro::PrepareNodeRenderBundles` class are deprecated in favor of the unified API. Both remain available as thin shims that emit a deprecation warning and delegate to `MODE=symlink`. `react_on_rails:doctor` flags deploy scripts that still reference the deprecated task.
 
 ### Configuration
 
@@ -136,9 +145,9 @@ The task follows the same environment-variable precedence as the Node Renderer, 
 
 1. `RENDERER_SERVER_BUNDLE_CACHE_PATH` environment variable (preferred)
 2. `RENDERER_BUNDLE_PATH` environment variable (deprecated — emits a warning)
-3. `Rails.root.join(".node-renderer-bundles")` (Rails-side default when env vars are unset)
+3. `Rails.root.join(".node-renderer-bundles")` (Rails-side default when env vars are unset, only accepted for `MODE=symlink` and in dev/test)
 
-Set `RENDERER_SERVER_BUNDLE_CACHE_PATH` in your Dockerfile to match the renderer's configuration:
+In **`MODE=copy`** (Docker image builds) the task requires one of the env vars above to be set in non-dev/test environments. Because the Node renderer's own default can differ (e.g., falling back to `/tmp/react-on-rails-pro-node-renderer-bundles` when its `cwd` sits outside the app tree), relying on the silent fallback risks pre-seeded bundles landing in a directory the renderer never reads. The task raises a clear error if the env var is missing:
 
 ```dockerfile
 ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles

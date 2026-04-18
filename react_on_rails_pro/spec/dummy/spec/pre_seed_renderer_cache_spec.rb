@@ -53,6 +53,45 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     ENV.delete("RENDERER_BUNDLE_PATH")
   end
 
+  context "when mode is invalid" do
+    it "raises ArgumentError" do
+      expect { described_class.call(mode: :hardlink) }.to raise_error(ArgumentError, /mode must be one of/)
+    end
+  end
+
+  context "when mode is :symlink" do
+    it "symlinks instead of copying" do
+      described_class.call(mode: :symlink)
+
+      dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
+      expect(File.exist?(dest_file)).to be(true)
+      expect(File.symlink?(dest_file)).to be(true)
+    end
+  end
+
+  context "when mode is :copy and no env var is set in a non-dev/test environment" do
+    before do
+      allow(Rails.env).to receive_messages(development?: false, test?: false)
+      allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(nil)
+    end
+
+    it "raises a clear error pointing at RENDERER_SERVER_BUNDLE_CACHE_PATH" do
+      expect { described_class.call(mode: :copy) }
+        .to raise_error(ReactOnRailsPro::Error, /RENDERER_SERVER_BUNDLE_CACHE_PATH/)
+    end
+
+    it "does not raise when the preferred env var is set" do
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = Dir.mktmpdir("renderer-cache-test")
+      expect { described_class.call(mode: :copy) }.not_to raise_error
+    ensure
+      FileUtils.rm_rf(ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", nil))
+    end
+
+    it "does not raise in :symlink mode even without an env var" do
+      expect { described_class.call(mode: :symlink) }.not_to raise_error
+    end
+  end
+
   context "when assets exist" do
     before do
       FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))

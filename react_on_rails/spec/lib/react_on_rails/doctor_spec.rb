@@ -2396,6 +2396,43 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "check_deprecated_renderer_cache_task" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when a Procfile references the deprecated task" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            File.write(
+              "Procfile",
+              "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer && bundle exec puma\n"
+            )
+            example.run
+          end
+        end
+      end
+
+      it "warns with migration guidance" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+        expect(warning_msgs.any? { |m| m[:content].include?("MODE=symlink") }).to be(true)
+      end
+    end
+
+    context "when no deploy scripts reference the deprecated task" do
+      around do |example|
+        Dir.mktmpdir { |tmpdir| Dir.chdir(tmpdir) { example.run } }
+      end
+
+      it "adds no warnings" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        expect(checker.messages.select { |m| m[:type] == :warning }).to be_empty
+      end
+    end
+  end
+
   describe "check_base_package_imports" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }

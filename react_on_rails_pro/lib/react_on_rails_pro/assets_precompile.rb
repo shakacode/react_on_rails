@@ -63,7 +63,10 @@ module ReactOnRailsPro
     def self.call
       instance.build_or_fetch_bundles
 
-      ReactOnRailsPro::PrepareNodeRenderBundles.call if ReactOnRailsPro.configuration.node_renderer?
+      # Auto-stage via symlink after asset precompile (same-filesystem default).
+      # Docker/image builds should invoke `rake react_on_rails_pro:pre_seed_renderer_cache`
+      # (MODE=copy, the default) as a separate step.
+      ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink) if ReactOnRailsPro.configuration.node_renderer?
     end
 
     def build_or_fetch_bundles
