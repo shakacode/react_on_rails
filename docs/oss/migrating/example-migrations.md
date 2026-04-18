@@ -7,7 +7,6 @@ They already have one of these:
 - `react-rails`
 - `vite_rails`
 - a custom Rails-side React helper
-- a legacy asset-pipeline React mount
 
 Some teams also arrive from Inertia-first apps. We treat those as a separate
 architecture case study because they are usually broader page-shell migrations,
@@ -31,7 +30,7 @@ The best examples are:
 These are stable references you can inspect today:
 
 1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails)
-2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example)
+2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) — based on `ganchdev/react-rails-example`
 
 ### In-progress migration work
 
@@ -114,7 +113,8 @@ The most useful next examples are:
 
 1. `react-rails` apps that migrate one Rails-owned mount at a time
 2. Modern `vite_rails` apps where one Rails-owned island can move before a broader asset rewrite
-3. Upgrades from older `react_on_rails` versions to current maintained defaults
+3. Apps with a custom Rails-side React bridge where one helper-backed boundary can be replaced before removing the wrapper
+4. Upgrades from older `react_on_rails` versions to current maintained defaults
 
 ## How to use these examples
 
@@ -122,5 +122,7 @@ Use this page together with the specific migration guide that matches your curre
 
 1. [Migrate from `react-rails`](./migrating-from-react-rails.md)
 2. [Migrate from `vite_rails`](./migrating-from-vite-rails.md)
+
+Other migration paths (Webpack → Rspack, Babel → SWC, Rails 5 API-only, AngularJS, RSC) live in the **Migration Guides** sidebar.
 
 The migration guides explain the mechanics. This page shows what those mechanics look like in real repos.
