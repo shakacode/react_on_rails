@@ -12,6 +12,7 @@ Before swapping gems, check these first:
 4. **Package manager metadata**: if you have `yarn.lock`, `pnpm-lock.yaml`, or `bun.lock*`, ensure `package.json` has a matching `packageManager` field (for example `npm@10.9.2`, `yarn@1.22.22`, `pnpm@10.12.1`, or `bun@1.2.13`).
 5. **Browserslist source**: use one source only. If `.browserslistrc` exists, remove `browserslist` from `package.json`.
 6. **JSX-in-.js projects**: current install generator auto-switches to Babel when JSX is detected in `.js` files. If your project has custom transpiler setup, review `config/shakapacker.yml` after generation.
+7. **`react_component` helper collision**: if you plan to keep `react-rails` installed during a staged migration, read [Coexistence: keeping both gems installed during a staged migration](#coexistence-keeping-both-gems-installed-during-a-staged-migration) before adding `react_on_rails`. Both gems define a `react_component` view helper with incompatible signatures, and the second-loaded one silently wins.
 
 If you are already on `shakapacker` 7+ and React 18+, the migration is mostly about helper syntax, component registration, and generated defaults.
 
@@ -127,6 +128,90 @@ Older `react-rails` apps frequently need these additional fixes after the genera
 You can also check [react-rails-to-react-on-rails](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) branch on [react-rails example app](https://github.com/shakacode/react-rails-example-app) for an example of migration from `react-rails` v3 to `react_on_rails` v13.4.
 
 For a more recent Rails 7-era migration example (published under ShakaCode), see [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example), based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example).
+
+## Coexistence: keeping both gems installed during a staged migration
+
+Large apps often cannot swap every `react-rails` mount in a single PR. If you need `react-rails` and `react_on_rails` installed side-by-side while you migrate views incrementally, plan for the `react_component` helper collision **before** adding the gem.
+
+### Why it collides
+
+Both gems ship a view helper named `react_component` that Rails mixes into `ActionView::Base`:
+
+- `react-rails` (`React::Rails::ViewHelper`) takes positional arguments: `react_component(name, props, html_options)`.
+- `react_on_rails` (`ReactOnRailsHelper` → `ReactOnRails::Helper#react_component`) takes `react_component(name, options = {})` where props are nested under `options[:props]`.
+
+Rails loads helpers by convention from `app/helpers/`, and the last-defined module wins. Once you add `react_on_rails` to the `Gemfile`, every existing legacy call like:
+
+```ruby
+react_component "command_bar/CommandBar", props, { camelize_props: false }
+```
+
+starts resolving to `ReactOnRails::Helper#react_component`, which rejects the positional shape and raises `ArgumentError`. This happens silently on any view that has not been migrated yet.
+
+### Detecting the collision quickly
+
+Before adding the gem, audit existing positional-style calls so you know what needs a shim or a same-PR migration:
+
+```bash
+rg -n "react_component\\b" app/views
+# or without ripgrep:
+grep -rEn "react_component\\b" app/views
+```
+
+Any call that passes props as the second positional argument (rather than `{ props: ... }`) will break as soon as `react_on_rails` is loaded.
+
+### Option A: migrate all call sites in the same PR (recommended)
+
+The cleanest path is to update every `react_component` call to the options-hash form in the same PR that adds the gem. See the syntax change under [Legacy compatibility fixes](#legacy-compatibility-fixes-that-often-make-migration-one-shot). After this, there is no collision to manage — the new helper is the only helper.
+
+### Option B: preserve the legacy helper and use an explicit alias
+
+If a single-PR migration is not practical, you can keep `react-rails`'s `react_component` semantics for un-migrated views and introduce a separate helper name for migrated mounts.
+
+Add a helper module that:
+
+1. Prepends an override so legacy `react_component(...)` calls keep delegating to `React::Rails::ViewHelper`.
+2. Exposes an explicit `react_on_rails_component(...)` alias for migrated mounts.
+
+```ruby
+# app/helpers/react_on_rails_coexistence.rb
+module ReactOnRailsCoexistence
+  # Legacy react-rails semantics for un-migrated views.
+  # Delegates to React::Rails::ViewHelper#react_component.
+  module LegacyReactComponent
+    def react_component(name, props = {}, options = {})
+      React::Rails::ViewHelper.instance_method(:react_component)
+                              .bind(self)
+                              .call(name, props, options)
+    end
+  end
+
+  # Explicit alias for migrated mounts.
+  # Uses the React on Rails options-hash shape: (name, options = {}).
+  def react_on_rails_component(name, options = {})
+    ReactOnRails::Helper.instance_method(:react_component)
+                        .bind(self)
+                        .call(name, options)
+  end
+end
+
+ReactOnRailsHelper.prepend(ReactOnRailsCoexistence::LegacyReactComponent)
+ActionView::Base.include(ReactOnRailsCoexistence)
+```
+
+Use `react_on_rails_component(...)` in new or migrated views:
+
+```erb
+<%= react_on_rails_component("CommandBar", props: { title: "Hi" }, prerender: true) %>
+```
+
+Leave existing `react_component(...)` calls untouched until you are ready to migrate them. When every call site has been converted, delete the shim and rename `react_on_rails_component` back to `react_component`.
+
+### Known limitations of Option B
+
+- This is a migration-only pattern. Carry the shim only as long as legacy calls remain, then remove it.
+- The shim is app-level; it will not help gem-provided engines or view partials that make legacy `react_component` calls.
+- Server rendering, Pro features, and auto-bundling all work through the explicit `react_on_rails_component` alias — the shim only forwards the default helper name back to `react-rails`.
 
 ## Practical checklist for Webpacker-era apps
 
