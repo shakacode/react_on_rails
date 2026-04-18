@@ -2,6 +2,32 @@
 
 This migration is easiest when the app is already on a modern Rails + Shakapacker baseline.
 
+## Pick the right first target
+
+Not every `react-rails` app is a good candidate for a low-friction first migration. Before you start, classify what you have:
+
+- **Rails-owned island mounts on Shakapacker 7+ and Rails 6+.** This is the smoothest path. The generator + the steps below usually get you there with small, localized edits.
+- **Webpacker-era apps (`gem "webpacker"`, Webpack 4).** These can work with React on Rails, but often only with compatibility shims that are not obvious up front. The low-friction path is to migrate the bundler first, not to keep Webpacker. See [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) below.
+- **Client-routed SPA shells (Rails is mostly a shell around a React Router / TanStack Router app).** Do not use this as the first migration slice. Treat it as an architecture case study, not a quick first migration. Pick a Rails-owned page that mounts a single component and migrate that slice first.
+
+The wrong first target usually leads to one of two misreadings: teams conclude "React on Rails is broken" when the real problem is legacy bundler compatibility, or they conclude "the migration path is heavy" when they chose a SPA-root rewrite instead of an island mount.
+
+## Preferred path for Webpacker-era apps
+
+If the app still uses `gem "webpacker"`, the recommended path is:
+
+1. **Migrate to Shakapacker first, as its own PR.** Keep the bundler change separate from the React on Rails change. This makes each step reviewable and isolates any compatibility issues.
+2. **Then run the React on Rails install generator** against the Shakapacker-based app.
+
+If you intentionally stay on Webpacker / Webpack 4 for a first incremental slice (for example, because the rest of the app is not yet ready to move), expect to need package-specific compatibility config:
+
+- pinned `webpack`, `webpack-cli`, and loader versions that match Webpack 4
+- a `babel.config.js` (or `.babelrc`) that is compatible with the older toolchain
+- manual updates to `config/webpack/*` because the Webpacker-generated files pre-date the Shakapacker conventions React on Rails expects
+- explicit `server_bundle_output_path` in `config/initializers/react_on_rails.rb` because auto-detection assumes Shakapacker 9.0+
+
+Plan this as a staged migration rather than a single PR. The generator is not designed to bridge Webpack 4 + Webpacker to current React on Rails defaults for you — it assumes a Shakapacker baseline.
+
 ## Preflight
 
 Before swapping gems, check these first:
@@ -130,6 +156,8 @@ For a more recent Rails 7-era migration example (published under ShakaCode), see
 
 ## Practical checklist for Webpacker-era apps
 
+See [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) above for the recommended staging. The concrete checklist:
+
 If your app looks like this:
 
 - `gem "webpacker"` in `Gemfile`
@@ -139,9 +167,11 @@ If your app looks like this:
 
 then treat the migration as:
 
-1. Move from `webpacker` to `shakapacker`.
+1. Move from `webpacker` to `shakapacker` in its own PR.
 2. If the app is still on Rails 5.1, upgrade Rails to 5.2+ before adding current `react_on_rails`.
 3. Remove `react_ujs`.
 4. Run the React on Rails install generator.
 5. Replace helper syntax and component registration.
 6. Review `bin/dev`, `config/shakapacker.yml`, and webpack config diffs before committing.
+
+If you intentionally keep Webpacker + Webpack 4 for this first slice, budget time for compatibility shims (pinned loader versions, an older-compatible Babel config, manual webpack config edits, and an explicit `server_bundle_output_path`). "Still on Webpacker" is supportable, but it is not the low-friction path.

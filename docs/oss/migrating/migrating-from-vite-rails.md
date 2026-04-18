@@ -13,6 +13,19 @@ React on Rails is a better fit when you want one or more of these:
 
 If your app is already happy with a Vite-only client-rendered setup, this migration is optional.
 
+## Two different starting points
+
+Not all `vite_rails` + React apps are the same shape, and the migration effort is very different for each:
+
+- **Rails-owned island mounts.** Rails renders real ERB views and mounts one or more React components inside them. This is what the steps below are written for. The migration is incremental: you can cut over one page (or one mount) at a time.
+- **Client-routed SPA shells.** Rails serves a minimal layout and a single `<div id="app">`, and a client-side router (React Router / TanStack Router) owns everything after the first render. This is an **architecture case study**, not a quick first migration. Before you convert it, decide whether you are:
+  1. moving Rails back to being view-owner and breaking the SPA into island mounts, or
+  2. keeping the SPA shape and just replacing Vite's build integration.
+
+The first is a real product decision and should not be bundled with a bundler/integration change. The second is narrower but rarely a one-PR job either, because SPA shells usually depend on Vite-specific runtime behavior (`import.meta.env`, `import.meta.glob`, Vite plugins with no direct Shakapacker analogue).
+
+If your app is a SPA shell, do not use it as the first proof of React on Rails adoption. Start with a Rails-owned island somewhere else in the app — even a small one — and migrate that first.
+
 ## Preflight
 
 Before you start, make sure the current app still installs cleanly on the Ruby and Node versions you plan to use for the migration.
