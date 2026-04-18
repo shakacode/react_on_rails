@@ -1,6 +1,6 @@
 # RSC Migration Success Stories
 
-If you are deciding whether React Server Components are worth the effort, these case studies show what teams have actually measured after shipping RSC in production. The sections below summarize the reported wins, link to the source articles for verification, and point to the React on Rails Pro docs that walk you through getting the same benefits.
+If you are deciding whether React Server Components are worth the effort, these case studies show what teams have actually measured after shipping RSC in production, alongside DoorDash's earlier Next.js SSR migration as a useful server-first baseline. The sections below summarize the reported wins, link to the source articles for verification, and point to the React on Rails Pro docs that walk you through getting the same benefits.
 
 ## Reported Results at a Glance
 
