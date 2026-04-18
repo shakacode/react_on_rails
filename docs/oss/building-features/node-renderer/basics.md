@@ -157,6 +157,7 @@ The Node Renderer must be started as a background process before running tests. 
 # .github/workflows/test.yml (GitHub Actions example)
 jobs:
   test:
+    runs-on: ubuntu-latest
     env:
       # Job-level: both the renderer and Rails test steps need this
       RENDERER_PASSWORD: ${{ secrets.RENDERER_PASSWORD }}
