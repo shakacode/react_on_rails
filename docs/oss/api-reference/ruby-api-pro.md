@@ -47,9 +47,7 @@ Streams a server-rendered React component using React 18's `renderToPipeableStre
 
 Requires the controller to use `stream_view_containing_react_components`.
 
-Options: same as `react_component` plus:
-
-- `:immediate_hydration` (default: `true`) — controls hydration timing
+Options: same as `react_component`. React on Rails Pro hydrates streamed components early (before `DOMContentLoaded`) automatically — no per-component toggle is exposed.
 
 ```ruby
 <%= stream_react_component("App", props: { data: @data }) %>

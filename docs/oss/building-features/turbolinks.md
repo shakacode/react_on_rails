@@ -129,11 +129,11 @@ Use `content_for` to render your body content first, capturing auto-appends befo
 
 > **⚡️ React on Rails Pro Feature**
 >
-> Turbo Streams require the `immediate_hydration: true` option, which is a [React on Rails Pro](../../pro/react-on-rails-pro.md) licensed feature.
+> Turbo Streams rely on Pro's early hydration behavior, which hydrates components as soon as they are inserted into the DOM. This is a [React on Rails Pro](../../pro/react-on-rails-pro.md) licensed feature that is always on for Pro users.
 
 **Why Turbo Streams Need Special Handling:**
 
-Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` events that React on Rails uses to hydrate components. Instead, they directly manipulate the DOM. The `immediate_hydration` option tells React on Rails to hydrate the component immediately when it's inserted into the DOM, without waiting for page load events.
+Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` events that React on Rails uses to hydrate components. Instead, they directly manipulate the DOM. React on Rails Pro hydrates components immediately when they are inserted into the DOM, without waiting for page load events, so Turbo Stream updates work out of the box.
 
 **Example: Create a Turbo Stream Response**
 
@@ -147,9 +147,7 @@ Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` even
 ```erb
 <%# app/views/items/create.turbo_stream.erb - Turbo Stream response %>
 <%= turbo_stream.update 'item-list' do %>
-  <%= react_component("ItemList",
-                      props: @items,
-                      immediate_hydration: true) %>
+  <%= react_component("ItemList", props: @items) %>
 <% end %>
 ```
 
@@ -158,16 +156,13 @@ Unlike Turbo Frames, Turbo Streams don't dispatch the normal `turbo:render` even
 1. User clicks "Load Items" button
 2. Rails responds with `create.turbo_stream.erb`
 3. Turbo Stream updates the `item-list` frame with the new React component
-4. `immediate_hydration: true` ensures the component hydrates immediately
+4. React on Rails Pro hydrates the inserted component immediately
 
 **Learn More:**
 
-- See [v16.0 Release Notes](../upgrading/release-notes/16.0.0.md#enhanced-script-loading-strategies) for full `immediate_hydration` documentation
 - See [Streaming Server Rendering](./streaming-server-rendering.md) for another Pro use case
 - Working example in codebase: `react_on_rails/spec/dummy/app/views/pages/turbo_stream_send_hello_world.turbo_stream.erb`
 - Contact [justin@shakacode.com](mailto:justin@shakacode.com) for React on Rails Pro licensing
-
-**Migration Note:** If you're referencing [PR #1620](https://github.com/shakacode/react_on_rails/pull/1620) discussions, note that `force_load` was renamed to `immediate_hydration` in v16.0.
 
 ## Legacy Turbolinks Support
 
@@ -259,17 +254,17 @@ document.addEventListener('turbolinks:load', function () {
 
 React on Rails 15 fixes both issues, so if you still have the listener it can be removed (and should be as `reactOnRailsPageLoaded()` is now async).
 
-> [!WARNING] > **Async Scripts with Turbolinks Require Pro Feature**
+> [!WARNING] > **Async Scripts with Turbolinks Require Pro**
 >
-> If you use async script loading with Turbolinks, you must enable `immediate_hydration: true` to prevent race conditions. This is a React on Rails Pro feature.
+> If you use async script loading with Turbolinks, you need Pro's early hydration behavior to prevent race conditions. This is a React on Rails Pro licensed feature.
 >
-> Without `immediate_hydration: true`, async scripts may not be ready when Turbolinks fires navigation events, causing components to fail hydration.
+> Without Pro's early hydration, async scripts may not be ready when Turbolinks fires navigation events, causing components to fail hydration.
 >
 > **Alternatives:**
 >
 > - Use `defer` instead of `async` (waits for full page load before hydration)
 > - Upgrade to modern Turbo (recommended)
-> - Use React on Rails Pro for `immediate_hydration: true`
+> - Use React on Rails Pro (early hydration is automatic for Pro users)
 
 ### Turbolinks 5 Specific Information
 
