@@ -15,16 +15,14 @@ If your app is already happy with a Vite-only client-rendered setup, this migrat
 
 ## Two different starting points
 
-Not all `vite_rails` + React apps are the same shape, and the migration effort is very different for each:
+Not all `vite_rails` + React apps are the same shape, and the migration effort differs for each:
 
-- **Rails-owned island mounts.** Rails renders real ERB views and mounts one or more React components inside them. This is what the steps below are written for. The migration is incremental: you can cut over one page (or one mount) at a time.
-- **Client-routed SPA shells.** Rails serves a minimal layout and a single `<div id="app">`, and a client-side router (React Router / TanStack Router) owns everything after the first render. This is an **architecture case study**, not a quick first migration. Before you convert it, decide whether you are:
-  1. moving Rails back to being view-owner and breaking the SPA into island mounts, or
-  2. keeping the SPA shape and just replacing Vite's build integration.
+- **Rails-owned island mounts.** Rails renders real ERB views and mounts one or more React components inside them. The migration is incremental: you can cut over one page (or one mount) at a time.
+- **Client-routed SPA shells.** Rails serves a minimal layout and a single `<div id="app">`, and a client-side router (React Router / TanStack Router) owns everything after the first render. You have two reasonable migration shapes here:
+  1. **Keep the SPA shape.** Render the top-level SPA component from a single ERB view using `react_component` (or `react_component_hash` when you need SSR that returns multiple regions such as `componentHtml`, `title`, and other head tags). One React on Rails call mounts the whole app — this is the pattern used by the largest React on Rails Pro deployment in production (Popmenu), where the entire app is a single top-level component call.
+  2. **Break the SPA into island mounts** by moving Rails back to being the view-owner. This is a real product decision and should not be bundled with the bundler/integration change.
 
-The first is a real product decision and should not be bundled with a bundler/integration change. The second is narrower but rarely a one-PR job either, because SPA shells usually depend on Vite-specific runtime behavior (`import.meta.env`, `import.meta.glob`, Vite plugins with no direct Shakapacker analogue). Note that `import.meta.glob` has no direct Webpack equivalent — it must be replaced with explicit [`require.context`](https://webpack.js.org/guides/dependency-management/#requirecontext) calls, which use a different API: the glob pattern syntax differs, results are always synchronously resolved, and any lazy loading must be handled through explicit dynamic `import()` calls instead of a built-in lazy mode.
-
-If your app is a SPA shell, do not use it as the first proof of React on Rails adoption. Start with a Rails-owned island somewhere else in the app — even a small one — and migrate that first.
+For most teams, option 1 is the fastest first step: you're swapping Vite's build integration for Shakapacker, not re-architecting the app. The main friction is usually not the Rails-side `react_component` call — it's the Vite-specific runtime behavior (`import.meta.env`, `import.meta.glob`, Vite plugins with no direct Shakapacker analogue) that the client code may depend on. In particular, `import.meta.glob` has no direct Webpack equivalent — it must be replaced with [`require.context`](https://webpack.js.org/guides/dependency-management/#requirecontext), whose glob-pattern syntax differs and whose lazy/eager behavior is selected via a `mode` argument (`'sync'`, `'lazy'`, `'lazy-once'`, `'eager'`, `'weak'`) rather than the per-call options `import.meta.glob` exposes.
 
 ## Preflight
 

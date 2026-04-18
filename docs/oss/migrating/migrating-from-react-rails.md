@@ -8,9 +8,9 @@ Not every `react-rails` app is a good candidate for a low-friction first migrati
 
 - **Rails-owned island mounts on Shakapacker 6+ and Rails 6+.** This is the smoothest path. The generator + the steps below usually get you there with small, localized edits. (Note: `server_bundle_output_path` auto-detection requires Shakapacker 9.0+; on 6–8, set it explicitly in the initializer.)
 - **Webpacker-era apps (`gem "webpacker"`, Webpack 4).** Current React on Rails does not support Webpacker — `react_on_rails doctor` flags it as a removed breaking-change issue, and the gem requires `shakapacker >= 6.0`. You must migrate off Webpacker before installing current React on Rails. See [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) below.
-- **Client-routed SPA shells (Rails is mostly a shell around a React Router / TanStack Router app).** Do not use this as the first migration slice. Treat it as an architecture case study, not a quick first migration. Pick a Rails-owned page that mounts a single component and migrate that slice first.
+- **Client-routed SPA shells (Rails is mostly a shell around a React Router / TanStack Router app).** Render the top-level SPA component from one ERB view using `react_component` (or `react_component_hash` when SSR needs to return multiple regions such as `componentHtml`, `title`, and other head tags). One React on Rails call mounts the whole app — this is the pattern used by the largest React on Rails Pro deployment in production (Popmenu), where the entire app is a single top-level component call. If you additionally want to break the SPA into several Rails-owned islands, treat that as a separate product decision rather than bundling it with the bundler/integration change.
 
-The wrong first target usually leads to one of two misreadings: teams conclude "React on Rails is broken" when the real problem is legacy bundler compatibility, or they conclude "the migration path is heavy" when they chose a SPA-root rewrite instead of an island mount.
+The wrong first target usually leads teams to conclude "React on Rails is broken" when the real problem is legacy bundler compatibility, or to bundle a SPA re-architecture into what should have been a bundler migration.
 
 ## Preferred path for Webpacker-era apps
 
