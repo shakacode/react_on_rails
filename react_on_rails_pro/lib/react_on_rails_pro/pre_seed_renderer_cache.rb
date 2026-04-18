@@ -21,8 +21,7 @@ module ReactOnRailsPro
       assets = RendererCacheHelpers.collect_assets
       rsc_required_paths = RendererCacheHelpers.required_rsc_asset_paths
 
-      RendererCacheHelpers.bundle_sources(pool).each do |src_bundle_path, bundle_hash|
-        RendererCacheHelpers.validate_bundle_exists!(src_bundle_path, "pre-seeding")
+      RendererCacheHelpers.bundle_sources(pool, "pre-seeding").each do |src_bundle_path, bundle_hash|
         seed_bundle(src_bundle_path, bundle_hash, cache_dir)
         # The Node Renderer serves manifests from whichever bundle dir it loaded,
         # so both server and RSC dirs need the manifests present.
@@ -48,10 +47,12 @@ module ReactOnRailsPro
     # the renderer to fail at runtime with a hard-to-diagnose error. User-configured
     # assets_to_copy are optional and only produce a warning. Required assets are
     # matched by expanded path rather than basename so a same-named unrelated entry
-    # in assets_to_copy cannot trigger a false-positive "required" error.
+    # in assets_to_copy cannot trigger a false-positive "required" error. Expand
+    # against Rails.root to match how RendererCacheHelpers.required_rsc_asset_paths
+    # builds its Set.
     def self.copy_assets(assets, bundle_dir, rsc_required_paths)
       assets.each do |asset_path|
-        expanded = File.expand_path(asset_path.to_s)
+        expanded = File.expand_path(asset_path.to_s, Rails.root)
         unless File.exist?(expanded)
           if rsc_required_paths.include?(expanded)
             raise ReactOnRailsPro::Error, "Required RSC asset not found: #{asset_path}. " \
