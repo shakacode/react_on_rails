@@ -245,11 +245,11 @@ Do not post the PR summary checkpoint during this triage-only phase. Post it onl
 
 ### Action `d` — Discuss items
 
-Present the requested items with full context and ask the user for a decision on each. If the user enters bare `d` with no item numbers, present all `DISCUSS` items. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). For approved items that produce local changes, use the same commit/push-before-reply ordering as action `f`. After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items. Note: `d` only accepts `DISCUSS` item numbers — for `OPTIONAL` items, use `o` instead.
+Present the requested items with full context and ask the user for a decision on each. If the user enters bare `d` with no item numbers, present all `DISCUSS` items. After the user decides, treat approved items as `MUST-FIX` (fix, reply, resolve) and declined items as `SKIPPED` (optionally reply with rationale if the user asks). For approved items that produce local changes, use the same commit/push-before-reply ordering as action `f`. After handling requested `d` items, re-offer the quick-action menu for remaining unaddressed items. Note: `d` only accepts `DISCUSS` item numbers. If any selected number refers to an `OPTIONAL`, `MUST-FIX`, or `SKIPPED` item, do not proceed — respond with "Item N is {tier} — use `{o|f|r}` instead" for each mismatched number and ask for a corrected selection.
 
 ### Action `o` — Address optional items inline
 
-Present the requested items with full context. If the user enters bare `o` with no item numbers, present all `OPTIONAL` items for selection. For each selected optional item, treat it the same as a `MUST-FIX`: make the code change, run relevant checks, reply, and resolve the thread. Use the same commit/push-before-reply ordering as action `f`. For optional items the user declines, offer a rationale reply via `r <nums>`. After handling requested `o` items, re-offer the quick-action menu for remaining unaddressed items.
+Present the requested items with full context. If the user enters bare `o` with no item numbers, present all `OPTIONAL` items for selection. For each selected optional item, treat it the same as a `MUST-FIX`: make the code change, run relevant checks, reply, and resolve the thread. Use the same commit/push-before-reply ordering as action `f`. For optional items the user declines, offer a rationale reply via `r <nums>`. After handling requested `o` items, re-offer the quick-action menu for remaining unaddressed items. Note: `o` only accepts `OPTIONAL` item numbers. If any selected number refers to a `DISCUSS`, `MUST-FIX`, or `SKIPPED` item, do not proceed — respond with "Item N is {tier} — use `{d|f|r}` instead" for each mismatched number and ask for a corrected selection.
 
 ### Action `r` — Reply with rationale
 
@@ -389,7 +389,7 @@ fi
 
 OPTIONAL_SECTION=""
 if [ -n "${OPTIONAL_ITEMS}" ]; then
-  printf -v OPTIONAL_SECTION '### Optional improvements\n%s\n' "${OPTIONAL_ITEMS}"
+  printf -v OPTIONAL_SECTION '### Optional items\n%s\n' "${OPTIONAL_ITEMS}"
 fi
 
 SKIPPED_SECTION=""
