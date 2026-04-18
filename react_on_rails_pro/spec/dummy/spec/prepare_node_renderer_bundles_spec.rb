@@ -84,7 +84,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([first_asset_path])
       FileUtils.rm_f(first_asset_path)
 
-      expect { pre_stage_cache }.to output("Asset not found #{first_asset_path}\n").to_stderr
+      expect { pre_stage_cache }.to output("[ReactOnRailsPro] Asset not found #{first_asset_path}\n").to_stderr
     end
   end
 

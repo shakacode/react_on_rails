@@ -78,18 +78,16 @@ module ReactOnRailsPro
 
     # RSC manifests are required when RSC is enabled — a missing manifest would cause
     # the renderer to fail at runtime with a hard-to-diagnose error. User-configured
-    # assets_to_copy are optional and only produce a warning.
+    # assets_to_copy are optional and only produce a warning. Required assets are
+    # matched by expanded path rather than basename so a same-named unrelated entry
+    # in assets_to_copy cannot trigger a false-positive "required" error.
     def self.copy_assets(assets, bundle_dir)
-      rsc_required = Set.new
-      if ReactOnRailsPro.configuration.enable_rsc_support
-        rsc_required << File.basename(ReactOnRailsPro::Utils.react_client_manifest_file_path.to_s)
-        rsc_required << File.basename(ReactOnRailsPro::Utils.react_server_client_manifest_file_path.to_s)
-      end
+      rsc_required_paths = required_rsc_asset_paths
 
       assets.each do |asset_path|
-        basename = File.basename(asset_path.to_s)
-        unless File.exist?(asset_path.to_s)
-          if rsc_required.include?(basename)
+        expanded = File.expand_path(asset_path.to_s)
+        unless File.exist?(expanded)
+          if rsc_required_paths.include?(expanded)
             raise ReactOnRailsPro::Error, "Required RSC asset not found: #{asset_path}. " \
                                           "Build your bundles before pre-seeding the renderer cache."
           end
@@ -97,11 +95,23 @@ module ReactOnRailsPro
           next
         end
 
-        dest = File.join(bundle_dir, basename)
-        FileUtils.cp(asset_path.to_s, dest)
+        dest = File.join(bundle_dir, File.basename(expanded))
+        FileUtils.cp(expanded, dest)
         puts "[ReactOnRailsPro] Copied asset: #{dest}"
       end
     end
     private_class_method :copy_assets
+
+    def self.required_rsc_asset_paths
+      return Set.new unless ReactOnRailsPro.configuration.enable_rsc_support
+
+      Set.new(
+        [
+          File.expand_path(ReactOnRailsPro::Utils.react_client_manifest_file_path.to_s),
+          File.expand_path(ReactOnRailsPro::Utils.react_server_client_manifest_file_path.to_s)
+        ]
+      )
+    end
+    private_class_method :required_rsc_asset_paths
   end
 end

@@ -194,6 +194,9 @@ module ReactOnRailsPro
       end
     end
 
+    # :nodoc: Test helper — resets the one-time deprecation-warning guard so
+    # specs can exercise both the "warning fires" and "warning suppressed" paths
+    # without leaking state between examples.
     def self.reset_renderer_bundle_path_deprecation_warned!
       @renderer_bundle_path_deprecation_warned = nil
     end
