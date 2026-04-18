@@ -227,7 +227,8 @@ module ReactOnRails
 
         if File.exist?(File.join(destination_root, legacy_node_renderer_path))
           say "ℹ️  #{legacy_node_renderer_path} detected, keeping existing renderer; " \
-              "to migrate, move it to #{node_renderer_path} and update Procfile.dev", :yellow
+              "to migrate, move it to #{node_renderer_path} and update Procfile.dev:", :yellow
+          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node #{node_renderer_path}", :yellow
           return true
         end
 

@@ -1258,6 +1258,38 @@ describe ProGenerator, type: :generator do
     end
   end
 
+  context "when renderer/node-renderer.js already exists but Procfile.dev lacks node-renderer entry" do
+    let(:existing_renderer_content) { "// existing renderer\n" }
+
+    before do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_existing_file("Gemfile", <<~RUBY)
+        source "https://rubygems.org"
+        gem "react_on_rails_pro"
+      RUBY
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails.rb", "ReactOnRails.configure {}")
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_base_webpack_files
+      simulate_existing_file("renderer/node-renderer.js", existing_renderer_content)
+      allow(Gem).to receive(:loaded_specs).and_return({ "react_on_rails_pro" => double })
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "preserves the existing renderer/node-renderer.js" do
+      expect(File.read(File.join(destination_root, "renderer/node-renderer.js"))).to eq(existing_renderer_content)
+    end
+
+    it "adds the node-renderer entry to Procfile.dev" do
+      expect(File.read(File.join(destination_root, "Procfile.dev")))
+        .to include("node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js")
+    end
+  end
+
   context "when server webpack has only libraryTarget uncommented" do
     before do
       prepare_destination
