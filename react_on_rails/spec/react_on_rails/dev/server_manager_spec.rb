@@ -18,6 +18,19 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     $stdout = @original_stdout
   end
 
+  shared_context "with clean port env" do
+    around do |example|
+      old = {}
+      %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL].each do |k|
+        old[k] = ENV.fetch(k, nil)
+        ENV.delete(k)
+      end
+      example.run
+    ensure
+      old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
+    end
+  end
+
   def mock_system_calls
     allow(ReactOnRails::Dev::PackGenerator).to receive(:generate).with(any_args)
     allow_any_instance_of(Kernel).to receive(:system).and_return(true)
@@ -263,21 +276,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     context "when configuring ports with a base port active" do
+      include_context "with clean port env"
+
       before do
         mock_system_calls
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
           .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
-      end
-
-      around do |example|
-        old = {}
-        %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL].each do |k|
-          old[k] = ENV.fetch(k, nil)
-          ENV.delete(k)
-        end
-        example.run
-      ensure
-        old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
       end
 
       it "overrides a pre-existing PORT with the base-derived Rails port" do
@@ -311,24 +315,44 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect { described_class.start(:development) }
           .not_to output(/Overriding REACT_RENDERER_URL/).to_stderr
       end
+
+      it "does not warn when the pre-existing URL is HTTPS localhost" do
+        ENV["REACT_RENDERER_URL"] = "https://localhost:3800"
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding REACT_RENDERER_URL/).to_stderr
+      end
+
+      it "warns before overriding a pre-existing PORT" do
+        ENV["PORT"] = "3000"
+        expect { described_class.start(:development) }
+          .to output(/Overriding PORT=3000 with 5000/).to_stderr
+      end
+
+      it "warns before overriding a pre-existing SHAKAPACKER_DEV_SERVER_PORT" do
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "3035"
+        expect { described_class.start(:development) }
+          .to output(/Overriding SHAKAPACKER_DEV_SERVER_PORT=3035 with 5001/).to_stderr
+      end
+
+      it "does not warn when PORT is unset" do
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding PORT/).to_stderr
+      end
+
+      it "does not warn when PORT already matches the derived value" do
+        ENV["PORT"] = "5000"
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding PORT/).to_stderr
+      end
     end
 
     context "when PORT/SHAKAPACKER_DEV_SERVER_PORT are set to empty strings" do
+      include_context "with clean port env"
+
       before do
         mock_system_calls
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
-      end
-
-      around do |example|
-        old = {}
-        %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL].each do |k|
-          old[k] = ENV.fetch(k, nil)
-          ENV.delete(k)
-        end
-        example.run
-      ensure
-        old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
       end
 
       it "treats PORT='' as unset and applies the selected Rails port" do
@@ -345,21 +369,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     context "when REACT_RENDERER_URL is set without RENDERER_PORT" do
+      include_context "with clean port env"
+
       before do
         mock_system_calls
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
-      end
-
-      around do |example|
-        old = {}
-        %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL].each do |k|
-          old[k] = ENV.fetch(k, nil)
-          ENV.delete(k)
-        end
-        example.run
-      ensure
-        old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
       end
 
       it "warns that the node renderer may bind to a different port" do
@@ -370,21 +385,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     end
 
     context "when RENDERER_PORT is set explicitly without a base port" do
+      include_context "with clean port env"
+
       before do
         mock_system_calls
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
-      end
-
-      around do |example|
-        old = {}
-        %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL].each do |k|
-          old[k] = ENV.fetch(k, nil)
-          ENV.delete(k)
-        end
-        example.run
-      ensure
-        old.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
       end
 
       it "derives REACT_RENDERER_URL from the explicit RENDERER_PORT" do

@@ -852,10 +852,23 @@ module ReactOnRails
         def apply_base_port_env(selected)
           derived_url = "http://localhost:#{selected[:renderer]}"
           warn_if_renderer_url_will_be_overridden(derived_url)
+          warn_if_port_will_be_overridden("PORT", selected[:rails])
+          warn_if_port_will_be_overridden("SHAKAPACKER_DEV_SERVER_PORT", selected[:webpack])
           ENV["PORT"] = selected[:rails].to_s
           ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
           ENV["RENDERER_PORT"] = selected[:renderer].to_s
           ENV["REACT_RENDERER_URL"] = derived_url
+        end
+
+        # Mirrors warn_if_renderer_url_will_be_overridden so users notice when a
+        # pre-existing PORT or SHAKAPACKER_DEV_SERVER_PORT is replaced by the
+        # base-port-derived value.
+        def warn_if_port_will_be_overridden(var_name, derived_port)
+          existing = ENV.fetch(var_name, nil)
+          return if existing.nil? || existing.strip.empty? || existing == derived_port.to_s
+
+          warn "WARNING: Overriding #{var_name}=#{existing} with #{derived_port} " \
+               "because base port mode is active."
         end
 
         # Base port mode overrides REACT_RENDERER_URL to point at a local
@@ -865,7 +878,9 @@ module ReactOnRails
         def warn_if_renderer_url_will_be_overridden(derived_url)
           existing = ENV.fetch("REACT_RENDERER_URL", nil)
           return if existing.nil? || existing.empty? || existing == derived_url
-          return if existing.start_with?("http://localhost:", "http://127.0.0.1:", "http://[::1]:")
+          return if existing.start_with?("http://localhost:", "https://localhost:",
+                                         "http://127.0.0.1:", "https://127.0.0.1:",
+                                         "http://[::1]:", "https://[::1]:")
 
           warn "WARNING: Overriding REACT_RENDERER_URL=#{existing} with #{derived_url} " \
                "because base port mode is active."
