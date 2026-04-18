@@ -215,7 +215,7 @@ module ReactOnRails
       #
       # @return [Boolean] true when a legacy client/node-renderer.js was detected
       #   (caller should skip add_pro_to_procfile to avoid pointing Procfile.dev
-      #   at a file that wasn't created); false/nil otherwise.
+      #   at a file that wasn't created); false otherwise.
       def create_node_renderer
         node_renderer_path = "renderer/node-renderer.js"
         legacy_node_renderer_path = "client/node-renderer.js"
@@ -227,7 +227,8 @@ module ReactOnRails
 
         if File.exist?(File.join(destination_root, legacy_node_renderer_path))
           say "ℹ️  #{legacy_node_renderer_path} detected, keeping existing renderer; " \
-              "to migrate, move it to #{node_renderer_path} and update Procfile.dev:", :yellow
+              "to migrate, move it to #{node_renderer_path} and update any references " \
+              "(e.g. Procfile.dev, Procfile.prod, Docker CMD / command:):", :yellow
           say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node #{node_renderer_path}", :yellow
           return true
         end
