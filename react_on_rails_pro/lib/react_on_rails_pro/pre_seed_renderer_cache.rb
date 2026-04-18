@@ -4,6 +4,7 @@ require "fileutils"
 require "pathname"
 require "react_on_rails_pro/renderer_cache_helpers"
 require "react_on_rails_pro/renderer_cache_path"
+require "react_on_rails_pro/rolling_deploy_cache_stager"
 
 module ReactOnRailsPro
   # Stages the Node Renderer bundle cache in the renderer's expected directory
@@ -41,6 +42,7 @@ module ReactOnRailsPro
 
       assets, rsc_required_paths = RendererCacheHelpers.collect_assets_with_required_paths
 
+      current_hashes = []
       # Block-level `rescue` (Ruby 2.5+): equivalent to wrapping the block body in
       # begin/rescue/end. RuboCop's Style/RedundantBegin enforces this form, so
       # callers reading the loop should treat the rescue clause below as the
@@ -51,6 +53,7 @@ module ReactOnRailsPro
         # The Node Renderer serves manifests from whichever bundle dir it loaded,
         # so both server and RSC dirs need the manifests present.
         stage_assets(assets, bundle_dir, rsc_required_paths, mode)
+        current_hashes << bundle_hash.to_s
       rescue StandardError => e
         # Fail-fast: re-raise on the first bundle failure so the deploy sees a non-zero exit and
         # aborts before downstream steps assume the cache is complete. Earlier bundles that
@@ -61,6 +64,10 @@ module ReactOnRailsPro
              "cache may be partially staged: #{e.message}"
         raise
       end
+
+      # Optionally seed previous deploys' bundle hashes for rolling-deploy safety.
+      # No-op when neither config.rolling_deploy_adapter nor PREVIOUS_BUNDLE_HASHES is set.
+      RollingDeployCacheStager.call(cache_dir: cache_dir, current_hashes: current_hashes, mode: mode)
     end
 
     # Validates the cache-dir env var (raises in production-like copy mode when

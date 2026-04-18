@@ -21,6 +21,7 @@ module ReactOnRailsPro
       dependency_globs: Configuration::DEFAULT_DEPENDENCY_GLOBS,
       excluded_dependency_globs: Configuration::DEFAULT_EXCLUDED_DEPENDENCY_GLOBS,
       remote_bundle_cache_adapter: Configuration::DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER,
+      rolling_deploy_adapter: Configuration::DEFAULT_ROLLING_DEPLOY_ADAPTER,
       ssr_timeout: Configuration::DEFAULT_SSR_TIMEOUT,
       ssr_pre_hook_js: nil,
       assets_to_copy: nil,
@@ -52,6 +53,7 @@ module ReactOnRailsPro
     DEFAULT_DEPENDENCY_GLOBS = [].freeze
     DEFAULT_EXCLUDED_DEPENDENCY_GLOBS = [].freeze
     DEFAULT_REMOTE_BUNDLE_CACHE_ADAPTER = nil
+    DEFAULT_ROLLING_DEPLOY_ADAPTER = nil
     DEFAULT_RENDERER_REQUEST_RETRY_LIMIT = 5
     DEFAULT_THROW_JS_ERRORS = true
     DEFAULT_RENDERING_RETURNS_PROMISES = false
@@ -68,7 +70,7 @@ module ReactOnRailsPro
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
                   :renderer_http_pool_size, :renderer_http_pool_timeout, :renderer_http_pool_warn_timeout,
                   :dependency_globs, :excluded_dependency_globs, :rendering_returns_promises,
-                  :remote_bundle_cache_adapter, :ssr_pre_hook_js, :assets_to_copy,
+                  :remote_bundle_cache_adapter, :rolling_deploy_adapter, :ssr_pre_hook_js, :assets_to_copy,
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
@@ -116,7 +118,8 @@ module ReactOnRailsPro
                    renderer_http_pool_warn_timeout: nil, renderer_http_keep_alive_timeout: nil,
                    tracing: nil,
                    dependency_globs: nil, excluded_dependency_globs: nil, rendering_returns_promises: nil,
-                   remote_bundle_cache_adapter: nil, ssr_pre_hook_js: nil, assets_to_copy: nil,
+                   remote_bundle_cache_adapter: nil, rolling_deploy_adapter: nil,
+                   ssr_pre_hook_js: nil, assets_to_copy: nil,
                    renderer_request_retry_limit: nil, throw_js_errors: nil, ssr_timeout: nil,
                    profile_server_rendering_js_code: nil, raise_non_shell_server_rendering_errors: nil,
                    enable_rsc_support: nil, rsc_payload_generation_url_path: nil,
@@ -137,6 +140,7 @@ module ReactOnRailsPro
       self.dependency_globs = dependency_globs
       self.excluded_dependency_globs = excluded_dependency_globs
       self.remote_bundle_cache_adapter = remote_bundle_cache_adapter
+      self.rolling_deploy_adapter = rolling_deploy_adapter
       self.ssr_pre_hook_js = ssr_pre_hook_js
       self.assets_to_copy = assets_to_copy
       self.renderer_request_retry_limit = renderer_request_retry_limit
@@ -156,6 +160,7 @@ module ReactOnRailsPro
       configure_default_url_if_not_provided
       validate_url
       validate_remote_bundle_cache_adapter
+      validate_rolling_deploy_adapter
       setup_renderer_password
       validate_renderer_password_for_production
       setup_assets_to_copy
@@ -247,6 +252,22 @@ module ReactOnRailsPro
         raise ReactOnRailsPro::Error,
               "config.remote_bundle_cache_adapter must have a class method named 'upload'" \
               "which takes a single named Pathname parameter 'zipped_bundles_filepath' & returns nil"
+      end
+    end
+
+    def validate_rolling_deploy_adapter
+      return if rolling_deploy_adapter.nil?
+
+      unless rolling_deploy_adapter.is_a?(Module)
+        raise ReactOnRailsPro::Error, "config.rolling_deploy_adapter must be a module or class"
+      end
+
+      %i[previous_bundle_hashes fetch upload].each do |method_name|
+        next if rolling_deploy_adapter.methods.include?(method_name)
+
+        raise ReactOnRailsPro::Error,
+              "config.rolling_deploy_adapter must define class method ##{method_name}. " \
+              "See docs/pro/rolling-deploy-adapters.md for the full protocol and reference implementations."
       end
     end
 

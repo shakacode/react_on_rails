@@ -70,6 +70,38 @@ module ReactOnRailsPro
       # immutable artifact, or invoke `rake react_on_rails_pro:pre_seed_renderer_cache`
       # directly (which defaults to copy mode).
       ReactOnRailsPro::PreSeedRendererCache.call(mode: pre_seed_renderer_cache_mode)
+
+      publish_current_bundle_if_configured
+    end
+
+    # Best-effort publication of the just-built bundle + assets to the configured
+    # rolling_deploy_adapter so that the *next* deploy can fetch this hash as a
+    # "previous" bundle. Runs only in production-like environments. Errors are
+    # warned, not raised, because a failed upload degrades the next deploy's
+    # rolling-deploy seeding — not this deploy's correctness.
+    def self.publish_current_bundle_if_configured
+      adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
+      return if adapter.nil?
+      return if Rails.env.development? || Rails.env.test?
+
+      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      server_bundle = ReactOnRails::Utils.server_bundle_js_file_path
+      return unless File.exist?(server_bundle)
+
+      hash = pool.server_bundle_hash
+      rsc_bundle = (ReactOnRailsPro::Utils.rsc_bundle_js_file_path if ReactOnRailsPro.configuration.enable_rsc_support)
+      assets = ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s)
+
+      adapter.upload(
+        hash,
+        server_bundle: server_bundle,
+        rsc_bundle: rsc_bundle,
+        assets: assets
+      )
+      puts "[ReactOnRailsPro] Published current bundle hash #{hash} via rolling_deploy_adapter"
+    rescue StandardError => e
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#upload raised #{e.class}: #{e.message}. " \
+           "Next deploy's rolling-deploy seeding may degrade until the next successful upload."
     end
 
     def self.pre_seed_renderer_cache_mode

@@ -2400,7 +2400,7 @@ RSpec.describe ReactOnRails::Doctor do
     context "when Pro gem is installed with NodeRenderer" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        pro_config = double("ProConfig", server_renderer: "NodeRenderer")
+        pro_config = double("ProConfig", server_renderer: "NodeRenderer", rolling_deploy_adapter: nil)
         stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
       end
 
@@ -2414,7 +2414,7 @@ RSpec.describe ReactOnRails::Doctor do
     context "when Pro gem is installed with ExecJS" do
       before do
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
-        pro_config = double("ProConfig", server_renderer: "ExecJS")
+        pro_config = double("ProConfig", server_renderer: "ExecJS", rolling_deploy_adapter: nil)
         stub_const("ReactOnRailsPro", double("ReactOnRailsPro", configuration: pro_config))
       end
 
@@ -2606,6 +2606,101 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_pro_initializer_existence)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("Pro initializer not found") }).to be true
+      end
+    end
+  end
+
+  describe "check_rolling_deploy_adapter" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:config) { double("ProConfig", rolling_deploy_adapter: adapter) } # rubocop:disable RSpec/VerifiedDoubles
+
+    before do
+      # Capture let values into locals so closures inside define_singleton_method
+      # can see them — define_singleton_method evaluates blocks in the module's
+      # own scope where `config` is not a known identifier.
+      config_value = config
+      pro_module = Module.new
+      pro_module.define_singleton_method(:configuration) { config_value }
+      utils_module = Module.new
+      utils_module.define_singleton_method(:resolve_renderer_cache_dir) { "/tmp/nonexistent-cache-dir" }
+      pro_module.const_set(:Utils, utils_module)
+      stub_const("ReactOnRailsPro", pro_module)
+      ENV.delete("PREVIOUS_BUNDLE_HASHES")
+    end
+
+    after { ENV.delete("PREVIOUS_BUNDLE_HASHES") }
+
+    context "when rolling_deploy_adapter is nil and env override is unset" do
+      let(:adapter) { nil }
+
+      it "adds an info line" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        expect(info.any? { |m| m[:content].include?("No rolling_deploy_adapter configured") }).to be(true)
+      end
+    end
+
+    context "when env override is set but adapter is nil" do
+      let(:adapter) { nil }
+
+      before { ENV["PREVIOUS_BUNDLE_HASHES"] = "abc,def" }
+
+      it "surfaces the env override" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        expect(info.any? do |m|
+                 m[:content].include?("PREVIOUS_BUNDLE_HASHES") && m[:content].include?("abc,def")
+               end).to be(true)
+      end
+    end
+
+    context "when adapter implements all required methods and returns hashes" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = %w[abc def]
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      it "reports protocol success and probe success" do
+        doctor.send(:check_rolling_deploy_adapter)
+        successes = checker.messages.select { |m| m[:type] == :success }
+        expect(successes.any? { |m| m[:content].include?("responds to all required methods") }).to be(true)
+        expect(successes.any? { |m| m[:content].include?("2 hash(es)") }).to be(true)
+      end
+    end
+
+    context "when adapter is missing required methods" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = []
+        end
+      end
+
+      it "warns with the missing methods listed" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? do |m|
+                 m[:content].include?("missing required methods") && m[:content].include?("fetch")
+               end).to be(true)
+      end
+    end
+
+    context "when previous_bundle_hashes returns []" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      it "warns that the upload side likely has not run" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? { |m| m[:content].include?("returned []") }).to be(true)
       end
     end
   end

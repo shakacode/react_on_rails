@@ -3,6 +3,7 @@
 require "json"
 require "erb"
 require "stringio"
+require "timeout"
 require "yaml"
 require_relative "utils"
 require_relative "config_path_resolver"
@@ -2751,6 +2752,7 @@ module ReactOnRails
       check_pro_renderer_mode
       check_base_package_references
       check_deprecated_renderer_cache_task
+      check_rolling_deploy_adapter
     end
 
     def check_pro_initializer_existence
@@ -2872,6 +2874,83 @@ module ReactOnRails
         # default to symlink (correct for local dev + same-filesystem deploys); call out the
         # copy alternative for users driving production container builds via Compose.
         "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink # use MODE=copy for Docker/container image builds"
+      end
+    end
+
+    # ── Rolling Deploy Adapter ────────────────────────────────────────
+
+    ROLLING_DEPLOY_REQUIRED_METHODS = %i[previous_bundle_hashes fetch upload].freeze
+    ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS = 3
+
+    def check_rolling_deploy_adapter
+      adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
+
+      if adapter.nil?
+        env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
+        if env_override && !env_override.empty?
+          checker.add_info(
+            "ℹ️  PREVIOUS_BUNDLE_HASHES=#{env_override.inspect} set but no rolling_deploy_adapter " \
+            "configured — env override will be used."
+          )
+        else
+          checker.add_info("ℹ️  No rolling_deploy_adapter configured (rolling-deploy seeding disabled).")
+        end
+        return
+      end
+
+      report_adapter_protocol(adapter)
+      report_previous_bundle_hashes_probe(adapter)
+      report_resolved_cache_dir
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not evaluate rolling_deploy_adapter: #{e.message}")
+    end
+
+    def report_adapter_protocol(adapter)
+      missing = ROLLING_DEPLOY_REQUIRED_METHODS.reject { |m| adapter.methods.include?(m) }
+      if missing.empty?
+        checker.add_success(
+          "✅ rolling_deploy_adapter responds to all required methods " \
+          "(#{ROLLING_DEPLOY_REQUIRED_METHODS.join(', ')})"
+        )
+      else
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter is missing required methods: #{missing.join(', ')}. " \
+          "See docs/pro/rolling-deploy-adapters.md."
+        )
+      end
+    end
+
+    def report_previous_bundle_hashes_probe(adapter)
+      start = Time.now
+      hashes = Timeout.timeout(ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS) { Array(adapter.previous_bundle_hashes) }
+      latency_ms = ((Time.now - start) * 1000).round
+
+      if hashes.empty?
+        checker.add_warning(
+          "⚠️  rolling_deploy_adapter#previous_bundle_hashes returned []. " \
+          "Usually indicates the upload side has never run on a prior deploy."
+        )
+      else
+        checker.add_success(
+          "✅ rolling_deploy_adapter#previous_bundle_hashes returned #{hashes.length} hash(es) in #{latency_ms}ms"
+        )
+      end
+    rescue Timeout::Error
+      checker.add_warning(
+        "⚠️  rolling_deploy_adapter#previous_bundle_hashes timed out after " \
+        "#{ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS}s"
+      )
+    rescue StandardError => e
+      checker.add_warning("⚠️  rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: #{e.message}")
+    end
+
+    def report_resolved_cache_dir
+      cache_dir = ReactOnRailsPro::Utils.resolve_renderer_cache_dir
+      if File.directory?(cache_dir)
+        subdirs = Dir.children(cache_dir).select { |c| File.directory?(File.join(cache_dir, c)) }
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (#{subdirs.length} bundle-hash subdir(s))")
+      else
+        checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (does not exist yet)")
       end
     end
 
