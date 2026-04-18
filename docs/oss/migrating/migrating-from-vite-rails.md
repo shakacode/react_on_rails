@@ -19,10 +19,10 @@ Not all `vite_rails` + React apps are the same shape, and the migration effort d
 
 - **Rails-owned island mounts.** Rails renders real ERB views and mounts one or more React components inside them. The migration is incremental: you can cut over one page (or one mount) at a time.
 - **Client-routed SPA shells.** Rails serves a minimal layout and a single `<div id="app">`, and a client-side router (React Router / TanStack Router) owns everything after the first render. You have two reasonable migration shapes here:
-  1. **Keep the SPA shape.** Render the top-level SPA component from a single ERB view using `react_component` (or `react_component_hash` when you need SSR that returns multiple regions such as `componentHtml`, `title`, and other head tags). One React on Rails call mounts the whole app — this is the pattern used by the largest React on Rails Pro deployment in production (Popmenu), where the entire app is a single top-level component call.
+  1. **Keep the SPA shape.** Render the top-level SPA component from a single ERB view using `react_component` (or `react_component_hash` when you need SSR that returns multiple regions such as `componentHtml`, `title`, and other head tags). One React on Rails call mounts the whole app — this is the pattern used by the largest React on Rails Pro deployment in production, Popmenu (for example, [110grill.com](https://www.110grill.com/) and other Popmenu-powered restaurant sites), where the entire app is a single top-level component call.
   2. **Break the SPA into island mounts** by moving Rails back to being the view-owner. This is a real product decision and should not be bundled with the bundler/integration change.
 
-For most teams, option 1 is the fastest first step: you're swapping Vite's build integration for Shakapacker, not re-architecting the app. The main friction is usually not the Rails-side `react_component` call — it's the Vite-specific runtime behavior (`import.meta.env`, `import.meta.glob`, Vite plugins with no direct Shakapacker analogue) that the client code may depend on. In particular, `import.meta.glob` has no direct Webpack equivalent — it must be replaced with [`require.context`](https://webpack.js.org/guides/dependency-management/#requirecontext), whose glob-pattern syntax differs and whose lazy/eager behavior is selected via a `mode` argument (`'sync'`, `'lazy'`, `'lazy-once'`, `'eager'`, `'weak'`) rather than the per-call options `import.meta.glob` exposes.
+For most teams, the **Keep the SPA shape** path is the fastest first step: you're swapping Vite's build integration for Shakapacker, not re-architecting the app. The main friction is usually not the Rails-side `react_component` call — it's the Vite-specific runtime behavior (`import.meta.env`, `import.meta.glob`, Vite plugins with no direct Shakapacker analogue) that the client code may depend on. See [Replace Vite-specific asset and env usage](#5-replace-vite-specific-asset-and-env-usage) for the concrete replacements.
 
 ## Preflight
 
@@ -137,6 +137,14 @@ Vite-specific `import.meta.env` usage needs to be replaced. In a React on Rails 
 - Rails-passed props (most reliable for both client and server rendering)
 - `railsContext` for request-aware values
 - `process.env` in server-rendered bundles (available natively in Node); for client bundles, values must be injected via webpack's `DefinePlugin` or `EnvironmentPlugin`
+
+### `import.meta.glob`
+
+`import.meta.glob` has no direct Webpack equivalent. Replace it with [`require.context`](https://webpack.js.org/guides/dependency-management/#requirecontext):
+
+- the glob-pattern syntax differs (Webpack uses a regex argument, not a glob string)
+- lazy/eager behavior is selected via a `mode` argument (`'sync'`, `'lazy'`, `'lazy-once'`, `'eager'`, `'weak'`) rather than the per-call options `import.meta.glob` exposes
+- the returned context function requires explicit `.keys()` + key lookup, not the object-map shape `import.meta.glob` returns
 
 ## 6. Replace the development workflow
 
