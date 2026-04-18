@@ -405,6 +405,39 @@ initializer agree on the port without any additional configuration.
 REACT_ON_RAILS_BASE_PORT=4000
 ```
 
+#### Tool-specific setup
+
+[Conductor.build](https://conductor.build) sets `CONDUCTOR_PORT` for you — no configuration
+needed. Other tools (Claude Code CLI, [OpenAI Codex](https://github.com/openai/codex) CLI or app,
+plain `git worktree`, etc.) don't inject a port variable, so pick a different base per checkout
+using one of the options below.
+
+- **Per-worktree `.env` file** (tool-agnostic; gitignored by default):
+
+  ```sh
+  # .env at the root of each worktree
+  REACT_ON_RAILS_BASE_PORT=4000
+  ```
+
+- **Claude Code `.claude/settings.json`** (per-project, checked in or local):
+
+  ```json
+  {
+    "env": {
+      "REACT_ON_RAILS_BASE_PORT": "4000"
+    }
+  }
+  ```
+
+- **Shell export** (ad hoc, one session):
+
+  ```sh
+  REACT_ON_RAILS_BASE_PORT=4000 bin/dev
+  ```
+
+`bin/dev` reads the variable from the process environment regardless of how it was set, so mix
+and match whichever is most convenient for each tool.
+
 ### Manual Worktree Port Setup (Pro)
 
 If you use the [Node Renderer](./node-renderer/basics.md) (React on Rails Pro) with manual

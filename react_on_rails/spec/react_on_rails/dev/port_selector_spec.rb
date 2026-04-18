@@ -87,11 +87,29 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         example.run
       end
 
-      it "falls back to normal auto-detection" do
+      it "warns and falls back to normal auto-detection" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
-        expect(result[:rails]).to eq(3000)
-        expect(result[:renderer]).to be_nil
+        expect do
+          result = described_class.select_ports
+          expect(result[:rails]).to eq(3000)
+          expect(result[:renderer]).to be_nil
+        end.to output(/out of range/).to_stderr
+      end
+    end
+
+    context "when base port is zero" do
+      around do |example|
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "0"
+        example.run
+      end
+
+      it "warns and falls back to auto-detection rather than deriving port 0" do
+        allow(described_class).to receive(:port_available?).and_return(true)
+        expect do
+          result = described_class.select_ports
+          expect(result[:rails]).to eq(3000)
+          expect(result[:renderer]).to be_nil
+        end.to output(/out of range/).to_stderr
       end
     end
 
@@ -102,11 +120,13 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         example.run
       end
 
-      it "falls back to normal auto-detection instead of deriving an invalid port" do
+      it "warns and falls back to auto-detection instead of deriving an invalid port" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
-        expect(result[:rails]).to eq(3000)
-        expect(result[:renderer]).to be_nil
+        expect do
+          result = described_class.select_ports
+          expect(result[:rails]).to eq(3000)
+          expect(result[:renderer]).to be_nil
+        end.to output(/out of range/).to_stderr
       end
     end
 

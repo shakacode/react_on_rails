@@ -10,6 +10,7 @@ require "erb"
 require "rbconfig"
 require "socket"
 require "time"
+require "uri"
 require "yaml"
 require_relative "../packer_utils"
 require_relative "database_checker"
@@ -866,15 +867,30 @@ module ReactOnRails
           url = ENV.fetch("REACT_RENDERER_URL", nil)
           return if port.nil? || port.empty?
 
+          unless port.match?(/\A\d+\z/) && port.to_i.between?(1, 65_535)
+            warn "WARNING: RENDERER_PORT=#{port.inspect} is not a valid port (1..65_535); ignoring."
+            return
+          end
+
           if url.nil? || url.empty?
             # Only RENDERER_PORT set: derive the URL so Rails reaches the right port.
             ENV["REACT_RENDERER_URL"] = "http://localhost:#{port}"
-          elsif !url.include?(":#{port}")
+          elsif url_port_mismatch?(url, port)
             # Both set but inconsistent — SSR will silently break otherwise.
             warn "WARNING: RENDERER_PORT=#{port} does not match REACT_RENDERER_URL=#{url}; " \
                  "Rails will use REACT_RENDERER_URL to reach the renderer. " \
                  "Unset one of them or ensure they agree."
           end
+        end
+
+        # Uses URI.parse so a short port isn't matched as a substring of a
+        # longer one (e.g. ":80" inside ":3800"). Malformed URLs fall back to
+        # "no mismatch detected" rather than crashing; the warn-path is only
+        # advisory.
+        def url_port_mismatch?(url, port)
+          URI.parse(url).port != port.to_i
+        rescue URI::InvalidURIError
+          false
         end
 
         def procfile_port(procfile)

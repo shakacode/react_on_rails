@@ -344,6 +344,28 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3801"
         expect { described_class.start(:development) }.not_to output(/does not match/).to_stderr
       end
+
+      it "warns when a short RENDERER_PORT is only a substring of the URL port" do
+        # :80 is a substring of :3800 — substring matching would miss this mismatch.
+        ENV["RENDERER_PORT"] = "80"
+        ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
+        expect { described_class.start(:development) }
+          .to output(/RENDERER_PORT=80 does not match/).to_stderr
+      end
+
+      it "warns and skips URL construction when RENDERER_PORT is non-numeric" do
+        ENV["RENDERER_PORT"] = "abc"
+        expect { described_class.start(:development) }
+          .to output(/RENDERER_PORT=.*not a valid port/).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      it "warns and skips URL construction when RENDERER_PORT is out of range" do
+        ENV["RENDERER_PORT"] = "0"
+        expect { described_class.start(:development) }
+          .to output(/RENDERER_PORT=.*not a valid port/).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
     end
   end
 
