@@ -7,7 +7,6 @@ They already have one of these:
 - `react-rails`
 - `vite_rails`
 - a custom Rails-side React helper
-- a legacy asset-pipeline React mount
 
 This page tracks practical migration references for those cases.
 
@@ -117,5 +116,7 @@ Use this page together with the specific migration guide that matches your curre
 
 1. [Migrate from `react-rails`](./migrating-from-react-rails.md)
 2. [Migrate from `vite_rails`](./migrating-from-vite-rails.md)
+
+Other migration paths (Webpack → Rspack, Babel → SWC, Rails 5 API-only, AngularJS, RSC) live in the **Migration Guides** sidebar.
 
 The migration guides explain the mechanics. This page shows what those mechanics look like in real repos.
