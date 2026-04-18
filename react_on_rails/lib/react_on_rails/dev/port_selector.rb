@@ -126,18 +126,18 @@ module ReactOnRails
         def base_port
           # Upper bound accounts for the largest derived offset so base + N stays
           # within the valid TCP port range (1..65_535).
-          BASE_PORT_ENV_VARS.each do |var|
+          BASE_PORT_ENV_VARS.each_with_index do |var, idx|
             raw = ENV.fetch(var, nil)
             next if raw.nil? || raw.empty?
 
             unless raw.match?(/\A\d+\z/)
-              warn "WARNING: #{var}=#{raw.inspect} is not a valid integer; ignoring."
+              warn invalid_base_port_warning(var, raw, "not a valid integer", idx)
               next
             end
 
             val = raw.to_i
             unless val.between?(1, MAX_BASE_PORT)
-              warn "WARNING: #{var}=#{raw.inspect} is out of range (1..#{MAX_BASE_PORT}); ignoring."
+              warn invalid_base_port_warning(var, raw, "out of range (1..#{MAX_BASE_PORT})", idx)
               next
             end
 
@@ -149,6 +149,19 @@ module ReactOnRails
             return val
           end
           nil
+        end
+
+        # Invalid REACT_ON_RAILS_BASE_PORT silently falls through to CONDUCTOR_PORT
+        # (or any future later entry). Surface the fallthrough in the warning so
+        # users who set a non-integer to "disable" base port mode realize they
+        # also need to unset the next var.
+        def invalid_base_port_warning(var, raw, reason, idx)
+          msg = "WARNING: #{var}=#{raw.inspect} is #{reason}; ignoring."
+          remaining = BASE_PORT_ENV_VARS[(idx + 1)..].reject { |v| ENV.fetch(v, "").empty? }
+          return msg if remaining.empty?
+
+          msg + " Base port mode will still activate from #{remaining.join(', ')}; " \
+                "unset to disable entirely."
         end
 
         def explicit_rails_port

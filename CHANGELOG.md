@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Added
+
+- **[Pro] `bin/dev` auto-derives `REACT_RENDERER_URL` from `RENDERER_PORT`**: When only `RENDERER_PORT` is set, `bin/dev` now sets `REACT_RENDERER_URL=http://localhost:RENDERER_PORT` so Rails reaches the right port by default. Users running a remote or non-localhost node renderer (Docker service, remote host) should set `REACT_RENDERER_URL` explicitly so it is not replaced with the localhost default. [PR 3142](https://github.com/shakacode/react_on_rails/pull/3142) by [justin808](https://github.com/justin808).
+
 #### Removed
 
 - **[Pro]** **Removed the `--rsc-pro` install generator flag**: `--rsc` already implies Pro, so the separate mode was unnecessary. Behaviors previously gated on `--rsc-pro` (Pro verification checklist, prerelease install note, exact Pro gem pin on prereleases) now fire on `--rsc` installs. See also [Issue 3104](https://github.com/shakacode/react_on_rails/issues/3104), which tracks unrelated silent-failure bugs in the Pro upgrade automation. [PR 3105](https://github.com/shakacode/react_on_rails/pull/3105) by [ihabadham](https://github.com/ihabadham).

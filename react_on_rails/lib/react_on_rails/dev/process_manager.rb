@@ -14,6 +14,12 @@ module ReactOnRails
       # before entering the block and pass them explicitly to system().
       # This follows the same pattern used by Rails' bundle_command (railties),
       # Spring's process spawning, and this codebase's own PackGenerator.
+      #
+      # REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT are intentionally excluded:
+      # by the time sub-processes spawn, configure_ports has already derived
+      # concrete values into PORT / SHAKAPACKER_DEV_SERVER_PORT / RENDERER_PORT /
+      # REACT_RENDERER_URL. Sub-processes should use those fixed ports rather
+      # than re-deriving from the base.
       ENV_KEYS_TO_PRESERVE = %w[
         PORT
         SHAKAPACKER_DEV_SERVER_PORT

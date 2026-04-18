@@ -310,14 +310,20 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .to output(%r{Overriding REACT_RENDERER_URL=http://renderer.internal:3800}).to_stderr
       end
 
-      it "does not warn when the pre-existing URL is already localhost" do
+      it "warns before overriding a localhost REACT_RENDERER_URL on a different port" do
         ENV["REACT_RENDERER_URL"] = "http://localhost:3800"
         expect { described_class.start(:development) }
-          .not_to output(/Overriding REACT_RENDERER_URL/).to_stderr
+          .to output(%r{Overriding REACT_RENDERER_URL=http://localhost:3800 with http://localhost:5002}).to_stderr
       end
 
-      it "does not warn when the pre-existing URL is HTTPS localhost" do
+      it "warns before overriding an HTTPS localhost REACT_RENDERER_URL on a different port" do
         ENV["REACT_RENDERER_URL"] = "https://localhost:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding REACT_RENDERER_URL=https://localhost:3800}).to_stderr
+      end
+
+      it "does not warn when REACT_RENDERER_URL already equals the derived URL" do
+        ENV["REACT_RENDERER_URL"] = "http://localhost:5002"
         expect { described_class.start(:development) }
           .not_to output(/Overriding REACT_RENDERER_URL/).to_stderr
       end
@@ -334,6 +340,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .to output(/Overriding SHAKAPACKER_DEV_SERVER_PORT=3035 with 5001/).to_stderr
       end
 
+      it "warns before overriding a pre-existing RENDERER_PORT" do
+        ENV["RENDERER_PORT"] = "3800"
+        expect { described_class.start(:development) }
+          .to output(/Overriding RENDERER_PORT=3800 with 5002/).to_stderr
+      end
+
       it "does not warn when PORT is unset" do
         expect { described_class.start(:development) }
           .not_to output(/Overriding PORT/).to_stderr
@@ -343,6 +355,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV["PORT"] = "5000"
         expect { described_class.start(:development) }
           .not_to output(/Overriding PORT/).to_stderr
+      end
+
+      it "does not warn when RENDERER_PORT already matches the derived value" do
+        ENV["RENDERER_PORT"] = "5002"
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding RENDERER_PORT/).to_stderr
       end
     end
 
@@ -363,6 +381,34 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       it "treats SHAKAPACKER_DEV_SERVER_PORT='' as unset and applies the selected webpack port" do
         ENV["SHAKAPACKER_DEV_SERVER_PORT"] = ""
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3035")
+      end
+    end
+
+    context "when PORT/SHAKAPACKER_DEV_SERVER_PORT hold invalid values" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      it "overwrites an out-of-range PORT with the selected Rails port" do
+        ENV["PORT"] = "99999"
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "overwrites a non-numeric PORT with the selected Rails port" do
+        ENV["PORT"] = "abc"
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("3000")
+      end
+
+      it "overwrites an out-of-range SHAKAPACKER_DEV_SERVER_PORT" do
+        ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "99999"
         described_class.start(:development)
         expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3035")
       end
@@ -427,11 +473,18 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .to output(/RENDERER_PORT=80 does not match/).to_stderr
       end
 
-      it "warns and skips URL construction when RENDERER_PORT is non-numeric" do
+      it "warns, deletes the bad RENDERER_PORT, and skips URL construction when RENDERER_PORT is non-numeric" do
         ENV["RENDERER_PORT"] = "abc"
         expect { described_class.start(:development) }
-          .to output(/RENDERER_PORT=.*not a valid port/).to_stderr
+          .to output(/RENDERER_PORT=.*not a valid port \(1\.\.65535\)/).to_stderr
+        expect(ENV.fetch("RENDERER_PORT", nil)).to be_nil
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      it "deletes an out-of-range RENDERER_PORT so the Procfile fallback can apply" do
+        ENV["RENDERER_PORT"] = "99999"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to be_nil
       end
 
       it "warns and skips URL construction when RENDERER_PORT is out of range" do

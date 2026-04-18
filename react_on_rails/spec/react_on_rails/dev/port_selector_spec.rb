@@ -213,6 +213,25 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       end
     end
 
+    context "when REACT_ON_RAILS_BASE_PORT is invalid but CONDUCTOR_PORT is valid" do
+      around do |example|
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "disabled"
+        ENV["CONDUCTOR_PORT"] = "6000"
+        example.run
+      end
+
+      it "falls through to CONDUCTOR_PORT and activates base port mode" do
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(6000)
+        expect(result[:base_port_mode]).to be(true)
+      end
+
+      it "warns that CONDUCTOR_PORT is still the active source so users can opt out" do
+        expect { described_class.select_ports }
+          .to output(/Base port mode will still activate from CONDUCTOR_PORT; unset to disable/).to_stderr
+      end
+    end
+
     context "when default ports are free" do
       it "returns the default Rails port 3000" do
         allow(described_class).to receive(:port_available?).and_return(true)
