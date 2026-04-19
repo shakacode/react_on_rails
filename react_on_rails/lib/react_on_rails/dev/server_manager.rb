@@ -599,7 +599,22 @@ module ReactOnRails
           # into child processes when ENV["PORT"] is unset, overriding the
           # ${PORT:-3001} fallback in the Procfile. Scan from 3001 (not 3000)
           # so prod-assets doesn't collide with the normal dev server.
-          ENV["PORT"] ||= PortSelector.find_available_port(procfile_port(procfile)).to_s
+          #
+          # Also normalize invalid/out-of-range values: ${PORT:-3001} only
+          # falls back on empty/unset, so `PORT=abc` or `PORT=99999` would
+          # otherwise flow straight through to `rails s -p …` and fail to
+          # start. This path does not call configure_ports, so do the
+          # validation here inline.
+          existing_port = ENV.fetch("PORT", nil)
+          unless valid_port_string?(existing_port)
+            unless existing_port.nil? || existing_port.strip.empty?
+              warn "WARNING: PORT=#{existing_port.inspect} is not a valid port; using auto-selected port."
+            end
+            # Clear the bad value first so procfile_port falls back to its default
+            # (3001) instead of `"abc".to_i == 0`, which would scan from port 0.
+            ENV.delete("PORT")
+            ENV["PORT"] = PortSelector.find_available_port(procfile_port(procfile)).to_s
+          end
 
           features = [
             "Precompiling assets with production optimizations",
@@ -942,7 +957,9 @@ module ReactOnRails
 
           if url.nil? || url.empty?
             # Only RENDERER_PORT set: derive the URL so Rails reaches the right port.
-            ENV["REACT_RENDERER_URL"] = "http://localhost:#{port}"
+            derived = "http://localhost:#{port}"
+            puts "RENDERER_PORT=#{port} set without REACT_RENDERER_URL; deriving REACT_RENDERER_URL=#{derived}."
+            ENV["REACT_RENDERER_URL"] = derived
           elsif url_port_mismatch?(url, port)
             # Both set but inconsistent — SSR will silently break otherwise.
             warn "WARNING: RENDERER_PORT=#{port} does not match REACT_RENDERER_URL=#{url}; " \

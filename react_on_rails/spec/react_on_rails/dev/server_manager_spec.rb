@@ -143,6 +143,24 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       ENV.delete("PORT")
     end
 
+    it "normalizes an invalid PORT to an auto-selected port in production-like mode" do
+      ENV["PORT"] = "abc"
+      env = { "NODE_ENV" => "production" }
+      argv = ["bundle", "exec", "rails", "assets:precompile"]
+      status_double = instance_double(Process::Status, success?: true)
+      allow(Open3).to receive(:capture3).with(env, *argv).and_return(["output", "", status_double])
+      allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port).with(3001).and_return(3005)
+      expect(ReactOnRails::Dev::ProcessManager)
+        .to receive(:run_with_process_manager).with("Procfile.dev-prod-assets") do
+          expect(ENV.fetch("PORT", nil)).to eq("3005")
+        end
+
+      expect { described_class.start(:production_like) }
+        .to output(/PORT=.*not a valid port/).to_stderr
+    ensure
+      ENV.delete("PORT")
+    end
+
     it "sets default PORT=3001 for production-like mode" do
       env = { "NODE_ENV" => "production" }
       argv = ["bundle", "exec", "rails", "assets:precompile"]
@@ -458,6 +476,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV["RENDERER_PORT"] = "3801"
         described_class.start(:development)
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3801")
+      end
+
+      it "announces the derived REACT_RENDERER_URL on stdout so the env injection is self-documenting" do
+        ENV["RENDERER_PORT"] = "3801"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=3801 set without REACT_RENDERER_URL; deriving REACT_RENDERER_URL=http://localhost:3801}).to_stdout
       end
 
       it "leaves a pre-existing REACT_RENDERER_URL untouched" do

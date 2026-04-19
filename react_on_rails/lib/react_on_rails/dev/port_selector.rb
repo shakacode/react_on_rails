@@ -183,14 +183,17 @@ module ReactOnRails
         # whether to overwrite the env var.
         def parse_explicit_port_env(var_name)
           raw = ENV.fetch(var_name, nil)
-          return nil if raw.nil? || raw.strip.empty?
+          return nil if raw.nil?
 
-          unless raw.match?(/\A\d+\z/)
+          stripped = raw.strip
+          return nil if stripped.empty?
+
+          unless stripped.match?(/\A\d+\z/)
             warn "WARNING: #{var_name}=#{raw.inspect} is not a valid integer; ignoring."
             return nil
           end
 
-          n = raw.to_i
+          n = stripped.to_i
           n.between?(1, 65_535) ? n : nil
         end
       end
