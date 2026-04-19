@@ -1,16 +1,16 @@
 # RSC Migration Success Stories
 
-If you are deciding whether React Server Components are worth the effort, these case studies show what teams have actually measured after shipping RSC in production, alongside DoorDash's earlier Next.js SSR migration as a useful server-first baseline. The sections below summarize the reported wins, link to the source articles for verification, and point to the React on Rails Pro docs that walk you through getting the same benefits.
+If you are deciding whether React Server Components are worth the effort, these case studies show what teams have actually measured after shipping RSC in production, alongside DoorDash's earlier pre-RSC Next.js SSR migration as a useful server-first baseline. The sections below summarize the reported wins, link to the source articles for verification, and point to the React on Rails Pro docs that walk you through getting the same benefits.
 
 ## Reported Results at a Glance
 
-| Company                           | Scope                                                                        | Headline Result                                                                       | Source                                                                                                                                                                  |
-| --------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **DoorDash**                      | Homepage and store pages (Next.js SSR migration, pre–App Router)             | 65% LCP improvement on homepage, 67% on store pages                                   | [Improving Web Page Performance with Next.js](https://careersatdoordash.com/blog/improving-web-page-performance-at-doordash-throughserver-side-rendering-with-next-js/) |
-| **Mux**                           | ~50,000 lines migrated to the App Router / RSC                               | Bundle-size reduction from keeping server code off the wire (no specific % published) | [What are React Server Components?](https://www.mux.com/blog/what-are-react-server-components)                                                                          |
-| **Frigade**                       | Embedded SaaS widget                                                         | 62% reduction in client-side bundle size                                              | [Bundle size reduction with RSC](https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade)                                                                   |
-| **BlogHunch**                     | Full marketing site + app                                                    | 30% server cost reduction, migration completed in ~1 month                            | [BlogHunch migration case study (via Entesta, migration provider)](https://entesta.com/case-studies/bloghunch-migration)                                                |
-| **Developerway (research piece)** | Instrumented comparison of SSR, App Router, and Server Components-first apps | Honest analysis of when RSC helps vs. doesn't                                         | [React Server Components performance](https://www.developerway.com/posts/react-server-components-performance)                                                           |
+| Company                           | Scope                                                                        | Headline Result                                                                           | Source                                                                                                                                                                   |
+| --------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **DoorDash**                      | Homepage and store pages (Next.js SSR migration, pre–App Router)             | 65% LCP improvement on homepage, 67% on store pages                                       | [Improving Web Page Performance with Next.js](https://careersatdoordash.com/blog/improving-web-page-performance-at-doordash-through-server-side-rendering-with-next-js/) |
+| **Mux**                           | ~50,000 lines migrated to the App Router / RSC                               | Suspense-based streaming kept server code off the client bundle (no headline % published) | [What are React Server Components?](https://www.mux.com/blog/what-are-react-server-components)                                                                           |
+| **Frigade**                       | Embedded SaaS widget                                                         | 62% reduction in client-side bundle size                                                  | [Bundle size reduction with RSC](https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade)                                                                    |
+| **BlogHunch**                     | Full marketing site + app                                                    | 30% server cost reduction, migration completed in ~1 month                                | [BlogHunch migration case study (via Entesta, migration provider)](https://entesta.com/case-studies/bloghunch-migration)                                                 |
+| **Developerway (research piece)** | Instrumented comparison of SSR, App Router, and Server Components-first apps | Honest analysis of when RSC helps vs. doesn't                                             | [React Server Components performance](https://www.developerway.com/posts/react-server-components-performance)                                                            |
 
 All numbers and quotes below are from the linked source articles. Treat them as vendor-reported benchmarks — representative of what's possible, not a guarantee of what you will see.
 
@@ -25,7 +25,7 @@ DoorDash reported large Largest Contentful Paint (LCP) improvements after moving
 
 **Why this matters for React on Rails teams.** LCP is the Core Web Vital most tightly coupled to conversion and SEO. DoorDash's results are useful evidence for selling the business case to stakeholders who are skeptical that an architecture change can move revenue metrics. The same streaming-first rendering strategy is available in React on Rails Pro through `stream_react_component` — see [Streaming SSR](../streaming-ssr.md) and [RSC Rendering Flow](./rendering-flow.md).
 
-- Source: [DoorDash — Improving Web Page Performance with Next.js](https://careersatdoordash.com/blog/improving-web-page-performance-at-doordash-throughserver-side-rendering-with-next-js/)
+- Source: [DoorDash — Improving Web Page Performance with Next.js](https://careersatdoordash.com/blog/improving-web-page-performance-at-doordash-through-server-side-rendering-with-next-js/)
 
 ## Mux — Migrating 50,000 Lines of React to RSC
 
@@ -48,6 +48,8 @@ Frigade ships an embedded onboarding/product-tour widget that runs inside other 
 - Source: [Frigade — Bundle size reduction with RSC](https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade)
 
 ## BlogHunch — 30% Lower Server Costs in One Month
+
+> **Sourcing note.** The BlogHunch figures below come from a case study published by **Entesta**, the migration vendor who performed the work — not from a first-party BlogHunch engineering post. Weigh accordingly alongside the first-party case studies (Mux, Frigade).
 
 BlogHunch's reported outcome is notable because it measures _operational_ cost rather than just front-end performance:
 
@@ -90,7 +92,7 @@ React on Rails Pro gives you these three mechanisms via the node renderer, `stre
 
 ## References
 
-- [DoorDash — Improving Web Page Performance with Next.js](https://careersatdoordash.com/blog/improving-web-page-performance-at-doordash-throughserver-side-rendering-with-next-js/)
+- [DoorDash — Improving Web Page Performance with Next.js](https://careersatdoordash.com/blog/improving-web-page-performance-at-doordash-through-server-side-rendering-with-next-js/)
 - [Mux — What are React Server Components?](https://www.mux.com/blog/what-are-react-server-components)
 - [Frigade — Bundle size reduction with RSC](https://frigade.com/blog/bundle-size-reduction-with-rsc-and-frigade)
 - [BlogHunch migration case study (Entesta)](https://entesta.com/case-studies/bloghunch-migration)
