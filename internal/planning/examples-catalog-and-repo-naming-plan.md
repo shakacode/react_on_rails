@@ -75,15 +75,11 @@ legacy once the current catalog is in place.
 | `egghead-add-redux-component-to-react-on-rails`                  | Archive or de-emphasize      | Video-course artifact                                           |
 | `react-webpack-rails-tutorial`                                   | De-emphasize                 | Legacy full app; still useful, but not a primary modern starter |
 
-## Private or Internal Repos to Exclude from Public Catalog
+## Internal Repos
 
-- `react-on-rails-template`
-- `react_on_rails-demo-octochangelog-on-rails-pro`
-- `react-on-rails-builds`
-- `react_on_rails_pro_licensing`
-
-These may matter operationally, but they should not be linked from the public
-examples page.
+Operational or private repos can matter for maintenance work, but they should
+not appear in public catalogs or public-facing docs. Keep those references in
+private planning material only.
 
 ## Docs and Site Follow-up
 
