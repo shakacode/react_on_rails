@@ -818,7 +818,7 @@ for the current recommendation. See also
 // renderer/node-renderer.js (or wherever you configure the renderer)
 module.exports = {
   supportModules: true, // Injects: Buffer, TextDecoder, TextEncoder,
-  // URLSearchParams, ReadableStream, process,
+  // URLSearchParams, ReadableStream, process, performance,
   // setTimeout, setInterval, setImmediate,
   // clearTimeout, clearInterval, clearImmediate,
   // queueMicrotask
@@ -831,13 +831,16 @@ Or set the environment variable:
 RENDERER_SUPPORT_MODULES=true
 ```
 
-For globals not covered by `supportModules` (e.g., `performance`), use `additionalContext`:
+For globals not covered by `supportModules`, use `additionalContext`:
 
 ```js
 module.exports = {
   supportModules: true,
   additionalContext: {
-    performance: require('perf_hooks').performance,
+    // Add any globals that aren't in the default supportModules set.
+    // Example: override `performance` with a deterministic stub if rendered
+    // output embeds timing values and you need byte-stable SSR.
+    performance: { now: () => 0 },
   },
 };
 ```

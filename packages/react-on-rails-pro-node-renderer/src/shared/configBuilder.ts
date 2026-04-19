@@ -44,7 +44,7 @@ export interface Config {
   bundlePath?: string;
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS
   // global objects and functions that get added to the VM context:
-  // `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
+  // `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, performance, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
   // This option is required to equal `true` if you want to use loadable components.
   // Setting this value to false causes the NodeRenderer to behave like ExecJS.
   supportModules: boolean;
