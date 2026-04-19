@@ -146,6 +146,19 @@ Vite-specific `import.meta.env` usage needs to be replaced. In a React on Rails 
 - lazy/eager behavior is selected via a `mode` argument (`'sync'`, `'lazy'`, `'lazy-once'`, `'eager'`, `'weak'`) rather than the per-call options `import.meta.glob` exposes
 - the returned context function requires explicit `.keys()` + key lookup, not the object-map shape `import.meta.glob` returns
 
+A minimal before/after:
+
+```js
+// Vite
+const modules = import.meta.glob('./dir/**/*.js');
+// { './dir/foo.js': () => import('./dir/foo.js'), ... }
+
+// Webpack (Shakapacker)
+const ctx = require.context('./dir', true, /\.js$/);
+// ctx.keys() → ['./foo.js', ...]
+// ctx('./foo.js') → the module
+```
+
 ## 6. Replace the development workflow
 
 Vite apps usually have a dev command like:
