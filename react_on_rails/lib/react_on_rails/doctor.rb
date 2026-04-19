@@ -2880,6 +2880,9 @@ module ReactOnRails
     # ── Rolling Deploy Adapter ────────────────────────────────────────
 
     ROLLING_DEPLOY_REQUIRED_METHODS = %i[previous_bundle_hashes fetch upload].freeze
+    # Must stay in sync with ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS.
+    # Duplicated rather than referenced directly because doctor runs in the open-source
+    # gem where the Pro constant may not be loaded.
     ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS = 10
 
     def check_rolling_deploy_adapter

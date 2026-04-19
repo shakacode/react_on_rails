@@ -428,5 +428,56 @@ describe ReactOnRailsPro::AssetsPrecompile do
       expect { described_class.publish_current_bundle_if_configured }
         .to output(/Skipping rolling_deploy_adapter publication for server bundle/).to_stderr
     end
+
+    context "when RSC support is enabled" do
+      let(:rsc_bundle) { File.join(Dir.tmpdir, "rolling-deploy-upload-rsc-bundle.js") }
+      let(:config) do
+        instance_double(
+          ReactOnRailsPro::Configuration,
+          rolling_deploy_adapter: adapter,
+          node_renderer?: true,
+          enable_rsc_support: true
+        )
+      end
+
+      before do
+        File.write(rsc_bundle, "// rsc bundle content")
+        allow(ReactOnRailsPro::Utils).to receive(:rsc_bundle_js_file_path).and_return(rsc_bundle)
+        allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+          .to receive(:rsc_bundle_hash).and_return("rsc999")
+        allow(adapter).to receive(:upload)
+      end
+
+      after { FileUtils.rm_f(rsc_bundle) }
+
+      it "uploads both server and RSC bundles" do
+        described_class.publish_current_bundle_if_configured
+
+        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [])
+        expect(adapter).to have_received(:upload).with("rsc999", bundle: rsc_bundle, assets: [])
+      end
+    end
+
+    context "when collect_assets returns a missing optional asset path" do
+      let(:existing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-existing-asset.js") }
+      let(:missing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-missing-asset.js") }
+
+      before do
+        File.write(existing_asset, "// existing asset")
+        FileUtils.rm_f(missing_asset)
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:collect_assets)
+          .and_return([existing_asset, missing_asset])
+        allow(adapter).to receive(:upload)
+      end
+
+      after { FileUtils.rm_f(existing_asset) }
+
+      it "filters out missing assets, warns, and still uploads the remaining ones" do
+        expect { described_class.publish_current_bundle_if_configured }
+          .to output(/Skipping missing optional assets/).to_stderr
+
+        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
+      end
+    end
   end
 end

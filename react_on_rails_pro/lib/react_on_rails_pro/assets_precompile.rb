@@ -107,7 +107,7 @@ module ReactOnRailsPro
 
     def self.publish_bundles(adapter)
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-      assets = ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s)
+      assets = filter_existing_assets(ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s))
 
       server_bundle = ReactOnRails::Utils.server_bundle_js_file_path
       publish_bundle(adapter, pool.server_bundle_hash, server_bundle, assets, "server") if File.exist?(server_bundle)
@@ -116,6 +116,21 @@ module ReactOnRailsPro
 
       rsc_bundle = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
       publish_bundle(adapter, pool.rsc_bundle_hash, rsc_bundle, assets, "RSC") if File.exist?(rsc_bundle)
+    end
+
+    # Optional assets (manifest companions, chunks) may legitimately be absent
+    # — the pre-seed path only warns for missing optional assets. Typical
+    # adapters iterate the list and `cp`/open each entry, so forwarding a
+    # missing path would raise and abort the whole hash upload, leaving the
+    # next deploy unable to fetch this hash (→ cold 410 retries). Drop missing
+    # entries with a warning so publication still covers the existing assets.
+    def self.filter_existing_assets(assets)
+      existing, missing = assets.partition { |path| File.exist?(path) }
+      unless missing.empty?
+        warn "[ReactOnRailsPro] Skipping missing optional assets for rolling_deploy_adapter upload: " \
+             "#{missing.inspect}. Continuing with #{existing.length} existing asset(s)."
+      end
+      existing
     end
 
     def self.publish_bundle(adapter, hash, bundle, assets, bundle_label)

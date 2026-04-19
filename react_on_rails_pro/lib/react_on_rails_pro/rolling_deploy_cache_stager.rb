@@ -74,8 +74,11 @@ module ReactOnRailsPro
                    source_label: "rolling_deploy_adapter#previous_bundle_hashes"
                  )
                end
-      # Deduplicate against the hashes we just staged so we don't re-fetch the current build.
-      hashes - Array(current_hashes).map(&:to_s)
+      # Deduplicate within the previous-hash list first so a duplicate entry can't
+      # fail later and trigger `seed_previous_hash`'s rollback on a directory an
+      # earlier successful stage already populated. Then subtract current-build
+      # hashes so we don't re-fetch what we just staged.
+      hashes.uniq - Array(current_hashes).map(&:to_s)
     end
     private_class_method :resolve_previous_hashes
 
@@ -134,6 +137,13 @@ module ReactOnRailsPro
       warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) timed out after " \
            "#{FETCH_TIMEOUT_SECONDS}s. Skipping this hash."
       nil
+    rescue StandardError => e
+      # Keep adapter-fetch attribution here instead of letting the outer rescue
+      # in `seed_previous_hash` rewrite the message as a generic staging failure —
+      # `bundle_dir` is still nil at this point, so nothing has been staged.
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) raised #{e.class}: " \
+           "#{e.message}. Skipping this hash."
+      nil
     end
     private_class_method :fetch_payload
 
@@ -166,8 +176,13 @@ module ReactOnRailsPro
       normalized_cache_dir = File.expand_path(cache_dir)
       normalized_candidate = File.expand_path(candidate)
 
-      return normalized_candidate if normalized_candidate == normalized_cache_dir ||
-                                     normalized_candidate.start_with?("#{normalized_cache_dir}/")
+      # Require the candidate to be a *subdirectory* of the cache root, not the
+      # cache root itself. `sanitize_hashes` already rejects `""` / `.` / `..`,
+      # so the equality case is unreachable today; enforcing `start_with?` only
+      # keeps staging safe even if sanitization ever regressed (a bundle landing
+      # directly at `<cache>/<hash>.js` instead of `<cache>/<hash>/<hash>.js`
+      # would break the renderer's lookup layout silently).
+      return normalized_candidate if normalized_candidate.start_with?("#{normalized_cache_dir}/")
 
       raise ReactOnRailsPro::Error,
             "Refusing to stage rolling-deploy bundle hash #{hash.inspect} outside renderer cache dir " \

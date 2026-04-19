@@ -116,9 +116,9 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       allow(adapter).to receive(:fetch).with("broken-hash").and_raise(StandardError, "network exploded")
     end
 
-    it "warns but does not propagate" do
+    it "warns with targeted fetch attribution and does not propagate" do
       expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
-        .to output(/Failed to seed previous bundle hash broken-hash/).to_stderr
+        .to output(/rolling_deploy_adapter#fetch\("broken-hash"\) raised StandardError: network exploded/).to_stderr
     end
   end
 
@@ -211,6 +211,23 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
       bundle_dir = File.join(cache_dir, "abc123")
       expect(File.exist?(bundle_dir)).to be(false)
+    end
+  end
+
+  context "when PREVIOUS_BUNDLE_HASHES contains duplicate hashes" do
+    let(:src_bundle) { source_file("bundle-dup.js") }
+
+    before do
+      ENV["PREVIOUS_BUNDLE_HASHES"] = "dup-hash,dup-hash"
+      allow(adapter).to receive(:previous_bundle_hashes)
+      allow(adapter).to receive(:fetch).with("dup-hash").and_return(bundle: src_bundle, assets: [])
+    end
+
+    it "deduplicates before staging so a late failure can't rollback an earlier successful stage" do
+      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+
+      expect(adapter).to have_received(:fetch).with("dup-hash").once
+      expect(File.exist?(File.join(cache_dir, "dup-hash", "dup-hash.js"))).to be(true)
     end
   end
 
