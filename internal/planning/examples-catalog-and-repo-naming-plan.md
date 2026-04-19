@@ -103,6 +103,8 @@ examples page.
 ## Execution Order
 
 1. Update docs and `reactonrails.com/examples` first.
-2. Rename active featured repos.
-3. Update repo descriptions/topics.
-4. Archive or de-emphasize legacy repos after the new catalog is live.
+2. After the docs PRs land and demo links are verified, open a tracking issue
+   for the rename/archive rollout.
+3. Rename active featured repos.
+4. Update repo descriptions/topics.
+5. Archive or de-emphasize legacy repos after the new catalog is live.
