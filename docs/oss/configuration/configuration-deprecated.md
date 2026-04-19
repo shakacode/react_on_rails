@@ -8,7 +8,7 @@ For current configuration options, see [Configuration](README.md).
 
 ### immediate_hydration
 
-**Status:** ⚠️ REMOVED in v17.0
+**Status:** ⚠️ REMOVED in v16.6.0
 
 This configuration option has been removed. React on Rails Pro now performs early hydration automatically for streamed components; there is no per-component toggle. Non-Pro users are not affected.
 
