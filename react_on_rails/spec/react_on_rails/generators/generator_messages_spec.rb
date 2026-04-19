@@ -280,5 +280,22 @@ describe GeneratorMessages do
                                    .and_return('{"packageManager":"deno@1.0.0"}')
       expect(described_class.package_manager_declared?).to be(false)
     end
+
+    it "returns true when packageManager matches the requested manager" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm@9.0.0"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(true)
+    end
+
+    # Prevents a false negative in the CI scaffold: if pnpm is selected via
+    # REACT_ON_RAILS_PACKAGE_MANAGER or pnpm-lock.yaml while package.json declares
+    # a different manager, `pnpm/action-setup` still needs the explicit version pin.
+    it "returns false when packageManager declares a different manager" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"yarn@1.22.0"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
   end
 end

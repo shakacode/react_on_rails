@@ -48,15 +48,21 @@ module GeneratorMessages
       nil
     end
 
-    # Returns true when package.json declares a supported packageManager field
-    # (Corepack standard). Used by the CI scaffold to decide whether
-    # `pnpm/action-setup` needs an explicit `version:` — the action only treats
-    # `version` as optional when packageManager is declared.
-    def package_manager_declared?(app_root: Dir.pwd)
+    # Returns true when package.json declares a `packageManager` field (Corepack standard)
+    # for a supported manager. When `manager:` is passed (e.g. `"pnpm"`), the declared
+    # value must match that specific manager — declaring `yarn@...` returns false even
+    # though yarn is supported. Used by the CI scaffold to decide whether
+    # `pnpm/action-setup` needs an explicit `version:`; the action only reads the pin
+    # from `packageManager` when that field actually declares pnpm.
+    def package_manager_declared?(app_root: Dir.pwd, manager: nil)
       content = read_package_json(app_root)
       return false unless content
 
-      !package_manager_from_content(content).nil?
+      declared = package_manager_from_content(content)
+      return false if declared.nil?
+      return true if manager.nil?
+
+      declared == manager.to_s.downcase
     end
 
     # Returns true only when a lockfile for the specific package manager exists.

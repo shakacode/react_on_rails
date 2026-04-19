@@ -247,9 +247,10 @@ module ReactOnRails
 
       # Pinned when the scaffolded CI workflow has to supply a pnpm version because
       # `pnpm/action-setup` requires one unless package.json declares `packageManager`.
-      # Matches the major used by this repo's own CI; users with a different setup can
-      # override by committing a `packageManager` field.
-      CI_PNPM_FALLBACK_VERSION = "9"
+      # Patch-level pin keeps the drift window inside one pnpm minor series; bump when
+      # the repo's own CI upgrades pnpm. Users can override by committing
+      # `packageManager` to their package.json.
+      CI_PNPM_FALLBACK_VERSION = "9.15"
       private_constant :CI_PNPM_FALLBACK_VERSION
 
       def add_ci_workflow
@@ -270,9 +271,13 @@ module ReactOnRails
         # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
         has_lockfile = GeneratorMessages.lockfile_for_manager?(package_manager, app_root: destination_root)
         # `pnpm/action-setup@v4` requires an explicit `version:` unless package.json declares
-        # `packageManager`. When pnpm is detected from the lockfile alone, pin a version so the
-        # scaffolded workflow does not fail in the setup step before dependency install.
-        package_manager_declared = GeneratorMessages.package_manager_declared?(app_root: destination_root)
+        # `packageManager: pnpm@...`. Only ask the question for pnpm projects — other managers
+        # never read this flag — and require a pnpm-specific declaration so an env-override to
+        # pnpm while package.json declares a different manager still gets the version pin.
+        package_manager_declared = package_manager == "pnpm" &&
+                                   GeneratorMessages.package_manager_declared?(
+                                     app_root: destination_root, manager: "pnpm"
+                                   )
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||
                     File.exist?(File.join(destination_root, "spec/spec_helper.rb"))
