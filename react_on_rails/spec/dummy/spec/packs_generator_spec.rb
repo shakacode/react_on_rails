@@ -312,6 +312,53 @@ module ReactOnRails
         end
       end
 
+      context "when a common component uses client hooks without 'use client'" do
+        let(:component_path) do
+          File.expand_path(
+            "./fixtures/automated_packs_generation/components/" \
+            "ReactServerComponents/ror_components/ReactServerComponent.jsx",
+            __dir__
+          )
+        end
+
+        before do
+          allow(File).to receive(:read).and_call_original
+          allow(File).to receive(:read).with(component_path).and_return("const [count, setCount] = useState(0);")
+        end
+
+        it "raises actionable diagnostics before generation completes" do
+          expect { described_class.instance.generate_packs_if_stale }
+            .to raise_error(
+              ReactOnRails::Error,
+              /ReactServerComponent.*uses client hooks \(useState\).*missing the 'use client' directive/m
+            )
+        end
+      end
+
+      context "when a server bundle component uses client hooks without 'use client'" do
+        let(:component_path) do
+          File.expand_path(
+            "./fixtures/automated_packs_generation/components/" \
+            "ReactServerComponents/ror_components/" \
+            "ReactServerComponentWithClientAndServer.server.jsx",
+            __dir__
+          )
+        end
+
+        before do
+          allow(File).to receive(:read).and_call_original
+          allow(File).to receive(:read).with(component_path).and_return("const ready = React.useEffect(() => {});")
+        end
+
+        it "raises actionable diagnostics before server bundle generation" do
+          expect { described_class.instance.generate_packs_if_stale }
+            .to raise_error(
+              ReactOnRails::Error,
+              /ReactServerComponentWithClientAndServer.*uses client hooks \(useEffect\).*wrong runtime/m
+            )
+        end
+      end
+
       context "when RSC support is disabled" do
         before do
           allow(ReactOnRailsPro::Utils).to receive(:rsc_support_enabled?).and_return(false)
@@ -906,6 +953,40 @@ module ReactOnRails
         let(:to) { "/app/generated/server-bundle-generated.js" }
 
         it { is_expected.to eq "server-bundle-generated.js" }
+      end
+    end
+
+    describe "#client_hook_matches" do
+      subject { described_class.instance.send(:client_hook_matches, file_path) }
+
+      let(:file_path) { "dummy_component.jsx" }
+
+      before do
+        allow(File).to receive(:read).with(file_path).and_return(content)
+      end
+
+      context "when the file calls direct hooks" do
+        let(:content) { "const [state, setState] = useState(false);" }
+
+        it { is_expected.to eq(["useState"]) }
+      end
+
+      context "when the file calls React-prefixed hooks" do
+        let(:content) { "React.useEffect(() => {});" }
+
+        it { is_expected.to eq(["useEffect"]) }
+      end
+
+      context "when hook text appears only in comments" do
+        let(:content) do
+          <<~JS
+            // useState()
+            /* React.useEffect(() => {}) */
+            const value = 1;
+          JS
+        end
+
+        it { is_expected.to eq([]) }
       end
     end
 

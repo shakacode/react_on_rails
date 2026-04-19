@@ -71,6 +71,7 @@ module ReactOnRails
     def generate_packs(verbose: false)
       # Check for name conflicts between components and stores
       check_for_component_store_name_conflicts
+      validate_unsupported_server_component_hooks! if ReactOnRails::Utils.rsc_support_enabled?
 
       common_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
       client_component_to_path.each_value { |component_path| create_pack(component_path, verbose: verbose) }
@@ -172,10 +173,47 @@ module ReactOnRails
       first_js_statement_in_code(content).match?(/^["']use client["'](?:;|\s|$)/)
     end
 
+    CLIENT_HOOK_PATTERN = /\b(?:React\.)?(useState|useEffect|useReducer|useCallback|useMemo|useRef|useLayoutEffect|useImperativeHandle|useContext|useSyncExternalStore|useTransition|useDeferredValue)\s*\(/ # rubocop:disable Layout/LineLength
+
     # Patterns that indicate a file likely uses client-side features.
     # Used as a heuristic warning — false positives (e.g., patterns in comments) are acceptable
     # because this is a warning, not an error.
     CLIENT_API_PATTERN = /\b(useState|useEffect|useReducer|useCallback|useMemo|useRef|useLayoutEffect|useImperativeHandle|useContext|useSyncExternalStore|useTransition|useDeferredValue)\b|\b(onClick|onChange|onSubmit|onFocus|onBlur|onKeyDown|onKeyUp|onKeyPress|onMouseDown|onMouseUp|onMouseEnter|onMouseLeave)\s*[={]|\bextends\s+(React\.)?(Component|PureComponent)\b/ # rubocop:disable Layout/LineLength
+
+    def strip_js_comments(content)
+      content.gsub(%r{/\*.*?\*/}m, "").gsub(%r{//.*$}, "")
+    end
+
+    def client_hook_matches(file_path)
+      strip_js_comments(File.read(file_path)).scan(CLIENT_HOOK_PATTERN).flatten.uniq
+    end
+
+    def raise_if_unsupported_client_hook_usage(file_path, component)
+      hooks = client_hook_matches(file_path)
+      return if hooks.empty?
+
+      message = <<~MSG
+        **ERROR** ReactOnRails: '#{component}' (#{file_path}) uses client hooks (#{hooks.join(', ')}) but will be treated as a server component because it is missing the 'use client' directive.
+        This would run in the wrong runtime. React Server Components and other server-runtime entries cannot call client hooks.
+        If this should be a client component, add '"use client";' as the first line of the file.
+        If this is a paired `.client` / `.server` component, move the hook usage into the `.client` file or mark the client boundary consistently.
+      MSG
+
+      raise ReactOnRails::Error, message
+    end
+
+    def validate_unsupported_server_component_hooks!
+      component_candidates =
+        common_component_to_path.to_a +
+        client_component_to_path.to_a +
+        server_component_to_path.to_a
+
+      component_candidates.each do |component_name, file_path|
+        next if client_entrypoint?(file_path)
+
+        raise_if_unsupported_client_hook_usage(file_path, component_name)
+      end
+    end
 
     def warn_if_likely_client_component(file_path, component)
       content = File.read(file_path)
