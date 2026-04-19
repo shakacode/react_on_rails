@@ -33,7 +33,7 @@ module ReactOnRails
       #
       # Creates:
       # - config/initializers/react_on_rails_pro.rb
-      # - client/node-renderer.js
+      # - renderer/node-renderer.js
       # - Procfile.dev entry for node-renderer
       #
       # @note NPM dependencies are handled separately by JsDependencyManager
@@ -43,8 +43,8 @@ module ReactOnRails
         say set_color("=" * 80, :cyan)
 
         create_pro_initializer
-        create_node_renderer
-        add_pro_to_procfile
+        legacy_renderer_detected = create_node_renderer
+        add_pro_to_procfile unless legacy_renderer_detected
         update_webpack_config_for_pro
 
         say set_color("=" * 80, :cyan)
@@ -210,23 +210,64 @@ module ReactOnRails
         say "✅ Created #{initializer_path}", :green
       end
 
+      # Matches active (uncommented) Procfile.dev node-renderer lines, tolerating
+      # an optional `./` prefix that a user may have added by hand
+      # (e.g. `node ./renderer/node-renderer.js`).
+      NEW_RENDERER_COMMAND_REGEX = %r{^[ \t]*node-renderer:[^\n]*\bnode\s+\.?/?renderer/node-renderer\.js\b}
+      LEGACY_RENDERER_COMMAND_REGEX = %r{^[ \t]*node-renderer:[^\n]*\bnode\s+\.?/?client/node-renderer\.js\b}
+
+      # Creates renderer/node-renderer.js unless either the new path or the legacy
+      # client/node-renderer.js already exists.
+      #
+      # @return [Boolean] true when a legacy client/node-renderer.js was detected
+      #   (caller should skip add_pro_to_procfile to avoid pointing Procfile.dev
+      #   at a file that wasn't created); false otherwise.
       def create_node_renderer
-        node_renderer_path = "client/node-renderer.js"
+        node_renderer_path = "renderer/node-renderer.js"
+        legacy_node_renderer_path = "client/node-renderer.js"
 
         if File.exist?(File.join(destination_root, node_renderer_path))
           say "ℹ️  #{node_renderer_path} already exists, skipping", :yellow
-          return
+          return false
+        end
+
+        if File.exist?(File.join(destination_root, legacy_node_renderer_path))
+          say "ℹ️  #{legacy_node_renderer_path} detected, keeping existing renderer; " \
+              "to migrate, move it to #{node_renderer_path} and update any references " \
+              "(e.g. Procfile.dev, Procfile.prod, Docker CMD / command):", :yellow
+          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node #{node_renderer_path}", :yellow
+          warn_on_stale_legacy_procfile_entry
+          return true
         end
 
         say "📝 Creating Node Renderer bootstrap...", :yellow
 
-        # Ensure client directory exists
-        FileUtils.mkdir_p(File.join(destination_root, "client"))
+        empty_directory("renderer")
 
-        template_path = "templates/pro/base/client/node-renderer.js"
+        template_path = "templates/pro/base/renderer/node-renderer.js"
         copy_file(template_path, node_renderer_path)
 
         say "✅ Created #{node_renderer_path}", :green
+        false
+      end
+
+      # When a legacy client/node-renderer.js is detected, add_pro_to_procfile is
+      # skipped, so surface a pointed warning if Procfile.dev still launches the
+      # legacy entry. This nudges the user to update the exact line they need to
+      # touch rather than leaving them to diff the generic migration hint against
+      # their Procfile themselves.
+      def warn_on_stale_legacy_procfile_entry
+        procfile_path = File.join(destination_root, "Procfile.dev")
+        return unless File.exist?(procfile_path)
+
+        procfile_content = File.read(procfile_path)
+        return unless procfile_content.match?(LEGACY_RENDERER_COMMAND_REGEX)
+
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  Procfile.dev still launches the legacy client/node-renderer.js.
+          After migrating the renderer file, update that line to:
+            node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
+        MSG
       end
 
       def add_pro_to_procfile
@@ -237,13 +278,22 @@ module ReactOnRails
             ⚠️  Procfile.dev not found. Skipping Node Renderer process addition.
 
             You'll need to add the Node Renderer to your process manager manually:
-              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js
+              node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
           MSG
           return
         end
 
-        if File.read(procfile_path).include?("node-renderer:")
+        procfile_content = File.read(procfile_path)
+
+        if procfile_content.match?(NEW_RENDERER_COMMAND_REGEX)
           say "ℹ️  Node Renderer already in Procfile.dev, skipping", :yellow
+          return
+        end
+
+        if procfile_content.match?(/^[ \t]*node-renderer:/)
+          say "⚠️  Procfile.dev has a node-renderer: entry that doesn't reference " \
+              "renderer/node-renderer.js. Update it manually to:", :yellow
+          say "      node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js", :yellow
           return
         end
 
@@ -252,7 +302,7 @@ module ReactOnRails
         node_renderer_line = <<~PROCFILE
 
           # React on Rails Pro - Node Renderer for SSR
-          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node client/node-renderer.js
+          node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js
         PROCFILE
 
         append_to_file("Procfile.dev", node_renderer_line)

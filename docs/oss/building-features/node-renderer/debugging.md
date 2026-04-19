@@ -63,7 +63,7 @@ Use Node's built-in flag to write heap snapshots on demand:
 ```bash
 cd react_on_rails_pro/spec/dummy
 # Adjust the port if your Rails app points at a different renderer URL.
-NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2" RENDERER_PORT=3800 node client/node-renderer.js
+NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2" RENDERER_PORT=3800 node renderer/node-renderer.js
 ```
 
 Then capture snapshots at different times:

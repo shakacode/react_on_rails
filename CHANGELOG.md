@@ -24,6 +24,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 ### [Unreleased]
 
+#### Changed
+
+- **[Pro]** **Pro generator now creates the Node Renderer at `renderer/node-renderer.js`**: The canonical location for the Node Renderer entry point is now a dedicated top-level `renderer/` directory instead of `client/`, making it straightforward to exclude from production Docker builds that strip JS sources after bundling. Docs and Pro `spec/dummy` now use the new path consistently. Existing apps are unaffected — the generator skips files that already exist (including a legacy `client/node-renderer.js`). Fixes [Issue 3073](https://github.com/shakacode/react_on_rails/issues/3073). [PR 3165](https://github.com/shakacode/react_on_rails/pull/3165) by [justin808](https://github.com/justin808).
+
 #### Fixed
 
 - **Client startup now recovers if initialization begins during `interactive` after `DOMContentLoaded` already fired**: React on Rails now still initializes the page when the client bundle starts in the browser timing window after `DOMContentLoaded` but before the document reaches `complete`. Fixes [Issue 3150](https://github.com/shakacode/react_on_rails/issues/3150). [PR 3151](https://github.com/shakacode/react_on_rails/pull/3151) by [ihabadham](https://github.com/ihabadham).

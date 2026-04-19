@@ -815,7 +815,7 @@ for the current recommendation. See also
 **Fix:** Enable `supportModules` in your node renderer configuration to inject common Node.js globals:
 
 ```js
-// node-renderer.js (or wherever you configure the renderer)
+// renderer/node-renderer.js (or wherever you configure the renderer)
 module.exports = {
   supportModules: true, // Injects: Buffer, TextDecoder, TextEncoder,
   // URLSearchParams, ReadableStream, process,

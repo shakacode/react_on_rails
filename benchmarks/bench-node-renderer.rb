@@ -23,7 +23,7 @@ end
 
 def read_password_from_config
   config_path = File.expand_path(
-    "../react_on_rails_pro/spec/dummy/client/node-renderer.js",
+    "../react_on_rails_pro/spec/dummy/renderer/node-renderer.js",
     __dir__
   )
   config_content = File.read(config_path)
