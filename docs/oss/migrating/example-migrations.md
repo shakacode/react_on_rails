@@ -34,7 +34,7 @@ The best examples are:
 
 These are stable references you can inspect today:
 
-1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) — covers react-rails v3 → react_on_rails v13.4
+1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) — covers `react-rails` v3 → `react_on_rails` v13.4, so compare it with the current migration guides before following it step by step
 2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) — based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example)
 
 ### In-progress migration work
@@ -128,6 +128,11 @@ Use this page together with the specific migration guide that matches your curre
 1. [Migrate from `react-rails`](./migrating-from-react-rails.md)
 2. [Migrate from `vite_rails`](./migrating-from-vite-rails.md)
 
-Other migration paths (Webpack → Rspack, Babel → SWC, Rails 5 API-only, AngularJS) live in the **Migration Guides** sidebar. RSC migration content lives under **React on Rails Pro → React Server Components**.
+Other migration paths:
+
+1. [Webpack to Rspack](./migrating-from-webpack-to-rspack.md)
+2. [Babel to SWC](./babel-to-swc-migration.md)
+
+The Rails 5 API-only and AngularJS paths also live in the **Migration Guides** sidebar. React Server Components migration content lives under **React on Rails Pro → React Server Components**.
 
 The migration guides explain the mechanics. This page shows what those mechanics look like in real repos.
