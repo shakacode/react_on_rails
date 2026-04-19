@@ -18,7 +18,12 @@
 # users commonly want.
 #
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
-require "pry-byebug"
+begin
+  require "readline"
+  require "pry-byebug"
+rescue LoadError
+  # Some Ruby builds (for example lightweight mise builds) ship without readline.
+end
 
 RSpec.configure do |config|
   config.example_status_persistence_file_path = "spec/examples.txt"
