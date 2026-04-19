@@ -34,6 +34,10 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 - **Doctor accepts TypeScript server bundle entrypoints**: `react_on_rails:doctor` now resolves common source entrypoint suffixes (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`) before warning that the server bundle is missing, preventing false positives when apps use `server-bundle.ts`. [PR 3111](https://github.com/shakacode/react_on_rails/pull/3111) by [justin808](https://github.com/justin808).
 - **Doctor no longer fails custom projects for a missing generated `bin/dev`**: `react_on_rails:doctor` now downgrades a missing official React on Rails `bin/dev` launcher from an error to a warning and adds explicit guidance when a custom `./dev` script is detected, so custom projects can pass diagnostics when their development setup is intentional. Fixes [Issue 3103](https://github.com/shakacode/react_on_rails/issues/3103). [PR 3117](https://github.com/shakacode/react_on_rails/pull/3117) by [justin808](https://github.com/justin808).
 
+#### Changed
+
+- **Rspack install scaffolding now targets Rspack v2**: `react_on_rails:install --rspack` and `bin/switch-bundler` now generate the Rspack v2 package line (`@rspack/core@^2.0.0-0`, `@rspack/cli@^2.0.0-0`, `@rspack/plugin-react-refresh@^2.0.0`) while keeping `rspack-manifest-plugin@^5.0.0`, which is already compatible. Closes [Issue 3082](https://github.com/shakacode/react_on_rails/issues/3082). [PR 3084](https://github.com/shakacode/react_on_rails/pull/3084) by [justin808](https://github.com/justin808).
+
 ### [16.6.0] - 2026-04-09
 
 #### Removed
