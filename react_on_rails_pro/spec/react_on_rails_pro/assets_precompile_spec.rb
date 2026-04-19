@@ -419,5 +419,14 @@ describe ReactOnRailsPro::AssetsPrecompile do
       expect { described_class.publish_current_bundle_if_configured }
         .to output(/rolling_deploy_adapter#upload for abc123 timed out after 0.05s/).to_stderr
     end
+
+    it "warns and skips publication when the server bundle hash is blank" do
+      allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
+        .to receive(:server_bundle_hash).and_return(nil)
+
+      expect(adapter).not_to receive(:upload)
+      expect { described_class.publish_current_bundle_if_configured }
+        .to output(/Skipping rolling_deploy_adapter publication for server bundle/).to_stderr
+    end
   end
 end

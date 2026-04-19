@@ -110,12 +110,22 @@ module ReactOnRailsPro
       assets = ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s)
 
       server_bundle = ReactOnRails::Utils.server_bundle_js_file_path
-      upload_bundle(adapter, pool.server_bundle_hash, server_bundle, assets) if File.exist?(server_bundle)
+      publish_bundle(adapter, pool.server_bundle_hash, server_bundle, assets, "server") if File.exist?(server_bundle)
 
       return unless ReactOnRailsPro.configuration.enable_rsc_support
 
       rsc_bundle = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
-      upload_bundle(adapter, pool.rsc_bundle_hash, rsc_bundle, assets) if File.exist?(rsc_bundle)
+      publish_bundle(adapter, pool.rsc_bundle_hash, rsc_bundle, assets, "RSC") if File.exist?(rsc_bundle)
+    end
+
+    def self.publish_bundle(adapter, hash, bundle, assets, bundle_label)
+      if hash.to_s.empty?
+        warn "[ReactOnRailsPro] Skipping rolling_deploy_adapter publication for #{bundle_label} bundle " \
+             "#{bundle.inspect} because its bundle hash is blank."
+        return
+      end
+
+      upload_bundle(adapter, hash, bundle, assets)
     end
 
     def self.upload_bundle(adapter, hash, bundle, assets)

@@ -2880,7 +2880,7 @@ module ReactOnRails
     # ── Rolling Deploy Adapter ────────────────────────────────────────
 
     ROLLING_DEPLOY_REQUIRED_METHODS = %i[previous_bundle_hashes fetch upload].freeze
-    ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS = 3
+    ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS = 10
 
     def check_rolling_deploy_adapter
       adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
@@ -2923,9 +2923,9 @@ module ReactOnRails
     end
 
     def report_previous_bundle_hashes_probe(adapter)
-      start = Time.now
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       hashes = Timeout.timeout(ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS) { Array(adapter.previous_bundle_hashes) }
-      latency_ms = ((Time.now - start) * 1000).round
+      latency_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000).round
 
       if hashes.empty?
         checker.add_warning(

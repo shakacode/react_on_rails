@@ -239,8 +239,10 @@ class ControlPlaneRollingDeployAdapter
     _out, status = Open3.capture2e("cpln", "image", "pull", image, "--output", tmp)
     return nil unless status.success?
 
-    bundle = Dir[File.join(tmp, "*.js")].first
-    return nil unless bundle
+    bundles = Dir[File.join(tmp, "*.js")].sort
+    return nil unless bundles.one?
+
+    bundle = bundles.first
 
     # Explicit allowlist — don't sweep up unrelated JSON files that may be
     # bundled in the image layer (lock files, health-check payloads, etc.).
@@ -281,8 +283,10 @@ class FilesystemRollingDeployAdapter
     dir = root.join(hash)
     return nil unless dir.directory?
 
+    asset_names = %w[loadable-stats.json react-client-manifest.json react-server-client-manifest.json]
+
     { bundle: dir.join("bundle.js").to_s,
-      assets: Dir[dir.join("*.json")] }
+      assets: asset_names.map { |name| dir.join(name).to_s }.select { |path| File.exist?(path) } }
   end
 
   def self.upload(hash, bundle:, assets:)
@@ -301,7 +305,7 @@ end
 `react_on_rails:doctor` probes a configured `rolling_deploy_adapter` and reports:
 
 - ✅ Whether it responds to all three required methods.
-- ✅ Whether `previous_bundle_hashes` returns successfully within 3 seconds, and how many hashes it returned.
+- ✅ Whether `previous_bundle_hashes` returns successfully within 10 seconds, and how many hashes it returned.
 - ⚠️ Empty-list returns (often indicates the upload side has never run on a prior deploy).
 - ℹ️ The resolved renderer cache dir and how many bundle-hash subdirectories are present.
 - ℹ️ Whether `PREVIOUS_BUNDLE_HASHES` env override is set.
