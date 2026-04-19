@@ -2,7 +2,7 @@
 
 module ReactOnRails
   class JsonParseError < ::ReactOnRails::Error
-    attr_reader :json
+    attr_reader :json, :original_error
 
     def initialize(parse_error:, json:)
       @json = json
@@ -19,9 +19,9 @@ module ReactOnRails
       to_error_context
     end
 
-    def raven_context
-      to_error_context
-    end
+    # Deprecated: Sentry SDK no longer uses Raven. Use {#to_honeybadger_context} or custom error tracking.
+    # Kept for backwards compatibility with existing error handlers.
+    alias raven_context to_honeybadger_context
 
     def to_error_context
       {
