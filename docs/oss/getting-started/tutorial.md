@@ -1,6 +1,6 @@
 # React on Rails Basic Tutorial
 
-_Also see the example repo of [React on Rails Tutorial With SSR, HMR fast refresh, and TypeScript](https://github.com/shakacode/react_on_rails_demo_ssr_hmr)_
+_See also [Examples and migration references](./examples-and-references.md) for the maintained tutorial demo, migration references, and current React on Rails Pro + RSC demos._
 
 ---
 
