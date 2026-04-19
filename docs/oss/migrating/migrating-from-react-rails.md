@@ -140,7 +140,9 @@ Both gems ship a view helper named `react_component` that ends up available in R
 - `react-rails` (`React::Rails::ViewHelper`) takes positional arguments: `react_component(name, props, html_options)`.
 - `react_on_rails` (`ReactOnRailsHelper` → `ReactOnRails::Helper#react_component`) takes `react_component(name, options = {})` where props are nested under `options[:props]`.
 
-`react-rails` includes `React::Rails::ViewHelper` directly into `ActionView::Base` from its railtie. `react_on_rails` ships `ReactOnRailsHelper` as a normal Rails helper module, and under Rails' default `include_all_helpers` behavior that helper is pulled into the controller/view helper module that sits earlier in method lookup than `ActionView::Base`. In a standard Rails app, that means `ReactOnRailsHelper#react_component` wins once the gem is present. This is a helper-precedence issue, not `app/helpers/` file order or gem-name alphabetics. If your app customizes helper loading, verify which helper owns `react_component` before relying on coexistence. Once you add `react_on_rails` to the `Gemfile`, every existing legacy call starts resolving to `ReactOnRails::Helper#react_component(name, options = {})`, which behaves differently depending on how many positional arguments you pass. Rails gives no boot-time warning in either case:
+`react-rails` includes `React::Rails::ViewHelper` directly into `ActionView::Base` from its railtie. `react_on_rails` ships `ReactOnRailsHelper` as a normal Rails helper module, and under Rails' default `include_all_helpers` behavior that helper is pulled into the controller/view helper module that sits earlier in method lookup than `ActionView::Base`. In a standard Rails app, that means `ReactOnRailsHelper#react_component` wins once the gem is present. This is a helper-precedence issue, not `app/helpers/` file order or gem-name alphabetics. If your app customizes helper loading, verify which helper owns `react_component` before relying on coexistence.
+
+Once you add `react_on_rails` to the `Gemfile`, every existing legacy call starts resolving to `ReactOnRails::Helper#react_component(name, options = {})`, which behaves differently depending on how many positional arguments you pass. Rails gives no boot-time warning in either case:
 
 - **Three or more positional arguments** — e.g. `react_component "command_bar/CommandBar", props, { camelize_props: false }` — raise `ArgumentError` at render time on the first request to any un-migrated view, because the new helper only takes two arguments.
 - **Two positional arguments** — e.g. `react_component "command_bar/CommandBar", props` — are silently accepted. The `props` hash is bound to `options`, but React on Rails reads props only from `options[:props]`, so the component renders with no props instead of failing loudly. This is the more dangerous case: un-migrated views do not error; they just lose their data.
@@ -178,6 +180,11 @@ module ReactOnRailsCoexistence
   # forwards a block, which react-rails uses for mount-tag content.
   module LegacyReactComponent
     def react_component(name, props = {}, options = {}, &block)
+      # bind(self) requires self to include React::Rails::ViewHelper. That
+      # holds in standard Rails views (the react-rails railtie includes it
+      # into ActionView::Base) but not in Rails engines, ViewComponent, or
+      # other view contexts that don't inherit from ActionView::Base.
+      # On Ruby 2.7+, .bind_call(self, ...) skips the BoundMethod allocation.
       React::Rails::ViewHelper.instance_method(:react_component)
                               .bind(self)
                               .call(name, props, options, &block)
@@ -204,6 +211,8 @@ Apply the monkey-patches from an initializer so they run once at boot and are re
 require Rails.root.join("app/helpers/react_on_rails_coexistence")
 
 Rails.application.config.to_prepare do
+  # Safe to re-run on every reload: Ruby skips the insertion when the module
+  # is already in the ancestor chain, so duplicates never accumulate.
   ReactOnRailsHelper.prepend(ReactOnRailsCoexistence::LegacyReactComponent)
   ActionView::Base.include(ReactOnRailsCoexistence)
 end
@@ -216,6 +225,8 @@ Use `react_on_rails_component(...)` in new or migrated views:
 ```
 
 Leave existing `react_component(...)` calls untouched until you are ready to migrate them. When every call site has been converted, update each migrated call site from `react_on_rails_component(...)` back to `react_component(...)` and delete the shim files (`app/helpers/react_on_rails_coexistence.rb` and `config/initializers/react_on_rails_coexistence.rb`).
+
+> **Note:** under this option, every migrated call site goes through two renames: `react_component` → `react_on_rails_component` (while the shim is active), then back to `react_component` once the shim is removed. A project-wide find-and-replace over `react_on_rails_component` makes the final pass quick.
 
 ### Known limitations of Option B
 
