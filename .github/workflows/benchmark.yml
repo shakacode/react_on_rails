@@ -157,7 +157,12 @@ jobs:
       # ============================================
 
       - name: Install Bencher CLI
-        uses: bencherdev/bencher@main
+        # Pinned: step 7a's alert-detection heuristic greps stderr for
+        # "Alert[s]" / "threshold violation" / "boundary violation". Those strings
+        # are not a documented API contract, so upgrading the CLI requires
+        # re-verifying that the expected phrases still appear in alert output.
+        # Expected stderr phrases at v0.6.2: "🚨 N Alerts", "Alert detected".
+        uses: bencherdev/bencher@v0.6.2
 
       - name: Add tools directory to PATH
         run: |
@@ -654,16 +659,18 @@ jobs:
           # Distinguish regression alerts from operational failures (auth/API/network/CLI)
           # so that main can warn-only on the former while still failing hard on the latter.
           # Match Bencher's actual alert output (e.g., "🚨 2 Alerts", "Alert detected") via
-          # a word-bounded, case-sensitive "Alert[s]" — a bare case-insensitive "alert" would
-          # also match lowercase "alert" in URL paths (e.g., "/v0/.../alerts") or CLI text,
-          # which could misclassify an operational failure as a regression and let main go green.
+          # a word-bounded, case-insensitive "Alert[s]". The word boundary (\b) already
+          # prevents matching lowercase "alerts" inside URL paths (e.g., "/v0/.../alerts"),
+          # so the case-insensitive flag adds robustness against future CLI wording changes
+          # (e.g., lowercase "1 alert") without reintroducing the URL-path false positive.
           BENCHER_HAS_ALERT=0
           if [ $BENCHER_EXIT_CODE -ne 0 ] && \
-             { grep -qE "\bAlerts?\b" "$BENCHER_STDERR" || \
+             { grep -qiE "\bAlerts?\b" "$BENCHER_STDERR" || \
                grep -qiE "threshold violation|boundary violation" "$BENCHER_STDERR"; }; then
             BENCHER_HAS_ALERT=1
           fi
-          rm -f "$BENCHER_STDERR"
+          # Cleanup is also handled by the `trap 'rm -f "$BENCHER_STDERR"' EXIT` above,
+          # so we don't need an explicit rm here.
 
           # Export exit code and alert flag early so downstream steps (7b/7c/7d) always
           # see them, even if the post-processing below (step summary, PR comments) fails.
@@ -831,7 +838,8 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.BENCHER_EXIT_CODE != '0' && env.BENCHER_HAS_ALERT != '1'
         run: |
           echo "::error::Bencher exited ${BENCHER_EXIT_CODE:-1} on main with no regression alert in stderr — this indicates an operational failure (auth/API/network/CLI), not a performance regression. Check the logs above."
-          exit 1
+          # Preserve the original Bencher exit code in CI logs for diagnostic context.
+          exit "${BENCHER_EXIT_CODE:-1}"
 
       # ============================================
       # STEP 8: WORKFLOW COMPLETION
