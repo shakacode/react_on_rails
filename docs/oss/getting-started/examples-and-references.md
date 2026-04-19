@@ -29,7 +29,7 @@ are current and worth starting from.
 
 ### Spec Dummy App
 
-- Repo: [shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy)
+- Repo: [shakacode/react_on_rails — spec/dummy](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy)
 - Use it when you want the simplest in-repo reference for current generator and
   feature behavior.
 - Note: this is the in-repo test app used by the RSpec suite, not a standalone
