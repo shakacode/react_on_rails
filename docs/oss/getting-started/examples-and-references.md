@@ -7,17 +7,7 @@ to navigate without scattering hard-coded repository links across the docs.
 For the curated marketing view, see
 [reactonrails.com/examples](https://reactonrails.com/examples).
 
-## Repo Naming Pattern
-
-React on Rails public reference repos fall into three buckets:
-
-| Type     | Preferred pattern           | Use it for                                                                 |
-| -------- | --------------------------- | -------------------------------------------------------------------------- |
-| Demo     | `react-on-rails-demo-*`     | Evaluation apps, benchmarks, feature showcases, and product comparisons    |
-| Example  | `react-on-rails-example-*`  | Focused implementation references and migration references                 |
-| Tutorial | `react-on-rails-tutorial-*` | Step-by-step follow-along repos that map directly to docs or video lessons |
-
-Some current repos still use older slugs with underscores or legacy wording.
+Some public repos still use older slugs with underscores or legacy wording.
 This page and the examples site are the source of truth for which public repos
 are current and worth starting from.
 
@@ -35,11 +25,15 @@ are current and worth starting from.
 - Use it when you want a minimal public sample for React Server Components with
   React on Rails Pro.
 
+## In-Repo Reference
+
 ### Spec Dummy App
 
 - Repo: [shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy)
 - Use it when you want the simplest in-repo reference for current generator and
   feature behavior.
+- Note: this is the in-repo test app used by the RSpec suite, not a standalone
+  starter repository.
 
 ## Migration References
 
