@@ -169,4 +169,4 @@ then treat the migration as:
 5. Replace helper syntax and component registration.
 6. Review `bin/dev`, `config/shakapacker.yml`, and webpack config diffs before committing.
 
-Current React on Rails does not install alongside `gem "webpacker"` — migrate to Shakapacker first (step 1 above) rather than budgeting time for Webpacker compatibility shims.
+Current React on Rails does not support `gem "webpacker"`. The install generator adds Shakapacker rather than enforcing a hard install-time block, and `react_on_rails doctor` flags Webpacker as a removed/breaking-change issue when it detects `config/webpacker.yml` or `bin/webpacker`. Migrate to Shakapacker first (step 1 above) rather than budgeting time for Webpacker compatibility shims.

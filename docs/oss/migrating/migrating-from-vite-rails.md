@@ -146,17 +146,36 @@ Vite-specific `import.meta.env` usage needs to be replaced. In a React on Rails 
 - lazy/eager behavior is selected via a `mode` argument (`'sync'`, `'lazy'`, `'lazy-once'`, `'eager'`, `'weak'`) rather than the per-call options `import.meta.glob` exposes
 - the returned context function requires explicit `.keys()` + key lookup, not the object-map shape `import.meta.glob` returns
 
-A minimal before/after:
+A minimal before/after — note two semantic mismatches that bite during migration:
+
+1. **Key paths differ.** Vite returns paths relative to the _calling module_ (`'./dir/foo.js'`); `require.context` returns paths relative to the _context directory_ (`'./foo.js'`). Code that derives names from keys (routing, registration, etc.) needs to account for this.
+2. **Sync vs async.** `import.meta.glob` is lazy by default — values are `() => import(...)` returning a Promise. `ctx(key)` is synchronous. A reader who replaces `await module()` with `ctx(key)` silently drops async behavior; for the lazy case, build a map of dynamic `import()` calls instead.
+
+Eager / synchronous case:
 
 ```js
-// Vite
+// Vite (eager)
+const modules = import.meta.glob('./dir/**/*.js', { eager: true });
+// { './dir/foo.js': <module>, ... }  ← keys relative to current file
+
+// Webpack (Shakapacker) — synchronous equivalent
+const ctx = require.context('./dir', true, /\.js$/);
+// ctx.keys() → ['./foo.js', ...]  ← keys relative to context dir, NOT './dir/foo.js'
+// ctx('./foo.js') → the module (synchronous)
+```
+
+Lazy (default Vite) case — `require.context` is not a direct replacement; build a map of dynamic `import()` calls:
+
+```js
+// Vite (lazy, the default)
 const modules = import.meta.glob('./dir/**/*.js');
 // { './dir/foo.js': () => import('./dir/foo.js'), ... }
 
-// Webpack (Shakapacker)
+// Webpack (Shakapacker) — lazy equivalent
 const ctx = require.context('./dir', true, /\.js$/);
-// ctx.keys() → ['./foo.js', ...]
-// ctx('./foo.js') → the module
+const lazyModules = Object.fromEntries(
+  ctx.keys().map((key) => [key, () => import(/* webpackMode: "lazy" */ `./dir/${key.slice(2)}`)]),
+);
 ```
 
 ## 6. Replace the development workflow
