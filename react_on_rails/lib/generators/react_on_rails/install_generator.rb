@@ -57,21 +57,13 @@ module ReactOnRails
       class_option :pro,
                    type: :boolean,
                    default: false,
-                   desc: "Install React on Rails Pro with Node Renderer. " \
-                         "Combined with --rsc, uses --rsc-pro mode. Default: false"
+                   desc: "Install React on Rails Pro with Node Renderer. Default: false"
 
       # --rsc
       class_option :rsc,
                    type: :boolean,
                    default: false,
-                   desc: "Install React Server Components support (includes Pro). " \
-                         "Combined with --pro, uses --rsc-pro mode. Default: false"
-
-      # --rsc-pro
-      class_option :rsc_pro,
-                   type: :boolean,
-                   default: false,
-                   desc: "Install first-class Pro RSC mode with matched Pro/RSC defaults. Default: false"
+                   desc: "Install React Server Components support (includes Pro). Default: false"
 
       # Hidden option: allows tests (and advanced users) to signal that Shakapacker
       # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
@@ -644,7 +636,7 @@ module ReactOnRails
                                      ci_workflow_generated: @ci_workflow_generated == true,
                                      app_root: destination_root
                                    ))
-        GeneratorMessages.add_info(rsc_pro_verification_message) if use_rsc_pro_mode?
+        GeneratorMessages.add_info(rsc_verification_message) if use_rsc?
       end
 
       def shakapacker_setup_incomplete?
@@ -658,9 +650,7 @@ module ReactOnRails
         flags << "--typescript" if options.typescript?
         flags << "--rspack" if options.rspack?
 
-        if use_rsc_pro_mode?
-          flags << "--rsc-pro"
-        elsif options.rsc?
+        if options.rsc?
           flags << "--rsc"
         elsif options.pro?
           flags << "--pro"
@@ -669,7 +659,7 @@ module ReactOnRails
         ["rails generate react_on_rails:install", *flags].join(" ")
       end
 
-      def rsc_pro_verification_message
+      def rsc_verification_message
         <<~MSG
 
           🔎 RSC Pro Verification:
