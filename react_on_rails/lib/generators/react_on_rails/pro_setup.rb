@@ -60,11 +60,12 @@ module ReactOnRails
         return false if pro_gem_installed?
         return false if attempt_pro_gem_auto_install
 
+        optional_prerelease_line = prerelease_note.empty? ? "" : "\n#{prerelease_note}"
+
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
 
-          #{pro_gem_requirement_context_line}
-          #{prerelease_note}
+          #{pro_gem_requirement_context_line}#{optional_prerelease_line}
 
           Please add manually to your Gemfile:
             gem '#{PRO_GEM_NAME}', '#{pro_gem_version_requirement}'

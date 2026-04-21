@@ -1575,13 +1575,16 @@ describe InstallGenerator, type: :generator do
       end
     end
 
-    it "installs RSC npm dependencies" do
+    it "installs RSC npm dependencies with matched version pins" do
+      expected_npm_version = ReactOnRails::VersionSyntaxConverter.new.rubygem_to_npm(ReactOnRails::VERSION)
+      expected_rsc_npm_version = ReactOnRails::Generators::JsDependencyManager::RSC_PACKAGE_VERSION_PIN
+
       assert_file "package.json" do |content|
         package_json = JSON.parse(content)
         deps = package_json["dependencies"] || {}
-        expect(deps).to include("react-on-rails-pro")
-        expect(deps).to include("react-on-rails-pro-node-renderer")
-        expect(deps).to include("react-on-rails-rsc")
+        expect(deps["react-on-rails-pro"]).to eq(expected_npm_version)
+        expect(deps["react-on-rails-pro-node-renderer"]).to eq(expected_npm_version)
+        expect(deps["react-on-rails-rsc"]).to eq(expected_rsc_npm_version)
       end
     end
 
