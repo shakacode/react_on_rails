@@ -2,15 +2,22 @@
 
 require "rainbow"
 
+# Error class for React server-side rendering failures
 # rubocop:disable: Layout/IndentHeredoc
 module ReactOnRails
   class PrerenderError < ::ReactOnRails::Error
+    # Maximum characters to log for error snippets (props, js_code)
     MAX_ERROR_SNIPPET_TO_LOG = 1000
-    # TODO: Consider remove providing original `err` as already have access to `self.cause`
+
+    # @deprecated Use {#cause} instead. Kept for backwards compatibility.
     # http://blog.honeybadger.io/nested-errors-in-ruby-with-exception-cause/
     attr_reader :component_name, :err, :props, :js_code, :console_messages
 
-    # err might be nil if JS caught the error
+    # @param component_name [String, nil] Name of the component that failed
+    # @param err [Exception, nil] The original error (nil if JS caught the error)
+    # @param props [String, nil] The component props as JSON
+    # @param js_code [String, nil] The JavaScript code that was executed
+    # @param console_messages [String, nil] Console output from the rendering
     def initialize(component_name: nil, err: nil, props: nil,
                    js_code: nil, console_messages: nil)
       @component_name = component_name
@@ -28,9 +35,9 @@ module ReactOnRails
       to_error_context
     end
 
-    def raven_context
-      to_error_context
-    end
+    # Deprecated: Sentry SDK no longer uses Raven. Use {#to_honeybadger_context} instead.
+    # @deprecated Use {#to_honeybadger_context} for error tracking
+    alias raven_context to_honeybadger_context
 
     def to_error_context
       result = {
