@@ -60,13 +60,10 @@ module ReactOnRails
         return false if pro_gem_installed?
         return false if attempt_pro_gem_auto_install
 
-        context_line = pro_gem_requirement_context_line
-        prerelease_note = rsc_prerelease_note
-
         GeneratorMessages.add_error(<<~MSG.strip)
           🚫 Failed to auto-install #{PRO_GEM_NAME} gem.
 
-          #{context_line}
+          #{pro_gem_requirement_context_line}
           #{prerelease_note}
 
           Please add manually to your Gemfile:
@@ -99,8 +96,7 @@ module ReactOnRails
         "--pro"
       end
 
-      def rsc_prerelease_note
-        return "" unless use_rsc?
+      def prerelease_note
         return "" unless prerelease_ror_version?
 
         "Note: #{PRO_GEM_NAME} #{ReactOnRails::VERSION} may not be published yet. " \

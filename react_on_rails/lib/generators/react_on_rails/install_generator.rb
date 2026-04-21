@@ -636,7 +636,7 @@ module ReactOnRails
                                      ci_workflow_generated: @ci_workflow_generated == true,
                                      app_root: destination_root
                                    ))
-        GeneratorMessages.add_info(rsc_pro_verification_message) if use_rsc?
+        GeneratorMessages.add_info(rsc_verification_message) if use_rsc?
       end
 
       def shakapacker_setup_incomplete?
@@ -659,7 +659,7 @@ module ReactOnRails
         ["rails generate react_on_rails:install", *flags].join(" ")
       end
 
-      def rsc_pro_verification_message
+      def rsc_verification_message
         <<~MSG
 
           🔎 RSC Pro Verification:

@@ -26,7 +26,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 
 #### Removed
 
-- **[Pro]** **Removed the `--rsc-pro` install generator flag**: `--rsc` already implies Pro, so the separate mode was unnecessary. Behaviors previously gated on `--rsc-pro` (Pro verification checklist, prerelease install note, exact Pro gem pin on prereleases) now fire on `--rsc` installs. [PR 3105](https://github.com/shakacode/react_on_rails/pull/3105) by [ihabadham](https://github.com/ihabadham).
+- **[Pro]** **Removed the `--rsc-pro` install generator flag**: `--rsc` already implies Pro, so the separate mode was unnecessary. Behaviors previously gated on `--rsc-pro` (Pro verification checklist, prerelease install note, exact Pro gem pin on prereleases) now fire on `--rsc` installs. See also [Issue 3104](https://github.com/shakacode/react_on_rails/issues/3104), which tracks unrelated silent-failure bugs in the Pro upgrade automation. [PR 3105](https://github.com/shakacode/react_on_rails/pull/3105) by [ihabadham](https://github.com/ihabadham).
 
 #### Changed
 
