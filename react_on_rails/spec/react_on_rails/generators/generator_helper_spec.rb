@@ -221,8 +221,8 @@ RSpec.describe GeneratorHelper, type: :generator do
     it "does not enable Pro or RSC for a plain install" do
       allow(self).to receive(:options).and_return({ rsc: false, pro: false })
 
-      expect(use_rsc?).to be_falsey
-      expect(use_pro?).to be_falsey
+      expect(use_rsc?).to be(false)
+      expect(use_pro?).to be(false)
     end
   end
 
