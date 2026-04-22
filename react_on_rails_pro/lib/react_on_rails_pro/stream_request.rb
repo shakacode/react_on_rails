@@ -86,9 +86,8 @@ module ReactOnRailsPro
   end
 
   class StreamRequest
-    def initialize(length_prefixed: true, &request_block)
+    def initialize(&request_block)
       @request_executor = request_block
-      @length_prefixed = length_prefixed
     end
 
     private_class_method :new
@@ -104,10 +103,13 @@ module ReactOnRailsPro
         loop do
           stream_response = @request_executor.call(send_bundle, barrier)
 
-          # Chunks can be merged during streaming, so we separate them by newlines
-          # Also, we check the status code inside the loop block because calling `status` outside the loop block
-          # is blocking, it will wait for the response to be fully received
-          # Look at the spec of `status` in `spec/react_on_rails_pro/stream_spec.rb` for more details
+          # The Node renderer always emits the length-prefixed wire format
+          # (`<metadata JSON>\t<content byte length hex>\n<raw content bytes>`)
+          # for every response chunk — both the one-shot streaming path and the
+          # incremental-rendering path. We check the status code inside the loop
+          # block because calling `status` outside of it blocks until the full
+          # response has been received. See the `status` spec in
+          # `spec/react_on_rails_pro/stream_spec.rb` for more details.
           process_response_chunks(stream_response, error_body, &block)
           break
         rescue HTTPX::HTTPError => e
@@ -122,21 +124,13 @@ module ReactOnRailsPro
     end
 
     # Method to start the decoration
-    def self.create(length_prefixed: true, &request_block)
-      StreamDecorator.new(new(length_prefixed: length_prefixed, &request_block))
+    def self.create(&request_block)
+      StreamDecorator.new(new(&request_block))
     end
 
     private
 
     def process_response_chunks(stream_response, error_body, &block)
-      if @length_prefixed
-        process_length_prefixed_chunks(stream_response, error_body, &block)
-      else
-        process_line_based_chunks(stream_response, error_body, &block)
-      end
-    end
-
-    def process_length_prefixed_chunks(stream_response, error_body, &block)
       parser = ReactOnRails::LengthPrefixedParser.new
       stream_response.each do |chunk|
         stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
@@ -147,22 +141,6 @@ module ReactOnRailsPro
         end
 
         parser.feed(chunk, &block)
-      end
-    end
-
-    def process_line_based_chunks(stream_response, error_body)
-      stream_response.each do |chunk|
-        stream_response.instance_variable_set(:@react_on_rails_received_first_chunk, true)
-
-        if response_has_error_status?(stream_response)
-          error_body << chunk
-          next
-        end
-
-        chunk.split("\n").each do |line|
-          stripped = line.strip
-          yield stripped unless stripped.empty?
-        end
       end
     end
 
