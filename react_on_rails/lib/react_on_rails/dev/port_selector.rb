@@ -110,6 +110,20 @@ module ReactOnRails
           raise NoPortAvailable, "No available port found starting at #{start_port}."
         end
 
+        # Strict port-string predicate shared with ServerManager so the two
+        # layers can't silently diverge. `String#to_i` would otherwise truncate
+        # `"3000abc"` to 3000 and slip it through here while ServerManager's
+        # overwrite path rejected it.
+        def valid_port_string?(value)
+          return false if value.nil?
+
+          stripped = value.to_s.strip
+          return false if stripped.empty?
+          return false unless stripped.match?(/\A\d+\z/)
+
+          stripped.to_i.between?(1, 65_535)
+        end
+
         private
 
         # Advisory: surface early conflicts when a base port's derived ports are
@@ -176,11 +190,9 @@ module ReactOnRails
           parse_explicit_port_env("SHAKAPACKER_DEV_SERVER_PORT")
         end
 
-        # Mirror valid_port_string? in server_manager.rb: require an all-digit
-        # value in the 1..65535 range. `String#to_i` would otherwise truncate
-        # `"3000abc"` to 3000 and silently accept it, diverging from the
-        # stricter validation apply_explicit_port_env uses when it decides
-        # whether to overwrite the env var.
+        # Reject values that aren't valid port strings and clear the env var
+        # so ServerManager's apply_explicit_port_env path (which also rejects
+        # them) doesn't emit a second warning for the same value.
         def parse_explicit_port_env(var_name)
           raw = ENV.fetch(var_name, nil)
           return nil if raw.nil?
@@ -190,11 +202,18 @@ module ReactOnRails
 
           unless stripped.match?(/\A\d+\z/)
             warn "WARNING: #{var_name}=#{raw.inspect} is not a valid integer; ignoring."
+            ENV.delete(var_name)
             return nil
           end
 
           n = stripped.to_i
-          n.between?(1, 65_535) ? n : nil
+          unless n.between?(1, 65_535)
+            warn "WARNING: #{var_name}=#{raw.inspect} is out of range (1..65535); ignoring."
+            ENV.delete(var_name)
+            return nil
+          end
+
+          n
         end
       end
     end

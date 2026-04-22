@@ -7,4 +7,4 @@ rails-client-assets: pnpm run build:dev:watch
 # Start Node server for server rendering.
 # Equivalent to `pnpm run node-renderer` (see package.json) — invoked directly so the
 # ${RENDERER_PORT:-3800} shell default picks up REACT_ON_RAILS_BASE_PORT assignments.
-node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node client/node-renderer.js
+node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js

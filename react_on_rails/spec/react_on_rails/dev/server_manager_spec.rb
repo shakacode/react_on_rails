@@ -27,7 +27,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       # that doesn't stub select_ports will see unexpected port assignments.
       # Mirrors port_selector_spec.rb's outer `around`.
       %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL
-         REACT_ON_RAILS_BASE_PORT CONDUCTOR_PORT].each do |k|
+         RENDERER_URL REACT_ON_RAILS_BASE_PORT CONDUCTOR_PORT].each do |k|
         old[k] = ENV.fetch(k, nil)
         ENV.delete(k)
       end
@@ -460,6 +460,29 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV["REACT_RENDERER_URL"] = "http://renderer:3801"
         expect { described_class.start(:development) }
           .not_to output(/set without RENDERER_PORT/).to_stderr
+      end
+    end
+
+    context "when legacy RENDERER_URL is set without REACT_RENDERER_URL" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+      end
+
+      it "warns about the rename so silent fallback to the default URL is surfaced" do
+        ENV["RENDERER_URL"] = "http://renderer:3800"
+        expect { described_class.start(:development) }
+          .to output(/RENDERER_URL is set but REACT_RENDERER_URL is not/).to_stderr
+      end
+
+      it "does not warn when both are set" do
+        ENV["RENDERER_URL"] = "http://renderer:3800"
+        ENV["REACT_RENDERER_URL"] = "http://renderer:3800"
+        expect { described_class.start(:development) }
+          .not_to output(/RENDERER_URL is set but REACT_RENDERER_URL is not/).to_stderr
       end
     end
 

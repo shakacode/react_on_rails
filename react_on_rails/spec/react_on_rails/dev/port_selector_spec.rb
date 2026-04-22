@@ -442,11 +442,16 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         example.run
       end
 
-      it "treats out-of-range PORT as unset and falls back to auto-detection" do
+      it "warns, clears PORT, and falls back to auto-detection" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = nil
+        expect { result = described_class.select_ports }
+          .to output(/PORT=.*"99999".*out of range/).to_stderr
         expect(result[:rails]).to eq(3000)
         expect(result[:webpack]).to eq(3035)
+        # Clearing suppresses the duplicate "not a valid port" warning from
+        # ServerManager.overwrite_invalid_port_env downstream.
+        expect(ENV.fetch("PORT", nil)).to be_nil
       end
     end
 
@@ -460,12 +465,13 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         example.run
       end
 
-      it "rejects PORT and falls back to auto-detection" do
+      it "rejects PORT, clears it, and falls back to auto-detection" do
         allow(described_class).to receive(:port_available?).and_return(true)
         result = nil
         expect { result = described_class.select_ports }
           .to output(/PORT=.*"3000abc".*not a valid integer/).to_stderr
         expect(result[:rails]).to eq(3000)
+        expect(ENV.fetch("PORT", nil)).to be_nil
       end
     end
 
@@ -475,13 +481,40 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         example.run
       end
 
-      it "rejects the value and falls back to auto-detection" do
+      it "rejects the value, clears the env var, and falls back to auto-detection" do
         allow(described_class).to receive(:port_available?).and_return(true)
         result = nil
         expect { result = described_class.select_ports }
           .to output(/SHAKAPACKER_DEV_SERVER_PORT=.*"3035xyz".*not a valid integer/).to_stderr
         expect(result[:webpack]).to eq(3035)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to be_nil
       end
+    end
+  end
+
+  describe ".valid_port_string?" do
+    it "returns true for all-digit values in the valid range" do
+      expect(described_class.valid_port_string?("3000")).to be true
+      expect(described_class.valid_port_string?("1")).to be true
+      expect(described_class.valid_port_string?("65535")).to be true
+    end
+
+    it "ignores surrounding whitespace" do
+      expect(described_class.valid_port_string?("  3000  ")).to be true
+    end
+
+    it "returns false for nil, empty, or whitespace-only values" do
+      expect(described_class.valid_port_string?(nil)).to be false
+      expect(described_class.valid_port_string?("")).to be false
+      expect(described_class.valid_port_string?("   ")).to be false
+    end
+
+    it "returns false for non-digit or out-of-range values" do
+      expect(described_class.valid_port_string?("3000abc")).to be false
+      expect(described_class.valid_port_string?("abc")).to be false
+      expect(described_class.valid_port_string?("0")).to be false
+      expect(described_class.valid_port_string?("65536")).to be false
+      expect(described_class.valid_port_string?("99999")).to be false
     end
   end
 

@@ -850,6 +850,7 @@ module ReactOnRails
         end
 
         def configure_ports
+          warn_if_legacy_renderer_url_env_used
           selected = PortSelector.select_ports
           if selected[:base_port_mode]
             apply_base_port_env(selected)
@@ -859,6 +860,20 @@ module ReactOnRails
         rescue PortSelector::NoPortAvailable => e
           warn e.message
           exit 1
+        end
+
+        # The env var used to configure the Pro node renderer URL was renamed
+        # from `RENDERER_URL` to `REACT_RENDERER_URL`. Infrastructure manifests
+        # that still set only the old name would silently fall back to the
+        # default `http://localhost:3800` (which doesn't exist in most
+        # container setups). Surface the mismatch so users can update without
+        # debugging a silent SSR failure.
+        def warn_if_legacy_renderer_url_env_used
+          return unless ENV["RENDERER_URL"] && !ENV["REACT_RENDERER_URL"]
+
+          warn "WARNING: RENDERER_URL is set but REACT_RENDERER_URL is not. " \
+               "RENDERER_URL was renamed to REACT_RENDERER_URL; update your " \
+               "env var to avoid silent fallback to the default renderer URL."
         end
 
         # Base port is active. Priority: base port > explicit per-service env vars.
@@ -903,7 +918,7 @@ module ReactOnRails
         # misconfiguration (Rails would target one port, the renderer another).
         def warn_if_renderer_url_will_be_overridden(derived_url)
           existing = ENV.fetch("REACT_RENDERER_URL", nil)
-          return if existing.nil? || existing.empty? || existing == derived_url
+          return if existing.nil? || existing.strip.empty? || existing.strip == derived_url
 
           warn "WARNING: Overriding REACT_RENDERER_URL=#{existing} with #{derived_url} " \
                "because base port mode is active."
@@ -935,10 +950,7 @@ module ReactOnRails
         end
 
         def valid_port_string?(value)
-          return false if value.nil? || value.strip.empty?
-          return false unless value.match?(/\A\d+\z/)
-
-          value.to_i.between?(1, 65_535)
+          PortSelector.valid_port_string?(value)
         end
 
         def sync_renderer_port_and_url
