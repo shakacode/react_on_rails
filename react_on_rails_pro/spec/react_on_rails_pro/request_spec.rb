@@ -406,7 +406,7 @@ describe ReactOnRailsPro::Request do
       allow(mock_request).to receive(:close)
       allow(mock_request).to receive(:<<)
       allow(mock_response).to receive(:is_a?).with(HTTPX::ErrorResponse).and_return(false)
-      allow(mock_response).to receive(:each).and_yield("chunk\n")
+      allow(mock_response).to receive(:each).and_yield(to_length_prefixed("chunk"))
       allow(described_class).to receive(:connection).and_return(mock_connection)
 
       # Stub AsyncPropsEmitter to return a mock with end_stream_chunk
@@ -468,7 +468,7 @@ describe ReactOnRailsPro::Request do
       # Track when chunks are yielded during streaming
       allow(mock_response).to receive(:each) do |&block|
         execution_order << :chunk_yielded
-        block.call("chunk\n")
+        block.call(to_length_prefixed("chunk"))
       end
 
       # Allow real emitter to be created for this test
