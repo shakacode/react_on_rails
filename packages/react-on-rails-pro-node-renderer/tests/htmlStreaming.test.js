@@ -98,12 +98,16 @@ describe('html streaming', () => {
     const { status, chunks } = await makeRequest();
     expect(status).toBe(200);
 
-    const secondChunk = chunks[1];
-    expect(secondChunk).not.toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
-    expect(secondChunk).not.toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
-    expect(secondChunk).not.toContain('Loading branch1...');
-    expect(secondChunk).not.toContain('Loading branch2...');
-    expect(secondChunk).not.toContain('branch1 (level 0)');
+    // Strip <script> tags from the chunk before checking for rendered HTML.
+    // RSC Flight payload <script> tags contain the serialized React tree which
+    // includes fallback text as data (e.g., "Loading branch1..." inside a JSON
+    // string). We only want to assert that the fallback is not rendered as HTML.
+    const secondChunkHtml = chunks[1].replace(/<script[\s\S]*?<\/script>/g, '');
+    expect(secondChunkHtml).not.toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
+    expect(secondChunkHtml).not.toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
+    expect(secondChunkHtml).not.toContain('Loading branch1...');
+    expect(secondChunkHtml).not.toContain('Loading branch2...');
+    expect(secondChunkHtml).not.toContain('branch1 (level 0)');
   }, 10000);
 
   it('should contains all components', async () => {

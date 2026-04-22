@@ -86,9 +86,6 @@ export default function injectRSCPayload(
   const sanitizedNonce = sanitizeNonce(cspNonce);
   const htmlStream = new PassThrough();
   const resultStream = new PassThrough();
-  safePipe(pipeableHtmlStream, htmlStream, (err) => {
-    resultStream.emit('error', err);
-  });
   let rscPromise: Promise<void> | null = null;
 
   // ========================================
@@ -121,7 +118,7 @@ export default function injectRSCPayload(
   // FLUSH SCHEDULING SYSTEM
   // ========================================
 
-  let flushTimeout: NodeJS.Timeout | null = null;
+  let flushFallbackTimeout: NodeJS.Timeout | null = null;
   let hasReceivedFirstHtmlChunk = false;
 
   /**
@@ -141,7 +138,6 @@ export default function injectRSCPayload(
     // This ensures the first chunk always contains HTML, which is required
     // for proper page rendering and prevents empty initial chunks
     if (!hasReceivedFirstHtmlChunk && htmlBuffers.length === 0) {
-      flushTimeout = null;
       return;
     }
 
@@ -153,8 +149,16 @@ export default function injectRSCPayload(
 
     // Skip flush if no data is buffered
     if (totalSize === 0) {
-      flushTimeout = null;
       return;
+    }
+
+    // Cancel the fallback timer only when we're actually flushing data.
+    // If we cancelled before the early-return guards above, a flush() call
+    // with no HTML yet would kill the timer without rescheduling, leaving
+    // RSC init data stuck until the next data event.
+    if (flushFallbackTimeout) {
+      clearTimeout(flushFallbackTimeout);
+      flushFallbackTimeout = null;
     }
 
     // Create single buffer with exact size needed (no reallocation)
@@ -191,32 +195,83 @@ export default function injectRSCPayload(
     rscInitializationBuffers.length = 0;
     htmlBuffers.length = 0;
     rscPayloadBuffers.length = 0;
-
-    flushTimeout = null;
   };
 
   const endResultStream = () => {
-    if (flushTimeout) clearTimeout(flushTimeout);
+    // Cancel any pending fallback timer unconditionally.
+    // flush() only clears the timer when it actually flushes data (past the
+    // early-return guards). If we're closing with empty buffers, the timer
+    // would fire after resultStream.end() and push to a closed stream.
+    if (flushFallbackTimeout) {
+      clearTimeout(flushFallbackTimeout);
+      flushFallbackTimeout = null;
+    }
     flush();
     if (!resultStream.writableEnded) {
       resultStream.end();
     }
   };
 
+  // ========================================
+  // FLUSH SIGNAL FROM REACT (primary) + setTimeout FALLBACK
+  // ========================================
+  //
+  // We use two flush mechanisms — a primary signal from React and a
+  // setTimeout(0) fallback — to ensure data is always delivered:
+  //
+  // PRIMARY: React's destination.flush() signal
+  //
+  //   React's renderToPipeableStream uses a 4KB internal buffer. It calls
+  //   destination.write() whenever the buffer fills — at arbitrary byte
+  //   positions, often mid-tag (e.g., '<div class="hea' / 'der">').
+  //   At the end of each flushCompletedQueues cycle, React calls
+  //   flushBuffered(destination) which invokes destination.flush() if it
+  //   exists. This signal means: "I finished writing a complete render
+  //   batch — all HTML elements are whole."
+  //
+  //   By buffering data events and flushing only on this signal, each
+  //   output chunk contains complete HTML from one render cycle, without
+  //   merging multiple render cycles into one chunk (which defeats
+  //   progressive streaming).
+  //
+  //   See: https://github.com/facebook/react/pull/21625
+  //   See: https://github.com/facebook/react/blob/main/packages/react-server/src/ReactServerStreamConfigNode.js#L31-L38
+  //
+  // FALLBACK: setTimeout(flush, 0)
+  //
+  //   React's flush() is not a public API — it's an internal convention
+  //   for compression middleware (e.g., Express's compression() adds
+  //   .flush() to the response). If a future React version stops calling
+  //   destination.flush(), data would sit in buffers until stream close.
+  //   The setTimeout(0) fallback ensures data is always delivered within
+  //   one event loop tick, even if flush() is never called.
+  //
+  //   In the happy path, flush() fires first and cancels the fallback
+  //   timer — zero overhead. If flush() never fires, the fallback kicks
+  //   in with the same behavior as the old setTimeout(0) approach.
+
   /**
-   * Schedules a flush operation using setTimeout to batch multiple data arrivals.
-   *
-   * SCHEDULING STRATEGY:
-   * - Uses setTimeout(flush, 0) to defer flush until the next event loop tick
-   * - Batches multiple rapid data arrivals into single output chunks
-   * - Provides optimal balance between latency and chunk efficiency
+   * Fallback: schedule a flush on the next event loop tick.
+   * Cancelled if React's flush() fires first (the common case).
    */
-  const scheduleFlush = () => {
-    if (flushTimeout) {
+  const scheduleFlushFallback = () => {
+    if (flushFallbackTimeout) {
       return;
     }
+    flushFallbackTimeout = setTimeout(() => {
+      flushFallbackTimeout = null;
+      flush();
+    }, 0);
+  };
 
-    flushTimeout = setTimeout(flush, 0);
+  /**
+   * Primary: React calls this at the end of each render cycle.
+   * flush() cancels the fallback timer internally.
+   * Verified against React 18.3 / 19.x ReactServerStreamConfigNode internals.
+   * Re-verify this signal on major React version upgrades.
+   */
+  (htmlStream as PassThrough & { flush?: () => void }).flush = () => {
+    flush();
   };
 
   /**
@@ -271,8 +326,9 @@ export default function injectRSCPayload(
                 if (consoleScript) {
                   rscPayloadBuffers.push(Buffer.from(createScriptTag(consoleScript, sanitizedNonce)));
                 }
-
-                scheduleFlush();
+                // Primary flush is handled by React's flush() callback (see above).
+                // Schedule fallback in case flush() is never called.
+                scheduleFlushFallback();
               });
             }
           })(),
@@ -320,6 +376,11 @@ export default function injectRSCPayload(
   // ========================================
   // EVENT HANDLERS - Coordinate the three data sources
   // ========================================
+  //
+  // All definitions (flush, scheduleFlushFallback, startRSC) MUST exist
+  // before these handlers are registered, because safePipe() below may
+  // trigger synchronous writes from React during pipe(), which fire the
+  // data handler immediately.
 
   htmlStream.on('data', (chunk: Buffer) => {
     htmlBuffers.push(chunk);
@@ -328,8 +389,9 @@ export default function injectRSCPayload(
     if (!rscPromise) {
       rscPromise = startRSC();
     }
-
-    scheduleFlush();
+    // Primary flush is handled by React's flush() callback (see above).
+    // Schedule fallback in case flush() is never called.
+    scheduleFlushFallback();
   });
 
   /**
@@ -360,6 +422,13 @@ export default function injectRSCPayload(
         endResultStream();
       })
       .finally(() => rscRequestTracker.clear());
+  });
+
+  // Start piping AFTER all handlers and definitions are in place.
+  // React may write shell HTML and call destination.flush() synchronously
+  // during pipe(). Everything must be ready to handle that.
+  safePipe(pipeableHtmlStream, htmlStream, (err) => {
+    resultStream.emit('error', err);
   });
 
   return resultStream;
