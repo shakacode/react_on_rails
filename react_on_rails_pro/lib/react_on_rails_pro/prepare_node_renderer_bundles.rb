@@ -35,7 +35,7 @@ module ReactOnRailsPro
     # Private so it can only be invoked from specs via `send`; prevents accidental
     # reset from production code.
     def self.reset_deprecation_warned!
-      @deprecation_mutex.synchronize { @deprecation_warned = nil }
+      @deprecation_mutex.synchronize { @deprecation_warned = false }
     end
     private_class_method :reset_deprecation_warned!
   end

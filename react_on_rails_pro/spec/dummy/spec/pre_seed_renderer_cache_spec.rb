@@ -80,6 +80,15 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       expect(File.symlink?(second_asset)).to be(true)
       expect(File.realpath(first_asset)).to eq(path_in_webpack_folder(asset_filename).to_s)
     end
+
+    it "treats a concurrent Errno::EEXIST from File.symlink as success" do
+      # Simulates two processes racing through make_relative_symlink: the
+      # other process recreated the destination between rm_f and File.symlink,
+      # so our syscall raises EEXIST. The guard should swallow that instead
+      # of propagating.
+      allow(File).to receive(:symlink).and_raise(Errno::EEXIST)
+      expect { described_class.call(mode: :symlink) }.not_to raise_error
+    end
   end
 
   context "when mode is :copy and no env var is set in a non-dev/test environment" do

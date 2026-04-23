@@ -88,15 +88,22 @@ module ReactOnRailsPro
 
     def self.stage_bundle(src_path, bundle_dir, bundle_hash, mode)
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
-      if mode == :copy
-        FileUtils.mkdir_p(bundle_dir)
-        FileUtils.cp(src_path, dest_file)
-        puts "[ReactOnRailsPro] Pre-seeded renderer cache: #{dest_file}"
-      else
-        make_relative_symlink(src_path, dest_file)
-      end
+      stage_file(src_path, dest_file, mode, "Pre-seeded renderer cache")
     end
     private_class_method :stage_bundle
+
+    # Shared mode dispatch. In :copy mode ensures the destination directory
+    # exists; make_relative_symlink handles its own mkdir_p in :symlink mode.
+    def self.stage_file(src, dest, mode, copy_log_prefix)
+      if mode == :copy
+        FileUtils.mkdir_p(File.dirname(dest))
+        FileUtils.cp(src, dest)
+        puts "[ReactOnRailsPro] #{copy_log_prefix}: #{dest}"
+      else
+        make_relative_symlink(src, dest)
+      end
+    end
+    private_class_method :stage_file
 
     # RSC manifests are required when RSC is enabled — a missing manifest would cause
     # the renderer to fail at runtime with a hard-to-diagnose error. User-configured
@@ -118,12 +125,7 @@ module ReactOnRailsPro
         end
 
         dest = File.join(bundle_dir, File.basename(expanded))
-        if mode == :copy
-          FileUtils.cp(expanded, dest)
-          puts "[ReactOnRailsPro] Copied asset: #{dest}"
-        else
-          make_relative_symlink(expanded, dest)
-        end
+        stage_file(expanded, dest, mode, "Copied asset")
       end
     end
     private_class_method :stage_assets
@@ -161,8 +163,18 @@ module ReactOnRailsPro
                 "it may have been removed after mkdir_p (race with an external cleanup)."
         end
       relative_source_path = source_path.relative_path_from(destination_dir_real)
-      File.symlink(relative_source_path, destination)
-      puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"
+      # File.symlink raises Errno::EEXIST if the destination reappears between
+      # the rm_f above and this call (e.g. two Puma workers racing through
+      # AssetsPrecompile.call at boot). Treat a concurrent winner as success:
+      # both processes compute the same relative source, so the existing link
+      # is already correct for us.
+      begin
+        File.symlink(relative_source_path, destination)
+        puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"
+      rescue Errno::EEXIST
+        puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
+             "(concurrent creator won the race); leaving existing link."
+      end
     end
     private_class_method :make_relative_symlink
   end

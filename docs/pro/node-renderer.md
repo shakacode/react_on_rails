@@ -147,7 +147,7 @@ The task follows the same environment-variable precedence as the Node Renderer, 
 2. `RENDERER_BUNDLE_PATH` environment variable (deprecated — emits a warning)
 3. `Rails.root.join(".node-renderer-bundles")` (Rails-side default when env vars are unset, only accepted for `MODE=symlink` and in dev/test)
 
-In **`MODE=copy`** (Docker image builds) the task requires one of the env vars above to be set in non-dev/test environments. Because the Node renderer's own default can differ (e.g., falling back to `/tmp/react-on-rails-pro-node-renderer-bundles` when its `cwd` sits outside the app tree), relying on the silent fallback risks pre-seeded bundles landing in a directory the renderer never reads. The task raises a clear error if the env var is missing:
+In **`MODE=copy`** (Docker image builds) the task requires one of the env vars above to be set in non-dev/test environments. "Non-dev/test" means any `RAILS_ENV` other than `development` or `test` — including custom environments like `staging`, `review`, or `ci` — so set `RENDERER_SERVER_BUNDLE_CACHE_PATH` wherever you run `MODE=copy` outside of local/CI-test runs. Because the Node renderer's own default can differ (e.g., falling back to `/tmp/react-on-rails-pro-node-renderer-bundles` when its `cwd` sits outside the app tree), relying on the silent fallback risks pre-seeded bundles landing in a directory the renderer never reads. The task raises a clear error if the env var is missing:
 
 ```dockerfile
 ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles
