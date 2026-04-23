@@ -205,6 +205,7 @@ const sidebars: SidebarsConfig = {
           link: { type: 'doc', id: 'pro/react-server-components/index' },
           items: [
             'pro/react-server-components/purpose-and-benefits',
+            'pro/react-server-components/success-stories',
             'pro/react-server-components/how-react-server-components-work',
             'pro/react-server-components/rendering-flow',
             'pro/react-server-components/tutorial',
