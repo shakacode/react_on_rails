@@ -152,12 +152,12 @@ Once you add `react_on_rails` to the `Gemfile`, every existing legacy call start
 Before adding the gem, audit existing positional-style calls so you know what needs a shim or a same-PR migration. Pay particular attention to two-argument calls, which fail silently rather than raising:
 
 ```bash
-rg -n "react_component\\b" app/views app/components app/mailers
+rg -n "react_component\\b" app/views app/components app/mailers app/helpers
 # or without ripgrep:
-grep -rEn "react_component\\b" app/views app/components app/mailers
+grep -rEn "react_component\\b" app/views app/components app/mailers app/helpers
 ```
 
-Expand the path list if you mount React from other locations (Phlex views, gem engines, etc.), or drop the path argument entirely to search the whole project and filter out false positives manually.
+`app/helpers` catches view-helper wrappers that call `react_component` from Ruby rather than a template. Expand the path list further if you mount React from other locations (Phlex views, gem engines, etc.), or drop the path argument entirely to search the whole project and filter out false positives manually.
 
 Any call that passes props as the second positional argument (rather than `{ props: ... }`) will break as soon as `react_on_rails` is loaded — either by raising `ArgumentError` (3+ args) or by silently dropping props (2 args).
 
@@ -184,10 +184,12 @@ module ReactOnRailsCoexistence
   # forwards a block, which react-rails uses for mount-tag content.
   module LegacyReactComponent
     def react_component(name, props = {}, options = {}, &block)
-      # bind_call requires self to include React::Rails::ViewHelper. That
-      # holds in standard Rails views (the react-rails railtie includes it
+      # bind_call requires self to include React::Rails::ViewHelper and
+      # raises TypeError at render time otherwise. That condition holds in
+      # standard Rails views (the react-rails railtie includes the module
       # into ActionView::Base) but not in Rails engines, ViewComponent, or
-      # other view contexts that don't inherit from ActionView::Base.
+      # other view contexts that don't inherit from ActionView::Base. See
+      # Known Limitations below.
       React::Rails::ViewHelper.instance_method(:react_component)
                               .bind_call(self, name, props, options, &block)
     end
@@ -229,7 +231,8 @@ Leave existing `react_component(...)` calls untouched until you are ready to mig
 - **Two project-wide renames.** Every migrated call site is renamed twice: `react_component` → `react_on_rails_component` while the shim is active, then `react_on_rails_component` → `react_component` once the shim is removed. On a large app this can equal or exceed the effort of migrating call sites in a single PR (Option A). Factor this in before choosing Option B.
 - This is a migration-only pattern. Carry the shim only as long as legacy calls remain, then remove it.
 - Edits to `config/initializers/react_on_rails_coexistence.rb` require a server restart in development, like any initializer.
-- The shim is app-level; it will not help gem-provided engines, Rails engines, or Action Mailer views that make legacy `react_component` calls.
+- **The shim is app-level and hard-fails in unsupported view contexts.** In gem-provided engines, Rails engines, ViewComponent, or Action Mailer views — any context where `self` doesn't include `React::Rails::ViewHelper` — `bind_call` raises `TypeError` at render time rather than falling back gracefully. Legacy `react_component` calls in those contexts must be migrated to `react_on_rails_component` up front, not carried through on the shim.
+- **Remove the initializer before (or at the same time as) removing `react-rails` from the `Gemfile`.** The shim's method body references `React::Rails::ViewHelper`, so once the gem is gone any request that still routes through the legacy delegate raises `NameError: uninitialized constant React::Rails::ViewHelper` at render time. Delete `config/initializers/react_on_rails_coexistence.rb` in the same commit that drops the gem.
 - Server rendering, Pro features, and auto-bundling all work through the explicit `react_on_rails_component` alias — the shim only forwards the default helper name back to `react-rails`.
 
 ## Practical checklist for Webpacker-era apps
