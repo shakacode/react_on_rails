@@ -45,6 +45,7 @@ Before swapping gems, check these first:
 4. **Package manager metadata**: if you have `yarn.lock`, `pnpm-lock.yaml`, or `bun.lock*`, ensure `package.json` has a matching `packageManager` field (for example `npm@10.9.2`, `yarn@1.22.22`, `pnpm@10.12.1`, or `bun@1.2.13`).
 5. **Browserslist source**: use one source only. If `.browserslistrc` exists, remove `browserslist` from `package.json`.
 6. **JSX-in-.js projects**: current install generator auto-switches to Babel when JSX is detected in `.js` files. If your project has custom transpiler setup, review `config/shakapacker.yml` after generation.
+7. **`react_component` helper collision**: if you plan to keep `react-rails` installed during a staged migration, read [Coexistence: keeping both gems installed during a staged migration](#coexistence-keeping-both-gems-installed-during-a-staged-migration) before adding `react_on_rails`. Both gems define a `react_component` view helper with incompatible signatures; once `react_on_rails` is present, its helper takes precedence in all views regardless of gem load order.
 
 If you are already on `shakapacker` 7+ and React 18+, the migration is mostly about helper syntax, component registration, and generated defaults.
 
@@ -158,6 +159,107 @@ Older `react-rails` apps frequently need these additional fixes after the genera
    ```
 
 For published repo examples, including older and Rails 7-era `react-rails` migrations, see [Example Migrations](./example-migrations.md).
+
+## Coexistence: keeping both gems installed during a staged migration
+
+Large apps often cannot swap every `react-rails` mount in a single PR. If you need `react-rails` and `react_on_rails` installed side-by-side while you migrate views incrementally, plan for the `react_component` helper collision **before** adding the gem.
+
+### Why it collides
+
+Both gems ship a view helper named `react_component` that ends up available in Rails views:
+
+- `react-rails` (`React::Rails::ViewHelper`) takes positional arguments: `react_component(name, props, html_options)`.
+- `react_on_rails` (`ReactOnRailsHelper` → `ReactOnRails::Helper#react_component`) takes `react_component(name, options = {})` where props are nested under `options[:props]`.
+
+`react-rails` includes `React::Rails::ViewHelper` directly into `ActionView::Base` from its railtie. `react_on_rails` ships `ReactOnRailsHelper` as a normal Rails helper module, and under Rails' default `include_all_helpers` behavior that helper is pulled into the controller/view helper module that sits earlier in method lookup than `ActionView::Base`. In a standard Rails app, that means `ReactOnRailsHelper#react_component` wins once the gem is present. This is a helper-precedence issue, not `app/helpers/` file order or gem-name alphabetics. If your app customizes helper loading, verify which helper owns `react_component` before relying on coexistence.
+
+Once you add `react_on_rails` to the `Gemfile`, every existing legacy call starts resolving to `ReactOnRails::Helper#react_component(name, options = {})`, which behaves differently depending on how many positional arguments you pass. As of Rails 7/8, Rails gives no boot-time warning in either case:
+
+- **Three or more positional arguments** — e.g. `react_component "command_bar/CommandBar", props, { camelize_props: false }` — raise `ArgumentError` at render time on the first request to any un-migrated view, because the new helper only takes two arguments.
+- **Two positional arguments** — e.g. `react_component "command_bar/CommandBar", props` — are silently accepted. The `props` hash is bound to `options`, but React on Rails reads props only from `options[:props]`, so the component renders with no props instead of failing loudly. This is the more dangerous case: un-migrated views do not error; they just lose their data.
+
+### Detecting the collision quickly
+
+Before adding the gem, audit existing positional-style calls so you know what needs a shim or a same-PR migration. Pay particular attention to two-argument calls, which fail silently rather than raising:
+
+```bash
+rg -n "react_component\\b" app/views app/components app/mailers app/helpers
+# or without ripgrep:
+grep -rEn "react_component\\b" app/views app/components app/mailers app/helpers
+```
+
+`app/helpers` catches view-helper wrappers that call `react_component` from Ruby rather than a template. Expand the path list further if you mount React from other locations (Phlex views, gem engines, etc.), or drop the path argument entirely to search the whole project and filter out false positives manually.
+
+Any call that passes props as the second positional argument (rather than `{ props: ... }`) will break as soon as `react_on_rails` is loaded — either by raising `ArgumentError` (3+ args) or by silently dropping props (2 args).
+
+### Option A: migrate all call sites in the same PR (recommended)
+
+The cleanest path is to update every `react_component` call to the options-hash form in the same PR that adds the gem. See the syntax change under [Legacy compatibility fixes](#legacy-compatibility-fixes-that-often-make-migration-one-shot). After this, there is no collision to manage — the new helper is the only helper.
+
+### Option B: preserve the legacy helper and use an explicit alias
+
+If a single-PR migration is impractical, you can keep `react-rails`'s `react_component` semantics for un-migrated views and introduce a separate helper name for migrated mounts.
+
+Define the shim module directly in an initializer so it lives outside Zeitwerk's autoload paths. The module:
+
+1. Prepends an override so legacy `react_component(...)` calls keep delegating to `React::Rails::ViewHelper`.
+2. Exposes an explicit `react_on_rails_component(...)` alias for migrated mounts.
+
+> **Note:** this initializer was contributed by a community member migrating a production app. It is not covered by the `react_on_rails` test suite. Verify it works in a staging environment before relying on it in production.
+
+```ruby
+# config/initializers/react_on_rails_coexistence.rb
+module ReactOnRailsCoexistence
+  # Legacy react-rails semantics for un-migrated views.
+  # Delegates to React::Rails::ViewHelper#react_component. Accepts and
+  # forwards a block, which react-rails uses for mount-tag content.
+  module LegacyReactComponent
+    def react_component(name, props = {}, options = {}, &block)
+      # Standard Rails views have the react-rails helper support methods.
+      # Engines, ViewComponent, mailers, and other restricted contexts may not.
+      # See Known Limitations below.
+      React::Rails::ViewHelper.instance_method(:react_component)
+                              .bind_call(self, name, props, options, &block)
+    end
+  end
+
+  # Explicit alias for migrated mounts.
+  # Uses the React on Rails options-hash shape: (name, options = {}).
+  # Fetches from ReactOnRails::Helper directly (not ReactOnRailsHelper) so
+  # migrated mounts always call the React on Rails implementation rather than
+  # the prepended LegacyReactComponent override.
+  def react_on_rails_component(name, options = {})
+    ReactOnRails::Helper.instance_method(:react_component)
+                        .bind_call(self, name, options)
+  end
+end
+
+Rails.application.config.to_prepare do
+  # Safe to re-run on every reload: Ruby skips the insertion when the module
+  # is already in the ancestor chain, so duplicates never accumulate.
+  ReactOnRailsHelper.prepend(ReactOnRailsCoexistence::LegacyReactComponent)
+  ActionView::Base.include(ReactOnRailsCoexistence)
+end
+```
+
+Defining the module inline in the initializer avoids a subtle issue: files under `app/helpers/` are on Zeitwerk's autoload paths, and `require`-ing such a file from an initializer can confuse Zeitwerk's bookkeeping in production eager-load mode. Keeping the module in `config/initializers/` sidesteps that entirely.
+
+Use `react_on_rails_component(...)` in new or migrated views:
+
+```erb
+<%= react_on_rails_component("CommandBar", props: { title: "Hi" }, prerender: true) %>
+```
+
+Leave existing `react_component(...)` calls untouched until you are ready to migrate them. When every call site has been converted, update each migrated call site from `react_on_rails_component(...)` back to `react_component(...)` and delete `config/initializers/react_on_rails_coexistence.rb`. A project-wide find-and-replace over `react_on_rails_component` makes the final pass quick. See [Known limitations of Option B](#known-limitations-of-option-b) below for the full cost of this approach.
+
+### Known limitations of Option B
+
+- **Two project-wide renames.** Every migrated call site is renamed twice: `react_component` → `react_on_rails_component` while the shim is active, then `react_on_rails_component` → `react_component` once the shim is removed. On a large app this can equal or exceed the effort of migrating call sites in a single PR (Option A). Factor this in before choosing Option B.
+- This is a migration-only pattern. Carry the shim only as long as legacy calls remain, then remove it.
+- Edits to `config/initializers/react_on_rails_coexistence.rb` require a server restart in development, like any initializer.
+- **The shim is app-level and can hard-fail in restricted view contexts.** In gem-provided engines, Rails engines, ViewComponent, or Action Mailer views, the receiver may be missing helper methods used by `react-rails` or React on Rails. That means legacy `react_component(...)` calls and migrated `react_on_rails_component(...)` calls can both fail at render time even though the method name is visible. Explicitly include the needed helper module or add a context-local wrapper before using either helper in those contexts.
+- **Remove the initializer before (or at the same time as) removing `react-rails` from the `Gemfile`.** The shim's method body references `React::Rails::ViewHelper`, so once the gem is gone any request that still routes through the legacy delegate raises `NameError: uninitialized constant React::Rails::ViewHelper` at render time. Delete `config/initializers/react_on_rails_coexistence.rb` in the same commit that drops the gem.
+- Server rendering, Pro features, and auto-bundling all work through the explicit `react_on_rails_component` alias — the shim only forwards the default helper name back to `react-rails`.
 
 ## Practical checklist for Webpacker-era apps
 
