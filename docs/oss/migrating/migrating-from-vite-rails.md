@@ -17,6 +17,17 @@ React on Rails is a better fit when you want one or more of these:
 
 If your app is already happy with a Vite-only client-rendered setup, this migration is optional.
 
+## Two different starting points
+
+Not all `vite_rails` + React apps are the same shape, and the migration effort differs for each:
+
+- **Rails-owned island mounts.** Rails renders real ERB views and mounts one or more React components inside them. The migration is incremental: you can cut over one page (or one mount) at a time.
+- **Client-routed SPA shells.** Rails serves a minimal layout and a single `<div id="app">`, and a client-side router (React Router / TanStack Router) owns everything after the first render. You have two reasonable migration shapes here:
+  1. **Keep the SPA shape.** Render the top-level SPA component from a single ERB view using `react_component` (or `react_component_hash` when you need SSR that returns multiple regions such as `componentHtml`, `title`, and other head tags). One React on Rails call mounts the whole app — this is the pattern used by the largest React on Rails Pro deployment in production, Popmenu (for example, [110grill.com](https://www.110grill.com/) and other Popmenu-powered restaurant sites), where the entire app is a single top-level component call.
+  2. **Break the SPA into island mounts** by moving Rails back to being the view-owner. This is a real product decision and should not be bundled with the bundler/integration change.
+
+For most teams, the **Keep the SPA shape** path is the fastest first step: you're swapping Vite's build integration for Shakapacker, not re-architecting the app. The main friction is usually not the Rails-side `react_component` call — it's the Vite-specific runtime behavior (`import.meta.env`, `import.meta.glob`, Vite plugins with no direct Shakapacker analogue) that the client code may depend on. See [Replace Vite-specific asset and env usage](#5-replace-vite-specific-asset-and-env-usage) for the concrete replacements.
+
 ## Preflight
 
 Before you start, make sure the current app still installs cleanly on the Ruby and Node versions you plan to use for the migration.
@@ -136,6 +147,46 @@ Vite-specific `import.meta.env` usage needs to be replaced. In a React on Rails 
 - Rails-passed props (most reliable for both client and server rendering)
 - `railsContext` for request-aware values
 - `process.env` in server-rendered bundles (available natively in Node); for client bundles, values must be injected via webpack's `DefinePlugin` or `EnvironmentPlugin`
+
+### `import.meta.glob`
+
+`import.meta.glob` has no direct Webpack equivalent. Replace it with [`require.context`](https://webpack.js.org/guides/dependency-management/#requirecontext):
+
+- the glob-pattern syntax differs (Webpack uses a regex argument, not a glob string)
+- lazy/eager behavior is selected via a `mode` argument (`'sync'`, `'lazy'`, `'lazy-once'`, `'eager'`, `'weak'`) rather than the per-call options `import.meta.glob` exposes
+- the returned context function requires explicit `.keys()` + key lookup, not the object-map shape `import.meta.glob` returns
+
+A minimal before/after — note two semantic mismatches that bite during migration:
+
+1. **Key paths differ.** Vite returns paths relative to the _calling module_ (`'./dir/foo.js'`); `require.context` returns paths relative to the _context directory_ (`'./foo.js'`). Code that derives names from keys (routing, registration, etc.) needs to account for this.
+2. **Sync vs async.** `import.meta.glob` is lazy by default — values are `() => import(...)` returning a Promise. The default `require.context(dir, recursive, regex)` (no 4th argument) is synchronous, so `ctx(key)` returns the module directly. For the lazy case, pass `'lazy'` as the 4th argument so `ctx(key)` returns a `Promise<Module>` (see the lazy example below).
+
+Eager / synchronous case:
+
+```js
+// Vite (eager)
+const modules = import.meta.glob('./dir/**/*.js', { eager: true });
+// { './dir/foo.js': <module>, ... }  ← keys relative to current file
+
+// Webpack (Shakapacker) — synchronous equivalent
+const ctx = require.context('./dir', true, /\.js$/);
+// ctx.keys() → ['./foo.js', ...]  ← keys relative to context dir, NOT './dir/foo.js'
+// ctx('./foo.js') → the module (synchronous)
+```
+
+Lazy (default Vite) case — pass `'lazy'` as the 4th `require.context` argument so `ctx(key)` returns a `Promise<Module>`:
+
+```js
+// Vite (lazy, the default)
+const modules = import.meta.glob('./dir/**/*.js');
+// { './dir/foo.js': () => import('./dir/foo.js'), ... }
+
+// Webpack (Shakapacker) — lazy equivalent
+const ctx = require.context('./dir', true, /\.js$/, 'lazy');
+// ctx.keys() → ['./foo.js', ...]  ← keys relative to context dir, NOT './dir/foo.js'
+// ctx(key) now returns Promise<Module>, matching Vite's lazy semantics
+const lazyModules = Object.fromEntries(ctx.keys().map((key) => [key, () => ctx(key)]));
+```
 
 ## 6. Replace the development workflow
 
