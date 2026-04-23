@@ -54,9 +54,23 @@ module ReactOnRails
           puts "🔪 Killing all development processes..."
           puts ""
 
-          killed_any = kill_running_processes || kill_port_processes([3000, 3001]) || cleanup_socket_files
+          killed_any = kill_running_processes || kill_port_processes(killable_ports) || cleanup_socket_files
 
           print_kill_summary(killed_any)
+        end
+
+        # Fallback port list for the port-scan kill path. Uses the base-port
+        # derived ports when REACT_ON_RAILS_BASE_PORT / CONDUCTOR_PORT is set,
+        # so `bin/dev kill` in a worktree on ports 5000/5001/5002 targets the
+        # right ports instead of the 3000/3001 default. Falls back to
+        # [3000, 3001] when no base port is configured. Uses PortSelector's
+        # pure #base_port_hash so no "Base port detected" banner prints during
+        # a kill.
+        def killable_ports
+          base = PortSelector.base_port_hash
+          return [3000, 3001] unless base
+
+          [base[:rails], base[:webpack], base[:renderer]]
         end
 
         def development_processes
@@ -600,6 +614,15 @@ module ReactOnRails
           # parallel worktrees running `bin/dev prod` don't silently collide
           # on port 3001. warn_if_legacy_renderer_url_env_used fires here too
           # so the RENDERER_URL rename warning surfaces in prod mode.
+          #
+          # The `unless apply_base_port_if_active` branch mirrors
+          # #configure_ports (the canonical per-mode env-setup) but intentionally
+          # differs in two ways: (1) PORT auto-scan starts at 3001 (via
+          # procfile_port) rather than 3000, and (2) SHAKAPACKER_DEV_SERVER_PORT
+          # is omitted because production-like mode runs static assets, not
+          # webpack-dev-server. sync_renderer_port_and_url still runs so Pro
+          # users who set RENDERER_PORT get the same auto-derivation and
+          # mismatch warnings as `bin/dev` and `bin/dev static`.
           warn_if_legacy_renderer_url_env_used
           unless apply_base_port_if_active
             # Set PORT before foreman starts — foreman injects its own PORT=5000
@@ -621,6 +644,7 @@ module ReactOnRails
               ENV.delete("PORT")
               ENV["PORT"] = PortSelector.find_available_port(procfile_port(procfile)).to_s
             end
+            sync_renderer_port_and_url
           end
 
           features = [
@@ -943,7 +967,7 @@ module ReactOnRails
           existing = ENV.fetch(var_name, nil)
           return if existing.nil? || existing.strip.empty? || existing == derived_port.to_s
 
-          warn "WARNING: Overriding #{var_name}=#{existing} with #{derived_port} " \
+          warn "WARNING: Overriding #{var_name}=#{existing.inspect} with #{derived_port} " \
                "because base port mode is active."
         end
 
@@ -956,7 +980,7 @@ module ReactOnRails
           existing = ENV.fetch("REACT_RENDERER_URL", nil)
           return if existing.nil? || existing.strip.empty? || existing.strip == derived_url
 
-          warn "WARNING: Overriding REACT_RENDERER_URL=#{existing} with #{derived_url} " \
+          warn "WARNING: Overriding REACT_RENDERER_URL=#{existing.inspect} with #{derived_url} " \
                "because base port mode is active."
         end
 

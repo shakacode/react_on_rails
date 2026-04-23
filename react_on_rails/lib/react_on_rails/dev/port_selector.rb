@@ -94,20 +94,34 @@ module ReactOnRails
         # branch on "is base-port mode active?" without triggering probing.
         # Used by ServerManager so all bin/dev modes (development, static,
         # production-like) honor the base-port contract consistently.
+        #
+        # Logs the detected base port and warns on derived-port collisions.
+        # Callers that need the derived ports without user-facing output
+        # (e.g. ServerManager#kill_processes, which shouldn't print a banner
+        # while killing) should use #base_port_hash instead.
         def base_port_ports
           bp, source = base_port_with_source
           return nil unless bp
 
-          ports = {
-            rails: bp + BASE_PORT_RAILS_OFFSET,
-            webpack: bp + BASE_PORT_WEBPACK_OFFSET,
-            renderer: bp + BASE_PORT_RENDERER_OFFSET,
-            base_port_mode: true
-          }
+          ports = derive_ports_from_base(bp)
           puts "Base port #{bp} detected via #{source}. Using Rails :#{ports[:rails]}, " \
                "webpack :#{ports[:webpack]}, renderer :#{ports[:renderer]}"
           warn_if_derived_ports_in_use(bp, ports)
           ports
+        end
+
+        # Pure derivation: returns the same port hash as #base_port_ports but
+        # without the "Base port X detected" log line or the derived-port
+        # collision warnings. Safe to call from any context where logging is
+        # undesirable (e.g. kill flows). Still delegates to
+        # #base_port_with_source, which surfaces invalid-value warnings — those
+        # describe the env input, not the port output, and are desirable even
+        # in silent callers.
+        def base_port_hash
+          bp, _source = base_port_with_source
+          return nil unless bp
+
+          derive_ports_from_base(bp)
         end
 
         def find_available_port(start_port, exclude: nil)
@@ -137,6 +151,15 @@ module ReactOnRails
 
         private
 
+        def derive_ports_from_base(base)
+          {
+            rails: base + BASE_PORT_RAILS_OFFSET,
+            webpack: base + BASE_PORT_WEBPACK_OFFSET,
+            renderer: base + BASE_PORT_RENDERER_OFFSET,
+            base_port_mode: true
+          }
+        end
+
         # Advisory: surface early conflicts when a base port's derived ports are
         # already bound (e.g. two worktrees share a base). Does not fail — the
         # actual bind at server start gives the definitive error.
@@ -155,16 +178,23 @@ module ReactOnRails
         def base_port_with_source
           # Upper bound accounts for the largest derived offset so base + N stays
           # within the valid TCP port range (1..65_535).
+          #
+          # Strip before validating so whitespace-padded values (common with
+          # copy-paste or env-file templating) parse the same way PORT and
+          # SHAKAPACKER_DEV_SERVER_PORT do via consume_explicit_port_env.
           BASE_PORT_ENV_VARS.each_with_index do |var, idx|
             raw = ENV.fetch(var, nil)
-            next if raw.nil? || raw.empty?
+            next if raw.nil?
 
-            unless raw.match?(/\A\d+\z/)
+            stripped = raw.strip
+            next if stripped.empty?
+
+            unless stripped.match?(/\A\d+\z/)
               warn invalid_base_port_warning(var, raw, "not a valid integer", idx)
               next
             end
 
-            val = raw.to_i
+            val = stripped.to_i
             unless val.between?(1, MAX_BASE_PORT)
               warn invalid_base_port_warning(var, raw, "out of range (1..#{MAX_BASE_PORT})", idx)
               next

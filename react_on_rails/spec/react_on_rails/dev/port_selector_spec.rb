@@ -221,6 +221,29 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       end
     end
 
+    # Parses the same way PORT and SHAKAPACKER_DEV_SERVER_PORT do
+    # (consume_explicit_port_env strips before validating). Without the strip
+    # step, env-file templating or copy-paste padding would silently disable
+    # base-port mode with a misleading "not a valid integer" warning.
+    context "when base port env var has surrounding whitespace" do
+      around do |example|
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "  5000  "
+        example.run
+      end
+
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
+
+      it "trims whitespace and treats the value as valid" do
+        result = described_class.select_ports
+        expect(result[:rails]).to eq(5000)
+        expect(result[:base_port_mode]).to be(true)
+      end
+
+      it "does not emit the not-a-valid-integer warning" do
+        expect { described_class.select_ports }.not_to output(/not a valid integer/).to_stderr
+      end
+    end
+
     context "when CONDUCTOR_PORT alone holds an invalid value" do
       around do |example|
         ENV["CONDUCTOR_PORT"] = "not-a-number"
@@ -510,6 +533,27 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       ENV["REACT_ON_RAILS_BASE_PORT"] = "not-a-port"
       expect { expect(described_class.base_port_ports).to be_nil }
         .to output(/not a valid integer/).to_stderr
+    end
+  end
+
+  describe ".base_port_hash" do
+    before { allow(described_class).to receive(:port_available?).and_return(true) }
+
+    it "returns the same shape as .base_port_ports without the banner log" do
+      ENV["REACT_ON_RAILS_BASE_PORT"] = "4000"
+      result = nil
+      expect { result = described_class.base_port_hash }.not_to output(/Base port .* detected/).to_stdout
+      expect(result).to include(rails: 4000, webpack: 4001, renderer: 4002, base_port_mode: true)
+    end
+
+    it "does not emit the derived-ports-in-use warning even when the ports are bound" do
+      ENV["REACT_ON_RAILS_BASE_PORT"] = "4000"
+      allow(described_class).to receive(:port_available?).and_return(false)
+      expect { described_class.base_port_hash }.not_to output(/already in use/).to_stderr
+    end
+
+    it "returns nil when no base port env var is set" do
+      expect(described_class.base_port_hash).to be_nil
     end
   end
 
