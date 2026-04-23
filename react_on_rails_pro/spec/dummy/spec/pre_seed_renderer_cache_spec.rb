@@ -96,6 +96,19 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       allow(File).to receive(:symlink).and_raise(Errno::EEXIST)
       expect { described_class.call(mode: :symlink) }.not_to raise_error
     end
+
+    it "logs mode-accurate prefixes (Pre-staged / Symlinked) instead of copy-oriented wording" do
+      FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))
+      FileUtils.cp(fixture_path2, path_in_webpack_folder(asset_filename2))
+
+      accurate_symlink_logs = satisfy("uses mode-aware log prefixes") do |out|
+        out.match?(/Pre-staged renderer cache:.*->/) &&
+          out.match?(/Symlinked asset:.*->/) &&
+          !out.include?("Copied asset") &&
+          !out.include?("Pre-seeded renderer cache")
+      end
+      expect { described_class.call(mode: :symlink) }.to output(accurate_symlink_logs).to_stdout
+    end
   end
 
   context "when mode is :copy and no env var is set in a non-dev/test environment" do

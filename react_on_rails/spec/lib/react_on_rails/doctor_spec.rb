@@ -2502,6 +2502,35 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
       end
     end
+
+    context "when reading a deploy-script file raises an unexpected error" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:procfile_path) { File.join(tmpdir, "Procfile") }
+
+      before do
+        File.write(
+          procfile_path,
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+        # Simulate a filesystem error (e.g. transient EIO or a permissions race)
+        # during the file-read step so the rescue branch is exercised.
+        # Pathname#read delegates to File.read, so stubbing File.read for this
+        # specific path exercises the rescue without impacting other reads.
+        allow(File).to receive(:read).and_call_original
+        allow(File).to receive(:read).with(procfile_path).and_raise(Errno::EIO, "simulated read failure")
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "captures the error as a warning instead of failing the doctor check" do
+        expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
   end
 
   describe "check_base_package_imports" do

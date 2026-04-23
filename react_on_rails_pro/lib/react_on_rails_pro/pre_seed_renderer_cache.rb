@@ -43,6 +43,8 @@ module ReactOnRailsPro
       end
     end
 
+    # Validates the cache-dir env var (raises in production-like copy mode when
+    # unset) before resolving. See enforce_cache_dir_env_var! for the rationale.
     def self.resolve_cache_dir(mode)
       enforce_cache_dir_env_var!(mode)
       ReactOnRailsPro::Utils.resolve_renderer_cache_dir
