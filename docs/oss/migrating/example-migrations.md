@@ -132,6 +132,6 @@ Other migration paths:
 1. [Webpack to Rspack](./migrating-from-webpack-to-rspack.md)
 2. [Babel to SWC](./babel-to-swc-migration.md)
 
-The Rails 5 API-only and AngularJS paths also live in the **Migration Guides** sidebar. React Server Components migration content lives under **React on Rails Pro → React Server Components**.
+The Rails 5 API-only and AngularJS paths also live in the **Migration Guides** sidebar. React Server Components migration content lives under **React on Rails Pro → React Server Components → Migrating to RSC**.
 
 The migration guides explain the mechanics. This page shows what those mechanics look like in real repos.
