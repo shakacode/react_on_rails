@@ -45,22 +45,8 @@ module ReactOnRailsPro
       end
     end
 
-    # Required assets are matched by expanded path rather than basename so a
-    # same-named unrelated entry in assets_to_copy cannot trigger a false-
-    # positive "required" error. Expand against Rails.root to match how
-    # RendererCacheHelpers.required_rsc_asset_paths builds its Set.
     def self.symlink_assets(assets, bundle_dir, rsc_required_paths)
-      assets.each do |asset_path|
-        expanded = File.expand_path(asset_path.to_s, Rails.root)
-        unless File.exist?(expanded)
-          if rsc_required_paths.include?(expanded)
-            raise ReactOnRailsPro::Error, "Required RSC asset not found: #{asset_path}. " \
-                                          "Build your bundles before pre-staging the renderer cache."
-          end
-          warn "[ReactOnRailsPro] Asset not found #{asset_path}"
-          next
-        end
-
+      RendererCacheHelpers.each_stageable_asset(assets, rsc_required_paths, "pre-staging") do |expanded|
         destination_full_path = File.join(bundle_dir, File.basename(expanded))
         make_relative_symlink(expanded, destination_full_path)
       end
