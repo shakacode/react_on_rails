@@ -182,6 +182,20 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end
         end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
       end
+
+      it "rejects extra required positional upload arguments even when required keywords are present" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _region, bundle:, assets:) = [bundle, assets]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
     end
 
     describe ".renderer_url" do

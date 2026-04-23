@@ -292,6 +292,9 @@ module ReactOnRailsPro
     end
 
     def accepts_bundle_hash_argument?(params)
+      required_positionals = params.count { |type, _name| type == :req }
+      return false if required_positionals > 1
+
       params.any? { |type, _name| ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS.include?(type) }
     end
 

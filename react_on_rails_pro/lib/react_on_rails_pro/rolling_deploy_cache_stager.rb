@@ -327,10 +327,13 @@ module ReactOnRailsPro
     private_class_method :remove_previous_bundle_backup
 
     def self.restore_previous_bundle_directory(backup_dir, bundle_dir)
-      return unless backup_dir
+      return unless backup_dir && File.exist?(backup_dir)
 
       FileUtils.rm_rf(bundle_dir)
       FileUtils.mv(backup_dir, bundle_dir) if File.exist?(backup_dir) && !File.exist?(bundle_dir)
+    rescue StandardError => e
+      warn "[ReactOnRailsPro] Could not restore previous rolling-deploy bundle directory #{backup_dir} " \
+           "to #{bundle_dir}: #{e.class}: #{e.message}. Runtime 410-retry remains the fallback."
     end
     private_class_method :restore_previous_bundle_directory
   end
