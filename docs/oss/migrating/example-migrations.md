@@ -106,7 +106,7 @@ Use maintainability notes when that is the honest win. Do not force a weak bench
 
 ## Contribute an example
 
-If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new?title=Migration+example%3A+) or open a PR that adds it here, and include:
+If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new/choose) or open a PR that adds it here, and include:
 
 1. The integration you started from, such as `react-rails`, `vite_rails`, or a custom helper
 2. The first slice you picked and why it was small enough to review

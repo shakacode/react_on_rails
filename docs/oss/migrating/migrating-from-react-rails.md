@@ -136,11 +136,7 @@ Older `react-rails` apps frequently need these additional fixes after the genera
    ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
    ```
 
-You can also check the [react-rails-to-react-on-rails snapshot](https://github.com/shakacode/react-rails-example-app/tree/c6b794a4b96746dbbc98a46f31119171109d70b0) on [react-rails example app](https://github.com/shakacode/react-rails-example-app) for an example of migration from `react-rails` v3 to `react_on_rails` v13.4.
-
-For a more recent Rails 7-era migration example (published under ShakaCode), see [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example), based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example).
-
-For additional real-world migration references and active public PRs, see [Example Migrations](./example-migrations.md).
+For published repo examples, including older and Rails 7-era `react-rails` migrations, see [Example Migrations](./example-migrations.md).
 
 ## Practical checklist for Webpacker-era apps
 
