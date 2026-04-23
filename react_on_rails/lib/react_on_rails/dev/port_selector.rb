@@ -49,19 +49,8 @@ module ReactOnRails
         # Pro-only service and does not participate in auto-detection).
         # :base_port_mode is true only in case 1.
         def select_ports
-          bp, source = base_port_with_source
-          if bp
-            ports = {
-              rails: bp + BASE_PORT_RAILS_OFFSET,
-              webpack: bp + BASE_PORT_WEBPACK_OFFSET,
-              renderer: bp + BASE_PORT_RENDERER_OFFSET,
-              base_port_mode: true
-            }
-            puts "Base port #{bp} detected via #{source}. Using Rails :#{ports[:rails]}, " \
-                 "webpack :#{ports[:webpack]}, renderer :#{ports[:renderer]}"
-            warn_if_derived_ports_in_use(bp, ports)
-            return ports
-          end
+          base = base_port_ports
+          return base if base
 
           rails_port   = explicit_rails_port
           webpack_port = explicit_webpack_port
@@ -97,6 +86,28 @@ module ReactOnRails
           rescue Errno::EADDRNOTAVAIL, SocketError
             true # address family unavailable on this system
           end
+        end
+
+        # Returns the base-port-derived port hash when a base port env var is
+        # set (with the same shape as #select_ports), otherwise nil. Does not
+        # fall back to per-service env vars or auto-detect, so callers can
+        # branch on "is base-port mode active?" without triggering probing.
+        # Used by ServerManager so all bin/dev modes (development, static,
+        # production-like) honor the base-port contract consistently.
+        def base_port_ports
+          bp, source = base_port_with_source
+          return nil unless bp
+
+          ports = {
+            rails: bp + BASE_PORT_RAILS_OFFSET,
+            webpack: bp + BASE_PORT_WEBPACK_OFFSET,
+            renderer: bp + BASE_PORT_RENDERER_OFFSET,
+            base_port_mode: true
+          }
+          puts "Base port #{bp} detected via #{source}. Using Rails :#{ports[:rails]}, " \
+               "webpack :#{ports[:webpack]}, renderer :#{ports[:renderer]}"
+          warn_if_derived_ports_in_use(bp, ports)
+          ports
         end
 
         def find_available_port(start_port, exclude: nil)

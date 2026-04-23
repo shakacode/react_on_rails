@@ -47,8 +47,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
     allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
-    allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
-      .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
+    # Default to "no base port active" so a developer running specs inside a
+    # Conductor workspace (REACT_ON_RAILS_BASE_PORT set in their shell) doesn't
+    # silently redirect tests into the base-port branch. Individual contexts
+    # that exercise base-port mode override these stubs.
+    allow(ReactOnRails::Dev::PortSelector).to receive_messages(
+      base_port_ports: nil,
+      select_ports: { rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false }
+    )
   end
 
   describe ".start" do
@@ -207,6 +213,95 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect { described_class.start(:unknown) }.to raise_error(ArgumentError, "Unknown mode: unknown")
     end
 
+    context "when REACT_ON_RAILS_BASE_PORT is set in production-like mode" do
+      include_context "with clean port env"
+
+      before do
+        # production-like mode does not call configure_ports, so stub the
+        # base-port accessor directly to simulate an active base port without
+        # touching PortSelector internals.
+        allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_ports)
+          .and_return({ rails: 4000, webpack: 4001, renderer: 4002, base_port_mode: true })
+        status_double = instance_double(Process::Status, success?: true)
+        allow(Open3).to receive(:capture3).and_return(["output", "", status_double])
+      end
+
+      it "derives PORT from the base port instead of the 3001 default" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("4000")
+      end
+
+      it "applies SHAKAPACKER_DEV_SERVER_PORT from base+1 even though prod mode doesn't use webpack-dev-server" do
+        # Applying all three env vars keeps prod mode consistent with dev/static,
+        # so any tooling that reads them (e.g. shell aliases, process inspectors)
+        # sees the same derived values regardless of which bin/dev mode is active.
+        described_class.start(:production_like)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("4001")
+      end
+
+      it "applies RENDERER_PORT from base+2" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("4002")
+      end
+
+      it "applies the derived REACT_RENDERER_URL" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:4002")
+      end
+
+      it "does not fall through to find_available_port(3001) when base port is active" do
+        expect(ReactOnRails::Dev::PortSelector).not_to receive(:find_available_port)
+        described_class.start(:production_like)
+      end
+
+      it "overrides a pre-set PORT=3001 with the base-derived value" do
+        # Mirrors the dev-mode contract: base port > explicit per-service env vars.
+        ENV["PORT"] = "3001"
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("4000")
+      end
+    end
+
+    context "when CONDUCTOR_PORT is set in production-like mode (no REACT_ON_RAILS_BASE_PORT)" do
+      include_context "with clean port env"
+
+      before do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_ports)
+          .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
+        status_double = instance_double(Process::Status, success?: true)
+        allow(Open3).to receive(:capture3).and_return(["output", "", status_double])
+      end
+
+      it "honors the base port just like REACT_ON_RAILS_BASE_PORT" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("5000")
+      end
+    end
+
+    context "when running production-like mode without a base port" do
+      include_context "with clean port env"
+
+      before do
+        allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_ports).and_return(nil)
+        status_double = instance_double(Process::Status, success?: true)
+        allow(Open3).to receive(:capture3).and_return(["output", "", status_double])
+      end
+
+      it "still uses the 3001 prod-specific default when no base port is set" do
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("3001")
+      end
+
+      it "still respects a pre-set valid PORT when no base port is set" do
+        # Preserves the existing "PORT is sticky" behavior so users who pin a
+        # specific prod-assets port in their env aren't surprised by the
+        # base-port change.
+        ENV["PORT"] = "4242"
+        described_class.start(:production_like)
+        expect(ENV.fetch("PORT", nil)).to eq("4242")
+      end
+    end
+
     context "when configuring ports" do
       before do
         mock_system_calls
@@ -307,7 +402,9 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        # configure_ports short-circuits on base_port_ports before consulting
+        # select_ports, so that's the stub that drives base-port behavior.
+        allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_ports)
           .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
       end
 
@@ -478,11 +575,25 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .to output(/RENDERER_URL is set but REACT_RENDERER_URL is not/).to_stderr
       end
 
-      it "does not warn when both are set" do
+      it "does not warn when both are set to the same value" do
         ENV["RENDERER_URL"] = "http://renderer:3800"
         ENV["REACT_RENDERER_URL"] = "http://renderer:3800"
         expect { described_class.start(:development) }
-          .not_to output(/RENDERER_URL is set but REACT_RENDERER_URL is not/).to_stderr
+          .not_to output(/RENDERER_URL/).to_stderr
+      end
+
+      it "warns when both are set but the values disagree" do
+        ENV["RENDERER_URL"] = "http://renderer:3800"
+        ENV["REACT_RENDERER_URL"] = "http://renderer:3801"
+        expect { described_class.start(:development) }
+          .to output(/both set but disagree/).to_stderr
+      end
+
+      it "tolerates whitespace-only differences as equivalent" do
+        ENV["RENDERER_URL"] = "  http://renderer:3800  "
+        ENV["REACT_RENDERER_URL"] = "http://renderer:3800"
+        expect { described_class.start(:development) }
+          .not_to output(/RENDERER_URL/).to_stderr
       end
     end
 
@@ -572,6 +683,13 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect { described_class.start(:development) }
           .to output(/RENDERER_PORT=.*not a valid port/).to_stderr
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      it "accepts RENDERER_PORT with surrounding whitespace (matches PortSelector.valid_port_string?)" do
+        ENV["RENDERER_PORT"] = "  3801  "
+        described_class.start(:development)
+        # Derived URL uses the stripped value, not the raw whitespace-padded env.
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3801")
       end
     end
 

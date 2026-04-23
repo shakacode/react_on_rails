@@ -492,6 +492,27 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
     end
   end
 
+  describe ".base_port_ports" do
+    before { allow(described_class).to receive(:port_available?).and_return(true) }
+
+    it "returns nil when no base port env var is set" do
+      expect(described_class.base_port_ports).to be_nil
+    end
+
+    it "returns the derived port hash when REACT_ON_RAILS_BASE_PORT is set" do
+      ENV["REACT_ON_RAILS_BASE_PORT"] = "4000"
+      expect(described_class.base_port_ports).to include(
+        rails: 4000, webpack: 4001, renderer: 4002, base_port_mode: true
+      )
+    end
+
+    it "returns nil for an invalid base port so callers can fall through" do
+      ENV["REACT_ON_RAILS_BASE_PORT"] = "not-a-port"
+      expect { expect(described_class.base_port_ports).to be_nil }
+        .to output(/not a valid integer/).to_stderr
+    end
+  end
+
   describe ".valid_port_string?" do
     it "returns true for all-digit values in the valid range" do
       expect(described_class.valid_port_string?("3000")).to be true

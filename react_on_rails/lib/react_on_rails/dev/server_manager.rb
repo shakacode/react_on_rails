@@ -595,25 +595,32 @@ module ReactOnRails
                                 open_browser: false, open_browser_once: false)
           procfile = "Procfile.dev-prod-assets"
 
-          # Set PORT before foreman starts — foreman injects its own PORT=5000
-          # into child processes when ENV["PORT"] is unset, overriding the
-          # ${PORT:-3001} fallback in the Procfile. Scan from 3001 (not 3000)
-          # so prod-assets doesn't collide with the normal dev server.
-          #
-          # Also normalize invalid/out-of-range values: ${PORT:-3001} only
-          # falls back on empty/unset, so `PORT=abc` or `PORT=99999` would
-          # otherwise flow straight through to `rails s -p …` and fail to
-          # start. This path does not call configure_ports, so do the
-          # validation here inline.
-          existing_port = ENV.fetch("PORT", nil)
-          unless valid_port_string?(existing_port)
-            unless existing_port.nil? || existing_port.strip.empty?
-              warn "WARNING: PORT=#{existing_port.inspect} is not a valid port; using auto-selected port."
+          # Honor base-port mode (REACT_ON_RAILS_BASE_PORT / CONDUCTOR_PORT)
+          # before falling through to the prod-specific 3001 auto-scan, so
+          # parallel worktrees running `bin/dev prod` don't silently collide
+          # on port 3001. warn_if_legacy_renderer_url_env_used fires here too
+          # so the RENDERER_URL rename warning surfaces in prod mode.
+          warn_if_legacy_renderer_url_env_used
+          unless apply_base_port_if_active
+            # Set PORT before foreman starts — foreman injects its own PORT=5000
+            # into child processes when ENV["PORT"] is unset, overriding the
+            # ${PORT:-3001} fallback in the Procfile. Scan from 3001 (not 3000)
+            # so prod-assets doesn't collide with the normal dev server.
+            #
+            # Also normalize invalid/out-of-range values: ${PORT:-3001} only
+            # falls back on empty/unset, so `PORT=abc` or `PORT=99999` would
+            # otherwise flow straight through to `rails s -p …` and fail to
+            # start.
+            existing_port = ENV.fetch("PORT", nil)
+            unless valid_port_string?(existing_port)
+              unless existing_port.nil? || existing_port.strip.empty?
+                warn "WARNING: PORT=#{existing_port.inspect} is not a valid port; using auto-selected port."
+              end
+              # Clear the bad value first so procfile_port falls back to its default
+              # (3001) instead of `"abc".to_i == 0`, which would scan from port 0.
+              ENV.delete("PORT")
+              ENV["PORT"] = PortSelector.find_available_port(procfile_port(procfile)).to_s
             end
-            # Clear the bad value first so procfile_port falls back to its default
-            # (3001) instead of `"abc".to_i == 0`, which would scan from port 0.
-            ENV.delete("PORT")
-            ENV["PORT"] = PortSelector.find_available_port(procfile_port(procfile)).to_s
           end
 
           features = [
@@ -851,29 +858,58 @@ module ReactOnRails
 
         def configure_ports
           warn_if_legacy_renderer_url_env_used
-          selected = PortSelector.select_ports
-          if selected[:base_port_mode]
-            apply_base_port_env(selected)
-          else
-            apply_explicit_port_env(selected)
-          end
+          return if apply_base_port_if_active
+
+          apply_explicit_port_env(PortSelector.select_ports)
         rescue PortSelector::NoPortAvailable => e
           warn e.message
           exit 1
         end
 
-        # The env var used to configure the Pro node renderer URL was renamed
-        # from `RENDERER_URL` to `REACT_RENDERER_URL`. Infrastructure manifests
-        # that still set only the old name would silently fall back to the
-        # default `http://localhost:3800` (which doesn't exist in most
-        # container setups). Surface the mismatch so users can update without
-        # debugging a silent SSR failure.
-        def warn_if_legacy_renderer_url_env_used
-          return unless ENV["RENDERER_URL"] && !ENV["REACT_RENDERER_URL"]
+        # Returns true if REACT_ON_RAILS_BASE_PORT / CONDUCTOR_PORT is active
+        # and the derived env vars have been applied; false otherwise (env
+        # untouched). Shared across development, static, and production-like
+        # modes so all bin/dev entry points honor the same base-port contract.
+        # Does not emit the legacy-RENDERER_URL warning — callers (or
+        # configure_ports) do that so it fires in every mode regardless of
+        # whether base-port mode is active.
+        def apply_base_port_if_active
+          selected = PortSelector.base_port_ports
+          return false unless selected
 
-          warn "WARNING: RENDERER_URL is set but REACT_RENDERER_URL is not. " \
-               "RENDERER_URL was renamed to REACT_RENDERER_URL; update your " \
-               "env var to avoid silent fallback to the default renderer URL."
+          apply_base_port_env(selected)
+          true
+        end
+
+        # The env var used to configure the Pro node renderer URL was renamed
+        # from `RENDERER_URL` to `REACT_RENDERER_URL`. Two mid-migration states
+        # are worth flagging:
+        #
+        #   1. Only `RENDERER_URL` is set — Rails falls back to the default
+        #      `http://localhost:3800` silently (which doesn't exist in most
+        #      container setups).
+        #   2. Both are set but disagree — the Pro initializer and any tooling
+        #      that reads one but not the other will silently disagree. The
+        #      gem does not read either env var directly; the user's Pro
+        #      initializer picks one (`config.renderer_url = ENV[...]`).
+        def warn_if_legacy_renderer_url_env_used
+          legacy = ENV.fetch("RENDERER_URL", nil)
+          current = ENV.fetch("REACT_RENDERER_URL", nil)
+          return if legacy.nil? || legacy.strip.empty?
+
+          if current.nil? || current.strip.empty?
+            warn "WARNING: RENDERER_URL is set but REACT_RENDERER_URL is not. " \
+                 "RENDERER_URL was renamed to REACT_RENDERER_URL; update your " \
+                 "env var to avoid silent fallback to the default renderer URL."
+            return
+          end
+
+          return if legacy.strip == current.strip
+
+          warn "WARNING: RENDERER_URL=#{legacy.inspect} and REACT_RENDERER_URL=#{current.inspect} " \
+               "are both set but disagree. RENDERER_URL was renamed to REACT_RENDERER_URL; " \
+               "unset RENDERER_URL or align the two values so tooling and the Pro initializer " \
+               "can't silently pick different renderer URLs."
         end
 
         # Base port is active. Priority: base port > explicit per-service env vars.
@@ -954,18 +990,26 @@ module ReactOnRails
         end
 
         def sync_renderer_port_and_url
-          port = ENV.fetch("RENDERER_PORT", nil)
+          raw_port = ENV.fetch("RENDERER_PORT", nil)
           url = ENV.fetch("REACT_RENDERER_URL", nil)
-          return warn_url_without_port(url) if port.nil? || port.empty?
+          return warn_url_without_port(url) if raw_port.nil? || raw_port.strip.empty?
 
-          unless port.match?(/\A\d+\z/) && port.to_i.between?(1, 65_535)
-            warn "WARNING: RENDERER_PORT=#{port.inspect} is not a valid port (1..65535); ignoring."
+          # Reuse the canonical port-string predicate so whitespace handling and
+          # range checks match PortSelector exactly (`" 3800 "` is accepted
+          # there; the inline regex here previously rejected it).
+          unless valid_port_string?(raw_port)
+            warn "WARNING: RENDERER_PORT=#{raw_port.inspect} is not a valid port (1..65535); ignoring."
             # Delete so the Procfile's `${RENDERER_PORT:-3800}` fallback applies
             # instead of passing the bad value through to the node renderer.
             ENV.delete("RENDERER_PORT")
             clear_local_renderer_url_after_invalid_port(url)
             return
           end
+
+          # Normalize for downstream URL construction and mismatch checks so
+          # `RENDERER_PORT=" 3800 "` doesn't leak whitespace into the derived
+          # URL or the warning body.
+          port = raw_port.strip
 
           if url.nil? || url.empty?
             # Only RENDERER_PORT set: derive the URL so Rails reaches the right port.
