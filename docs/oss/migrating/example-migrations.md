@@ -75,9 +75,9 @@ Treat the wrapper as the migration boundary: preserve the Rails-side props
 contract, replace one helper-backed component first, and remove the wrapper
 later.
 
-No dedicated guide exists yet. The [react-rails migration guide](./migrating-from-react-rails.md)
-covers the nearest-neighbor mechanics for helper syntax and component
-registration.
+No dedicated guide exists yet; if you have one, see [Contribute an example](#contribute-an-example).
+The [react-rails migration guide](./migrating-from-react-rails.md) covers the
+nearest-neighbor mechanics for helper syntax and component registration.
 
 ## What counts as proof
 
