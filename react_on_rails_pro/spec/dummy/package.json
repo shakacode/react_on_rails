@@ -106,8 +106,9 @@
     "build:server": "RAILS_ENV=production NODE_ENV=production SERVER=true bin/shakapacker",
     "build:clean": "rm -rf public/webpack && rm -rf ssr-generated || true",
     "node-renderer-debug": "RENDERER_PORT=3800 ndb renderer/node-renderer.js",
+    "node-renderer:debug": "RENDERER_PORT=3800 ndb renderer/node-renderer.js",
     "node-renderer": "RENDERER_PORT=3800 node renderer/node-renderer.js",
-    "node-renderer:fresh": "pnpm --filter react-on-rails-pro-node-renderer run build && RENDERER_PORT=3800 node renderer/node-renderer.js",
+    "node-renderer:fresh": "pnpm --filter react-on-rails-pro-node-renderer run build && RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect renderer/node-renderer.js",
     "node-renderer:build-watch": "pnpm --filter react-on-rails-pro-node-renderer run build-watch"
   },
   "license": "UNLICENSED",

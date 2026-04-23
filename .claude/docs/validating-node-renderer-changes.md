@@ -21,14 +21,18 @@ If your PR touches **any** of these, run through the checklist below:
 
 ## Pre-flight: Toolchain
 
-The Pro dummy app requires Ruby 3.3.x. If you are on a newer Ruby (3.5+), the dummy's
-Gemfile already pulls in `ostruct`, `logger`, and `benchmark` as explicit gems to silence
-warnings, but you may still hit unrelated incompatibilities. When in doubt, switch to the
-documented Ruby version:
+Ruby 3.3.x is the documented baseline for the Pro dummy app, and this workflow
+has also been verified on Ruby 3.4.8. On Ruby 3.5+, the dummy's Gemfile pulls in
+`ostruct`, `logger`, and `benchmark` as explicit gems for stdlib compatibility.
+If a newer Ruby hits unrelated incompatibilities, fall back to the documented
+Ruby version.
 
 ```bash
-mise use ruby@3.3.7  # or rbenv/asdf equivalent
 cd react_on_rails_pro/spec/dummy
+bundle install
+
+# Optional fallback if your local Ruby fails:
+mise shell ruby@3.3.7  # or rbenv/asdf equivalent
 bundle install
 ```
 
@@ -97,9 +101,10 @@ For each route:
 
 It is easy to validate stale lib output without realizing it. Confirm:
 
-- [ ] `lib/` mtime is newer than the `src/` file you changed (compare
-      `ls -la packages/react-on-rails-pro-node-renderer/lib/` against
-      `ls -la packages/react-on-rails-pro-node-renderer/src/`)
+- [ ] The built `lib/` file corresponding to your edit is newer than the `src/`
+      file you changed. Compare the specific files with `stat` or use a
+      per-file freshness check, for example:
+      `find packages/react-on-rails-pro-node-renderer/lib -newer packages/react-on-rails-pro-node-renderer/src/<changed-file>.ts | head`
 - [ ] If you used watch mode, you saw a rebuild line in the watcher output after your
       most recent edit
 - [ ] Restart the `node-renderer` Procfile process after the rebuild — `node` does not
@@ -111,7 +116,7 @@ It is easy to validate stale lib output without realizing it. Confirm:
 ## Node Renderer Validation
 
 - [x] Rebuilt `react-on-rails-pro-node-renderer` package
-- [x] Verified `lib/` mtime newer than `src/` after edit
+- [x] Verified the rebuilt `lib/` file is newer than the changed `src/` file
 - [x] `bin/dev` starts cleanly
 - [x] `/stream_native_metadata` renders without errors
 - [x] `/hybrid_metadata_streaming` renders without errors
