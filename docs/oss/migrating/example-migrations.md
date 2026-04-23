@@ -28,10 +28,15 @@ The best examples are:
 
 ### Published example repos
 
-These are stable references you can inspect today:
+These maintainer-owned references are the stable starting set. Add community
+examples here after they have landed or stabilized enough to inspect.
 
-1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) — covers `react-rails` v3 → `react_on_rails` v13.4, so compare it with the current migration guides before following it step by step
-2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) — based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example)
+1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) —
+   covers `react-rails` v3 → `react_on_rails` v13.4 (current is v16.6.0), so
+   treat it as a structural reference and follow current migration guides for
+   gem and configuration specifics
+2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) —
+   based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example)
 
 ### In-progress migration work
 
@@ -50,31 +55,23 @@ list above with a short proof note.
 
 ### `react-rails` to React on Rails
 
-This is usually the cleanest migration path. The main changes are:
-
-1. Replace `react_ujs` mounting with explicit React on Rails registration
-2. Update `react_component` helper calls to the React on Rails options style
-3. Keep the old app architecture in place while converting one mount at a time
+This is usually the cleanest migration path: primarily a gem swap and mount
+registration change while the app architecture stays intact during
+slice-by-slice conversion.
 
 ### `vite_rails` to React on Rails
 
-This is more of an asset and entrypoint migration than a component rewrite.
-
-The primary changes are:
-
-1. Replace Vite layout tags and entrypoints
-2. Move component registration into the React on Rails / Shakapacker flow
-3. Preserve route behavior before removing Vite
+This is more of an asset and entrypoint migration than a component rewrite: the
+route behavior should stay stable while registration moves into the React on
+Rails and Shakapacker flow.
 
 ### Custom Rails React bridge to React on Rails
 
 This is common in mature apps that built a thin wrapper around React mounts.
 
-The safest approach is:
-
-1. Preserve the Rails-side props contract
-2. Replace one helper-backed component boundary first
-3. Treat the wrapper removal as a later step
+Treat the wrapper as the migration boundary: preserve the Rails-side props
+contract, replace one helper-backed component first, and remove the wrapper
+later.
 
 ## What counts as proof
 
