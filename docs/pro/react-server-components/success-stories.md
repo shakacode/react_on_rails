@@ -14,7 +14,7 @@ If you are deciding whether React Server Components are worth the effort, these 
 
 All numbers and quotes below are from the linked source articles. Treat them as vendor-reported benchmarks — representative of what's possible, not a guarantee of what you will see.
 
-## DoorDash — Core Web Vitals Transformation
+## DoorDash — Core Web Vitals Transformation (SSR Baseline, pre-RSC)
 
 DoorDash reported large Largest Contentful Paint (LCP) improvements after moving key surfaces onto Next.js server-side rendering. The write-up predates Next.js App Router / RSC, so treat the numbers as evidence for what server-first rendering (the same architectural shift RSC formalizes) can unlock — not as a direct RSC benchmark:
 

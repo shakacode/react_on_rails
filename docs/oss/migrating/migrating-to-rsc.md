@@ -15,7 +15,14 @@ React Server Components offer significant performance benefits when used correct
 - Improvements in Google Speed Index and Total Blocking Time
 - Server-only dependencies (date-fns, marked, sanitize-html) never ship to the client
 
-Teams adopting RSC report concrete wins — Frigade's 62% bundle-size cut, BlogHunch's 30% server-cost reduction, and Mux's incremental 50,000-line RSC migration — all summarized in [Migration Success Stories](../../pro/react-server-components/success-stories.md). DoorDash's earlier Next.js SSR migration (65% LCP improvement) is included there as a useful SSR baseline.
+Real-world results from teams that have shipped RSC in production:
+
+- **Frigade** — 62% reduction in client-side bundle size ([source](../../pro/react-server-components/success-stories.md#frigade--62-smaller-client-bundle))
+- **BlogHunch** — 30% server cost reduction ([source](../../pro/react-server-components/success-stories.md#bloghunch--30-lower-server-costs-in-one-month))
+- **Mux** — incremental migration of ~50,000 lines to RSC ([source](../../pro/react-server-components/success-stories.md#mux--migrating-50000-lines-of-react-to-rsc))
+- **DoorDash** — 65% LCP improvement (Next.js SSR baseline, pre-RSC) ([source](../../pro/react-server-components/success-stories.md#doordash--core-web-vitals-transformation-ssr-baseline-pre-rsc))
+
+Full case studies with context and caveats: [Migration Success Stories](../../pro/react-server-components/success-stories.md).
 
 However, these benefits require intentional architecture changes. Simply adding `'use client'` everywhere preserves the status quo -- `'use client'` is a [boundary marker, not a component annotation](rsc-component-patterns.md#use-client-marks-a-boundary-not-a-component-type). The guides below walk you through the restructuring needed to capture real gains.
 
