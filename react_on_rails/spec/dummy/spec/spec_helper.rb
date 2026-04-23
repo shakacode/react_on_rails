@@ -20,11 +20,14 @@
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 begin
   require "readline"
-  require "pry-byebug"
-rescue LoadError => e
-  # readline is absent on some lightweight Ruby builds (e.g. mise) — silently skip.
-  # For any *other* LoadError, surface it so developers notice.
-  warn "[spec_helper] Skipping pry-byebug (#{e.message})" unless e.message.include?("readline")
+rescue LoadError
+  # readline is absent on some lightweight Ruby builds (e.g. mise) — pry-byebug won't work, skip silently.
+else
+  begin
+    require "pry-byebug"
+  rescue LoadError => e
+    warn "[spec_helper] Skipping pry-byebug: #{e.message}"
+  end
 end
 
 RSpec.configure do |config|
