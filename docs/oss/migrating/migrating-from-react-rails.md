@@ -33,7 +33,7 @@ If the app still uses `gem "webpacker"`, the recommended path is:
 1. **Migrate to Shakapacker first, as its own PR.** Keep the bundler change separate from the React on Rails change. This makes each step reviewable and isolates any compatibility issues. See the [Shakapacker v6 upgrade guide](https://github.com/shakacode/shakapacker/blob/v6.6.0/docs/v6_upgrade.md) for the concrete Webpacker → Shakapacker steps.
 2. **Then run the React on Rails install generator** against the Shakapacker-based app.
 
-The generator is not designed to bridge Webpack 4 + Webpacker to current React on Rails defaults for you — it assumes a Shakapacker baseline. If you cannot migrate off Webpacker yet, pin `react_on_rails` to `< 16.0` (v16 is the release that removed Webpacker support) rather than trying to use current React on Rails with Webpacker.
+The generator is not designed to bridge Webpack 4 + Webpacker to current React on Rails defaults for you — it assumes a Shakapacker baseline. If you cannot migrate off Webpacker yet, pin `react_on_rails` to `~> 14.2` (v15.0.0 is retracted; v16 is the release that removed Webpacker support) rather than trying to use current React on Rails with Webpacker.
 
 ## Preflight
 
