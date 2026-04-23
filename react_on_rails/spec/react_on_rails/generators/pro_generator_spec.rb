@@ -1286,7 +1286,10 @@ describe ProGenerator, type: :generator do
 
     it "adds the node-renderer entry to Procfile.dev" do
       expect(File.read(File.join(destination_root, "Procfile.dev")))
-        .to include("node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js")
+        .to include(
+          "node-renderer: RENDERER_LOG_LEVEL=debug " \
+          "RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js"
+        )
     end
   end
 
@@ -1525,7 +1528,10 @@ describe ProGenerator, type: :generator do
     it "adds exactly one renderer/ node-renderer entry to Procfile.dev" do
       procfile = File.read(File.join(destination_root, "Procfile.dev"))
       expect(procfile)
-        .to include("node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node renderer/node-renderer.js")
+        .to include(
+          "node-renderer: RENDERER_LOG_LEVEL=debug " \
+          "RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js"
+        )
       expect(procfile.scan(/^node-renderer:/).size).to eq(1)
     end
   end
