@@ -58,7 +58,7 @@ Deprecated options:
 
 ### Testing example:
 
-[spec/dummy/client/node-renderer.js](https://github.com/shakacode/react_on_rails/blob/main/react_on_rails_pro/spec/dummy/client/node-renderer.js)
+See `react_on_rails_pro/spec/dummy/client/node-renderer.js` in this repository.
 
 ### Simple example:
 
