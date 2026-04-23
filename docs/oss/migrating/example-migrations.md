@@ -130,10 +130,13 @@ Use this page together with the specific migration guide that matches your curre
 
 Other migration paths live in the **Migration Guides** sidebar:
 
-- [Webpack → Rspack](./migrating-from-webpack-to-rspack.md)
-- [Babel → SWC](./babel-to-swc-migration.md)
-- [Rails 5 API-only](./convert-rails-5-api-only-app.md)
-- [AngularJS](./angular-js-integration-migration.md)
-- [React Server Components (RSC)](./migrating-to-rsc.md)
+- [Migrate from Webpack to Rspack](./migrating-from-webpack-to-rspack.md)
+- [Migrate from Babel to SWC](./babel-to-swc-migration.md)
+- [Migrate a Rails 5 API-only app](./convert-rails-5-api-only-app.md)
+- [Migrate from AngularJS](./angular-js-integration-migration.md)
+
+React Server Components migration content lives under **React on Rails Pro** in the sidebar:
+
+- [Migrate to React Server Components (RSC)](./migrating-to-rsc.md)
 
 The migration guides explain the mechanics. This page shows what those mechanics look like in real repos.
