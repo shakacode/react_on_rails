@@ -33,7 +33,7 @@ module ReactOnRailsPro
     end
     private_class_method :emit_deprecation_warning!
 
-    # :nodoc: Test helper — resets the one-time deprecation-warning guard so
+    # :nodoc: Test helper - resets the one-time deprecation-warning guard so
     # specs can exercise the warning path without leaking state between examples.
     # Private so it can only be invoked from specs via `send`; prevents accidental
     # reset from production code.

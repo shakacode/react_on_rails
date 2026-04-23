@@ -213,6 +213,48 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
   end
 
+  context "when assets include a blank path" do
+    before { allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([""]) }
+
+    it "keeps the invalid entry visible and warns instead of dropping it silently" do
+      expect { pre_seed_cache }.to output(/Asset not found <blank> \(missing or not a file\)/).to_stderr
+    end
+  end
+
+  context "when assets include a directory path" do
+    let(:asset_directory) { Rails.root.join("public", "webpack", "production", "asset-directory") }
+
+    before do
+      FileUtils.mkdir_p(asset_directory)
+      allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([asset_directory])
+    end
+
+    after { FileUtils.rm_rf(asset_directory) }
+
+    it "warns and skips the non-file asset path" do
+      expect { pre_seed_cache }
+        .to output(/Asset not found #{Regexp.escape(asset_directory.to_s)} \(missing or not a file\)/).to_stderr
+    end
+  end
+
+  context "when replacing an existing cached bundle fails mid-copy" do
+    let(:dest_file) { File.join(bundle_dir, "#{bundle_hash}.js") }
+
+    before do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(dest_file, "// previous bundle content")
+      allow(FileUtils).to receive(:cp).and_call_original
+      allow(FileUtils).to receive(:cp)
+        .with(server_bundle_path, a_string_matching(/#{Regexp.escape(dest_file)}\.tmp-/))
+        .and_raise(Errno::EIO, "disk full")
+    end
+
+    it "leaves the previous bundle file in place" do
+      expect { pre_seed_cache }.to raise_error(Errno::EIO)
+      expect(File.read(dest_file)).to eq("// previous bundle content")
+    end
+  end
+
   context "when server bundle doesn't exist" do
     before { FileUtils.rm_f(server_bundle_path) }
 

@@ -11,13 +11,13 @@ module ReactOnRailsPro
   #
   # Supports two modes:
   #
-  # * `:copy` (default) — copies bundle and assets. Designed for Docker image
+  # * `:copy` (default) - copies bundle and assets. Designed for Docker image
   #   builds where the cache must be baked into an immutable artifact.
-  # * `:symlink` — creates relative symlinks. For same-filesystem workflows
+  # * `:symlink` - creates relative symlinks. For same-filesystem workflows
   #   (local dev, CI, Heroku-style same-dyno deploys, bundle-caching restores).
   #
   # Both modes produce the same on-disk cache layout, matching the renderer's
-  # runtime contract. The 410→retry cold-start round-trip on first SSR request
+  # runtime contract. The 410->retry cold-start round-trip on first SSR request
   # is eliminated when the pre-seeded bundle is present at renderer startup.
   class PreSeedRendererCache
     VALID_MODES = %i[copy symlink].freeze
@@ -98,39 +98,20 @@ module ReactOnRailsPro
     end
     private_class_method :stage_bundle
 
-    # Shared mode dispatch. In :copy mode ensures the destination directory
-    # exists; make_relative_symlink handles its own mkdir_p in :symlink mode.
     def self.stage_file(src, dest, mode, log_prefix)
       if mode == :copy
-        FileUtils.mkdir_p(File.dirname(dest))
-        FileUtils.cp(src, dest)
-        puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
+        RendererCacheHelpers.copy_file_atomically(src, dest, log_prefix: log_prefix)
       else
         make_relative_symlink(src, dest, log_prefix)
       end
     end
     private_class_method :stage_file
 
-    # RSC manifests are required when RSC is enabled — a missing manifest would cause
-    # the renderer to fail at runtime with a hard-to-diagnose error. User-configured
-    # assets_to_copy are optional and only produce a warning. Required assets are
-    # matched by expanded path rather than basename so a same-named unrelated entry
-    # in assets_to_copy cannot trigger a false-positive "required" error. Expand
-    # against Rails.root to match how RendererCacheHelpers.required_rsc_asset_paths
-    # builds its Set.
+    # RSC manifests are required when RSC is enabled; user-configured
+    # assets_to_copy are optional and only produce a warning.
     def self.stage_assets(assets, bundle_dir, rsc_required_paths, mode)
       action_desc = action_description(mode)
-      assets.each do |asset_path|
-        expanded = File.expand_path(asset_path.to_s, Rails.root)
-        unless File.exist?(expanded)
-          if rsc_required_paths.include?(expanded)
-            raise ReactOnRailsPro::Error, "Required RSC asset not found: #{asset_path}. " \
-                                          "Build your bundles before #{action_desc} the renderer cache."
-          end
-          warn "[ReactOnRailsPro] Asset not found #{asset_path}"
-          next
-        end
-
+      RendererCacheHelpers.each_stageable_asset(assets, rsc_required_paths, action_desc) do |expanded|
         dest = File.join(bundle_dir, File.basename(expanded))
         log_prefix = mode == :copy ? "Copied asset" : "Symlinked asset"
         stage_file(expanded, dest, mode, log_prefix)
@@ -140,7 +121,7 @@ module ReactOnRailsPro
 
     # Replaces `destination` with a relative symlink to `source`. Not atomic:
     # if the process is killed between `rm_f` and `File.symlink` the destination
-    # is briefly absent. In practice the renderer's 410→refetch retry at
+    # is briefly absent. In practice the renderer's 410->refetch retry at
     # request time recovers from a missing bundle, so the brief gap is benign.
     def self.make_relative_symlink(source, destination, log_prefix)
       destination_dir = Pathname.new(destination).dirname
@@ -156,7 +137,7 @@ module ReactOnRailsPro
           Pathname.new(source).realpath
         rescue Errno::ENOENT
           raise ReactOnRailsPro::Error,
-                "Cannot resolve real path for symlink source #{source} — " \
+                "Cannot resolve real path for symlink source #{source} - " \
                 "it does not exist or is a dangling symlink. " \
                 "Rebuild your bundles before staging the renderer cache."
         end
@@ -166,7 +147,7 @@ module ReactOnRailsPro
           destination_dir.realpath
         rescue Errno::ENOENT
           raise ReactOnRailsPro::Error,
-                "Cannot resolve real path for symlink destination dir #{destination_dir} — " \
+                "Cannot resolve real path for symlink destination dir #{destination_dir} - " \
                 "it may have been removed after mkdir_p (race with an external cleanup)."
         end
       relative_source_path = source_path.relative_path_from(destination_dir_real)
