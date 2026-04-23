@@ -22,8 +22,8 @@ React on Rails is one product with two tiers: open source for Rails + React inte
 
 ### Evaluating Rails + React options
 
-- [Example migrations](./oss/migrating/example-migrations.md)
-- [Examples gallery](https://reactonrails.com/examples)
+- [Example migrations](./oss/migrating/example-migrations.md) — curated migration references and proof criteria
+- [Examples gallery](https://reactonrails.com/examples) — reactonrails.com showcase apps
 - [Compare with alternatives](./oss/getting-started/comparing-react-on-rails-to-alternatives.md) — decision guide covering Hotwire, Inertia, Next.js, and more
 - [Migrate from react-rails](./oss/migrating/migrating-from-react-rails.md)
 

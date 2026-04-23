@@ -31,7 +31,7 @@ The best examples are:
 These maintainer-owned references are the stable starting set. Add community
 examples here after they have landed or stabilized enough to inspect.
 
-1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) —
+1. [react-rails example app: `react-rails-to-react-on-rails` snapshot](https://github.com/shakacode/react-rails-example-app/tree/c6b794a4b96746dbbc98a46f31119171109d70b0) —
    covers an older `react-rails` v3 → `react_on_rails` v13.4 migration, so treat
    it as a structural reference and follow current migration guides for gem and
    configuration specifics
@@ -74,6 +74,10 @@ This is common in mature apps that built a thin wrapper around React mounts.
 Treat the wrapper as the migration boundary: preserve the Rails-side props
 contract, replace one helper-backed component first, and remove the wrapper
 later.
+
+No dedicated guide exists yet. The [react-rails migration guide](./migrating-from-react-rails.md)
+covers the nearest-neighbor mechanics for helper syntax and component
+registration.
 
 ## What counts as proof
 
