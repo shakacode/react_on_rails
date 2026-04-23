@@ -152,10 +152,12 @@ Once you add `react_on_rails` to the `Gemfile`, every existing legacy call start
 Before adding the gem, audit existing positional-style calls so you know what needs a shim or a same-PR migration. Pay particular attention to two-argument calls, which fail silently rather than raising:
 
 ```bash
-rg -n "react_component\\b" app/views
+rg -n "react_component\\b" app/views app/components
 # or without ripgrep:
-grep -rEn "react_component\\b" app/views
+grep -rEn "react_component\\b" app/views app/components
 ```
+
+Expand the path list if you mount React from other locations (Phlex views, mailer templates, gem engines, etc.), or drop the path argument entirely to search the whole project and filter out false positives manually.
 
 Any call that passes props as the second positional argument (rather than `{ props: ... }`) will break as soon as `react_on_rails` is loaded — either by raising `ArgumentError` (3+ args) or by silently dropping props (2 args).
 
@@ -167,27 +169,25 @@ The cleanest path is to update every `react_component` call to the options-hash 
 
 If a single-PR migration is impractical, you can keep `react-rails`'s `react_component` semantics for un-migrated views and introduce a separate helper name for migrated mounts.
 
-Add a helper module that:
+Define the shim module directly in an initializer so it lives outside Zeitwerk's autoload paths. The module:
 
 1. Prepends an override so legacy `react_component(...)` calls keep delegating to `React::Rails::ViewHelper`.
 2. Exposes an explicit `react_on_rails_component(...)` alias for migrated mounts.
 
 ```ruby
-# app/helpers/react_on_rails_coexistence.rb
+# config/initializers/react_on_rails_coexistence.rb
 module ReactOnRailsCoexistence
   # Legacy react-rails semantics for un-migrated views.
   # Delegates to React::Rails::ViewHelper#react_component. Accepts and
   # forwards a block, which react-rails uses for mount-tag content.
   module LegacyReactComponent
     def react_component(name, props = {}, options = {}, &block)
-      # bind(self) requires self to include React::Rails::ViewHelper. That
+      # bind_call requires self to include React::Rails::ViewHelper. That
       # holds in standard Rails views (the react-rails railtie includes it
       # into ActionView::Base) but not in Rails engines, ViewComponent, or
       # other view contexts that don't inherit from ActionView::Base.
-      # On Ruby 2.7+, .bind_call(self, ...) skips the BoundMethod allocation.
       React::Rails::ViewHelper.instance_method(:react_component)
-                              .bind(self)
-                              .call(name, props, options, &block)
+                              .bind_call(self, name, props, options, &block)
     end
   end
 
@@ -198,17 +198,9 @@ module ReactOnRailsCoexistence
   # the prepended LegacyReactComponent override.
   def react_on_rails_component(name, options = {})
     ReactOnRails::Helper.instance_method(:react_component)
-                        .bind(self)
-                        .call(name, options)
+                        .bind_call(self, name, options)
   end
 end
-```
-
-Apply the monkey-patches from an initializer so they run once at boot and are reapplied after every development reload. Keeping the `prepend`/`include` calls out of `app/helpers/` avoids relying on Zeitwerk autoload timing and prevents duplicate ancestors from accumulating across reloads:
-
-```ruby
-# config/initializers/react_on_rails_coexistence.rb
-require Rails.root.join("app/helpers/react_on_rails_coexistence")
 
 Rails.application.config.to_prepare do
   # Safe to re-run on every reload: Ruby skips the insertion when the module
@@ -218,20 +210,22 @@ Rails.application.config.to_prepare do
 end
 ```
 
+Defining the module inline in the initializer avoids a subtle issue: files under `app/helpers/` are on Zeitwerk's autoload paths, and `require`-ing such a file from an initializer can confuse Zeitwerk's bookkeeping in production eager-load mode. Keeping the module in `config/initializers/` sidesteps that entirely.
+
 Use `react_on_rails_component(...)` in new or migrated views:
 
 ```erb
 <%= react_on_rails_component("CommandBar", props: { title: "Hi" }, prerender: true) %>
 ```
 
-Leave existing `react_component(...)` calls untouched until you are ready to migrate them. When every call site has been converted, update each migrated call site from `react_on_rails_component(...)` back to `react_component(...)` and delete the shim files (`app/helpers/react_on_rails_coexistence.rb` and `config/initializers/react_on_rails_coexistence.rb`).
+Leave existing `react_component(...)` calls untouched until you are ready to migrate them. When every call site has been converted, update each migrated call site from `react_on_rails_component(...)` back to `react_component(...)` and delete `config/initializers/react_on_rails_coexistence.rb`.
 
 > **Note:** under this option, every migrated call site goes through two renames: `react_component` → `react_on_rails_component` (while the shim is active), then back to `react_component` once the shim is removed. A project-wide find-and-replace over `react_on_rails_component` makes the final pass quick.
 
 ### Known limitations of Option B
 
 - This is a migration-only pattern. Carry the shim only as long as legacy calls remain, then remove it.
-- Because the initializer uses `require` to keep the shim module stable across reloads, edits to `app/helpers/react_on_rails_coexistence.rb` require a server restart in development.
+- Edits to `config/initializers/react_on_rails_coexistence.rb` require a server restart in development, like any initializer.
 - The shim is app-level; it will not help gem-provided engines, Rails engines, or Action Mailer views that make legacy `react_component` calls.
 - Server rendering, Pro features, and auto-bundling all work through the explicit `react_on_rails_component` alias — the shim only forwards the default helper name back to `react-rails`.
 
