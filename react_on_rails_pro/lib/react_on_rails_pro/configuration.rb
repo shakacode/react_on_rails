@@ -304,8 +304,13 @@ module ReactOnRailsPro
     end
 
     def accepts_upload_options_hash?(params)
-      params.any? { |type, _name| type == :rest } ||
-        params.count { |type, _name| ROLLING_DEPLOY_UPLOAD_OPTION_HASH_PARAMS.include?(type) } >= 2
+      return true if params.any? { |type, _name| type == :rest }
+
+      positional_params = params.select { |type, _name| ROLLING_DEPLOY_UPLOAD_OPTION_HASH_PARAMS.include?(type) }
+      return false if positional_params.length < 2
+
+      required_positionals = positional_params.count { |type, _name| type == :req }
+      required_positionals <= 2
     end
 
     def setup_renderer_password
