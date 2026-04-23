@@ -5,6 +5,8 @@ rails: bin/rails s -p ${PORT:-3000}
 rails-client-assets: pnpm run build:dev:watch
 
 # Start Node server for server rendering.
-# Equivalent to `pnpm run node-renderer` (see package.json) — invoked directly so the
-# ${RENDERER_PORT:-3800} shell default picks up REACT_ON_RAILS_BASE_PORT assignments.
+# Mirrors `pnpm run node-renderer` (see package.json): both use the same
+# `RENDERER_PORT=${RENDERER_PORT:-3800}` shell default so REACT_ON_RAILS_BASE_PORT
+# assignments reach the renderer identically whether it is launched via foreman
+# or directly from pnpm. Keep the two commands in sync.
 node-renderer: RENDERER_PORT=${RENDERER_PORT:-3800} node renderer/node-renderer.js

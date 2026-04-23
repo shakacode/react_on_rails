@@ -612,10 +612,10 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3801")
       end
 
-      it "announces the derived REACT_RENDERER_URL on stdout so the env injection is self-documenting" do
+      it "announces the derived REACT_RENDERER_URL on stderr alongside other env-mutation warnings" do
         ENV["RENDERER_PORT"] = "3801"
         expect { described_class.start(:development) }
-          .to output(%r{RENDERER_PORT=3801 set without REACT_RENDERER_URL; deriving REACT_RENDERER_URL=http://localhost:3801}).to_stdout
+          .to output(%r{RENDERER_PORT=3801 set without REACT_RENDERER_URL; deriving REACT_RENDERER_URL=http://localhost:3801}).to_stderr
       end
 
       it "leaves a pre-existing REACT_RENDERER_URL untouched" do
@@ -635,6 +635,16 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       it "does not warn when RENDERER_PORT appears inside REACT_RENDERER_URL" do
         ENV["RENDERER_PORT"] = "3801"
         ENV["REACT_RENDERER_URL"] = "http://renderer.internal:3801"
+        expect { described_class.start(:development) }.not_to output(/does not match/).to_stderr
+      end
+
+      # Basic-auth password digits used to trick the pre-URI.parse guard regex:
+      # `[^/]+` would backtrack, match `user` as host, and consume `:3800` from
+      # the password. The early `return true` was skipped, URI.parse returned
+      # the scheme default (80), and the mismatch check fired spuriously.
+      it "does not warn for a basic-auth URL where the password contains digits matching RENDERER_PORT" do
+        ENV["RENDERER_PORT"] = "3800"
+        ENV["REACT_RENDERER_URL"] = "http://user:3800@renderer.internal:3800"
         expect { described_class.start(:development) }.not_to output(/does not match/).to_stderr
       end
 

@@ -194,17 +194,22 @@ module ReactOnRails
         end
 
         def explicit_rails_port
-          parse_explicit_port_env("PORT")
+          consume_explicit_port_env("PORT")
         end
 
         def explicit_webpack_port
-          parse_explicit_port_env("SHAKAPACKER_DEV_SERVER_PORT")
+          consume_explicit_port_env("SHAKAPACKER_DEV_SERVER_PORT")
         end
 
         # Reject values that aren't valid port strings and clear the env var
         # so ServerManager's apply_explicit_port_env path (which also rejects
         # them) doesn't emit a second warning for the same value.
-        def parse_explicit_port_env(var_name)
+        #
+        # Named `consume_*` rather than `parse_*` because invalid values are
+        # removed from ENV as a side effect — the "warn once + fall back" flow
+        # is shared with ServerManager via the cleared env, not via the return
+        # value. Kept in one place so the coupling is obvious.
+        def consume_explicit_port_env(var_name)
           raw = ENV.fetch(var_name, nil)
           return nil if raw.nil?
 

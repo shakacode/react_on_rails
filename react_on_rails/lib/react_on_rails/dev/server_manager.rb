@@ -1013,8 +1013,11 @@ module ReactOnRails
 
           if url.nil? || url.empty?
             # Only RENDERER_PORT set: derive the URL so Rails reaches the right port.
+            # Use warn (stderr) so `bin/dev 2>/dev/null` silences this env-mutation
+            # log together with every other "I changed your env" warning in this
+            # file — stdout would leak through the same silencing attempt.
             derived = "http://localhost:#{port}"
-            puts "RENDERER_PORT=#{port} set without REACT_RENDERER_URL; deriving REACT_RENDERER_URL=#{derived}."
+            warn "RENDERER_PORT=#{port} set without REACT_RENDERER_URL; deriving REACT_RENDERER_URL=#{derived}."
             ENV["REACT_RENDERER_URL"] = derived
           elsif url_port_mismatch?(url, port)
             # Both set but inconsistent — SSR will silently break otherwise.
@@ -1058,8 +1061,15 @@ module ReactOnRails
         # otherwise return the scheme default (80 for http, 443 for https),
         # which would silently match `RENDERER_PORT=80` / `=443` — a misconfig
         # worth flagging rather than hiding.
+        #
+        # Regex anatomy: the optional `(?:[^@/]*@)?` steps past a userinfo
+        # prefix like `user:pass@` so a URL such as
+        # `http://user:3800@localhost` does not match its password as a host
+        # port via backtracking. The host charset excludes both `/` and `:`
+        # so the `:\d+` port anchor lands on the authority separator without
+        # backtracking into the host.
         def url_port_mismatch?(url, port)
-          return true unless url.match?(%r{://[^/]+:\d+})
+          return true unless url.match?(%r{://(?:[^@/]*@)?[^@/:]+:\d+})
 
           URI.parse(url).port != port.to_i
         rescue URI::InvalidURIError
