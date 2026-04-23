@@ -175,8 +175,18 @@ module ReactOnRailsPro
     private_class_method :valid_bundle_payload?
 
     def self.valid_asset_payload?(asset_paths, hash)
-      missing_assets = asset_paths.reject { |asset_path| File.exist?(asset_path) }
-      return true if missing_assets.empty?
+      invalid_assets = asset_paths.reject { |asset_path| File.file?(asset_path) }
+      return true if invalid_assets.empty?
+
+      missing_assets, non_file_assets = invalid_assets.partition { |asset_path| !File.exist?(asset_path) }
+      warn_missing_asset_payload(hash, missing_assets)
+      warn_non_file_asset_payload(hash, non_file_assets)
+      false
+    end
+    private_class_method :valid_asset_payload?
+
+    def self.warn_missing_asset_payload(hash, missing_assets)
+      return if missing_assets.empty?
 
       missing_required = required_rsc_asset_basenames & missing_assets.map { |path| File.basename(path) }
       if missing_required.any?
@@ -186,9 +196,22 @@ module ReactOnRailsPro
         warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned missing asset " \
              "path(s): #{missing_assets.inspect}. Skipping this hash."
       end
-      false
     end
-    private_class_method :valid_asset_payload?
+    private_class_method :warn_missing_asset_payload
+
+    def self.warn_non_file_asset_payload(hash, non_file_assets)
+      return if non_file_assets.empty?
+
+      non_file_required = required_rsc_asset_basenames & non_file_assets.map { |path| File.basename(path) }
+      if non_file_required.any?
+        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-file required RSC " \
+             "asset path(s): #{non_file_required.inspect}. Skipping this hash."
+      else
+        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-file asset " \
+             "path(s): #{non_file_assets.inspect}. Skipping this hash."
+      end
+    end
+    private_class_method :warn_non_file_asset_payload
 
     def self.valid_required_rsc_payload?(asset_paths, hash)
       missing = required_rsc_asset_basenames - asset_paths.map { |path| File.basename(path) }

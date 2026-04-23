@@ -320,6 +320,10 @@ module ReactOnRailsPro
     end
 
     def accepts_upload_options_hash?(params)
+      # Ruby 3 only converts keywords to an options hash when the callee has no
+      # explicit keyword parameters. `upload(hash, options = {}, region:)` still
+      # rejects the `bundle:` / `assets:` call shape used by assets precompile.
+      return false if params.any? { |type, _name| ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS.include?(type) }
       return true if params.any? { |type, _name| type == :rest }
 
       required_positionals = params.count { |type, _name| type == :req }

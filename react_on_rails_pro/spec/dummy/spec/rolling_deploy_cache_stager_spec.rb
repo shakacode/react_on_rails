@@ -279,6 +279,26 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when adapter#fetch returns a directory as an asset path" do
+    let(:src_bundle) { source_file("bundle-directory-asset.js") }
+    let(:asset_directory) { File.join(cache_dir, "__sources", "chunk-directory.js") }
+
+    before do
+      FileUtils.mkdir_p(asset_directory)
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["directory-asset"])
+      allow(adapter).to receive(:fetch)
+        .with("directory-asset")
+        .and_return(bundle: src_bundle, assets: [asset_directory])
+    end
+
+    it "warns and skips that hash before staging non-file assets" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :symlink) }
+        .to output(/returned non-file asset path/).to_stderr
+
+      expect(File.exist?(File.join(cache_dir, "directory-asset"))).to be(false)
+    end
+  end
+
   context "when refreshing an existing seeded hash fails during staging" do
     let(:src_bundle) { source_file("bundle-refresh.js") }
     let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
