@@ -31,7 +31,7 @@ group :development, :test do
   gem "listen"
   gem "debug"
   gem "pry"
-  gem "pry-byebug"
+  gem "pry-byebug", require: false
   gem "pry-doc"
   gem "pry-rails"
   gem "pry-rescue"
