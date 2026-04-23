@@ -113,6 +113,34 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end.not_to raise_error
       end
 
+      it "accepts optional extra upload keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, bundle:, assets:, region: nil) = [bundle, assets, region]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "rejects adapters that require extra upload keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, bundle:, assets:, region:) = [bundle, assets, region]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
       it "accepts adapters that capture upload keywords in an options hash" do
         adapter = Class.new do
           def self.previous_bundle_hashes = []

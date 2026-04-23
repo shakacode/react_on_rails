@@ -297,8 +297,22 @@ module ReactOnRailsPro
     end
 
     def accepts_upload_keyword_arguments?(params)
-      accepts_all_keywords = params.any? { |type, _name| ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS.include?(type) }
-      accepts_all_keywords || ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS.all? do |keyword|
+      return false if extra_required_upload_keywords(params).any?
+
+      accepts_all_upload_keywords?(params) || accepts_required_upload_keywords?(params)
+    end
+
+    def extra_required_upload_keywords(params)
+      required_keywords = params.select { |type, _name| type == :keyreq }.map(&:last)
+      required_keywords - ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS
+    end
+
+    def accepts_all_upload_keywords?(params)
+      params.any? { |type, _name| ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS.include?(type) }
+    end
+
+    def accepts_required_upload_keywords?(params)
+      ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS.all? do |keyword|
         params.any? { |type, name| ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS.include?(type) && name == keyword }
       end
     end
