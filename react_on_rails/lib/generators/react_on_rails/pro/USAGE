@@ -6,7 +6,7 @@ Example:
 
     This will add:
     - Pro initializer (config/initializers/react_on_rails_pro.rb)
-    - Node renderer (client/node-renderer.js)
+    - Node renderer (renderer/node-renderer.js)
     - Node renderer process to Procfile.dev
 
 Modifies:

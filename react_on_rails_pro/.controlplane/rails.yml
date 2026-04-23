@@ -20,7 +20,7 @@ spec:
           protocol: http
     - name: node-renderer
       args:
-        - client/node-renderer.js
+        - renderer/node-renderer.js
       command: node
       cpu: 512m
       env:

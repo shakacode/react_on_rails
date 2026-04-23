@@ -26,7 +26,7 @@ describe('buildVM and runInVM', () => {
     await resetForTest(testName);
   });
 
-  describe('Buffer and process in context', () => {
+  describe('default VM globals (Buffer, process, performance)', () => {
     test('not available if supportModules disabled', async () => {
       const config = getConfig();
       config.supportModules = false;
@@ -35,10 +35,13 @@ describe('buildVM and runInVM', () => {
       await buildVM(uploadedBundlePathForTest());
 
       let result = await runInVM('typeof Buffer === "undefined"', uploadedBundlePathForTest());
-      expect(result).toBeTruthy();
+      expect(result).toBe('true');
 
       result = await runInVM('typeof process === "undefined"', uploadedBundlePathForTest());
-      expect(result).toBeTruthy();
+      expect(result).toBe('true');
+
+      result = await runInVM('typeof performance === "undefined"', uploadedBundlePathForTest());
+      expect(result).toBe('true');
     });
 
     test('available if supportModules enabled', async () => {
@@ -49,10 +52,18 @@ describe('buildVM and runInVM', () => {
       await buildVM(uploadedBundlePathForTest());
 
       let result = await runInVM('typeof Buffer !== "undefined"', uploadedBundlePathForTest());
-      expect(result).toBeTruthy();
+      expect(result).toBe('true');
 
       result = await runInVM('typeof process !== "undefined"', uploadedBundlePathForTest());
-      expect(result).toBeTruthy();
+      expect(result).toBe('true');
+
+      // React 19's development build of `React.lazy` calls `performance.now()`,
+      // so `performance` must be available when `supportModules` is enabled.
+      result = await runInVM('typeof performance !== "undefined"', uploadedBundlePathForTest());
+      expect(result).toBe('true');
+
+      result = await runInVM('typeof performance.now === "function"', uploadedBundlePathForTest());
+      expect(result).toBe('true');
     });
   });
 
@@ -62,7 +73,7 @@ describe('buildVM and runInVM', () => {
       await buildVM(uploadedBundlePathForTest());
 
       const result = await runInVM('typeof testString === "undefined"', uploadedBundlePathForTest());
-      expect(result).toBeTruthy();
+      expect(result).toBe('true');
     });
 
     test('available if additionalContext set', async () => {
@@ -73,7 +84,7 @@ describe('buildVM and runInVM', () => {
       await buildVM(uploadedBundlePathForTest());
 
       const result = await runInVM('typeof testString !== "undefined"', uploadedBundlePathForTest());
-      expect(result).toBeTruthy();
+      expect(result).toBe('true');
     });
   });
 

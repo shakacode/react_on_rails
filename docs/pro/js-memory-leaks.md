@@ -141,7 +141,7 @@ done
 Node provides a built-in flag that writes heap snapshots on a signal — no custom code required:
 
 ```bash
-NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2" node node-renderer.js
+NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2" node renderer/node-renderer.js
 ```
 
 Then send `kill -USR2 <worker-pid>` at different times to capture snapshots. Each signal writes a `.heapsnapshot` file to the working directory.
@@ -186,7 +186,7 @@ To diagnose leaks in a running container:
 Start the renderer with the `--inspect` flag to connect Chrome DevTools:
 
 ```bash
-node --inspect node-renderer.js
+node --inspect renderer/node-renderer.js
 ```
 
 Open `chrome://inspect` in Chrome, take heap snapshots, and use the "Comparison" view to see what objects accumulated between snapshots.
@@ -200,7 +200,7 @@ Without this flag, V8 reads the container's memory limit and sets a very large h
 **Always set this for production:**
 
 ```bash
-NODE_OPTIONS=--max-old-space-size=1536 node node-renderer.js
+NODE_OPTIONS=--max-old-space-size=1536 node renderer/node-renderer.js
 ```
 
 Size it based on your container memory and worker count. For example, with 4GB container memory and 3 workers: `4096 / 3 ≈ 1365`, round to `1400`.

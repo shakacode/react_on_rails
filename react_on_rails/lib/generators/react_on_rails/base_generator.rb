@@ -418,7 +418,7 @@ module ReactOnRails
 
         if use_pro?
           hints << {
-            path: "client/node-renderer.js",
+            path: "renderer/node-renderer.js",
             description: "Node renderer entrypoint used for Pro SSR and RSC."
           }
         end
