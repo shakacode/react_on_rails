@@ -181,7 +181,7 @@ module ReactOnRailsPro
     private_class_method :make_relative_symlink
 
     def self.replace_existing_symlink(destination, relative_source_path, log_prefix)
-      if File.symlink?(destination) && File.readlink(destination) == relative_source_path.to_s
+      if matching_symlink?(destination, relative_source_path)
         puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
              "(concurrent creator won the race); leaving existing link."
         return
