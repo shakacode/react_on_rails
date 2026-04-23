@@ -241,13 +241,13 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       allow(adapter).to receive_messages(previous_bundle_hashes: ["abc123"])
       allow(adapter).to receive(:fetch).with("abc123").and_return(
         bundle: src_bundle,
-        assets: ["/nonexistent/loadable-stats.json"]
+        assets: ["/nonexistent/chunk.js"]
       )
     end
 
     it "rolls back the entire hash directory so the renderer sees 410, not a bundle without manifests" do
       expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
-        .to output(/returned missing asset path/).to_stderr
+        .to output(/\A(?!.*missing loadable-stats\.json).*returned missing asset path/m).to_stderr
 
       bundle_dir = File.join(cache_dir, "abc123")
       expect(File.exist?(bundle_dir)).to be(false)
@@ -275,6 +275,32 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
       expect(File.read(existing_bundle)).to eq("// existing bundle")
       expect(Dir.children(cache_dir).grep(/abc123\.staging/)).to be_empty
+    end
+  end
+
+  context "when refreshing an existing seeded hash cannot remove the old backup after promotion" do
+    let(:src_bundle) { source_file("bundle-new.js", contents: "// new bundle") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
+    let(:bundle_dir) { File.join(cache_dir, "abc123") }
+    let(:existing_bundle) { File.join(bundle_dir, "abc123.js") }
+
+    before do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(existing_bundle, "// existing bundle")
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["abc123"])
+      allow(adapter).to receive(:fetch).with("abc123").and_return(bundle: src_bundle, assets: [src_asset])
+      allow(FileUtils).to receive(:rm_rf).and_call_original
+      allow(FileUtils).to receive(:rm_rf)
+        .with(a_string_matching(/abc123\.previous-/))
+        .and_raise(Errno::EACCES, "permission denied")
+    end
+
+    it "keeps the promoted bundle and leaves stale backup cleanup for a later sweep" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/Could not remove stale rolling-deploy backup directory/).to_stderr
+
+      expect(File.read(existing_bundle)).to eq("// new bundle")
+      expect(Dir.children(cache_dir).grep(/abc123\.previous/)).not_to be_empty
     end
   end
 

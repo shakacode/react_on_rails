@@ -66,7 +66,6 @@ module ReactOnRailsPro
     DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE = 64
     ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS = %i[req opt rest].freeze
-    ROLLING_DEPLOY_UPLOAD_OPTION_HASH_PARAMS = %i[req opt].freeze
     ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
     ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest rest].freeze
     ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
@@ -320,11 +319,9 @@ module ReactOnRailsPro
     def accepts_upload_options_hash?(params)
       return true if params.any? { |type, _name| type == :rest }
 
-      positional_params = params.select { |type, _name| ROLLING_DEPLOY_UPLOAD_OPTION_HASH_PARAMS.include?(type) }
-      return false if positional_params.length < 2
-
-      required_positionals = positional_params.count { |type, _name| type == :req }
-      required_positionals <= 2
+      required_positionals = params.count { |type, _name| type == :req }
+      optional_positionals = params.count { |type, _name| type == :opt }
+      required_positionals == 1 && optional_positionals.positive?
     end
 
     def setup_renderer_password

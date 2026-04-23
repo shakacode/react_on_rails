@@ -129,8 +129,9 @@ module ReactOnRailsPro
     def self.filter_existing_assets(assets)
       existing, missing = assets.partition { |path| File.exist?(path) }
       unless missing.empty?
-        warn "[ReactOnRailsPro] Skipping missing optional assets for rolling_deploy_adapter upload: " \
-             "#{missing.inspect}. Continuing with #{existing.length} existing asset(s)."
+        warn "[ReactOnRailsPro] Skipping missing assets for rolling_deploy_adapter upload " \
+             "(some may be required for RSC): #{missing.inspect}. " \
+             "Continuing with #{existing.length} existing asset(s)."
         warn_if_missing_required_rsc_assets(missing)
       end
       existing

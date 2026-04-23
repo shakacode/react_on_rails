@@ -155,7 +155,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end.not_to raise_error
       end
 
-      it "accepts adapters that require the options hash positional argument" do
+      it "rejects adapters that require the options hash positional argument" do
         adapter = Class.new do
           def self.previous_bundle_hashes = []
           def self.fetch(_hash) = nil
@@ -166,7 +166,7 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           ReactOnRailsPro.configure do |config|
             config.rolling_deploy_adapter = adapter
           end
-        end.not_to raise_error
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
       end
 
       it "rejects adapters that require extra positional upload arguments" do

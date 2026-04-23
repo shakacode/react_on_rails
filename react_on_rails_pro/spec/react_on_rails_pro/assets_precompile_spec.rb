@@ -497,7 +497,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       it "filters out missing assets, warns, and still uploads the remaining ones" do
         expect { described_class.publish_current_bundle_if_configured }
-          .to output(/Skipping missing optional assets/).to_stderr
+          .to output(/Skipping missing assets/).to_stderr
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
       end

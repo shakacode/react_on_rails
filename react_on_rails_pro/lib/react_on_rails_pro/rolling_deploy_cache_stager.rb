@@ -135,10 +135,9 @@ module ReactOnRailsPro
       asset_paths = Array(payload[:assets]).map(&:to_s)
       return nil unless valid_bundle_payload?(payload, hash)
       return nil unless valid_required_rsc_payload?(asset_paths, hash)
-
-      warn_if_missing_loadable_stats(asset_paths, hash)
       return nil unless valid_asset_payload?(asset_paths, hash)
 
+      warn_if_missing_loadable_stats(asset_paths, hash)
       payload
     rescue Timeout::Error
       warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) timed out after " \
@@ -250,6 +249,7 @@ module ReactOnRailsPro
     private_class_method :sanitize_hashes
 
     def self.bundle_directory(cache_dir, hash)
+      # File.realpath requires the cache root to exist before path normalization.
       FileUtils.mkdir_p(cache_dir)
       normalized_cache_dir = File.realpath(cache_dir)
       normalized_candidate = File.expand_path(File.join(normalized_cache_dir, hash))
@@ -276,12 +276,22 @@ module ReactOnRailsPro
       end
 
       FileUtils.mv(staging_dir, bundle_dir)
-      FileUtils.rm_rf(backup_dir) if backup_dir
+      remove_previous_bundle_backup(backup_dir)
     rescue StandardError
       restore_previous_bundle_directory(backup_dir, bundle_dir)
       raise
     end
     private_class_method :replace_bundle_directory
+
+    def self.remove_previous_bundle_backup(backup_dir)
+      return unless backup_dir
+
+      FileUtils.rm_rf(backup_dir)
+    rescue StandardError => e
+      warn "[ReactOnRailsPro] Could not remove stale rolling-deploy backup directory #{backup_dir}: " \
+           "#{e.class}: #{e.message}. It will be swept on a later run."
+    end
+    private_class_method :remove_previous_bundle_backup
 
     def self.restore_previous_bundle_directory(backup_dir, bundle_dir)
       return unless backup_dir
