@@ -2,6 +2,7 @@
 
 require "fileutils"
 require "pathname"
+require "react_on_rails_pro/renderer_cache_helpers"
 require "timeout"
 
 module ReactOnRailsPro
@@ -126,11 +127,10 @@ module ReactOnRailsPro
         return nil
       end
 
-      unless payload[:bundle] && File.exist?(payload[:bundle])
-        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned payload without " \
-             "a valid :bundle path. Skipping this hash."
-        return nil
-      end
+      asset_paths = Array(payload[:assets]).map(&:to_s)
+      return nil unless valid_bundle_payload?(payload, hash)
+      return nil unless valid_asset_payload?(asset_paths, hash)
+      return nil unless valid_required_rsc_payload?(asset_paths, hash)
 
       payload
     rescue Timeout::Error
@@ -146,6 +146,42 @@ module ReactOnRailsPro
       nil
     end
     private_class_method :fetch_payload
+
+    def self.valid_bundle_payload?(payload, hash)
+      return true if payload[:bundle] && File.exist?(payload[:bundle])
+
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned payload without " \
+           "a valid :bundle path. Skipping this hash."
+      false
+    end
+    private_class_method :valid_bundle_payload?
+
+    def self.valid_asset_payload?(asset_paths, hash)
+      missing_assets = asset_paths.reject { |asset_path| File.exist?(asset_path) }
+      return true if missing_assets.empty?
+
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned missing asset " \
+           "path(s): #{missing_assets.inspect}. Skipping this hash."
+      false
+    end
+    private_class_method :valid_asset_payload?
+
+    def self.valid_required_rsc_payload?(asset_paths, hash)
+      missing = required_rsc_asset_basenames - asset_paths.map { |path| File.basename(path) }
+      return true if missing.empty?
+
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) is missing required RSC " \
+           "companion asset(s): #{missing.inspect}. Skipping this hash."
+      false
+    end
+    private_class_method :valid_required_rsc_payload?
+
+    def self.required_rsc_asset_basenames
+      return [] unless ReactOnRailsPro.configuration.enable_rsc_support
+
+      RendererCacheHelpers.required_rsc_asset_paths.map { |path| File.basename(path) }
+    end
+    private_class_method :required_rsc_asset_basenames
 
     def self.stage_file(src, dest, mode)
       FileUtils.mkdir_p(File.dirname(dest))

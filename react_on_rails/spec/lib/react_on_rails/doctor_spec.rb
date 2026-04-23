@@ -2685,6 +2685,7 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warnings.any? do |m|
                  m[:content].include?("missing required methods") && m[:content].include?("fetch")
                end).to be(true)
+        expect(warnings.none? { |m| m[:content].include?("previous_bundle_hashes returned []") }).to be(true)
       end
     end
 

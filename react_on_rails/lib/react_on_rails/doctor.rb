@@ -2903,7 +2903,8 @@ module ReactOnRails
         return
       end
 
-      report_adapter_protocol(adapter)
+      return unless report_adapter_protocol(adapter)
+
       report_previous_bundle_hashes_probe(adapter)
       report_resolved_cache_dir
     rescue StandardError => e
@@ -2917,11 +2918,13 @@ module ReactOnRails
           "✅ rolling_deploy_adapter responds to all required methods " \
           "(#{ROLLING_DEPLOY_REQUIRED_METHODS.join(', ')})"
         )
+        true
       else
         checker.add_warning(
           "⚠️  rolling_deploy_adapter is missing required methods: #{missing.join(', ')}. " \
           "See docs/pro/rolling-deploy-adapters.md."
         )
+        false
       end
     end
 

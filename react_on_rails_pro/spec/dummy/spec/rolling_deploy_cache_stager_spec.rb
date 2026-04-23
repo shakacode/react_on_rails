@@ -9,7 +9,10 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
   # rubocop:enable RSpec/VerifiedDoubleReference
 
   before do
-    allow(ReactOnRailsPro.configuration).to receive(:rolling_deploy_adapter).and_return(adapter)
+    allow(ReactOnRailsPro.configuration).to receive_messages(
+      rolling_deploy_adapter: adapter,
+      enable_rsc_support: false
+    )
     ENV.delete("PREVIOUS_BUNDLE_HASHES")
   end
 
@@ -207,10 +210,45 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "rolls back the entire hash directory so the renderer sees 410, not a bundle without manifests" do
-      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/returned missing asset path/).to_stderr
 
       bundle_dir = File.join(cache_dir, "abc123")
       expect(File.exist?(bundle_dir)).to be(false)
+    end
+  end
+
+  context "when RSC support is enabled" do
+    let(:src_bundle) { source_file("bundle-rsc.js") }
+    let(:client_manifest) { source_file("react-client-manifest.json", contents: "{}") }
+    let(:server_client_manifest) { source_file("react-server-client-manifest.json", contents: "{}") }
+
+    before do
+      allow(ReactOnRailsPro.configuration).to receive(:enable_rsc_support).and_return(true)
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["rsc-hash"])
+    end
+
+    it "skips previous hashes that omit required RSC companion assets" do
+      allow(adapter).to receive(:fetch).with("rsc-hash").and_return(bundle: src_bundle, assets: [])
+
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/missing required RSC companion asset/).to_stderr
+
+      expect(File.exist?(File.join(cache_dir, "rsc-hash"))).to be(false)
+    end
+
+    it "stages previous hashes when required RSC companion assets are present" do
+      allow(adapter).to receive(:fetch).with("rsc-hash").and_return(
+        bundle: src_bundle,
+        assets: [client_manifest, server_client_manifest]
+      )
+
+      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+
+      bundle_dir = File.join(cache_dir, "rsc-hash")
+      expect(File.exist?(File.join(bundle_dir, "rsc-hash.js"))).to be(true)
+      expect(File.exist?(File.join(bundle_dir, "react-client-manifest.json"))).to be(true)
+      expect(File.exist?(File.join(bundle_dir, "react-server-client-manifest.json"))).to be(true)
     end
   end
 

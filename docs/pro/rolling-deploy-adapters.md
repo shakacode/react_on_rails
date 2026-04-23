@@ -53,9 +53,12 @@ module MyRollingDeployAdapter
   #
   # @return [Hash, nil] Hash with keys :bundle (String path to the
   #   bundle file, required) and :assets (Array<String> of companion
-  #   asset paths like loadable-stats.json / RSC manifests). nil if
-  #   the bundle is unavailable — pre-seeding logs a warning and
-  #   continues.
+  #   asset paths like loadable-stats.json / RSC manifests). Return
+  #   only paths that exist on local disk. When RSC support is enabled,
+  #   react-client-manifest.json and react-server-client-manifest.json
+  #   are required companion assets; hashes missing them are skipped so
+  #   the runtime 410-retry path remains the safe fallback. Return nil
+  #   if the bundle is unavailable — pre-seeding logs a warning and continues.
   #
   # Fetch is wrapped in Timeout.timeout(30s) to protect pre-seeding
   # and assets:precompile from hanging on slow external stores.
@@ -92,15 +95,16 @@ This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. 
 
 ## Edge cases and error handling
 
-| Scenario                               | Behavior                                                                     |
-| -------------------------------------- | ---------------------------------------------------------------------------- |
-| Adapter not configured                 | No-op. Only the current hash is staged.                                      |
-| `previous_bundle_hashes` returns `[]`  | Log "No previous bundle hashes to seed" and continue.                        |
-| `previous_bundle_hashes` raises        | Warn, skip previous-hash seeding, continue. Current-hash staging unaffected. |
-| `fetch(hash)` returns `nil`            | Warn, skip that hash. Runtime 410-retry remains the fallback.                |
-| `fetch(hash)` raises                   | Warn, skip that hash. Runtime 410-retry remains the fallback.                |
-| Returned hash matches current hash     | Deduplicated — not refetched.                                                |
-| `upload` raises in `assets:precompile` | Warn but don't fail precompile. Next deploy degrades, not this one.          |
+| Scenario                                | Behavior                                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------- |
+| Adapter not configured                  | No-op. Only the current hash is staged.                                      |
+| `previous_bundle_hashes` returns `[]`   | Log "No previous bundle hashes to seed" and continue.                        |
+| `previous_bundle_hashes` raises         | Warn, skip previous-hash seeding, continue. Current-hash staging unaffected. |
+| `fetch(hash)` returns `nil`             | Warn, skip that hash. Runtime 410-retry remains the fallback.                |
+| `fetch(hash)` raises                    | Warn, skip that hash. Runtime 410-retry remains the fallback.                |
+| `fetch(hash)` omits required RSC assets | Warn, skip that hash. Runtime 410-retry remains the fallback.                |
+| Returned hash matches current hash      | Deduplicated — not refetched.                                                |
+| `upload` raises in `assets:precompile`  | Warn but don't fail precompile. Next deploy degrades, not this one.          |
 
 ## Reference implementations
 
@@ -283,9 +287,12 @@ class FilesystemRollingDeployAdapter
     dir = root.join(hash)
     return nil unless dir.directory?
 
+    bundle = dir.join("bundle.js")
+    return nil unless bundle.file?
+
     asset_names = %w[loadable-stats.json react-client-manifest.json react-server-client-manifest.json]
 
-    { bundle: dir.join("bundle.js").to_s,
+    { bundle: bundle.to_s,
       assets: asset_names.map { |name| dir.join(name).to_s }.select { |path| File.exist?(path) } }
   end
 
