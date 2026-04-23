@@ -75,7 +75,8 @@ Treat the wrapper as the migration boundary: preserve the Rails-side props
 contract, replace one helper-backed component first, and remove the wrapper
 later.
 
-No dedicated guide exists yet; if you have one, see [Contribute an example](#contribute-an-example).
+No dedicated guide exists yet. If your app uses this pattern and you want to
+contribute an example, see [Contribute an example](#contribute-an-example).
 The [react-rails migration guide](./migrating-from-react-rails.md) covers the
 nearest-neighbor mechanics for helper syntax and component registration.
 
@@ -106,7 +107,7 @@ Use maintainability notes when that is the honest win. Do not force a weak bench
 
 ## Contribute an example
 
-If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new/choose) or open a PR that adds it here, and include:
+If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new/choose) or [submit a PR](https://github.com/shakacode/react_on_rails/compare) adding it to this page, and include:
 
 1. The integration you started from, such as `react-rails`, `vite_rails`, or a custom helper
 2. The first slice you picked and why it was small enough to review
