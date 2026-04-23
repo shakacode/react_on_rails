@@ -92,7 +92,7 @@ The [migration guide](../../oss/migrating/migrating-to-rsc.md) covers how to inc
 - [Flight Protocol Syntax](./flight-protocol-syntax.md) — the wire format for streaming RSC data
 - [RSC Inside Client Components](./inside-client-components.md) — composing server and client components
 - [Purpose and Benefits](./purpose-and-benefits.md) — waterfall loading patterns, bundle size, and selective hydration
-- [Migration Success Stories](./success-stories.md) — reported results from DoorDash, Mux, Frigade, BlogHunch, and others
+- [Migration Success Stories](./success-stories.md) — reported results from DoorDash, Mux, Frigade, BlogHunch, and Developerway's independent analysis
 
 ## Related Documentation
 

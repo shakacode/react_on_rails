@@ -16,6 +16,8 @@ All numbers and quotes below are from the linked source articles. Treat them as 
 
 ## DoorDash — Core Web Vitals Transformation (SSR Baseline, pre-RSC)
 
+> **Note:** This case study predates React Server Components — it is included as a server-first rendering baseline, not an RSC benchmark. Do not cite these numbers as RSC results in stakeholder presentations.
+
 DoorDash reported large Largest Contentful Paint (LCP) improvements after moving key surfaces onto Next.js server-side rendering. The write-up predates Next.js App Router / RSC, so treat the numbers as evidence for what server-first rendering (the same architectural shift RSC formalizes) can unlock — not as a direct RSC benchmark:
 
 - **+12% to +15% faster page load times** on key pages
