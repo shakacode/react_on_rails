@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "fileutils"
+require "securerandom"
 require "set"
 
 module ReactOnRailsPro
@@ -18,7 +20,41 @@ module ReactOnRailsPro
         assets << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
       end
 
-      assets.compact_blank
+      assets.compact.uniq(&:to_s)
+    end
+
+    # Required assets are matched by expanded path rather than basename so a
+    # same-named unrelated entry in assets_to_copy cannot trigger a false-
+    # positive "required" error. Expand against Rails.root to match how
+    # required_rsc_asset_paths builds its Set.
+    def each_stageable_asset(assets, rsc_required_paths, action_description)
+      assets.each do |asset_path|
+        expanded = File.expand_path(asset_path.to_s, Rails.root)
+        unless File.file?(expanded)
+          if rsc_required_paths.include?(expanded)
+            raise ReactOnRailsPro::Error, "Required RSC asset not found or not a file: #{asset_path}. " \
+                                          "Build your bundles before #{action_description} the renderer cache."
+          end
+          warn "[ReactOnRailsPro] Asset not found #{asset_label(asset_path)} (missing or not a file)"
+          next
+        end
+
+        yield expanded
+      end
+    end
+
+    def copy_file_atomically(src, dest, log_prefix:)
+      FileUtils.mkdir_p(File.dirname(dest))
+      tmp_file = "#{dest}.tmp-#{Process.pid}-#{SecureRandom.hex(6)}"
+      FileUtils.cp(src, tmp_file)
+      File.rename(tmp_file, dest)
+      puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
+    ensure
+      FileUtils.rm_f(tmp_file) if tmp_file && File.exist?(tmp_file)
+    end
+
+    def asset_label(asset_path)
+      asset_path.to_s.empty? ? "<blank>" : asset_path
     end
 
     # Must expand against Rails.root so that callers who expand per-asset paths
