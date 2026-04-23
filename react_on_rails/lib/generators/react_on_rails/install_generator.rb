@@ -245,13 +245,15 @@ module ReactOnRails
         setup_js_dependencies
       end
 
-      # Pinned when the scaffolded CI workflow has to supply a pnpm version because
-      # `pnpm/action-setup` requires one unless package.json declares `packageManager`.
-      # Patch-level pin keeps the drift window inside one pnpm minor series; bump when
-      # the repo's own CI upgrades pnpm. Users can override by committing
-      # `packageManager` to their package.json.
-      CI_PNPM_FALLBACK_VERSION = "9.15"
-      private_constant :CI_PNPM_FALLBACK_VERSION
+      # Minor-level floor used when the scaffolded CI workflow has to supply a pnpm
+      # version because `pnpm/action-setup` requires one unless package.json declares
+      # `packageManager`. `pnpm/action-setup@v4` resolves this to the latest matching
+      # patch (e.g. `9.15` → latest `9.15.x`) at install time, so this is a minor
+      # floor — not a reproducible patch pin. Bump when the repo's own CI upgrades
+      # pnpm. Users who need exact reproducibility should commit `packageManager` to
+      # their package.json instead.
+      CI_PNPM_FALLBACK_MINOR = "9.15"
+      private_constant :CI_PNPM_FALLBACK_MINOR
 
       def add_ci_workflow
         return if options[:pretend]
@@ -284,7 +286,7 @@ module ReactOnRails
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
                  { package_manager: package_manager, has_lockfile: has_lockfile,
                    package_manager_declared: package_manager_declared,
-                   pnpm_fallback_version: CI_PNPM_FALLBACK_VERSION,
+                   pnpm_fallback_version: CI_PNPM_FALLBACK_MINOR,
                    has_active_record: has_active_record, has_rspec: has_rspec })
         @ci_workflow_generated = true
       end
