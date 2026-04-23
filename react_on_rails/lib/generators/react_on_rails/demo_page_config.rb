@@ -182,7 +182,7 @@ module ReactOnRails
             description: "Rails view that calls stream_react_component."
           },
           {
-            path: "client/node-renderer.js",
+            path: "renderer/node-renderer.js",
             description: "Node renderer entrypoint used by the Pro SSR and RSC stack."
           }
         ]

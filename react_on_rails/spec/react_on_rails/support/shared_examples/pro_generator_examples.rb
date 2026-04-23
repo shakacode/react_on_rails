@@ -9,7 +9,7 @@ shared_examples "pro_common_files" do
   end
 
   it "creates node-renderer.js bootstrap file" do
-    assert_file "client/node-renderer.js" do |content|
+    assert_file "renderer/node-renderer.js" do |content|
       expect(content).to include("reactOnRailsProNodeRenderer")
     end
   end

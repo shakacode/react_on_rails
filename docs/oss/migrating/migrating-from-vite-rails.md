@@ -2,6 +2,10 @@
 
 This guide is for Rails apps that currently use `vite_rails` with React and want to move to React on Rails.
 
+If you want repo-shaped references before touching your own app, start with
+[Example Migrations](./example-migrations.md) and then come back here for the
+mechanics.
+
 ## When this migration makes sense
 
 React on Rails is a better fit when you want one or more of these:
@@ -48,6 +52,12 @@ Expect this migration to touch both Ruby and JavaScript entrypoints.
 Do the migration in a branch and keep the Vite setup working until the new React on Rails path is rendering the same screens.
 
 For anything beyond a tiny app, prefer a route-by-route cutover instead of a big-bang rewrite.
+
+If the app uses `vite_rails` plus a custom Rails-side React wrapper, the first credible PR may be maintainability-first rather than a full Vite removal. In that case:
+
+1. Replace one helper-backed component or boundary with React on Rails first.
+2. Keep Vite in place for the rest of the app until the narrow slice has parity.
+3. Treat Vite removal as a later step, not as the proof point itself.
 
 ## 1. Add React on Rails and Shakapacker
 
@@ -149,7 +159,7 @@ Vite-specific `import.meta.env` usage needs to be replaced. In a React on Rails 
 A minimal before/after — note two semantic mismatches that bite during migration:
 
 1. **Key paths differ.** Vite returns paths relative to the _calling module_ (`'./dir/foo.js'`); `require.context` returns paths relative to the _context directory_ (`'./foo.js'`). Code that derives names from keys (routing, registration, etc.) needs to account for this.
-2. **Sync vs async.** `import.meta.glob` is lazy by default — values are `() => import(...)` returning a Promise. `ctx(key)` is synchronous. A reader who replaces `await module()` with `ctx(key)` silently drops async behavior; for the lazy case, build a map of dynamic `import()` calls instead.
+2. **Sync vs async.** `import.meta.glob` is lazy by default — values are `() => import(...)` returning a Promise. The default `require.context(dir, recursive, regex)` (no 4th argument) is synchronous, so `ctx(key)` returns the module directly. For the lazy case, pass `'lazy'` as the 4th argument so `ctx(key)` returns a `Promise<Module>` (see the lazy example below).
 
 Eager / synchronous case:
 
@@ -164,7 +174,7 @@ const ctx = require.context('./dir', true, /\.js$/);
 // ctx('./foo.js') → the module (synchronous)
 ```
 
-Lazy (default Vite) case — `require.context` is not a direct replacement; build a map of dynamic `import()` calls:
+Lazy (default Vite) case — pass `'lazy'` as the 4th `require.context` argument so `ctx(key)` returns a `Promise<Module>`:
 
 ```js
 // Vite (lazy, the default)
@@ -172,10 +182,9 @@ const modules = import.meta.glob('./dir/**/*.js');
 // { './dir/foo.js': () => import('./dir/foo.js'), ... }
 
 // Webpack (Shakapacker) — lazy equivalent
-const ctx = require.context('./dir', true, /\.js$/);
-const lazyModules = Object.fromEntries(
-  ctx.keys().map((key) => [key, () => import(/* webpackMode: "lazy" */ `./dir/${key.slice(2)}`)]),
-);
+const ctx = require.context('./dir', true, /\.js$/, 'lazy');
+// ctx(key) now returns Promise<Module>, matching Vite's lazy semantics
+const lazyModules = Object.fromEntries(ctx.keys().map((key) => [key, () => ctx(key)]));
 ```
 
 ## 6. Replace the development workflow
@@ -231,3 +240,5 @@ one reasonable React on Rails target is:
 - Turbo usage, if your app already uses it
 
 The migration is mostly about asset/build integration, mounting strategy, and optional SSR capability.
+
+For additional real-world migration references and active public PRs, see [Example Migrations](./example-migrations.md).

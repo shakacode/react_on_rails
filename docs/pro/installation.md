@@ -34,7 +34,7 @@ git commit -m "Prepare app for React on Rails Pro install"
 bundle exec rails generate react_on_rails:install --pro
 ```
 
-This creates the Pro initializer, node-renderer.js, installs npm packages, and adds the Node Renderer to Procfile.dev.
+This creates the Pro initializer, `renderer/node-renderer.js`, installs npm packages, and adds the Node Renderer to Procfile.dev.
 
 ## Upgrading an Existing App
 
@@ -227,7 +227,7 @@ yarn add react-on-rails-pro-node-renderer@<npm_version> --exact
 
 ## Node Renderer Setup
 
-Create a JavaScript file to configure and launch the node renderer, for example `react-on-rails-pro-node-renderer.js`:
+Create a JavaScript file to configure and launch the node renderer at `renderer/node-renderer.js`:
 
 ```js
 const path = require('path');
@@ -276,7 +276,7 @@ Add a script to your `package.json`:
 ```json
 {
   "scripts": {
-    "node-renderer": "node ./react-on-rails-pro-node-renderer.js"
+    "node-renderer": "node renderer/node-renderer.js"
   }
 }
 ```

@@ -1,6 +1,10 @@
-## Migrate From react-rails
+# Migrate From react-rails
 
 This migration is easiest when the app is already on a modern Rails + Shakapacker baseline.
+
+If you want repo-shaped references before touching your own app, start with
+[Example Migrations](./example-migrations.md) and then come back here for the
+mechanics.
 
 ## Pick the right first target
 
@@ -9,10 +13,18 @@ Not every `react-rails` app is a good candidate for a low-friction first migrati
 - **Rails-owned island mounts on Shakapacker 6+ and Rails 6+.** This is the smoothest path. The generator + the steps below usually get you there with small, localized edits. (Note: `server_bundle_output_path` auto-detection requires Shakapacker 9.0+; on 6–8, set it explicitly in the initializer.)
 - **Webpacker-era apps (`gem "webpacker"`, Webpack 4).** Current React on Rails does not support Webpacker — `react_on_rails doctor` flags it as a removed breaking-change issue, and the gem requires `shakapacker >= 6.0`. You must migrate off Webpacker before installing current React on Rails. See [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) below.
 - **Client-routed SPA shells (Rails is mostly a shell around a React Router / TanStack Router app).** Render the top-level SPA component from one ERB view using `react_component` (or `react_component_hash` when SSR needs to return multiple regions such as `componentHtml`, `title`, and other head tags).
-  - One `react_component` call mounts the whole app — this is the pattern used by the largest React on Rails Pro deployment in production, Popmenu (for example, [110grill.com](https://www.110grill.com/) and other Popmenu-powered restaurant sites), where the entire app is a single top-level component call.
+  - One `react_component` call mounts the whole app.
   - If you additionally want to break the SPA into several Rails-owned islands, treat that as a separate product decision rather than bundling it with the bundler/integration change.
 
 The wrong first target usually leads teams to conclude "React on Rails is broken" when the real problem is legacy bundler compatibility, or to bundle a SPA re-architecture into what should have been a bundler migration.
+
+## Choose a first slice
+
+Pick a small first slice before you touch the whole app:
+
+1. Prefer one Rails-owned page, island, or shell fragment over a broad page rewrite.
+2. Good first wins are often maintainability-first: replacing `ReactRailsUJS` on one low-risk mount, splitting a large shell into smaller boundaries, or moving one legacy Rails page behind a documented helper path.
+3. The first PR does not need to eliminate every `react_component` call. It only needs to prove that one mount can move cleanly.
 
 ## Preferred path for Webpacker-era apps
 
@@ -145,9 +157,7 @@ Older `react-rails` apps frequently need these additional fixes after the genera
    ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
    ```
 
-You can also check [react-rails-to-react-on-rails](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) branch on [react-rails example app](https://github.com/shakacode/react-rails-example-app) for an example of migration from `react-rails` v3 to `react_on_rails` v13.4.
-
-For a more recent Rails 7-era migration example (published under ShakaCode), see [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example), based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example).
+For published repo examples, including older and Rails 7-era `react-rails` migrations, see [Example Migrations](./example-migrations.md).
 
 ## Practical checklist for Webpacker-era apps
 
