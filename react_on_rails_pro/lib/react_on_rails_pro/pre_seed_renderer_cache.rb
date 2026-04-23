@@ -144,8 +144,6 @@ module ReactOnRailsPro
     # request time recovers from a missing bundle, so the brief gap is benign.
     def self.make_relative_symlink(source, destination, log_prefix)
       destination_dir = Pathname.new(destination).dirname
-      FileUtils.mkdir_p(destination_dir)
-      FileUtils.rm_f(destination)
 
       # Canonicalize both sides so paths like /var -> /private/var do not
       # produce broken relative symlinks when the cache dir comes from tmpdir.
@@ -162,6 +160,7 @@ module ReactOnRailsPro
                 "it does not exist or is a dangling symlink. " \
                 "Rebuild your bundles before staging the renderer cache."
         end
+      FileUtils.mkdir_p(destination_dir)
       destination_dir_real =
         begin
           destination_dir.realpath
@@ -171,6 +170,7 @@ module ReactOnRailsPro
                 "it may have been removed after mkdir_p (race with an external cleanup)."
         end
       relative_source_path = source_path.relative_path_from(destination_dir_real)
+      FileUtils.rm_f(destination)
       begin
         File.symlink(relative_source_path, destination)
         puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
@@ -188,10 +188,21 @@ module ReactOnRailsPro
       end
 
       FileUtils.rm_f(destination)
-      File.symlink(relative_source_path, destination)
+      begin
+        File.symlink(relative_source_path, destination)
+      rescue Errno::EEXIST
+        return if matching_symlink?(destination, relative_source_path)
+
+        raise
+      end
       puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination} " \
            "(replaced stale symlink)"
     end
     private_class_method :replace_existing_symlink
+
+    def self.matching_symlink?(destination, relative_source_path)
+      File.symlink?(destination) && File.readlink(destination) == relative_source_path.to_s
+    end
+    private_class_method :matching_symlink?
   end
 end

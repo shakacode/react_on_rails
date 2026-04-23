@@ -12,6 +12,7 @@ module ReactOnRailsPro
     # (e.g. multiple Puma workers invoking the shim at boot) still see exactly one
     # warning per process.
     @deprecation_mutex = Mutex.new
+    @deprecation_warned = false
 
     # The deprecated rake task emits its own warning and calls PreSeedRendererCache
     # directly; it does not set this one-time guard. See assets.rake for that path.

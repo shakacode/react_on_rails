@@ -119,6 +119,28 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       expect(File.realpath(dest_file)).to eq(server_bundle_path)
     end
 
+    it "treats a concurrent matching symlink during stale replacement as success" do
+      stale_source = "stale-server-bundle.js"
+      symlink_calls = 0
+      allow(File).to receive(:symlink).and_wrap_original do |original, source, destination|
+        symlink_calls += 1
+        case symlink_calls
+        when 1
+          original.call(stale_source, destination)
+          raise Errno::EEXIST
+        when 2
+          original.call(source, destination)
+          raise Errno::EEXIST
+        else
+          original.call(source, destination)
+        end
+      end
+
+      expect { described_class.call(mode: :symlink) }.not_to raise_error
+      dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
+      expect(File.realpath(dest_file)).to eq(server_bundle_path)
+    end
+
     it "logs mode-accurate prefixes (Pre-staged / Symlinked) instead of copy-oriented wording" do
       FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))
       FileUtils.cp(fixture_path2, path_in_webpack_folder(asset_filename2))

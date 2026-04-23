@@ -2770,6 +2770,7 @@ module ReactOnRails
 
         The unified 'pre_seed_renderer_cache' task uses MODE=copy by default (for
         Docker/image builds) and MODE=symlink for same-filesystem workflows.
+        This scan also matches comments; remove stale mentions after migrating.
       MSG
     rescue StandardError => e
       checker.add_warning("⚠️  Could not scan for deprecated renderer-cache task references: #{e.message}")
