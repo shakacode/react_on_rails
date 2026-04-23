@@ -106,10 +106,22 @@ module ReactOnRailsPro
 
       bundle_dir = bundle_directory(cache_dir, hash)
       staging_dir = temporary_bundle_directory(bundle_dir)
-      stage_file(payload[:bundle], File.join(staging_dir, "#{hash}.js"), mode, "Seeded previous bundle file")
+      stage_previous_file(
+        payload[:bundle],
+        File.join(staging_dir, "#{hash}.js"),
+        bundle_dir,
+        mode,
+        "Seeded previous bundle file"
+      )
 
       Array(payload[:assets]).each do |asset_path|
-        stage_file(asset_path, File.join(staging_dir, File.basename(asset_path)), mode, "Seeded previous asset")
+        stage_previous_file(
+          asset_path,
+          File.join(staging_dir, File.basename(asset_path)),
+          bundle_dir,
+          mode,
+          "Seeded previous asset"
+        )
       end
 
       replace_bundle_directory(staging_dir, bundle_dir)
@@ -202,6 +214,27 @@ module ReactOnRailsPro
       RendererCacheHelpers.required_rsc_asset_paths.map { |path| File.basename(path) }
     end
     private_class_method :required_rsc_asset_basenames
+
+    def self.stage_previous_file(src, dest, bundle_dir, mode, log_prefix)
+      stage_mode = cache_local_source?(src, bundle_dir) ? :copy : mode
+      stage_file(src, dest, stage_mode, log_prefix)
+    end
+    private_class_method :stage_previous_file
+
+    # In symlink mode, a payload source inside the same target bundle dir would
+    # become self-referential after the staging dir is promoted into place.
+    # Copy those cache-local files instead; external payload sources still use
+    # the caller-requested mode.
+    def self.cache_local_source?(src, bundle_dir)
+      return false unless File.directory?(bundle_dir)
+
+      bundle_dir_realpath = File.realpath(bundle_dir)
+      source_realpath = File.realpath(src)
+      source_realpath.start_with?("#{bundle_dir_realpath}#{File::SEPARATOR}")
+    rescue Errno::ENOENT
+      false
+    end
+    private_class_method :cache_local_source?
 
     def self.stage_file(src, dest, mode, log_prefix)
       RendererCacheHelpers.stage_file(src, dest, mode, log_prefix: log_prefix)

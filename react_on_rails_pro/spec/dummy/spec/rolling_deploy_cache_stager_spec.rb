@@ -84,6 +84,31 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when symlink mode refreshes a hash from files already inside its cache directory" do
+    let(:bundle_dir) { File.join(cache_dir, "abc123") }
+    let(:existing_bundle) { File.join(bundle_dir, "abc123.js") }
+    let(:existing_asset) { File.join(bundle_dir, "loadable-stats.json") }
+
+    before do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(existing_bundle, "// existing bundle")
+      File.write(existing_asset, '{"chunks":{}}')
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["abc123"])
+      allow(adapter).to receive(:fetch)
+        .with("abc123")
+        .and_return(bundle: existing_bundle, assets: [existing_asset])
+    end
+
+    it "copies cache-local sources so promoted files cannot become self-referential symlinks" do
+      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :symlink)
+
+      expect(File.symlink?(existing_bundle)).to be(false)
+      expect(File.symlink?(existing_asset)).to be(false)
+      expect(File.read(existing_bundle)).to eq("// existing bundle")
+      expect(File.read(existing_asset)).to eq('{"chunks":{}}')
+    end
+  end
+
   context "when PREVIOUS_BUNDLE_HASHES env override is set" do
     let(:src_bundle) { source_file("bundle-xyz.js") }
     let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }

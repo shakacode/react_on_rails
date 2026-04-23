@@ -503,6 +503,30 @@ describe ReactOnRailsPro::AssetsPrecompile do
       end
     end
 
+    context "when collect_assets returns a directory asset path" do
+      let(:existing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-existing-file.js") }
+      let(:directory_asset) { Dir.mktmpdir("rolling-deploy-upload-directory-asset") }
+
+      before do
+        File.write(existing_asset, "// existing asset")
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:collect_assets)
+          .and_return([existing_asset, directory_asset])
+        allow(adapter).to receive(:upload)
+      end
+
+      after do
+        FileUtils.rm_f(existing_asset)
+        FileUtils.rm_rf(directory_asset)
+      end
+
+      it "filters out non-file assets, warns, and still uploads the remaining files" do
+        expect { described_class.publish_current_bundle_if_configured }
+          .to output(/Skipping non-file assets/).to_stderr
+
+        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
+      end
+    end
+
     context "when a missing upload asset is required for RSC" do
       let(:missing_manifest) { File.join(Dir.tmpdir, "react-client-manifest.json") }
 

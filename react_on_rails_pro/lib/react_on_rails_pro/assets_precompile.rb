@@ -120,28 +120,36 @@ module ReactOnRailsPro
       publish_bundle(adapter, pool.rsc_bundle_hash, rsc_bundle, assets, "RSC") if File.exist?(rsc_bundle)
     end
 
-    # Optional assets (manifest companions, chunks) may legitimately be absent
-    # — the pre-seed path only warns for missing optional assets. Typical
-    # adapters iterate the list and `cp`/open each entry, so forwarding a
-    # missing path would raise and abort the whole hash upload, leaving the
-    # next deploy unable to fetch this hash (→ cold 410 retries). Drop missing
+    # Some collected companion assets may be absent or point at non-file paths.
+    # Typical adapters iterate the list and `cp`/open each entry, so forwarding
+    # an invalid path would raise and abort the whole hash upload, leaving the
+    # next deploy unable to fetch this hash (→ cold 410 retries). Drop invalid
     # entries with a warning so publication still covers the existing assets.
     def self.filter_existing_assets(assets)
-      existing, missing = assets.partition { |path| File.exist?(path) }
+      existing, invalid = assets.partition { |path| File.file?(path) }
+      missing, non_files = invalid.partition { |path| !File.exist?(path) }
+
       unless missing.empty?
         warn "[ReactOnRailsPro] Skipping missing assets for rolling_deploy_adapter upload " \
              "(some may be required for RSC): #{missing.inspect}. " \
              "Continuing with #{existing.length} existing asset(s)."
-        warn_if_missing_required_rsc_assets(missing)
+        warn_if_unavailable_required_rsc_assets(missing)
       end
+      unless non_files.empty?
+        warn "[ReactOnRailsPro] Skipping non-file assets for rolling_deploy_adapter upload " \
+             "(some may be required for RSC): #{non_files.inspect}. " \
+             "Continuing with #{existing.length} existing asset(s)."
+        warn_if_unavailable_required_rsc_assets(non_files)
+      end
+
       existing
     end
 
-    def self.warn_if_missing_required_rsc_assets(missing_assets)
-      missing_required = required_rsc_asset_basenames & missing_assets.map { |path| File.basename(path) }
+    def self.warn_if_unavailable_required_rsc_assets(unavailable_assets)
+      missing_required = required_rsc_asset_basenames & unavailable_assets.map { |path| File.basename(path) }
       return if missing_required.empty?
 
-      warn "[ReactOnRailsPro] WARNING: missing assets include required RSC companion file(s) " \
+      warn "[ReactOnRailsPro] WARNING: unavailable assets include required RSC companion file(s) " \
            "#{missing_required.inspect}. The next deploy will not be able to seed this bundle hash for RSC " \
            "and will fall back to 410-retry."
     end
