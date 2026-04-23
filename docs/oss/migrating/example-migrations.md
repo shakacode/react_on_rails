@@ -32,11 +32,13 @@ These maintainer-owned references are the stable starting set. Add community
 examples here after they have landed or stabilized enough to inspect.
 
 1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) —
-   covers `react-rails` v3 → `react_on_rails` v13.4 (current is v16.6.0), so
-   treat it as a structural reference and follow current migration guides for
-   gem and configuration specifics
+   covers an older `react-rails` v3 → `react_on_rails` v13.4 migration, so treat
+   it as a structural reference and follow current migration guides for gem and
+   configuration specifics
 2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) —
-   based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example)
+   demonstrates a Rails 7-era `react-rails` → `react_on_rails` migration with
+   Shakapacker client/server bundles and SSR setup, based on
+   [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example)
 
 ### In-progress migration work
 
