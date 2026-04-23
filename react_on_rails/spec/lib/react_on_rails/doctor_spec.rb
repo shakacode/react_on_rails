@@ -2531,6 +2531,31 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when a configured deploy-script path is a directory" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, "bin/deploy"))
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "skips the directory and continues scanning real files" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+
+        expect(warning_msgs.any? { |m| m[:content].include?("Procfile") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
     context "when a deploy-script file exceeds the size gate" do
       let(:tmpdir) { Dir.mktmpdir }
 
@@ -2590,7 +2615,7 @@ RSpec.describe ReactOnRails::Doctor do
         # Simulate a filesystem error (e.g. transient EIO or a permissions race)
         # on the actual Pathname receiver used by the doctor scan.
         failing_procfile = instance_double(Pathname)
-        allow(failing_procfile).to receive_messages(exist?: true, size: File.size(procfile_path))
+        allow(failing_procfile).to receive_messages(file?: true, size: File.size(procfile_path))
         allow(failing_procfile).to receive(:read).and_raise(Errno::EIO, "simulated read failure")
         allow(root_path).to receive(:join).and_call_original
         allow(root_path).to receive(:join).with("Procfile").and_return(failing_procfile)

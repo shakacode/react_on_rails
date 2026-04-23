@@ -2778,7 +2778,7 @@ module ReactOnRails
       # already been migrated but still references the old name in a comment.
       matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
         full_path = Rails.root.join(path)
-        next false unless full_path.exist?
+        next false unless full_path.file?
         # Skip files larger than 1 MB; deploy scripts should be tiny.
         next false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
 
