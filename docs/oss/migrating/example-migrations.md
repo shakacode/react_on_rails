@@ -134,6 +134,6 @@ Other migration paths live in the **Migration Guides** sidebar:
 - [Babel → SWC](./babel-to-swc-migration.md)
 - [Rails 5 API-only](./convert-rails-5-api-only-app.md)
 - [AngularJS](./angular-js-integration-migration.md)
-- [RSC](./migrating-to-rsc.md)
+- [React Server Components (RSC)](./migrating-to-rsc.md)
 
 The migration guides explain the mechanics. This page shows what those mechanics look like in real repos.
