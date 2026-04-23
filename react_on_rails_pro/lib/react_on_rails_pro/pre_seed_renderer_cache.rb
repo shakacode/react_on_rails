@@ -56,11 +56,12 @@ module ReactOnRailsPro
     # explicit env var in non-dev/test environments.
     def self.enforce_cache_dir_env_var!(mode)
       return unless mode == :copy
+      return if Rails.env.development? || Rails.env.test?
+
       # Use a plain-Ruby check (no ActiveSupport .present?) so whitespace-only
       # values are treated as "not set" and the guard remains portable.
       return unless ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").strip.empty? &&
                     ENV.fetch("RENDERER_BUNDLE_PATH", "").strip.empty?
-      return if Rails.env.development? || Rails.env.test?
 
       raise ReactOnRailsPro::Error, <<~MSG.strip
         Pre-seeding the renderer cache in copy mode (#{Rails.env}) requires an explicit
@@ -94,13 +95,13 @@ module ReactOnRailsPro
 
     # Shared mode dispatch. In :copy mode ensures the destination directory
     # exists; make_relative_symlink handles its own mkdir_p in :symlink mode.
-    def self.stage_file(src, dest, mode, copy_log_prefix)
+    def self.stage_file(src, dest, mode, log_prefix)
       if mode == :copy
         FileUtils.mkdir_p(File.dirname(dest))
         FileUtils.cp(src, dest)
-        puts "[ReactOnRailsPro] #{copy_log_prefix}: #{dest}"
+        puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
       else
-        make_relative_symlink(src, dest)
+        make_relative_symlink(src, dest, log_prefix)
       end
     end
     private_class_method :stage_file
@@ -134,7 +135,7 @@ module ReactOnRailsPro
     # if the process is killed between `rm_f` and `File.symlink` the destination
     # is briefly absent. In practice the renderer's 410→refetch retry at
     # request time recovers from a missing bundle, so the brief gap is benign.
-    def self.make_relative_symlink(source, destination)
+    def self.make_relative_symlink(source, destination, log_prefix)
       destination_dir = Pathname.new(destination).dirname
       FileUtils.mkdir_p(destination_dir)
       FileUtils.rm_f(destination)
@@ -170,7 +171,7 @@ module ReactOnRailsPro
       # is already correct for us.
       begin
         File.symlink(relative_source_path, destination)
-        puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"
+        puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
       rescue Errno::EEXIST
         puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
              "(concurrent creator won the race); leaving existing link."

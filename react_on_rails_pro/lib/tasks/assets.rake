@@ -10,7 +10,7 @@ namespace :react_on_rails_pro do
     raw_mode = "copy" if raw_mode.empty?
     valid_modes = ReactOnRailsPro::PreSeedRendererCache::VALID_MODES.map(&:to_s)
     unless valid_modes.include?(raw_mode)
-      abort "[ReactOnRailsPro] Unknown MODE=#{ENV.fetch('MODE', nil).inspect}. " \
+      abort "[ReactOnRailsPro] Unknown MODE=#{raw_mode.inspect}. " \
             "Expected one of: #{valid_modes.join(', ')}"
     end
     ReactOnRailsPro::PreSeedRendererCache.call(mode: raw_mode.to_sym)
