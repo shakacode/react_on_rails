@@ -175,6 +175,7 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Migration Guides',
           items: [
+            'migrating/example-migrations',
             'migrating/migrating-from-react-rails',
             'migrating/migrating-from-vite-rails',
             'migrating/migrating-from-webpack-to-rspack',
