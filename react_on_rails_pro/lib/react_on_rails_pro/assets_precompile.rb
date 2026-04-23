@@ -107,6 +107,8 @@ module ReactOnRailsPro
 
     def self.publish_bundles(adapter)
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      # Companion manifests are generated for the deploy as a whole, so server
+      # and RSC hashes from the same build intentionally share this asset set.
       assets = filter_existing_assets(ReactOnRailsPro::RendererCacheHelpers.collect_assets.map(&:to_s))
 
       server_bundle = ReactOnRails::Utils.server_bundle_js_file_path
