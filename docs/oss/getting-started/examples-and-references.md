@@ -12,7 +12,7 @@ starting from.
 
 ### SSR + HMR Tutorial Demo
 
-- Repo: [shakacode/react_on_rails_demo_ssr_hmr](https://github.com/shakacode/react_on_rails_demo_ssr_hmr)
+- Repo: [shakacode/react-on-rails-demo-ssr-hmr](https://github.com/shakacode/react-on-rails-demo-ssr-hmr)
 - Use it when you want the maintained Rails + React + SSR + HMR walkthrough repo
   that backs the tutorial and Webpack configuration guidance.
 
@@ -36,15 +36,18 @@ starting from.
 
 ## Migration References
 
+For detailed proof criteria and migration contribution guidance, see
+[Example Migrations](../migrating/example-migrations.md).
+
 ### Migrate from `react-rails`
 
-- Repo: [shakacode/react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example)
+- Repo: [shakacode/react-on-rails-example-migration](https://github.com/shakacode/react-on-rails-example-migration)
 - Use it when you want a focused before/after migration reference instead of
   reconstructing the upgrade from older blog posts.
 
 ### Open Flights Migration Example
 
-- Repo: [shakacode/react-on-rails-open-flights-example](https://github.com/shakacode/react-on-rails-open-flights-example)
+- Repo: [shakacode/react-on-rails-example-open-flights](https://github.com/shakacode/react-on-rails-example-open-flights)
 - Use it when you want a larger example app that shows React on Rails replacing
   `react-rails` in a more realistic codebase.
 
@@ -55,15 +58,23 @@ starting from.
 
 ### Hacker News RSC Demo
 
-- Repo: [shakacode/react-on-rails-hn-rsc-demo](https://github.com/shakacode/react-on-rails-hn-rsc-demo)
+- Repo: [shakacode/react-on-rails-demo-hacker-news-rsc](https://github.com/shakacode/react-on-rails-demo-hacker-news-rsc)
 - Use it when you want a compact public demo of React on Rails Pro with React
   Server Components on a familiar read-heavy UI.
 
 ### Marketplace RSC Performance Demo
 
-- Repo: [shakacode/react-server-components-marketplace-demo](https://github.com/shakacode/react-server-components-marketplace-demo)
+- Repo: [shakacode/react-on-rails-demo-marketplace-rsc](https://github.com/shakacode/react-on-rails-demo-marketplace-rsc)
 - Use it when you want a public performance-oriented RSC demo showing the shape
   of the user-visible win on a marketplace-style surface.
+
+### Gumroad-Style RSC Benchmark Demo
+
+- Repo: [shakacode/react-on-rails-demo-gumroad-rsc](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
+- Use it when you want a benchmark-oriented comparison between an Inertia-style
+  surface and a React on Rails Pro + RSC surface on the same product domain.
+- Note: this is a ShakaCode-built demo modeled on a Gumroad-style UI, not an
+  official Gumroad product or integration.
 
 ## Legacy Repos
 

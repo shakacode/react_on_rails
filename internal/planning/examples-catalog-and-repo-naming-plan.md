@@ -33,16 +33,16 @@ Those names are package identities, not marketing slugs.
 These are the repos we should feature on `reactonrails.com/examples` and point
 to from the docs:
 
-| Current repo                               | Recommended action | Proposed canonical name               | Notes                                     |
-| ------------------------------------------ | ------------------ | ------------------------------------- | ----------------------------------------- |
-| `react_on_rails_demo_ssr_hmr`              | Rename             | `react-on-rails-demo-ssr-hmr`         | Maintained SSR + HMR tutorial repo        |
-| `react-on-rails-rsc-demo`                  | Rename             | `react-on-rails-demo-rsc-starter`     | Minimal public RSC starter                |
-| `react-on-rails-hn-rsc-demo`               | Rename             | `react-on-rails-demo-hacker-news-rsc` | Compact Pro + RSC showcase                |
-| `react-server-components-marketplace-demo` | Rename             | `react-on-rails-demo-marketplace-rsc` | Performance-focused RSC demo              |
-| `gumroad-rsc`                              | Rename             | `react-on-rails-demo-gumroad-rsc`     | Inertia vs React on Rails Pro benchmark   |
-| `react-on-rails-migration-example`         | Rename             | `react-on-rails-example-migration`    | Focused `react-rails` migration reference |
-| `react-on-rails-open-flights-example`      | Rename             | `react-on-rails-example-open-flights` | Larger migration reference                |
-| `react_on_rails-demos`                     | Rename             | `react-on-rails-demos`                | Shared infrastructure repo for demo apps  |
+| Public repo                           | Recommended action | Canonical status          | Notes                                     |
+| ------------------------------------- | ------------------ | ------------------------- | ----------------------------------------- |
+| `react-on-rails-demo-ssr-hmr`         | Feature            | Rename completed          | Maintained SSR + HMR tutorial repo        |
+| `react-on-rails-rsc-demo`             | Feature            | Keep current slug for now | Minimal public RSC starter                |
+| `react-on-rails-demo-hacker-news-rsc` | Feature            | Rename completed          | Compact Pro + RSC showcase                |
+| `react-on-rails-demo-marketplace-rsc` | Feature            | Rename completed          | Performance-focused RSC demo              |
+| `react-on-rails-demo-gumroad-rsc`     | Feature            | Rename completed          | Inertia vs React on Rails Pro benchmark   |
+| `react-on-rails-example-migration`    | Feature            | Rename completed          | Focused `react-rails` migration reference |
+| `react-on-rails-example-open-flights` | Feature            | Rename completed          | Larger migration reference                |
+| `react-on-rails-demos`                | Feature            | Rename completed          | Shared infrastructure repo for demo apps  |
 
 ## Repos to De-emphasize or Archive
 
@@ -99,8 +99,7 @@ private planning material only.
 ## Execution Order
 
 1. Update docs and `reactonrails.com/examples` first.
-2. After the docs PRs land and demo links are verified, open a tracking issue
-   for the rename/archive rollout.
-3. Rename active featured repos.
-4. Update repo descriptions/topics.
-5. Archive or de-emphasize legacy repos after the new catalog is live.
+2. Verify GitHub redirects for completed renames before removing any legacy
+   slugs from docs or issue references.
+3. Update repo descriptions and topics.
+4. Archive or de-emphasize legacy repos after the new catalog is live.
