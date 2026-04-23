@@ -2776,8 +2776,10 @@ module ReactOnRails
     end
 
     def renderer_cache_migration_suggestion(path)
-      # Dockerfile* entries run while building an image, so copy mode is correct.
-      # Procfile/bin entries run in the deployed filesystem and need symlink mode.
+      # Dockerfile* entries are RUN steps during image build, so copy mode bakes
+      # the cache into the layer. Procfile, bin/*, and other runtime scripts run
+      # inside the already-booted container or dyno, where both the app and
+      # renderer share the same filesystem, so symlink mode is correct.
       if path.start_with?("Dockerfile")
         "rake react_on_rails_pro:pre_seed_renderer_cache"
       else

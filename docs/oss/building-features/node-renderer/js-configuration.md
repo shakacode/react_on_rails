@@ -58,7 +58,8 @@ Deprecated options:
 
 ### Testing example:
 
-[spec/dummy/client/node-renderer.js](https://github.com/shakacode/react_on_rails/blob/b42dc5214bc3e4a0db8f6b47474e93f04a019e24/react_on_rails_pro/spec/dummy/client/node-renderer.js)
+The repository's dummy app keeps a full integration-test launcher at
+`react_on_rails_pro/spec/dummy/client/node-renderer.js`.
 
 ### Simple example:
 

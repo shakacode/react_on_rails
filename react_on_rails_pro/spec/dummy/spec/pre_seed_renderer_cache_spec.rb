@@ -88,13 +88,35 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
         .to output(/Pre-staged renderer cache: .* -> .*Symlinked asset: .* ->/m).to_stdout
     end
 
-    it "treats a concurrent Errno::EEXIST from File.symlink as success" do
+    it "treats a concurrent matching symlink as success" do
       # Simulates two processes racing through make_relative_symlink: the
       # other process recreated the destination between rm_f and File.symlink,
       # so our syscall raises EEXIST. The guard should swallow that instead
       # of propagating.
-      allow(File).to receive(:symlink).and_raise(Errno::EEXIST)
+      allow(File).to receive(:symlink).and_wrap_original do |original, source, destination|
+        original.call(source, destination)
+        raise Errno::EEXIST
+      end
+
       expect { described_class.call(mode: :symlink) }.not_to raise_error
+    end
+
+    it "replaces a mismatched symlink created by a concurrent stage" do
+      stale_source = "stale-server-bundle.js"
+      created_stale_link = false
+      allow(File).to receive(:symlink).and_wrap_original do |original, source, destination|
+        unless created_stale_link
+          created_stale_link = true
+          original.call(stale_source, destination)
+          raise Errno::EEXIST
+        end
+
+        original.call(source, destination)
+      end
+
+      expect { described_class.call(mode: :symlink) }.to output(/replaced stale symlink/).to_stdout
+      dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
+      expect(File.realpath(dest_file)).to eq(server_bundle_path)
     end
 
     it "logs mode-accurate prefixes (Pre-staged / Symlinked) instead of copy-oriented wording" do
@@ -127,7 +149,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = tmpdir
       expect { described_class.call(mode: :copy) }.not_to raise_error
     ensure
-      FileUtils.rm_rf(tmpdir) if tmpdir
+      FileUtils.rm_rf(tmpdir)
       ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     end
 

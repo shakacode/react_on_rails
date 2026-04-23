@@ -62,6 +62,8 @@ module ReactOnRailsPro
 
       # Use a plain-Ruby check (no ActiveSupport .present?) so whitespace-only
       # values are treated as "not set" and the guard remains portable.
+      # RENDERER_BUNDLE_PATH remains accepted for compatibility, but new deploys
+      # should migrate to RENDERER_SERVER_BUNDLE_CACHE_PATH.
       return unless ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").strip.empty? &&
                     ENV.fetch("RENDERER_BUNDLE_PATH", "").strip.empty?
 
@@ -168,19 +170,27 @@ module ReactOnRailsPro
                 "it may have been removed after mkdir_p (race with an external cleanup)."
         end
       relative_source_path = source_path.relative_path_from(destination_dir_real)
-      # File.symlink raises Errno::EEXIST if the destination reappears between
-      # the rm_f above and this call (e.g. two Puma workers racing through
-      # AssetsPrecompile.call at boot). Treat a concurrent winner as success:
-      # both processes compute the same relative source, so the existing link
-      # is already correct for us.
       begin
         File.symlink(relative_source_path, destination)
         puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
       rescue Errno::EEXIST
-        puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
-             "(concurrent creator won the race); leaving existing link."
+        replace_existing_symlink(destination, relative_source_path, log_prefix)
       end
     end
     private_class_method :make_relative_symlink
+
+    def self.replace_existing_symlink(destination, relative_source_path, log_prefix)
+      if File.symlink?(destination) && File.readlink(destination) == relative_source_path.to_s
+        puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
+             "(concurrent creator won the race); leaving existing link."
+        return
+      end
+
+      FileUtils.rm_f(destination)
+      File.symlink(relative_source_path, destination)
+      puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination} " \
+           "(replaced stale symlink)"
+    end
+    private_class_method :replace_existing_symlink
   end
 end
