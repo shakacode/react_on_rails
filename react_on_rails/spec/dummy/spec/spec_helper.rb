@@ -22,7 +22,8 @@ begin
   require "readline"
   require "pry-byebug"
 rescue LoadError => e
-  # Some Ruby builds (for example lightweight mise builds) ship without readline.
+  # readline is absent on some lightweight Ruby builds (e.g. mise) — silently skip.
+  # For any *other* LoadError, surface it so developers notice.
   warn "[spec_helper] Skipping pry-byebug (#{e.message})" unless e.message.include?("readline")
 end
 
