@@ -114,6 +114,24 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when adapter#fetch returns a directory as the bundle path" do
+    let(:bundle_directory) { File.join(cache_dir, "not-a-file") }
+
+    before do
+      FileUtils.mkdir_p(bundle_directory)
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["directory-bundle"])
+      allow(adapter).to receive(:fetch)
+        .with("directory-bundle")
+        .and_return(bundle: bundle_directory, assets: [])
+    end
+
+    it "warns with bundle-file attribution and skips that hash" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/returned payload without a valid :bundle file path/).to_stderr
+      expect(File.exist?(File.join(cache_dir, "directory-bundle"))).to be(false)
+    end
+  end
+
   context "when adapter#fetch raises" do
     before do
       allow(adapter).to receive_messages(previous_bundle_hashes: ["broken-hash"])
@@ -260,6 +278,29 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when stale temporary bundle directories are present" do
+    let(:stale_staging_dir) { File.join(cache_dir, "abc123.staging-123-deadbeef") }
+    let(:fresh_previous_dir) { File.join(cache_dir, "abc123.previous-123-feedface") }
+
+    before do
+      stub_const("ReactOnRailsPro::RollingDeployCacheStager::STALE_TEMP_DIR_TTL_SECONDS", 60)
+      allow(adapter).to receive_messages(previous_bundle_hashes: [])
+      FileUtils.mkdir_p(stale_staging_dir)
+      FileUtils.mkdir_p(fresh_previous_dir)
+      old_time = Time.now - 120
+      File.utime(old_time, old_time, stale_staging_dir)
+    end
+
+    it "removes stale temp directories and keeps fresh ones" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/Removed stale rolling-deploy temp directory/).to_stderr
+        .and output(/No previous bundle hashes/).to_stdout
+
+      expect(File.exist?(stale_staging_dir)).to be(false)
+      expect(File.exist?(fresh_previous_dir)).to be(true)
+    end
+  end
+
   context "when RSC support is enabled" do
     let(:src_bundle) { source_file("bundle-rsc.js") }
     let(:client_manifest) { source_file("react-client-manifest.json", contents: "{}") }
@@ -334,7 +375,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
     it "warns and skips that hash" do
       expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
-        .to output(/without.*valid :bundle path/m).to_stderr
+        .to output(/without.*valid :bundle file path/m).to_stderr
     end
   end
 end

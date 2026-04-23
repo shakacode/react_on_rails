@@ -12,6 +12,8 @@ module ReactOnRailsPro
   # PreSeedRendererCache (copies files for Docker images) and
   # PrepareNodeRenderBundles (symlinks for same-filesystem workflows).
   module RendererCacheHelpers
+    LOADABLE_STATS_ASSET_NAME = "loadable-stats.json"
+
     module_function
 
     def collect_assets_with_required_paths
@@ -20,12 +22,15 @@ module ReactOnRailsPro
       # those are silently dropped by `.compact`. RSC manifests, by contrast,
       # are required, so resolve them separately and fail loudly if either
       # resolves to nil rather than letting `.compact` swallow the gap.
-      assets = Array(config.assets_to_copy).compact
-      rsc_manifests = []
+      assets = Array(config.assets_to_copy).dup.compact
+      loadable_stats_path = loadable_stats_asset_path
+      assets << loadable_stats_path if loadable_stats_path
 
       if config.enable_rsc_support
         rsc_manifests = rsc_manifest_paths
         assets.concat(rsc_manifests)
+      else
+        rsc_manifests = []
       end
 
       unique = assets.uniq(&:to_s)
@@ -59,6 +64,11 @@ module ReactOnRailsPro
 
       warn "[ReactOnRailsPro] Duplicate asset basenames in assets_to_copy / RSC manifests: " \
            "#{duplicates.join(', ')}. Only the last entry per basename will be staged."
+    end
+
+    def loadable_stats_asset_path
+      path = ReactOnRails::PackerUtils.asset_uri_from_packer(LOADABLE_STATS_ASSET_NAME)
+      File.exist?(path.to_s) ? path : nil
     end
 
     # Required assets are matched by expanded path rather than basename so a
@@ -209,6 +219,14 @@ module ReactOnRailsPro
 
     def matching_symlink?(destination, relative_source_path)
       File.symlink?(destination) && File.readlink(destination) == relative_source_path.to_s
+    end
+
+    def stage_file(src, dest, mode, log_prefix:)
+      if mode == :copy
+        copy_file_atomically(src, dest, log_prefix: log_prefix)
+      else
+        make_relative_symlink(src, dest, log_prefix: log_prefix)
+      end
     end
 
     def realpath_for_symlink_source(source)

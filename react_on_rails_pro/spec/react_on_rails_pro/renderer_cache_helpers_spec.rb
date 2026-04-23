@@ -1,0 +1,40 @@
+# frozen_string_literal: true
+
+require_relative "spec_helper"
+require "react_on_rails_pro/renderer_cache_helpers"
+
+describe ReactOnRailsPro::RendererCacheHelpers do
+  describe ".collect_assets" do
+    let(:config) do
+      instance_double(ReactOnRailsPro::Configuration, assets_to_copy: [custom_asset], enable_rsc_support: false)
+    end
+    let(:custom_asset) { "/app/public/webpack/production/custom.json" }
+    let(:loadable_stats_path) { File.join(Dir.tmpdir, "renderer-cache-helper-loadable-stats.json") }
+
+    before do
+      allow(ReactOnRailsPro).to receive(:configuration).and_return(config)
+      allow(ReactOnRails::PackerUtils).to receive(:asset_uri_from_packer)
+        .with("loadable-stats.json")
+        .and_return(loadable_stats_path)
+    end
+
+    after { FileUtils.rm_f(loadable_stats_path) }
+
+    it "includes loadable-stats.json when it exists" do
+      File.write(loadable_stats_path, "{}")
+
+      expect(described_class.collect_assets.map(&:to_s)).to contain_exactly(custom_asset, loadable_stats_path)
+    end
+
+    it "does not add loadable-stats.json when it does not exist" do
+      expect(described_class.collect_assets.map(&:to_s)).to contain_exactly(custom_asset)
+    end
+
+    it "deduplicates collected assets" do
+      allow(config).to receive(:assets_to_copy).and_return([custom_asset, loadable_stats_path])
+      File.write(loadable_stats_path, "{}")
+
+      expect(described_class.collect_assets.map(&:to_s)).to contain_exactly(custom_asset, loadable_stats_path)
+    end
+  end
+end

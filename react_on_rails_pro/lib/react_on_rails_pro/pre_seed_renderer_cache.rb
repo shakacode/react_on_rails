@@ -129,11 +129,7 @@ module ReactOnRailsPro
     private_class_method :stage_bundle
 
     def self.stage_file(src, dest, mode, log_prefix)
-      if mode == :copy
-        RendererCacheHelpers.copy_file_atomically(src, dest, log_prefix: log_prefix)
-      else
-        RendererCacheHelpers.make_relative_symlink(src, dest, log_prefix: log_prefix)
-      end
+      RendererCacheHelpers.stage_file(src, dest, mode, log_prefix: log_prefix)
     end
     private_class_method :stage_file
 

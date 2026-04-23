@@ -32,11 +32,14 @@ module ReactOnRailsPro
   module RollingDeployCacheStager # rubocop:disable Metrics/ModuleLength
     DISCOVERY_TIMEOUT_SECONDS = 10
     FETCH_TIMEOUT_SECONDS = 30
+    STALE_TEMP_DIR_TTL_SECONDS = 3600
+    TEMPORARY_DIRECTORY_PATTERN = /\.(?:staging|previous)-\d+-[0-9a-f]+\z/
 
     def self.call(cache_dir:, current_hashes:, mode:)
       adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
       return handle_missing_adapter unless adapter
 
+      sweep_stale_temporary_directories(cache_dir)
       hashes = resolve_previous_hashes(adapter, current_hashes)
       if hashes.empty?
         puts "[ReactOnRailsPro] No previous bundle hashes to seed for rolling deploy."
@@ -152,10 +155,10 @@ module ReactOnRailsPro
     private_class_method :fetch_payload
 
     def self.valid_bundle_payload?(payload, hash)
-      return true if payload[:bundle] && File.exist?(payload[:bundle])
+      return true if payload[:bundle] && File.file?(payload[:bundle])
 
       warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned payload without " \
-           "a valid :bundle path. Skipping this hash."
+           "a valid :bundle file path. Skipping this hash."
       false
     end
     private_class_method :valid_bundle_payload?
@@ -202,17 +205,33 @@ module ReactOnRailsPro
     private_class_method :required_rsc_asset_basenames
 
     def self.stage_file(src, dest, mode, log_prefix)
-      FileUtils.mkdir_p(File.dirname(dest))
-      FileUtils.rm_f(dest)
-
-      if mode == :copy
-        FileUtils.cp(src, dest)
-        puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
-      else
-        RendererCacheHelpers.make_relative_symlink(src, dest, log_prefix: log_prefix)
-      end
+      RendererCacheHelpers.stage_file(src, dest, mode, log_prefix: log_prefix)
     end
     private_class_method :stage_file
+
+    def self.sweep_stale_temporary_directories(cache_dir)
+      return unless Dir.exist?(cache_dir)
+
+      Dir.children(cache_dir).each do |entry|
+        next unless entry.match?(TEMPORARY_DIRECTORY_PATTERN)
+
+        remove_stale_temporary_directory(File.join(cache_dir, entry))
+      end
+    end
+    private_class_method :sweep_stale_temporary_directories
+
+    def self.remove_stale_temporary_directory(path)
+      stat = File.lstat(path)
+      return unless stat.directory?
+      return unless stat.mtime < Time.now - STALE_TEMP_DIR_TTL_SECONDS
+
+      FileUtils.rm_rf(path)
+      warn "[ReactOnRailsPro] Removed stale rolling-deploy temp directory #{path}."
+    rescue StandardError => e
+      warn "[ReactOnRailsPro] Could not remove stale rolling-deploy temp directory #{path}: " \
+           "#{e.class}: #{e.message}."
+    end
+    private_class_method :remove_stale_temporary_directory
 
     def self.temporary_bundle_directory(bundle_dir)
       "#{bundle_dir}.staging-#{Process.pid}-#{SecureRandom.hex(6)}"
