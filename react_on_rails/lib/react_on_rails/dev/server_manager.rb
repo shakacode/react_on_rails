@@ -1065,11 +1065,13 @@ module ReactOnRails
         # Regex anatomy: the optional `(?:[^@/]*@)?` steps past a userinfo
         # prefix like `user:pass@` so a URL such as
         # `http://user:3800@localhost` does not match its password as a host
-        # port via backtracking. The host charset excludes both `/` and `:`
-        # so the `:\d+` port anchor lands on the authority separator without
-        # backtracking into the host.
+        # port via backtracking. The host alternative accepts either a
+        # bracketed IPv6 literal (`\[[^\]]+\]` for URLs like `http://[::1]:3800`)
+        # or a regular host whose charset excludes `/` and `:` so the `:\d+`
+        # port anchor lands on the authority separator without backtracking
+        # into the host.
         def url_port_mismatch?(url, port)
-          return true unless url.match?(%r{://(?:[^@/]*@)?[^@/:]+:\d+})
+          return true unless url.match?(%r{://(?:[^@/]*@)?(?:\[[^\]]+\]|[^@/:]+):\d+})
 
           URI.parse(url).port != port.to_i
         rescue URI::InvalidURIError

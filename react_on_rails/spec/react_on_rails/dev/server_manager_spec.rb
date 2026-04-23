@@ -729,6 +729,22 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .to output(%r{Clearing REACT_RENDERER_URL=http://\[::1\]:3900}).to_stderr
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
       end
+
+      # The pre-URI.parse regex used `[^@/:]+` for the host, which stops at the
+      # `[` of `[::1]` so `:\d+` never anchors on the real port — the function
+      # returned `true` (mismatch) even when RENDERER_PORT agreed with the URL.
+      it "does not warn when RENDERER_PORT agrees with an IPv6 REACT_RENDERER_URL" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3801"
+        expect { described_class.start(:development) }.not_to output(/does not match/).to_stderr
+      end
+
+      it "warns when RENDERER_PORT disagrees with an IPv6 REACT_RENDERER_URL" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "http://[::1]:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{RENDERER_PORT=3801 does not match REACT_RENDERER_URL=http://\[::1\]:3800}).to_stderr
+      end
     end
 
     context "when REACT_RENDERER_URL has no explicit port" do
