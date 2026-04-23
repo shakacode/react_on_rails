@@ -57,6 +57,23 @@ module ReactOnRails
     DEFAULT_SHAKAPACKER_CONFIG_PATH = "config/shakapacker.yml"
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
 
+    # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
+    # look for references to the old pre_stage_bundle_for_node_renderer task in
+    # common deploy-script locations so users on older Procfile/Dockerfile entries
+    # get a migration nudge before the task is removed.
+    DEPRECATED_RENDERER_CACHE_TASK = "pre_stage_bundle_for_node_renderer"
+    RENDERER_CACHE_DEPLOY_SCRIPT_PATHS = [
+      "Procfile",
+      "Procfile.dev",
+      "Procfile.dev-static-assets",
+      "Procfile.production",
+      "Dockerfile",
+      "bin/deploy",
+      "bin/release",
+      "bin/docker-entrypoint"
+    ].freeze
+    RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
+
     def initialize(verbose: false, fix: false)
       @verbose = verbose
       @fix = fix
@@ -2724,28 +2741,16 @@ module ReactOnRails
       checker.add_warning("⚠️  Could not detect Pro renderer mode: #{e.message}")
     end
 
-    # Scan common deploy-script locations for references to the deprecated
-    # pre_stage_bundle_for_node_renderer rake task, so users on older Procfile/
-    # Dockerfile entries get a clear migration nudge before the task is removed.
-    DEPRECATED_RENDERER_CACHE_TASK = "pre_stage_bundle_for_node_renderer"
-    RENDERER_CACHE_DEPLOY_SCRIPT_PATHS = [
-      "Procfile",
-      "Procfile.dev",
-      "Procfile.dev-static-assets",
-      "Procfile.production",
-      "Dockerfile",
-      "bin/deploy",
-      "bin/release",
-      "bin/docker-entrypoint"
-    ].freeze
-    RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
-
     def check_deprecated_renderer_cache_task
+      # Resolve against Rails.root (not Dir.pwd) so the scan still fires when
+      # doctor is invoked from a subdirectory — otherwise the checks silently
+      # find nothing and the deprecation warning never surfaces.
       matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
-        next false unless File.exist?(path)
-        next false if File.size(path) >= RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
+        full_path = Rails.root.join(path)
+        next false unless full_path.exist?
+        next false if full_path.size >= RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
 
-        File.read(path).include?(DEPRECATED_RENDERER_CACHE_TASK)
+        full_path.read.include?(DEPRECATED_RENDERER_CACHE_TASK)
       end
 
       return if matches.empty?

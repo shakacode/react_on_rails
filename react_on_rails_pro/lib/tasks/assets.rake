@@ -18,10 +18,12 @@ namespace :react_on_rails_pro do
   # Deprecated alias. Delegates to pre_seed_renderer_cache with MODE=symlink so
   # existing Procfile/Dockerfile/deploy-script entries keep working during the
   # deprecation cycle.
-  desc "DEPRECATED: use 'pre_seed_renderer_cache MODE=symlink' instead."
+  desc "DEPRECATED: use 'pre_seed_renderer_cache' (MODE=copy for Docker, MODE=symlink for same-filesystem)."
   task pre_stage_bundle_for_node_renderer: :environment do
-    warn "[ReactOnRailsPro] The 'react_on_rails_pro:pre_stage_bundle_for_node_renderer' rake task " \
-         "is deprecated. Use 'rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink' instead."
+    warn "[ReactOnRailsPro] The 'react_on_rails_pro:pre_stage_bundle_for_node_renderer' rake task is deprecated. " \
+         "Migrate to 'rake react_on_rails_pro:pre_seed_renderer_cache' — use MODE=copy (default) for Docker/image " \
+         "builds, or MODE=symlink for same-filesystem deploys (this shim preserves the old symlink behavior). " \
+         "Run 'rake react_on_rails:doctor' for a per-file migration suggestion based on where the task is referenced."
     ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink)
   end
 

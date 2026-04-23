@@ -2401,17 +2401,17 @@ RSpec.describe ReactOnRails::Doctor do
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
     context "when a Procfile references the deprecated task" do
-      around do |example|
-        Dir.mktmpdir do |tmpdir|
-          Dir.chdir(tmpdir) do
-            File.write(
-              "Procfile",
-              "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer && bundle exec puma\n"
-            )
-            example.run
-          end
-        end
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer && bundle exec puma\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
       end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
 
       it "warns with migration guidance" do
         doctor.send(:check_deprecated_renderer_cache_task)
@@ -2422,9 +2422,10 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     context "when no deploy scripts reference the deprecated task" do
-      around do |example|
-        Dir.mktmpdir { |tmpdir| Dir.chdir(tmpdir) { example.run } }
-      end
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before { allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir)) }
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
 
       it "adds no warnings" do
         doctor.send(:check_deprecated_renderer_cache_task)

@@ -56,7 +56,10 @@ module ReactOnRailsPro
     # explicit env var in non-dev/test environments.
     def self.enforce_cache_dir_env_var!(mode)
       return unless mode == :copy
-      return if ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"].present? || ENV["RENDERER_BUNDLE_PATH"].present?
+      # Use a plain-Ruby check (no ActiveSupport .present?) so whitespace-only
+      # values are treated as "not set" and the guard remains portable.
+      return unless ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").strip.empty? &&
+                    ENV.fetch("RENDERER_BUNDLE_PATH", "").strip.empty?
       return if Rails.env.development? || Rails.env.test?
 
       raise ReactOnRailsPro::Error, <<~MSG.strip
@@ -134,23 +137,28 @@ module ReactOnRailsPro
       # produce broken relative symlinks when the cache dir comes from tmpdir.
       # Pathname#realpath raises Errno::ENOENT on a dangling symlink or a
       # path that vanished between File.exist? and here (e.g. webpack output
-      # rotating mid-stage). Surface that as a clear ReactOnRailsPro::Error
-      # rather than a raw system error.
+      # rotating mid-stage). Wrap each realpath call separately so the error
+      # message correctly names the side that failed.
       source_path =
         begin
           Pathname.new(source).realpath
         rescue Errno::ENOENT
           raise ReactOnRailsPro::Error,
-                "Cannot resolve real path for #{source} — it does not exist or is a dangling symlink."
+                "Cannot resolve real path for symlink source #{source} — " \
+                "it does not exist or is a dangling symlink. " \
+                "Rebuild your bundles before staging the renderer cache."
         end
-      relative_source_path = source_path.relative_path_from(destination_dir.realpath)
+      destination_dir_real =
+        begin
+          destination_dir.realpath
+        rescue Errno::ENOENT
+          raise ReactOnRailsPro::Error,
+                "Cannot resolve real path for symlink destination dir #{destination_dir} — " \
+                "it may have been removed after mkdir_p (race with an external cleanup)."
+        end
+      relative_source_path = source_path.relative_path_from(destination_dir_real)
       File.symlink(relative_source_path, destination)
       puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"
-    rescue Errno::ENOENT => e
-      raise ReactOnRailsPro::Error,
-            "Could not resolve real path for symlink source #{source} " \
-            "(#{e.message}). The file may have been removed or may be a dangling symlink. " \
-            "Rebuild your bundles before staging the renderer cache."
     end
     private_class_method :make_relative_symlink
   end
