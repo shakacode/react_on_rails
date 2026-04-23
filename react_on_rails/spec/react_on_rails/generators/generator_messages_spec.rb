@@ -111,30 +111,79 @@ describe GeneratorMessages do
 
     it "returns bun when bun.lock exists" do
       allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-      allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lock").and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(true)
 
       expect(described_class.detect_package_manager).to eq("bun")
     end
 
+    it "prefers the packageManager field in package.json over lockfile fallback" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
+                                   .and_return('{"packageManager": "pnpm@8.0.0"}')
+
+      expect(described_class.detect_package_manager).to eq("pnpm")
+    end
+
+    it "picks packageManager field when no lockfile is present (first-run state)" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lockb")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package-lock.json")).and_return(false)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
+                                   .and_return('{"packageManager": "yarn@3.6.0"}')
+
+      expect(described_class.detect_package_manager).to eq("yarn")
+    end
+
+    it "ignores an unsupported packageManager value and falls through to lockfiles" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(true)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
+                                   .and_return('{"packageManager": "unknown@1.0.0"}')
+
+      expect(described_class.detect_package_manager).to eq("yarn")
+    end
+
+    it "returns nil from detect_package_manager_from_package_json for malformed JSON" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
+                                   .and_return("not-json")
+
+      expect(described_class.send(:detect_package_manager_from_package_json)).to be_nil
+    end
+
     it "returns bun when bun.lockb exists" do
       allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-      allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lock").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lockb").and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lockb")).and_return(true)
 
       expect(described_class.detect_package_manager).to eq("bun")
     end
 
     it "returns npm when package-lock.json exists" do
       allow(File).to receive(:exist?).and_call_original
-      allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-      allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lock").and_return(false)
-      allow(File).to receive(:exist?).with("bun.lockb").and_return(false)
-      allow(File).to receive(:exist?).with("package-lock.json").and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lockb")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package-lock.json")).and_return(true)
 
       expect(described_class.detect_package_manager).to eq("npm")
     end
@@ -147,6 +196,54 @@ describe GeneratorMessages do
       expect(described_class.supported_package_manager?("pnpm")).to be(true)
       expect(described_class.supported_package_manager?("bun")).to be(true)
       expect(described_class.supported_package_manager?("foo")).to be(false)
+    end
+  end
+
+  describe ".lockfile_for_manager?" do
+    # Scopes "has a lockfile" to the detected package manager so the CI scaffold
+    # doesn't emit `cache: "pnpm"` with only yarn.lock on disk (cursor[bot] #3104333056)
+    # and picks the right non-frozen install flag when the declared manager lacks its
+    # lockfile on first CI run (codex[bot] #3104330951).
+    let(:app_root) { Dir.pwd }
+
+    before { allow(File).to receive(:exist?).and_call_original }
+
+    it "returns true only when yarn.lock exists for yarn" do
+      allow(File).to receive(:exist?).with(File.join(app_root, "yarn.lock")).and_return(true)
+      expect(described_class.lockfile_for_manager?("yarn")).to be(true)
+
+      allow(File).to receive(:exist?).with(File.join(app_root, "yarn.lock")).and_return(false)
+      expect(described_class.lockfile_for_manager?("yarn")).to be(false)
+    end
+
+    it "returns true only when pnpm-lock.yaml exists for pnpm" do
+      allow(File).to receive(:exist?).with(File.join(app_root, "pnpm-lock.yaml")).and_return(true)
+      expect(described_class.lockfile_for_manager?("pnpm")).to be(true)
+
+      allow(File).to receive(:exist?).with(File.join(app_root, "pnpm-lock.yaml")).and_return(false)
+      expect(described_class.lockfile_for_manager?("pnpm")).to be(false)
+    end
+
+    it "accepts either bun.lock or bun.lockb for bun" do
+      allow(File).to receive(:exist?).with(File.join(app_root, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(app_root, "bun.lockb")).and_return(true)
+      expect(described_class.lockfile_for_manager?("bun")).to be(true)
+
+      allow(File).to receive(:exist?).with(File.join(app_root, "bun.lockb")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(app_root, "bun.lock")).and_return(true)
+      expect(described_class.lockfile_for_manager?("bun")).to be(true)
+    end
+
+    it "returns false when the declared manager's lockfile is missing even if another exists" do
+      # packageManager: "pnpm" but only yarn.lock on disk → pnpm lockfile is still absent.
+      allow(File).to receive(:exist?).with(File.join(app_root, "yarn.lock")).and_return(true)
+      allow(File).to receive(:exist?).with(File.join(app_root, "pnpm-lock.yaml")).and_return(false)
+      expect(described_class.lockfile_for_manager?("pnpm")).to be(false)
+    end
+
+    it "returns false for unknown package managers" do
+      expect(described_class.lockfile_for_manager?("unknown")).to be(false)
+      expect(described_class.lockfile_for_manager?(nil)).to be(false)
     end
   end
 end

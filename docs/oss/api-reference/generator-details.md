@@ -50,7 +50,7 @@ can pass the redux option if you'd like to have redux setup for you automaticall
     Passing the --pro generator option sets up React on Rails Pro with Node
     server rendering, fragment caching, and code-splitting support.
     Requires the react_on_rails_pro gem (add it to your Gemfile first).
-    Creates the Pro initializer, node-renderer.js, and adds the Node Renderer
+    Creates the Pro initializer, renderer/node-renderer.js, and adds the Node Renderer
     process to Procfile.dev.
 
 * RSC (React Server Components)
@@ -215,7 +215,7 @@ rails generate react_on_rails:install --pro
 **What gets created:**
 
 - `config/initializers/react_on_rails_pro.rb` - Pro configuration with Node Renderer settings
-- `client/node-renderer.js` - Node Renderer bootstrap file
+- `renderer/node-renderer.js` - Node Renderer bootstrap file
 - Node Renderer process added to `Procfile.dev`
 - Pro npm packages (`react-on-rails-pro`, `react-on-rails-pro-node-renderer`)
 

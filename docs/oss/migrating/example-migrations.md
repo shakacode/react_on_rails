@@ -8,6 +8,11 @@ They already have one of these:
 - `vite_rails`
 - a custom Rails-side React helper
 
+Some teams also arrive from Inertia-first apps. We treat those as a separate
+architecture case study because they are usually broader page-shell migrations,
+not narrow React mount migrations. If that is your starting point, begin with
+[Compare with alternatives](../getting-started/comparing-react-on-rails-to-alternatives.md).
+
 This page tracks practical migration references for those cases.
 
 ## What makes a useful migration example
@@ -23,10 +28,17 @@ The best examples are:
 
 ### Published example repos
 
-These are stable references you can inspect today:
+These maintainer-owned references are the stable starting set. Add community
+examples here after they have landed or stabilized enough to inspect.
 
-1. [react-rails example app: `react-rails-to-react-on-rails` branch](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails)
-2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) — based on `ganchdev/react-rails-example`
+1. [react-rails example app: `react-rails-to-react-on-rails` snapshot](https://github.com/shakacode/react-rails-example-app/tree/c6b794a4b96746dbbc98a46f31119171109d70b0) —
+   covers an older `react-rails` v3 → `react_on_rails` v13.4 migration, so treat
+   it as a structural reference and follow current migration guides for gem and
+   configuration specifics
+2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) —
+   demonstrates a Rails 7-era `react-rails` → `react_on_rails` migration with
+   Shakapacker client/server bundles and SSR setup, based on
+   [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example)
 
 ### In-progress migration work
 
@@ -45,31 +57,28 @@ list above with a short proof note.
 
 ### `react-rails` to React on Rails
 
-This is usually the cleanest migration path. The main changes are:
-
-1. Replace `react_ujs` mounting with explicit React on Rails registration
-2. Update `react_component` helper calls to the React on Rails options style
-3. Keep the old app architecture in place while converting one mount at a time
+This is usually the cleanest migration path: primarily a gem swap and mount
+registration change while the app architecture stays intact during
+slice-by-slice conversion.
 
 ### `vite_rails` to React on Rails
 
-This is more of an asset and entrypoint migration than a component rewrite.
-
-The primary changes are:
-
-1. Replace Vite layout tags and entrypoints
-2. Move component registration into the React on Rails / Shakapacker flow
-3. Preserve route behavior before removing Vite
+This is more of an asset and entrypoint migration than a component rewrite: the
+route behavior should stay stable while registration moves into the React on
+Rails and Shakapacker flow.
 
 ### Custom Rails React bridge to React on Rails
 
 This is common in mature apps that built a thin wrapper around React mounts.
 
-The safest approach is:
+Treat the wrapper as the migration boundary: preserve the Rails-side props
+contract, replace one helper-backed component first, and remove the wrapper
+later.
 
-1. Preserve the Rails-side props contract
-2. Replace one helper-backed component boundary first
-3. Treat the wrapper removal as a later step
+No dedicated guide exists yet. If your app uses this pattern and you want to
+contribute an example, see [Contribute an example](#contribute-an-example).
+The [react-rails migration guide](./migrating-from-react-rails.md) covers the
+nearest-neighbor mechanics for helper syntax and component registration.
 
 ## What counts as proof
 
@@ -83,7 +92,9 @@ When the change is performance-first, compare the same route on the baseline bra
 4. Number of JS assets needed for the route
 5. Hydration warnings or client boot errors
 
-If possible, also record browser metrics such as FCP, LCP, CLS, and TBT or INP.
+If possible, also record browser load metrics such as FCP, LCP, CLS, and TBT,
+plus interaction metrics such as INP. TBT is captured by Lighthouse; INP
+requires field data or a real-user monitoring tool.
 
 When the change is maintainability-first, record:
 
@@ -96,7 +107,7 @@ Use maintainability notes when that is the honest win. Do not force a weak bench
 
 ## Contribute an example
 
-If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new) or PR that adds it here and include:
+If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new/choose) or [submit a PR](https://github.com/shakacode/react_on_rails/compare) adding it to this page, and include:
 
 1. The integration you started from, such as `react-rails`, `vite_rails`, or a custom helper
 2. The first slice you picked and why it was small enough to review
