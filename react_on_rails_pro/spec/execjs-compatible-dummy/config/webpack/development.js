@@ -16,7 +16,9 @@ const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
     clientWebpackConfig.plugins.push(
       new ReactRefreshWebpackPlugin({
         overlay: {
-          sockPort: devServer.port,
+          // bin/dev sets SHAKAPACKER_DEV_SERVER_PORT as a string, which Shakapacker
+          // surfaces unchanged on devServer.port. The plugin schema requires a number.
+          sockPort: Number(devServer.port),
         },
       }),
     );

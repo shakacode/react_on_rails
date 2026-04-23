@@ -11,4 +11,9 @@ rails-server-assets: HMR=true SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 
 # Start Node server for server rendering.
+# NOTE: This consumes the *built* `packages/react-on-rails-pro-node-renderer/lib/**`.
+# When validating source changes under `packages/react-on-rails-pro-node-renderer/src/**`,
+# either rebuild once (`pnpm --filter react-on-rails-pro-node-renderer run build`) or
+# uncomment the `node-renderer-build` line below to watch and rebuild on every save.
+# node-renderer-build: pnpm --filter react-on-rails-pro-node-renderer run build-watch
 node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect renderer/node-renderer.js
