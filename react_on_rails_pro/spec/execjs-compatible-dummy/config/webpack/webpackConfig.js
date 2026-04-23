@@ -1,5 +1,5 @@
 // The source code including full typescript support is available at:
-// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/webpackConfig.js
+// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/webpack.config.js
 
 const clientWebpackConfig = require('./clientWebpackConfig');
 const serverWebpackConfig = require('./serverWebpackConfig');
