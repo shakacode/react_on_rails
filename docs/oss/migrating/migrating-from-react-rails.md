@@ -158,7 +158,7 @@ Older `react-rails` apps frequently need these additional fixes after the genera
    ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)
    ```
 
-For published repo examples, including older and Rails 7-era `react-rails` migrations, see [Example Migrations](./example-migrations.md).
+Published migration references, including older and Rails 7-era `react-rails` migrations, are listed in [Example Migrations](./example-migrations.md). In-progress migration PRs are tracked in the meta issue [#3125](https://github.com/shakacode/react_on_rails/issues/3125).
 
 ## Coexistence: keeping both gems installed during a staged migration
 
