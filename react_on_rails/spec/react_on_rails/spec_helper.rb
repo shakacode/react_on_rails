@@ -7,9 +7,15 @@ require "react_on_rails"
 # let's us use Rails's generator testing helpers but with RSpec syntax
 require "generator_spec"
 require "amazing_print"
-require "pry"
-require "pry-byebug"
-require "pry-doc"
+begin
+  require "readline"
+  require "pry"
+  require "pry-byebug"
+  require "pry-doc"
+rescue LoadError => e
+  # Some Ruby builds (for example lightweight mise builds) ship without readline.
+  warn "[spec_helper] Skipping pry (#{e.message})" unless e.message.include?("readline")
+end
 
 require "rspec/retry"
 

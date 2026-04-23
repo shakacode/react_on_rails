@@ -21,8 +21,9 @@
 begin
   require "readline"
   require "pry-byebug"
-rescue LoadError
+rescue LoadError => e
   # Some Ruby builds (for example lightweight mise builds) ship without readline.
+  warn "[spec_helper] Skipping pry-byebug (#{e.message})" unless e.message.include?("readline")
 end
 
 RSpec.configure do |config|
