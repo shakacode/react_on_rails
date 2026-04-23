@@ -119,12 +119,13 @@ module ReactOnRailsPro
     # against Rails.root to match how RendererCacheHelpers.required_rsc_asset_paths
     # builds its Set.
     def self.stage_assets(assets, bundle_dir, rsc_required_paths, mode)
+      action_desc = action_description(mode)
       assets.each do |asset_path|
         expanded = File.expand_path(asset_path.to_s, Rails.root)
         unless File.exist?(expanded)
           if rsc_required_paths.include?(expanded)
             raise ReactOnRailsPro::Error, "Required RSC asset not found: #{asset_path}. " \
-                                          "Build your bundles before #{action_description(mode)} the renderer cache."
+                                          "Build your bundles before #{action_desc} the renderer cache."
           end
           warn "[ReactOnRailsPro] Asset not found #{asset_path}"
           next

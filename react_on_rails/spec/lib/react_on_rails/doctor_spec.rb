@@ -2512,13 +2512,16 @@ RSpec.describe ReactOnRails::Doctor do
           procfile_path,
           "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
         )
-        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+        root_path = Pathname.new(tmpdir)
+        allow(Rails).to receive(:root).and_return(root_path)
+
         # Simulate a filesystem error (e.g. transient EIO or a permissions race)
-        # during the file-read step so the rescue branch is exercised.
-        # Pathname#read delegates to File.read, so stubbing File.read for this
-        # specific path exercises the rescue without impacting other reads.
-        allow(File).to receive(:read).and_call_original
-        allow(File).to receive(:read).with(procfile_path).and_raise(Errno::EIO, "simulated read failure")
+        # on the actual Pathname receiver used by the doctor scan.
+        failing_procfile = instance_double(Pathname)
+        allow(failing_procfile).to receive_messages(exist?: true, size: File.size(procfile_path))
+        allow(failing_procfile).to receive(:read).and_raise(Errno::EIO, "simulated read failure")
+        allow(root_path).to receive(:join).and_call_original
+        allow(root_path).to receive(:join).with("Procfile").and_return(failing_procfile)
       end
 
       after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
