@@ -2,6 +2,7 @@
 
 require "fileutils"
 require "securerandom"
+require "pathname"
 require "set"
 
 require "react_on_rails_pro/error"
@@ -168,6 +169,63 @@ module ReactOnRailsPro
 
       raise ReactOnRailsPro::Error,
             "Bundle hash for #{path} is nil or blank; cannot stage renderer cache."
+    end
+
+    def make_relative_symlink(source, destination, log_prefix:)
+      destination_dir = Pathname.new(destination).dirname
+      FileUtils.mkdir_p(destination_dir)
+
+      source_path = realpath_for_symlink_source(source)
+      destination_dir_real = realpath_for_symlink_destination(destination_dir)
+      relative_source_path = source_path.relative_path_from(destination_dir_real)
+
+      FileUtils.rm_f(destination)
+      begin
+        File.symlink(relative_source_path, destination)
+        puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
+      rescue Errno::EEXIST
+        replace_existing_symlink(destination, relative_source_path, log_prefix)
+      end
+    end
+
+    def replace_existing_symlink(destination, relative_source_path, log_prefix)
+      if matching_symlink?(destination, relative_source_path)
+        puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
+             "(concurrent creator won the race); leaving existing link."
+        return
+      end
+
+      FileUtils.rm_f(destination)
+      begin
+        File.symlink(relative_source_path, destination)
+      rescue Errno::EEXIST
+        return if matching_symlink?(destination, relative_source_path)
+
+        raise
+      end
+      puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination} " \
+           "(replaced stale symlink)"
+    end
+
+    def matching_symlink?(destination, relative_source_path)
+      File.symlink?(destination) && File.readlink(destination) == relative_source_path.to_s
+    end
+
+    def realpath_for_symlink_source(source)
+      Pathname.new(source).realpath
+    rescue Errno::ENOENT
+      raise ReactOnRailsPro::Error,
+            "Cannot resolve real path for symlink source #{source} — " \
+            "it does not exist or is a dangling symlink. " \
+            "Rebuild your bundles before staging the renderer cache."
+    end
+
+    def realpath_for_symlink_destination(destination_dir)
+      destination_dir.realpath
+    rescue Errno::ENOENT
+      raise ReactOnRailsPro::Error,
+            "Cannot resolve real path for symlink destination dir #{destination_dir} — " \
+            "it may have been removed after mkdir_p (race with an external cleanup)."
     end
 
     # Resolves bundle sources as [path, hash] pairs so callers can iterate

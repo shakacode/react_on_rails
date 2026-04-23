@@ -30,6 +30,8 @@ If the renderer handles a request for bundle `abc` but reads the **new** build's
 
 Each **bundle hash** is a single cache entry. A deploy that has both a server bundle and an RSC bundle contributes **two** hashes — `server_bundle_hash` and `rsc_bundle_hash`. The protocol is opaque about which kind of bundle a hash represents; the adapter just stores and retrieves files keyed by hash.
 
+When RSC is enabled, publication calls `upload` once for the server bundle hash and once for the RSC bundle hash. Both calls receive the same companion `assets:` list from that build (`loadable-stats.json` plus RSC manifests). Store those files with each hash; do not filter the assets by bundle type, because `fetch(hash)` must return a complete local cache entry for whichever hash is requested.
+
 Your adapter must define three class methods:
 
 ```ruby

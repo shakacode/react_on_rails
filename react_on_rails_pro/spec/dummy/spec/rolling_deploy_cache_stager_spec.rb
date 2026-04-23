@@ -86,11 +86,12 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
   context "when PREVIOUS_BUNDLE_HASHES env override is set" do
     let(:src_bundle) { source_file("bundle-xyz.js") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
 
     before do
       ENV["PREVIOUS_BUNDLE_HASHES"] = "xyz999"
       allow(adapter).to receive(:previous_bundle_hashes)
-      allow(adapter).to receive(:fetch).with("xyz999").and_return(bundle: src_bundle, assets: [])
+      allow(adapter).to receive(:fetch).with("xyz999").and_return(bundle: src_bundle, assets: [src_asset])
     end
 
     it "skips previous_bundle_hashes discovery and uses the env list" do
@@ -183,10 +184,11 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
   context "when adapter returns an unsafe hash" do
     let(:src_bundle) { source_file("bundle-ok.js") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
 
     before do
       allow(adapter).to receive_messages(previous_bundle_hashes: ["..", "safe-hash"])
-      allow(adapter).to receive(:fetch).with("safe-hash").and_return(bundle: src_bundle, assets: [])
+      allow(adapter).to receive(:fetch).with("safe-hash").and_return(bundle: src_bundle, assets: [src_asset])
     end
 
     it "rejects the unsafe adapter hash before any file staging" do
@@ -195,6 +197,22 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
       expect(adapter).not_to have_received(:fetch).with("..")
       expect(File.exist?(File.join(cache_dir, "safe-hash", "safe-hash.js"))).to be(true)
+    end
+  end
+
+  context "when the adapter omits loadable-stats.json" do
+    let(:src_bundle) { source_file("bundle-without-stats.js") }
+
+    before do
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["no-stats"])
+      allow(adapter).to receive(:fetch).with("no-stats").and_return(bundle: src_bundle, assets: [])
+    end
+
+    it "warns but still stages the bundle for adapters that intentionally omit it" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/missing loadable-stats\.json/).to_stderr
+
+      expect(File.exist?(File.join(cache_dir, "no-stats", "no-stats.js"))).to be(true)
     end
   end
 
@@ -218,6 +236,30 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when refreshing an existing seeded hash fails during staging" do
+    let(:src_bundle) { source_file("bundle-refresh.js") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
+    let(:bundle_dir) { File.join(cache_dir, "abc123") }
+    let(:existing_bundle) { File.join(bundle_dir, "abc123.js") }
+
+    before do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(existing_bundle, "// existing bundle")
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["abc123"])
+      allow(adapter).to receive(:fetch).with("abc123").and_return(bundle: src_bundle, assets: [src_asset])
+      allow(FileUtils).to receive(:cp).and_call_original
+      allow(FileUtils).to receive(:cp).with(src_asset, anything).and_raise(Errno::EIO, "disk full")
+    end
+
+    it "keeps the previous valid cache entry and removes only this attempt's temp directory" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/Failed to seed previous bundle hash abc123/).to_stderr
+
+      expect(File.read(existing_bundle)).to eq("// existing bundle")
+      expect(Dir.children(cache_dir).grep(/abc123\.staging/)).to be_empty
+    end
+  end
+
   context "when RSC support is enabled" do
     let(:src_bundle) { source_file("bundle-rsc.js") }
     let(:client_manifest) { source_file("react-client-manifest.json", contents: "{}") }
@@ -233,6 +275,20 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
       expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
         .to output(/missing required RSC companion asset/).to_stderr
+
+      expect(File.exist?(File.join(cache_dir, "rsc-hash"))).to be(false)
+    end
+
+    it "identifies required RSC asset paths that are present in the payload but missing on disk" do
+      missing_client_manifest = File.join(cache_dir, "__sources", "react-client-manifest.json")
+      FileUtils.rm_f(missing_client_manifest)
+      allow(adapter).to receive(:fetch).with("rsc-hash").and_return(
+        bundle: src_bundle,
+        assets: [missing_client_manifest, server_client_manifest]
+      )
+
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/missing required RSC asset path/).to_stderr
 
       expect(File.exist?(File.join(cache_dir, "rsc-hash"))).to be(false)
     end
@@ -254,11 +310,12 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
   context "when PREVIOUS_BUNDLE_HASHES contains duplicate hashes" do
     let(:src_bundle) { source_file("bundle-dup.js") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
 
     before do
       ENV["PREVIOUS_BUNDLE_HASHES"] = "dup-hash,dup-hash"
       allow(adapter).to receive(:previous_bundle_hashes)
-      allow(adapter).to receive(:fetch).with("dup-hash").and_return(bundle: src_bundle, assets: [])
+      allow(adapter).to receive(:fetch).with("dup-hash").and_return(bundle: src_bundle, assets: [src_asset])
     end
 
     it "deduplicates before staging so a late failure can't rollback an earlier successful stage" do

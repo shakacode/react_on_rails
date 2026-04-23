@@ -65,6 +65,11 @@ module ReactOnRailsPro
     DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
     DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE = 64
+    ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS = %i[req opt rest].freeze
+    ROLLING_DEPLOY_UPLOAD_OPTION_HASH_PARAMS = %i[req opt].freeze
+    ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
+    ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest rest].freeze
+    ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
@@ -269,6 +274,38 @@ module ReactOnRailsPro
               "config.rolling_deploy_adapter must define class method ##{method_name}. " \
               "See docs/pro/rolling-deploy-adapters.md for the full protocol and reference implementations."
       end
+
+      validate_rolling_deploy_upload_signature
+    end
+
+    def validate_rolling_deploy_upload_signature
+      params = rolling_deploy_adapter.method(:upload).parameters
+      return if rolling_deploy_upload_signature_valid?(params)
+
+      raise ReactOnRailsPro::Error,
+            "config.rolling_deploy_adapter#upload must accept signature " \
+            "upload(bundle_hash, bundle:, assets:). See docs/pro/rolling-deploy-adapters.md."
+    end
+
+    def rolling_deploy_upload_signature_valid?(params)
+      accepts_bundle_hash_argument?(params) &&
+        (accepts_upload_keyword_arguments?(params) || accepts_upload_options_hash?(params))
+    end
+
+    def accepts_bundle_hash_argument?(params)
+      params.any? { |type, _name| ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS.include?(type) }
+    end
+
+    def accepts_upload_keyword_arguments?(params)
+      accepts_all_keywords = params.any? { |type, _name| ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS.include?(type) }
+      accepts_all_keywords || ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS.all? do |keyword|
+        params.any? { |type, name| ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS.include?(type) && name == keyword }
+      end
+    end
+
+    def accepts_upload_options_hash?(params)
+      params.any? { |type, _name| type == :rest } ||
+        params.count { |type, _name| ROLLING_DEPLOY_UPLOAD_OPTION_HASH_PARAMS.include?(type) } >= 2
     end
 
     def setup_renderer_password

@@ -84,6 +84,50 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
       end
     end
 
+    describe ".rolling_deploy_adapter" do
+      it "throws if upload does not accept bundle and assets keyword arguments" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
+      it "accepts the documented upload signature" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, bundle:, assets:) = [bundle, assets]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+
+      it "accepts adapters that capture upload keywords in an options hash" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.not_to raise_error
+      end
+    end
+
     describe ".renderer_url" do
       it "is the renderer_url if provided" do
         url = "http://something.com:1234"

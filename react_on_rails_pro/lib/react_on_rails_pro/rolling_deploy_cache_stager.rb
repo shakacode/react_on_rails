@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 require "fileutils"
-require "pathname"
 require "react_on_rails_pro/renderer_cache_helpers"
+require "securerandom"
 require "timeout"
 
 module ReactOnRailsPro
@@ -29,7 +29,7 @@ module ReactOnRailsPro
   # the runtime 410-retry path is still a valid fallback — a failed
   # rolling-deploy seed is less catastrophic than a failed *current*
   # bundle seed.
-  module RollingDeployCacheStager
+  module RollingDeployCacheStager # rubocop:disable Metrics/ModuleLength
     DISCOVERY_TIMEOUT_SECONDS = 10
     FETCH_TIMEOUT_SECONDS = 30
 
@@ -63,7 +63,7 @@ module ReactOnRailsPro
     # Bundle hashes are used as directory names under the renderer cache path
     # (<cache>/<hash>/<hash>.js). Reject path separators and also "." / ".."
     # so staging and cleanup can never escape the cache root.
-    SAFE_HASH_PATTERN = /\A(?!\.{1,2}\z)[A-Za-z0-9_\-.]+\z/
+    SAFE_HASH_PATTERN = /\A(?!\.{1,2}\z)[A-Za-z0-9_.-]+\z/
 
     def self.resolve_previous_hashes(adapter, current_hashes)
       explicit = ENV["PREVIOUS_BUNDLE_HASHES"].to_s.split(",").map(&:strip).reject(&:empty?)
@@ -97,25 +97,27 @@ module ReactOnRailsPro
     private_class_method :fetch_hashes_from_adapter
 
     def self.seed_previous_hash(adapter, hash, cache_dir, mode)
-      bundle_dir = nil
+      staging_dir = nil
       payload = fetch_payload(adapter, hash)
       return if payload.nil?
 
       bundle_dir = bundle_directory(cache_dir, hash)
-      stage_file(payload[:bundle], File.join(bundle_dir, "#{hash}.js"), mode)
+      staging_dir = temporary_bundle_directory(bundle_dir)
+      stage_file(payload[:bundle], File.join(staging_dir, "#{hash}.js"), mode, "Seeded previous bundle file")
 
       Array(payload[:assets]).each do |asset_path|
-        stage_file(asset_path, File.join(bundle_dir, File.basename(asset_path)), mode)
+        stage_file(asset_path, File.join(staging_dir, File.basename(asset_path)), mode, "Seeded previous asset")
       end
+
+      replace_bundle_directory(staging_dir, bundle_dir)
+      staging_dir = nil
     rescue StandardError => e
-      # Roll back the entire hash directory. Leaving the bundle file in place
-      # without its companion assets would cause the renderer to find the bundle
-      # (skipping its 410 path) and emit HTML referencing chunks from a manifest
-      # that never got staged — producing hydration failures instead of the clean
-      # 410-retry fallback that we rely on for degradation.
-      FileUtils.rm_rf(bundle_dir) if bundle_dir
+      # Remove only files created by this attempt. If the hash directory was
+      # already valid from an earlier seed on a persistent cache volume, keep it
+      # available rather than evicting it because this refresh failed.
+      FileUtils.rm_rf(staging_dir) if staging_dir
       warn "[ReactOnRailsPro] Failed to seed previous bundle hash #{hash}: #{e.class}: #{e.message}. " \
-           "Rolled back partially-staged files. Runtime 410-retry remains the fallback."
+           "Rolled back this attempt's partially-staged files. Runtime 410-retry remains the fallback."
     end
     private_class_method :seed_previous_hash
 
@@ -129,8 +131,10 @@ module ReactOnRailsPro
 
       asset_paths = Array(payload[:assets]).map(&:to_s)
       return nil unless valid_bundle_payload?(payload, hash)
-      return nil unless valid_asset_payload?(asset_paths, hash)
       return nil unless valid_required_rsc_payload?(asset_paths, hash)
+
+      warn_if_missing_loadable_stats(asset_paths, hash)
+      return nil unless valid_asset_payload?(asset_paths, hash)
 
       payload
     rescue Timeout::Error
@@ -160,8 +164,14 @@ module ReactOnRailsPro
       missing_assets = asset_paths.reject { |asset_path| File.exist?(asset_path) }
       return true if missing_assets.empty?
 
-      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned missing asset " \
-           "path(s): #{missing_assets.inspect}. Skipping this hash."
+      missing_required = required_rsc_asset_basenames & missing_assets.map { |path| File.basename(path) }
+      if missing_required.any?
+        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned missing required RSC " \
+             "asset path(s): #{missing_required.inspect}. Skipping this hash."
+      else
+        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned missing asset " \
+             "path(s): #{missing_assets.inspect}. Skipping this hash."
+      end
       false
     end
     private_class_method :valid_asset_payload?
@@ -176,6 +186,14 @@ module ReactOnRailsPro
     end
     private_class_method :valid_required_rsc_payload?
 
+    def self.warn_if_missing_loadable_stats(asset_paths, hash)
+      return if asset_paths.map { |path| File.basename(path) }.include?("loadable-stats.json")
+
+      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) is missing loadable-stats.json. " \
+           "Client hydration may break for requests served by this previous bundle hash."
+    end
+    private_class_method :warn_if_missing_loadable_stats
+
     def self.required_rsc_asset_basenames
       return [] unless ReactOnRailsPro.configuration.enable_rsc_support
 
@@ -183,18 +201,23 @@ module ReactOnRailsPro
     end
     private_class_method :required_rsc_asset_basenames
 
-    def self.stage_file(src, dest, mode)
+    def self.stage_file(src, dest, mode, log_prefix)
       FileUtils.mkdir_p(File.dirname(dest))
       FileUtils.rm_f(dest)
 
       if mode == :copy
         FileUtils.cp(src, dest)
-        puts "[ReactOnRailsPro] Seeded (copy) previous bundle file: #{dest}"
+        puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
       else
-        make_relative_symlink(src, dest)
+        RendererCacheHelpers.make_relative_symlink(src, dest, log_prefix: log_prefix)
       end
     end
     private_class_method :stage_file
+
+    def self.temporary_bundle_directory(bundle_dir)
+      "#{bundle_dir}.staging-#{Process.pid}-#{SecureRandom.hex(6)}"
+    end
+    private_class_method :temporary_bundle_directory
 
     def self.sanitize_hashes(hash_values, source_label:)
       hashes = Array(hash_values).map { |value| value.to_s.strip }.reject(&:empty?)
@@ -208,9 +231,9 @@ module ReactOnRailsPro
     private_class_method :sanitize_hashes
 
     def self.bundle_directory(cache_dir, hash)
-      candidate = File.join(cache_dir, hash)
-      normalized_cache_dir = File.expand_path(cache_dir)
-      normalized_candidate = File.expand_path(candidate)
+      FileUtils.mkdir_p(cache_dir)
+      normalized_cache_dir = File.realpath(cache_dir)
+      normalized_candidate = File.expand_path(File.join(normalized_cache_dir, hash))
 
       # Require the candidate to be a *subdirectory* of the cache root, not the
       # cache root itself. `sanitize_hashes` already rejects `""` / `.` / `..`,
@@ -226,20 +249,27 @@ module ReactOnRailsPro
     end
     private_class_method :bundle_directory
 
-    # Mirrors PreSeedRendererCache.make_relative_symlink so previous-hash
-    # symlinks have identical properties (relative path, realpath-canonicalized)
-    # to current-hash symlinks.
-    def self.make_relative_symlink(source, destination)
-      destination_dir = Pathname.new(destination).dirname
-      source_path = Pathname.new(source).realpath
-      relative_source_path = source_path.relative_path_from(destination_dir.realpath)
-      File.symlink(relative_source_path, destination)
-      puts "[ReactOnRailsPro] Seeded (symlink) previous bundle file: #{relative_source_path} -> #{destination}"
-    rescue Errno::ENOENT => e
-      raise ReactOnRailsPro::Error,
-            "Could not resolve real path for symlink source #{source} (#{e.message}). " \
-            "The file may have been removed or be a dangling symlink."
+    def self.replace_bundle_directory(staging_dir, bundle_dir)
+      backup_dir = nil
+      if File.exist?(bundle_dir)
+        backup_dir = "#{bundle_dir}.previous-#{Process.pid}-#{SecureRandom.hex(6)}"
+        FileUtils.mv(bundle_dir, backup_dir)
+      end
+
+      FileUtils.mv(staging_dir, bundle_dir)
+      FileUtils.rm_rf(backup_dir) if backup_dir
+    rescue StandardError
+      restore_previous_bundle_directory(backup_dir, bundle_dir)
+      raise
     end
-    private_class_method :make_relative_symlink
+    private_class_method :replace_bundle_directory
+
+    def self.restore_previous_bundle_directory(backup_dir, bundle_dir)
+      return unless backup_dir
+
+      FileUtils.rm_rf(bundle_dir)
+      FileUtils.mv(backup_dir, bundle_dir) if File.exist?(backup_dir) && !File.exist?(bundle_dir)
+    end
+    private_class_method :restore_previous_bundle_directory
   end
 end

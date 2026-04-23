@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "set"
 require_relative "spec_helper"
 require_relative "../../lib/react_on_rails_pro/assets_precompile"
 
@@ -412,6 +413,28 @@ describe ReactOnRailsPro::AssetsPrecompile do
       FileUtils.rm_f(server_bundle)
     end
 
+    it "is a no-op when no rolling_deploy_adapter is configured" do
+      allow(config).to receive(:rolling_deploy_adapter).and_return(nil)
+
+      expect(adapter).not_to receive(:upload)
+      expect { described_class.publish_current_bundle_if_configured }.not_to output.to_stderr
+    end
+
+    it "is a no-op outside NodeRenderer mode" do
+      allow(config).to receive(:node_renderer?).and_return(false)
+
+      expect(adapter).not_to receive(:upload)
+      described_class.publish_current_bundle_if_configured
+    end
+
+    it "is a no-op in development and test environments" do
+      expect(adapter).not_to receive(:upload)
+      %w[development test].each do |env_name|
+        allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new(env_name))
+        described_class.publish_current_bundle_if_configured
+      end
+    end
+
     it "warns and continues when upload times out" do
       stub_const("ReactOnRailsPro::AssetsPrecompile::UPLOAD_TIMEOUT_SECONDS", 0.05)
       allow(adapter).to receive(:upload) { sleep 1 }
@@ -477,6 +500,21 @@ describe ReactOnRailsPro::AssetsPrecompile do
           .to output(/Skipping missing optional assets/).to_stderr
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
+      end
+    end
+
+    context "when a missing upload asset is required for RSC" do
+      let(:missing_manifest) { File.join(Dir.tmpdir, "react-client-manifest.json") }
+
+      before do
+        allow(config).to receive(:enable_rsc_support).and_return(true)
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths)
+          .and_return(Set.new([missing_manifest]))
+      end
+
+      it "warns that the next deploy will fall back instead of treating it as purely optional" do
+        expect { described_class.filter_existing_assets([missing_manifest]) }
+          .to output(/required RSC companion file/).to_stderr
       end
     end
   end

@@ -131,8 +131,24 @@ module ReactOnRailsPro
       unless missing.empty?
         warn "[ReactOnRailsPro] Skipping missing optional assets for rolling_deploy_adapter upload: " \
              "#{missing.inspect}. Continuing with #{existing.length} existing asset(s)."
+        warn_if_missing_required_rsc_assets(missing)
       end
       existing
+    end
+
+    def self.warn_if_missing_required_rsc_assets(missing_assets)
+      missing_required = required_rsc_asset_basenames & missing_assets.map { |path| File.basename(path) }
+      return if missing_required.empty?
+
+      warn "[ReactOnRailsPro] WARNING: missing assets include required RSC companion file(s) " \
+           "#{missing_required.inspect}. The next deploy will not be able to seed this bundle hash for RSC " \
+           "and will fall back to 410-retry."
+    end
+
+    def self.required_rsc_asset_basenames
+      return [] unless ReactOnRailsPro.configuration.enable_rsc_support
+
+      ReactOnRailsPro::RendererCacheHelpers.required_rsc_asset_paths.map { |path| File.basename(path) }
     end
 
     def self.publish_bundle(adapter, hash, bundle, assets, bundle_label)

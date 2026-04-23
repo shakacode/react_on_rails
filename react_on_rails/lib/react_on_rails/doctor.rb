@@ -2880,10 +2880,6 @@ module ReactOnRails
     # ── Rolling Deploy Adapter ────────────────────────────────────────
 
     ROLLING_DEPLOY_REQUIRED_METHODS = %i[previous_bundle_hashes fetch upload].freeze
-    # Must stay in sync with ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS.
-    # Duplicated rather than referenced directly because doctor runs in the open-source
-    # gem where the Pro constant may not be loaded.
-    ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS = 10
 
     def check_rolling_deploy_adapter
       adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
@@ -2930,7 +2926,8 @@ module ReactOnRails
 
     def report_previous_bundle_hashes_probe(adapter)
       start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      hashes = Timeout.timeout(ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS) { Array(adapter.previous_bundle_hashes) }
+      timeout_seconds = rolling_deploy_discovery_timeout_seconds
+      hashes = Timeout.timeout(timeout_seconds) { Array(adapter.previous_bundle_hashes) }
       latency_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000).round
 
       if hashes.empty?
@@ -2946,10 +2943,18 @@ module ReactOnRails
     rescue Timeout::Error
       checker.add_warning(
         "⚠️  rolling_deploy_adapter#previous_bundle_hashes timed out after " \
-        "#{ROLLING_DEPLOY_DISCOVERY_TIMEOUT_SECONDS}s"
+        "#{rolling_deploy_discovery_timeout_seconds}s"
       )
     rescue StandardError => e
       checker.add_warning("⚠️  rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: #{e.message}")
+    end
+
+    def rolling_deploy_discovery_timeout_seconds
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS)
+        ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+      else
+        10
+      end
     end
 
     def report_resolved_cache_dir

@@ -2704,6 +2704,31 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warnings.any? { |m| m[:content].include?("returned []") }).to be(true)
       end
     end
+
+    context "when previous_bundle_hashes times out" do
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes
+            sleep 1
+          end
+
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      before do
+        stager_module = Module.new
+        stager_module.const_set(:DISCOVERY_TIMEOUT_SECONDS, 0.01)
+        ReactOnRailsPro.const_set(:RollingDeployCacheStager, stager_module)
+      end
+
+      it "uses the stager timeout constant when it is loaded" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warnings = checker.messages.select { |m| m[:type] == :warning }
+        expect(warnings.any? { |m| m[:content].include?("timed out after 0.01s") }).to be(true)
+      end
+    end
   end
 
   describe "check_deprecated_renderer_cache_task" do
