@@ -80,7 +80,6 @@ exclude = [
   # ============================================================================
   '^https://blog\.shakacode\.com',  # May block automated requests
   '^https?://(www\.)?foxford\.ru',  # Russian site, often blocks bots
-  '^https://(www\.)?guavapass\.com',  # TLS handshake fails from GitHub Actions (bot filter)
   '^https://(www\.)?airgoat\.com',  # Returns 403
   '^https://(www\.)?first\.io',     # Returns 403
   '^https://(www\.)?estately\.com', # Returns 403
