@@ -35,7 +35,7 @@ examples here after they have landed or stabilized enough to inspect.
    covers an older `react-rails` v3 → `react_on_rails` v13.4 migration, so treat
    it as a structural reference and follow current migration guides for gem and
    configuration specifics
-2. [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example) —
+2. [react-on-rails-example-migration](https://github.com/shakacode/react-on-rails-example-migration) —
    demonstrates a Rails 7-era `react-rails` → `react_on_rails` migration with
    Shakapacker client/server bundles and SSR setup, based on
    [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example)
