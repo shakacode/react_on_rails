@@ -106,7 +106,7 @@ Use maintainability notes when that is the honest win. Do not force a weak bench
 
 ## Contribute an example
 
-If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new) or open a PR that adds it here, and include:
+If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new?title=Migration+example%3A+) or open a PR that adds it here, and include:
 
 1. The integration you started from, such as `react-rails`, `vite_rails`, or a custom helper
 2. The first slice you picked and why it was small enough to review
@@ -132,6 +132,6 @@ Other migration paths:
 1. [Webpack to Rspack](./migrating-from-webpack-to-rspack.md)
 2. [Babel to SWC](./babel-to-swc-migration.md)
 
-The Rails 5 API-only and AngularJS paths also live in the **Migration Guides** sidebar. React Server Components migration content lives under **React on Rails Pro → React Server Components → Migrating to RSC**.
+The Rails 5 API-only and AngularJS paths also live in the **Migration Guides** sidebar. For React Server Components migration content, start with [Migrating to RSC](./migrating-to-rsc.md).
 
 The migration guides explain the mechanics. This page shows what those mechanics look like in real repos.
