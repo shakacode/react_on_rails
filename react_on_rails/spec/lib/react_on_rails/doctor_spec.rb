@@ -2481,6 +2481,27 @@ RSpec.describe ReactOnRails::Doctor do
         expect(checker.messages.select { |m| m[:type] == :warning }).to be_empty
       end
     end
+
+    context "when a deploy-script file is exactly the size gate" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:script_content) do
+        "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+      end
+
+      before do
+        stub_const("ReactOnRails::Doctor::RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES", script_content.bytesize)
+        File.write(File.join(tmpdir, "Procfile"), script_content)
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "still scans the file" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+      end
+    end
   end
 
   describe "check_base_package_imports" do

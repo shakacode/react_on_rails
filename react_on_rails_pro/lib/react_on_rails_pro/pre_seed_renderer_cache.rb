@@ -89,7 +89,8 @@ module ReactOnRailsPro
 
     def self.stage_bundle(src_path, bundle_dir, bundle_hash, mode)
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
-      stage_file(src_path, dest_file, mode, "Pre-seeded renderer cache")
+      log_prefix = mode == :copy ? "Pre-seeded renderer cache" : "Pre-staged renderer cache"
+      stage_file(src_path, dest_file, mode, log_prefix)
     end
     private_class_method :stage_bundle
 
@@ -126,7 +127,8 @@ module ReactOnRailsPro
         end
 
         dest = File.join(bundle_dir, File.basename(expanded))
-        stage_file(expanded, dest, mode, "Copied asset")
+        log_prefix = mode == :copy ? "Copied asset" : "Symlinked asset"
+        stage_file(expanded, dest, mode, log_prefix)
       end
     end
     private_class_method :stage_assets

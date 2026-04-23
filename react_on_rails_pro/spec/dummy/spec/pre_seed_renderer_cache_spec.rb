@@ -81,6 +81,13 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       expect(File.realpath(first_asset)).to eq(path_in_webpack_folder(asset_filename).to_s)
     end
 
+    it "logs symlink operations with symlink-specific labels" do
+      FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))
+
+      expect { described_class.call(mode: :symlink) }
+        .to output(/Pre-staged renderer cache: .* -> .*Symlinked asset: .* ->/m).to_stdout
+    end
+
     it "treats a concurrent Errno::EEXIST from File.symlink as success" do
       # Simulates two processes racing through make_relative_symlink: the
       # other process recreated the destination between rm_f and File.symlink,

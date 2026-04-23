@@ -2756,8 +2756,8 @@ module ReactOnRails
       matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
         full_path = Rails.root.join(path)
         next false unless full_path.exist?
-        # Skip files that are 1 MB or larger; deploy scripts should be tiny.
-        next false if full_path.size >= RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
+        # Skip files larger than 1 MB; deploy scripts should be tiny.
+        next false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
 
         full_path.read.include?(DEPRECATED_RENDERER_CACHE_TASK)
       end
@@ -2775,10 +2775,9 @@ module ReactOnRails
       checker.add_warning("⚠️  Could not scan for deprecated renderer-cache task references: #{e.message}")
     end
 
-    # Dockerfile matches mean the user is building an image, so they want the
-    # copy-mode default (no MODE needed). Procfile/bin scripts mean same-filesystem
-    # runtime staging, which needs the symlink mode.
     def renderer_cache_migration_suggestion(path)
+      # Dockerfile* entries run while building an image, so copy mode is correct.
+      # Procfile/bin entries run in the deployed filesystem and need symlink mode.
       if path.start_with?("Dockerfile")
         "rake react_on_rails_pro:pre_seed_renderer_cache"
       else
