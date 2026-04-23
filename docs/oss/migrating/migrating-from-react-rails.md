@@ -1,6 +1,18 @@
-## Migrate From react-rails
+# Migrate From react-rails
 
 This migration is easiest when the app is already on a modern Rails + Shakapacker baseline.
+
+If you want repo-shaped references before touching your own app, start with
+[Example Migrations](./example-migrations.md) and then come back here for the
+mechanics.
+
+## Choose a first slice
+
+Pick a small first slice before you touch the whole app:
+
+1. Prefer one Rails-owned page, island, or shell fragment over a broad page rewrite.
+2. Good first wins are often maintainability-first: replacing `ReactRailsUJS` on one low-risk mount, splitting a large shell into smaller boundaries, or moving one legacy Rails page behind a documented helper path.
+3. The first PR does not need to eliminate every `react_component` call. It only needs to prove that one mount can move cleanly.
 
 ## Preflight
 
@@ -127,6 +139,8 @@ Older `react-rails` apps frequently need these additional fixes after the genera
 You can also check [react-rails-to-react-on-rails](https://github.com/shakacode/react-rails-example-app/tree/react-rails-to-react-on-rails) branch on [react-rails example app](https://github.com/shakacode/react-rails-example-app) for an example of migration from `react-rails` v3 to `react_on_rails` v13.4.
 
 For a more recent Rails 7-era migration example (published under ShakaCode), see [react-on-rails-migration-example](https://github.com/shakacode/react-on-rails-migration-example), based on [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example).
+
+For additional real-world migration references and active public PRs, see [Example Migrations](./example-migrations.md).
 
 ## Practical checklist for Webpacker-era apps
 
