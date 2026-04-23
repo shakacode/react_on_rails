@@ -172,6 +172,27 @@ export async function handleIncrementalRenderStream(
             try {
               // eslint-disable-next-line no-await-in-loop
               await onUpdateReceived(parsed);
+
+              // Yield to the event loop after each update chunk so React's
+              // setImmediate(performWork) can fire. Without this, all setProp()
+              // calls batch into React's pingedTasks and are processed in a
+              // single performWork → single flushCompletedQueues, merging all
+              // resolved Suspense boundaries into one chunk.
+              // With this yield, each setProp triggers its own performWork →
+              // flushCompletedQueues → destination.flush(), producing a
+              // separate output chunk per resolved Suspense boundary.
+              //
+              // Tradeoff: adds one event-loop tick (~0.1ms) per update chunk.
+              // For N async props this costs N extra ticks, but the streaming
+              // granularity gain far outweighs it (see PR #3196 benchmarks).
+              //
+              // Note: on the error path (catch block below), the yield is
+              // skipped — intentional, as there's no React work to process
+              // when the update failed.
+              // eslint-disable-next-line no-await-in-loop
+              await new Promise<void>((resolve) => {
+                setImmediate(resolve);
+              });
             } catch (err) {
               // Error in update chunk processing - log and report but continue processing
               const errorMessage = `Error processing update chunk: ${err instanceof Error ? err.message : String(err)}`;
