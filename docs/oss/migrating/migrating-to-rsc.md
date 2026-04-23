@@ -15,7 +15,7 @@ React Server Components offer significant performance benefits when used correct
 - Improvements in Google Speed Index and Total Blocking Time
 - Server-only dependencies (date-fns, marked, sanitize-html) never ship to the client
 
-Real-world results from teams that have shipped RSC in production:
+Real-world results from teams that have adopted server-first rendering (RSC in production, plus DoorDash's pre-RSC SSR baseline):
 
 - **Frigade** — 62% reduction in client-side bundle size ([source](../../pro/react-server-components/success-stories.md#frigade--62-smaller-client-bundle))
 - **BlogHunch** — 30% server cost reduction ([source](../../pro/react-server-components/success-stories.md#bloghunch--30-lower-server-costs-in-one-month))
