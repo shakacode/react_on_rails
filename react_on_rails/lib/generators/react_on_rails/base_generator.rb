@@ -445,7 +445,7 @@ module ReactOnRails
           },
           {
             title: "Marketplace RSC demo",
-            url: "https://github.com/shakacode/react-server-components-marketplace-demo",
+            url: "https://github.com/shakacode/react-on-rails-demo-marketplace-rsc",
             description: "Study a larger app comparing traditional SSR, client boundaries, and streamed RSC."
           }
         ]
@@ -524,7 +524,7 @@ module ReactOnRails
           },
           {
             label: "Marketplace demo",
-            url: "https://github.com/shakacode/react-server-components-marketplace-demo"
+            url: "https://github.com/shakacode/react-on-rails-demo-marketplace-rsc"
           }
         ]
 

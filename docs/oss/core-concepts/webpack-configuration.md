@@ -110,7 +110,7 @@ serverWebpackConfig.output = {
 
 **For older Shakapacker versions:** Use hardcoded paths and manual configuration as shown in the generator templates.
 
-Per the example repo [shakacode/react_on_rails_demo_ssr_hmr](https://github.com/shakacode/react_on_rails_demo_ssr_hmr),
+Per the example repo [shakacode/react-on-rails-demo-ssr-hmr](https://github.com/shakacode/react-on-rails-demo-ssr-hmr),
 you should consider keeping your codebase mostly consistent with the defaults for [Shakapacker](https://github.com/shakacode/shakapacker).
 
 # React on Rails

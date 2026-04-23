@@ -1,4 +1,4 @@
-<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/development.js") %>
+<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/development.js") %>
 
 const { devServer, inliningCss, config } = require('shakapacker');
 

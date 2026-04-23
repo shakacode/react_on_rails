@@ -72,7 +72,7 @@ Step-by-step walkthrough building a full app with Redux, routing, and deployment
 ### 👀 Learn by Example?
 
 - **[Spec/Dummy App](https://github.com/shakacode/react_on_rails/tree/main/react_on_rails/spec/dummy)** - Simple example in this repo
-- **[Tutorial Demo App](https://github.com/shakacode/react_on_rails_demo_ssr_hmr)** - Example with SSR, HMR, and TypeScript
+- **[Tutorial Demo App](https://github.com/shakacode/react-on-rails-demo-ssr-hmr)** - Example with SSR, HMR, and TypeScript
 - **[Live Demo with Source](https://github.com/shakacode/react-webpack-rails-tutorial)** - Full production app at [reactrails.com](https://reactrails.com)
 
 ## Popular Use Cases

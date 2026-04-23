@@ -1,4 +1,4 @@
-<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/config/webpack/commonWebpackConfig.js") %>
+<%= add_documentation_reference(config[:message], "// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/config/webpack/commonWebpackConfig.js") %>
 
 // Common configuration applying to client and server configuration
 const { generateWebpackConfig, merge } = require('shakapacker');

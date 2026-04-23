@@ -145,7 +145,7 @@ module ReactOnRails
           },
           {
             label: "Marketplace RSC demo",
-            url: "https://github.com/shakacode/react-server-components-marketplace-demo"
+            url: "https://github.com/shakacode/react-on-rails-demo-marketplace-rsc"
           }
         ]
       end
@@ -216,7 +216,7 @@ module ReactOnRails
           },
           {
             label: "Marketplace RSC demo",
-            url: "https://github.com/shakacode/react-server-components-marketplace-demo"
+            url: "https://github.com/shakacode/react-on-rails-demo-marketplace-rsc"
           }
         ]
       end
