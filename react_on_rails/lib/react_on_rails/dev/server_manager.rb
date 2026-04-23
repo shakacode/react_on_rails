@@ -882,9 +882,15 @@ module ReactOnRails
 
         def configure_ports
           warn_if_legacy_renderer_url_env_used
-          return if apply_base_port_if_active
-
-          apply_explicit_port_env(PortSelector.select_ports)
+          # Single call: select_ports internally consults base_port_ports and
+          # returns the same hash when base-port mode is active, so we branch
+          # on :base_port_mode instead of calling base_port_ports twice.
+          selected = PortSelector.select_ports
+          if selected[:base_port_mode]
+            apply_base_port_env(selected)
+          else
+            apply_explicit_port_env(selected)
+          end
         rescue PortSelector::NoPortAvailable => e
           warn e.message
           exit 1
@@ -948,6 +954,12 @@ module ReactOnRails
         # do not use base-port mode — set REACT_RENDERER_URL explicitly and
         # rely on the explicit-ports path instead. warn_if_renderer_url_will_be_overridden
         # below surfaces the override whenever a pre-set URL doesn't match.
+        #
+        # SHAKAPACKER_DEV_SERVER_PORT is set even in production-like mode (which
+        # runs static assets, not webpack-dev-server) for tooling consistency:
+        # a subsequent `bin/dev` in the same shell sees the base-port-derived
+        # value rather than a stale explicit one, and developers inspecting
+        # their env after `bin/dev prod` see the full derived block.
         def apply_base_port_env(selected)
           derived_url = "http://localhost:#{selected[:renderer]}"
           warn_if_renderer_url_will_be_overridden(derived_url)
@@ -1055,6 +1067,12 @@ module ReactOnRails
         # binds to the Procfile default (3800) while Rails targets whatever
         # port is in the URL. Warn so the mismatch is visible, but only for
         # local URLs where this process actually controls the renderer.
+        #
+        # Remote portless URLs (e.g. `REACT_RENDERER_URL=http://renderer.internal`)
+        # are intentionally excluded: this process doesn't launch remote
+        # renderers, so scheme-default ports (80/443) may be the correct target
+        # behind a reverse proxy. Remote-side port mismatches are a deployment
+        # concern, not something bin/dev can diagnose safely.
         def warn_url_without_port(url)
           return if url.nil? || url.empty? || !localhost_renderer_url?(url)
 

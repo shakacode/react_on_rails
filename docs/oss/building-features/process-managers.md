@@ -406,9 +406,11 @@ initializer agree on the port without any additional configuration.
 > **Note on `CONDUCTOR_PORT`:** React on Rails treats `CONDUCTOR_PORT` as the
 > **base** of a consecutive port block (Rails = base + 0, webpack = base + 1,
 > renderer = base + 2). This interpretation is not part of a public Conductor
-> API. If a future Conductor release redefines `CONDUCTOR_PORT` to mean the
-> Rails port itself, override by setting `REACT_ON_RAILS_BASE_PORT` explicitly —
-> it takes precedence and uses the same derivation rules.
+> API; treat `CONDUCTOR_PORT` support as best-effort until Conductor documents
+> the contract. If a future Conductor release redefines `CONDUCTOR_PORT` (for
+> example, to mean the Rails port itself), override by setting
+> `REACT_ON_RAILS_BASE_PORT` explicitly — it takes precedence and uses the
+> same derivation rules.
 
 **Priority chain:** base port > explicit per-service env vars (`PORT`, etc.) > auto-detect free ports.
 

@@ -94,6 +94,7 @@
     "fs": false
   },
   "scripts": {
+    "//": "node-renderer scripts rely on POSIX shell parameter expansion (${RENDERER_PORT:-3800}); they require sh/bash and won't expand correctly on Windows cmd.exe. This dummy app is Linux/macOS only.",
     "test": "pnpm run build:test && pnpm run lint && rspec",
     "test:js": "jest ./tests",
     "lint": "cd ../.. && nps lint",

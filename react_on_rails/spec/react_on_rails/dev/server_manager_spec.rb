@@ -432,10 +432,16 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        # configure_ports short-circuits on base_port_ports before consulting
-        # select_ports, so that's the stub that drives base-port behavior.
-        allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_ports)
-          .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
+        # configure_ports calls select_ports once; select_ports internally
+        # consults base_port_ports and returns that hash when base-port mode
+        # is active. Stub both so every code path (select_ports callers and
+        # direct base_port_ports callers like run_production_like) sees the
+        # same base-port result.
+        base_port_hash = { rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true }
+        allow(ReactOnRails::Dev::PortSelector).to receive_messages(
+          base_port_ports: base_port_hash,
+          select_ports: base_port_hash
+        )
       end
 
       it "overrides a pre-existing PORT with the base-derived Rails port" do

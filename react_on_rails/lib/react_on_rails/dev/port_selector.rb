@@ -25,9 +25,11 @@ module ReactOnRails
       # CONDUCTOR_PORT is an empirical interpretation based on Conductor.build
       # (https://conductor.build) allocating a block of consecutive ports per
       # workspace and exposing the block base via this env var. This contract
-      # is not in a public Conductor API; if a future release changes the
-      # meaning (e.g. CONDUCTOR_PORT becomes the Rails port itself rather than
-      # a block base), the derived offsets below will land on the wrong ports.
+      # is not in a public Conductor API, so treat CONDUCTOR_PORT support as
+      # best-effort until Conductor documents it. If a future release changes
+      # the meaning (e.g. CONDUCTOR_PORT becomes the Rails port itself rather
+      # than a block base), the derived offsets below will land on the wrong
+      # ports.
       #
       # Escape hatch: REACT_ON_RAILS_BASE_PORT takes precedence, so users can
       # override the CONDUCTOR_PORT interpretation without code changes.
@@ -181,7 +183,7 @@ module ReactOnRails
           #
           # Strip before validating so whitespace-padded values (common with
           # copy-paste or env-file templating) parse the same way PORT and
-          # SHAKAPACKER_DEV_SERVER_PORT do via consume_explicit_port_env.
+          # SHAKAPACKER_DEV_SERVER_PORT do via consume_explicit_port_env!.
           BASE_PORT_ENV_VARS.each_with_index do |var, idx|
             raw = ENV.fetch(var, nil)
             next if raw.nil?
@@ -224,22 +226,22 @@ module ReactOnRails
         end
 
         def explicit_rails_port
-          consume_explicit_port_env("PORT")
+          consume_explicit_port_env!("PORT")
         end
 
         def explicit_webpack_port
-          consume_explicit_port_env("SHAKAPACKER_DEV_SERVER_PORT")
+          consume_explicit_port_env!("SHAKAPACKER_DEV_SERVER_PORT")
         end
 
         # Reject values that aren't valid port strings and clear the env var
         # so ServerManager's apply_explicit_port_env path (which also rejects
         # them) doesn't emit a second warning for the same value.
         #
-        # Named `consume_*` rather than `parse_*` because invalid values are
-        # removed from ENV as a side effect — the "warn once + fall back" flow
-        # is shared with ServerManager via the cleared env, not via the return
-        # value. Kept in one place so the coupling is obvious.
-        def consume_explicit_port_env(var_name)
+        # The `!` suffix signals the ENV-mutation side effect at the call site
+        # (explicit_rails_port / explicit_webpack_port); the "warn once + fall
+        # back" flow is shared with ServerManager via the cleared env, not via
+        # the return value. Kept in one place so the coupling is obvious.
+        def consume_explicit_port_env!(var_name)
           raw = ENV.fetch(var_name, nil)
           return nil if raw.nil?
 
