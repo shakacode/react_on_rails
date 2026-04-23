@@ -183,6 +183,7 @@ const modules = import.meta.glob('./dir/**/*.js');
 
 // Webpack (Shakapacker) — lazy equivalent
 const ctx = require.context('./dir', true, /\.js$/, 'lazy');
+// ctx.keys() → ['./foo.js', ...]  ← keys relative to context dir, NOT './dir/foo.js'
 // ctx(key) now returns Promise<Module>, matching Vite's lazy semantics
 const lazyModules = Object.fromEntries(ctx.keys().map((key) => [key, () => ctx(key)]));
 ```
