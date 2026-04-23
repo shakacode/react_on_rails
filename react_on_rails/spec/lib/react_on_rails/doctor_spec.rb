@@ -2421,6 +2421,32 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when a Dockerfile references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Dockerfile"),
+          "RUN bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "suggests the copy-mode task without MODE=symlink" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs).not_to be_empty
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("Dockerfile →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+        expect(suggestion_line).not_to include("MODE=symlink")
+      end
+    end
+
     context "when no deploy scripts reference the deprecated task" do
       let(:tmpdir) { Dir.mktmpdir }
 

@@ -2745,6 +2745,11 @@ module ReactOnRails
       # Resolve against Rails.root (not Dir.pwd) so the scan still fires when
       # doctor is invoked from a subdirectory — otherwise the checks silently
       # find nothing and the deprecation warning never surfaces.
+      #
+      # Substring match is intentional: a comment line in a Procfile/Dockerfile
+      # that mentions the old task name will also trigger the warning. That is
+      # acceptable — the worst case is a benign migration nudge on a file that's
+      # already been migrated but still references the old name in a comment.
       matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
         full_path = Rails.root.join(path)
         next false unless full_path.exist?

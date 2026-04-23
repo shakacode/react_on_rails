@@ -128,6 +128,10 @@ module ReactOnRailsPro
     end
     private_class_method :stage_assets
 
+    # Replaces `destination` with a relative symlink to `source`. Not atomic:
+    # if the process is killed between `rm_f` and `File.symlink` the destination
+    # is briefly absent. In practice the renderer's 410→refetch retry at
+    # request time recovers from a missing bundle, so the brief gap is benign.
     def self.make_relative_symlink(source, destination)
       destination_dir = Pathname.new(destination).dirname
       FileUtils.mkdir_p(destination_dir)
