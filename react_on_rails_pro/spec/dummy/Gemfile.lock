@@ -245,8 +245,6 @@ GEM
     minitest (6.0.2)
       drb (~> 2.0)
       prism (~> 1.5)
-    mize (0.4.1)
-      protocol (~> 2.0)
     msgpack (1.7.2)
     net-http (0.4.1)
       uri
@@ -291,8 +289,6 @@ GEM
     prism (1.9.0)
     prism-rails (1.5.0)
       railties
-    protocol (2.0.0)
-      ruby_parser (~> 3.0)
     pry (0.14.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
@@ -420,9 +416,6 @@ GEM
     rubocop-rspec_rails (2.29.1)
       rubocop (~> 1.61)
     ruby-progressbar (1.13.0)
-    ruby_parser (3.21.0)
-      racc (~> 1.5)
-      sexp_processor (~> 4.16)
     rubyzip (2.3.2)
     sass (3.7.4)
       sass-listen (~> 4.0.0)
@@ -447,7 +440,6 @@ GEM
       rubyzip (>= 1.2.2, < 3.0)
       websocket (~> 1.0)
     semantic_range (3.1.1)
-    sexp_processor (4.17.1)
     shakapacker (9.6.1)
       activesupport (>= 5.2)
       package_json
@@ -484,9 +476,8 @@ GEM
     sqlite3 (2.9.2-x86_64-linux-musl)
     stringio (3.2.0)
     sync (0.5.0)
-    term-ansicolor (1.10.2)
-      mize
-      tins (~> 1.0)
+    term-ansicolor (1.11.3)
+      tins (~> 1)
     thor (1.5.0)
     tilt (2.4.0)
     timeout (0.6.0)

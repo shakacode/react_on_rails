@@ -6,7 +6,7 @@ ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
   config.renderer_url = ENV.fetch("REACT_RENDERER_URL", "http://localhost:3800")
 
-  # See value in client/node-renderer.js
+  # See value in renderer/node-renderer.js
   config.renderer_password = ENV.fetch("RENDERER_PASSWORD", "devPassword")
 
   config.ssr_timeout = 5

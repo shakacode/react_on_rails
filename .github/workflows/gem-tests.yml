@@ -3,14 +3,15 @@ name: Rspec test for gem
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.event.pull_request.number && format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) || format('{0}-{1}', github.workflow, github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches:
       - 'main'
-    paths-ignore:
-      - 'AGENTS_USER_GUIDE.md'
-      - 'llms.txt'
-      - 'llms-full.txt'
+    # Always trigger on main; docs-only detection handles skipping heavy jobs
   pull_request:
     paths-ignore:
       - '**.md'
@@ -43,6 +44,7 @@ jobs:
       run_dummy_tests: ${{ steps.detect.outputs.run_dummy_tests }}
       run_generators: ${{ steps.detect.outputs.run_generators }}
       has_full_ci_label: ${{ steps.check-label.outputs.result }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -69,6 +71,22 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.sha || github.event.before || 'origin/main' }}"
           script/ci-changes-detector "$BASE_REF"
         shell: bash
+      - name: Set gem tests matrix
+        id: set-matrix
+        run: |
+          # Determine if we should run full matrix (main or full-ci label)
+          # Each Ruby version / dependency level is split into two shards:
+          #   generators – spec/react_on_rails/generators (heavy filesystem I/O)
+          #   unit       – everything else under spec/react_on_rails
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
+             [[ "${{ steps.check-label.outputs.result }}" == "true" ]] || \
+             [[ "${{ inputs.force_run }}" == "true" ]]; then
+            # Full matrix: test both latest and minimum supported versions × 2 shards
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"generators"},{"ruby-version":"3.2","dependency-level":"minimum","shard":"unit"}]}' >> $GITHUB_OUTPUT
+          else
+            # PR matrix: test only latest versions for fast feedback × 2 shards
+            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest","shard":"generators"},{"ruby-version":"3.4","dependency-level":"latest","shard":"unit"}]}' >> "$GITHUB_OUTPUT"
+          fi
       - name: Guard docs-only main pushes
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: ./.github/actions/ensure-main-docs-safety
@@ -76,26 +94,8 @@ jobs:
           docs-only: ${{ steps.detect.outputs.docs_only }}
           previous-sha: ${{ github.event.before }}
 
-  setup-gem-tests-matrix:
-    needs: detect-changes
-    runs-on: ubuntu-22.04
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          # Determine if we should run full matrix (main or full-ci label)
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || \
-             [[ "${{ needs.detect-changes.outputs.has_full_ci_label }}" == "true" ]]; then
-            # Full matrix: test both latest and minimum supported versions
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"},{"ruby-version":"3.2","dependency-level":"minimum"}]}' >> $GITHUB_OUTPUT
-          else
-            # PR matrix: test only latest versions for fast feedback
-            echo 'matrix={"include":[{"ruby-version":"3.4","dependency-level":"latest"}]}' >> $GITHUB_OUTPUT
-          fi
-
   rspec-package-tests:
-    needs: [detect-changes, setup-gem-tests-matrix]
+    needs: detect-changes
     # Skip only if: main push AND docs-only changes
     # Otherwise run if: on main OR Ruby tests needed
     # This allows docs-only commits to skip heavy jobs while ensuring full CI on main for code changes
@@ -110,7 +110,7 @@ jobs:
       )
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup-gem-tests-matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     env:
       BUNDLE_FROZEN: ${{ matrix.dependency-level == 'minimum' && 'false' || 'true' }}
     runs-on: ubuntu-22.04
@@ -151,14 +151,22 @@ jobs:
         run: |
           echo "CI_DEPENDENCY_LEVEL=${{ matrix.dependency-level }}" >> $GITHUB_ENV
       - name: Run rspec tests
-        run: cd react_on_rails && bundle exec rspec spec/react_on_rails
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          cd react_on_rails
+          if [[ "$SHARD" = "generators" ]]; then
+            bundle exec rspec spec/react_on_rails/generators
+          else
+            bundle exec rspec spec/react_on_rails --exclude-pattern "**/generators/**"
+          fi
       - name: Store test results
         uses: actions/upload-artifact@v4
         with:
-          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-rspec-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.shard }}
           path: ~/rspec
       - name: Store artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: main-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}
+          name: main-test-log-${{ github.run_id }}-${{ github.job }}-ruby${{ matrix.ruby-version }}-${{ matrix.dependency-level }}-${{ matrix.shard }}
           path: log/test.log

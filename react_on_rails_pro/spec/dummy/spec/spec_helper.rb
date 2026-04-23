@@ -18,7 +18,18 @@
 # users commonly want.
 #
 # See http://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
-require "pry-byebug"
+begin
+  require "readline"
+rescue LoadError
+  # readline is absent on some lightweight Ruby builds (e.g. mise) — pry-byebug won't work, skip silently.
+else
+  begin
+    require "pry-byebug"
+  rescue LoadError => e
+    warn "[spec_helper] Skipping pry-byebug: #{e.message}"
+  end
+end
+
 require "webmock"
 require "httpx/adapters/webmock"
 require "webmock/rspec"

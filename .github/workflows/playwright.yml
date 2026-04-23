@@ -3,13 +3,14 @@ name: Playwright E2E Tests
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.event.pull_request.number && format('{0}-pr-{1}', github.workflow, github.event.pull_request.number) || format('{0}-{1}', github.workflow, github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'AGENTS_USER_GUIDE.md'
-      - 'llms.txt'
-      - 'llms-full.txt'
+    # Always trigger on main; docs-only detection handles skipping heavy jobs
   workflow_dispatch:
 
 jobs:

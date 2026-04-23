@@ -131,6 +131,8 @@ end
 
 ## Dockerfile Example
 
+> **Why the renderer entry point lives in a dedicated `renderer/` directory:** Production Docker builds commonly strip JavaScript sources after the client bundles are built, since the Rails app no longer needs them at runtime. Keeping the renderer entry point in its own top-level directory (separate from `client/`) makes it trivial to exclude from that cleanup — the Node Renderer process still needs its entry file and dependencies at runtime.
+
 A minimal Dockerfile that bundles Rails and the Node Renderer in a single image:
 
 ```dockerfile
@@ -175,10 +177,10 @@ For the single-container pattern, use a process manager like [overmind](https://
 ```text
 # Procfile
 rails: bundle exec rails server -b 0.0.0.0 -p 3000
-renderer: node client/node-renderer.js
+renderer: node renderer/node-renderer.js
 ```
 
-> **Tip:** For sidecar containers, use the same image but override the `CMD` — one container runs `bundle exec rails server`, the other runs `node client/node-renderer.js` (or your Node Renderer entry point).
+> **Tip:** For sidecar containers, use the same image but override the `CMD` — one container runs `bundle exec rails server`, the other runs `node renderer/node-renderer.js` (or your Node Renderer entry point).
 
 ## Docker Compose Example
 
@@ -199,7 +201,7 @@ services:
 
   renderer:
     build: .
-    command: node client/node-renderer.js
+    command: node renderer/node-renderer.js
     ports:
       - '3800:3800'
     environment:
@@ -220,7 +222,7 @@ services:
 By default, the Node Renderer binds to `localhost`. For **sidecar containers** in the same Kubernetes pod, that works because the containers share a network namespace. For **separate workloads** or Docker Compose setups without shared networking, bind to `0.0.0.0`:
 
 ```javascript
-// node-renderer.js
+// renderer/node-renderer.js
 import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
 
 const config = {
@@ -488,7 +490,7 @@ spec:
 
         - name: node-renderer
           image: your-app:latest # Same image as Rails
-          command: ['node', 'client/node-renderer.js']
+          command: ['node', 'renderer/node-renderer.js']
           ports:
             - containerPort: 3800
           env:

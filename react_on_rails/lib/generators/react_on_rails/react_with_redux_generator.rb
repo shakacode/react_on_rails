@@ -104,7 +104,7 @@ module ReactOnRails
         # Fallback to package manager detection if GeneratorHelper fails
         return if success
 
-        package_manager = GeneratorMessages.detect_package_manager
+        package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
         return unless package_manager
 
         install_packages_with_fallback(regular_packages, dev: false, package_manager: package_manager)
@@ -116,7 +116,8 @@ module ReactOnRails
         # Append Redux-specific post-install instructions
         GeneratorMessages.add_info(
           GeneratorMessages.helpful_message_after_installation(component_name: "HelloWorldApp", route: "hello_world",
-                                                               pro: Gem.loaded_specs.key?("react_on_rails_pro"))
+                                                               pro: Gem.loaded_specs.key?("react_on_rails_pro"),
+                                                               app_root: destination_root)
         )
       end
 

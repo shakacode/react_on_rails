@@ -2,6 +2,76 @@
 
 This guide explains how render-functions work in React on Rails and how to use them with Ruby helper methods.
 
+## Component types supported by React on Rails
+
+Before diving into render-functions, it helps to know the three kinds of values you can register with `ReactOnRails.register`. React on Rails classifies each registered entry based on its shape, and the classification determines where it can run (server, client, or both) and which Ruby helpers can invoke it.
+
+| Type                  | Signature                                  | Server (SSR)    | Client | Detection rule                                                          |
+| --------------------- | ------------------------------------------ | --------------- | ------ | ----------------------------------------------------------------------- |
+| **React Component**   | `(props) => JSX` or class component        | Yes             | Yes    | `Function.length <= 1` and no `renderFunction` flag                     |
+| **Render Function**   | `(props, railsContext) => ...`             | Yes             | Yes    | `Function.length >= 2` **or** `fn.renderFunction === true`              |
+| **Renderer Function** | `(props, railsContext, domNodeId) => void` | **No — throws** | Yes    | A render function (detected first) with exactly `Function.length === 3` |
+
+A few important points about the detection:
+
+- **The detection is based on `Function.length`** (the number of declared parameters). Destructured parameters count as 1 — `({ name }) => ...` has length 1.
+- **Render functions return** a React component, a React element, a server-render hash object, or a promise that resolves to one of those. See [Types of Render-Functions and Their Return Values](#types-of-render-functions-and-their-return-values) below.
+- **Renderer functions do not return anything meaningful.** They take control of mounting/hydration themselves by calling `ReactDOM.hydrateRoot` / `createRoot` against `domNodeId`. Because there is no DOM on the server, **registering a renderer function and then server-rendering it throws a descriptive error**. Renderer functions are strictly client-side.
+- **`fn.renderFunction = true` is an escape hatch** for render functions that don't need `railsContext` but still want to be treated as render functions (e.g., so they can return a hash). Without the flag, a one-parameter function is classified as a regular React component.
+
+```jsx
+// Regular React Component — 0 or 1 params, renders normally
+const HelloMessage = (props) => <div>Hello {props.name}</div>;
+
+// Render Function — 2 params, returns a React component or a hash
+const HelloWithContext = (props, railsContext) => {
+  return () => (
+    <div>
+      Hello {props.name} from {railsContext.pathname}
+    </div>
+  );
+};
+
+// Render Function via the renderFunction flag — 1 param but still a render function
+const HelloHash = (props) => {
+  return { renderedHtml: { componentHtml: `<div>Hello ${props.name}</div>` } };
+};
+HelloHash.renderFunction = true;
+
+// Renderer Function — 3 params, handles hydration itself, CLIENT ONLY
+const LazyHydrate = (props, railsContext, domNodeId) => {
+  // whenVisible is a hypothetical helper that resolves when the element scrolls into view
+  whenVisible(domNodeId).then(() => {
+    const root = document.getElementById(domNodeId);
+    ReactDOM.hydrateRoot(root, <HelloMessage {...props} />);
+  });
+};
+
+ReactOnRails.register({ HelloMessage, HelloWithContext, HelloHash, LazyHydrate });
+```
+
+The rest of this document focuses on **render functions** — the most flexible of the three types, with the richest set of return values. For renderer functions (client-side mounting control), see [Renderer Functions](../api-reference/view-helpers-api.md#renderer-functions-function-that-will-call-reactdomrender-or-reactdomhydrate) in the view helpers reference.
+
+### Compatibility matrix: component types and Ruby helpers
+
+The Ruby helper you use in your Rails view must be compatible with the component type you registered. Mismatches usually produce a clear server-side error, but it's faster to pick the right combination upfront:
+
+| Component type                                                                                  | `react_component`                                                                                                                         | `react_component_hash`                                                                                     | `stream_react_component` (Pro)                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **React Component** (plain function / class)                                                    | ✅ Works (client-side rendering or SSR)                                                                                                   | ❌ Raises — the helper requires a hash return, not a component                                             | ✅ Works (streaming SSR)                                                                                                                                                    |
+| **Render Function returning a React component**                                                 | ✅ Works                                                                                                                                  | ❌ Raises — must return a hash, not a component                                                            | ✅ Works                                                                                                                                                                    |
+| **Render Function returning `{ renderedHtml: string }`**                                        | ✅ Works                                                                                                                                  | ❌ Raises — string is not a hash with `componentHtml`                                                      | ❌ Raises — streaming does not support server render hashes                                                                                                                 |
+| **Render Function returning `{ renderedHtml: ReactElement }`**                                  | ✅ Works (calls `renderToString` on the element)                                                                                          | ❌ Raises — element is not a hash with `componentHtml`                                                     | ❌ Raises — streaming does not support server render hashes                                                                                                                 |
+| **Render Function returning a server-render hash** (`{ renderedHtml: { componentHtml, ... } }`) | ⚠️ Raises — tells you to use `react_component_hash`                                                                                       | ✅ Works (the designed use case)                                                                           | ❌ Raises — streaming does not support server render hashes                                                                                                                 |
+| **Async Render Function** (returns a Promise)                                                   | ✅ Works with Pro Node renderer. ❌ ExecJS silently returns empty output — see [Async functions and ExecJS](#async-functions-and-execjs). | ✅ Only if the promise resolves to a server-render hash with `componentHtml`. Pro Node renderer only.      | ✅ Only if the promise resolves to a React component. Promises resolving to strings or server-render hashes are rejected — streaming does not support server render hashes. |
+| **Renderer Function** (3 params)                                                                | ✅ Works with `prerender: false` (client-only). ❌ Throws with `prerender: true` — renderer functions cannot run on the server.           | ❌ Raises — `react_component_hash` forces `prerender: true`, which is incompatible with renderer functions | ❌ Raises — streaming requires server rendering                                                                                                                             |
+
+**Key takeaways:**
+
+- `react_component_hash` is specifically for the "multiple HTML strings in one response" use case. If your render function returns a plain component, string, or React element, use `react_component` instead.
+- Renderer functions are a client-only optimization. Any helper that prerenders (`prerender: true`, `react_component_hash`, or `stream_react_component`) will throw when used with a renderer function.
+- Async render functions require the Pro Node renderer. On ExecJS, they fail silently — see the warning in the [Promises of Strings](#5-promises-of-strings) section.
+
 ## Types of Render-Functions and Their Return Values
 
 Render-functions take two parameters:
@@ -11,29 +81,10 @@ Render-functions take two parameters:
 
 ### Identifying Render-Functions
 
-React on Rails needs to identify which functions are render-functions (as opposed to regular React components). There are two ways to mark a function as a render function:
+As shown in the [component types table](#component-types-supported-by-react-on-rails) above, React on Rails marks a function as a render function in two ways:
 
-1. Accept two parameters in your function definition: `(props, railsContext)` - React on Rails will detect this signature (the parameter names don't matter).
-2. Add a `renderFunction = true` property to your function - This is useful when your function doesn't need the railsContext.
-
-```jsx
-// Method 1: Use signature with two parameters
-const MyComponent = (props, railsContext) => {
-  return () => (
-    <div>
-      Hello {props.name} from {railsContext.pathname}
-    </div>
-  );
-};
-
-// Method 2: Use renderFunction property
-const MyOtherComponent = (props) => {
-  return () => <div>Hello {props.name}</div>;
-};
-MyOtherComponent.renderFunction = true;
-
-ReactOnRails.register({ MyComponent, MyOtherComponent });
-```
+1. Accept two parameters in your function definition: `(props, railsContext)` — React on Rails will detect this signature (the parameter names don't matter).
+2. Add a `renderFunction = true` property to your function — useful when your function doesn't need `railsContext`.
 
 Render-functions can return several types of values:
 
@@ -47,8 +98,8 @@ const MyComponent = (props, _railsContext) => {
 };
 ```
 
-> [!NOTE]
-> Ensure to return a React component (a function or class) and not a React element (the result of calling `React.createElement` or JSX).
+> [!IMPORTANT]
+> **Return a React component (a function or class), not a React element.** That means `return MyComponent;` or `return () => <div>…</div>;`, **not** `return <MyComponent />;` or `return <div>…</div>;`. Returning a React element directly is deprecated: React on Rails currently logs a `console.error` and still renders the element, but **hooks silently don't work**, and the behavior may change in a future release. If you need to return JSX from a render function, wrap it in a server-render hash — see [Return Type 3](#3-objects-with-renderedhtml-as-a-react-element) below.
 
 ### 2. Objects with `renderedHtml` string property
 
@@ -61,6 +112,8 @@ const MyComponent = (props, _railsContext) => {
 ```
 
 ### 3. Objects with `renderedHtml` as a React element
+
+This is the supported way to return JSX from a render function: wrap it in `{ renderedHtml: ... }`. React on Rails will call `renderToString` on the element and use the result as the server-rendered HTML. Unlike [returning a React element directly](#1-react-components), this form correctly satisfies React's Rules of Hooks — the element is rendered in a normal component tree context, so hooks that are SSR-compatible (e.g., `useState`, `useContext`) work as expected during server rendering.
 
 > **React 19 Alternative:** For metadata use cases (titles, meta tags), consider using [React 19 Native Metadata](../building-features/react-19-native-metadata.md) instead of this pattern. React 19 hoists `<title>`, `<meta>`, and `<link>` to `<head>` automatically, eliminating the need for server-side hash render-functions.
 
@@ -99,6 +152,13 @@ const MyComponent = async (props, _railsContext) => {
 };
 ```
 
+#### Async functions and ExecJS
+
+> [!WARNING]
+> Async render functions **only work with the React on Rails Pro Node renderer**. When a promise-returning render function is used on ExecJS (the OSS default SSR runtime), React on Rails logs a `console.error` and returns an empty JSON object (`'{}'`) as the server-rendered output. **The Rails view ends up with empty content and no visible exception**, which can be hard to diagnose. If you use async render functions, make sure your server runtime is the Pro Node renderer.
+>
+> The exact error message logged to `console.error` is: `Your render function returned a Promise, which is only supported by the React on Rails Pro Node renderer, not ExecJS.`
+
 ### 6. Promises of server-side hash
 
 ```jsx
@@ -121,12 +181,24 @@ const MyComponent = async (props, _railsContext) => {
 };
 ```
 
-### 8. Redirect Information
+### 8. Redirect Information (Legacy)
 
-> [!NOTE]
-> React on Rails does not perform actual page redirections. Instead, it returns an empty component and relies on the front end to handle the redirection when the router is rendered. The `redirectLocation` property is logged in the console and ignored by the server renderer. If the `routeError` property is not null or undefined, it is logged and will cause Ruby to throw a `ReactOnRails::PrerenderError` if the `raise_on_prerender_error` configuration is enabled.
+> [!WARNING]
+> **These fields have significant limitations.** They originated from React Router v3/v4 integrations but are still supported at the runtime level:
+>
+> - `redirectLocation` does **not** trigger an actual server-side HTTP redirect — Rails still returns the full response with an empty `<div>`. The redirect only takes effect once the client-side router renders.
+> - `routeError` only triggers `raise_on_prerender_error` behavior (if enabled) — it does not produce a user-facing error page.
+> - Modern React Router v6 Declarative Mode (`StaticRouter`) has no mechanism to produce these values.
+> - React Router v6 Data Mode (`createStaticHandler`) handles redirects via `Response` objects, not these fields.
+>
+> **Modern alternatives:**
+>
+> - For redirects during SSR, handle them in your Rails controller (e.g., check auth before rendering and call `redirect_to`).
+> - For client-side redirects, use React Router's `<Navigate to="/path" />` (note: this is a [no-op during SSR](../building-features/react-router.md#navigate-component-ssr-behavior)).
+> - For route errors, use React Router's `errorElement` or an `ErrorBoundary`.
 
 ```jsx
+// Legacy pattern — prefer modern alternatives above
 const MyComponent = (props, _railsContext) => {
   return {
     redirectLocation: { pathname: '/new-path', search: '' },
@@ -143,12 +215,18 @@ Take a look at [serverRenderReactComponent.test.ts](https://github.com/shakacode
 
 2. **Objects Require Specific Properties** - Non-promise objects must include a `renderedHtml` property to be valid when used with `react_component`.
 
-3. **Async Functions Support Server Render Hashes** - When using the React on Rails Pro Node renderer, async render-functions can return React components, strings, or full server render hashes, including `clientProps`, `redirectLocation`, and `routeError`. See [8. Redirect Information](#8-redirect-information).
+3. **Which object keys trigger "server render hash" processing** — React on Rails treats a returned object as a server render hash if it contains **any** of these keys: `renderedHtml`, `redirectLocation`, `routeError`, or `error`. If none of those keys are present, the object is passed through unchanged (which typically fails validation elsewhere).
 
-4. **`clientProps` are merged back into hydration props** - If a server render result includes `clientProps`, React on Rails merges those keys into the client hydration props generated by `react_component`.
+   > [!WARNING]
+   > **The `error` key is a landmine.** If your render function accidentally returns `{ error: someError }` — for example from a `try/catch` block — the framework routes it through server-render-hash handling, which produces **empty HTML output** (because `renderedHtml` is missing). Note that `hasErrors` is _not_ set — only `routeError` sets the error flag, so no `PrerenderError` is raised regardless of `raise_on_prerender_error`. If you want to signal failure, throw an error instead of returning one in a plain object.
+
+4. **Async Functions Support Server Render Hashes** - When using the React on Rails Pro Node renderer, async render-functions can return React components, strings, or full server render hashes, including `clientProps`, `redirectLocation`, and `routeError`. See [8. Redirect Information (Legacy)](#8-redirect-information-legacy).
+
+5. **`clientProps` are merged back into hydration props** - If a server render result includes `clientProps`, React on Rails merges those keys into the client hydration props generated by `react_component`.
    - Use this to pass server-only computed hydration data (for example router dehydrated state).
    - Merge order is `original_props.merge(clientProps)`, so keys from `clientProps` override matching original keys.
-   - This merge requires your original `props:` to be a Ruby `Hash` or a JSON string representing an object.
+   - This merge requires your original `props:` to be a Ruby `Hash` or a JSON string representing an object. If you pass any other type (including `nil`), the helper raises an error with a message pointing to this requirement.
+   - **Symbol vs string keys:** If your original props use a symbol key (`:locale`) and `clientProps` returns the same name as a string (`"locale"`), the merge writes to the existing symbol key to preserve its type. If your original props contain **both** forms of the same key (`:locale` and `"locale"`), the merge raises an error rather than guessing which one you meant.
 
 ## Ruby Helper Functions
 
@@ -209,12 +287,13 @@ This helper accepts render-functions that return objects with a `renderedHtml` p
 
 - Simple component rendering
 - Client-side only rendering (always uses server rendering)
+- Renderer functions (3-parameter functions) — these are client-only and incompatible with forced server rendering
 
 #### Requirements
 
-- The render function MUST return an object
-- The object MUST include a `componentHtml` key
-- All other keys are optional and can be accessed in your Rails view
+- The render function MUST return an object with shape `{ renderedHtml: { componentHtml, ...otherKeys } }`
+- The `renderedHtml` object MUST include a `componentHtml` key — missing it raises `ReactOnRails::Error`
+- All other keys inside `renderedHtml` are optional and can be accessed in your Rails view as `result["keyName"]`
 
 ## Examples with Appropriate Helper Methods
 
@@ -358,7 +437,7 @@ ReactOnRails.register({ AsyncReactComponent });
 <%= react_component("AsyncReactComponent", props: { dataUrl: "/api/data" }) %>
 ```
 
-### Return Type 8: Redirect Object
+### Return Type 8: Redirect Object (Legacy)
 
 ```jsx
 const RedirectComponent = (props, railsContext) => {

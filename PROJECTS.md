@@ -20,7 +20,6 @@ _Please support the project by [emailing Justin Gordon](mailto:justin@shakacode.
 - **[OppenheimerFunds](https://www.oppenheimerfunds.com/)**, investment site.
 - **[KissKissBankBank](https://www.kisskissbankbank.com/)**, large French crowdfunding platform.
 - **HVMN**: Web ecommerce site for "biohacking" products.
-- **[GuavaPass](https://guavapass.com/)**: Coaching client of [ShakaCode](https://www.shakacode.com) and React on Rails fan!
 - **[Pivotal Tracker](http://www.pivotaltracker.com/)**: The first (and most-loved) agile project management tool built on Rails. React on Rails has greatly simplified integration and workflow for our React components in Rails!
 - **[Estately](https://www.estately.com)**: Home search.
 - **[Blink Inc](https://www.blinkinc.com)**: Website and more built by [ShakaCode](https://www.shakacode.com).

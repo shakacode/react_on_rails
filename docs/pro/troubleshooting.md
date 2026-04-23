@@ -97,5 +97,4 @@ For issues related to upgrading from GitHub Packages to public distribution, see
 **Fixes**:
 
 - Check that client-side JavaScript bundles are loaded (no 404s in browser console)
-- Verify `immediate_hydration` option — set to `true` for immediate hydration
 - Ensure client components have the `'use client'` directive

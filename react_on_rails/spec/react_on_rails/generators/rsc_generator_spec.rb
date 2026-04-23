@@ -663,6 +663,80 @@ describe RscGenerator, type: :generator do
         end
       end
     end
+
+    # Rspack RSC compatibility — verifies that the generated RSC config uses
+    # bundler-agnostic patterns that work with both webpack and Rspack runtimes.
+    # Some assertions below overlap with the "RSC webpack config transforms" block
+    # above but use more specific matchers (e.g. verifying the `false` value, not
+    # just the key name). The duplication is intentional.
+    # See: https://github.com/shakacode/react_on_rails/issues/1828
+
+    describe "Rspack RSC runtime compatibility" do
+      it "rscWebpackConfig.js uses react-server conditionNames for module resolution" do
+        assert_file "config/rspack/rscWebpackConfig.js" do |content|
+          expect(content).to include("conditionNames")
+          expect(content).to include("react-server")
+        end
+      end
+
+      it "rscWebpackConfig.js aliases react-dom/server to false for RSC bundle" do
+        assert_file "config/rspack/rscWebpackConfig.js" do |content|
+          expect(content).to include("'react-dom/server': false")
+        end
+      end
+
+      it "rscWebpackConfig.js adds RSC WebpackLoader to the loader chain" do
+        assert_file "config/rspack/rscWebpackConfig.js" do |content|
+          expect(content).to include("react-on-rails-rsc/WebpackLoader")
+        end
+      end
+
+      it "rscWebpackConfig.js passes true to skip RSCWebpackPlugin in RSC bundle" do
+        assert_file "config/rspack/rscWebpackConfig.js" do |content|
+          expect(content).to include("serverWebpackConfig(true)")
+          expect(content).not_to match(/new\s+RSCWebpackPlugin/)
+        end
+      end
+
+      it "rscWebpackConfig.js renames entry to rsc-bundle" do
+        assert_file "config/rspack/rscWebpackConfig.js" do |content|
+          expect(content).to include("'rsc-bundle'")
+          expect(content).to include("rsc-bundle.js")
+        end
+      end
+
+      it "rscWebpackConfig.js contains conditional loader-chain handling for function-based and array-based rule.use" do
+        assert_file "config/rspack/rscWebpackConfig.js" do |content|
+          # Must handle both loader styles since Rspack projects often use SWC
+          expect(content).to include("typeof rule.use === 'function'")
+          expect(content).to include("Array.isArray(rule.use)")
+        end
+      end
+
+      it "serverWebpackConfig.js (from Pro generator) uses bundler-agnostic LimitChunkCountPlugin" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          # This content comes from the Pro generator, not the RSC generator.
+          # Verified here to ensure the full Rspack server config is bundler-agnostic.
+          expect(content).to include("bundler.optimize.LimitChunkCountPlugin")
+        end
+      end
+
+      it "serverWebpackConfig.js conditionally skips RSCWebpackPlugin when rscBundle is true" do
+        assert_file "config/rspack/serverWebpackConfig.js" do |content|
+          expect(content).to include("if (!rscBundle)")
+          expect(content).to include("RSCWebpackPlugin({ isServer: true })")
+        end
+      end
+
+      it "ServerClientOrBoth.js includes RSC_BUNDLE_ONLY env var handling for isolated RSC builds" do
+        assert_file "config/rspack/ServerClientOrBoth.js" do |content|
+          expect(content).to include("process.env.RSC_BUNDLE_ONLY")
+          expect(content).to include("rscConfig")
+          # Verify three-bundle default (client + server + RSC)
+          expect(content).to include("[clientConfig, serverConfig, rscConfig]")
+        end
+      end
+    end
   end
 
   # Rspack + legacy Pro variant — same as the legacy webpack exports context below,

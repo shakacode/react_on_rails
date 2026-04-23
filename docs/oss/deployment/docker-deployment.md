@@ -411,7 +411,7 @@ containers:
 
   - name: node-renderer
     image: your-registry/myapp-node-renderer:latest # must include Node.js
-    command: ['node', 'node-renderer.js']
+    command: ['node', 'renderer/node-renderer.js']
     ports:
       - containerPort: 3800
     env:

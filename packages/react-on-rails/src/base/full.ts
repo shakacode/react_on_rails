@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use `capabilities/ssr.ts` instead. This file is kept for backward compatibility
+ * with older versions of react-on-rails-pro that import from `react-on-rails/@internal/base/full`.
+ */
+
 import { createBaseClientObject, type BaseClientObjectType } from './client.ts';
 import type { ReactOnRailsInternal, RenderParams, RenderResult, ErrorOptions } from '../types/index.ts';
 import handleError from '../handleError.ts';
