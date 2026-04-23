@@ -117,6 +117,12 @@ Use this page together with the specific migration guide that matches your curre
 1. [Migrate from `react-rails`](./migrating-from-react-rails.md)
 2. [Migrate from `vite_rails`](./migrating-from-vite-rails.md)
 
-Other migration paths (Webpack → Rspack, Babel → SWC, Rails 5 API-only, AngularJS, RSC) live in the **Migration Guides** sidebar.
+Other migration paths live in the **Migration Guides** sidebar:
+
+- [Webpack → Rspack](./migrating-from-webpack-to-rspack.md)
+- [Babel → SWC](./babel-to-swc-migration.md)
+- [Rails 5 API-only](./convert-rails-5-api-only-app.md)
+- [AngularJS](./angular-js-integration-migration.md)
+- [RSC](./migrating-to-rsc.md)
 
 The migration guides explain the mechanics. This page shows what those mechanics look like in real repos.
