@@ -6,6 +6,9 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 // - deployment/troubleshooting-when-using-webpacker
 // - misc/asset-pipeline
 //
+// URL-compatibility stubs (redirect to a current, live page):
+// - pro/home-pro (→ pro/react-on-rails-pro)
+//
 // Contributing/Resources pages (linked from introduction.md instead of sidebar):
 // - misc/doctrine
 // - misc/style
@@ -172,6 +175,7 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Migration Guides',
           items: [
+            'migrating/example-migrations',
             'migrating/migrating-from-react-rails',
             'migrating/migrating-from-vite-rails',
             'migrating/migrating-from-webpack-to-rspack',
@@ -201,6 +205,7 @@ const sidebars: SidebarsConfig = {
           link: { type: 'doc', id: 'pro/react-server-components/index' },
           items: [
             'pro/react-server-components/purpose-and-benefits',
+            'pro/react-server-components/success-stories',
             'pro/react-server-components/how-react-server-components-work',
             'pro/react-server-components/rendering-flow',
             'pro/react-server-components/tutorial',
@@ -211,6 +216,7 @@ const sidebars: SidebarsConfig = {
             'pro/react-server-components/selective-hydration-in-streamed-components',
             'pro/react-server-components/flight-protocol-syntax',
             'pro/react-server-components/upgrading-existing-pro-app',
+            'pro/react-server-components/rspack-compatibility',
             'pro/react-server-components/glossary',
             {
               type: 'category',

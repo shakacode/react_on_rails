@@ -158,14 +158,14 @@ yarn install
 **Pro-exclusive features** (React Server Components, async loading):
 
 ```diff
-- import { RSCRoute } from 'react-on-rails/RSCRoute';
-+ import { RSCRoute } from 'react-on-rails-pro/RSCRoute';
+- import RSCRoute from 'react-on-rails/RSCRoute';
++ import RSCRoute from 'react-on-rails-pro/RSCRoute';
 
 - import registerServerComponent from 'react-on-rails/registerServerComponent/client';
 + import registerServerComponent from 'react-on-rails-pro/registerServerComponent/client';
 
-- import { wrapServerComponentRenderer } from 'react-on-rails/wrapServerComponentRenderer/client';
-+ import { wrapServerComponentRenderer } from 'react-on-rails-pro/wrapServerComponentRenderer/client';
+- import wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client';
++ import wrapServerComponentRenderer from 'react-on-rails-pro/wrapServerComponentRenderer/client';
 ```
 
 **Node renderer configuration file:**

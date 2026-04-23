@@ -34,7 +34,8 @@ available default ENV values if you wire them into your own launch script.
 1. **gracefulWorkerRestartTimeout**: (default: `env.GRACEFUL_WORKER_RESTART_TIMEOUT`) - Time in seconds that the master waits for a worker to gracefully restart (after serving all active requests) before killing it. Use this when you want to avoid situations where a worker gets stuck in an infinite loop and never restarts. This config is only usable if worker restart is enabled. The timeout starts when the worker should restart; if it elapses without a restart, the worker is killed.
 1. **maxDebugSnippetLength** (default: 1000) - If the rendering request is longer than this, it will be truncated in exception and logging messages.
 1. **supportModules** - (default: `env.RENDERER_SUPPORT_MODULES || null`) - If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS global objects and functions that get added to the VM context:
-   `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
+   `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, performance, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
+   `performance` is included so React 19's development build can call `performance.now()` from `React.lazy` without throwing `ReferenceError: performance is not defined`.
    This option is required to equal `true` if you want to use loadable components.
    Setting this value to false causes the NodeRenderer to behave like ExecJS.
    See also `stubTimers`.
@@ -45,6 +46,7 @@ available default ENV values if you wire them into your own launch script.
    This is useful when using dependencies like [react-virtuoso](https://github.com/petyosi/react-virtuoso) that use these functions during hydration.
    In RORP, hydration typically is synchronous and single-task (unless you use streaming) and thus callbacks passed to task-scheduling functions should never run during server-side rendering.
    Because these functions are valid client-side, they are ignored on server-side rendering without errors or warnings.
+   Note that `performance` (exposed when `supportModules: true`) is the host's real `performance` object and is **not** stubbed by `stubTimers`; if rendered output embeds `performance.now()` values (e.g., dev-only timing annotations) they will vary between renders. Override via `additionalContext` (e.g., `{ performance: { now: () => 0 } }`) if strict SSR determinism is required.
    See also `supportModules`.
 
 Deprecated options:
@@ -59,12 +61,12 @@ Deprecated options:
 ### Testing example:
 
 The repository's dummy app keeps a full integration-test launcher at
-`react_on_rails_pro/spec/dummy/client/node-renderer.js`.
+`react_on_rails_pro/spec/dummy/renderer/node-renderer.js`.
 
 ### Simple example:
 
-Create a file `client/node-renderer.js`. The generator uses this filename and CommonJS syntax so
-the file runs directly with `node client/node-renderer.js` without extra ESM configuration.
+Create a file `renderer/node-renderer.js`. The generator uses this filename and CommonJS syntax so
+the file runs directly with `node renderer/node-renderer.js` without extra ESM configuration.
 
 ```js
 const path = require('path');
@@ -95,7 +97,7 @@ And add a root-level script to the `scripts` section of your `package.json`
 
 ```json
   "scripts": {
-    "node-renderer": "node client/node-renderer.js"
+    "node-renderer": "node renderer/node-renderer.js"
   },
 ```
 
@@ -114,7 +116,7 @@ For advanced use cases, you can customize the Fastify server instance by importi
 When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
 
 The advanced examples below use ES modules for readability. If you want this file to keep running
-as `node client/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
+as `node renderer/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
 example above or switch the file to `.mjs` or `"type": "module"`.
 
 ```js

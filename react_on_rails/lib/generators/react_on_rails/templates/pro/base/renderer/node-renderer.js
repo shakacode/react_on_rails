@@ -6,6 +6,7 @@ const configuredWorkersCount =
   parseWorkersCount(env.RENDERER_WORKERS_COUNT) ?? parseWorkersCount(env.NODE_RENDERER_CONCURRENCY);
 
 const config = {
+  // Resolves to <project-root>/.node-renderer-bundles (one level up from renderer/).
   serverBundleCachePath: path.resolve(__dirname, '../.node-renderer-bundles'),
   port: Number(env.RENDERER_PORT) || 3800,
   logLevel: env.RENDERER_LOG_LEVEL || 'info',

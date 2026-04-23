@@ -2,6 +2,10 @@
 
 This guide is for Rails apps that currently use `vite_rails` with React and want to move to React on Rails.
 
+If you want repo-shaped references before touching your own app, start with
+[Example Migrations](./example-migrations.md) and then come back here for the
+mechanics.
+
 ## When this migration makes sense
 
 React on Rails is a better fit when you want one or more of these:
@@ -37,6 +41,12 @@ Expect this migration to touch both Ruby and JavaScript entrypoints.
 Do the migration in a branch and keep the Vite setup working until the new React on Rails path is rendering the same screens.
 
 For anything beyond a tiny app, prefer a route-by-route cutover instead of a big-bang rewrite.
+
+If the app uses `vite_rails` plus a custom Rails-side React wrapper, the first credible PR may be maintainability-first rather than a full Vite removal. In that case:
+
+1. Replace one helper-backed component or boundary with React on Rails first.
+2. Keep Vite in place for the rest of the app until the narrow slice has parity.
+3. Treat Vite removal as a later step, not as the proof point itself.
 
 ## 1. Add React on Rails and Shakapacker
 
@@ -180,3 +190,5 @@ one reasonable React on Rails target is:
 - Turbo usage, if your app already uses it
 
 The migration is mostly about asset/build integration, mounting strategy, and optional SSR capability.
+
+For additional real-world migration references and active public PRs, see [Example Migrations](./example-migrations.md).

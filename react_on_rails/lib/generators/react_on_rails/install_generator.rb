@@ -57,21 +57,13 @@ module ReactOnRails
       class_option :pro,
                    type: :boolean,
                    default: false,
-                   desc: "Install React on Rails Pro with Node Renderer. " \
-                         "Combined with --rsc, uses --rsc-pro mode. Default: false"
+                   desc: "Install React on Rails Pro with Node Renderer. Default: false"
 
       # --rsc
       class_option :rsc,
                    type: :boolean,
                    default: false,
-                   desc: "Install React Server Components support (includes Pro). " \
-                         "Combined with --pro, uses --rsc-pro mode. Default: false"
-
-      # --rsc-pro
-      class_option :rsc_pro,
-                   type: :boolean,
-                   default: false,
-                   desc: "Install first-class Pro RSC mode with matched Pro/RSC defaults. Default: false"
+                   desc: "Install React Server Components support (includes Pro). Default: false"
 
       # Hidden option: allows tests (and advanced users) to signal that Shakapacker
       # was just installed, triggering force-overwrite of shakapacker.yml with RoR's template.
@@ -163,6 +155,8 @@ module ReactOnRails
 
         if installation_prerequisites_met? || options.ignore_warnings?
           invoke_generators
+          add_package_json_scripts
+          add_ci_workflow
           add_bin_scripts
           add_post_install_message
         else
@@ -249,6 +243,156 @@ module ReactOnRails
         end
 
         setup_js_dependencies
+      end
+
+      def add_ci_workflow
+        return if options[:pretend]
+
+        ci_path = ".github/workflows/ci.yml"
+        # Generators may run non-interactively (CI, scripts), so we never want Thor's
+        # `template` to prompt on conflict. Treat any existing workflow as "skip" by
+        # default; users who want to overwrite must pass --force explicitly. --skip
+        # falls into the same path because the desired outcome is identical.
+        if File.exist?(File.join(destination_root, ci_path)) && !options[:force]
+          say_status :skip, "#{ci_path} already exists (pass --force to overwrite)", :yellow
+          return
+        end
+
+        package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
+        # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
+        # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
+        has_lockfile = GeneratorMessages.lockfile_for_manager?(package_manager, app_root: destination_root)
+        has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
+        has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||
+                    File.exist?(File.join(destination_root, "spec/spec_helper.rb"))
+        template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
+                 { package_manager: package_manager, has_lockfile: has_lockfile,
+                   has_active_record: has_active_record, has_rspec: has_rspec })
+        @ci_workflow_generated = true
+      end
+
+      # NODE_ENV=production ensures Shakapacker emits a minified production bundle;
+      # without it the default is "development" which produces an unminified dev bundle
+      # and is almost never what `npm run build` is expected to do.
+      DEFAULT_PACKAGE_JSON_SCRIPTS = {
+        "build" => "NODE_ENV=production bin/shakapacker",
+        "build:test" => "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
+      }.freeze
+      private_constant :DEFAULT_PACKAGE_JSON_SCRIPTS
+
+      def add_package_json_scripts
+        return if options[:pretend]
+
+        package_json_path = File.join(destination_root, "package.json")
+        return unless File.exist?(package_json_path)
+
+        original_text = File.read(package_json_path)
+        existing_scripts = JSON.parse(original_text)["scripts"] || {}
+        scripts_to_add = DEFAULT_PACKAGE_JSON_SCRIPTS.reject { |key, _| existing_scripts.key?(key) }
+
+        if scripts_to_add.empty?
+          say_status :skip, "build scripts already present in package.json", :yellow
+          return
+        end
+
+        updated_text = inject_scripts_into_package_json(original_text, scripts_to_add, existing_scripts)
+        File.write(package_json_path, updated_text)
+        say_status :append, "📝 Added build scripts (#{scripts_to_add.keys.join(', ')}) to package.json", :yellow
+      rescue JSON::ParserError => e
+        GeneratorMessages.add_warning("⚠️  Could not parse package.json to add scripts: #{e.message}")
+      rescue Errno::EACCES, Errno::ENOENT => e
+        GeneratorMessages.add_warning("⚠️  Failed to add build scripts to package.json: #{e.message}")
+      end
+
+      # Inserts new entries into the existing "scripts" object without rewriting the rest of
+      # package.json, so Prettier-formatted files only see the added lines in the diff.
+      # Falls back to a structured rewrite when the "scripts" key is absent or when the
+      # scripts object can't be located unambiguously (e.g. malformed JSON).
+      #
+      # Relies on the JSON invariant that `"scripts": {` cannot appear unescaped inside a
+      # preceding string value — in valid JSON the `"` characters are escaped as `\"`, so
+      # the regex can never falsely match a substring nested in a string literal.
+      def inject_scripts_into_package_json(original_text, scripts_to_add, existing_scripts)
+        opener = original_text.match(/"scripts"\s*:\s*\{/m)
+        return rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts) unless opener
+
+        inner_start = opener.end(0)
+        inner_end = find_matching_brace(original_text, inner_start)
+        return rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts) unless inner_end
+
+        inner = original_text[inner_start...inner_end]
+        # Detect the indent of the "scripts" key wherever it appears (any object position),
+        # not only when it's the first key. Defaults to two spaces so the closing `}` of the
+        # rebuilt scripts block lines up under "scripts" instead of being emitted at column 0.
+        object_indent = original_text[/\n([ \t]*)"scripts"/, 1] || "  "
+        entry_indent = inner[/\n([ \t]+)"/, 1] || "#{object_indent}  "
+        new_entries = scripts_to_add.map { |key, value| %(#{entry_indent}#{key.to_json}: #{value.to_json}) }
+
+        rebuilt_inner =
+          if existing_scripts.any?
+            trimmed = inner.sub(/\s*\z/, "")
+            separator = trimmed.end_with?(",") ? "" : ","
+            "#{trimmed}#{separator}\n#{new_entries.join(",\n")}\n#{object_indent}"
+          else
+            "\n#{new_entries.join(",\n")}\n#{object_indent}"
+          end
+
+        "#{original_text[0...opener.begin(0)]}\"scripts\": {#{rebuilt_inner}}#{original_text[(inner_end + 1)..]}"
+      end
+
+      # Returns the index of the `}` that closes the `{` whose body starts at `start`,
+      # or nil if the object is unterminated. Tracks brace depth while stepping through
+      # JSON string literals so `}` characters inside script values (e.g.
+      # "lint": "eslint '{src,test}/**/*.js'") do not match a non-matching brace.
+      def find_matching_brace(text, start)
+        depth = 1
+        i = start
+        while i < text.length
+          case text[i]
+          when '"'
+            i = skip_json_string(text, i)
+            return nil unless i
+          when "{"
+            depth += 1
+            i += 1
+          when "}"
+            depth -= 1
+            return i if depth.zero?
+
+            i += 1
+          else
+            i += 1
+          end
+        end
+        nil
+      end
+
+      # Given an index pointing at the opening `"` of a JSON string, returns the index
+      # just past the closing `"`. Honours `\"` and `\\` escapes. Returns nil if the
+      # string is unterminated.
+      def skip_json_string(text, start)
+        i = start + 1
+        while i < text.length
+          case text[i]
+          when "\\"
+            i += 2
+          when '"'
+            return i + 1
+          else
+            i += 1
+          end
+        end
+        nil
+      end
+
+      # Used only when the "scripts" key is missing entirely or the regex can't locate it.
+      # This path does reformat the whole file, but it's rare — a Rails package.json with
+      # no scripts key at all is unusual.
+      def rewrite_package_json_with_scripts(original_text, scripts_to_add, existing_scripts)
+        content = JSON.parse(original_text)
+        content["scripts"] = existing_scripts.merge(scripts_to_add)
+        indent = original_text[/\A\{\n(\s+)/, 1] || "  "
+        "#{JSON.pretty_generate(content, indent: indent)}\n"
       end
 
       def ensure_jsx_in_js_compatibility
@@ -409,7 +553,8 @@ module ReactOnRails
           return
         end
 
-        # Make these and only these files executable
+        # Make these and only these files executable. Use destination_root so
+        # chmod remains correct even if an earlier generator step changed Dir.pwd.
         files_to_become_executable = bin_scripts_to_chmod(template_bin_path)
         File.chmod(0o755, *files_to_become_executable)
       end
@@ -444,7 +589,7 @@ module ReactOnRails
       def bin_scripts_to_chmod(template_bin_path)
         files = Dir.children(template_bin_path).reject { |filename| filename == "dev" }
         files << "dev" unless preserve_existing_bin_dev?
-        files.map { |filename| "bin/#{filename}" }
+        files.map { |filename| File.join(destination_root, "bin/#{filename}") }
       end
 
       def default_bin_dev_route
@@ -487,9 +632,11 @@ module ReactOnRails
                                      pro: use_pro?,
                                      rsc: use_rsc?,
                                      shakapacker_just_installed: shakapacker_just_installed?,
-                                     landing_page: options.new_app? && new_app_root_route_available?
+                                     landing_page: options.new_app? && new_app_root_route_available?,
+                                     ci_workflow_generated: @ci_workflow_generated == true,
+                                     app_root: destination_root
                                    ))
-        GeneratorMessages.add_info(rsc_pro_verification_message) if use_rsc_pro_mode?
+        GeneratorMessages.add_info(rsc_verification_message) if use_rsc?
       end
 
       def shakapacker_setup_incomplete?
@@ -503,9 +650,7 @@ module ReactOnRails
         flags << "--typescript" if options.typescript?
         flags << "--rspack" if options.rspack?
 
-        if use_rsc_pro_mode?
-          flags << "--rsc-pro"
-        elsif options.rsc?
+        if options.rsc?
           flags << "--rsc"
         elsif options.pro?
           flags << "--pro"
@@ -514,7 +659,7 @@ module ReactOnRails
         ["rails generate react_on_rails:install", *flags].join(" ")
       end
 
-      def rsc_pro_verification_message
+      def rsc_verification_message
         <<~MSG
 
           🔎 RSC Pro Verification:
@@ -543,7 +688,7 @@ module ReactOnRails
       end
 
       def incomplete_installation_message
-        package_install_step = "#{GeneratorMessages.detect_package_manager} install"
+        package_install_step = "#{GeneratorMessages.detect_package_manager(app_root: destination_root)} install"
 
         <<~MSG
 

@@ -15,6 +15,15 @@ React Server Components offer significant performance benefits when used correct
 - Improvements in Google Speed Index and Total Blocking Time
 - Server-only dependencies (date-fns, marked, sanitize-html) never ship to the client
 
+Real-world results from teams that have adopted server-first rendering (RSC in production, plus DoorDash's pre-RSC SSR baseline):
+
+- **Frigade** — 62% reduction in client-side bundle size ([source](../../pro/react-server-components/success-stories.md#frigade--62-smaller-client-bundle))
+- **BlogHunch** — 30% server cost reduction ([source](../../pro/react-server-components/success-stories.md#bloghunch--30-lower-server-costs-in-one-month))
+- **Mux** — incremental migration of ~50,000 lines to RSC ([source](../../pro/react-server-components/success-stories.md#mux--migrating-50000-lines-of-react-to-rsc))
+- **DoorDash** — 65% LCP improvement (Next.js SSR baseline, pre-RSC) ([source](../../pro/react-server-components/success-stories.md#doordash--core-web-vitals-transformation-ssr-baseline-pre-rsc))
+
+Full case studies with context and caveats: [Migration Success Stories](../../pro/react-server-components/success-stories.md).
+
 However, these benefits require intentional architecture changes. Simply adding `'use client'` everywhere preserves the status quo -- `'use client'` is a [boundary marker, not a component annotation](rsc-component-patterns.md#use-client-marks-a-boundary-not-a-component-type). The guides below walk you through the restructuring needed to capture real gains.
 
 ## Article Series
@@ -106,11 +115,11 @@ Before diving into the React patterns, understand how RSC maps to React on Rails
 
 **Three API changes per component.** Each component you migrate touches three layers:
 
-| Layer           | Before                               | After                                                         |
-| --------------- | ------------------------------------ | ------------------------------------------------------------- |
-| ERB view helper | `react_component("Product", ...)`    | `stream_react_component("Product", ...)`                      |
-| JS registration | `ReactOnRails.register({ Product })` | `registerServerComponent({ Product })` (in all three bundles) |
-| Controller      | Standard Rails controller            | Add `include ReactOnRailsPro::Stream`                         |
+| Layer           | Before                               | After                                                                                                                                                                                               |
+| --------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ERB view helper | `react_component("Product", ...)`    | `stream_react_component("Product", ...)`                                                                                                                                                            |
+| JS registration | `ReactOnRails.register({ Product })` | `registerServerComponent` (signature varies per bundle — see [details](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#the-two-registerservercomponent-signatures)) |
+| Controller      | Standard Rails controller            | Add `include ReactOnRailsPro::Stream`                                                                                                                                                               |
 
 **Three webpack bundles.** RSC requires separate client, server, and RSC bundles. The `registerServerComponent` API behaves differently in each:
 
@@ -189,3 +198,4 @@ These mistakes account for the majority of setup failures:
 - [React `'use client'` directive](https://react.dev/reference/rsc/use-client)
 - [React on Rails Pro RSC tutorial](../../pro/react-server-components/tutorial.md)
 - [React on Rails Pro RSC purpose and benefits](../../pro/react-server-components/purpose-and-benefits.md)
+- [RSC migration success stories](../../pro/react-server-components/success-stories.md)

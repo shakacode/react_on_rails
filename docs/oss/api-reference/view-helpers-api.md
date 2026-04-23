@@ -25,7 +25,11 @@ Uncommonly used options:
 ```
 
 - **component_name:** Can be a React component, created using a React Function Component, an ES6 class or a Render-Function that returns a React component (or, only on the server side, an object with shape `{ renderedHtml, clientProps?, redirectLocation?, routeError? }`), or a "renderer function" that manually renders a React component to the DOM (client-side only). Note, a "renderer function" is a special type of "Render-Function." A "renderer function" takes a 3rd param of a DOM ID.
-  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described [here](../configuration/README.md).
+
+  > If your render function returns a hash with multiple HTML strings (e.g., `{ renderedHtml: { componentHtml, title, metaTags } }`), `react_component` raises a `ReactOnRails::Error` telling you to use [`react_component_hash`](#react_component_hash) instead. `react_component` is for rendering a single HTML result; `react_component_hash` is for rendering multiple HTML strings to place in different parts of the page.
+
+  All options except `props, id, html_options` will inherit from your `react_on_rails.rb` initializer, as described in the [configuration documentation](../configuration/README.md).
+
 - **general options:**
   - **props:** Ruby Hash which contains the properties to pass to the React object, or a JSON string. If you pass a string, we'll escape it for you.
   - **prerender:** enable server-side rendering of a component. Set to false when debugging!
@@ -39,7 +43,7 @@ Uncommonly used options:
 - **options if prerender (server rendering) is true:**
   - **replay_console:** Default is true. False will disable echoing server-rendering logs to the browser. While this can make troubleshooting server rendering difficult, so long as you have the configuration of `logging_on_server` set to true, you'll still see the errors on the server.
   - **logging_on_server:** Default is true. True will log JS console messages and errors to the server.
-  - **raise_on_prerender_error:** Default is false. True will throw an error on the server side rendering. Your controller will have to handle the error.
+  - **raise_on_prerender_error:** Default is `Rails.env.development?` (true in development, false in production). True will throw an error on server-side rendering. Your controller will have to handle the error.
   - **`clientProps` merge behavior:** If a prerender result includes `clientProps`, React on Rails merges them into the generated client hydration props payload (`props.merge(clientProps)`). The original `props:` value must be a Ruby Hash or a JSON string representing an object.
 
 ---
@@ -49,12 +53,14 @@ Uncommonly used options:
 > **React 19 Alternative:** For metadata use cases (page titles, meta tags, canonical URLs), consider using [React 19 Native Metadata](../building-features/react-19-native-metadata.md) with `react_component` or `stream_react_component` instead. React 19 natively hoists `<title>`, `<meta>`, and `<link>` tags to `<head>`, eliminating the need for a render-function and `react_component_hash`. See the [migration guide](../building-features/react-19-native-metadata.md#migration-guide) for step-by-step instructions.
 
 `react_component_hash` is used to return multiple HTML strings for server rendering, such as for
-adding meta-tags to a page. It is exactly like react_component except for the following:
+adding meta-tags to a page. It is exactly like `react_component` except for the following:
 
-1. `prerender: true` is automatically added to options, as this method doesn't make sense for
-   client only rendering.
-2. Your JavaScript Render-Function for server rendering must return an Object rather than a React Component.
-3. Your view code must expect an object and not a string.
+1. **`prerender: true` is forced**, not defaulted. This helper always prerenders on the server — passing `prerender: false` has no effect. Client-only rendering is incompatible with the "return multiple HTML strings" use case, so the option cannot be disabled.
+2. Your JavaScript Render-Function for server rendering must return an Object rather than a React Component. The object must have shape `{ renderedHtml: { componentHtml, ...otherKeys } }`, where:
+   - **`componentHtml` is mandatory.** Missing it raises `ReactOnRails::Error` with a message pointing to this requirement. This key contains the main server-rendered HTML that gets placed where the helper is called.
+   - All other keys are optional and are returned to your view as `html_safe` strings, ready to be inserted anywhere in the layout (meta tags in `<head>`, sidebars, etc.).
+3. Your view code must expect an object and not a string. Access keys with `react_component_hash_result["componentHtml"]`, `["title"]`, etc.
+4. If the render function returns a string instead of an object, the helper raises an error telling you to return a render function that produces a hash.
 
 Here is an example of ERB view code:
 
@@ -93,13 +99,12 @@ You can call `rails_context` or `rails_context(server_side: true|false)` from yo
 
 ### Renderer Functions (function that will call ReactDOM.render or ReactDOM.hydrate)
 
-A "renderer function" is a Render-Function that accepts three arguments (rather than 2): `(props, railsContext, domNodeId) => { ... }`. Instead of returning a React component, a renderer is responsible for installing a callback that will call `ReactDOM.render` (in React 16+, `ReactDOM.hydrate`) to render a React component into the DOM. The "renderer function" is called at the same time the document ready event would instantiate the React components into the DOM.
+A **renderer function** is a Render-Function that declares **three** parameters: `(props, railsContext, domNodeId) => { ... }`. React on Rails detects renderer functions purely by parameter count (`Function.length === 3`) — the names don't matter. Instead of returning a React component, a renderer function is responsible for mounting the React tree itself by calling `ReactDOM.hydrateRoot` (for SSR'd HTML) or `ReactDOM.createRoot(...).render(...)` (for empty containers) against the DOM node identified by `domNodeId`. The renderer function is invoked at the point where React on Rails would normally mount the component automatically.
 
-Why would you want to call `ReactDOM.hydrate` yourself? One possible use case is code splitting. In a nutshell, you don't want to load the React component on the DOM node yet. So you want to install some handler that will call `ReactDOM.hydrate` at a later time. In the case of code splitting with server rendering, the server-rendered code has any async code loaded and used to server render. Thus, the client code must also fully load any async code before server rendering. Otherwise, the client code would first render partially, not matching the server rendering, and then a second later, the full code would render, resulting in an unpleasant flashing on the screen.
+Why would you want to take over mounting yourself? One use case is code splitting: you may want to defer mounting a component until its code chunk has loaded, or until the container scrolls into view, instead of mounting it eagerly on page load. For modern code splitting with server-side rendering, see the [React on Rails Pro loadable-components guide](../building-features/code-splitting.md).
 
-For modern code splitting with server-side rendering, see the [React on Rails Pro loadable-components guide](../building-features/code-splitting.md).
-
-Renderer functions are not meant to be used on the server since there's no DOM on the server. Instead, use a Render-Function. Attempting to server render with a renderer function will throw an error.
+> [!IMPORTANT]
+> **Renderer functions are strictly client-only.** There is no DOM on the server, so a renderer function cannot produce SSR output. React on Rails detects renderer functions at registration time and will throw a descriptive error like `Detected a renderer while server rendering component 'X'. See https://reactonrails.com/docs/core-concepts/render-functions for more information.` if you attempt to use one with `react_component(... prerender: true)`, `react_component_hash` (which forces prerendering), or `stream_react_component` (which is server-streaming only). For rendering that needs to run on the server, use a regular render function instead.
 
 ---
 
@@ -156,6 +161,9 @@ Progressive server-side rendering using React 18+ streaming with `renderToPipeab
 - Better perceived performance
 
 See the [Streaming Server Rendering guide](../building-features/streaming-server-rendering.md) for usage details.
+
+> [!IMPORTANT]
+> `stream_react_component` always forces `prerender: true` — passing `prerender: false` has no effect. It only supports React components and render functions that return React components; render functions returning a `{ renderedHtml }` hash are incompatible (see [compatibility matrix](../core-concepts/render-functions.md#compatibility-matrix-component-types-and-ruby-helpers)).
 
 ### rsc_payload_react_component
 

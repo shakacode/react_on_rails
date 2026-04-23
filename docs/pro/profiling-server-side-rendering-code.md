@@ -28,7 +28,7 @@ installed. On macOS, you can install it with `brew install overmind`.
 
    ```bash
    cd react_on_rails_pro/spec/dummy
-   RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect client/node-renderer.js
+   RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect renderer/node-renderer.js
    ```
 
    Keep this terminal open while you profile. If your app usually starts the renderer through a

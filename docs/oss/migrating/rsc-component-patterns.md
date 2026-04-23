@@ -47,7 +47,7 @@ Choose one registered component to migrate. The ideal first candidate is a compo
 
 **Step 2: Update the registration.** When a component loses its `'use client'` directive, its registration must change:
 
-- **With `auto_load_bundle`:** This happens automatically. The generated pack switches from `ReactOnRails.register` to `registerServerComponent` based on whether the file has `'use client'`.
+- **With `auto_load_bundle`:** This happens automatically. The generated pack switches from `ReactOnRails.register` to `registerServerComponent` based on whether the file has `'use client'`. For the full details on how auto-bundling classifies and registers RSC components, see [Auto-Bundling with React Server Components](../core-concepts/auto-bundling-file-system-based-automated-bundle-generation.md#auto-bundling-with-react-server-components).
 - **With manual registration:** The `registerServerComponent` API uses different import paths per bundle (`/server` vs `/client`). How you update registration depends on your current setup:
 
   **If you have a single bundle file** (e.g., `server-bundle.js` that imports and registers all components):

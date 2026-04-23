@@ -8,18 +8,11 @@ For current configuration options, see [Configuration](README.md).
 
 ### immediate_hydration
 
-**Status:** ⚠️ REMOVED in v17.0
+**Status:** ⚠️ REMOVED in v16.6.0
 
-This configuration option has been removed. Immediate hydration is now automatically enabled for Pro users and disabled for non-Pro users.
+This configuration option has been removed. React on Rails Pro now performs early hydration automatically for streamed components; there is no per-component toggle. Non-Pro users are not affected.
 
-**Migration:** Remove any `config.immediate_hydration` lines from your configuration. Use per-component overrides if needed:
-
-```ruby
-# Pro users can disable for specific components:
-react_component("MyComponent", immediate_hydration: false)
-
-# Non-Pro users: immediate_hydration is ignored
-```
+**Migration:** Remove any `config.immediate_hydration` lines from your configuration and any `immediate_hydration:` keys passed to `react_component` / `stream_react_component` — both are no-ops and can be safely deleted.
 
 See [CHANGELOG.md](https://github.com/shakacode/react_on_rails/blob/main/CHANGELOG.md) for details.
 

@@ -18,7 +18,7 @@ pnpm add react-on-rails-pro-node-renderer
 
 ### 1. Create the Node Renderer entry file
 
-Create `node-renderer.js` in your project root:
+Create `renderer/node-renderer.js` in your project root:
 
 ```js
 const path = require('path');
@@ -72,13 +72,13 @@ libraryTarget: 'commonjs2',
 ### 4. Start the renderer
 
 ```bash
-node node-renderer.js
+node renderer/node-renderer.js
 ```
 
 Or add to your `Procfile.dev`:
 
 ```text
-node-renderer: node node-renderer.js
+node-renderer: node renderer/node-renderer.js
 ```
 
 ## Generator (Recommended)

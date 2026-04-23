@@ -116,10 +116,11 @@ const configureServer = () => {
     }
   });
 
-  // eval works well for the SSR bundle because it's the fastest and shows
-  // lines in the server bundle which is good for debugging SSR
-  // The default of cheap-module-source-map is slow and provides poor info.
-  serverWebpackConfig.devtool = 'eval';
+  // Avoid the webpack eval devtool, which triggers a webpack 5.106+ regression
+  // with ESM default exports (ReferenceError: __WEBPACK_DEFAULT_EXPORT__ is not defined).
+  // In development, cheap-module-source-map provides original line numbers in SSR error traces.
+  // In production, devtool is disabled to avoid generating .map files.
+  serverWebpackConfig.devtool = process.env.NODE_ENV === 'production' ? false : 'cheap-module-source-map';
 
   // If using the default 'web', then libraries like Emotion and loadable-components
   // break with SSR. The fix is to use a node renderer and change the target.

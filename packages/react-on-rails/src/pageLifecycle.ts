@@ -67,20 +67,33 @@ function initializePageEventListeners(): void {
   }
   isPageLifecycleInitialized = true;
 
-  // Important: replacing this condition with `document.readyState !== 'loading'` is not valid
-  // As the core ReactOnRails needs to ensure that all component bundles are loaded and executed before hydrating them
-  // If the `document.readyState === 'interactive'`, it doesn't guarantee that deferred scripts are executed
-  // the `readyState` can be `'interactive'` while the deferred scripts are still being executed
-  // Which will lead to the error `"Could not find component registered with name <component name>"`
-  // It will happen if this line is reached before the component chunk is executed on browser and reached the line
-  // ReactOnRails.register({ Component });
-  // ReactOnRailsPro is resellient against that type of race conditions, but it won't wait for that state anyway
-  // As it immediately hydrates the components at the page as soon as its html and bundle is loaded on the browser
-  // See pageLifecycle.test.js for unit tests validating this logic
+  // Important: replacing this condition with `document.readyState !== 'loading'` is not valid for
+  // the core page-load sweep. During `interactive`, deferred/module scripts may still be executing,
+  // and a component chunk may not yet have reached `ReactOnRails.register({ Component })`.
+  // Starting hydration too early can trigger "Could not find component registered" errors.
+  //
+  // However, async or dynamically-injected scripts can start after DOMContentLoaded has already fired
+  // while the document is still `interactive`. In that case, waiting only for DOMContentLoaded can miss
+  // initialization entirely, so we recover on the later `complete` transition.
+  //
+  // ReactOnRailsPro's early hydration path is more resilient to the registration race because it can
+  // hydrate components as their HTML and bundles arrive, but this page lifecycle still powers the
+  // fallback page-load sweep. See pageLifecycle.test.js for regression coverage of both cases.
   if (document.readyState === 'complete') {
     setupPageNavigationListeners();
   } else {
-    document.addEventListener('DOMContentLoaded', setupPageNavigationListeners);
+    const initialPageLoadHandler = (event: Event): void => {
+      if (event.type === 'readystatechange' && document.readyState !== 'complete') return;
+      document.removeEventListener('DOMContentLoaded', initialPageLoadHandler);
+      document.removeEventListener('readystatechange', initialPageLoadHandler);
+      setupPageNavigationListeners();
+    };
+
+    document.addEventListener('DOMContentLoaded', initialPageLoadHandler);
+
+    if (document.readyState === 'interactive') {
+      document.addEventListener('readystatechange', initialPageLoadHandler);
+    }
   }
 }
 

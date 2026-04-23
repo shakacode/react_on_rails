@@ -46,7 +46,7 @@ Define the script in your root `package.json` so Heroku can run it from the app 
 ```json
 {
   "scripts": {
-    "node-renderer": "node client/node-renderer.js"
+    "node-renderer": "node renderer/node-renderer.js"
   }
 }
 ```
