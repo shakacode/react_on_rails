@@ -115,7 +115,7 @@ Start with the docs here:
 - [GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)
   for questions
 - [GitHub Issues](https://github.com/shakacode/react_on_rails/issues) for bugs
-- [React + Rails Slack](https://invite.reactrails.com) for community chat
+- [React + Rails Slack](https://reactrails.slack.com) for community chat
 - [Commercial support](mailto:react_on_rails@shakacode.com) for upgrades,
   consulting, and Pro guidance
 - [AI Agent User Guide](AGENTS_USER_GUIDE.md) for AI coding assistants
