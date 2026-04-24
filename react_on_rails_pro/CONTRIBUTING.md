@@ -347,7 +347,7 @@ bundle exec rspec
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
 
-After running a test, you can view the coverage results in SimpleCov reports by opening `coverage/index.html`.
+If you run tests with `COVERAGE=true`, you can view the SimpleCov report at `coverage/index.html`.
 
 ### Debugging
 

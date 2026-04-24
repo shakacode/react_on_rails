@@ -6,12 +6,6 @@
 tasks = %w[lint run_rspec]
 prepare_for_ci = %w[node_package dummy_apps]
 
-if ENV["USE_COVERALLS"] == "TRUE"
-  require "coveralls/rake/task"
-  Coveralls::RakeTask.new
-  tasks << "coveralls:push"
-end
-
 desc "Run all tests and linting"
 task default: tasks
 

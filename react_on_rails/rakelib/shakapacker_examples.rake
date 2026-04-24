@@ -213,7 +213,7 @@ namespace :shakapacker_examples do # rubocop:disable Metrics/BlockLength
       # Use unbundled_sh_in_dir to ensure the generator uses the example app's
       # gem versions, not the parent workspace's cached bundle context.
       unbundled_sh_in_dir(example_type.dir, generator_commands)
-      # Re-run bundle install since dev_tests generator adds rspec-rails and coveralls to Gemfile
+      # Re-run bundle install since dev_tests generator adds rspec-rails and simplecov to Gemfile
       bundle_install_in(example_type.dir)
 
       # Apply specific React version for compatibility testing examples
