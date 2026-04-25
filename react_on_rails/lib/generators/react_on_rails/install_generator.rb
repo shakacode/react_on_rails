@@ -268,7 +268,10 @@ module ReactOnRails
           return
         end
 
-        package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
+        package_json = read_package_json_for_ci
+        package_manager = GeneratorMessages.detect_package_manager(
+          app_root: destination_root, package_json: package_json
+        )
         # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
         # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
         has_lockfile = GeneratorMessages.lockfile_for_manager?(package_manager, app_root: destination_root)
@@ -278,7 +281,7 @@ module ReactOnRails
         # pnpm while package.json declares a different manager still gets the version pin.
         package_manager_declared = package_manager == "pnpm" &&
                                    GeneratorMessages.package_manager_declared?(
-                                     app_root: destination_root, manager: "pnpm"
+                                     app_root: destination_root, manager: "pnpm", package_json: package_json
                                    )
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||
@@ -289,6 +292,15 @@ module ReactOnRails
                    pnpm_fallback_version: CI_PNPM_FALLBACK_MINOR,
                    has_active_record: has_active_record, has_rspec: has_rspec })
         @ci_workflow_generated = true
+      end
+
+      def read_package_json_for_ci
+        package_json_path = File.join(destination_root, "package.json")
+        return nil unless File.exist?(package_json_path)
+
+        JSON.parse(File.read(package_json_path))
+      rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
+        nil
       end
 
       # NODE_ENV=production ensures Shakapacker emits a minified production bundle;

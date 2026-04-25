@@ -288,6 +288,17 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(true)
     end
 
+    it "uses a provided package_json without reading package.json again" do
+      expect(File).not_to receive(:read)
+
+      expect(
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          package_json: { "packageManager" => "pnpm@9.0.0" }
+        )
+      ).to be(true)
+    end
+
     # Prevents a false negative in the CI scaffold: if pnpm is selected via
     # REACT_ON_RAILS_PACKAGE_MANAGER or pnpm-lock.yaml while package.json declares
     # a different manager, `pnpm/action-setup` still needs the explicit version pin.

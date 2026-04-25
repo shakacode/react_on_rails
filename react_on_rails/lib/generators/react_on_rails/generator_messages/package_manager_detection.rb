@@ -8,6 +8,8 @@ module GeneratorMessages
   # under Metrics/ClassLength and to group related logic together.
   module PackageManagerDetection
     SUPPORTED_PACKAGE_MANAGERS = %w[npm pnpm yarn bun].freeze
+    PACKAGE_JSON_UNSET = Object.new.freeze
+    private_constant :PACKAGE_JSON_UNSET
 
     # Detects the package manager in priority order:
     # 1. REACT_ON_RAILS_PACKAGE_MANAGER env variable
@@ -19,14 +21,14 @@ module GeneratorMessages
     # (e.g. destination_root in generators) instead of Dir.pwd.
     # Pass package_json: to reuse an already-parsed package.json and avoid a re-read
     # (callers that also inspect scripts/deps should parse once and pass the hash).
-    def detect_package_manager(app_root: Dir.pwd, package_json: nil)
+    def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
       return env_package_manager if supported_package_manager?(env_package_manager)
 
-      pm_from_json = if package_json
-                       package_manager_from_content(package_json)
-                     else
+      pm_from_json = if package_json.equal?(PACKAGE_JSON_UNSET)
                        detect_package_manager_from_package_json(app_root: app_root)
+                     elsif package_json
+                       package_manager_from_content(package_json)
                      end
       pm_from_json || detect_package_manager_from_lockfiles(app_root: app_root) || "npm"
     end
@@ -54,8 +56,13 @@ module GeneratorMessages
     # though yarn is supported. Used by the CI scaffold to decide whether
     # `pnpm/action-setup` needs an explicit `version:`; the action only reads the pin
     # from `packageManager` when that field actually declares pnpm.
-    def package_manager_declared?(app_root: Dir.pwd, manager: nil)
-      content = read_package_json(app_root)
+    # Pass package_json: to reuse an already-parsed package.json and avoid a re-read.
+    def package_manager_declared?(app_root: Dir.pwd, manager: nil, package_json: PACKAGE_JSON_UNSET)
+      content = if package_json.equal?(PACKAGE_JSON_UNSET)
+                  read_package_json(app_root)
+                else
+                  package_json
+                end
       return false unless content
 
       declared = package_manager_from_content(content)

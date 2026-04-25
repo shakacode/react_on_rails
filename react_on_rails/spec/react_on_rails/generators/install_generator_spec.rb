@@ -2023,8 +2023,8 @@ describe InstallGenerator, type: :generator do
       assert_file ".github/workflows/ci.yml" do |content|
         setup_pos = content.index("uses: pnpm/action-setup@v4")
         expect(setup_pos).not_to be_nil
-        next_step_pos = content.index("- name: ", setup_pos + 1)
-        pnpm_block = content[setup_pos..next_step_pos]
+        next_step_pos = content.index("- name: ", setup_pos + 1) || content.length
+        pnpm_block = content[setup_pos...next_step_pos]
         # `pnpm/action-setup` reads the version from `packageManager` when declared,
         # so the scaffold must not inject a `with: version:` that would override it.
         expect(pnpm_block).not_to include("version:")
