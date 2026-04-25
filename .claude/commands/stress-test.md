@@ -174,6 +174,10 @@ Examples:
 - Always quote shell variable expansions (`"$repo"`, `"$sha"`). Where a tool supports it, use `--` to terminate options before positional args (`git show -- "$sha"`, `git diff -- "$path"`).
 - Where possible, prefer argv-array invocations (programmatic `gh`/`git` callers) over interpolating into a shell command string.
 - Feature-flag values: validate strictly against the table; abort with the valid list on unknown.
+- `--max-hours N`: must match `^[0-9]+(\.[0-9]+)?$`, parse as a positive number, and satisfy `0.25 <= N <= 96`. Reject negative, zero, non-numeric, or out-of-range values with the allowed range.
+- `--from`/`--to`/PR/SHA values must pass the regex above before any `git`/`gh` invocation.
+- **Workspace timestamp format.** Use `TS=$(date -u +%Y%m%dT%H%M%SZ)` (UTC, ISO-8601 basic, no separators) for the workspace dir name (`tmp/stress-test-$TS`). This sorts lexically, avoids timezone ambiguity across machines, and matches across logs.
+- **GitHub repo slug.** Capture once at Phase 0: `GH_REPO_SLUG=$(gh -R "$REPO" repo view --json nameWithOwner -q .nameWithOwner)`. Pass `--repo "$GH_REPO_SLUG"` (or `-R "$GH_REPO_SLUG"`) to **every** `gh` invocation in any phase, especially Phase 8's `gh label create`, `gh issue create`, and `gh pr view/diff` calls. Without this, a fork's `gh` default remote can silently target the wrong repository.
 
 ### Sensitive-data handling for persisted artifacts
 
@@ -216,7 +220,7 @@ Examples:
    - If `--features` not given: use the inventory tags (or all features if no scope).
    - If `--features` given and no commit scope: use the listed features.
    - If both given: **intersection**. Print the intersection back to the user; if empty, abort with a message ("PR #X does not touch any of the requested features: …").
-8. Decide tier (apply auto-quick rule if applicable). Compute hard wallclock ceiling.
+8. Decide tier. The auto-quick rule fires when scope is a single commit/PR with `≤ 30 lines diff` AND `≤ 3 files changed`; this is a heuristic and may downgrade a small-but-high-impact change. Compute the hard wallclock ceiling (tier default, or `--max-hours N` if supplied).
 9. Print a one-screen plan to the user before launching agents:
 
    ```text
@@ -231,6 +235,13 @@ Examples:
    Pro features: <on|off>
    Max parallel agents: <cap>
    Workspace:    <WORKSPACE_ROOT>
+   ```
+
+   When the resolved tier was selected by the auto-quick rule, append:
+
+   ```text
+   Auto-tier:    quick (commit is <X> lines / <Y> files; threshold ≤30 lines / ≤3 files).
+                 Override with --tier standard|deep|exhaustive.
    ```
 
    When the resolved tier is `exhaustive`, append:
@@ -248,16 +259,28 @@ Examples:
 ## Phase 1 — Workspace setup
 
 1. `mkdir -p "$WORKSPACE_ROOT"/{demos,reports,logs,payloads,metrics}`. (`$WORKSPACE_ROOT` was created in Phase 0; this expands the subdirectory tree.)
+   Record `START_TS=$(date -u +%s)` and the resolved tier's wallclock budget (`MAX_SECS=<tier-or-override-in-seconds>`) immediately. Persist both to `$WORKSPACE_ROOT/00-env.md`. Every later wave checks elapsed seconds against this anchor (see "Wallclock enforcement").
 2. Verify `tmp/` is in `$REPO/.gitignore`. If not, **abort and tell user** rather than auto-edit `.gitignore`.
 3. Snapshot environment to `$WORKSPACE_ROOT/00-env.md`: Ruby version, Node version, pnpm/yarn/npm versions, OS (`uname -srm`), free RAM, disk free, git HEAD of framework, and a **redacted** copy of `bundle env` (apply the redaction patterns in "Sensitive-data handling for persisted artifacts" before writing). Never persist raw `bundle env` output.
-4. Build the gem and pack the npm packages **into the workspace** (do not litter the framework checkout):
+4. Build the gem and pack the npm packages **into the workspace** (do not litter the framework checkout). Run under `set -e` (or check `$?` after each command) and abort the entire run on any non-zero exit before scaffolding starts; downstream demos consuming a stale or missing artifact would only fail in confusing, non-obvious ways:
 
    ```bash
+   set -euo pipefail
    gem build "$GEM_ROOT/react_on_rails.gemspec" --output "$WORKSPACE_ROOT/payloads/react_on_rails.gem"
-   ( cd "$REPO" && pnpm -r pack --pack-destination "$WORKSPACE_ROOT/payloads" )
+   # Enumerate user-facing packages explicitly so we don't pick up internal/dev
+   # packages from `pnpm -r`. Add to this list if a demo needs another package.
+   PNPM_PACK_PACKAGES=(
+     react-on-rails
+     react-on-rails-pro
+     react-on-rails-pro-node-renderer
+     create-react-on-rails-app
+   )
+   for pkg in "${PNPM_PACK_PACKAGES[@]}"; do
+     ( cd "$REPO" && pnpm --filter "$pkg" pack --pack-destination "$WORKSPACE_ROOT/payloads" )
+   done
    ```
 
-   Save the resulting `*.gem` and `*.tgz` paths for each demo's `Gemfile`/`package.json` to consume via `path:` / `file:`.
+   If `--skip-pro` is set, drop the `react-on-rails-pro*` entries from the list before packing. Save the resulting `*.gem` and `*.tgz` paths for each demo's `Gemfile`/`package.json` to consume via `path:` / `file:`.
 5. Plant **leak canaries** for data-leakage testing: generate `LEAK_CANARY_<uuid>` strings, set them as demo-only env vars, demo DB rows, and synthetic "user" fields. Record canaries to `$WORKSPACE_ROOT/payloads/canaries.txt`. Agents will grep responses, bundles, logs, and caches for these.
 
 ### Cross-platform measurement helpers
@@ -309,7 +332,9 @@ Spawn N parallel sub-agents (general-purpose), one per demo. **Demos are selecte
 | `config`, `doctor`, `generators`, `licensing` | **Demo G: Config/install matrix** (boots multiple times with mutated config) |
 | `replay-console`, `error-handling` | tests inside whichever demo applies; not a standalone demo |
 | `csp` | adds CSP middleware to Demo A or B; not standalone |
-| `all` or empty scope | Run A, B, C, D, E (standard tier) |
+| `all` or empty scope | quick → A only; standard → A, B, C, D, E; deep / exhaustive → A, B, C, D, E, F, G |
+
+`standard` deliberately omits Demos F and G to fit its 2–4 hr ceiling — caching and config-matrix exercises are inherently slower (multiple boots, multiple cache permutations). They are included by default in `deep` and `exhaustive`. To force them at `standard`, pass `--features caching,prerender-cache,config,doctor,licensing` (which selects F and G) alongside `--tier standard`. The Phase 0 plan printout always lists the resolved demo set explicitly so the exclusion is visible.
 
 The total number of concurrent scaffolding agents is capped by the tier's `Max parallel agents` value. If more demos are required than the cap allows, queue and process in waves.
 
@@ -345,16 +370,37 @@ Spawn one sub-agent per persona × demo, **capped by the tier's `Max parallel ag
 
 **Per-vector procedure:**
 
-1. Modify the demo (only files inside the demo dir) to introduce the failure.
-2. Run the demo (`bin/dev` or `bin/rails s` + `bin/shakapacker-dev-server`). For Pro RSC, also start node renderer.
-3. Hit it: curl, headless browser (`npx playwright` or `puppeteer` if available; otherwise raw HTTP), parallel requests via `oha` or `ab` for concurrency vectors.
-4. **Run the cross-cutting battery** for the vector:
+1. **Pre-mutation snapshot.** With the demo in its baseline state (Phase 2 install, no vector applied), capture a fresh `<demo>-pre-vector-<NNN>.json` measurement: RSS, FD count, p50/p95/p99 latency at the tier's primary concurrency. This is the comparison anchor for *this* vector specifically (avoids confounding the Phase 2 baseline with drift from earlier vectors run against the same demo).
+2. Modify the demo (only files inside the demo dir) to introduce the failure.
+3. Run the demo (`bin/dev` or `bin/rails s` + `bin/shakapacker-dev-server`). For Pro RSC, also start node renderer.
+4. Hit it: curl, headless browser (`npx playwright` or `puppeteer` if available; otherwise raw HTTP), parallel requests via `oha` (preferred) or `ab` for concurrency vectors. **Fallback when neither is installed:** use a curl-loop helper (see below) and **explicitly note in the finding card and the run report** that measurements came from the curl-loop fallback so cross-tool comparisons are not made silently.
+5. **Run the cross-cutting battery** for the vector:
    - **Data leakage:** issue 2 requests with different fake user IDs / locales / canaries; diff HTML, JSON props, RSC payload, cached fragments, logs. Grep all responses + the client bundle for any canary string from the *other* user's context. Log "no leak" or finding.
    - **Memory leakage:** loop the request N times (per tier); record RSS, FD count, renderer worker `process.memoryUsage()` at sampling intervals; compute slope. Slope above threshold → finding.
-   - **Performance degradation:** drive concurrent load at the tier's concurrency levels via `oha`; record p50/p95/p99/throughput; compare against the demo baseline. Regression beyond threshold → finding.
-5. Capture: HTTP status, response body, server logs, browser console, hydration warnings, memory growth (`ps`/`top` snapshots), file descriptor count, latency table.
-6. Classify: **broke loud** / **broke quiet** / **survived** / **degraded** / **leaked-data** / **leaked-memory**.
-7. For each non-survived outcome, write a finding card to `$WORKSPACE_ROOT/reports/findings/<NNN>-<slug>.md` (schema below).
+   - **Performance degradation:** drive concurrent load at the tier's concurrency levels via the chosen tool; record p50/p95/p99/throughput; compare against the **pre-mutation snapshot from step 1** (primary) and the Phase 2 baseline (secondary). Regression beyond threshold → finding.
+6. **Post-vector teardown.** Revert the demo to baseline (e.g., `git -C "$DEMO_DIR" reset --hard` if the demo is its own git repo, or restore from a Phase 2 snapshot tarball in `$WORKSPACE_ROOT/payloads/`) before the next vector runs against the same demo.
+7. Capture: HTTP status, response body, server logs, browser console, hydration warnings, memory growth (RSS/FD via the cross-platform helpers), latency table.
+8. Classify: **broke loud** / **broke quiet** / **survived** / **degraded** / **leaked-data** / **leaked-memory**.
+9. For each non-survived outcome, write a finding card to `$WORKSPACE_ROOT/reports/findings/<NNN>-<slug>.md` (schema below) and reference both the pre-mutation snapshot and the Phase 2 baseline in `metrics_refs`.
+
+**Load-test helpers (use one, in this priority):**
+
+```bash
+# 1. oha (preferred): JSON output, accurate percentiles
+oha --no-tui -j -n "$N" -c "$C" "$URL" > "$WORKSPACE_ROOT/metrics/<demo>-<vector>.oha.json"
+
+# 2. ab: ApacheBench fallback
+ab -n "$N" -c "$C" "$URL" > "$WORKSPACE_ROOT/metrics/<demo>-<vector>.ab.txt"
+
+# 3. curl loop fallback (no oha, no ab): coarse but comparable within a single run
+{
+  for i in $(seq 1 "$N"); do
+    curl -s -o /dev/null -w "%{time_total}\n" "$URL"
+  done
+} | sort -n > "$WORKSPACE_ROOT/metrics/<demo>-<vector>.curl-loop.txt"
+# Compute p50/p95/p99 from the sorted file with awk; flag the finding card with
+# `tool: curl-loop` in metrics_refs so cross-tool comparisons are not silently made.
+```
 
 **Vector library (filtered by effective feature set):**
 
@@ -445,7 +491,7 @@ Both produce a working demo. Both run the cross-cutting battery (data leakage, m
 - Where their demos diverge functionally — and whether one accidentally introduces a leak/perf issue the other avoids.
 - Snippet-level doc traps that would mislead an LLM coding assistant (broken signature blocks, dead links, mixed import paths).
 
-Output: `$WORKSPACE_ROOT/reports/05-doc-compare.md` with concise per-mistake entries (≤2 paragraphs each). (Phase 8 lists `05-doc-compare.md` as the canonical filename for this report; the other phase report names follow the same `NN-<topic>.md` numbering.)
+Output: `$WORKSPACE_ROOT/reports/04-doc-compare.md` with concise per-mistake entries (≤2 paragraphs each). Report numbering follows phase execution order: 01-blackbox (Phase 3), 02-whitebox (Phase 4), 03-pentest (Phase 5), 04-doc-compare (Phase 6), 05-network-fault (Phase 7), then the cross-cutting concern files 06-data-leakage / 07-memory-leakage / 08-performance.
 
 ---
 
@@ -457,7 +503,7 @@ Run only if **all** of the following hold:
 - `--skip-pro` is not set (network-fault simulation only meaningfully exercises Pro features),
 - the effective feature set includes at least one of `ssr-node`, `streaming`, `rsc`, `rsc-payload`, `node-renderer`.
 
-If any condition fails, skip Phase 7 and note the reason in `$WORKSPACE_ROOT/reports/04-network-fault.md`.
+If any condition fails, skip Phase 7 and note the reason in `$WORKSPACE_ROOT/reports/05-network-fault.md`.
 
 If `toxiproxy-cli` is on `PATH`, use it to interpose between Rails and the Pro node renderer:
 
@@ -481,11 +527,11 @@ For each scenario, record: did Rails recover? did the user see a clean error or 
 
 1. Aggregate all finding cards into:
    - `$WORKSPACE_ROOT/reports/00-summary.md` — top-15 cross-phase, severity table, scope reminder, tier reminder, **effective feature set**, framework HEAD sha, plus a **dedicated cross-cutting subsection** with the worst data-leak / memory-leak / performance-regression findings.
-   - `$WORKSPACE_ROOT/reports/01-blackbox.md`
-   - `$WORKSPACE_ROOT/reports/02-whitebox.md`
-   - `$WORKSPACE_ROOT/reports/03-pentest.md`
-   - `$WORKSPACE_ROOT/reports/04-network-fault.md`
-   - `$WORKSPACE_ROOT/reports/05-doc-compare.md` (written by Phase 6)
+   - `$WORKSPACE_ROOT/reports/01-blackbox.md` (Phase 3)
+   - `$WORKSPACE_ROOT/reports/02-whitebox.md` (Phase 4)
+   - `$WORKSPACE_ROOT/reports/03-pentest.md` (Phase 5)
+   - `$WORKSPACE_ROOT/reports/04-doc-compare.md` (Phase 6)
+   - `$WORKSPACE_ROOT/reports/05-network-fault.md` (Phase 7; may be present-but-skipped with reason logged)
    - `$WORKSPACE_ROOT/reports/06-data-leakage.md` — every finding tagged data-leak, with canary trace.
    - `$WORKSPACE_ROOT/reports/07-memory-leakage.md` — RSS/FD slope tables per demo, retainer hypotheses.
    - `$WORKSPACE_ROOT/reports/08-performance.md` — latency tables (p50/p95/p99), throughput, regression vs baseline.
@@ -497,17 +543,18 @@ For each scenario, record: did Rails recover? did the user see a clean error or 
    - Keep workspace or delete.
    - Re-run a phase with deeper budget.
 4. If user selects issues to open:
-   1. **Pre-flight label check.** For each label the orchestrator wants to attach (`stress-test`, `triage`), run `gh label list --json name -q '.[].name' | grep -qx "<label>"`. If a label is missing, attempt `gh label create "<label>" --color ededed` once; if creation fails (no permission, etc.), drop that label from the create call and add a one-line note to the issue body asking the user to label manually. Never let a missing label abort issue creation.
-   2. For each selected finding, show the user the exact title/body and ask for a final confirmation, then run `gh issue create --title "<title>" --body-file <finding-card> [--label <available-labels>]`.
+   1. **Pre-flight label check.** For each label the orchestrator wants to attach (`stress-test`, `triage`), run `gh -R "$GH_REPO_SLUG" label list --json name -q '.[].name' | grep -qx "<label>"`. If a label is missing, attempt `gh -R "$GH_REPO_SLUG" label create "<label>" --color ededed` once; if creation fails (no permission, etc.), drop that label from the create call and add a one-line note to the issue body asking the user to label manually. Never let a missing label abort issue creation.
+   2. For each selected finding, show the user the exact title/body and ask for a final confirmation, then run `gh -R "$GH_REPO_SLUG" issue create --title "<title>" --body-file <finding-card> [--label <available-labels>]`. Always pass `-R "$GH_REPO_SLUG"` so a fork's `gh` default remote does not silently target the wrong repository.
 5. Print final paths and exit.
 
 ---
 
 ## Wallclock enforcement
 
-- Track elapsed time. At 80% of budget, signal sub-agents to wind down and consolidate findings.
-- At 100%, halt remaining vectors and proceed to Phase 8 with what's collected.
-- Always reach Phase 8 — partial reports are still useful.
+- Anchor: `START_TS=$(date -u +%s)` is recorded at Phase 1 step 1; `MAX_SECS` is the tier ceiling (or `--max-hours N * 3600` if supplied).
+- Before each sub-agent spawn wave (Phases 2/3/4/5/6/7), compute `ELAPSED=$(( $(date -u +%s) - START_TS ))`. If `ELAPSED >= 80% of MAX_SECS`, signal in-flight agents to wind down (write a `WINDDOWN` flag file in `$WORKSPACE_ROOT/`); they must stop opening new vectors and consolidate findings. If `ELAPSED >= 100% of MAX_SECS`, halt remaining vectors and proceed to Phase 8 with what's collected.
+- Sub-agents check the `WINDDOWN` flag at the top of each vector; if present, they finish the in-flight repro/measurement, write the finding card, and exit.
+- Always reach Phase 8 — partial reports are still useful. Phase 8 itself runs even after a wallclock cutoff (it's the consolidation, not new work).
 
 ---
 
