@@ -378,6 +378,11 @@ When using coding agent tools that run multiple workspaces concurrently
 set `REACT_ON_RAILS_BASE_PORT` to derive all service ports from a single value.
 This eliminates the need for per-worktree `.env` files.
 
+> **Important:** Run each live `bin/dev` stack from a separate checkout, worktree,
+> or copied app directory. Starting two stacks from the exact same app path is
+> not supported because build tools such as ReScript and webpack watchers share
+> lock files and runtime artifacts within that directory.
+
 `bin/dev` assigns ports using fixed offsets from the base:
 
 | Service             | Offset | Example (base=4000) |
@@ -453,6 +458,12 @@ using one of the options below.
 
 `bin/dev` reads the variable from the process environment regardless of how it was set, so mix
 and match whichever is most convenient for each tool.
+
+If you create a new checkout by copying an existing app directory while another
+`bin/dev` is running, the copy can inherit `tmp/pids/server.pid` or Overmind
+socket files from the original app. `bin/dev` now cleans those copied stale
+runtime files automatically on startup. If you launch processes outside
+`bin/dev`, clear those files yourself before booting the copied app.
 
 ### Manual Worktree Port Setup (Pro)
 
