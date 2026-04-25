@@ -1,0 +1,20 @@
+<h1>Renderer cleanup test (Issue #3209)</h1>
+
+<p>
+  Mounts a renderer function that returns a teardown closure. Once Issue #3209 is
+  implemented, navigating away via Turbo should cause the framework to invoke the
+  teardown — unmounting the React root and firing the tree's <code>useEffect</code>
+  cleanup, which sets <code>window.__rendererCleanupRan__ = true</code>.
+</p>
+
+<%= react_component(
+  "RendererCleanupTest",
+  props: {},
+  prerender: false,
+  id: "RendererCleanupTest-1",
+  auto_load_bundle: false,
+) %>
+
+<p>
+  <%= link_to "Navigate away (Turbo)", manual_render_test_path, id: "renderer-cleanup-leave-link" %>
+</p>

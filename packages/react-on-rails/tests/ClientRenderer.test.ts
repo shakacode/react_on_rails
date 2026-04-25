@@ -6,6 +6,12 @@ import * as React from 'react';
 import { renderComponent, reactOnRailsComponentLoaded } from '../src/ClientRenderer.ts';
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import StoreRegistry from '../src/StoreRegistry.ts';
+import * as pageLifecycle from '../src/pageLifecycle.ts';
+import type { RenderFunction } from '../src/types/index.ts';
+
+const triggerPageUnload = (
+  pageLifecycle as unknown as { __triggerPageUnload: () => Promise<void> }
+).__triggerPageUnload;
 
 // Mock React DOM methods since we're testing client-side rendering
 jest.mock('../src/reactHydrateOrRender.ts', () => ({
@@ -16,6 +22,28 @@ jest.mock('../src/reactHydrateOrRender.ts', () => ({
     domNode.innerHTML = '<div>Rendered: test</div>';
   }),
 }));
+
+// Mock pageLifecycle so we can drive the unload sweep deterministically.
+// In the real module, `runPageUnloadedCallbacks` is fired by Turbo events that
+// jsdom doesn't emit. The stub captures every callback the framework registers
+// via `onPageUnloaded` (notably `unmountAllComponents` from ClientRenderer) and
+// exposes a `__triggerPageUnload` helper tests use to invoke them.
+jest.mock('../src/pageLifecycle.ts', () => {
+  const unloadCallbacks: Array<() => void | Promise<void>> = [];
+  return {
+    __esModule: true,
+    onPageUnloaded: (cb: () => void | Promise<void>) => {
+      unloadCallbacks.push(cb);
+    },
+    onPageLoaded: () => {},
+    __triggerPageUnload: async () => {
+      for (const cb of [...unloadCallbacks]) {
+        // eslint-disable-next-line no-await-in-loop
+        await cb();
+      }
+    },
+  };
+});
 
 describe('ClientRenderer', () => {
   beforeEach(() => {
@@ -307,6 +335,125 @@ describe('ClientRenderer', () => {
       // The mock SHOULD have been called again for the replaced node
       expect(mockHydrateOrRender.mock.calls.length).toBe(callCountAfterFirstRender + 1);
       expect(targetNode2.innerHTML).toContain('Rendered:');
+    });
+  });
+
+  describe('Issue #3209: Renderer function teardown on unmount', () => {
+    const setupRailsContext = () => {
+      const railsContextElement = document.createElement('div');
+      railsContextElement.id = 'js-react-on-rails-context';
+      railsContextElement.textContent = JSON.stringify({
+        railsEnv: 'test',
+        inMailer: false,
+        i18nLocale: 'en',
+        i18nDefaultLocale: 'en',
+        rorVersion: '13.0.0',
+        rorPro: false,
+        href: 'http://localhost:3000',
+        location: 'http://localhost:3000',
+        scheme: 'http',
+        host: 'localhost',
+        port: 3000,
+        pathname: '/',
+        search: null,
+        httpAcceptLanguage: 'en',
+        serverSide: false,
+        componentRegistryTimeout: 0,
+      });
+      document.body.appendChild(railsContextElement);
+    };
+
+    const setupRendererDom = (componentName: string, domId: string) => {
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', componentName);
+      componentElement.setAttribute('data-dom-id', domId);
+      componentElement.textContent = JSON.stringify({});
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = domId;
+      document.body.appendChild(targetNode);
+      return targetNode;
+    };
+
+    it('invokes the teardown returned by a renderer function on page unload', async () => {
+      setupRailsContext();
+
+      const teardown = jest.fn();
+      // Three explicit params so ComponentRegistry classifies this as `isRenderer`
+      // (`renderFunction && component.length === 3`).
+      function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
+        return teardown;
+      }
+      // The cast is temporary: today's `RenderFunction` return type doesn't permit
+      // a teardown function. Issue #3209 widens it to `RenderFunctionResult |
+      // RendererTeardown | Promise<… | RendererTeardown>`; once landed, the cast
+      // can be removed.
+      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      setupRendererDom('Renderer', 'renderer-unload');
+
+      renderComponent('renderer-unload');
+      await triggerPageUnload();
+
+      // Today: framework discards the renderer's return value, so the teardown
+      // is never invoked on Turbo navigation. After the fix it must be called once.
+      expect(teardown).toHaveBeenCalledTimes(1);
+    });
+
+    it('invokes the teardown when the DOM node at the same domNodeId is replaced', () => {
+      setupRailsContext();
+
+      const teardown1 = jest.fn();
+      const teardown2 = jest.fn();
+      let nextTeardown: jest.Mock = teardown1;
+
+      function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
+        return nextTeardown;
+      }
+      // The cast is temporary: today's `RenderFunction` return type doesn't permit
+      // a teardown function. Issue #3209 widens it to `RenderFunctionResult |
+      // RendererTeardown | Promise<… | RendererTeardown>`; once landed, the cast
+      // can be removed.
+      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      const target1 = setupRendererDom('Renderer', 'renderer-replace');
+
+      renderComponent('renderer-replace');
+
+      // Replace the DOM node at the same id (e.g. via async HTML injection).
+      target1.remove();
+      const target2 = document.createElement('div');
+      target2.id = 'renderer-replace';
+      document.body.appendChild(target2);
+
+      nextTeardown = teardown2;
+      renderComponent('renderer-replace');
+
+      // Today: the first renderer's teardown was discarded, so the framework
+      // cannot clean it up before mounting on the new node — leak. After the
+      // fix it must run exactly once before the second mount, while teardown2
+      // remains armed for the next unmount.
+      expect(teardown1).toHaveBeenCalledTimes(1);
+      expect(teardown2).toHaveBeenCalledTimes(0);
+    });
+
+    it('does not throw on page unload when the renderer returns nothing', async () => {
+      setupRailsContext();
+
+      function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
+        // Intentionally returns undefined — the teardown is optional in the
+        // new contract; absence must remain a no-op on unmount.
+      }
+      // The cast is temporary: today's `RenderFunction` return type doesn't permit
+      // a teardown function. Issue #3209 widens it to `RenderFunctionResult |
+      // RendererTeardown | Promise<… | RendererTeardown>`; once landed, the cast
+      // can be removed.
+      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      setupRendererDom('Renderer', 'renderer-noop');
+
+      renderComponent('renderer-noop');
+
+      await expect(triggerPageUnload()).resolves.not.toThrow();
     });
   });
 });
