@@ -33,16 +33,16 @@ Those names are package identities, not marketing slugs.
 These are the repos we should feature on `reactonrails.com/examples` and point
 to from the docs:
 
-| Public repo                           | Recommended action | Canonical status          | Notes                                     |
-| ------------------------------------- | ------------------ | ------------------------- | ----------------------------------------- |
-| `react-on-rails-demo-ssr-hmr`         | Feature            | Rename completed          | Maintained SSR + HMR tutorial repo        |
-| `react-on-rails-rsc-demo`             | Feature            | Keep current slug for now | Minimal public RSC starter                |
-| `react-on-rails-demo-hacker-news-rsc` | Feature            | Rename completed          | Compact Pro + RSC showcase                |
-| `react-on-rails-demo-marketplace-rsc` | Feature            | Rename completed          | Performance-focused RSC demo              |
-| `react-on-rails-demo-gumroad-rsc`     | Feature            | Rename completed          | Inertia vs React on Rails Pro benchmark   |
-| `react-on-rails-example-migration`    | Feature            | Rename completed          | Focused `react-rails` migration reference |
-| `react-on-rails-example-open-flights` | Feature            | Rename completed          | Larger migration reference                |
-| `react-on-rails-demos`                | Feature            | Rename completed          | Shared infrastructure repo for demo apps  |
+| Public repo                           | Recommended action | Canonical status          | Target slug                        | Notes                                     |
+| ------------------------------------- | ------------------ | ------------------------- | ---------------------------------- | ----------------------------------------- |
+| `react-on-rails-demo-ssr-hmr`         | Feature            | Rename completed          | (current)                          | Maintained SSR + HMR tutorial repo        |
+| `react-on-rails-rsc-demo`             | Feature            | Keep current slug for now | `react-on-rails-demo-rsc` (future) | Minimal public RSC starter                |
+| `react-on-rails-demo-hacker-news-rsc` | Feature            | Rename completed          | (current)                          | Compact Pro + RSC showcase                |
+| `react-on-rails-demo-marketplace-rsc` | Feature            | Rename completed          | (current)                          | Performance-focused RSC demo              |
+| `react-on-rails-demo-gumroad-rsc`     | Feature            | Rename completed          | (current)                          | Inertia vs React on Rails Pro benchmark   |
+| `react-on-rails-example-migration`    | Feature            | Rename completed          | (current)                          | Focused `react-rails` migration reference |
+| `react-on-rails-example-open-flights` | Feature            | Rename completed          | (current)                          | Larger migration reference                |
+| `react-on-rails-demos`                | Feature            | Rename completed          | (current)                          | Shared infrastructure repo for demo apps  |
 
 ## Repos to De-emphasize or Archive
 

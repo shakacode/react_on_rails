@@ -23,6 +23,10 @@ starting from.
   React on Rails Pro.
 - Note: this repo uses React on Rails Pro. See [OSS vs Pro](./oss-vs-pro.md)
   for evaluation guidance.
+- Note: this slug predates the `react-on-rails-demo-*` naming convention used
+  by the other demos on this page. It may be renamed to
+  `react-on-rails-demo-rsc` in a future cleanup, so prefer linking to this
+  docs page rather than the repo URL directly.
 
 ## In-Repo Reference
 
@@ -83,6 +87,10 @@ repos are useful historical references, but they are not the primary starting
 point for new evaluations.
 
 - Legacy full app: [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) — older production-style app with a [live demo at reactrails.com](https://reactrails.com). Still useful as a historical reference, but not the recommended starting point for new projects.
+
+For the full list of repos being de-emphasized or archived, see the internal
+[examples-catalog and repo-naming plan](../../../internal/planning/examples-catalog-and-repo-naming-plan.md)
+in this repository.
 
 If you are choosing a public reference repo for docs, talks, or adoption work,
 start with the repos above.
