@@ -22,7 +22,7 @@ namespace :run_rspec do
     run_tests_in(spec_dummy_dir)
   end
 
-  desc "(HACK) Run RSpec on spec/empty_spec in order to have SimpleCov generate a coverage report from cache"
+  desc "(HACK) Run RSpec on spec/empty_spec.rb — set COVERAGE=true to also generate a SimpleCov report from cache"
   task :empty do
     sh "bundle exec rspec spec/empty_spec.rb"
   end
