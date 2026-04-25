@@ -9,6 +9,11 @@ import ReactOnRails from 'react-on-rails/client';
 import HelloTurboStream from '../startup/HelloTurboStream';
 import ManualRenderComponent from '../startup/ManualRenderComponent';
 import SharedReduxStore from '../stores/SharedReduxStore';
+import { wrapRegisteredComponentsWithStrictMode } from '../strictModeSupport';
+
+const originalRegister = ReactOnRails.register.bind(ReactOnRails);
+
+ReactOnRails.register = (components) => originalRegister(wrapRegisteredComponentsWithStrictMode(components));
 
 ReactOnRails.setOptions({
   traceTurbolinks: true,
