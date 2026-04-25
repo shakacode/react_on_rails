@@ -31,15 +31,35 @@ describe('strictModeSupport', () => {
     expect(firstWrappedComponent).toBe(secondWrappedComponent);
   });
 
+  it('wraps class components and preserves useful display names', () => {
+    // eslint-disable-next-line react/prefer-stateless-function
+    class HelloWorld extends React.Component {
+      render() {
+        return <div>Hello</div>;
+      }
+    }
+
+    const wrappedComponent = wrapRegisteredComponentsWithStrictMode({ HelloWorld }).HelloWorld;
+    const wrappedElement = wrappedComponent({});
+
+    expect(wrappedComponent.displayName).toBe('StrictMode(HelloWorld)');
+    expect(wrappedElement.type).toBe(React.StrictMode);
+    expect(wrappedElement.props.children.type).toBe(HelloWorld);
+  });
+
   it('does not wrap render functions or renderer functions', () => {
     const renderFunction = (props, railsContext) => ({ props, railsContext });
     const rendererFunction = (props, railsContext, domNodeId) => ({ props, railsContext, domNodeId });
+    const flaggedRenderFunction = () => () => <div>Hello</div>;
+    flaggedRenderFunction.renderFunction = true;
 
     const wrappedComponents = wrapRegisteredComponentsWithStrictMode({
+      flaggedRenderFunction,
       renderFunction,
       rendererFunction,
     });
 
+    expect(wrappedComponents.flaggedRenderFunction).toBe(flaggedRenderFunction);
     expect(wrappedComponents.renderFunction).toBe(renderFunction);
     expect(wrappedComponents.rendererFunction).toBe(rendererFunction);
   });

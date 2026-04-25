@@ -1,8 +1,9 @@
 import React from 'react';
 
 const wrappedFunctionComponents = new WeakMap();
-const wrappedOtherComponents = new Map();
+const wrappedOtherComponents = new Map(); // Map, not WeakMap: string component names are valid keys.
 
+// Mirrors the public react-on-rails/isRenderFunction convention for this dummy-only wrapper.
 const isRenderFunction = (component) => {
   if (typeof component !== 'function') {
     return false;
@@ -21,11 +22,7 @@ const isRenderFunction = (component) => {
 
 const createStrictModeWrapper = (Component) => {
   function StrictModeWrapper(props) {
-    return (
-      <React.StrictMode>
-        {typeof Component === 'function' ? <Component {...props} /> : React.createElement(Component, props)}
-      </React.StrictMode>
-    );
+    return <React.StrictMode>{React.createElement(Component, props)}</React.StrictMode>;
   }
 
   const componentName =
@@ -65,6 +62,7 @@ export const wrapRegisteredComponentsWithStrictMode = (components) =>
   Object.fromEntries(
     Object.entries(components).map(([name, component]) => [
       name,
+      // OSS dummy registered render functions own their root; manual renderer entries wrap explicitly.
       isRenderFunction(component) ? component : wrapComponentInStrictMode(component),
     ]),
   );

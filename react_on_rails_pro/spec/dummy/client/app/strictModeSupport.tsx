@@ -4,31 +4,39 @@ type ReactClassPrototype = {
   isReactComponent?: boolean;
 };
 
-type ComponentWithMetadata = React.ComponentType<Record<string, unknown>> & {
+type ComponentMetadata = {
   displayName?: string;
   name?: string;
   prototype?: ReactClassPrototype;
 };
 
-type RenderFunction = ((props?: unknown, railsContext?: unknown) => unknown) & {
-  renderFunction?: true;
-  displayName?: string;
-  name?: string;
-  prototype?: ReactClassPrototype;
+type CallableComponent = React.ComponentType<Record<string, unknown>> & ComponentMetadata;
+type ObjectComponent = ComponentMetadata & {
+  $$typeof?: symbol | number;
 };
+type ComponentWithMetadata = string | CallableComponent | ObjectComponent;
+type RenderFunction = ((props?: unknown, railsContext?: unknown) => unknown) &
+  ComponentMetadata & {
+    renderFunction?: true;
+  };
 
-type RegisteredComponent = string | ComponentWithMetadata | RenderFunction;
-type ComponentRegistry = Record<string, RegisteredComponent>;
+type ComponentRegistry = Record<string, unknown>;
 type ReactOnRailsWithRegister = {
   register: (components: ComponentRegistry) => void;
   [key: string]: unknown;
 };
 
 const STRICT_MODE_PATCHED = '__reactOnRailsProDummyStrictModePatched';
+const REACT_OBJECT_COMPONENT_TYPES = new Set<symbol | number>([
+  Symbol.for('react.forward_ref'),
+  Symbol.for('react.lazy'),
+  Symbol.for('react.memo'),
+]);
 
-const wrappedFunctionComponents = new WeakMap<ComponentWithMetadata | RenderFunction, RegisteredComponent>();
+const wrappedFunctionComponents = new WeakMap<CallableComponent | RenderFunction, ComponentWithMetadata>();
 const wrappedRenderFunctions = new WeakMap<RenderFunction, RenderFunction>();
-const wrappedOtherComponents = new Map<RegisteredComponent, RegisteredComponent>();
+const wrappedObjectComponents = new WeakMap<ObjectComponent, ComponentWithMetadata>();
+const wrappedStringComponents = new Map<string, ComponentWithMetadata>();
 
 const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   typeof value === 'object' &&
@@ -36,12 +44,25 @@ const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   'then' in value &&
   typeof (value as { then?: unknown }).then === 'function';
 
-const isRenderFunction = (component: RegisteredComponent): component is RenderFunction => {
+const isFunctionWithMetadata = (component: unknown): component is CallableComponent | RenderFunction =>
+  typeof component === 'function';
+
+const isObjectComponent = (component: unknown): component is ObjectComponent =>
+  typeof component === 'object' &&
+  component !== null &&
+  REACT_OBJECT_COMPONENT_TYPES.has((component as ObjectComponent).$$typeof ?? 0);
+
+const isReactComponent = (component: unknown): component is ComponentWithMetadata =>
+  typeof component === 'string' || isFunctionWithMetadata(component) || isObjectComponent(component);
+
+// Mirrors React on Rails' render-function convention while keeping class components wrappable.
+const isRenderFunction = (component: unknown): component is RenderFunction => {
   if (typeof component !== 'function') {
     return false;
   }
 
-  if (component.prototype?.isReactComponent) {
+  const reactPrototype = (component as { prototype?: ReactClassPrototype }).prototype;
+  if (reactPrototype?.isReactComponent) {
     return false;
   }
 
@@ -52,15 +73,13 @@ const isRenderFunction = (component: RegisteredComponent): component is RenderFu
   return component.length >= 2;
 };
 
-const isRendererFunction = (component: RegisteredComponent): component is RenderFunction =>
+// A 3-arg renderer controls its own root, so direct renderer files wrap their root elements explicitly.
+const isRendererFunction = (component: unknown): component is RenderFunction =>
   isRenderFunction(component) && component.length === 3;
 
-const createStrictModeWrapper = (Component: RegisteredComponent): React.FC<Record<string, unknown>> => {
+const createStrictModeWrapper = (Component: ComponentWithMetadata): React.FC<Record<string, unknown>> => {
   function StrictModeWrapper(props: Record<string, unknown>) {
-    const childElement =
-      typeof Component === 'string'
-        ? React.createElement(Component, props)
-        : React.createElement(Component as ComponentWithMetadata, props);
+    const childElement = React.createElement(Component as React.ElementType<Record<string, unknown>>, props);
 
     return <React.StrictMode>{childElement}</React.StrictMode>;
   }
@@ -74,7 +93,7 @@ const createStrictModeWrapper = (Component: RegisteredComponent): React.FC<Recor
   return StrictModeWrapper;
 };
 
-const wrapComponentInStrictMode = (component: RegisteredComponent): RegisteredComponent => {
+const wrapComponentInStrictMode = (component: ComponentWithMetadata): ComponentWithMetadata => {
   if (typeof component === 'function') {
     const cachedComponent = wrappedFunctionComponents.get(component);
     if (cachedComponent) {
@@ -86,13 +105,23 @@ const wrapComponentInStrictMode = (component: RegisteredComponent): RegisteredCo
     return wrappedComponent;
   }
 
-  const cachedComponent = wrappedOtherComponents.get(component);
+  if (typeof component === 'string') {
+    const cachedComponent = wrappedStringComponents.get(component);
+    if (cachedComponent) {
+      return cachedComponent;
+    }
+
+    const wrappedComponent = createStrictModeWrapper(component);
+    wrappedStringComponents.set(component, wrappedComponent);
+    return wrappedComponent;
+  }
+
+  const cachedComponent = wrappedObjectComponents.get(component);
   if (cachedComponent) {
     return cachedComponent;
   }
-
   const wrappedComponent = createStrictModeWrapper(component);
-  wrappedOtherComponents.set(component, wrappedComponent);
+  wrappedObjectComponents.set(component, wrappedComponent);
   return wrappedComponent;
 };
 
@@ -109,8 +138,8 @@ const wrapRenderFunctionResult = (result: unknown): unknown => {
     return wrapElementInStrictMode(result);
   }
 
-  if (typeof result === 'function') {
-    return wrapComponentInStrictMode(result as RegisteredComponent);
+  if (isReactComponent(result)) {
+    return wrapComponentInStrictMode(result);
   }
 
   return result;
@@ -125,6 +154,9 @@ const wrapRenderFunctionInStrictMode = (renderFunction: RenderFunction): RenderF
   const wrappedRenderFunction: RenderFunction = function StrictModeRenderFunction(props, railsContext) {
     return wrapRenderFunctionResult(renderFunction(props, railsContext));
   };
+  wrappedRenderFunction.displayName = `StrictMode(${
+    renderFunction.displayName || renderFunction.name || 'AnonymousRenderFunction'
+  })`;
 
   if (renderFunction.renderFunction) {
     wrappedRenderFunction.renderFunction = true;
@@ -145,6 +177,10 @@ export const wrapRegisteredComponentsWithStrictMode = (components: ComponentRegi
         return [name, wrapRenderFunctionInStrictMode(component)];
       }
 
+      if (!isReactComponent(component)) {
+        return [name, component];
+      }
+
       return [name, wrapComponentInStrictMode(component)];
     }),
   );
@@ -154,14 +190,14 @@ export const enableStrictModeForReactOnRails = <T extends ReactOnRailsWithRegist
     return reactOnRails;
   }
 
-  const originalRegister = reactOnRails.register.bind(reactOnRails);
-  const patchedReactOnRails = reactOnRails;
-
-  patchedReactOnRails.register = (components: ComponentRegistry) => {
+  // Mutate the singleton in place so every default-import consumer observes the patch.
+  const reactOnRailsSingleton = reactOnRails;
+  const originalRegister = reactOnRailsSingleton.register.bind(reactOnRailsSingleton);
+  reactOnRailsSingleton.register = (components: ComponentRegistry) => {
     originalRegister(wrapRegisteredComponentsWithStrictMode(components));
   };
 
-  Object.defineProperty(patchedReactOnRails, STRICT_MODE_PATCHED, { value: true });
+  Object.defineProperty(reactOnRailsSingleton, STRICT_MODE_PATCHED, { value: true });
 
-  return patchedReactOnRails;
+  return reactOnRailsSingleton;
 };

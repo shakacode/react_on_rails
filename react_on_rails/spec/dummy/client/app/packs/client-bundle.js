@@ -11,9 +11,16 @@ import ManualRenderComponent from '../startup/ManualRenderComponent';
 import SharedReduxStore from '../stores/SharedReduxStore';
 import { wrapRegisteredComponentsWithStrictMode } from '../strictModeSupport';
 
-const originalRegister = ReactOnRails.register.bind(ReactOnRails);
+const STRICT_MODE_PATCHED = '__reactOnRailsDummyStrictModePatched';
 
-ReactOnRails.register = (components) => originalRegister(wrapRegisteredComponentsWithStrictMode(components));
+if (!ReactOnRails[STRICT_MODE_PATCHED]) {
+  const originalRegister = ReactOnRails.register.bind(ReactOnRails);
+
+  // Covers this bundle and inline ERB register calls, which run after the bundle has loaded.
+  ReactOnRails.register = (components) =>
+    originalRegister(wrapRegisteredComponentsWithStrictMode(components));
+  Object.defineProperty(ReactOnRails, STRICT_MODE_PATCHED, { value: true });
+}
 
 ReactOnRails.setOptions({
   traceTurbolinks: true,
