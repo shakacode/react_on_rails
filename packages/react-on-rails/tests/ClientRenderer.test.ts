@@ -28,11 +28,16 @@ jest.mock('../src/reactHydrateOrRender.ts', () => ({
 // via `onPageUnloaded` (notably `unmountAllComponents` from ClientRenderer) and
 // exposes a `__triggerPageUnload` helper tests use to invoke them.
 jest.mock('../src/pageLifecycle.ts', () => {
-  const unloadCallbacks: Array<() => void | Promise<void>> = [];
+  // Mirror the real module's Set-backed semantics so the same callback can't
+  // register twice. We do NOT drain on trigger: ClientRenderer registers
+  // `unmountAllComponents` once at module load and that callback is itself
+  // idempotent (iterates and clears `renderedRoots`), so re-firing it from the
+  // describe-block `afterEach` is harmless and is what keeps test state clean.
+  const unloadCallbacks = new Set<() => void | Promise<void>>();
   return {
     __esModule: true,
     onPageUnloaded: (cb: () => void | Promise<void>) => {
-      unloadCallbacks.push(cb);
+      unloadCallbacks.add(cb);
     },
     onPageLoaded: () => {},
     __triggerPageUnload: async () => {
@@ -474,11 +479,12 @@ describe('ClientRenderer', () => {
       setupRendererDom('Renderer', 'renderer-async');
 
       renderComponent('renderer-async');
-      // Flush two microtask ticks so we cover both the renderer's own async body
-      // and any await the framework adds when unwrapping the returned promise.
-      await Promise.resolve()
-        .then(() => {})
-        .then(() => {});
+      // Drain the entire microtask queue (tick-count-agnostic) so we don't
+      // depend on how many internal `await`s the framework adds when unwrapping
+      // the renderer's returned promise.
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
       await triggerPageUnload();
 
       expect(teardown).toHaveBeenCalledTimes(1);

@@ -30,16 +30,18 @@ test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () 
 
   test('invokes the renderer-returned teardown when navigating away via Turbo', async ({ page }) => {
     await page.goto('/renderer_cleanup_test');
-    await page.waitForLoadState('networkidle');
 
-    // Sanity: the tree is mounted and no cleanup has run yet.
+    // Sanity: the tree is mounted and no cleanup has run yet. `toBeVisible`
+    // auto-waits, so we don't need a `networkidle` gate (which can flake on
+    // pages with background pollers/analytics).
     await expect(page.locator('[data-testid="renderer-cleanup-tree"]')).toBeVisible();
     expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(0);
 
     // Trigger a Turbo navigation. Window globals persist across Turbo visits, so the
     // counter incremented during unmount on the previous page is visible on the new page.
     await Promise.all([page.waitForURL('**/manual_render_test'), page.click('#renderer-cleanup-leave-link')]);
-    await page.waitForLoadState('networkidle');
+    // Wait for content unique to the destination page rather than `networkidle`.
+    await expect(page.locator('#ManualRenderComponent-1')).toBeVisible();
 
     // After the fix: the framework called our teardown, root.unmount() ran,
     // TrackedTree's useEffect cleanup fired, the counter is 1.
@@ -48,7 +50,6 @@ test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () 
 
   test('invokes the renderer-returned teardown when the same domNodeId is replaced', async ({ page }) => {
     await page.goto('/renderer_cleanup_test');
-    await page.waitForLoadState('networkidle');
 
     await expect(page.locator('[data-testid="renderer-cleanup-tree"]')).toBeVisible();
     expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(0);
