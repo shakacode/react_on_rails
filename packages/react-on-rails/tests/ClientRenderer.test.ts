@@ -9,9 +9,8 @@ import StoreRegistry from '../src/StoreRegistry.ts';
 import * as pageLifecycle from '../src/pageLifecycle.ts';
 import type { RenderFunction } from '../src/types/index.ts';
 
-const triggerPageUnload = (
-  pageLifecycle as unknown as { __triggerPageUnload: () => Promise<void> }
-).__triggerPageUnload;
+const triggerPageUnload = (pageLifecycle as unknown as { __triggerPageUnload: () => Promise<void> })
+  .__triggerPageUnload;
 
 // Mock React DOM methods since we're testing client-side rendering
 jest.mock('../src/reactHydrateOrRender.ts', () => ({
@@ -377,6 +376,12 @@ describe('ClientRenderer', () => {
       return targetNode;
     };
 
+    // Flush the framework's renderedRoots map between tests so a renderer
+    // tracked in one test doesn't bleed into the next.
+    afterEach(async () => {
+      await triggerPageUnload();
+    });
+
     it('invokes the teardown returned by a renderer function on page unload', async () => {
       setupRailsContext();
 
@@ -454,6 +459,27 @@ describe('ClientRenderer', () => {
       renderComponent('renderer-noop');
 
       await expect(triggerPageUnload()).resolves.not.toThrow();
+    });
+
+    it('invokes the teardown returned by an async renderer function on page unload', async () => {
+      setupRailsContext();
+
+      const teardown = jest.fn();
+      // Async renderer: the framework must await the Promise to capture the
+      // teardown. Pro's ClientSideRenderer already awaits; core needs the same.
+      async function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
+        return teardown;
+      }
+      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      setupRendererDom('Renderer', 'renderer-async');
+
+      renderComponent('renderer-async');
+      // Let the renderer's Promise settle before triggering unload, so the
+      // framework has had a chance to store the resolved teardown.
+      await Promise.resolve();
+      await triggerPageUnload();
+
+      expect(teardown).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -11,53 +11,46 @@ import { app } from '../../support/on-rails';
  *
  * This spec drives the fix end-to-end:
  *   1. Visit a page that mounts a renderer-function-driven component.
- *   2. The TrackedTree inside the renderer flips `window.__rendererCleanupRan__ = true`
- *      from its useEffect cleanup — i.e. only when React actually unmounts the tree.
- *   3. Click a Turbo link and assert the flag is now true.
+ *   2. The TrackedTree inside the renderer increments
+ *      `window.__rendererCleanupCount__` from its useEffect cleanup — i.e. only
+ *      when React actually unmounts the tree.
+ *   3. Trigger an unmount path (Turbo navigation, or same-id node replacement) and
+ *      assert the counter increased.
  *
  * The renderer (RendererCleanupTest.jsx) returns `() => root.unmount()` as its teardown.
- * Today this return value is silently ignored, so the assertion fails. Once Issue #3209
- * lands, the framework will call the teardown on `turbo:before-render`, root.unmount()
- * runs, useEffect cleanup runs, and the flag becomes true.
+ * Today this return value is silently ignored, so the counter stays at 0 and the
+ * assertions fail. Once Issue #3209 lands, the framework will call the teardown,
+ * root.unmount() runs, useEffect cleanup runs, and the counter increments to 1.
  */
 test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () => {
   test.beforeEach(async () => {
     await app('clean');
   });
 
-  test('invokes the renderer-returned teardown when navigating away via Turbo', async ({
-    page,
-  }) => {
+  test('invokes the renderer-returned teardown when navigating away via Turbo', async ({ page }) => {
     await page.goto('/renderer_cleanup_test');
     await page.waitForLoadState('networkidle');
 
-    // Sanity: the tree is mounted and the flag was reset to false at mount time.
+    // Sanity: the tree is mounted and no cleanup has run yet.
     await expect(page.locator('[data-testid="renderer-cleanup-tree"]')).toBeVisible();
-    const beforeNav = await page.evaluate(() => window.__rendererCleanupRan__);
-    expect(beforeNav).toBe(false);
+    expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(0);
 
     // Trigger a Turbo navigation. Window globals persist across Turbo visits, so the
-    // flag set during unmount on the previous page is visible on the new page.
-    await Promise.all([
-      page.waitForURL('**/manual_render_test'),
-      page.click('#renderer-cleanup-leave-link'),
-    ]);
+    // counter incremented during unmount on the previous page is visible on the new page.
+    await Promise.all([page.waitForURL('**/manual_render_test'), page.click('#renderer-cleanup-leave-link')]);
     await page.waitForLoadState('networkidle');
 
     // After the fix: the framework called our teardown, root.unmount() ran,
-    // TrackedTree's useEffect cleanup fired, the flag is true.
-    const afterNav = await page.evaluate(() => window.__rendererCleanupRan__);
-    expect(afterNav).toBe(true);
+    // TrackedTree's useEffect cleanup fired, the counter is 1.
+    expect(await page.evaluate(() => window.__rendererCleanupCount__)).toBe(1);
   });
 
-  test('invokes the renderer-returned teardown when the same domNodeId is replaced', async ({
-    page,
-  }) => {
+  test('invokes the renderer-returned teardown when the same domNodeId is replaced', async ({ page }) => {
     await page.goto('/renderer_cleanup_test');
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('[data-testid="renderer-cleanup-tree"]')).toBeVisible();
-    expect(await page.evaluate(() => window.__rendererCleanupRan__)).toBe(false);
+    expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(0);
 
     // Replace the mount node in place (e.g. mimicking async HTML injection) and
     // re-trigger the page-loaded sweep. The framework must invoke the prior renderer's
@@ -72,8 +65,9 @@ test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () 
     });
 
     // After the fix: the prior teardown ran during the same-id replacement path,
-    // unmounting the old root and firing useEffect cleanup → flag is true.
-    const cleanupRan = await page.evaluate(() => window.__rendererCleanupRan__);
-    expect(cleanupRan).toBe(true);
+    // unmounting the old root and firing useEffect cleanup → counter is 1.
+    // (The newly mounted root for the replaced node has not been unmounted yet,
+    // so the counter stays at 1, not 2.)
+    expect(await page.evaluate(() => window.__rendererCleanupCount__)).toBe(1);
   });
 });
