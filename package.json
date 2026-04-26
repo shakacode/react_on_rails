@@ -127,6 +127,7 @@
       "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files."
     ],
     "overrides": {
+      "webpack": "5.104.1",
       "react": "$react",
       "react-dom": "$react-dom",
       "app>react": "^18.3.1",
