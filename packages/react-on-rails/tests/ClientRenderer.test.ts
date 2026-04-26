@@ -479,9 +479,10 @@ describe('ClientRenderer', () => {
       setupRendererDom('Renderer', 'renderer-async');
 
       renderComponent('renderer-async');
-      // Drain the entire microtask queue (tick-count-agnostic) so we don't
-      // depend on how many internal `await`s the framework adds when unwrapping
-      // the renderer's returned promise.
+      // Yield to a macrotask, which by spec runs only after the entire pending
+      // microtask queue is drained. So this also drains any chain of `await`s
+      // the framework adds while unwrapping the renderer's returned promise
+      // (each `await` schedules a microtask) before we check the teardown.
       await new Promise((resolve) => {
         setTimeout(resolve, 0);
       });

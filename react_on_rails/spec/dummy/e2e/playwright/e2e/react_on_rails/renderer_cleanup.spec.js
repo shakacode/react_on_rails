@@ -44,8 +44,10 @@ test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () 
     await expect(page.locator('#ManualRenderComponent-1')).toBeVisible();
 
     // After the fix: the framework called our teardown, root.unmount() ran,
-    // TrackedTree's useEffect cleanup fired, the counter is 1.
-    expect(await page.evaluate(() => window.__rendererCleanupCount__)).toBe(1);
+    // TrackedTree's useEffect cleanup fired, the counter is 1. `|| 0` so the
+    // current red-phase failure reads `Expected: 1 / Received: 0` instead of
+    // `Expected: 1 / Received: undefined`.
+    expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(1);
   });
 
   test('invokes the renderer-returned teardown when the same domNodeId is replaced', async ({ page }) => {
@@ -71,7 +73,7 @@ test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () 
     // After the fix: the prior teardown ran during the same-id replacement path,
     // unmounting the old root and firing useEffect cleanup → counter is 1.
     // (The newly mounted root for the replaced node has not been unmounted yet,
-    // so the counter stays at 1, not 2.)
-    expect(await page.evaluate(() => window.__rendererCleanupCount__)).toBe(1);
+    // so the counter stays at 1, not 2.) `|| 0` for a readable red-phase failure.
+    expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(1);
   });
 });
