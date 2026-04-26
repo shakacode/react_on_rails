@@ -342,7 +342,7 @@ describe('ClientRenderer', () => {
     });
   });
 
-  describe('Issue #3209: Renderer function teardown on unmount', () => {
+  describe('Renderer function teardown on unmount', () => {
     const setupRailsContext = () => {
       const railsContextElement = document.createElement('div');
       railsContextElement.id = 'js-react-on-rails-context';
@@ -396,18 +396,14 @@ describe('ClientRenderer', () => {
       function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
         return teardown;
       }
-      // The cast is temporary: today's `RenderFunction` return type doesn't permit
-      // a teardown function. Issue #3209 widens it to `RenderFunctionResult |
-      // RendererTeardown | Promise<… | RendererTeardown>`; once landed, the cast
-      // can be removed.
+      // Cast widens RenderFunction's return type to allow returning a teardown.
       ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
       setupRendererDom('Renderer', 'renderer-unload');
 
       renderComponent('renderer-unload');
       await triggerPageUnload();
 
-      // Today: framework discards the renderer's return value, so the teardown
-      // is never invoked on Turbo navigation. After the fix it must be called once.
+      // The framework calls the renderer's teardown when the page unloads.
       expect(teardown).toHaveBeenCalledTimes(1);
     });
 
@@ -421,10 +417,7 @@ describe('ClientRenderer', () => {
       function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
         return nextTeardown;
       }
-      // The cast is temporary: today's `RenderFunction` return type doesn't permit
-      // a teardown function. Issue #3209 widens it to `RenderFunctionResult |
-      // RendererTeardown | Promise<… | RendererTeardown>`; once landed, the cast
-      // can be removed.
+      // Cast widens RenderFunction's return type to allow returning a teardown.
       ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
       const target1 = setupRendererDom('Renderer', 'renderer-replace');
 
@@ -439,10 +432,8 @@ describe('ClientRenderer', () => {
       nextTeardown = teardown2;
       renderComponent('renderer-replace');
 
-      // Today: the first renderer's teardown was discarded, so the framework
-      // cannot clean it up before mounting on the new node — leak. After the
-      // fix it must run exactly once before the second mount, while teardown2
-      // remains armed for the next unmount.
+      // The framework calls teardown1 before mounting on the new node;
+      // teardown2 stays armed until the next unmount.
       expect(teardown1).toHaveBeenCalledTimes(1);
       expect(teardown2).toHaveBeenCalledTimes(0);
     });
@@ -451,13 +442,9 @@ describe('ClientRenderer', () => {
       setupRailsContext();
 
       function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
-        // Intentionally returns undefined — the teardown is optional in the
-        // new contract; absence must remain a no-op on unmount.
+        // Returning a teardown is optional; not returning one is a no-op on unmount.
       }
-      // The cast is temporary: today's `RenderFunction` return type doesn't permit
-      // a teardown function. Issue #3209 widens it to `RenderFunctionResult |
-      // RendererTeardown | Promise<… | RendererTeardown>`; once landed, the cast
-      // can be removed.
+      // Cast widens RenderFunction's return type to allow returning a teardown.
       ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
       setupRendererDom('Renderer', 'renderer-noop');
 
@@ -470,8 +457,8 @@ describe('ClientRenderer', () => {
       setupRailsContext();
 
       const teardown = jest.fn();
-      // Async renderer: the framework must await the Promise to capture the
-      // teardown. Pro's ClientSideRenderer already awaits; core needs the same.
+      // Async renderer: the framework awaits the renderer's promise and stores
+      // the teardown it resolves to.
       async function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
         return teardown;
       }

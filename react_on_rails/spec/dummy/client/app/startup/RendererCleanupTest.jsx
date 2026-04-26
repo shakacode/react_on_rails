@@ -2,12 +2,11 @@
 import React, { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 
-// A monotonic counter is the canary: useEffect cleanup increments it only when
-// React actually unmounts the tree (via root.unmount()). If the framework discards
-// the teardown returned below, navigation happens, Turbo throws away the cached
-// body, and the root is leaked — useEffect cleanup never runs and the counter
-// stays at its initial value. Counter (vs. boolean) so re-rendering on the same
-// page can't overwrite a true value back to false.
+// The cleanup inside useEffect runs only when React unmounts the tree (via
+// root.unmount()). When the framework invokes the teardown returned below,
+// root.unmount() runs, React fires this cleanup, and the counter on window
+// goes up. We use a counter rather than a boolean flag so that re-rendering
+// on the same page can't reset a previous "did unmount" signal back to false.
 const TrackedTree = () => {
   useEffect(
     () => () => {
@@ -25,9 +24,8 @@ const RendererCleanupTest = (_props, _railsContext, domNodeId) => {
   }
   const root = createRoot(mountNode);
   root.render(<TrackedTree />);
-  // Issue #3209: returning a teardown is the new contract. Today react-on-rails
-  // discards this return value; once the issue is implemented the framework will
-  // invoke it on `turbo:before-render` and on same-id node replacement.
+  // Returning a teardown lets the framework unmount this root on Turbo
+  // navigation and when the same DOM node is replaced.
   return () => root.unmount();
 };
 

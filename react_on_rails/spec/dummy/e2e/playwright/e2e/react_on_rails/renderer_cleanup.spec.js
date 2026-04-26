@@ -3,27 +3,23 @@ import { test, expect } from '@playwright/test';
 import { app } from '../../support/on-rails';
 
 /**
- * Tests for Issue #3209: Renderer functions are never cleaned up on Turbo navigation.
+ * E2E coverage for renderer-function teardowns.
  *
- * A renderer function (3-arg `(props, railsContext, domNodeId) => …`) registered with
- * ReactOnRails takes responsibility for mounting its own React root. Today the framework
- * discards anything the renderer returns, so when Turbo navigates away there is no
- * `root.unmount()` call — the React tree is leaked and its useEffect cleanups never run.
+ * A renderer function (3-arg `(props, railsContext, domNodeId) => …`) registered
+ * with ReactOnRails takes responsibility for mounting its own React root. When
+ * it returns a teardown closure, the framework invokes that closure on Turbo
+ * navigation and on same-id node replacement — unmounting the root and firing
+ * any useEffect cleanups on the tree.
  *
- * This spec drives the fix end-to-end:
+ * These tests assert the contract end-to-end through the dummy app:
  *   1. Visit a page that mounts a renderer-function-driven component.
  *   2. The TrackedTree inside the renderer increments
- *      `window.__rendererCleanupCount__` from its useEffect cleanup — i.e. only
- *      when React actually unmounts the tree.
- *   3. Trigger an unmount path (Turbo navigation, or same-id node replacement) and
- *      assert the counter increased.
- *
- * The renderer (RendererCleanupTest.jsx) returns `() => root.unmount()` as its teardown.
- * Today this return value is silently ignored, so the counter stays at 0 and the
- * assertions fail. Once Issue #3209 lands, the framework will call the teardown,
- * root.unmount() runs, useEffect cleanup runs, and the counter increments to 1.
+ *      `window.__rendererCleanupCount__` from its useEffect cleanup, which
+ *      runs only when the framework unmounts the root.
+ *   3. Trigger an unmount path (Turbo navigation, or same-id node replacement)
+ *      and assert the counter went up.
  */
-test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () => {
+test.describe('Renderer function teardown', () => {
   test.beforeEach(async () => {
     await app('clean');
   });
@@ -43,10 +39,9 @@ test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () 
     // Wait for content unique to the destination page rather than `networkidle`.
     await expect(page.locator('#ManualRenderComponent-1')).toBeVisible();
 
-    // After the fix: the framework called our teardown, root.unmount() ran,
-    // TrackedTree's useEffect cleanup fired, the counter is 1. `|| 0` so the
-    // current red-phase failure reads `Expected: 1 / Received: 0` instead of
-    // `Expected: 1 / Received: undefined`.
+    // The framework called the teardown, root.unmount() ran, the tree's
+    // useEffect cleanup fired, and the counter is 1. `|| 0` so a missing
+    // counter reads `Received: 0` instead of `Received: undefined` in failures.
     expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(1);
   });
 
@@ -57,8 +52,8 @@ test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () 
     expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(0);
 
     // Replace the mount node in place (e.g. mimicking async HTML injection) and
-    // re-trigger the page-loaded sweep. The framework must invoke the prior renderer's
-    // teardown before mounting on the new node, otherwise the previous root is leaked.
+    // re-trigger the page-loaded sweep. The framework invokes the prior renderer's
+    // teardown before mounting on the new node so the previous root isn't leaked.
     await page.evaluate(() => {
       const old = document.getElementById('RendererCleanupTest-1');
       const replacement = document.createElement('div');
@@ -70,10 +65,9 @@ test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () 
       return ReactOnRails.reactOnRailsPageLoaded();
     });
 
-    // After the fix: the prior teardown ran during the same-id replacement path,
-    // unmounting the old root and firing useEffect cleanup → counter is 1.
-    // (The newly mounted root for the replaced node has not been unmounted yet,
-    // so the counter stays at 1, not 2.) `|| 0` for a readable red-phase failure.
+    // The prior teardown ran on same-id replacement, unmounting the old root
+    // and firing useEffect cleanup → counter is 1. The newly mounted root for
+    // the replaced node has not been unmounted yet, so the counter stays at 1.
     expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(1);
   });
 });

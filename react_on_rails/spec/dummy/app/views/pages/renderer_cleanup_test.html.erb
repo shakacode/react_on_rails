@@ -1,10 +1,10 @@
-<h1>Renderer cleanup test (Issue #3209)</h1>
+<h1>Renderer cleanup test</h1>
 
 <p>
-  Mounts a renderer function that returns a teardown closure. Once Issue #3209 is
-  implemented, navigating away via Turbo should cause the framework to invoke the
-  teardown — unmounting the React root and firing the tree's <code>useEffect</code>
-  cleanup, which sets <code>window.__rendererCleanupRan__ = true</code>.
+  Mounts a renderer function that returns a teardown closure. Navigating away
+  via Turbo invokes the teardown, which unmounts the React root and fires the
+  tree's <code>useEffect</code> cleanup, incrementing
+  <code>window.__rendererCleanupCount__</code>.
 </p>
 
 <%= react_component(
