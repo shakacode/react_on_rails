@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle */
 import React, { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -18,7 +19,11 @@ const TrackedTree = () => {
 };
 
 const RendererCleanupTest = (_props, _railsContext, domNodeId) => {
-  const root = createRoot(document.getElementById(domNodeId));
+  const mountNode = document.getElementById(domNodeId);
+  if (!mountNode) {
+    throw new Error(`RendererCleanupTest: DOM node #${domNodeId} not found`);
+  }
+  const root = createRoot(mountNode);
   root.render(<TrackedTree />);
   // Issue #3209: returning a teardown is the new contract. Today react-on-rails
   // discards this return value; once the issue is implemented the framework will

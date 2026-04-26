@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle */
 import { test, expect } from '@playwright/test';
 import { app } from '../../support/on-rails';
 
@@ -60,8 +61,10 @@ test.describe('Issue #3209: Renderer function teardown on Turbo navigation', () 
       const replacement = document.createElement('div');
       replacement.id = 'RendererCleanupTest-1';
       old.replaceWith(replacement);
+      // Returning the promise so Playwright awaits it — protects this assertion
+      // if reactOnRailsPageLoaded ever becomes truly async at the call site.
       // eslint-disable-next-line no-undef
-      ReactOnRails.reactOnRailsPageLoaded();
+      return ReactOnRails.reactOnRailsPageLoaded();
     });
 
     // After the fix: the prior teardown ran during the same-id replacement path,

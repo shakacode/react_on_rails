@@ -474,9 +474,11 @@ describe('ClientRenderer', () => {
       setupRendererDom('Renderer', 'renderer-async');
 
       renderComponent('renderer-async');
-      // Let the renderer's Promise settle before triggering unload, so the
-      // framework has had a chance to store the resolved teardown.
-      await Promise.resolve();
+      // Flush two microtask ticks so we cover both the renderer's own async body
+      // and any await the framework adds when unwrapping the returned promise.
+      await Promise.resolve()
+        .then(() => {})
+        .then(() => {});
       await triggerPageUnload();
 
       expect(teardown).toHaveBeenCalledTimes(1);
