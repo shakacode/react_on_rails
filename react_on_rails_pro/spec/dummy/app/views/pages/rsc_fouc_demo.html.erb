@@ -1,0 +1,12 @@
+<h1>RSC FOUC Demo — issue #3211</h1>
+<p>
+  Reproduces the bug: CSS imported behind a <code>&apos;use client&apos;</code> boundary
+  inside a true RSC tree is not hoisted into <code>&lt;head&gt;</code> by React on Rails Pro,
+  so it only loads as a side-effect of the client JS chunk evaluating, producing FOUC.
+</p>
+
+<%= stream_react_component("RSCFOUCDemo",
+    props: { artificialDelay: (params[:artificial_delay].presence || 0).to_i },
+    prerender: true,
+    trace: true,
+    id: "rsc-fouc-demo-ssr") %>

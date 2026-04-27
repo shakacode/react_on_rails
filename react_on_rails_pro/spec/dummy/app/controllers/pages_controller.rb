@@ -108,6 +108,10 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/rsc_echo_props")
   end
 
+  def rsc_fouc_demo
+    stream_view_containing_react_components(template: "/pages/rsc_fouc_demo")
+  end
+
   def rsc_posts_page_over_http
     stream_view_containing_react_components(template: "/pages/rsc_posts_page_over_http")
   end
