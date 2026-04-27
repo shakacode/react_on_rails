@@ -8,7 +8,6 @@ import ReactOnRails from 'react-on-rails/client';
 
 import HelloTurboStream from '../startup/HelloTurboStream';
 import ManualRenderComponent from '../startup/ManualRenderComponent';
-import RendererCleanupTest from '../startup/RendererCleanupTest';
 import SharedReduxStore from '../stores/SharedReduxStore';
 
 ReactOnRails.setOptions({
@@ -19,7 +18,6 @@ ReactOnRails.setOptions({
 ReactOnRails.register({
   HelloTurboStream,
   ManualRenderComponent,
-  RendererCleanupTest,
 });
 
 ReactOnRails.registerStore({
