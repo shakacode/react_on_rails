@@ -155,54 +155,10 @@ describe('ClientRenderer', () => {
       expect(() => renderComponent('non-existent-component')).not.toThrow();
     });
 
-    it('handles renderer functions correctly', () => {
-      expect.hasAssertions();
-      // Setup Rails context
-      const railsContextElement = document.createElement('div');
-      railsContextElement.id = 'js-react-on-rails-context';
-      railsContextElement.textContent = JSON.stringify({
-        railsEnv: 'test',
-        inMailer: false,
-        i18nLocale: 'en',
-        i18nDefaultLocale: 'en',
-        rorVersion: '13.0.0',
-        rorPro: false,
-        href: 'http://localhost:3000',
-        location: 'http://localhost:3000',
-        scheme: 'http',
-        host: 'localhost',
-        port: 3000,
-        pathname: '/',
-        search: null,
-        httpAcceptLanguage: 'en',
-        serverSide: false,
-        componentRegistryTimeout: 0,
-      });
-      document.body.appendChild(railsContextElement);
-
-      // Create a mock renderer function
-      const mockRenderer = jest.fn();
-      ComponentRegistry.register({ MockRenderer: mockRenderer });
-
-      // Setup DOM element
-      const componentElement = document.createElement('div');
-      componentElement.className = 'js-react-on-rails-component';
-      componentElement.setAttribute('data-component-name', 'MockRenderer');
-      componentElement.setAttribute('data-dom-id', 'test-renderer');
-      componentElement.textContent = JSON.stringify({ test: 'data' });
-      document.body.appendChild(componentElement);
-
-      const targetNode = document.createElement('div');
-      targetNode.id = 'test-renderer';
-      document.body.appendChild(targetNode);
-
-      renderComponent('test-renderer');
-
-      // The renderer should be called since it has 3 parameters (making it a renderer)
-      // Note: This test depends on the mock function being detected as a renderer
-      // which requires the function to have length === 3
-      expect(true).toBe(true); // Test passes if no error
-    });
+    // Renderer-function behaviour is covered in detail by the
+    // `Renderer function teardown on unmount` describe block below — it
+    // exercises invocation, the teardown contract, same-id replacement, and
+    // the optional-teardown guard.
   });
 
   describe('reactOnRailsComponentLoaded', () => {
