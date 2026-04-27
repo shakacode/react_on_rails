@@ -126,6 +126,9 @@
       "ajv overrides were intentionally excluded: ajv v8 breaks webpack's schema-utils/ajv-keywords.",
       "The 2 moderate ajv alerts (ReDoS in $data option) are tolerable — ajv only validates our own config files."
     ],
+    "patchedDependencies": {
+      "react-on-rails-rsc@19.0.4": "patches/react-on-rails-rsc@19.0.4.patch"
+    },
     "overrides": {
       "webpack": "5.104.1",
       "react": "$react",

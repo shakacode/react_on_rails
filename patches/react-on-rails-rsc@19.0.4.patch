@@ -1,0 +1,53 @@
+--- a/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js
++++ b/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js
+@@ -195,14 +195,30 @@
+                     });
+                     compilation.chunkGroups.forEach(function (chunkGroup) {
+                         function recordModule(id, module) {
+-                            resolvedClientFiles.has(module.resource) &&
+-                                ((module = url.pathToFileURL(module.resource).href),
+-                                    void 0 !== module &&
+-                                        (filePathToModuleMetadata[module] = {
+-                                            id,
+-                                            chunks,
+-                                            name: "*"
+-                                        }));
++                            if (!resolvedClientFiles.has(module.resource)) return;
++                            const href = url.pathToFileURL(module.resource).href;
++                            if (void 0 === href) return;
++                            const existing = filePathToModuleMetadata[href];
++                            if (existing) {
++                                // Merge chunks from additional chunk groups instead of overwriting.
++                                // A module can appear in multiple chunk groups, and all chunks
++                                // need to be recorded so the flight client preloads them all.
++                                const existingChunkIds = new Set();
++                                for (let i = 0; i < existing.chunks.length; i += 2) {
++                                    existingChunkIds.add(existing.chunks[i]);
++                                }
++                                for (let j = 0; j < chunks.length; j += 2) {
++                                    if (!existingChunkIds.has(chunks[j])) {
++                                        existing.chunks.push(chunks[j], chunks[j + 1]);
++                                    }
++                                }
++                            } else {
++                                filePathToModuleMetadata[href] = {
++                                    id,
++                                    chunks: chunks.slice(),
++                                    name: "*"
++                                };
++                            }
+                         }
+                         const chunks = [];
+                         chunkGroup.chunks.forEach(function (c) {
+@@ -211,9 +227,9 @@
+                                 for (_iterator.s(); !(_step = _iterator.n()).done;) {
+                                     const file = _step.value;
+                                     if (!file.endsWith(".js"))
+-                                        break;
++                                        continue;
+                                     if (file.endsWith(".hot-update.js"))
+-                                        break;
++                                        continue;
+                                     chunks.push(c.id, file);
+                                     break;
+                                 }
