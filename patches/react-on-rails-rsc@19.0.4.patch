@@ -1,6 +1,14 @@
 --- a/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js
 +++ b/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js
-@@ -195,14 +195,30 @@
+@@ -179,6 +179,7 @@
+                                 : "anonymous"
+                             : null;
+                     var resolvedClientFiles = new Set((resolvedClientReferences || []).map((ref) => ref.request)), filePathToModuleMetadata = {};
++                    var cssPrefix = (typeof compilation.outputOptions.publicPath === "string" ? compilation.outputOptions.publicPath : "") || "";
+                     configuredCrossOriginLoading = {
+                         moduleLoading: {
+                             prefix: compilation.outputOptions.publicPath || "",
+@@ -195,25 +196,49 @@
                      });
                      compilation.chunkGroups.forEach(function (chunkGroup) {
                          function recordModule(id, module) {
@@ -17,9 +25,6 @@
 +                            if (void 0 === href) return;
 +                            const existing = filePathToModuleMetadata[href];
 +                            if (existing) {
-+                                // Merge chunks from additional chunk groups instead of overwriting.
-+                                // A module can appear in multiple chunk groups, and all chunks
-+                                // need to be recorded so the flight client preloads them all.
 +                                const existingChunkIds = new Set();
 +                                for (let i = 0; i < existing.chunks.length; i += 2) {
 +                                    existingChunkIds.add(existing.chunks[i]);
@@ -29,19 +34,31 @@
 +                                        existing.chunks.push(chunks[j], chunks[j + 1]);
 +                                    }
 +                                }
++                                if (!existing.css) existing.css = [];
++                                for (const cssFile of cssFiles) {
++                                    if (!existing.css.includes(cssFile)) existing.css.push(cssFile);
++                                }
 +                            } else {
 +                                filePathToModuleMetadata[href] = {
 +                                    id,
 +                                    chunks: chunks.slice(),
++                                    css: cssFiles.slice(),
 +                                    name: "*"
 +                                };
 +                            }
                          }
                          const chunks = [];
++                        const cssFiles = [];
                          chunkGroup.chunks.forEach(function (c) {
-@@ -211,9 +227,9 @@
+                             var _iterator = _createForOfIteratorHelper(c.files), _step;
+                             try {
                                  for (_iterator.s(); !(_step = _iterator.n()).done;) {
                                      const file = _step.value;
++                                    if (file.endsWith(".css")) {
++                                        var cssUrl = cssPrefix + file;
++                                        if (!cssFiles.includes(cssUrl)) cssFiles.push(cssUrl);
++                                        continue;
++                                    }
                                      if (!file.endsWith(".js"))
 -                                        break;
 +                                        continue;
@@ -51,3 +68,105 @@
                                      chunks.push(c.id, file);
                                      break;
                                  }
+--- a/dist/react-server-dom-webpack/esm/react-server-dom-webpack-node-loader.production.js
++++ b/dist/react-server-dom-webpack/esm/react-server-dom-webpack-node-loader.production.js
+@@ -362,22 +362,64 @@
+     if (names.length === 0) {
+         return '';
+     }
++    // Issue #3211 Path B: for component-shaped exports of a 'use client' file,
++    // emit a server-side wrapper that renders
++    //   <><link rel=stylesheet precedence=ror-rsc href=…/>...<RealRef {...props}/></>
++    // so React DOM emits its $RR gating script for deferred Suspense subtrees.
++    // Non-component exports (lowercase-named) keep the original client-reference
++    // shim so they can still be passed across the server/client boundary as
++    // tagged values (hooks, stores, constants, etc).
++    //
++    // CSS hrefs are looked up at runtime from globalThis.__rorRscClientManifest,
++    // which the SSR pipeline populates before rendering. The lookup happens on
++    // every wrapper invocation (no closure cache) so HMR rebuilds and multi-
++    // bundle setups always read the current manifest.
+     let newSrc = 'import {registerClientReference} from "react-on-rails-rsc/server";\n';
++    newSrc += 'import {createElement as __ror_h, Fragment as __ror_F} from "react";\n';
++    // Defensive lookup: handle both flat ClientManifest shape (entries keyed
++    // by file URL directly) and the wrapped {filePathToModuleMetadata, ...}
++    // shape that the plugin emits. Either way, find the entry and read .css.
++    newSrc += 'function __ror_css_lookup(refUrl){var m=globalThis.__rorRscClientManifest;if(!m)return [];var entries=m.filePathToModuleMetadata||m;var e=entries[refUrl];return (e&&e.css)||[];}\n';
++    // Wrapper: look up CSS every render (no closure cache so HMR / multi-
++    // bundle setups don't see stale values); pass children variadic via
++    // .apply so React doesn't warn about missing keys for the inner element.
++    newSrc += 'function __ror_wrap(ref, refUrl){return function __ror_wrapped(props){var __h=__ror_css_lookup(refUrl);if(__h.length===0)return __ror_h(ref,props);var c=[__ror_F,null];for(var i=0;i<__h.length;i++){c.push(__ror_h("link",{key:"__ror_link_"+__h[i],rel:"stylesheet",href:__h[i],precedence:"ror-rsc"}));}c.push(__ror_h(ref,props));return __ror_h.apply(null,c);};}\n';
++    // Component-shape heuristic: default export OR named export starting with
++    // PascalCase (uppercase followed by lowercase letter). Lowercase exports
++    // (hooks, utilities), UPPER_SNAKE constants, and single-letter names keep
++    // the bare client-reference shim so React Flight can serialize them as
++    // values across the boundary. Known limitation: default exports that are
++    // actually hooks (e.g. `export default useThing`) get wrapped — refactor
++    // those to named exports if it matters. Pure value-as-prop passing of
++    // wrapped exports also breaks — that requires moving the wrap site into
++    // the React Flight server (out of scope for this loader-only fix).
++    const isComponentName = (n) => n === 'default' || /^[A-Z][a-z]/.test(n);
++    // Use distinct prefixes for the default-export shim variable name vs named
++    // exports so a named export literally called "_default" doesn't collide.
++    const refVarFor = (n) => n === 'default' ? '__ror_default_ref__' : '__ror_named_ref_' + n;
+     for (let i = 0; i < names.length; i++) {
+         const name = names[i];
+-        if (name === 'default') {
+-            newSrc += 'export default ';
+-            newSrc += 'registerClientReference(function() {';
+-            newSrc += 'throw new Error(' + JSON.stringify("Attempted to call the default export of " + url + " from the server " + "but it's on the client. It's not possible to invoke a client function from " + "the server, it can only be rendered as a Component or passed to props of a " + "Client Component.") + ');';
++        const errMsg = name === 'default'
++            ? "Attempted to call the default export of " + url + " from the server but it's on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component."
++            : "Attempted to call " + name + "() from the server but " + name + " is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.";
++        const shim = 'registerClientReference(function() { throw new Error(' + JSON.stringify(errMsg) + '); }, ' + JSON.stringify(url) + ', ' + JSON.stringify(name) + ')';
++        if (!isComponentName(name)) {
++            // Non-component export: emit the bare shim, no wrapping.
++            if (name === 'default') {
++                newSrc += 'export default ' + shim + ';\n';
++            } else {
++                newSrc += 'export const ' + name + ' = ' + shim + ';\n';
++            }
++            continue;
+         }
+-        else {
+-            newSrc += 'export const ' + name + ' = ';
+-            newSrc += 'registerClientReference(function() {';
+-            newSrc += 'throw new Error(' + JSON.stringify("Attempted to call " + name + "() from the server but " + name + " is on the client. " + "It's not possible to invoke a client function from the server, it can " + "only be rendered as a Component or passed to props of a Client Component.") + ');';
++        // Component export: bind the shim to a private variable, then wrap.
++        const refVar = refVarFor(name);
++        newSrc += 'const ' + refVar + ' = ' + shim + ';\n';
++        if (name === 'default') {
++            newSrc += 'export default __ror_wrap(' + refVar + ', ' + JSON.stringify(url) + ');\n';
++        } else {
++            newSrc += 'export const ' + name + ' = __ror_wrap(' + refVar + ', ' + JSON.stringify(url) + ');\n';
+         }
+-        newSrc += '},';
+-        newSrc += JSON.stringify(url) + ',';
+-        newSrc += JSON.stringify(name) + ');\n';
+     } // TODO: Generate source maps for Client Reference functions so they can point to their
+     // original locations.
+     return newSrc;
+--- a/dist/server.node.js
++++ b/dist/server.node.js
+@@ -2,7 +2,13 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.renderToPipeableStream = exports.buildServerRenderer = void 0;
+ const server_node_1 = require("./react-server-dom-webpack/server.node");
++// Issue #3211 Path B: publish the loaded manifest to globalThis so the
++// loader-emitted wrapper functions can look up each client reference's CSS
++// hrefs at render time. One assignment per VM context; the Node Renderer's
++// vm.createContext() per-bundle isolation makes this safe across bundles.
++const __publishManifest = (m) => { globalThis.__rorRscClientManifest = m; };
+ const buildServerRenderer = (clientManifest) => {
++    __publishManifest(clientManifest);
+     const { filePathToModuleMetadata } = clientManifest;
+     return {
+         renderToPipeableStream: (
+@@ -15,6 +21,7 @@
+ };
+ exports.buildServerRenderer = buildServerRenderer;
+ const renderToPipeableStream = (model, clientManifest, options) => {
++    __publishManifest(clientManifest);
+     const { filePathToModuleMetadata } = clientManifest;
+     return (0, server_node_1.renderToPipeableStream)(model, filePathToModuleMetadata, options);
+ };
