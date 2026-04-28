@@ -1,6 +1,14 @@
 --- a/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js
 +++ b/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-plugin.js
-@@ -195,14 +195,30 @@
+@@ -179,6 +179,7 @@
+                                 : "anonymous"
+                             : null;
+                     var resolvedClientFiles = new Set((resolvedClientReferences || []).map((ref) => ref.request)), filePathToModuleMetadata = {};
++                    var cssPrefix = (typeof compilation.outputOptions.publicPath === "string" ? compilation.outputOptions.publicPath : "") || "";
+                     configuredCrossOriginLoading = {
+                         moduleLoading: {
+                             prefix: compilation.outputOptions.publicPath || "",
+@@ -195,25 +196,52 @@
                      });
                      compilation.chunkGroups.forEach(function (chunkGroup) {
                          function recordModule(id, module) {
@@ -29,19 +37,31 @@
 +                                        existing.chunks.push(chunks[j], chunks[j + 1]);
 +                                    }
 +                                }
++                                if (!existing.css) existing.css = [];
++                                for (const cssFile of cssFiles) {
++                                    if (!existing.css.includes(cssFile)) existing.css.push(cssFile);
++                                }
 +                            } else {
 +                                filePathToModuleMetadata[href] = {
 +                                    id,
 +                                    chunks: chunks.slice(),
++                                    css: cssFiles.slice(),
 +                                    name: "*"
 +                                };
 +                            }
                          }
                          const chunks = [];
++                        const cssFiles = [];
                          chunkGroup.chunks.forEach(function (c) {
-@@ -211,9 +227,9 @@
+                             var _iterator = _createForOfIteratorHelper(c.files), _step;
+                             try {
                                  for (_iterator.s(); !(_step = _iterator.n()).done;) {
                                      const file = _step.value;
++                                    if (file.endsWith(".css")) {
++                                        var cssUrl = cssPrefix + file;
++                                        if (!cssFiles.includes(cssUrl)) cssFiles.push(cssUrl);
++                                        continue;
++                                    }
                                      if (!file.endsWith(".js"))
 -                                        break;
 +                                        continue;
@@ -51,3 +71,92 @@
                                      chunks.push(c.id, file);
                                      break;
                                  }
+--- a/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-server.node.production.js
++++ b/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-server.node.production.js
+@@ -992,12 +992,44 @@
+             case REACT_MEMO_TYPE:
+                 return renderElement(request, task, type.type, key, ref, props);
+         }
++    // Issue #3211 Path A: if the type is a client reference whose manifest
++    // entry records CSS files, wrap the rendered element in an array containing
++    // <link rel=stylesheet precedence=ror-rsc> elements + the original element.
++    // React encodes a key-less Fragment as a plain array of children, so the
++    // wrapper enters the React tree as in-tree <link> JSX siblings of the
++    // client component. React DOM then emits its $RR gating script for the
++    // resolution chunk.
++    var __css_3211 = null;
++    if (type && type.$$typeof === CLIENT_REFERENCE_TAG$1) {
++        var __bc_3211 = request.bundlerConfig;
++        var __path_3211 = type.$$id;
++        var __mod_3211 = __bc_3211[__path_3211];
++        if (!__mod_3211) {
++            var __hashIdx_3211 = __path_3211.lastIndexOf("#");
++            if (__hashIdx_3211 !== -1) {
++                __mod_3211 = __bc_3211[__path_3211.slice(0, __hashIdx_3211)];
++            }
++        }
++        if (__mod_3211 && __mod_3211.css && __mod_3211.css.length > 0) {
++            __css_3211 = __mod_3211.css;
++        }
++    }
+     request = key;
+     key = task.keyPath;
+     null === request
+         ? (request = key)
+         : null !== key && (request = key + "," + request);
+     props = [REACT_ELEMENT_TYPE, type, request, props];
++    if (__css_3211) {
++        var __wrapped_3211 = [];
++        for (var __i_3211 = 0; __i_3211 < __css_3211.length; __i_3211++) {
++            var __href_3211 = __css_3211[__i_3211];
++            __wrapped_3211.push([REACT_ELEMENT_TYPE, "link", __href_3211,
++                { rel: "stylesheet", href: __href_3211, precedence: "ror-rsc" }]);
++        }
++        __wrapped_3211.push(props);
++        props = __wrapped_3211;
++    }
+     task = task.implicitSlot && null !== request ? [props] : props;
+     return task;
+ }
+--- a/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-server.node.development.js
++++ b/dist/react-server-dom-webpack/cjs/react-server-dom-webpack-server.node.development.js
+@@ -1013,11 +1013,39 @@
+             }
+             else
+                 return renderFunctionComponent(request, task, key, type, props);
++            // Issue #3211 Path A: wrap CSS-having client refs with in-tree
++            // <link rel=stylesheet precedence> JSX so React DOM emits the $RR
++            // gating script for the resolution chunk.
++            var __css_3211 = null;
++            if (type && type.$$typeof === CLIENT_REFERENCE_TAG$1) {
++                var __bc_3211 = request.bundlerConfig;
++                var __mod_3211 = __bc_3211[type.$$id];
++                if (!__mod_3211) {
++                    var __h_3211 = type.$$id.lastIndexOf("#");
++                    if (__h_3211 !== -1) {
++                        __mod_3211 = __bc_3211[type.$$id.slice(0, __h_3211)];
++                    }
++                }
++                if (__mod_3211 && __mod_3211.css && __mod_3211.css.length > 0) {
++                    __css_3211 = __mod_3211.css;
++                }
++            }
+             ref = task.keyPath;
+             null === key ? (key = ref) : null !== ref && (key = ref + "," + key);
+             null !== task.debugOwner &&
+                 outlineComponentInfo(request, task.debugOwner);
+             request = [REACT_ELEMENT_TYPE, type, key, props, task.debugOwner];
++            if (__css_3211) {
++                var __wrapped_3211 = [];
++                for (var __i_3211 = 0; __i_3211 < __css_3211.length; __i_3211++) {
++                    var __href_3211 = __css_3211[__i_3211];
++                    __wrapped_3211.push([REACT_ELEMENT_TYPE, "link", __href_3211,
++                        { rel: "stylesheet", href: __href_3211, precedence: "ror-rsc" },
++                        task.debugOwner]);
++                }
++                __wrapped_3211.push(request);
++                request = __wrapped_3211;
++            }
+             task = task.implicitSlot && null !== key ? [request] : request;
+             return task;
+         }
