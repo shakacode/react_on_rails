@@ -10,8 +10,8 @@ starting from.
 
 ## Starter Repos
 
-One starter repo is fully open source; one requires React on Rails Pro —
-check each entry's note before evaluating.
+Check each entry's note before evaluating — some starters are fully open
+source, while others require React on Rails Pro.
 
 ### SSR + HMR Tutorial Demo (open source)
 
@@ -22,6 +22,8 @@ check each entry's note before evaluating.
 ### React on Rails Pro + RSC Starter (Pro)
 
 - Repo: [shakacode/react-on-rails-rsc-demo](https://github.com/shakacode/react-on-rails-rsc-demo)
+  _(slug rename to `react-on-rails-demo-rsc` pending — update this line when the
+  rename completes)_
 - Use it when you want a minimal public sample for React Server Components with
   React on Rails Pro.
 - Note: this repo uses React on Rails Pro. See [OSS vs Pro](./oss-vs-pro.md)
@@ -86,7 +88,9 @@ Version-specific demos, `test-*` repos, generator snapshots, and older tutorial
 repos are useful historical references, but they are not the primary starting
 point for new evaluations.
 
-- Legacy full app: [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) — older production-style app (see Live Demos above for the running site at reactrails.com). Still useful as a historical reference, but not the recommended starting point for new projects.
+- Legacy full app: [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) —
+  older production-style app (see Live Demos above for the running site at reactrails.com).
+  Still useful as a historical reference, but not the recommended starting point for new projects.
 
 If you are choosing a public reference repo for docs, talks, or adoption work,
 start with the repos above.
