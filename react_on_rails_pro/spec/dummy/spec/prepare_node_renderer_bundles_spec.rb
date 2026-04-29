@@ -210,10 +210,19 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
       server_dir = File.join(cache_dir, bundle_hash)
       rsc_dir = File.join(cache_dir, rsc_bundle_hash)
 
-      expect(File.exist?(File.join(server_dir, "react-client-manifest.json"))).to be(true)
-      expect(File.exist?(File.join(server_dir, "react-server-client-manifest.json"))).to be(true)
-      expect(File.exist?(File.join(rsc_dir, "react-client-manifest.json"))).to be(true)
-      expect(File.exist?(File.join(rsc_dir, "react-server-client-manifest.json"))).to be(true)
+      server_bundle_client_manifest = File.join(server_dir, "react-client-manifest.json")
+      server_bundle_server_client_manifest = File.join(server_dir, "react-server-client-manifest.json")
+      rsc_bundle_client_manifest = File.join(rsc_dir, "react-client-manifest.json")
+      rsc_bundle_server_client_manifest = File.join(rsc_dir, "react-server-client-manifest.json")
+
+      expect(File.exist?(server_bundle_client_manifest)).to be(true)
+      expect(File.symlink?(server_bundle_client_manifest)).to be(true)
+      expect(File.exist?(server_bundle_server_client_manifest)).to be(true)
+      expect(File.symlink?(server_bundle_server_client_manifest)).to be(true)
+      expect(File.exist?(rsc_bundle_client_manifest)).to be(true)
+      expect(File.symlink?(rsc_bundle_client_manifest)).to be(true)
+      expect(File.exist?(rsc_bundle_server_client_manifest)).to be(true)
+      expect(File.symlink?(rsc_bundle_server_client_manifest)).to be(true)
     end
   end
 
