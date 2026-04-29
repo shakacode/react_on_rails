@@ -7,6 +7,8 @@ import ReactOnRails from 'react-on-rails/client';
 import ReactDOM from 'react-dom';
 
 import HelloWorldContainer from '../../app/components/HelloWorldContainer';
+// Intentional cross-tree import: the React 16 dummy entries reuse the StrictMode helper from the
+// React 19 `app/` tree. Keep the import path in sync if `app/strictModeSupport` is moved.
 import { wrapElementInStrictMode } from '../../app/strictModeSupport';
 
 /*

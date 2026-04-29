@@ -64,6 +64,19 @@ describe('strictModeSupport', () => {
     expect(wrappedComponents.rendererFunction).toBe(rendererFunction);
   });
 
+  it('treats a 2-arg functional component as a render function (arity heuristic)', () => {
+    // A 2-arg component looks like a render function to isRenderFunction; this test pins down
+    // the heuristic so a future change has to update the test alongside the behavior.
+    const TwoArgComponent = ({ greeting }, _legacyContext) => <div>{greeting}</div>;
+    TwoArgComponent.propTypes = {
+      greeting: PropTypes.string.isRequired,
+    };
+
+    const wrappedComponents = wrapRegisteredComponentsWithStrictMode({ TwoArgComponent });
+
+    expect(wrappedComponents.TwoArgComponent).toBe(TwoArgComponent);
+  });
+
   it('wraps manual render trees in StrictMode', () => {
     const innerElement = <div>hello</div>;
     const wrappedElement = wrapElementInStrictMode(innerElement);

@@ -145,6 +145,10 @@ const wrapRenderFunctionResult = (result: unknown): unknown => {
   return result;
 };
 
+// The wrapped function below has `length === 2`, so `isRenderFunction` would re-classify it as a
+// render function if it ever flowed back through `wrapRegisteredComponentsWithStrictMode`. The
+// STRICT_MODE_PATCHED guard on `enableStrictModeForReactOnRails` ensures the patched `register`
+// runs only once per singleton, which keeps that re-entry path unreachable.
 const wrapRenderFunctionInStrictMode = (renderFunction: RenderFunction): RenderFunction => {
   const cachedRenderFunction = wrappedRenderFunctions.get(renderFunction);
   if (cachedRenderFunction) {

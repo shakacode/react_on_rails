@@ -36,6 +36,9 @@ const configureRsc = () => {
   const rootNodeModules = resolve(__dirname, '..', '..', '..', '..', '..', 'node_modules');
   const rscAliases = { ...(rscConfig.resolve?.alias || {}) };
   delete rscAliases['react-on-rails-pro$'];
+  // Drop the client-only StrictMode shim so RSC imports of `react-on-rails-pro/client` don't pull
+  // in a browser entry point inside the React server bundle.
+  delete rscAliases['react-on-rails-pro/client$'];
   rscConfig.resolve = {
     ...rscConfig.resolve,
     conditionNames: ['react-server', '...'],

@@ -13,10 +13,13 @@ import { wrapRegisteredComponentsWithStrictMode } from '../strictModeSupport';
 
 const STRICT_MODE_PATCHED = '__reactOnRailsDummyStrictModePatched';
 
+// Scope: this patch only affects `ReactOnRails.register` calls that share this bundle's module
+// instance (this pack and inline ERB views that run after it). Separate entry-point packs that
+// import `react-on-rails/client` independently get their own unpatched module and would skip
+// StrictMode wrapping.
 if (!ReactOnRails[STRICT_MODE_PATCHED]) {
   const originalRegister = ReactOnRails.register.bind(ReactOnRails);
 
-  // Covers this bundle and inline ERB register calls, which run after the bundle has loaded.
   ReactOnRails.register = (components) =>
     originalRegister(wrapRegisteredComponentsWithStrictMode(components));
   Object.defineProperty(ReactOnRails, STRICT_MODE_PATCHED, { value: true });

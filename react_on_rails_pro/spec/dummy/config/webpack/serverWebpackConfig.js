@@ -25,14 +25,20 @@ const configureServer = (rscBundle = false) => {
   // entry value will result in changing the client config!
   // Using webpack-merge into an empty object avoids this issue.
   const serverWebpackConfig = commonWebpackConfig();
-  serverWebpackConfig.resolve.alias['react-on-rails-pro$'] = path.resolve(
-    __dirname,
-    '..',
-    '..',
-    'client',
-    'app',
-    'strictModeReactOnRailsProNode.js',
-  );
+  serverWebpackConfig.resolve = {
+    ...serverWebpackConfig.resolve,
+    alias: {
+      ...(serverWebpackConfig.resolve?.alias || {}),
+      'react-on-rails-pro$': path.resolve(
+        __dirname,
+        '..',
+        '..',
+        'client',
+        'app',
+        'strictModeReactOnRailsProNode.js',
+      ),
+    },
+  };
 
   // We just want the single server bundle entry
   const serverEntry = {
