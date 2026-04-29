@@ -13,14 +13,26 @@ module ReactOnRailsPro
 
     def collect_assets
       config = ReactOnRailsPro.configuration
-      assets = Array(config.assets_to_copy).dup
+      # assets_to_copy may include nil entries (user-configured, optional);
+      # those are silently dropped by `.compact`. RSC manifests, by contrast,
+      # are required, so resolve them separately and fail loudly if either
+      # resolves to nil rather than letting `.compact` swallow the gap.
+      assets = Array(config.assets_to_copy).dup.compact
 
       if config.enable_rsc_support
-        assets << ReactOnRailsPro::Utils.react_client_manifest_file_path
-        assets << ReactOnRailsPro::Utils.react_server_client_manifest_file_path
+        rsc_manifests = [
+          ReactOnRailsPro::Utils.react_client_manifest_file_path,
+          ReactOnRailsPro::Utils.react_server_client_manifest_file_path
+        ]
+        if rsc_manifests.any?(&:nil?)
+          raise ReactOnRailsPro::Error,
+                "RSC manifest path resolved to nil. " \
+                "Check react_client_manifest_file and react_server_client_manifest_file configuration."
+        end
+        assets.concat(rsc_manifests)
       end
 
-      assets.compact.uniq(&:to_s)
+      assets.uniq(&:to_s)
     end
 
     # Required assets are matched by expanded path rather than basename so a
@@ -50,7 +62,7 @@ module ReactOnRailsPro
       File.rename(tmp_file, dest)
       puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
     ensure
-      FileUtils.rm_f(tmp_file) if tmp_file && File.exist?(tmp_file)
+      FileUtils.rm_f(tmp_file) if tmp_file
     end
 
     def asset_label(asset_path)
