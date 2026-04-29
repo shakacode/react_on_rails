@@ -18,7 +18,9 @@ const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
         overlay: {
           // bin/dev sets SHAKAPACKER_DEV_SERVER_PORT as a string, which Shakapacker
           // surfaces unchanged on devServer.port. The plugin schema requires a number.
-          sockPort: parseInt(devServer.port, 10),
+          // `|| 3035` falls back to Shakapacker's default if devServer.port is missing,
+          // so a misconfiguration surfaces as a wrong port rather than silent NaN.
+          sockPort: parseInt(devServer.port, 10) || 3035,
         },
       }),
     );
