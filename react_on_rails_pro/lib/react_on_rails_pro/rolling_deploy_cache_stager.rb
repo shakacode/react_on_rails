@@ -193,8 +193,9 @@ module ReactOnRailsPro
         warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned missing required RSC " \
              "asset path(s): #{missing_required.inspect}. Skipping this hash."
       else
-        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned missing asset " \
-             "path(s): #{missing_assets.inspect}. Skipping this hash."
+        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-required asset " \
+             "path(s) that do not exist: #{missing_assets.inspect}. Adapter contract requires only " \
+             "existing file paths. Skipping this hash."
       end
     end
     private_class_method :warn_missing_asset_payload
@@ -207,8 +208,9 @@ module ReactOnRailsPro
         warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-file required RSC " \
              "asset path(s): #{non_file_required.inspect}. Skipping this hash."
       else
-        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-file asset " \
-             "path(s): #{non_file_assets.inspect}. Skipping this hash."
+        warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-required asset " \
+             "path(s) that are not files: #{non_file_assets.inspect}. Adapter contract requires only " \
+             "existing file paths. Skipping this hash."
       end
     end
     private_class_method :warn_non_file_asset_payload
@@ -353,7 +355,7 @@ module ReactOnRailsPro
       return unless backup_dir && File.exist?(backup_dir)
 
       FileUtils.rm_rf(bundle_dir)
-      FileUtils.mv(backup_dir, bundle_dir) if File.exist?(backup_dir) && !File.exist?(bundle_dir)
+      FileUtils.mv(backup_dir, bundle_dir) unless File.exist?(bundle_dir)
     rescue StandardError => e
       warn "[ReactOnRailsPro] Could not restore previous rolling-deploy bundle directory #{backup_dir} " \
            "to #{bundle_dir}: #{e.class}: #{e.message}. Runtime 410-retry remains the fallback."

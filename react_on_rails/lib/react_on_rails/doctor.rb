@@ -2953,7 +2953,7 @@ module ReactOnRails
       if defined?(ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS)
         ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
       else
-        10
+        10 # Must match ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS default
       end
     end
 

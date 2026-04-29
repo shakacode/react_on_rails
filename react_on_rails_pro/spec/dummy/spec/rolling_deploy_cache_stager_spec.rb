@@ -259,7 +259,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
-  context "when an asset stage fails mid-way" do
+  context "when adapter#fetch returns an asset path that does not exist" do
     let(:src_bundle) { source_file("bundle-partial.js") }
 
     before do
@@ -270,9 +270,10 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       )
     end
 
-    it "rolls back the entire hash directory so the renderer sees 410, not a bundle without manifests" do
+    it "skips staging entirely so the renderer sees 410, not a bundle without manifests" do
+      warning_pattern = /\A(?!.*missing loadable-stats\.json).*returned non-required asset path\(s\) that do not exist/m
       expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
-        .to output(/\A(?!.*missing loadable-stats\.json).*returned missing asset path/m).to_stderr
+        .to output(warning_pattern).to_stderr
 
       bundle_dir = File.join(cache_dir, "abc123")
       expect(File.exist?(bundle_dir)).to be(false)
@@ -293,7 +294,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
     it "warns and skips that hash before staging non-file assets" do
       expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :symlink) }
-        .to output(/returned non-file asset path/).to_stderr
+        .to output(/returned non-required asset path\(s\) that are not files/).to_stderr
 
       expect(File.exist?(File.join(cache_dir, "directory-asset"))).to be(false)
     end
