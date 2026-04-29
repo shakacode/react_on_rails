@@ -281,6 +281,16 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?).to be(false)
     end
 
+    # Corepack rejects a bare manager name with no @version, and `pnpm/action-setup`
+    # has nothing to resolve from such a field — so the CI scaffold must still pin
+    # the fallback version when packageManager is malformed this way.
+    it "returns false when packageManager omits the version (no @ separator)" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
     it "returns true when packageManager matches the requested manager" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path)

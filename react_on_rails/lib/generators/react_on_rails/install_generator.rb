@@ -134,6 +134,17 @@ module ReactOnRails
         SH
       ].map { |template| template.gsub("\r\n", "\n").strip }.freeze
 
+      # Floor used when the scaffolded CI workflow has to supply a pnpm version because
+      # `pnpm/action-setup` requires one unless package.json declares `packageManager`.
+      # `pnpm/action-setup@v4` resolves this to the latest matching patch (e.g. `"10"`
+      # → latest `10.x.y`) at install time, so this is a major-or-minor floor — not a
+      # reproducible patch pin. Bump on each pnpm major so projects that generated a
+      # lockfile with a newer pnpm but never committed `packageManager` get a runtime
+      # that can still read the lockfile. Users who need exact reproducibility should
+      # commit `packageManager` to their package.json instead.
+      CI_PNPM_FALLBACK_MINOR = "10"
+      private_constant :CI_PNPM_FALLBACK_MINOR
+
       # Main generator entry point
       #
       # Sets up React on Rails in a Rails application by:
@@ -245,16 +256,6 @@ module ReactOnRails
         setup_js_dependencies
       end
 
-      # Minor-level floor used when the scaffolded CI workflow has to supply a pnpm
-      # version because `pnpm/action-setup` requires one unless package.json declares
-      # `packageManager`. `pnpm/action-setup@v4` resolves this to the latest matching
-      # patch (e.g. `9.15` → latest `9.15.x`) at install time, so this is a minor
-      # floor — not a reproducible patch pin. Bump when the repo's own CI upgrades
-      # pnpm. Users who need exact reproducibility should commit `packageManager` to
-      # their package.json instead.
-      CI_PNPM_FALLBACK_MINOR = "9.15"
-      private_constant :CI_PNPM_FALLBACK_MINOR
-
       def add_ci_workflow
         return if options[:pretend]
 
@@ -268,7 +269,7 @@ module ReactOnRails
           return
         end
 
-        package_json = read_package_json_for_ci
+        package_json = GeneratorMessages.read_package_json(destination_root)
         package_manager = GeneratorMessages.detect_package_manager(
           app_root: destination_root, package_json: package_json
         )
@@ -292,15 +293,6 @@ module ReactOnRails
                    pnpm_fallback_version: CI_PNPM_FALLBACK_MINOR,
                    has_active_record: has_active_record, has_rspec: has_rspec })
         @ci_workflow_generated = true
-      end
-
-      def read_package_json_for_ci
-        package_json_path = File.join(destination_root, "package.json")
-        return nil unless File.exist?(package_json_path)
-
-        JSON.parse(File.read(package_json_path))
-      rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
-        nil
       end
 
       # NODE_ENV=production ensures Shakapacker emits a minified production bundle;

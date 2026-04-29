@@ -35,7 +35,10 @@ module GeneratorMessages
 
     def package_manager_from_content(content)
       declared = content["packageManager"]
-      return nil unless declared.is_a?(String)
+      # Corepack requires `<name>@<version>`; treat a bare `"pnpm"` (no `@version`)
+      # as undeclared so the CI scaffold still pins a fallback — `pnpm/action-setup`
+      # has nothing to resolve from a versionless field.
+      return nil unless declared.is_a?(String) && declared.include?("@")
 
       name = declared.split("@").first&.strip&.downcase
       supported_package_manager?(name) ? name : nil
@@ -92,6 +95,19 @@ module GeneratorMessages
       SUPPORTED_PACKAGE_MANAGERS.include?(package_manager)
     end
 
+    # Parses package.json once and returns the hash, or nil if the file is missing
+    # or unreadable. Callers that need multiple fields (packageManager, scripts, ...)
+    # should parse once via this helper and pass the result through to
+    # `detect_package_manager(package_json:)` and `package_manager_declared?(package_json:)`.
+    def read_package_json(app_root)
+      package_json_path = File.join(app_root, "package.json")
+      return nil unless File.exist?(package_json_path)
+
+      JSON.parse(File.read(package_json_path))
+    rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
+      nil
+    end
+
     private
 
     # Pipeline internals — external callers should go through `detect_package_manager`
@@ -101,18 +117,6 @@ module GeneratorMessages
     def detect_package_manager_from_package_json(app_root: Dir.pwd)
       content = read_package_json(app_root)
       content ? package_manager_from_content(content) : nil
-    end
-
-    # Parses package.json once and returns the hash, or nil if the file is missing
-    # or unreadable. Callers that need multiple fields (packageManager, scripts, ...)
-    # should parse once via this helper and pass the result through.
-    def read_package_json(app_root)
-      package_json_path = File.join(app_root, "package.json")
-      return nil unless File.exist?(package_json_path)
-
-      JSON.parse(File.read(package_json_path))
-    rescue JSON::ParserError, Errno::EACCES, Errno::ENOENT
-      nil
     end
   end
 end
