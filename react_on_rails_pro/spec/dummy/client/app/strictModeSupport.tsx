@@ -17,7 +17,7 @@ type ObjectComponent = ComponentMetadata & {
 type ComponentWithMetadata = string | CallableComponent | ObjectComponent;
 type RenderFunction = ((props?: unknown, railsContext?: unknown) => unknown) &
   ComponentMetadata & {
-    renderFunction?: true;
+    renderFunction?: boolean;
   };
 
 type ComponentRegistry = Record<string, unknown>;
@@ -36,7 +36,14 @@ const REACT_OBJECT_COMPONENT_TYPES = new Set<symbol | number>([
 const wrappedFunctionComponents = new WeakMap<CallableComponent | RenderFunction, ComponentWithMetadata>();
 const wrappedRenderFunctions = new WeakMap<RenderFunction, RenderFunction>();
 const wrappedObjectComponents = new WeakMap<ObjectComponent, ComponentWithMetadata>();
+// Strings are primitives and cannot key a WeakMap, so registered string component names live here.
 const wrappedStringComponents = new Map<string, ComponentWithMetadata>();
+
+// TODO: Pro-only logic (`enableStrictModeForReactOnRails`, `wrapRenderFunctionResult` Promise
+// handling, `wrapRenderFunctionInStrictMode`) has no dedicated test suite. The OSS dummy's Jest
+// config doesn't cover Pro-specific paths; consider a small Vitest/Jest harness inside
+// `react_on_rails_pro/spec/dummy/tests/` (mirroring the OSS `strict-mode-support.test.jsx`) to
+// pin the async Promise-result path and the singleton-patch idempotency.
 
 const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   typeof value === 'object' &&
@@ -55,7 +62,11 @@ const isObjectComponent = (component: unknown): component is ObjectComponent =>
 const isReactComponent = (component: unknown): component is ComponentWithMetadata =>
   typeof component === 'string' || isFunctionWithMetadata(component) || isObjectComponent(component);
 
-// Mirrors React on Rails' render-function convention while keeping class components wrappable.
+// Mirrors React on Rails' render-function convention while extending it with an explicit
+// `renderFunction = false` opt-out (the public helper only checks for truthiness; this dummy
+// honors `false` so legacy 2-arg `(props, context)` components can be wrapped via the component
+// path rather than the render-function path). Class components are detected via the prototype
+// check.
 const isRenderFunction = (component: unknown): component is RenderFunction => {
   if (typeof component !== 'function') {
     return false;
@@ -66,8 +77,9 @@ const isRenderFunction = (component: unknown): component is RenderFunction => {
     return false;
   }
 
-  if (component.renderFunction) {
-    return true;
+  const renderFunctionFlag = (component as { renderFunction?: unknown }).renderFunction;
+  if (typeof renderFunctionFlag === 'boolean') {
+    return renderFunctionFlag;
   }
 
   return component.length >= 2;
@@ -148,7 +160,11 @@ const wrapRenderFunctionResult = (result: unknown): unknown => {
 // The wrapped function below has `length === 2`, so `isRenderFunction` would re-classify it as a
 // render function if it ever flowed back through `wrapRegisteredComponentsWithStrictMode`. The
 // STRICT_MODE_PATCHED guard on `enableStrictModeForReactOnRails` ensures the patched `register`
-// runs only once per singleton, which keeps that re-entry path unreachable.
+// runs only once per singleton, which keeps that re-entry path unreachable. Note: when called
+// directly (outside the registry path) with a 3-arg renderer, the wrapper's hardcoded
+// `length === 2` would not reflect the original arity. `wrapRegisteredComponentsWithStrictMode`
+// orders the renderer check before the render-function check so a 3-arg renderer never reaches
+// this helper through the registry, but direct callers should treat this as a precondition.
 const wrapRenderFunctionInStrictMode = (renderFunction: RenderFunction): RenderFunction => {
   const cachedRenderFunction = wrappedRenderFunctions.get(renderFunction);
   if (cachedRenderFunction) {

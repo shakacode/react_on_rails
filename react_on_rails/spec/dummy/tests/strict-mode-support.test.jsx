@@ -47,34 +47,94 @@ describe('strictModeSupport', () => {
     expect(wrappedElement.props.children.type).toBe(HelloWorld);
   });
 
-  it('does not wrap render functions or renderer functions', () => {
-    const renderFunction = (props, railsContext) => ({ props, railsContext });
+  it('skips 3-arg renderer functions (they manage their own DOM root)', () => {
     const rendererFunction = (props, railsContext, domNodeId) => ({ props, railsContext, domNodeId });
-    const flaggedRenderFunction = () => () => <div>Hello</div>;
-    flaggedRenderFunction.renderFunction = true;
+    const wrappedComponents = wrapRegisteredComponentsWithStrictMode({ rendererFunction });
 
-    const wrappedComponents = wrapRegisteredComponentsWithStrictMode({
-      flaggedRenderFunction,
-      renderFunction,
-      rendererFunction,
-    });
-
-    expect(wrappedComponents.flaggedRenderFunction).toBe(flaggedRenderFunction);
-    expect(wrappedComponents.renderFunction).toBe(renderFunction);
     expect(wrappedComponents.rendererFunction).toBe(rendererFunction);
   });
 
-  it('treats a 2-arg functional component as a render function (arity heuristic)', () => {
-    // A 2-arg component looks like a render function to isRenderFunction; this test pins down
-    // the heuristic so a future change has to update the test alongside the behavior.
+  it('wraps 2-arg render functions and intercepts React element results in StrictMode', () => {
+    const renderFunction = (props, _railsContext) => <div>{props.greeting}</div>;
+    const wrappedComponents = wrapRegisteredComponentsWithStrictMode({ renderFunction });
+
+    expect(wrappedComponents.renderFunction).not.toBe(renderFunction);
+    const result = wrappedComponents.renderFunction({ greeting: 'hello' }, {});
+    expect(result.type).toBe(React.StrictMode);
+    expect(result.props.children.type).toBe('div');
+    expect(result.props.children.props.children).toBe('hello');
+  });
+
+  it('wraps render functions flagged with renderFunction = true', () => {
+    const flaggedRenderFunction = (props) => <div>{props.greeting}</div>;
+    flaggedRenderFunction.renderFunction = true;
+    const wrappedComponents = wrapRegisteredComponentsWithStrictMode({ flaggedRenderFunction });
+
+    expect(wrappedComponents.flaggedRenderFunction).not.toBe(flaggedRenderFunction);
+    const result = wrappedComponents.flaggedRenderFunction({ greeting: 'hello' });
+    expect(result.type).toBe(React.StrictMode);
+    expect(result.props.children.type).toBe('div');
+  });
+
+  it('passes through non-element results from render functions unchanged', () => {
+    const renderFunction = (props, railsContext) => ({ props, railsContext });
+    const wrappedComponents = wrapRegisteredComponentsWithStrictMode({ renderFunction });
+
+    const result = wrappedComponents.renderFunction({ a: 1 }, { b: 2 });
+    expect(result).toEqual({ props: { a: 1 }, railsContext: { b: 2 } });
+  });
+
+  it('wraps a component result returned from a render function via the component path', () => {
+    const ResultComponent = ({ greeting }) => <span>{greeting}</span>;
+    ResultComponent.propTypes = {
+      greeting: PropTypes.string.isRequired,
+    };
+    const renderFunction = (_props, _railsContext) => ResultComponent;
+    const wrappedComponents = wrapRegisteredComponentsWithStrictMode({ renderFunction });
+
+    const wrappedResult = wrappedComponents.renderFunction({}, {});
+    expect(wrappedResult).not.toBe(ResultComponent);
+    const wrappedElement = wrappedResult({ greeting: 'hello' });
+    expect(wrappedElement.type).toBe(React.StrictMode);
+    expect(wrappedElement.props.children.type).toBe(ResultComponent);
+  });
+
+  it('respects explicit renderFunction = false on 2-arg components (component path)', () => {
     const TwoArgComponent = ({ greeting }, _legacyContext) => <div>{greeting}</div>;
     TwoArgComponent.propTypes = {
       greeting: PropTypes.string.isRequired,
     };
+    TwoArgComponent.renderFunction = false;
 
     const wrappedComponents = wrapRegisteredComponentsWithStrictMode({ TwoArgComponent });
 
-    expect(wrappedComponents.TwoArgComponent).toBe(TwoArgComponent);
+    expect(wrappedComponents.TwoArgComponent).not.toBe(TwoArgComponent);
+    const wrappedElement = wrappedComponents.TwoArgComponent({ greeting: 'hello' });
+    expect(wrappedElement.type).toBe(React.StrictMode);
+    expect(wrappedElement.props.children.type).toBe(TwoArgComponent);
+  });
+
+  it('treats a 2-arg functional component as a render function by default (arity heuristic)', () => {
+    // Without the explicit `renderFunction = false` opt-out, a 2-arg signature is classified as
+    // a render function and its return value is intercepted (wrapped in StrictMode) rather than
+    // the component itself wrapped via the component path.
+    const TwoArgComponent = ({ greeting }, _legacyContext) => <div>{greeting}</div>;
+    TwoArgComponent.propTypes = {
+      greeting: PropTypes.string.isRequired,
+    };
+    const wrappedComponents = wrapRegisteredComponentsWithStrictMode({ TwoArgComponent });
+
+    expect(wrappedComponents.TwoArgComponent).not.toBe(TwoArgComponent);
+    const result = wrappedComponents.TwoArgComponent({ greeting: 'hello' }, {});
+    expect(result.type).toBe(React.StrictMode);
+    expect(result.props.children.type).toBe('div');
+  });
+
+  it('passes plain objects (non-React components) through unchanged', () => {
+    const plainObject = { world: () => 'hello' };
+    const wrappedComponents = wrapRegisteredComponentsWithStrictMode({ plainObject });
+
+    expect(wrappedComponents.plainObject).toBe(plainObject);
   });
 
   it('wraps manual render trees in StrictMode', () => {
