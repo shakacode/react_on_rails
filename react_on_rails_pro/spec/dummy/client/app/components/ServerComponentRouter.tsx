@@ -5,6 +5,7 @@ import RSCRoute from 'react-on-rails-pro/RSCRoute';
 import EchoProps from './EchoProps';
 import { ErrorBoundary } from './ErrorBoundary';
 import ServerComponentWithRetry from './ServerComponentWithRetry';
+import RefetchStressPage from './RefetchStressPage';
 
 export default function App({ basePath = '/server_router', ...props }: { basePath?: string }) {
   return (
@@ -46,6 +47,9 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
           </li>
           <li>
             <Link to={`${basePath}/server-component-with-retry`}>Server Component with Retry</Link>
+          </li>
+          <li>
+            <Link to={`${basePath}/refetch-stress`}>Refetch Stress (Issue 3106)</Link>
           </li>
           <li>
             <Link to={`${basePath}/deterministic-rsc-error`}>Deterministic RSC Error</Link>
@@ -94,6 +98,7 @@ export default function App({ basePath = '/server_router', ...props }: { basePat
             element={<RSCRoute componentName="AsyncComponentsTreeForTesting" componentProps={props} />}
           />
           <Route path={`${basePath}/server-component-with-retry`} element={<ServerComponentWithRetry />} />
+          <Route path={`${basePath}/refetch-stress`} element={<RefetchStressPage />} />
           <Route
             path={`${basePath}/deterministic-rsc-error`}
             element={<RSCRoute componentName="DeterministicRSCErrorComponent" componentProps={{}} />}

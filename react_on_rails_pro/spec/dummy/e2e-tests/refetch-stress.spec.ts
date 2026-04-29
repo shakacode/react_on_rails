@@ -1,0 +1,116 @@
+import { test, expect } from '@playwright/test';
+
+const STRESS_URL = '/server_router/refetch-stress';
+
+// Use the port the dev server happens to be running on. CI/local can override
+// PLAYWRIGHT_BASE_URL or BASE_URL; default matches the dummy app's typical
+// dev setup.
+const BASE = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3002';
+
+test.describe('Imperative RSC refetch — stress scenarios (Issue 3106)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`${BASE}${STRESS_URL}`);
+    await expect(page.getByTestId('stress-time-ref-handle')).toBeVisible();
+  });
+
+  test('1. ref handle: button click visibly refreshes the timestamp', async ({ page }) => {
+    const before = await page.getByTestId('stress-time-ref-handle').textContent();
+    await page.getByTestId('ref-refetch-button').click();
+    await expect
+      .poll(() => page.getByTestId('stress-time-ref-handle').textContent(), { timeout: 5000 })
+      .not.toBe(before);
+  });
+
+  test('2. inside-RSC hook: button click visibly refreshes the timestamp', async ({ page }) => {
+    const before = await page.getByTestId('stress-time-inside-hook').textContent();
+    await page.getByTestId('stress-inline-inside-hook').click();
+    await expect
+      .poll(() => page.getByTestId('stress-time-inside-hook').textContent(), { timeout: 5000 })
+      .not.toBe(before);
+  });
+
+  test('3. multi-instance fan-out: two cards with same key both update on one refetch', async ({ page }) => {
+    // Two separate <span data-testid="stress-time-shared"> in DOM — they share
+    // the cache key, so both must update together.
+    const initial = await page.getByTestId('stress-time-shared').allTextContents();
+    expect(initial).toHaveLength(2);
+    expect(initial[0]).toBe(initial[1]); // initial render: same payload
+    await page.getByTestId('multi-refetch-button').click();
+    await expect
+      .poll(
+        async () => {
+          const ts = await page.getByTestId('stress-time-shared').allTextContents();
+          return ts.length === 2 && ts[0] === ts[1] && ts[0] !== initial[0];
+        },
+        { timeout: 5000 },
+      )
+      .toBe(true);
+  });
+
+  test('4. independent siblings: refreshing left does not change right', async ({ page }) => {
+    const leftBefore = await page.getByTestId('stress-time-indep-left').textContent();
+    const rightBefore = await page.getByTestId('stress-time-indep-right').textContent();
+    await page.getByTestId('indep-left-button').click();
+    await expect
+      .poll(() => page.getByTestId('stress-time-indep-left').textContent(), { timeout: 5000 })
+      .not.toBe(leftBefore);
+    expect(await page.getByTestId('stress-time-indep-right').textContent()).toBe(rightBefore);
+  });
+
+  test('5. captured handle: refetch after props change uses the LATEST props', async ({ page }) => {
+    // step 1: capture refetch when label = captured-v1
+    await page.getByTestId('captured-grab').click();
+    // step 2: change props (label becomes captured-v2)
+    await page.getByTestId('captured-bump').click();
+    // wait for the card to mount under the new key
+    await expect(page.getByTestId('stress-card-captured-v2')).toBeVisible();
+    const before = await page.getByTestId('stress-time-captured-v2').textContent();
+    // step 3: invoke the captured handle. It should refetch v2's payload.
+    await page.getByTestId('captured-invoke').click();
+    await expect
+      .poll(() => page.getByTestId('stress-time-captured-v2').textContent(), { timeout: 5000 })
+      .not.toBe(before);
+  });
+
+  test('6. rapid double-click: UI ends up showing the latest payload', async ({ page }) => {
+    const before = await page.getByTestId('stress-time-rapid').textContent();
+    await page.getByTestId('rapid-button').click();
+    await expect
+      .poll(() => page.getByTestId('stress-time-rapid').textContent(), { timeout: 5000 })
+      .not.toBe(before);
+  });
+
+  test('7. many siblings: refresh-all updates each card independently', async ({ page }) => {
+    const before = await Promise.all(
+      [0, 1, 2, 3, 4].map((i) => page.getByTestId(`stress-time-many-${i}`).textContent()),
+    );
+    await page.getByTestId('many-refresh-all').click();
+    await expect
+      .poll(
+        async () => {
+          const after = await Promise.all(
+            [0, 1, 2, 3, 4].map((i) => page.getByTestId(`stress-time-many-${i}`).textContent()),
+          );
+          return after.every((v, i) => v && v !== before[i]);
+        },
+        { timeout: 10000 },
+      )
+      .toBe(true);
+  });
+
+  test('8. mount/unmount: ref.current is null after unmount, set after re-mount', async ({ page }) => {
+    // initial state
+    await expect(page.getByTestId('mount-ref-state')).toHaveText('ref.current: set');
+
+    // unmount
+    await page.getByTestId('mount-toggle').click();
+    await page.getByTestId('mount-check-ref').click();
+    await expect(page.getByTestId('mount-ref-state')).toHaveText('ref.current: null');
+
+    // re-mount
+    await page.getByTestId('mount-toggle').click();
+    await expect(page.getByTestId('stress-card-mount-cycle')).toBeVisible();
+    await page.getByTestId('mount-check-ref').click();
+    await expect(page.getByTestId('mount-ref-state')).toHaveText('ref.current: set');
+  });
+});

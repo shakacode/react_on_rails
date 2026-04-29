@@ -4,6 +4,10 @@ import rootConfig from '../../jest.config.base.js';
 
 const require = createRequire(import.meta.url);
 const nodeVersion = parseInt(process.version.slice(1), 10);
+const isReactServerEnv = (process.env.NODE_CONDITIONS ?? '')
+  .split(',')
+  .map((condition) => condition.trim())
+  .includes('react-server');
 
 // Resolve React package roots through Node's module resolution so the aliases
 // follow workspace structure changes (renames, hoisting strategies, package
@@ -42,19 +46,20 @@ export default {
           '^@testing-library/dom$': '<rootDir>/tests/emptyForTesting.js',
           '^@testing-library/react$': '<rootDir>/tests/emptyForTesting.js',
         }
-      : {}),
-    // Scope the dedup-skip to RSC tests specifically: only NODE_CONDITIONS
-    // values containing `react-server` need the default resolution (so
-    // conditional exports are honored). Any unrelated env var that happens to
-    // set NODE_CONDITIONS must not silently disable React deduplication.
-    ...(process.env.NODE_CONDITIONS?.includes('react-server')
-      ? {}
-      : {
-          '^react$': reactPackageRoot,
-          '^react/(.*)$': `${reactPackageRoot}/$1`,
-          '^react-dom$': reactDomPackageRoot,
-          '^react-dom/(.*)$': `${reactDomPackageRoot}/$1`,
-        }),
+      : isReactServerEnv
+        ? {
+            // RSC tests need React's `react-server` condition while still
+            // deduping to the workspace-resolved package copy.
+            '^react$': `${reactPackageRoot}/react.react-server.js`,
+            '^react/jsx-runtime$': `${reactPackageRoot}/jsx-runtime.react-server.js`,
+            '^react/jsx-dev-runtime$': `${reactPackageRoot}/jsx-dev-runtime.react-server.js`,
+          }
+        : {
+            '^react$': reactPackageRoot,
+            '^react/(.*)$': `${reactPackageRoot}/$1`,
+            '^react-dom$': reactDomPackageRoot,
+            '^react-dom/(.*)$': `${reactDomPackageRoot}/$1`,
+          }),
   },
 
   // Allow Jest to transform react-on-rails package from node_modules
