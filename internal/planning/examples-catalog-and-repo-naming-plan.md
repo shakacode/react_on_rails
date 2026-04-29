@@ -42,7 +42,6 @@ to from the docs:
 | `react-on-rails-demo-gumroad-rsc`     | Feature            | Rename completed          | (current)                          | Inertia vs React on Rails Pro benchmark   |
 | `react-on-rails-example-migration`    | Feature            | Rename completed          | (current)                          | Focused `react-rails` migration reference |
 | `react-on-rails-example-open-flights` | Feature            | Rename completed          | (current)                          | Larger migration reference                |
-| `react-on-rails-demos`                | Feature            | Rename completed          | (current)                          | Shared infrastructure repo for demo apps  |
 
 ## Repos to De-emphasize or Archive
 
@@ -80,6 +79,10 @@ legacy once the current catalog is in place.
 Operational or private repos can matter for maintenance work, but they should
 not appear in public catalogs or public-facing docs. Keep those references in
 private planning material only.
+
+- `react-on-rails-demos` — shared infrastructure repo for demo apps. Rename
+  completed, but it is not a stand-alone evaluation target, so it stays out of
+  the public examples page.
 
 ## Docs and Site Follow-up
 

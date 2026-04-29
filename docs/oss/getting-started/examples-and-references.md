@@ -10,23 +10,22 @@ starting from.
 
 ## Starter Repos
 
-### SSR + HMR Tutorial Demo
+One starter repo is fully open source; one requires React on Rails Pro —
+check each entry's note before evaluating.
+
+### SSR + HMR Tutorial Demo (open source)
 
 - Repo: [shakacode/react-on-rails-demo-ssr-hmr](https://github.com/shakacode/react-on-rails-demo-ssr-hmr)
 - Use it when you want the maintained Rails + React + SSR + HMR walkthrough repo
   that backs the tutorial and Webpack configuration guidance.
 
-### React on Rails Pro + RSC Starter
+### React on Rails Pro + RSC Starter (Pro)
 
 - Repo: [shakacode/react-on-rails-rsc-demo](https://github.com/shakacode/react-on-rails-rsc-demo)
 - Use it when you want a minimal public sample for React Server Components with
   React on Rails Pro.
 - Note: this repo uses React on Rails Pro. See [OSS vs Pro](./oss-vs-pro.md)
   for evaluation guidance.
-- Note: this slug predates the `react-on-rails-demo-*` naming convention used
-  by the other demos on this page. It may be renamed to
-  `react-on-rails-demo-rsc` in a future cleanup, so prefer linking to this
-  docs page rather than the repo URL directly.
 
 ## In-Repo Reference
 
@@ -43,17 +42,11 @@ starting from.
 For detailed proof criteria and migration contribution guidance, see
 [Example Migrations](../migrating/example-migrations.md).
 
-### Migrate from `react-rails`
-
-- Repo: [shakacode/react-on-rails-example-migration](https://github.com/shakacode/react-on-rails-example-migration)
-- Use it when you want a focused before/after migration reference instead of
-  reconstructing the upgrade from older blog posts.
-
-### Open Flights Migration Example
-
-- Repo: [shakacode/react-on-rails-example-open-flights](https://github.com/shakacode/react-on-rails-example-open-flights)
-- Use it when you want a larger example app that shows React on Rails replacing
-  `react-rails` in a more realistic codebase.
+- [shakacode/react-on-rails-example-migration](https://github.com/shakacode/react-on-rails-example-migration) —
+  focused before/after `react-rails` → React on Rails migration reference.
+- [shakacode/react-on-rails-example-open-flights](https://github.com/shakacode/react-on-rails-example-open-flights) —
+  larger example app that shows React on Rails replacing `react-rails` in a
+  more realistic codebase.
 
 ## React on Rails Pro + RSC Demos
 
@@ -80,13 +73,20 @@ For detailed proof criteria and migration contribution guidance, see
 - Note: this is a ShakaCode-built demo modeled on a Gumroad-style UI, not an
   official Gumroad product or integration.
 
+## Live Demos
+
+- [reactrails.com](https://reactrails.com) — production-style React on Rails app
+  you can click through in your browser without any local setup. Backed by the
+  legacy [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial)
+  source.
+
 ## Legacy Repos
 
 Version-specific demos, `test-*` repos, generator snapshots, and older tutorial
 repos are useful historical references, but they are not the primary starting
 point for new evaluations.
 
-- Legacy full app: [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) — older production-style app with a [live demo at reactrails.com](https://reactrails.com). Still useful as a historical reference, but not the recommended starting point for new projects.
+- Legacy full app: [shakacode/react-webpack-rails-tutorial](https://github.com/shakacode/react-webpack-rails-tutorial) — older production-style app (see Live Demos above for the running site at reactrails.com). Still useful as a historical reference, but not the recommended starting point for new projects.
 
 If you are choosing a public reference repo for docs, talks, or adoption work,
 start with the repos above.
