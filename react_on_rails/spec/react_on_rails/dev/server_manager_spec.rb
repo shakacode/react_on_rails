@@ -234,9 +234,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "applies SHAKAPACKER_DEV_SERVER_PORT from base+1 even though prod mode doesn't use webpack-dev-server" do
-        # Applying all three env vars keeps prod mode consistent with dev/static,
-        # so any tooling that reads them (e.g. shell aliases, process inspectors)
-        # sees the same derived values regardless of which bin/dev mode is active.
+        # Intentional, not a bug: prod mode runs static assets and does not use
+        # webpack-dev-server, but applying all three env vars keeps prod mode
+        # consistent with dev/static so any tooling that reads them (shell aliases,
+        # process inspectors, a subsequent `bin/dev` in the same shell) sees the
+        # same derived values regardless of which bin/dev mode is active. See
+        # the matching comment above #apply_base_port_env in server_manager.rb.
         described_class.start(:production_like)
         expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("4001")
       end

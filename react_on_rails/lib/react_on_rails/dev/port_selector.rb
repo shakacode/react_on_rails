@@ -15,7 +15,8 @@ module ReactOnRails
       BASE_PORT_RAILS_OFFSET    = 0
       BASE_PORT_WEBPACK_OFFSET  = 1
       BASE_PORT_RENDERER_OFFSET = 2
-      MAX_BASE_PORT = 65_535 - BASE_PORT_RENDERER_OFFSET
+      TCP_PORT_MAX  = 65_535
+      MAX_BASE_PORT = TCP_PORT_MAX - BASE_PORT_RENDERER_OFFSET
 
       # Ports 1..1023 are privileged on Linux/macOS and require root to bind.
       PRIVILEGED_PORT_MAX = 1023
@@ -198,7 +199,9 @@ module ReactOnRails
 
             val = stripped.to_i
             unless val.between?(1, MAX_BASE_PORT)
-              warn invalid_base_port_warning(var, raw, "out of range (1..#{MAX_BASE_PORT})", idx)
+              reason = "out of range (1..#{MAX_BASE_PORT}; must leave room for " \
+                       "+#{BASE_PORT_RENDERER_OFFSET} renderer offset)"
+              warn invalid_base_port_warning(var, raw, reason, idx)
               next
             end
 
@@ -255,8 +258,8 @@ module ReactOnRails
           end
 
           n = stripped.to_i
-          unless n.between?(1, 65_535)
-            warn "WARNING: #{var_name}=#{raw.inspect} is out of range (1..65535); ignoring."
+          unless n.between?(1, TCP_PORT_MAX)
+            warn "WARNING: #{var_name}=#{raw.inspect} is out of range (1..#{TCP_PORT_MAX}); ignoring."
             ENV.delete(var_name)
             return nil
           end

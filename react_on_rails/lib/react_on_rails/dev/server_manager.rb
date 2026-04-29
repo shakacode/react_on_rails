@@ -1129,6 +1129,12 @@ module ReactOnRails
           false
         end
 
+        # Callers are expected to have normalized ENV["PORT"] beforehand:
+        # run_production_like clears non-integer / out-of-range values before
+        # calling here, and the development/static paths route through
+        # PortSelector.consume_explicit_port_env! which does the same. That
+        # makes the `.to_i` below safe — a stray "abc" would otherwise become
+        # 0 and scan from port 0.
         def procfile_port(procfile)
           if procfile == "Procfile.dev-prod-assets"
             ENV.fetch("PORT", 3001).to_i
