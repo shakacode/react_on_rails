@@ -28,23 +28,19 @@ const ScenarioRefHandle: React.FC = () => {
   const ref = useRef<RSCRouteHandle>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const handleRefetch = () => {
+    setError(null);
+    ref.current?.refetch().catch((e: unknown) => {
+      setError(String(e));
+    });
+  };
+
   return (
     <Section
       title="1. Ref handle (parent triggers refetch)"
       description="A parent button calls ref.current.refetch(). NO useState/setKey workaround."
     >
-      <button
-        type="button"
-        data-testid="ref-refetch-button"
-        onClick={async () => {
-          setError(null);
-          try {
-            await ref.current?.refetch();
-          } catch (e) {
-            setError(String(e));
-          }
-        }}
-      >
+      <button type="button" data-testid="ref-refetch-button" onClick={handleRefetch}>
         Refresh via ref
       </button>
       {error ? <div style={{ color: 'red' }}>error: {error}</div> : null}
@@ -81,6 +77,10 @@ const ScenarioInsideHook: React.FC = () => (
 // Scenario 3 — multi-instance fan-out: two RSCRoutes with the SAME name+props.
 // Refetching ONE updates BOTH (they share the cache key).
 // =============================================================================
+const fireAndIgnore = (ref: React.RefObject<RSCRouteHandle | null>) => () => {
+  ref.current?.refetch().catch(() => {});
+};
+
 const ScenarioMultiInstance: React.FC = () => {
   const ref = useRef<RSCRouteHandle>(null);
   return (
@@ -88,11 +88,7 @@ const ScenarioMultiInstance: React.FC = () => {
       title="3. Multi-instance fan-out (same name + same props)"
       description="Two <RSCRoute>s with identical componentProps share a cache entry. Clicking ‘Refresh A’ should update BOTH cards (they bind to the same key)."
     >
-      <button
-        type="button"
-        data-testid="multi-refetch-button"
-        onClick={() => void ref.current?.refetch()}
-      >
+      <button type="button" data-testid="multi-refetch-button" onClick={fireAndIgnore(ref)}>
         Refresh A (both cards should update)
       </button>
       <div style={{ display: 'flex', gap: '12px' }}>
@@ -109,10 +105,7 @@ const ScenarioMultiInstance: React.FC = () => {
         <div style={{ flex: 1 }}>
           <small>card B (no ref, same name + props)</small>
           <Suspense fallback={<div>loading…</div>}>
-            <RSCRoute
-              componentName="RefetchStressServerComponent"
-              componentProps={{ label: 'shared' }}
-            />
+            <RSCRoute componentName="RefetchStressServerComponent" componentProps={{ label: 'shared' }} />
           </Suspense>
         </div>
       </div>
@@ -134,11 +127,7 @@ const ScenarioIndependentSiblings: React.FC = () => {
     >
       <div style={{ display: 'flex', gap: '12px' }}>
         <div style={{ flex: 1 }}>
-          <button
-            type="button"
-            data-testid="indep-left-button"
-            onClick={() => void refLeft.current?.refetch()}
-          >
+          <button type="button" data-testid="indep-left-button" onClick={fireAndIgnore(refLeft)}>
             Refresh left only
           </button>
           <Suspense fallback={<div>loading…</div>}>
@@ -150,11 +139,7 @@ const ScenarioIndependentSiblings: React.FC = () => {
           </Suspense>
         </div>
         <div style={{ flex: 1 }}>
-          <button
-            type="button"
-            data-testid="indep-right-button"
-            onClick={() => void refRight.current?.refetch()}
-          >
+          <button type="button" data-testid="indep-right-button" onClick={fireAndIgnore(refRight)}>
             Refresh right only
           </button>
           <Suspense fallback={<div>loading…</div>}>
@@ -198,14 +183,18 @@ const ScenarioCapturedHandle: React.FC = () => {
         <button
           type="button"
           data-testid="captured-bump"
-          onClick={() => setVersion((v) => v + 1)}
+          onClick={() => {
+            setVersion((v) => v + 1);
+          }}
         >
           2. Bump label (current: captured-v{version})
         </button>{' '}
         <button
           type="button"
           data-testid="captured-invoke"
-          onClick={() => void captured.current?.()}
+          onClick={() => {
+            captured.current?.().catch(() => {});
+          }}
         >
           3. Invoke captured.refetch()
         </button>
@@ -239,17 +228,29 @@ const ScenarioRapidClicks: React.FC = () => {
         data-testid="rapid-button"
         onClick={() => {
           const t0 = Date.now();
-          void ref.current?.refetch().then(() => {
-            setLog((l) => [...l, `first resolved @ +${Date.now() - t0}ms`]);
-          });
-          void ref.current?.refetch().then(() => {
-            setLog((l) => [...l, `second resolved @ +${Date.now() - t0}ms`]);
-          });
+          ref.current
+            ?.refetch()
+            .then(() => {
+              setLog((l) => [...l, `first resolved @ +${Date.now() - t0}ms`]);
+            })
+            .catch(() => {});
+          ref.current
+            ?.refetch()
+            .then(() => {
+              setLog((l) => [...l, `second resolved @ +${Date.now() - t0}ms`]);
+            })
+            .catch(() => {});
         }}
       >
         Refresh twice in one tick
       </button>{' '}
-      <button type="button" data-testid="rapid-clear" onClick={() => setLog([])}>
+      <button
+        type="button"
+        data-testid="rapid-clear"
+        onClick={() => {
+          setLog([]);
+        }}
+      >
         clear log
       </button>
       <pre data-testid="rapid-log" style={{ background: '#eee', padding: '4px' }}>
@@ -283,15 +284,11 @@ const ScenarioManySiblings: React.FC = () => {
       <button
         type="button"
         data-testid="many-refresh-all"
-        onClick={async () => {
+        onClick={() => {
           setError(null);
-          try {
-            await Promise.all(
-              refs.current.map((r) => r?.refetch() ?? Promise.resolve()),
-            );
-          } catch (e) {
+          Promise.all(refs.current.map((r) => r?.refetch() ?? Promise.resolve())).catch((e: unknown) => {
             setError(String(e));
-          }
+          });
         }}
       >
         Refresh all {COUNT}
@@ -340,7 +337,9 @@ const ScenarioMountCycle: React.FC = () => {
       <button
         type="button"
         data-testid="mount-check-ref"
-        onClick={() => setRefState(ref.current ? 'set' : 'null')}
+        onClick={() => {
+          setRefState(ref.current ? 'set' : 'null');
+        }}
       >
         Check ref.current
       </button>{' '}
@@ -365,9 +364,8 @@ const RefetchStressPage: React.FC = () => (
     <h2>RSCRoute imperative refetch — stress scenarios</h2>
     <p>
       Each section below exercises a different aspect of the new <code>ref</code> handle and{' '}
-      <code>useCurrentRSCRoute()</code> hook. None of the scenarios use a caller-side{' '}
-      <code>useState</code>/<code>setKey</code> workaround to drive re-render — that is the whole
-      point.
+      <code>useCurrentRSCRoute()</code> hook. None of the scenarios use a caller-side <code>useState</code>/
+      <code>setKey</code> workaround to drive re-render — that is the whole point.
     </p>
     <ScenarioRefHandle />
     <ScenarioInsideHook />

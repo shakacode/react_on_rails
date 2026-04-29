@@ -55,10 +55,7 @@ type GetServerComponentArgs = {
     return result;
   };
 
-  const rerenderInAct = async (
-    result: ReturnType<typeof render>,
-    ui: React.ReactElement,
-  ) => {
+  const rerenderInAct = async (result: ReturnType<typeof render>, ui: React.ReactElement) => {
     await act(async () => {
       result.rerender(ui);
     });
@@ -71,10 +68,7 @@ type GetServerComponentArgs = {
   });
 
   it('1. ref.current.refetch() triggers a fresh getServerComponent call with enforceRefetch=true', async () => {
-    setupSequencedFetcher([
-      <div data-testid="card">Card v1</div>,
-      <div data-testid="card">Card v2</div>,
-    ]);
+    setupSequencedFetcher([<div data-testid="card">Card v1</div>, <div data-testid="card">Card v2</div>]);
     const ref = React.createRef<RSCRouteHandle>();
 
     await renderInAct(
@@ -218,10 +212,7 @@ type GetServerComponentArgs = {
   });
 
   it('5b. captured refetch called after unmount still updates the cache and does not throw', async () => {
-    setupSequencedFetcher([
-      <div data-testid="x">x1</div>,
-      <div data-testid="x">x2</div>,
-    ]);
+    setupSequencedFetcher([<div data-testid="x">x1</div>, <div data-testid="x">x2</div>]);
     const ref = React.createRef<RSCRouteHandle>();
     const { unmount } = await renderInAct(
       <TestHarness>
