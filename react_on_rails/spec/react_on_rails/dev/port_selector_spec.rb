@@ -222,7 +222,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
     end
 
     # Parses the same way PORT and SHAKAPACKER_DEV_SERVER_PORT do
-    # (consume_explicit_port_env! strips before validating). Without the strip
+    # (read_and_sanitize_port_env! strips before validating). Without the strip
     # step, env-file templating or copy-paste padding would silently disable
     # base-port mode with a misleading "not a valid integer" warning.
     context "when base port env var has surrounding whitespace" do

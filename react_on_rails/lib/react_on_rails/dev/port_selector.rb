@@ -184,7 +184,7 @@ module ReactOnRails
           #
           # Strip before validating so whitespace-padded values (common with
           # copy-paste or env-file templating) parse the same way PORT and
-          # SHAKAPACKER_DEV_SERVER_PORT do via consume_explicit_port_env!.
+          # SHAKAPACKER_DEV_SERVER_PORT do via read_and_sanitize_port_env!.
           BASE_PORT_ENV_VARS.each_with_index do |var, idx|
             raw = ENV.fetch(var, nil)
             next if raw.nil?
@@ -229,11 +229,11 @@ module ReactOnRails
         end
 
         def explicit_rails_port
-          consume_explicit_port_env!("PORT")
+          read_and_sanitize_port_env!("PORT")
         end
 
         def explicit_webpack_port
-          consume_explicit_port_env!("SHAKAPACKER_DEV_SERVER_PORT")
+          read_and_sanitize_port_env!("SHAKAPACKER_DEV_SERVER_PORT")
         end
 
         # Reject values that aren't valid port strings and clear the env var
@@ -244,7 +244,7 @@ module ReactOnRails
         # (explicit_rails_port / explicit_webpack_port); the "warn once + fall
         # back" flow is shared with ServerManager via the cleared env, not via
         # the return value. Kept in one place so the coupling is obvious.
-        def consume_explicit_port_env!(var_name)
+        def read_and_sanitize_port_env!(var_name)
           raw = ENV.fetch(var_name, nil)
           return nil if raw.nil?
 

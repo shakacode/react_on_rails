@@ -66,6 +66,11 @@ module ReactOnRails
         # [3000, 3001] when no base port is configured. Uses PortSelector's
         # pure #base_port_hash so no "Base port detected" banner prints during
         # a kill.
+        #
+        # The renderer port (base+2) is always included, even for OSS users
+        # without Pro who have no renderer process. Harmless in practice — lsof
+        # will find nothing on that port — but it is a slight expansion of the
+        # kill surface vs. the previous hard-coded [3000, 3001].
         def killable_ports
           base = PortSelector.base_port_hash
           return [3000, 3001] unless base
@@ -977,7 +982,7 @@ module ReactOnRails
         # base-port-derived value.
         def warn_if_port_will_be_overridden(var_name, derived_port)
           existing = ENV.fetch(var_name, nil)
-          return if existing.nil? || existing.strip.empty? || existing == derived_port.to_s
+          return if existing.nil? || existing.strip.empty? || existing.strip == derived_port.to_s
 
           warn "WARNING: Overriding #{var_name}=#{existing.inspect} with #{derived_port} " \
                "because base port mode is active."
@@ -1132,7 +1137,7 @@ module ReactOnRails
         # Callers are expected to have normalized ENV["PORT"] beforehand:
         # run_production_like clears non-integer / out-of-range values before
         # calling here, and the development/static paths route through
-        # PortSelector.consume_explicit_port_env! which does the same. That
+        # PortSelector.read_and_sanitize_port_env! which does the same. That
         # makes the `.to_i` below safe — a stray "abc" would otherwise become
         # 0 and scan from port 0.
         def procfile_port(procfile)

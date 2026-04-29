@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "open3"
 require "socket"
 
 module ReactOnRails
@@ -15,6 +16,9 @@ module ReactOnRails
 
         private
 
+        # Globs every *.sock under tmp/sockets/, treating the directory as bin/dev-owned:
+        # any inactive Unix socket there is removed on startup. Apps using Puma or Action
+        # Cable Unix sockets should place them outside tmp/sockets/ to avoid being cleaned.
         def cleanup_overmind_sockets
           socket_files = [".overmind.sock", "tmp/sockets/overmind.sock", *Dir.glob("tmp/sockets/*.sock")].uniq
           cleaned_any = false
@@ -76,12 +80,19 @@ module ReactOnRails
           false
         end
 
+        # Uses Open3.capture2 with a word-list argv (matching ServerManager#find_port_pids)
+        # so the no-shell-injection invariant is structural rather than caller-enforced —
+        # passing a non-Integer pid in the future cannot introduce a shell metacharacter.
         def working_directory_for_pid(pid)
-          path_line = `lsof -a -p #{pid} -d cwd -Fn 2>/dev/null`.lines.find { |line| line.start_with?("n") }
+          stdout, = Open3.capture2("lsof", "-a", "-p", pid.to_s, "-d", "cwd", "-Fn", err: File::NULL)
+          path_line = stdout.lines.find { |line| line.start_with?("n") }
           path = path_line&.delete_prefix("n")&.strip
           return nil if path.nil? || path.empty?
 
           path
+        rescue StandardError
+          # lsof command not found or other error
+          nil
         end
 
         def same_working_directory?(left, right)

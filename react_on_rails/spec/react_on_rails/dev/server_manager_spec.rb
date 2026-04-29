@@ -520,6 +520,12 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
           .not_to output(/Overriding PORT/).to_stderr
       end
 
+      it "does not warn when PORT matches the derived value with surrounding whitespace" do
+        ENV["PORT"] = " 5000 "
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding PORT/).to_stderr
+      end
+
       it "does not warn when RENDERER_PORT already matches the derived value" do
         ENV["RENDERER_PORT"] = "5002"
         expect { described_class.start(:development) }
