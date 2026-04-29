@@ -14,7 +14,7 @@ type CallableComponent = React.ComponentType<Record<string, unknown>> & Componen
 type ObjectComponent = ComponentMetadata & {
   $$typeof?: symbol | number;
 };
-type ComponentWithMetadata = string | CallableComponent | ObjectComponent;
+type ComponentWithMetadata = CallableComponent | ObjectComponent;
 type RenderFunction = ((props?: unknown, railsContext?: unknown) => unknown) &
   ComponentMetadata & {
     renderFunction?: boolean;
@@ -36,14 +36,6 @@ const REACT_OBJECT_COMPONENT_TYPES = new Set<symbol | number>([
 const wrappedFunctionComponents = new WeakMap<CallableComponent | RenderFunction, ComponentWithMetadata>();
 const wrappedRenderFunctions = new WeakMap<RenderFunction, RenderFunction>();
 const wrappedObjectComponents = new WeakMap<ObjectComponent, ComponentWithMetadata>();
-// Strings are primitives and cannot key a WeakMap, so registered string component names live here.
-const wrappedStringComponents = new Map<string, ComponentWithMetadata>();
-
-// TODO: Pro-only logic (`enableStrictModeForReactOnRails`, `wrapRenderFunctionResult` Promise
-// handling, `wrapRenderFunctionInStrictMode`) has no dedicated test suite. The OSS dummy's Jest
-// config doesn't cover Pro-specific paths; consider a small Vitest/Jest harness inside
-// `react_on_rails_pro/spec/dummy/tests/` (mirroring the OSS `strict-mode-support.test.jsx`) to
-// pin the async Promise-result path and the singleton-patch idempotency.
 
 const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   typeof value === 'object' &&
@@ -60,7 +52,7 @@ const isObjectComponent = (component: unknown): component is ObjectComponent =>
   REACT_OBJECT_COMPONENT_TYPES.has((component as ObjectComponent).$$typeof ?? 0);
 
 const isReactComponent = (component: unknown): component is ComponentWithMetadata =>
-  typeof component === 'string' || isFunctionWithMetadata(component) || isObjectComponent(component);
+  isFunctionWithMetadata(component) || isObjectComponent(component);
 
 // Mirrors React on Rails' render-function convention while extending it with an explicit
 // `renderFunction = false` opt-out (the public helper only checks for truthiness; this dummy
@@ -96,11 +88,7 @@ const createStrictModeWrapper = (Component: ComponentWithMetadata): React.FC<Rec
     return <React.StrictMode>{childElement}</React.StrictMode>;
   }
 
-  const componentName =
-    typeof Component === 'string'
-      ? Component
-      : Component.displayName || Component.name || 'AnonymousComponent';
-  StrictModeWrapper.displayName = `StrictMode(${componentName})`;
+  StrictModeWrapper.displayName = `StrictMode(${Component.displayName || Component.name || 'AnonymousComponent'})`;
 
   return StrictModeWrapper;
 };
@@ -114,17 +102,6 @@ const wrapComponentInStrictMode = (component: ComponentWithMetadata): ComponentW
 
     const wrappedComponent = createStrictModeWrapper(component);
     wrappedFunctionComponents.set(component, wrappedComponent);
-    return wrappedComponent;
-  }
-
-  if (typeof component === 'string') {
-    const cachedComponent = wrappedStringComponents.get(component);
-    if (cachedComponent) {
-      return cachedComponent;
-    }
-
-    const wrappedComponent = createStrictModeWrapper(component);
-    wrappedStringComponents.set(component, wrappedComponent);
     return wrappedComponent;
   }
 

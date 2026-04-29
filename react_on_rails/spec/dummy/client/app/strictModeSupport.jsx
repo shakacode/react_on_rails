@@ -10,8 +10,6 @@ const wrappedFunctionComponents = new WeakMap();
 const wrappedRenderFunctions = new WeakMap();
 // Object-typed React components (memo, forwardRef, lazy) are GC-safe in a WeakMap.
 const wrappedObjectComponents = new WeakMap();
-// Strings are primitives and cannot key a WeakMap, so registered string component names live here.
-const wrappedStringComponents = new Map();
 
 const isPromiseLike = (value) =>
   typeof value === 'object' && value !== null && typeof value.then === 'function';
@@ -23,8 +21,7 @@ const isObjectComponent = (component) =>
   component !== null &&
   REACT_OBJECT_COMPONENT_TYPES.has(component.$$typeof ?? 0);
 
-const isReactComponent = (component) =>
-  typeof component === 'string' || isFunctionWithMetadata(component) || isObjectComponent(component);
+const isReactComponent = (component) => isFunctionWithMetadata(component) || isObjectComponent(component);
 
 // Mirrors the public react-on-rails/isRenderFunction convention while extending it with an
 // explicit `renderFunction = false` opt-out (the public helper only checks for truthiness; this
@@ -55,11 +52,7 @@ const createStrictModeWrapper = (Component) => {
     return <React.StrictMode>{React.createElement(Component, props)}</React.StrictMode>;
   }
 
-  const componentName =
-    typeof Component === 'string'
-      ? Component
-      : Component.displayName || Component.name || 'AnonymousComponent';
-  StrictModeWrapper.displayName = `StrictMode(${componentName})`;
+  StrictModeWrapper.displayName = `StrictMode(${Component.displayName || Component.name || 'AnonymousComponent'})`;
 
   return StrictModeWrapper;
 };
@@ -73,17 +66,6 @@ const wrapComponentInStrictMode = (component) => {
 
     const wrappedComponent = createStrictModeWrapper(component);
     wrappedFunctionComponents.set(component, wrappedComponent);
-    return wrappedComponent;
-  }
-
-  if (typeof component === 'string') {
-    const cachedComponent = wrappedStringComponents.get(component);
-    if (cachedComponent) {
-      return cachedComponent;
-    }
-
-    const wrappedComponent = createStrictModeWrapper(component);
-    wrappedStringComponents.set(component, wrappedComponent);
     return wrappedComponent;
   }
 
