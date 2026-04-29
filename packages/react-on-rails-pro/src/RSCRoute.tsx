@@ -17,7 +17,19 @@
 'use client';
 
 import * as React from 'react';
-import { Component, use, type ReactNode } from 'react';
+import {
+  Component,
+  createContext,
+  forwardRef,
+  use,
+  useCallback,
+  useContext,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { useRSC } from './RSCProvider.tsx';
 import { ServerComponentFetchError } from './ServerComponentFetchError.ts';
 
@@ -71,10 +83,56 @@ class RSCRouteErrorBoundary extends Component<
  * wrapServerComponentRenderer from 'react-on-rails/wrapServerComponentRenderer/client' for client-side
  * rendering or 'react-on-rails/wrapServerComponentRenderer/server' for server-side rendering.
  */
+/**
+ * Imperative handle exposed by `<RSCRoute>` via `ref`.
+ *
+ * `refetch()` re-fetches the server component using the RSCRoute's currently
+ * rendered `componentName` and `componentProps`. It resolves with the new
+ * rendered ReactNode and rejects if the fetch fails.
+ *
+ * Behavior caveats:
+ * - **Concurrent refetches:** only the most-recent cache write wins; earlier
+ *   returned promises may resolve with stale data while the UI has already
+ *   moved on to a later refetch.
+ * - **Unmount:** if the owning `<RSCRoute>` unmounts before resolution, the
+ *   shared cache still updates (so other RSCRoutes bound to the same key
+ *   reflect the new payload) but no visible re-render happens in the
+ *   unmounted instance.
+ */
+export type RSCRouteHandle = {
+  refetch: () => Promise<ReactNode>;
+};
+
 export type RSCRouteProps = {
   componentName: string;
   componentProps: unknown;
+  ref?: Ref<RSCRouteHandle>;
 };
+
+const CurrentRSCRouteContext = createContext<RSCRouteHandle | null>(null);
+
+/**
+ * Returns the `RSCRouteHandle` of the nearest ancestor `<RSCRoute>`, so a
+ * client component rendered inside a server component subtree can refetch
+ * that server component without knowing its name or props.
+ *
+ * @throws If called outside of any `<RSCRoute>` ancestor.
+ *
+ * @example
+ * ```tsx
+ * function InlineRefreshButton() {
+ *   const { refetch } = useCurrentRSCRoute();
+ *   return <button onClick={() => refetch().catch(console.error)}>Refresh</button>;
+ * }
+ * ```
+ */
+export function useCurrentRSCRoute(): RSCRouteHandle {
+  const handle = useContext(CurrentRSCRouteContext);
+  if (!handle) {
+    throw new Error('useCurrentRSCRoute must be used inside an <RSCRoute>');
+  }
+  return handle;
+}
 
 const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   // use is available in React 18.3+
@@ -89,14 +147,38 @@ const PromiseWrapper = ({ promise }: { promise: Promise<ReactNode> }) => {
   return promiseResult;
 };
 
-const RSCRoute = ({ componentName, componentProps }: RSCRouteProps): ReactNode => {
-  const { getComponent } = useRSC();
-  const componentPromise = getComponent(componentName, componentProps);
-  return (
-    <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
-      <PromiseWrapper promise={componentPromise} />
-    </RSCRouteErrorBoundary>
-  );
-};
+const RSCRoute = forwardRef<RSCRouteHandle, Omit<RSCRouteProps, 'ref'>>(
+  ({ componentName, componentProps }, ref) => {
+    const { getComponent, refetchComponent } = useRSC();
+
+    // Always read the latest props in `refetch`, even when a descendant
+    // captured the handle at an earlier render.
+    const latestPropsRef = useRef({ componentName, componentProps });
+    latestPropsRef.current = { componentName, componentProps };
+
+    const refetch = useCallback((): Promise<ReactNode> => {
+      const { componentName: n, componentProps: p } = latestPropsRef.current;
+      // refetchComponent swaps the cache promise and bumps the provider's
+      // version inside startTransition. That re-renders every <RSCRoute>
+      // (including this one) as a transition commit, so old content stays
+      // visible while the new promise streams in.
+      return refetchComponent(n, p);
+    }, [refetchComponent]);
+
+    const handle = useMemo<RSCRouteHandle>(() => ({ refetch }), [refetch]);
+    useImperativeHandle(ref, () => handle, [handle]);
+
+    const componentPromise = getComponent(componentName, componentProps);
+    return (
+      <CurrentRSCRouteContext.Provider value={handle}>
+        <RSCRouteErrorBoundary componentName={componentName} componentProps={componentProps}>
+          <PromiseWrapper promise={componentPromise} />
+        </RSCRouteErrorBoundary>
+      </CurrentRSCRouteContext.Provider>
+    );
+  },
+);
+
+RSCRoute.displayName = 'RSCRoute';
 
 export default RSCRoute;

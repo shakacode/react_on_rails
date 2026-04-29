@@ -23,7 +23,19 @@ export default {
           '^@testing-library/dom$': '<rootDir>/tests/emptyForTesting.js',
           '^@testing-library/react$': '<rootDir>/tests/emptyForTesting.js',
         }
-      : {},
+      : {
+          // Dedupe React/React-DOM to the workspace root copy so that hooks
+          // called from this package's source share a single dispatcher with
+          // @testing-library/react (which resolves React from the root). Two
+          // copies → "Cannot read properties of null (reading 'useRef')".
+          // The `react-dom/(.*)` mapper is required because react-dom asserts
+          // it shares an exact version with react.
+          '^react$': '<rootDir>/../../node_modules/react',
+          '^react-dom$': '<rootDir>/../../node_modules/react-dom',
+          '^react-dom/(.*)$': '<rootDir>/../../node_modules/react-dom/$1',
+          '^react/jsx-runtime$': '<rootDir>/../../node_modules/react/jsx-runtime',
+          '^react/jsx-dev-runtime$': '<rootDir>/../../node_modules/react/jsx-dev-runtime',
+        },
 
   // Allow Jest to transform react-on-rails package from node_modules
   transformIgnorePatterns: ['node_modules/(?!react-on-rails)'],
