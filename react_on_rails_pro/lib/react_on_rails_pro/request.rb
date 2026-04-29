@@ -2,6 +2,7 @@
 
 require "uri"
 require "httpx"
+require_relative "httpx_tcp_nodelay_patch"
 require_relative "stream_request"
 
 module ReactOnRailsPro
