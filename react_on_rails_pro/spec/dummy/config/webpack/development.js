@@ -13,7 +13,7 @@ const developmentEnvOnly = (clientWebpackConfig, _serverWebpackConfig) => {
         overlay: {
           // bin/dev sets SHAKAPACKER_DEV_SERVER_PORT as a string, which Shakapacker
           // surfaces unchanged on devServer.port. The plugin schema requires a number.
-          sockPort: Number(devServer.port),
+          sockPort: parseInt(devServer.port, 10),
         },
       }),
     );
