@@ -497,7 +497,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       it "filters out missing assets, warns, and still uploads the remaining ones" do
         expect { described_class.publish_current_bundle_if_configured }
-          .to output(/Skipping missing assets/).to_stderr
+          .to output(/Skipping invalid assets.*missing:.*rolling-deploy-upload-missing-asset/m).to_stderr
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
       end
@@ -521,7 +521,7 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       it "filters out non-file assets, warns, and still uploads the remaining files" do
         expect { described_class.publish_current_bundle_if_configured }
-          .to output(/Skipping non-file assets/).to_stderr
+          .to output(/Skipping invalid assets.*not a file:.*rolling-deploy-upload-directory-asset/m).to_stderr
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
       end

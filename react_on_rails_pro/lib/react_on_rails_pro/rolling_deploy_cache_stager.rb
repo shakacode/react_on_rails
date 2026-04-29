@@ -30,6 +30,11 @@ module ReactOnRailsPro
   # rolling-deploy seed is less catastrophic than a failed *current*
   # bundle seed.
   module RollingDeployCacheStager # rubocop:disable Metrics/ModuleLength
+    # Duplicated in react_on_rails/lib/react_on_rails/doctor.rb as a hardcoded
+    # fallback when the Pro gem isn't loaded. The cross-package equality is
+    # asserted in spec/dummy/spec/rolling_deploy_cache_stager_spec.rb so a
+    # change here fails that spec instead of silently drifting past the doctor
+    # probe.
     DISCOVERY_TIMEOUT_SECONDS = 10
     FETCH_TIMEOUT_SECONDS = 30
     STALE_TEMP_DIR_TTL_SECONDS = 3600
@@ -46,6 +51,10 @@ module ReactOnRailsPro
         return
       end
 
+      # Create the cache root once we know we have at least one hash to stage.
+      # bundle_directory then resolves real paths against an existing dir without
+      # needing to mutate the filesystem itself.
+      FileUtils.mkdir_p(cache_dir)
       puts "[ReactOnRailsPro] Seeding previous bundle hashes for rolling deploy: #{hashes.inspect}"
       hashes.each { |hash| seed_previous_hash(adapter, hash, cache_dir, mode) }
     end
@@ -227,6 +236,11 @@ module ReactOnRailsPro
 
     def self.warn_if_missing_loadable_stats(asset_paths, hash)
       return if asset_paths.map { |path| File.basename(path) }.include?("loadable-stats.json")
+      # Skip the warning for builds that legitimately don't produce loadable-stats.json
+      # (single-chunk apps without code-splitting). The local build's collect_assets
+      # only attaches the file when it exists, so the previous-hash payload absence is
+      # consistent — warning would just be noise on every rolling deploy.
+      return unless ReactOnRailsPro::RendererCacheHelpers.loadable_stats_asset_path
 
       warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) is missing loadable-stats.json. " \
            "Client hydration may break for requests served by this previous bundle hash."
@@ -307,8 +321,10 @@ module ReactOnRailsPro
     private_class_method :sanitize_hashes
 
     def self.bundle_directory(cache_dir, hash)
-      # File.realpath requires the cache root to exist before path normalization.
-      FileUtils.mkdir_p(cache_dir)
+      # File.realpath requires the cache root to exist; the caller in `call` is
+      # responsible for `FileUtils.mkdir_p(cache_dir)` once at least one hash is
+      # known to need staging. Keeping the mkdir here would make every call to
+      # this pure-looking helper mutate the filesystem.
       normalized_cache_dir = File.realpath(cache_dir)
       normalized_candidate = File.expand_path(File.join(normalized_cache_dir, hash))
 

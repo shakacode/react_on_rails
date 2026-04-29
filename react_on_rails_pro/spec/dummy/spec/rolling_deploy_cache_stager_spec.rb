@@ -251,11 +251,30 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       allow(adapter).to receive(:fetch).with("no-stats").and_return(bundle: src_bundle, assets: [])
     end
 
-    it "warns but still stages the bundle for adapters that intentionally omit it" do
-      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
-        .to output(/missing loadable-stats\.json/).to_stderr
+    context "when the local build also lacks loadable-stats.json (single-chunk app)" do
+      before do
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:loadable_stats_asset_path).and_return(nil)
+      end
 
-      expect(File.exist?(File.join(cache_dir, "no-stats", "no-stats.js"))).to be(true)
+      it "stages the bundle without warning, since the file is not expected" do
+        expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+          .not_to output(/missing loadable-stats\.json/).to_stderr
+
+        expect(File.exist?(File.join(cache_dir, "no-stats", "no-stats.js"))).to be(true)
+      end
+    end
+
+    context "when the local build does produce loadable-stats.json (code-split app)" do
+      before do
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:loadable_stats_asset_path).and_return("/some/path")
+      end
+
+      it "warns but still stages the bundle for adapters that intentionally omit it" do
+        expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+          .to output(/missing loadable-stats\.json/).to_stderr
+
+        expect(File.exist?(File.join(cache_dir, "no-stats", "no-stats.js"))).to be(true)
+      end
     end
   end
 
@@ -478,6 +497,16 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     it "warns and skips that hash" do
       expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
         .to output(/without.*valid :bundle file path/m).to_stderr
+    end
+  end
+
+  # The OSS gem's react_on_rails:doctor task duplicates this constant as a
+  # hardcoded fallback (`react_on_rails/lib/react_on_rails/doctor.rb`'s
+  # `rolling_deploy_discovery_timeout_seconds`) because OSS cannot depend on
+  # the Pro gem. If you change DISCOVERY_TIMEOUT_SECONDS, update both.
+  describe "DISCOVERY_TIMEOUT_SECONDS" do
+    it "matches the OSS doctor.rb hardcoded fallback" do
+      expect(described_class::DISCOVERY_TIMEOUT_SECONDS).to eq(10)
     end
   end
 end

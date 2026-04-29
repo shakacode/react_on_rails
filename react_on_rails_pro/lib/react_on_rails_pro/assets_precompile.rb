@@ -127,22 +127,25 @@ module ReactOnRailsPro
     # entries with a warning so publication still covers the existing assets.
     def self.filter_existing_assets(assets)
       existing, invalid = assets.partition { |path| File.file?(path) }
+      return existing if invalid.empty?
+
       missing, non_files = invalid.partition { |path| !File.exist?(path) }
-
-      unless missing.empty?
-        warn "[ReactOnRailsPro] Skipping missing assets for rolling_deploy_adapter upload " \
-             "(some may be required for RSC): #{missing.inspect}. " \
-             "Continuing with #{existing.length} existing asset(s)."
-        warn_if_unavailable_required_rsc_assets(missing)
-      end
-      unless non_files.empty?
-        warn "[ReactOnRailsPro] Skipping non-file assets for rolling_deploy_adapter upload " \
-             "(some may be required for RSC): #{non_files.inspect}. " \
-             "Continuing with #{existing.length} existing asset(s)."
-        warn_if_unavailable_required_rsc_assets(non_files)
-      end
-
+      warn_skipped_invalid_assets(existing, missing, non_files)
+      warn_if_unavailable_required_rsc_assets(invalid)
       existing
+    end
+
+    # Combine missing-vs-non-file reasons into a single warning so operators see
+    # one entry per skipped batch instead of two near-identical lines. The
+    # reason breakdown (missing vs non-file) still appears so adapter authors
+    # can tell a deleted asset apart from one that resolved to e.g. a directory.
+    def self.warn_skipped_invalid_assets(existing, missing, non_files)
+      reasons = []
+      reasons << "missing: #{missing.inspect}" unless missing.empty?
+      reasons << "not a file: #{non_files.inspect}" unless non_files.empty?
+      warn "[ReactOnRailsPro] Skipping invalid assets for rolling_deploy_adapter upload " \
+           "(some may be required for RSC) — #{reasons.join('; ')}. " \
+           "Continuing with #{existing.length} existing asset(s)."
     end
 
     def self.warn_if_unavailable_required_rsc_assets(unavailable_assets)
@@ -150,8 +153,9 @@ module ReactOnRailsPro
       return if missing_required.empty?
 
       warn "[ReactOnRailsPro] WARNING: unavailable assets include required RSC companion file(s) " \
-           "#{missing_required.inspect}. The next deploy will not be able to seed this bundle hash for RSC " \
-           "and will fall back to 410-retry."
+           "#{missing_required.inspect}. The partial entry will be rejected on every subsequent rolling " \
+           "deploy that tries to seed this bundle hash for RSC (falling back to 410-retry) until a " \
+           "complete precompile with all required RSC companion files overwrites this hash."
     end
 
     def self.required_rsc_asset_basenames

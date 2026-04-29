@@ -2953,7 +2953,11 @@ module ReactOnRails
       if defined?(ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS)
         ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
       else
-        10 # Must match ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS default
+        # Must match ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS.
+        # The Pro spec at react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+        # asserts the constant equals 10, so changing it there without updating this
+        # fallback will fail that spec.
+        10
       end
     end
 

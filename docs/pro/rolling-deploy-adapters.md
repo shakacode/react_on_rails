@@ -108,6 +108,15 @@ This runs the adapter's `fetch(hash)` for each listed hash but skips discovery. 
 | Returned hash matches current hash      | Deduplicated — not refetched.                                                |
 | `upload` raises in `assets:precompile`  | Warn but don't fail precompile. Next deploy degrades, not this one.          |
 
+## Local temp directory cleanup
+
+The reference implementations below stage `fetch` results into `tmp/rolling-deploy/<hash>/` and never delete them. The stager either copies (`mode: :copy`) or symlinks (`mode: :symlink`) those files into the renderer cache, so cleanup must happen outside `fetch`:
+
+- In `:copy` mode (Docker/image builds), the stager copies files into the cache before returning, so the temp dir can be removed at the end of the deploy.
+- In `:symlink` mode (same-filesystem deploys), the staged symlinks point _into_ `tmp/rolling-deploy/<hash>/`. Removing the temp files breaks the symlinks and causes the renderer to 410. Keep the temp dir alive for the lifetime of the deploy, or replace symlinks with copies before sweeping.
+
+A simple cleanup strategy: a periodic task that removes `tmp/rolling-deploy/<hash>/` directories older than your longest expected deploy duration. Adapter authors should add this — the stager doesn't know about adapter-private temp paths and so cannot clean them up itself.
+
 ## Reference implementations
 
 These are copy-pasteable starting points. Adapt to your infrastructure.
