@@ -101,7 +101,7 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("is ready.")
         expect(content).to include("/hello_world")
         expect(content).to include("Compare OSS and Pro")
-        expect(content).to include("https://github.com/shakacode/react-server-components-marketplace-demo")
+        expect(content).to include("https://github.com/shakacode/react-on-rails-demo-marketplace-rsc")
       end
     end
 
@@ -1709,7 +1709,7 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("/hello_server")
         expect(content).to include("React Server Components")
         expect(content).to include("https://reactonrails.com/docs/pro/react-server-components/tutorial/")
-        expect(content).to include("https://github.com/shakacode/react-server-components-marketplace-demo")
+        expect(content).to include("https://github.com/shakacode/react-on-rails-demo-marketplace-rsc")
       end
     end
 

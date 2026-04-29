@@ -105,4 +105,4 @@ bin/conductor-exec git commit -m "message"  # Pre-commit hooks work correctly
 
 ## Reference
 
-See [react_on_rails-demos#105](https://github.com/shakacode/react_on_rails-demos/issues/105) for detailed problem analysis and solution development.
+See [react-on-rails-demos#105](https://github.com/shakacode/react-on-rails-demos/issues/105) for detailed problem analysis and solution development.

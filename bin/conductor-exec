@@ -14,7 +14,7 @@
 #   bin/conductor-exec git commit -m "msg"  # Pre-commit hooks work correctly
 #   bin/conductor-exec pnpm install         # Uses correct Node version
 #
-# See: https://github.com/shakacode/react_on_rails-demos/issues/105
+# See: https://github.com/shakacode/react-on-rails-demos/issues/105
 
 if command -v mise &> /dev/null; then
   exec mise exec -- "$@"

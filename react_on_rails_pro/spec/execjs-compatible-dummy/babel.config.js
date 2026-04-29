@@ -1,5 +1,5 @@
 // The source code including full typescript support is available at:
-// https://github.com/shakacode/react_on_rails_demo_ssr_hmr/blob/master/babel.config.js
+// https://github.com/shakacode/react-on-rails-demo-ssr-hmr/blob/master/babel.config.js
 const defaultConfigFunc = require('shakapacker/package/babel/preset.js');
 
 module.exports = (api) => {
