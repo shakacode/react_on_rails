@@ -480,6 +480,8 @@ export default function PageErrorBoundary({ children }) {
 
 `refetchComponent` re-fetches the RSC payload for the named component with `enforceRefetch: true`, bypassing any cached promise. This is the React on Rails equivalent of Next.js's `router.refresh()`.
 
+For refetch triggers that aren't part of an error-recovery flow — a "Refresh" toolbar button, a websocket-driven invalidation, or an inline refresh button rendered by the server component itself — see [Manually refetching a server component](../../pro/react-server-components/inside-client-components.md#manually-refetching-a-server-component) for the `<RSCRoute ref={...}>` and `useCurrentRSCRoute()` APIs that don't require the caller to know the component's name or props.
+
 ## `'use client'` Directive Mistakes
 
 ### Only at the Boundary
