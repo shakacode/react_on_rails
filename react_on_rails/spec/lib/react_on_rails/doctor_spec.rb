@@ -2468,6 +2468,171 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "check_deprecated_renderer_cache_task" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+
+    context "when a Procfile references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer && bundle exec puma\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "warns with migration guidance" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+        expect(warning_msgs.any? { |m| m[:content].include?("MODE=symlink") }).to be(true)
+      end
+    end
+
+    context "when a Dockerfile variant references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Dockerfile.production"),
+          "RUN bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "suggests the copy-mode task without MODE=symlink" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs).not_to be_empty
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("Dockerfile.production →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+        expect(suggestion_line).not_to include("MODE=symlink")
+      end
+    end
+
+    context "when no deploy scripts reference the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before { allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir)) }
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "adds no warnings" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        expect(checker.messages.select { |m| m[:type] == :warning }).to be_empty
+      end
+    end
+
+    context "when a configured deploy-script path is a directory" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, "bin/deploy"))
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "skips the directory and continues scanning real files" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+
+        expect(warning_msgs.any? { |m| m[:content].include?("Procfile") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
+    context "when a deploy-script file exceeds the size gate" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        # Stub the cap so we do not have to write a real 1 MB file — the gate
+        # logic is what we are exercising, not the specific threshold.
+        stub_const("ReactOnRails::Doctor::RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES", 64)
+        padding = "x" * 128
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n#{padding}"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "silently skips the file and emits no warning" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        expect(checker.messages.select { |m| m[:type] == :warning }).to be_empty
+      end
+    end
+
+    context "when a deploy-script file is exactly the size gate" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:script_content) do
+        "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+      end
+
+      before do
+        stub_const("ReactOnRails::Doctor::RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES", script_content.bytesize)
+        File.write(File.join(tmpdir, "Procfile"), script_content)
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "still scans the file" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+      end
+    end
+
+    context "when reading a deploy-script file raises an unexpected error" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:procfile_path) { File.join(tmpdir, "Procfile") }
+
+      before do
+        File.write(
+          procfile_path,
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        root_path = Pathname.new(tmpdir)
+        allow(Rails).to receive(:root).and_return(root_path)
+
+        # Simulate a filesystem error (e.g. transient EIO or a permissions race)
+        # on the actual Pathname receiver used by the doctor scan.
+        failing_procfile = instance_double(Pathname)
+        allow(failing_procfile).to receive_messages(file?: true, size: File.size(procfile_path))
+        allow(failing_procfile).to receive(:read).and_raise(Errno::EIO, "simulated read failure")
+        allow(root_path).to receive(:join).and_call_original
+        allow(root_path).to receive(:join).with("Procfile").and_return(failing_procfile)
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "captures the error as a warning instead of failing the doctor check" do
+        expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+  end
+
   describe "check_base_package_imports" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }

@@ -53,6 +53,133 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     ENV.delete("RENDERER_BUNDLE_PATH")
   end
 
+  context "when mode is invalid" do
+    it "raises ArgumentError" do
+      expect { described_class.call(mode: :hardlink) }.to raise_error(ArgumentError, /mode must be one of/)
+    end
+  end
+
+  context "when mode is :symlink" do
+    it "symlinks the bundle instead of copying it" do
+      described_class.call(mode: :symlink)
+
+      dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
+      expect(File.exist?(dest_file)).to be(true)
+      expect(File.symlink?(dest_file)).to be(true)
+    end
+
+    it "symlinks assets rather than copying them" do
+      FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))
+      FileUtils.cp(fixture_path2, path_in_webpack_folder(asset_filename2))
+
+      described_class.call(mode: :symlink)
+
+      first_asset = File.join(bundle_dir, asset_filename)
+      second_asset = File.join(bundle_dir, asset_filename2)
+      expect(File.symlink?(first_asset)).to be(true)
+      expect(File.symlink?(second_asset)).to be(true)
+      expect(File.realpath(first_asset)).to eq(path_in_webpack_folder(asset_filename).to_s)
+    end
+
+    it "logs symlink operations with symlink-specific labels" do
+      FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))
+
+      expect { described_class.call(mode: :symlink) }
+        .to output(/Pre-staged renderer cache: .* -> .*Symlinked asset: .* ->/m).to_stdout
+    end
+
+    it "treats a concurrent matching symlink as success" do
+      # Simulates two processes racing through make_relative_symlink: the
+      # other process recreated the destination between rm_f and File.symlink,
+      # so our syscall raises EEXIST. The guard should swallow that instead
+      # of propagating.
+      allow(File).to receive(:symlink).and_wrap_original do |original, source, destination|
+        original.call(source, destination)
+        raise Errno::EEXIST
+      end
+
+      expect { described_class.call(mode: :symlink) }.not_to raise_error
+    end
+
+    it "replaces a mismatched symlink created by a concurrent stage" do
+      stale_source = "stale-server-bundle.js"
+      created_stale_link = false
+      allow(File).to receive(:symlink).and_wrap_original do |original, source, destination|
+        unless created_stale_link
+          created_stale_link = true
+          original.call(stale_source, destination)
+          raise Errno::EEXIST
+        end
+
+        original.call(source, destination)
+      end
+
+      expect { described_class.call(mode: :symlink) }.to output(/replaced stale symlink/).to_stdout
+      dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
+      expect(File.realpath(dest_file)).to eq(server_bundle_path)
+    end
+
+    it "treats a concurrent matching symlink during stale replacement as success" do
+      stale_source = "stale-server-bundle.js"
+      symlink_calls = 0
+      allow(File).to receive(:symlink).and_wrap_original do |original, source, destination|
+        symlink_calls += 1
+        case symlink_calls
+        when 1
+          original.call(stale_source, destination)
+          raise Errno::EEXIST
+        when 2
+          original.call(source, destination)
+          raise Errno::EEXIST
+        else
+          original.call(source, destination)
+        end
+      end
+
+      expect { described_class.call(mode: :symlink) }.not_to raise_error
+      dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
+      expect(File.realpath(dest_file)).to eq(server_bundle_path)
+    end
+
+    it "logs mode-accurate prefixes (Pre-staged / Symlinked) instead of copy-oriented wording" do
+      FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))
+      FileUtils.cp(fixture_path2, path_in_webpack_folder(asset_filename2))
+
+      accurate_symlink_logs = satisfy("uses mode-aware log prefixes") do |out|
+        out.match?(/Pre-staged renderer cache:.*->/) &&
+          out.match?(/Symlinked asset:.*->/) &&
+          !out.include?("Copied asset") &&
+          !out.include?("Pre-seeded renderer cache")
+      end
+      expect { described_class.call(mode: :symlink) }.to output(accurate_symlink_logs).to_stdout
+    end
+  end
+
+  context "when mode is :copy and no env var is set in a non-dev/test environment" do
+    before do
+      allow(Rails.env).to receive_messages(development?: false, test?: false)
+      allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(nil)
+    end
+
+    it "raises a clear error pointing at RENDERER_SERVER_BUNDLE_CACHE_PATH" do
+      expect { described_class.call(mode: :copy) }
+        .to raise_error(ReactOnRailsPro::Error, /RENDERER_SERVER_BUNDLE_CACHE_PATH/)
+    end
+
+    it "does not raise when the preferred env var is set" do
+      tmpdir = Dir.mktmpdir("renderer-cache-test")
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = tmpdir
+      expect { described_class.call(mode: :copy) }.not_to raise_error
+    ensure
+      FileUtils.rm_rf(tmpdir)
+      ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
+    end
+
+    it "does not raise in :symlink mode even without an env var" do
+      expect { described_class.call(mode: :symlink) }.not_to raise_error
+    end
+  end
+
   context "when assets exist" do
     before do
       FileUtils.cp(fixture_path, path_in_webpack_folder(asset_filename))

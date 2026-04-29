@@ -88,6 +88,7 @@ exclude = [
   '^https://(www\.)?estately\.com', # Returns 403
   '^https://hiring\.careerbuilder\.com',  # Returns 403
   '^https://(www\.)?yourmechanic\.com',  # Returns 403/503
+  '^https://(www\.)?guavapass\.com',  # TLS handshake failures from CI
   '^https?://(www\.)?hvmn\.com',  # Returns 503 from CI
   '^https://(www\.)?hawaiichee\.com/?$', # Intermittent 500 from CI
 

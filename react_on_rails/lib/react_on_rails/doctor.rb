@@ -58,6 +58,26 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
 
+    # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
+    # look for references to the old pre_stage_bundle_for_node_renderer task in
+    # common deploy-script locations so users on older Procfile/Dockerfile entries
+    # get a migration nudge before the task is removed.
+    DEPRECATED_RENDERER_CACHE_TASK = "pre_stage_bundle_for_node_renderer"
+    RENDERER_CACHE_DEPLOY_SCRIPT_PATHS = [
+      "Procfile",
+      "Procfile.dev",
+      "Procfile.dev-static-assets",
+      "Procfile.production",
+      "Dockerfile",
+      "Dockerfile.production",
+      "Dockerfile.staging",
+      "Dockerfile.review",
+      "bin/deploy",
+      "bin/release",
+      "bin/docker-entrypoint"
+    ].freeze
+    RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
+
     def initialize(verbose: false, fix: false)
       @verbose = verbose
       @fix = fix
@@ -2717,6 +2737,7 @@ module ReactOnRails
       ensure_rails_environment_loaded
       check_pro_renderer_mode
       check_base_package_imports
+      check_deprecated_renderer_cache_task
     end
 
     def check_pro_initializer_existence
@@ -2744,6 +2765,50 @@ module ReactOnRails
       end
     rescue StandardError => e
       checker.add_warning("⚠️  Could not detect Pro renderer mode: #{e.message}")
+    end
+
+    def check_deprecated_renderer_cache_task
+      # Resolve against Rails.root (not Dir.pwd) so the scan still fires when
+      # doctor is invoked from a subdirectory — otherwise the checks silently
+      # find nothing and the deprecation warning never surfaces.
+      #
+      # Substring match is intentional: a comment line in a Procfile/Dockerfile
+      # that mentions the old task name will also trigger the warning. That is
+      # acceptable — the worst case is a benign migration nudge on a file that's
+      # already been migrated but still references the old name in a comment.
+      matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
+        full_path = Rails.root.join(path)
+        next false unless full_path.file?
+        # Skip files larger than 1 MB; deploy scripts should be tiny.
+        next false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
+
+        full_path.read.include?(DEPRECATED_RENDERER_CACHE_TASK)
+      end
+
+      return if matches.empty?
+
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Deprecated rake task '#{DEPRECATED_RENDERER_CACHE_TASK}' referenced in:
+        #{matches.map { |p| "  • #{p} → #{renderer_cache_migration_suggestion(p)}" }.join("\n")}
+
+        The unified 'pre_seed_renderer_cache' task uses MODE=copy by default (for
+        Docker/image builds) and MODE=symlink for same-filesystem workflows.
+        This scan also matches comments; remove stale mentions after migrating.
+      MSG
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not scan for deprecated renderer-cache task references: #{e.message}")
+    end
+
+    def renderer_cache_migration_suggestion(path)
+      # Dockerfile* entries are RUN steps during image build, so copy mode bakes
+      # the cache into the layer. Procfile, bin/*, and other runtime scripts run
+      # inside the already-booted container or dyno, where both the app and
+      # renderer share the same filesystem, so symlink mode is correct.
+      if path.start_with?("Dockerfile")
+        "rake react_on_rails_pro:pre_seed_renderer_cache"
+      else
+        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink"
+      end
     end
 
     # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',

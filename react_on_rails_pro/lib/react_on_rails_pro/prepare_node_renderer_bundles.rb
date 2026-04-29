@@ -1,56 +1,45 @@
 # frozen_string_literal: true
 
-require "fileutils"
-require "pathname"
-require "react_on_rails_pro/renderer_cache_helpers"
+require "react_on_rails_pro/pre_seed_renderer_cache"
 
 module ReactOnRailsPro
-  # Pre-stages the Node Renderer cache via symlinks for same-filesystem workflows
-  # such as local development, Heroku-style same-dyno deploys, and bundle-caching
-  # restores. The staged layout matches the renderer's runtime cache contract:
-  # <cache>/<bundleHash>/<bundleHash>.js
+  # DEPRECATED: use `ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink)` directly.
+  # Retained as a thin shim so existing callers (custom rake tasks, Procfile entries,
+  # deploy scripts) keep working during the deprecation cycle. Emits a warning once
+  # per process on first call.
   class PrepareNodeRenderBundles
-    def self.make_relative_symlink(source, destination)
-      destination_dir = Pathname.new(destination).dirname
-      FileUtils.mkdir_p(destination_dir)
-      FileUtils.rm_f(destination)
+    # Mutex guards the check-then-set on @deprecation_warned so concurrent callers
+    # (e.g. multiple Puma workers invoking the shim at boot) still see exactly one
+    # warning per process.
+    @deprecation_mutex = Mutex.new
+    @deprecation_warned = false
 
-      # Canonicalize both sides so paths like /var -> /private/var do not
-      # produce broken relative symlinks when the cache dir comes from tmpdir.
-      source_path = Pathname.new(source).realpath
-      relative_source_path = source_path.relative_path_from(destination_dir.realpath)
-      File.symlink(relative_source_path, destination)
-      puts "[ReactOnRailsPro] Symlinked #{relative_source_path} to #{destination}"
-    end
-    private_class_method :make_relative_symlink
-
-    def self.resolve_dest_path
-      ReactOnRailsPro::Utils.resolve_renderer_cache_dir
-    end
-    private_class_method :resolve_dest_path
-
+    # The deprecated rake task emits its own warning and calls PreSeedRendererCache
+    # directly; it does not set this one-time guard. See assets.rake for that path.
     def self.call
-      cache_dir = resolve_dest_path
-      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
-      puts "[ReactOnRailsPro] Pre-staging renderer cache via symlinks at: #{cache_dir}"
-
-      assets = RendererCacheHelpers.collect_assets
-      rsc_required_paths = RendererCacheHelpers.required_rsc_asset_paths
-
-      RendererCacheHelpers.bundle_sources(pool, "pre-staging").each do |src_bundle_path, bundle_hash|
-        bundle_dir = File.join(cache_dir, bundle_hash.to_s)
-        bundle_dest_path = File.join(bundle_dir, "#{bundle_hash}.js")
-        make_relative_symlink(src_bundle_path, bundle_dest_path)
-        symlink_assets(assets, bundle_dir, rsc_required_paths)
-      end
+      emit_deprecation_warning!
+      PreSeedRendererCache.call(mode: :symlink)
     end
 
-    def self.symlink_assets(assets, bundle_dir, rsc_required_paths)
-      RendererCacheHelpers.each_stageable_asset(assets, rsc_required_paths, "pre-staging") do |expanded|
-        destination_full_path = File.join(bundle_dir, File.basename(expanded))
-        make_relative_symlink(expanded, destination_full_path)
+    def self.emit_deprecation_warning!
+      @deprecation_mutex.synchronize do
+        return if @deprecation_warned
+
+        warn "[ReactOnRailsPro] ReactOnRailsPro::PrepareNodeRenderBundles is deprecated. " \
+             "Use ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink) instead. " \
+             "The rake task equivalent is 'rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink'."
+        @deprecation_warned = true
       end
     end
-    private_class_method :symlink_assets
+    private_class_method :emit_deprecation_warning!
+
+    # :nodoc: Test helper - resets the one-time deprecation-warning guard so
+    # specs can exercise the warning path without leaking state between examples.
+    # Private so it can only be invoked from specs via `send`; prevents accidental
+    # reset from production code.
+    def self.reset_deprecation_warned!
+      @deprecation_mutex.synchronize { @deprecation_warned = false }
+    end
+    private_class_method :reset_deprecation_warned!
   end
 end

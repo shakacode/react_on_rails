@@ -39,6 +39,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
     ReactOnRailsPro::Utils.reset_renderer_bundle_path_deprecation_warned!
+    described_class.send(:reset_deprecation_warned!)
   end
 
   after do
@@ -48,6 +49,11 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
     FileUtils.rm_f(path_in_webpack_folder(asset_filename2))
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
+    described_class.send(:reset_deprecation_warned!)
+  end
+
+  it "emits a deprecation warning pointing at PreSeedRendererCache" do
+    expect { pre_stage_cache }.to output(/deprecated.*PreSeedRendererCache/m).to_stderr
   end
 
   context "when assets exist" do
