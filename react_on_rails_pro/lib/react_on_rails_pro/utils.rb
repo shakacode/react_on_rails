@@ -182,10 +182,18 @@ module ReactOnRailsPro
     RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX = Mutex.new
     private_constant :RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX
 
+    # Uses the same plain-Ruby blank check as enforce_cache_dir_env_var! so a
+    # whitespace-only env var (e.g. RENDERER_SERVER_BUNDLE_CACHE_PATH=" ") is
+    # treated as unset by both call sites — otherwise the guard would raise
+    # while this resolver would silently return " " as the cache path.
     def self.resolve_renderer_cache_dir
-      if ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"].present?
-        ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"]
-      elsif ENV["RENDERER_BUNDLE_PATH"].present?
+      preferred = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").strip
+      return preferred unless preferred.empty?
+
+      legacy = ENV.fetch("RENDERER_BUNDLE_PATH", "").strip
+      if legacy.empty?
+        Rails.root.join(".node-renderer-bundles").to_s
+      else
         RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize do
           unless @renderer_bundle_path_deprecation_warned
             warn "[ReactOnRailsPro] RENDERER_BUNDLE_PATH is deprecated. " \
@@ -193,20 +201,20 @@ module ReactOnRailsPro
             @renderer_bundle_path_deprecation_warned = true
           end
         end
-        ENV["RENDERER_BUNDLE_PATH"]
-      else
-        Rails.root.join(".node-renderer-bundles").to_s
+        legacy
       end
     end
 
     # :nodoc: Test helper — resets the one-time deprecation-warning guard so
     # specs can exercise both the "warning fires" and "warning suppressed" paths
-    # without leaking state between examples.
+    # without leaking state between examples. Private so production callers can't
+    # inadvertently reset the once-per-process guard; specs invoke it via `send`.
     def self.reset_renderer_bundle_path_deprecation_warned!
       RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize do
         @renderer_bundle_path_deprecation_warned = nil
       end
     end
+    private_class_method :reset_renderer_bundle_path_deprecation_warned!
 
     def self.mine_type_from_file_name(filename)
       extension = File.extname(filename)

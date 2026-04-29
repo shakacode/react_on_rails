@@ -2772,17 +2772,20 @@ module ReactOnRails
       # doctor is invoked from a subdirectory — otherwise the checks silently
       # find nothing and the deprecation warning never surfaces.
       #
-      # Substring match is intentional: a comment line in a Procfile/Dockerfile
-      # that mentions the old task name will also trigger the warning. That is
-      # acceptable — the worst case is a benign migration nudge on a file that's
-      # already been migrated but still references the old name in a comment.
+      # Read in binary mode (the task name is pure ASCII) so a non-UTF-8 byte
+      # in a deploy script does not raise Encoding::InvalidByteSequenceError
+      # and mask the file via the rescue below.
+      #
+      # Skip leading-comment lines (`#` Procfile/shell, `//` Dockerfile-style)
+      # so files that mention the old task only inside a comment do not trip
+      # the migration nudge.
       matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
         full_path = Rails.root.join(path)
         next false unless full_path.file?
         # Skip files larger than 1 MB; deploy scripts should be tiny.
         next false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
 
-        full_path.read.include?(DEPRECATED_RENDERER_CACHE_TASK)
+        deploy_script_references_deprecated_task?(full_path)
       end
 
       return if matches.empty?
@@ -2793,10 +2796,16 @@ module ReactOnRails
 
         The unified 'pre_seed_renderer_cache' task uses MODE=copy by default (for
         Docker/image builds) and MODE=symlink for same-filesystem workflows.
-        This scan also matches comments; remove stale mentions after migrating.
       MSG
     rescue StandardError => e
       checker.add_warning("⚠️  Could not scan for deprecated renderer-cache task references: #{e.message}")
+    end
+
+    def deploy_script_references_deprecated_task?(full_path)
+      full_path.binread.each_line.any? do |line|
+        stripped = line.lstrip
+        !stripped.start_with?("#", "//") && stripped.include?(DEPRECATED_RENDERER_CACHE_TASK)
+      end
     end
 
     def renderer_cache_migration_suggestion(path)

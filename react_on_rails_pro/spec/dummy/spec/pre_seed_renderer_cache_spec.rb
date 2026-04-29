@@ -41,7 +41,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     # Clear env vars and deprecation warning guard
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
-    ReactOnRailsPro::Utils.reset_renderer_bundle_path_deprecation_warned!
+    ReactOnRailsPro::Utils.send(:reset_renderer_bundle_path_deprecation_warned!)
   end
 
   after do
@@ -234,6 +234,61 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     it "warns and skips the non-file asset path" do
       expect { pre_seed_cache }
         .to output(/Asset not found #{Regexp.escape(asset_directory.to_s)} \(missing or not a file\)/).to_stderr
+    end
+  end
+
+  context "when two assets share the same basename" do
+    let(:dir_a) { Rails.root.join("public", "webpack", "production", "dir-a") }
+    let(:dir_b) { Rails.root.join("public", "webpack", "production", "dir-b") }
+    let(:asset_a) { File.join(dir_a, "manifest.json") }
+    let(:asset_b) { File.join(dir_b, "manifest.json") }
+
+    before do
+      FileUtils.mkdir_p(dir_a)
+      FileUtils.mkdir_p(dir_b)
+      File.write(asset_a, "{\"from\":\"a\"}")
+      File.write(asset_b, "{\"from\":\"b\"}")
+      allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return([asset_a, asset_b])
+    end
+
+    after do
+      FileUtils.rm_rf(dir_a)
+      FileUtils.rm_rf(dir_b)
+    end
+
+    it "warns about the basename collision so the silent overwrite is visible" do
+      expect { pre_seed_cache }
+        .to output(/Duplicate asset basenames in assets_to_copy: manifest\.json/).to_stderr
+    end
+  end
+
+  context "when an RSC client manifest path is a dev-server URL" do
+    let(:server_client_manifest_path) { path_in_webpack_folder("react-server-client-manifest.json") }
+
+    before do
+      allow(ReactOnRailsPro.configuration).to receive_messages(enable_rsc_support: true, assets_to_copy: nil)
+      File.write(server_client_manifest_path, "{}")
+      allow(ReactOnRailsPro::Utils).to receive_messages(
+        rsc_bundle_js_file_path: server_bundle_path,
+        # asset_uri_from_packer returns an HTTP URL while the dev server is running
+        react_client_manifest_file_path: "http://localhost:3035/packs/react-client-manifest.json",
+        react_server_client_manifest_file_path: server_client_manifest_path
+      )
+
+      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      allow(pool).to receive(:rsc_bundle_hash).and_return("rsc-hash")
+    end
+
+    after { FileUtils.rm_f(server_client_manifest_path) }
+
+    it "skips the URL-backed manifest with a warning instead of raising" do
+      expect { pre_seed_cache }
+        .to output(%r{Skipping URL-backed asset http://localhost:3035/packs/react-client-manifest\.json}).to_stderr
+    end
+
+    it "still stages the file-backed RSC manifest" do
+      pre_seed_cache
+      expect(File.exist?(File.join(bundle_dir, "react-server-client-manifest.json"))).to be(true)
     end
   end
 

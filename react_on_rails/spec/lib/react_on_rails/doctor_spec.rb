@@ -2616,7 +2616,7 @@ RSpec.describe ReactOnRails::Doctor do
         # on the actual Pathname receiver used by the doctor scan.
         failing_procfile = instance_double(Pathname)
         allow(failing_procfile).to receive_messages(file?: true, size: File.size(procfile_path))
-        allow(failing_procfile).to receive(:read).and_raise(Errno::EIO, "simulated read failure")
+        allow(failing_procfile).to receive(:binread).and_raise(Errno::EIO, "simulated read failure")
         allow(root_path).to receive(:join).and_call_original
         allow(root_path).to receive(:join).with("Procfile").and_return(failing_procfile)
       end
@@ -2627,6 +2627,59 @@ RSpec.describe ReactOnRails::Doctor do
         expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
+    context "when the deprecated task name appears only inside a comment" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "# was: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n" \
+          "web: bundle exec puma\n"
+        )
+        File.write(
+          File.join(tmpdir, "Dockerfile"),
+          "// previously: rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n" \
+          "RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "does not warn for files where every match is in a leading-comment line" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs).to be_empty
+      end
+    end
+
+    context "when a deploy-script file contains non-UTF-8 bytes" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        # Latin-1 byte (\xE9) outside ASCII; Pathname#read would raise
+        # Encoding::InvalidByteSequenceError if the default external encoding
+        # is UTF-8. The doctor scan should still match the ASCII task name.
+        File.binwrite(
+          File.join(tmpdir, "Procfile"),
+          "# d\xE9ploiement legacy\n" \
+          "web: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "still detects the deprecated task and does not surface a generic scan error" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
+        expect(warning_msgs.none? do |m|
                  m[:content].include?("Could not scan for deprecated renderer-cache task")
                end).to be(true)
       end

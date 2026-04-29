@@ -32,15 +32,42 @@ module ReactOnRailsPro
         assets.concat(rsc_manifests)
       end
 
-      assets.uniq(&:to_s)
+      unique = assets.uniq(&:to_s)
+      warn_on_duplicate_basenames(unique)
+      unique
+    end
+
+    # `stage_assets` writes each asset into `bundle_dir` using only its basename,
+    # so two distinct assets with the same basename (e.g. `/path/a/manifest.json`
+    # and `/path/b/manifest.json`) silently overwrite one another. Uniq-by-path
+    # cannot detect this; warn so the user notices the misconfiguration.
+    def warn_on_duplicate_basenames(assets)
+      basenames = assets.reject { |a| http_url?(a) }.map { |a| File.basename(a.to_s) }
+      duplicates = basenames.tally.select { |_, count| count > 1 }.keys
+      return if duplicates.empty?
+
+      warn "[ReactOnRailsPro] Duplicate asset basenames in assets_to_copy: " \
+           "#{duplicates.join(', ')}. Only the last entry per basename will be staged."
     end
 
     # Required assets are matched by expanded path rather than basename so a
     # same-named unrelated entry in assets_to_copy cannot trigger a false-
     # positive "required" error. Expand against Rails.root to match how
     # required_rsc_asset_paths builds its Set.
+    #
+    # URL-backed assets (returned by `asset_uri_from_packer` while the dev
+    # server is running) cannot be staged into the local cache; skip them with
+    # a warning so the renderer falls back to fetching them at request time
+    # rather than aborting the entire pre-seed.
     def each_stageable_asset(assets, rsc_required_paths, action_description)
       assets.each do |asset_path|
+        if http_url?(asset_path)
+          warn "[ReactOnRailsPro] Skipping URL-backed asset #{asset_path} while " \
+               "#{action_description} the renderer cache; the dev server is serving " \
+               "this asset, so the renderer will fetch it on first request."
+          next
+        end
+
         expanded = File.expand_path(asset_path.to_s, Rails.root)
         unless File.file?(expanded)
           if rsc_required_paths.include?(expanded)
@@ -62,6 +89,10 @@ module ReactOnRailsPro
       File.rename(tmp_file, dest)
       puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
     ensure
+      # `tmp_file` is only nil if `mkdir_p` raised before assignment. After a
+      # successful rename the path no longer exists on disk, but `rm_f` is a
+      # no-op for missing files, so this is safe in both the success and
+      # failure paths.
       FileUtils.rm_f(tmp_file) if tmp_file
     end
 
@@ -69,18 +100,31 @@ module ReactOnRailsPro
       asset_path.to_s.empty? ? "<blank>" : asset_path
     end
 
+    # Mirrors `Request#http_url?`: detects dev-server-served assets returned
+    # by `ReactOnRails::PackerUtils.asset_uri_from_packer` so the staging
+    # path can skip them instead of treating them as filesystem paths.
+    def http_url?(path)
+      path.to_s.match?(%r{\Ahttps?://})
+    end
+
     # Must expand against Rails.root so that callers who expand per-asset paths
     # against the same base produce Set-comparable strings. Without an explicit
     # base, File.expand_path uses Dir.pwd, which differs in Docker RUN steps
     # and would make the Set lookup miss.
+    #
+    # URL-backed manifests (dev server) cannot be staged; exclude them so
+    # `each_stageable_asset` does not see them as "required" and raise.
     def required_rsc_asset_paths
       return Set.new unless ReactOnRailsPro.configuration.enable_rsc_support
 
+      manifests = [
+        ReactOnRailsPro::Utils.react_client_manifest_file_path,
+        ReactOnRailsPro::Utils.react_server_client_manifest_file_path
+      ]
       Set.new(
-        [
-          File.expand_path(ReactOnRailsPro::Utils.react_client_manifest_file_path.to_s, Rails.root),
-          File.expand_path(ReactOnRailsPro::Utils.react_server_client_manifest_file_path.to_s, Rails.root)
-        ]
+        manifests
+          .reject { |path| http_url?(path) }
+          .map { |path| File.expand_path(path.to_s, Rails.root) }
       )
     end
 

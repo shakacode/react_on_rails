@@ -38,7 +38,7 @@ describe ReactOnRailsPro::PrepareNodeRenderBundles do # rubocop:disable RSpec/Fi
 
     ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     ENV.delete("RENDERER_BUNDLE_PATH")
-    ReactOnRailsPro::Utils.reset_renderer_bundle_path_deprecation_warned!
+    ReactOnRailsPro::Utils.send(:reset_renderer_bundle_path_deprecation_warned!)
     described_class.send(:reset_deprecation_warned!)
   end
 

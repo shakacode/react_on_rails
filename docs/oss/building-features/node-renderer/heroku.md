@@ -72,7 +72,7 @@ For same-dyno / same-filesystem deployments such as Heroku, the legacy
 
 If you're not using the default cache location, set `RENDERER_SERVER_BUNDLE_CACHE_PATH` so the files stage into the right place. `RENDERER_BUNDLE_PATH` remains a deprecated compatibility alias.
 
-Then you can use the rake task: `react_on_rails_pro:pre_stage_bundle_for_node_renderer`.
+Then you can use the rake task: `react_on_rails_pro:pre_seed_renderer_cache MODE=symlink`.
 
 You might do something like this:
 
@@ -81,7 +81,8 @@ Rake::Task["assets:precompile"]
     .clear_prerequisites
     .enhance([:environment, "react_on_rails:assets:compile_environment"])
     .enhance do
-  Rake::Task["react_on_rails_pro:pre_stage_bundle_for_node_renderer"].invoke
+  ENV["MODE"] = "symlink"
+  Rake::Task["react_on_rails_pro:pre_seed_renderer_cache"].invoke
 end
 ```
 
