@@ -452,6 +452,69 @@ export default function DetailsPanel({ id }) {
 }
 ```
 
+## Manually refetching a server component
+
+Sometimes you need to refresh an `<RSCRoute>` outside of an error-recovery flow — a "Refresh" toolbar button, a websocket-driven invalidation, an inline button rendered by the server component itself. There are three APIs, designed for different positions in the tree:
+
+### `ref` handle on `<RSCRoute>`
+
+When the trigger is a parent or a sibling of the `<RSCRoute>` (or anything else that can hold a ref to it), put a ref on the route and call `ref.current.refetch()`.
+
+```tsx
+import { useRef } from 'react';
+import RSCRoute, { type RSCRouteHandle } from 'react-on-rails-pro/RSCRoute';
+
+function Dashboard() {
+  const cardRef = useRef<RSCRouteHandle>(null);
+
+  return (
+    <>
+      <Toolbar>
+        <button onClick={() => cardRef.current?.refetch()}>Refresh</button>
+      </Toolbar>
+      <RSCRoute ref={cardRef} componentName="UserCard" componentProps={{ userId: 123 }} />
+    </>
+  );
+}
+```
+
+`ref.current.refetch()` returns a `Promise<ReactNode>` that resolves with the new tree. You usually don't need the returned promise — the `<RSCRoute>` updates on its own. The current content stays visible while the new payload streams in (no Suspense fallback flash) thanks to an internal React transition.
+
+### `useCurrentRSCRoute()` from inside the RSC subtree
+
+When the trigger lives inside the server component's own subtree — for example, an inline "Refresh" button that the server component itself renders — that descendant client component can call `useCurrentRSCRoute()` and refetch without being passed any props.
+
+```tsx
+'use client';
+import { useCurrentRSCRoute } from 'react-on-rails-pro/RSCRoute';
+
+export function InlineRefreshButton() {
+  const { refetch } = useCurrentRSCRoute();
+  return <button onClick={() => refetch().catch(console.error)}>Refresh</button>;
+}
+```
+
+The hook returns the same `RSCRouteHandle` as the ref. Calling it outside an `<RSCRoute>` ancestor throws an error.
+
+### `useRSC().refetchComponent(name, props)` for error retry
+
+Use this when the props come from a `ServerComponentFetchError` caught in an error boundary — the typical retry-after-failure flow. See [Error handling](#error-handling) above for the full pattern.
+
+```tsx
+const { refetchComponent } = useRSC();
+refetchComponent(error.serverComponentName, error.serverComponentProps);
+```
+
+### When to use which
+
+| Trigger lives…                                | Use                                      |
+| --------------------------------------------- | ---------------------------------------- |
+| In a parent or sibling that can hold a ref    | `ref` handle on `<RSCRoute>`             |
+| Inside the server component's own RSC subtree | `useCurrentRSCRoute()`                   |
+| In an error-boundary fallback                 | `useRSC().refetchComponent(name, props)` |
+
+All three update the visible tree automatically — no caller-side `setKey` / `useState` workaround. If multiple `<RSCRoute>` instances share the same `componentName`+`componentProps` (and therefore the same cache key), refetching any one of them updates all of them.
+
 ## API reference
 
 Unless noted otherwise, each API below is a default export — use default-import syntax.
@@ -464,6 +527,8 @@ Unless noted otherwise, each API below is a default export — use default-impor
 | `registerServerComponent` (client)     | `react-on-rails-pro/registerServerComponent/client`                                          | Default     | Registers server component placeholders in the client bundle. Takes names as strings: `registerServerComponent('A', 'B')`. The client fetches the RSC payload from the server or uses the payload already embedded in the HTML. |
 | `registerServerComponent` (server)     | `react-on-rails-pro/registerServerComponent/server`                                          | Default     | Registers server components in the server bundle. Takes an object: `registerServerComponent({ A, B })`.                                                                                                                         |
 | `useRSC`                               | `import { useRSC } from 'react-on-rails-pro/RSCProvider'`                                    | **Named**   | Hook providing `refetchComponent(name, props)` for manual refetch and error recovery. Available anywhere inside a tree set up by `wrapServerComponentRenderer`, `registerServerComponent`, or the default client provider.      |
+| `RSCRouteHandle`                       | `import type { RSCRouteHandle } from 'react-on-rails-pro/RSCRoute'`                          | **Named**   | TypeScript type of the imperative handle exposed by `<RSCRoute ref={...} />`. Has a single method, `refetch(): Promise<ReactNode>`, that re-fetches the route using its currently-rendered name and props.                      |
+| `useCurrentRSCRoute`                   | `import { useCurrentRSCRoute } from 'react-on-rails-pro/RSCRoute'`                           | **Named**   | Hook returning the `RSCRouteHandle` of the nearest ancestor `<RSCRoute>`. Lets a client component rendered inside the server component's subtree refetch its parent route without being passed any props.                       |
 | `isServerComponentFetchError`          | `import { isServerComponentFetchError } from 'react-on-rails-pro/ServerComponentFetchError'` | **Named**   | Type guard to check if an error came from a failed server component fetch. The error has `serverComponentName` and `serverComponentProps` fields.                                                                               |
 
 ## Troubleshooting
