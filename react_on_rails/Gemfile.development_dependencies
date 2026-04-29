@@ -48,7 +48,7 @@ end
 group :test do
   gem "capybara", "~> 3.40"
   gem "capybara-screenshot"
-  gem "coveralls", require: false
+  gem "simplecov", "~> 0.16.1", require: false
   gem "cypress-on-rails", "~> 1.19"
   gem "equivalent-xml"
   gem "generator_spec"

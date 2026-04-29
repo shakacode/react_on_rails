@@ -41,7 +41,7 @@ module ReactOnRails
         gem("rspec-rails", group: :test)
         # NOTE: chromedriver-helper was deprecated in 2019. Modern selenium-webdriver (4.x)
         # and GitHub Actions have built-in driver management, so no driver helper is needed.
-        gem("coveralls", require: false)
+        gem("simplecov", require: false, group: :test)
       end
 
       def replace_prerender_if_server_rendering

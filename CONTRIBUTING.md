@@ -430,7 +430,7 @@ Run `rake` for testing the gem and `react_on_rails/spec/dummy`. Otherwise, the `
 
 If you run `rspec` at the top level, you'll see this message: `require': cannot load such file -- rails_helper (LoadError)`
 
-After running a test, you can view the coverage results SimpleCov reports by opening `coverage/index.html`.
+If you run tests with `COVERAGE=true`, you can view the SimpleCov report at `coverage/index.html`.
 
 Turbolinks 5 is included in the test app, unless "DISABLE_TURBOLINKS" is set to YES in the environment.
 

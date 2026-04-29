@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "coveralls/rake/task" if ENV["USE_COVERALLS"] == "TRUE"
-
 require "pathname"
 require "yaml"
 
@@ -141,8 +139,6 @@ namespace :run_rspec do
     pinned_version_examples.each { |example_type| Rake::Task[example_type.rspec_task_name].invoke }
   end
 
-  Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
-
   desc "run all tests no examples"
   task all_but_examples: %i[gem dummy_no_turbolinks dummy js_tests] do
     puts "Completed all RSpec tests"
@@ -209,7 +205,6 @@ def run_tests_in(dir, options = {})
   env_tokens = []
   env_tokens << options.fetch(:env_vars, "").strip unless options.fetch(:env_vars, "").strip.empty?
   env_tokens << "TEST_ENV_COMMAND_NAME=\"#{command_name}\""
-  env_tokens << "COVERAGE=true" if ENV["USE_COVERALLS"]
 
   env_vars = env_tokens.join(" ")
   command = "#{env_vars} bundle exec rspec #{rspec_args}"
