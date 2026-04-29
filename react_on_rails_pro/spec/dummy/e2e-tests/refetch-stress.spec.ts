@@ -99,7 +99,12 @@ test.describe('Imperative RSC refetch — stress scenarios (Issue 3106)', () => 
   });
 
   test('8. mount/unmount: ref.current is null after unmount, set after re-mount', async ({ page }) => {
-    // initial state
+    // The page renders 'unchecked' until the button is pressed, so the
+    // first assertion is a real ref read, not a seeded display value.
+    await expect(page.getByTestId('mount-ref-state')).toHaveText('ref.current: unchecked');
+
+    // While mounted, the ref is set.
+    await page.getByTestId('mount-check-ref').click();
     await expect(page.getByTestId('mount-ref-state')).toHaveText('ref.current: set');
 
     // unmount

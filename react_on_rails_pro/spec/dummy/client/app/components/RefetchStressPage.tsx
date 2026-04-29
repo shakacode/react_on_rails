@@ -318,7 +318,10 @@ const ScenarioManySiblings: React.FC = () => {
 const ScenarioMountCycle: React.FC = () => {
   const ref = useRef<RSCRouteHandle>(null);
   const [mounted, setMounted] = useState(true);
-  const [refState, setRefState] = useState<'set' | 'null'>('set');
+  // Start as 'unchecked' so the displayed state reflects an actual click on
+  // the "Check ref.current" button rather than seeded UI text. This makes the
+  // e2e test's assertions a real ref observation, not a tautology.
+  const [refState, setRefState] = useState<'set' | 'null' | 'unchecked'>('unchecked');
 
   return (
     <Section
