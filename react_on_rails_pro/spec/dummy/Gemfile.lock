@@ -564,7 +564,7 @@ DEPENDENCIES
   scss_lint
   selenium-webdriver (= 4.9.0)
   shakapacker (= 9.6.1)
-  simplecov
+  simplecov (~> 0.16.1)
   spring
   spring-watcher-listen
   sprockets
