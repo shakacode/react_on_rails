@@ -457,15 +457,17 @@ const { refetchComponent } = useRSC();
 refetchComponent(error.serverComponentName, error.serverComponentProps);
 ```
 
+> **Note:** `refetchComponent` only refreshes the cache. When an error boundary is currently displaying its fallback, the `<RSCRoute>` underneath is unmounted, so it cannot react to the cache change on its own — you still have to call `resetErrorBoundary()` (or otherwise unmount the fallback) for the route to re-mount and pick up the new payload. The example in [Error handling](#error-handling) shows the full pattern. The `ref` and `useCurrentRSCRoute()` APIs below do not have this constraint, since both can only be invoked while the route is currently mounted (and therefore not in an error state).
+
 ### When to use which
 
-| Trigger lives…                                | Use                                      |
-| --------------------------------------------- | ---------------------------------------- |
-| In a parent or sibling that can hold a ref    | `ref` handle on `<RSCRoute>`             |
-| Inside the server component's own RSC subtree | `useCurrentRSCRoute()`                   |
-| In an error-boundary fallback                 | `useRSC().refetchComponent(name, props)` |
+| Trigger lives…                                | Use                                                               |
+| --------------------------------------------- | ----------------------------------------------------------------- |
+| In a parent or sibling that can hold a ref    | `ref` handle on `<RSCRoute>`                                      |
+| Inside the server component's own RSC subtree | `useCurrentRSCRoute()`                                            |
+| In an error-boundary fallback                 | `useRSC().refetchComponent(name, props)` + `resetErrorBoundary()` |
 
-All three update the visible tree automatically — no caller-side `setKey` / `useState` workaround. If multiple `<RSCRoute>` instances share the same `componentName`+`componentProps` (and therefore the same cache key), refetching any one of them updates all of them.
+For the `ref` and `useCurrentRSCRoute()` rows, refetching updates the visible tree automatically — no caller-side `setKey` / `useState` workaround, and if multiple `<RSCRoute>` instances share the same `componentName`+`componentProps` (and therefore the same cache key), refetching any one of them updates all of them. For the error-boundary row, you still pair `refetchComponent` with the boundary's reset (see Note above).
 
 ## API reference
 

@@ -41,6 +41,39 @@ type GetServerComponentArgs = {
     RSCProvider = createRSCProvider({ getServerComponent });
   };
 
+  type Deferred<T> = {
+    promise: Promise<T>;
+    resolve: (v: T) => void;
+    reject: (err: unknown) => void;
+  };
+
+  const createDeferred = <T,>(): Deferred<T> => {
+    let resolveFn!: (v: T) => void;
+    let rejectFn!: (err: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolveFn = res;
+      rejectFn = rej;
+    });
+    return { promise, resolve: resolveFn, reject: rejectFn };
+  };
+
+  /**
+   * Build a fetcher that returns a fresh deferred per call. The test controls
+   * resolution order by calling `pending[N].resolve(payload)` whenever it
+   * wants. Used by the concurrency test to assert last-write-wins under
+   * out-of-order resolution.
+   */
+  const setupDeferredFetcher = () => {
+    const pending: Deferred<React.ReactNode>[] = [];
+    getServerComponent = jest.fn((..._args: [GetServerComponentArgs]) => {
+      const d = createDeferred<React.ReactNode>();
+      pending.push(d);
+      return d.promise;
+    });
+    RSCProvider = createRSCProvider({ getServerComponent });
+    return pending;
+  };
+
   /**
    * Wrap the initial render in an act() so React drains microtasks queued by
    * `use(promise)` and we observe a settled tree on return. Without this,
@@ -281,5 +314,55 @@ type GetServerComponentArgs = {
     // Both siblings reflect the new payload.
     await waitFor(() => expect(screen.getAllByText('v2')).toHaveLength(2));
     expect(screen.queryByText('v1')).not.toBeInTheDocument();
+  });
+
+  it('8. concurrent refetches: last write wins even when resolutions arrive out of order', async () => {
+    // Setup: deferred fetcher so the test controls resolution order.
+    // Initial render uses pending[0]; first refetch creates pending[1];
+    // second refetch creates pending[2]. We then resolve pending[2] BEFORE
+    // pending[1] and verify the UI ends on payload-2, not payload-1.
+    const pending = setupDeferredFetcher();
+    const ref = React.createRef<RSCRouteHandle>();
+
+    // Initial render — resolve immediately so the route mounts with payload-0.
+    let result!: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(
+        <TestHarness>
+          <RSCRoute ref={ref} componentName="Race" componentProps={{}} />
+        </TestHarness>,
+      );
+    });
+    await act(async () => {
+      pending[0].resolve(<div data-testid="race">payload-0</div>);
+    });
+    expect(screen.getByTestId('race')).toHaveTextContent('payload-0');
+
+    // Issue refetch #1 (creates pending[1]) and #2 (creates pending[2]) back to
+    // back, before resolving either. Cache now points at pending[2].promise.
+    let r1!: Promise<unknown>;
+    let r2!: Promise<unknown>;
+    await act(async () => {
+      r1 = ref.current!.refetch();
+      r2 = ref.current!.refetch();
+    });
+    expect(getServerComponent).toHaveBeenCalledTimes(3);
+
+    // Resolve the SECOND refetch first — the latest cache write.
+    await act(async () => {
+      pending[2].resolve(<div data-testid="race">payload-2</div>);
+      await r2;
+    });
+    await waitFor(() => expect(screen.getByTestId('race')).toHaveTextContent('payload-2'));
+
+    // Now resolve the older first refetch. The cache no longer points at it,
+    // so the UI must NOT regress to payload-1; it stays on payload-2.
+    await act(async () => {
+      pending[1].resolve(<div data-testid="race">payload-1</div>);
+      await r1;
+    });
+    expect(screen.getByTestId('race')).toHaveTextContent('payload-2');
+
+    result.unmount();
   });
 });
