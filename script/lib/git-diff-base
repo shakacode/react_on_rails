@@ -27,26 +27,34 @@ git_diff_base_fetch_refspec() {
 git_diff_base_fetch_remote_branch() {
   local branch="$1"
   local mode="$2"
+  local quiet="${3:-false}"
   local depth="${GIT_DIFF_BASE_FETCH_DEPTH:-50}"
+  local fetch_args=()
   local refspec
 
   refspec="$(git_diff_base_fetch_refspec "$branch")"
 
   case "$mode" in
     initial)
-      git fetch --depth="$depth" origin "$refspec" 2>/dev/null
+      fetch_args=(--depth="$depth" origin "$refspec")
       ;;
     deepen)
-      git fetch --deepen="$depth" origin "$refspec" 2>/dev/null
+      fetch_args=(--deepen="$depth" origin "$refspec")
       ;;
     unshallow)
-      git fetch --unshallow origin "$refspec" 2>/dev/null
+      fetch_args=(--unshallow origin "$refspec")
       ;;
     *)
       echo "Unknown fetch mode '$mode'" >&2
       return 1
       ;;
   esac
+
+  if [ "$quiet" = "true" ]; then
+    git fetch "${fetch_args[@]}" 2>/dev/null
+  else
+    git fetch "${fetch_args[@]}"
+  fi
 }
 
 git_diff_base_current_remote_branch() {
@@ -88,11 +96,14 @@ git_diff_base_merge_base() {
   git merge-base "$base_ref" "$current_ref" 2>/dev/null
 }
 
+git_diff_base_is_shallow_repository() {
+  [ "$(git rev-parse --is-shallow-repository 2>/dev/null || echo false)" = "true" ]
+}
+
 git_diff_base_resolve() {
   local base_ref="$1"
   local current_ref="$2"
   local fetch_policy="${3:-required}"
-  local max_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-20}"
   local remote_branch=""
   local current_remote_branch=""
   local merge_base
@@ -110,7 +121,7 @@ git_diff_base_resolve() {
 
   if current_remote_branch="$(git_diff_base_current_remote_branch "$current_ref")"; then
     if [ "$current_remote_branch" != "$remote_branch" ]; then
-      git_diff_base_fetch_remote_branch "$current_remote_branch" initial || true
+      git_diff_base_fetch_remote_branch "$current_remote_branch" initial true || true
     fi
   else
     current_remote_branch=""
@@ -132,16 +143,16 @@ git_diff_base_resolve() {
   fi
 
   if [ -n "$remote_branch" ]; then
-    local attempt=1
-    while [ "$attempt" -le "$max_attempts" ]; do
-      local fetched=false
+    local fetched
+    while git_diff_base_is_shallow_repository; do
+      fetched=false
 
       if git_diff_base_fetch_remote_branch "$remote_branch" deepen; then
         fetched=true
       fi
 
       if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
-        if git_diff_base_fetch_remote_branch "$current_remote_branch" deepen; then
+        if git_diff_base_fetch_remote_branch "$current_remote_branch" deepen true; then
           fetched=true
         fi
       fi
@@ -154,11 +165,9 @@ git_diff_base_resolve() {
         printf '%s\n' "$merge_base"
         return 0
       fi
-
-      attempt=$((attempt + 1))
     done
 
-    if [ "$(git rev-parse --is-shallow-repository 2>/dev/null || echo false)" = "true" ]; then
+    if git_diff_base_is_shallow_repository; then
       if git_diff_base_fetch_remote_branch "$remote_branch" unshallow; then
         if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"
@@ -167,7 +176,7 @@ git_diff_base_resolve() {
       fi
 
       if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
-        git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow || true
+        git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow true || true
         if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"
           return 0
