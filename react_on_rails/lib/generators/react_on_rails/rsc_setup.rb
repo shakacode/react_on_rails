@@ -435,7 +435,7 @@ module ReactOnRails
         injected_imports = [
           "\\1",
           ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(content)),
-          "const { resolve } = require('path');",
+          ("const { resolve } = require('path');" unless path_resolve_imported?(content)),
           "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
           "",
           rsc_client_references_js
@@ -515,7 +515,26 @@ module ReactOnRails
       end
 
       def shakapacker_config_imported?(content)
-        content.match?(/^\s*const\s+\{[^\n}]*\bconfig\b[^\n}]*\}\s*=\s*require\(['"]shakapacker['"]\);?/)
+        commonjs_named_imported?(content, "shakapacker", "config")
+      end
+
+      def path_resolve_imported?(content)
+        commonjs_named_imported?(content, "path", "resolve") ||
+          content.match?(/^\s*const\s+resolve\s*=/)
+      end
+
+      def commonjs_named_imported?(content, package_name, binding_name)
+        content.lines.any? do |line|
+          match = line.match(
+            /^\s*const\s+\{(?<bindings>[^\n}]*)\}\s*=\s*require\(['"]#{Regexp.escape(package_name)}['"]\);?/
+          )
+          next false unless match
+
+          match[:bindings].split(",").any? do |binding|
+            binding = binding.strip
+            binding == binding_name || binding.start_with?("#{binding_name} =")
+          end
+        end
       end
 
       def resolve_hello_server_layout_name

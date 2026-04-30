@@ -162,6 +162,43 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when the client webpack config uses aliased imports" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { config: shakapackerConfig } = require('shakapacker');
+          const { resolve } = require('path');
+          #{base_client_webpack_content}
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "injects a usable config import without redeclaring resolve" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("const { config } = require('shakapacker');").length).to eq(1)
+        expect(content.scan("const { resolve } = require('path');").length).to eq(1)
+        expect(content).to include("const { config: shakapackerConfig } = require('shakapacker');")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
+      end
+    end
+  end
+
   context "when Pro is installed with a canonical legacy hello_world layout" do
     before(:all) do
       prepare_destination
