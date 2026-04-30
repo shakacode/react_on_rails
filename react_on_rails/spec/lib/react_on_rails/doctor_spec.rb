@@ -2975,6 +2975,20 @@ RSpec.describe ReactOnRails::Doctor do
             allow(ReactOnRails).to receive(:configuration).and_return(
               instance_double(ReactOnRails::Configuration, node_modules_location: "client")
             )
+            allow(Open3).to receive(:capture3)
+              .with(
+                "node",
+                "-e",
+                "console.log(require.resolve('react/package.json'))",
+                chdir: File.join(tmpdir, "client")
+              )
+              .and_return(
+                [
+                  "#{File.join(tmpdir, 'client/node_modules/react/package.json')}\n",
+                  "",
+                  instance_double(Process::Status, success?: true)
+                ]
+              )
 
             doctor.send(:check_rsc_react_version)
             success_msgs = checker.messages.select { |m| m[:type] == :success }
