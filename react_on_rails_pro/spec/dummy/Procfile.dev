@@ -18,4 +18,4 @@ rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 # Foreman/overmind starts processes concurrently, so on first use wait for the initial
 # build-watch compile or restart `node-renderer` before trusting renderer output.
 # node-renderer-build: pnpm --filter react-on-rails-pro-node-renderer run build-watch
-node-renderer: RENDERER_LOG_LEVEL=debug RENDERER_PORT=3800 node --inspect renderer/node-renderer.js
+node-renderer: RENDERER_PORT=3800 node renderer/node-renderer.js
