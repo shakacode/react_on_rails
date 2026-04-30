@@ -113,6 +113,29 @@ When the change is maintainability-first, record:
 
 Use maintainability notes when that is the honest win. Do not force a weak benchmark onto an example whose real value is simpler ownership or a narrower integration boundary.
 
+### Proof artifact template
+
+Use this template in the migration PR description, linked issue, or a short `docs/` note in the example repository. Fill in the fields that match the claim and mark anything else as not applicable.
+
+| Field                     | What to record                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Baseline ref              | Commit SHA, branch, or tag before the migration                                                              |
+| Migration ref             | Commit SHA, branch, or PR after the migration                                                                |
+| Route or component        | The exact Rails route, controller action, or React mount point                                               |
+| Starting integration      | `react-rails`, `vite_rails`, custom helper, or older React on Rails                                          |
+| Migration slice           | What changed and what intentionally stayed out of scope                                                      |
+| Performance evidence      | Response timing, HTML size, JS bytes, asset count, Lighthouse/WebPageTest/RUM metrics, or "not claimed"      |
+| Maintainability evidence  | Removed custom bridge code, smaller mount boundary, standardized helper usage, fewer entrypoints, or similar |
+| Validation                | Test commands, build commands, browser smoke checks, screenshots, or CI links                                |
+| Known blockers or caveats | Native services, old lockfiles, auth setup, browser-only flows, or environment assumptions                   |
+| Honest summary sentence   | One sentence maintainers can reuse without overstating the result                                            |
+
+Example summary sentences:
+
+- "This migration is performance-first: the route ships fewer JavaScript bytes and keeps the same Rails response contract."
+- "This migration is maintainability-first: it replaces a custom Rails-side React bridge with a standard React on Rails helper while preserving route behavior."
+- "This migration is a setup proof: it demonstrates the minimum config changes needed for a legacy stack, but does not claim route-level speedup."
+
 ## Contribute an example
 
 If your migration could help other teams evaluate React on Rails, [open an issue](https://github.com/shakacode/react_on_rails/issues/new/choose) or [submit a PR](https://github.com/shakacode/react_on_rails/compare) adding it to this page, and include:
