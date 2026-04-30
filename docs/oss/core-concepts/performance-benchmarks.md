@@ -89,6 +89,39 @@ Server components produce HTML that does not need hydration — they have no cli
 
 ## Real-World Results
 
+### Gumroad-Style RSC Benchmark Demo
+
+The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
+is a public ShakaCode comparison repo, not an official Gumroad integration. It measures a bounded creator-dashboard
+surface with the same reduced presenter data and outer layout across two routes:
+
+- Inertia-style control: `/dashboard/inertia_demo`
+- React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
+
+The current clean-port, alternating local benchmark recorded on April 30, 2026, showed this directional signal:
+
+| Metric                    | Inertia demo |   RSC demo |    Delta |
+| ------------------------- | -----------: | ---------: | -------: |
+| Navigation duration       |   `457.16ms` | `402.29ms` | `-12.0%` |
+| Largest Contentful Paint  |   `501.00ms` | `421.00ms` | `-16.0%` |
+| Response end              |   `320.70ms` | `335.96ms` |  `+4.8%` |
+| Controller `action_total` |   `163.10ms` | `169.74ms` |  `+4.1%` |
+| Page-specific JS requests |          `6` |        `1` | `-83.3%` |
+
+Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
+user-visible navigation duration and LCP while sending much less page-specific JavaScript, but the Inertia control was
+still modestly ahead on server response and controller timing. Production-like renderer profiling is still required
+before making stronger production-performance claims.
+
+The important positioning split is:
+
+- **Rspack** is the build-speed and development-loop story.
+- **React Server Components** are the runtime experiment for reducing route-level client JavaScript and moving more
+  composition to the server.
+
+See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
+[Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the current tracking discussion.
+
 ### Popmenu
 
 Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on Rails Pro and reported:
