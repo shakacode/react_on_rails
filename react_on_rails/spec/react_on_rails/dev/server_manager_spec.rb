@@ -41,12 +41,25 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
   end
 
   def mock_system_calls
+    mock_process_managers
+    mock_port_selector_defaults
+    # Default to "Pro renderer active" so legacy base-port tests that expect
+    # RENDERER_PORT / REACT_RENDERER_URL to be set still pass without each
+    # context having to pre-set a renderer env var. The OSS guard is exercised
+    # in a dedicated context below.
+    allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+  end
+
+  def mock_process_managers
     allow(ReactOnRails::Dev::PackGenerator).to receive(:generate).with(any_args)
     allow_any_instance_of(Kernel).to receive(:system).and_return(true)
     allow_any_instance_of(Kernel).to receive(:exit)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
     allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
     allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
+  end
+
+  def mock_port_selector_defaults
     # Default to "no base port active" so a developer running specs inside a
     # Conductor workspace (REACT_ON_RAILS_BASE_PORT set in their shell) doesn't
     # silently redirect tests into the base-port branch. Individual contexts
@@ -530,6 +543,72 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV["RENDERER_PORT"] = "5002"
         expect { described_class.start(:development) }
           .not_to output(/Overriding RENDERER_PORT/).to_stderr
+      end
+
+      it "applies the base-derived PORT in static mode" do
+        # Both run_static_development and run_development call configure_ports,
+        # so the base-port behavior should be identical across modes. This
+        # locks in :static so a future refactor that drops configure_ports
+        # from run_static_development gets caught.
+        described_class.start(:static)
+        expect(ENV.fetch("PORT", nil)).to eq("5000")
+      end
+
+      it "applies the base-derived SHAKAPACKER_DEV_SERVER_PORT in static mode" do
+        described_class.start(:static)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("5001")
+      end
+
+      it "applies the base-derived RENDERER_PORT in static mode" do
+        described_class.start(:static)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("5002")
+      end
+    end
+
+    context "when base port mode is active in an OSS-only environment" do
+      include_context "with clean port env"
+
+      before do
+        mock_system_calls
+        # Disable the default Pro stub so the OSS guard runs for real.
+        allow(described_class).to receive(:pro_renderer_active?).and_call_original
+        allow(Gem.loaded_specs).to receive(:key?).and_call_original
+        allow(Gem.loaded_specs).to receive(:key?).with("react_on_rails_pro").and_return(false)
+        base_port_hash = { rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true }
+        allow(ReactOnRails::Dev::PortSelector).to receive_messages(
+          base_port_ports: base_port_hash,
+          select_ports: base_port_hash
+        )
+      end
+
+      it "still applies the base-derived PORT" do
+        described_class.start(:development)
+        expect(ENV.fetch("PORT", nil)).to eq("5000")
+      end
+
+      it "still applies the base-derived SHAKAPACKER_DEV_SERVER_PORT" do
+        described_class.start(:development)
+        expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("5001")
+      end
+
+      it "does not set RENDERER_PORT for OSS users without a renderer" do
+        described_class.start(:development)
+        expect(ENV).not_to have_key("RENDERER_PORT")
+      end
+
+      it "does not set REACT_RENDERER_URL for OSS users without a renderer" do
+        described_class.start(:development)
+        expect(ENV).not_to have_key("REACT_RENDERER_URL")
+      end
+
+      it "still applies RENDERER_PORT when the user has pre-set a renderer env var" do
+        # A user without the Pro gem who is configuring their own node renderer
+        # is signaled by any RENDERER_* env var. The guard should treat them
+        # the same as a Pro user and apply the derived block.
+        ENV["RENDERER_PORT"] = "3800"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("5002")
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:5002")
       end
     end
 

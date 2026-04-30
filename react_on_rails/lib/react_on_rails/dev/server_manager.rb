@@ -965,16 +965,37 @@ module ReactOnRails
         # a subsequent `bin/dev` in the same shell sees the base-port-derived
         # value rather than a stale explicit one, and developers inspecting
         # their env after `bin/dev prod` see the full derived block.
+        #
+        # RENDERER_PORT / REACT_RENDERER_URL are gated on `pro_renderer_active?`
+        # so OSS environments without the Pro node renderer don't get two
+        # extra env vars in every child process. Pro users (gem loaded or env
+        # vars already set) still get the derived block.
         def apply_base_port_env(selected)
-          derived_url = "http://localhost:#{selected[:renderer]}"
-          warn_if_renderer_url_will_be_overridden(derived_url)
           warn_if_port_will_be_overridden("PORT", selected[:rails])
           warn_if_port_will_be_overridden("SHAKAPACKER_DEV_SERVER_PORT", selected[:webpack])
-          warn_if_port_will_be_overridden("RENDERER_PORT", selected[:renderer])
           ENV["PORT"] = selected[:rails].to_s
           ENV["SHAKAPACKER_DEV_SERVER_PORT"] = selected[:webpack].to_s
+          return unless pro_renderer_active?
+
+          derived_url = "http://localhost:#{selected[:renderer]}"
+          warn_if_renderer_url_will_be_overridden(derived_url)
+          warn_if_port_will_be_overridden("RENDERER_PORT", selected[:renderer])
           ENV["RENDERER_PORT"] = selected[:renderer].to_s
           ENV["REACT_RENDERER_URL"] = derived_url
+        end
+
+        # Heuristic for "this app has a Pro node renderer to point at": either
+        # the react_on_rails_pro gem is loaded, or the user has already set one
+        # of the renderer env vars (so they're configuring a renderer manually
+        # without the Pro gem). Keeps OSS environments clean while not
+        # silently dropping renderer env for any caller who actually wants it.
+        def pro_renderer_active?
+          return true if Gem.loaded_specs.key?("react_on_rails_pro")
+
+          %w[RENDERER_PORT REACT_RENDERER_URL RENDERER_URL].any? do |var|
+            value = ENV.fetch(var, nil)
+            !value.nil? && !value.strip.empty?
+          end
         end
 
         # Mirrors warn_if_renderer_url_will_be_overridden so users notice when a
@@ -1103,6 +1124,22 @@ module ReactOnRails
           ENV.delete("REACT_RENDERER_URL")
         end
 
+        # Matches a URL with an explicit `:port` after the authority. Used by
+        # `#url_port_mismatch?` to distinguish "URL has a port that disagrees"
+        # from "URL has no port at all" (treated as a mismatch separately).
+        #
+        # Anatomy:
+        #   - `(?:[^@/]*@)?` — optional userinfo prefix (`user:pass@`) so a URL
+        #     like `http://user:3800@localhost` does not match the password as
+        #     a host port via backtracking.
+        #   - `(?:\[[^\]]+\]|[^@/:]+)` — host alternatives:
+        #       * `\[[^\]]+\]` for bracketed IPv6 literals (`http://[::1]:3800`)
+        #       * `[^@/:]+` for a regular hostname/IPv4 whose charset excludes
+        #         `/` and `:` so the `:\d+` port anchor lands on the authority
+        #         separator without backtracking into the host.
+        URL_WITH_EXPLICIT_PORT_RE = %r{://(?:[^@/]*@)?(?:\[[^\]]+\]|[^@/:]+):\d+}
+        private_constant :URL_WITH_EXPLICIT_PORT_RE
+
         # Uses URI.parse so a short port isn't matched as a substring of a
         # longer one (e.g. ":80" inside ":3800"). Malformed URLs fall back to
         # "no mismatch detected" rather than crashing; the warn-path is only
@@ -1112,17 +1149,8 @@ module ReactOnRails
         # otherwise return the scheme default (80 for http, 443 for https),
         # which would silently match `RENDERER_PORT=80` / `=443` — a misconfig
         # worth flagging rather than hiding.
-        #
-        # Regex anatomy: the optional `(?:[^@/]*@)?` steps past a userinfo
-        # prefix like `user:pass@` so a URL such as
-        # `http://user:3800@localhost` does not match its password as a host
-        # port via backtracking. The host alternative accepts either a
-        # bracketed IPv6 literal (`\[[^\]]+\]` for URLs like `http://[::1]:3800`)
-        # or a regular host whose charset excludes `/` and `:` so the `:\d+`
-        # port anchor lands on the authority separator without backtracking
-        # into the host.
         def url_port_mismatch?(url, port)
-          return true unless url.match?(%r{://(?:[^@/]*@)?(?:\[[^\]]+\]|[^@/:]+):\d+})
+          return true unless url.match?(URL_WITH_EXPLICIT_PORT_RE)
 
           URI.parse(url).port != port.to_i
         rescue URI::InvalidURIError

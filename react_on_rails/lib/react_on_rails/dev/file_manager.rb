@@ -73,27 +73,74 @@ module ReactOnRails
           true
         end
 
+        # Bounded probe so a stuck server with a full accept queue (rare for a
+        # local overmind socket but theoretically possible) cannot stall
+        # bin/dev startup indefinitely. UNIXSocket.open uses a blocking
+        # connect(2) with no timeout; switching to connect_nonblock + IO.select
+        # gives us a deadline.
+        SOCKET_PROBE_TIMEOUT_SECS = 1.0
+        private_constant :SOCKET_PROBE_TIMEOUT_SECS
+
         def socket_active?(socket_path)
           return false unless File.exist?(socket_path)
 
-          UNIXSocket.open(socket_path, &:close)
-          true
-        rescue IOError, SystemCallError
-          false
+          socket = Socket.new(Socket::AF_UNIX, Socket::SOCK_STREAM, 0)
+          begin
+            socket.connect_nonblock(Socket.sockaddr_un(socket_path))
+            true
+          rescue IO::WaitWritable
+            # connect is in progress — wait up to SOCKET_PROBE_TIMEOUT_SECS for
+            # writability, then check SO_ERROR to distinguish accepted vs.
+            # refused/timed-out connections. Uses socket.wait_writable rather
+            # than IO.select so a Fiber scheduler can interleave properly.
+            ready = socket.wait_writable(SOCKET_PROBE_TIMEOUT_SECS)
+            return false unless ready
+
+            socket.getsockopt(Socket::SOL_SOCKET, Socket::SO_ERROR).int.zero?
+          rescue Errno::EISCONN
+            true
+          rescue SystemCallError, IOError
+            false
+          ensure
+            socket.close
+          end
         end
 
-        # Uses Open3.capture2 with a word-list argv (matching ServerManager#find_port_pids)
-        # so the no-shell-injection invariant is structural rather than caller-enforced —
-        # passing a non-Integer pid in the future cannot introduce a shell metacharacter.
+        # Two-stage lookup: try the zero-dependency `/proc/PID/cwd` readlink first
+        # (Linux), then fall back to `lsof` (macOS, BSD, Linux without /proc visibility).
+        # The /proc path matters for minimal Alpine/CI containers where `lsof`
+        # is not installed by default — without it, this method would silently
+        # return nil on every container and leave stale PID files behind.
         #
-        # Returns nil when:
-        #   - `lsof` is absent (Errno::ENOENT) — common on minimal Alpine/CI images,
-        #   - `lsof` runs but produces no `n` line (process exited or kernel withholds info),
+        # The lsof call uses Open3.capture2 with a word-list argv (matching
+        # ServerManager#find_port_pids) so the no-shell-injection invariant is
+        # structural rather than caller-enforced.
+        #
+        # Returns nil when both probes fail:
+        #   - /proc not present (macOS, BSD) and `lsof` absent (Errno::ENOENT) — minimal containers,
+        #   - the kernel withholds info (permission denied, process exited mid-probe),
         #   - any other unexpected error.
         # The nil return causes `cleanup_rails_pid_file` to keep the PID file as a safe
-        # fallback. The "lsof not found" branch silently skips the cross-directory check;
-        # set DEBUG=1 to surface the cause on stderr.
+        # fallback. Set DEBUG=1 to surface the failure on stderr.
         def working_directory_for_pid(pid)
+          proc_cwd = working_directory_via_proc(pid)
+          return proc_cwd if proc_cwd
+
+          working_directory_via_lsof(pid)
+        end
+
+        def working_directory_via_proc(pid)
+          path = File.readlink("/proc/#{pid}/cwd")
+          return nil if path.nil? || path.empty?
+
+          path
+        rescue Errno::ENOENT, Errno::EACCES, Errno::EPERM, NotImplementedError
+          # /proc not present (macOS, BSD), no permission to read this PID's cwd,
+          # or readlink unsupported on this platform. Fall through to lsof.
+          nil
+        end
+
+        def working_directory_via_lsof(pid)
           stdout, = Open3.capture2("lsof", "-a", "-p", pid.to_s, "-d", "cwd", "-Fn", err: File::NULL)
           path_line = stdout.lines.find { |line| line.start_with?("n") }
           path = path_line&.delete_prefix("n")&.strip
