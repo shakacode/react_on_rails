@@ -547,6 +547,14 @@ In each view, replace `react_component` with `stream_react_component`:
 
 `stream_react_component` automatically sets `prerender: true`. The component renders identically — the difference is that the response is now streamed, which will matter when you start adding Suspense boundaries and async Server Components. React on Rails Pro automatically hydrates components early (before `DOMContentLoaded`), so selective hydration works out of the box.
 
+If the existing page already uses React on Rails Pro async helpers, keep the names straight:
+
+- `async_react_component` and `cached_async_react_component` render independent legacy React roots concurrently and return values that you later resolve with `.value`.
+- `stream_react_component` is the helper to use when migrating a Rails view root into streaming SSR/RSC.
+- `rsc_payload_react_component` is the lower-level RSC payload helper; it does not have a separate `_with_async_props` variant.
+
+In the RSC migration docs, "async props" describes the Rails-owned data pattern: fetch or assemble data in Rails, pass it as `props`, and let streaming SSR flush the component tree progressively.
+
 ### 6c. Update script loading in layouts (recommended)
 
 For streaming to deliver its full performance benefit, script tags should use `async` loading so the browser can hydrate components as they arrive:

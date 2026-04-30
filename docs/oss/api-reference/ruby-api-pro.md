@@ -76,6 +76,8 @@ Requires `enable_rsc_support = true` in configuration.
 <%= rsc_payload_react_component("RSCPage", props: { id: @post.id }) %>
 ```
 
+> **Async props note:** The public RSC payload helper is `rsc_payload_react_component`; there is no separate `_with_async_props` helper name. For RSC routes, resolve data in Rails and pass it through `props`, or let `stream_react_component` stream Suspense boundaries as the component tree renders.
+
 ### `async_react_component(component_name, options = {})`
 
 Renders a component asynchronously, returning an `AsyncValue`. Multiple calls execute concurrently.
@@ -89,6 +91,8 @@ Requires the controller to include `ReactOnRailsPro::AsyncRendering` and call `e
 <%= header.value %>
 <%= sidebar.value %>
 ```
+
+Use `async_react_component` for independent legacy React roots that are still rendered through `react_component`. For RSC migration work, the streaming helper remains `stream_react_component`; the "async props" pattern refers to Rails providing props while streaming SSR progressively flushes HTML.
 
 ### `cached_async_react_component(component_name, options = {}, &block)`
 
