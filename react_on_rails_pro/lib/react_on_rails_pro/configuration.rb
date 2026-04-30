@@ -67,7 +67,7 @@ module ReactOnRailsPro
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE = 64
     ROLLING_DEPLOY_UPLOAD_POSITIONAL_PARAMS = %i[req opt rest].freeze
     ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS = %i[key keyreq].freeze
-    ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest rest].freeze
+    ROLLING_DEPLOY_UPLOAD_ALL_KEYWORD_PARAMS = %i[keyrest].freeze
     ROLLING_DEPLOY_UPLOAD_REQUIRED_KEYWORDS = %i[bundle assets].freeze
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
