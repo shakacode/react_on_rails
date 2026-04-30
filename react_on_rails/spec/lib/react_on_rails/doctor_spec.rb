@@ -2546,6 +2546,7 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_base_package_imports)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("Found references to 'react-on-rails'") }).to be true
       end
     end
 
@@ -2565,6 +2566,7 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_base_package_imports)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails.d.ts") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("imports, require calls, mocks, and declarations") }).to be true
       end
     end
 

@@ -2747,9 +2747,9 @@ module ReactOnRails
     end
 
     # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
-    # so `import ... from 'react-on-rails'` resolves silently — loading the base package instead
-    # of Pro. Components registered through the base package won't have Pro features (streaming,
-    # caching, RSC), and may cause "component not registered" errors at runtime.
+    # so references to 'react-on-rails' resolve silently — loading the base package instead of Pro.
+    # Components registered through the base package won't have Pro features (streaming, caching,
+    # RSC), and may cause "component not registered" errors at runtime.
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
     BASE_PACKAGE_MOCK_PATTERN = %r{\b\w+\.(?:mock|unmock|doMock|dontMock|requireActual|requireMock)\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]} # rubocop:disable Layout/LineLength
@@ -2777,13 +2777,13 @@ module ReactOnRails
         checker.add_success("✅ No base 'react-on-rails' imports found (Pro package used correctly)")
       else
         checker.add_warning(<<~MSG.strip)
-          ⚠️  Found imports from 'react-on-rails' instead of 'react-on-rails-pro':
+          ⚠️  Found references to 'react-on-rails' instead of 'react-on-rails-pro':
           #{files_with_base_import.map { |f| "  • #{f}" }.join("\n")}
 
-          The base package is a transitive dependency of Pro, so these imports resolve
+          The base package is a transitive dependency of Pro, so these references resolve
           silently but load the base version without Pro features.
 
-          Fix: Update imports to use 'react-on-rails-pro':
+          Fix: Update imports, require calls, mocks, and declarations to use 'react-on-rails-pro':
             import ReactOnRails from 'react-on-rails-pro';        // server
             import ReactOnRails from 'react-on-rails-pro/client';  // client
         MSG
