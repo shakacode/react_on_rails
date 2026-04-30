@@ -23,6 +23,18 @@ Consider this approach if you:
 
 ## Implementation
 
+### Migration Checklist
+
+When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice:
+
+1. Move custom one-time tasks into `run_precompile_tasks` in `bin/dev`.
+2. Remove matching shell fragments from `Procfile.dev`, `Procfile.dev-static-assets`, and `Procfile.dev-prod-assets`.
+3. Remove or comment out `precompile_hook` in `config/shakapacker.yml` unless you still need Shakapacker to run a separate hook.
+4. Add the same required build steps to `build_test_command` and `build_production_command`.
+5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
+
+The goal is one owner per lifecycle: `bin/dev` owns development startup, Procfile processes own long-running watchers, and React on Rails build commands own test and production compilation.
+
 ### 1. Customize bin/dev
 
 The React on Rails generator creates a `bin/dev` script with an extensible precompile pattern. Uncomment and customize the `run_precompile_tasks` method:
@@ -127,7 +139,7 @@ wp-server: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 
 ### 4. Configure Build Commands
 
-Handle production builds in `config/initializers/react_on_rails.rb`:
+Handle test and production builds in `config/initializers/react_on_rails.rb`. These commands must include every build step that production deploys and CI test runs require, because `bin/dev` is not part of those lifecycles:
 
 ```ruby
 ReactOnRails.configure do |config|
@@ -136,6 +148,38 @@ ReactOnRails.configure do |config|
   config.build_production_command = "yarn res:build && RAILS_ENV=production NODE_ENV=production bin/shakapacker"
 end
 ```
+
+For larger apps, prefer a small Ruby or shell script over a very long command string:
+
+```ruby
+#!/usr/bin/env ruby
+# bin/build-react-on-rails
+# frozen_string_literal: true
+
+mode = ARGV.fetch(0)
+
+system("yarn res:build", exception: true)
+
+case mode
+when "test"
+  system({ "RAILS_ENV" => "test" }, "bin/shakapacker", exception: true)
+when "production"
+  system({ "RAILS_ENV" => "production", "NODE_ENV" => "production" }, "bin/shakapacker", exception: true)
+else
+  warn "Usage: bin/build-react-on-rails test|production"
+  exit 1
+end
+```
+
+```ruby
+# config/initializers/react_on_rails.rb
+ReactOnRails.configure do |config|
+  config.build_test_command = "bin/build-react-on-rails test"
+  config.build_production_command = "bin/build-react-on-rails production"
+end
+```
+
+This keeps the migration reviewable and avoids duplicating custom build logic across `bin/dev`, Procfiles, and deploy scripts.
 
 ## Direct Ruby API Reference
 
