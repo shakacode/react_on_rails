@@ -2,7 +2,7 @@
 
 This guide covers how to migrate your data fetching from client-side patterns (`useEffect` + `fetch`, React Query, SWR) to Server Component patterns. In React on Rails, data flows from Rails to your components as props — eliminating the need for loading states, error handling boilerplate, and client-side caching in many cases.
 
-> **Part 4 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Context and State Management](rsc-context-and-state.md) | Next: [Third-Party Library Compatibility](rsc-third-party-libs.md)
+> **Part 4 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Context and State Management](rsc-context-and-state.md) | Next: [HTTP Response Ownership](rsc-http-response-patterns.md)
 
 ## The Core Shift: From Client-Side Fetching to Server-Side Data
 
@@ -890,5 +890,6 @@ For each component that fetches data:
 
 ## Next Steps
 
+- [HTTP Response Ownership](rsc-http-response-patterns.md) -- status codes, redirects, and cache headers
 - [Third-Party Library Compatibility](rsc-third-party-libs.md) -- dealing with incompatible libraries
 - [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) -- debugging and avoiding problems

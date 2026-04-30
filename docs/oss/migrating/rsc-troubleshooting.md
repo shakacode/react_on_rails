@@ -2,7 +2,7 @@
 
 This guide covers the most common problems you'll encounter when migrating to React Server Components, with concrete solutions for each. Use it as a reference when you hit errors or unexpected behavior.
 
-> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md) | Next: [Flight Payload Optimization](rsc-flight-payload.md)
+> **Part 7 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Third-Party Library Compatibility](rsc-third-party-libs.md) | Next: [Flight Payload Optimization](rsc-flight-payload.md)
 
 ## Diagnostic Quick-Reference
 
@@ -1087,4 +1087,5 @@ For these cases, keep components as Client Components and adopt Server Component
 - [Component Tree Restructuring Patterns](rsc-component-patterns.md) -- how to restructure your component tree
 - [Context, Providers, and State Management](rsc-context-and-state.md) -- how to handle Context and global state
 - [Data Fetching Migration](rsc-data-fetching.md) -- migrating from useEffect to server-side fetching
+- [HTTP Response Ownership](rsc-http-response-patterns.md) -- status codes, redirects, and cache headers
 - [Third-Party Library Compatibility](rsc-third-party-libs.md) -- dealing with incompatible libraries

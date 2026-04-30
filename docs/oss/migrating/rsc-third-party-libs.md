@@ -2,7 +2,7 @@
 
 Most third-party React libraries were built before Server Components existed. Many rely on hooks, Context, or browser APIs that are unavailable in Server Components. This guide covers how to identify incompatible libraries, create wrapper patterns, and choose RSC-compatible alternatives.
 
-> **Part 5 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Data Fetching Migration](rsc-data-fetching.md) | Next: [Troubleshooting](rsc-troubleshooting.md)
+> **Part 6 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [HTTP Response Ownership](rsc-http-response-patterns.md) | Next: [Troubleshooting](rsc-troubleshooting.md)
 
 ## Why Libraries Break in Server Components
 
@@ -423,3 +423,4 @@ Styled-components and Emotion work inside `'use client'` boundaries, but they pr
 
 - [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) -- debugging and avoiding problems
 - [Data Fetching Migration](rsc-data-fetching.md) -- migrating from useEffect to server-side fetching
+- [HTTP Response Ownership](rsc-http-response-patterns.md) -- status codes, redirects, and cache headers

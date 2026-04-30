@@ -2,7 +2,7 @@
 
 This guide covers a critical and counterintuitive RSC performance nuance: not all non-interactive, stateless components should be Server Components. When presentational components produce element trees much larger than their data props, moving them to Client Components can dramatically reduce page weight.
 
-> **Part 7 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md)
+> **Part 8 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md)
 
 ## What's in the Flight Payload
 

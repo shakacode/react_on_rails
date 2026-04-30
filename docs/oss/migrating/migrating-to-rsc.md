@@ -72,7 +72,17 @@ How to migrate from client-side data fetching to server component patterns. Cove
 - Streaming data with the `use()` hook and Suspense
 - When to keep client-side data fetching
 
-### 5. [Third-Party Library Compatibility](rsc-third-party-libs.md)
+### 5. [HTTP Response Ownership](rsc-http-response-patterns.md)
+
+How to keep HTTP response semantics in Rails while rendering the UI with RSC. Covers:
+
+- Preflight patterns for controller/service decisions before streaming
+- Route-level `404` and not-found UI patterns
+- Redirect ownership and why it should stay in Rails
+- Cache header strategy for public and personalized RSC responses
+- Passing response policy into the RSC tree as serializable props
+
+### 6. [Third-Party Library Compatibility](rsc-third-party-libs.md)
 
 How to handle libraries that aren't RSC-compatible. Covers:
 
@@ -83,7 +93,7 @@ How to handle libraries that aren't RSC-compatible. Covers:
 - The barrel file problem and direct imports
 - Using `server-only` and `client-only` packages
 
-### 6. [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md)
+### 7. [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md)
 
 How to debug and avoid common problems. Covers:
 
@@ -96,7 +106,7 @@ How to debug and avoid common problems. Covers:
 - Performance monitoring and bundle analysis tools
 - Common error messages and their solutions
 
-### 7. [Flight Payload Optimization](rsc-flight-payload.md)
+### 8. [Flight Payload Optimization](rsc-flight-payload.md)
 
 How to optimize RSC Flight payload size for better performance. Covers:
 
@@ -136,7 +146,8 @@ Tailored for React on Rails' multi-root architecture:
 1. **[Prepare your app](rsc-preparing-app.md)** -- set up the RSC infrastructure, add `'use client'` to all component entry points, and switch to streaming rendering. The app works identically -- nothing changes yet.
 2. **Pick a component and push the boundary down** -- move `'use client'` from the root component to its interactive children, letting parent components become Server Components.
 3. **Adopt advanced patterns** -- add Suspense boundaries, [`stream_react_component`](rsc-data-fetching.md#data-fetching-in-react-on-rails-pro) for streaming SSR, and server-side data fetching.
-4. **Repeat for each registered component** -- migrate components one at a time, in any order.
+4. **Keep route policy in Rails** -- decide redirects, status codes, and cache headers before streaming commits the response.
+5. **Repeat for each registered component** -- migrate components one at a time, in any order.
 
 This approach lets you migrate incrementally, one component at a time, without ever breaking your app.
 
@@ -191,6 +202,7 @@ These mistakes account for the majority of setup failures:
 
 - [Upgrading an Existing Pro App to RSC](../../pro/react-server-components/upgrading-existing-pro-app.md) — generator-based runbook for adding RSC to an existing Pro app, including legacy webpack compatibility and verification checklist
 - [React 19 Native Metadata](../building-features/react-19-native-metadata.md) — replace react-helmet and `react_component_hash` with React 19's built-in `<title>`, `<meta>`, and `<link>` hoisting. Native metadata works with streaming and RSC out of the box.
+- [HTTP Response Ownership](rsc-http-response-patterns.md) -- keep `404`, redirects, and cache policy in Rails while rendering route UI with RSC.
 
 ## References
 
