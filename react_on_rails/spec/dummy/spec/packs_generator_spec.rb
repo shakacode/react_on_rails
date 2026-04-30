@@ -45,6 +45,7 @@ module ReactOnRails
     after do
       ReactOnRails.configuration.server_bundle_js_file = old_server_bundle
       ReactOnRails.configuration.components_subdirectory = old_subdirectory
+      ReactOnRails.configuration.auto_load_bundle = old_auto_load_bundle
 
       FileUtils.rm_rf "#{packer_source_entry_path}/generated"
       FileUtils.rm_rf generated_server_bundle_file_path
@@ -408,6 +409,44 @@ module ReactOnRails
         # the following expectation checks that an additional import statement is not added if one already exists
         same_instance.generate_packs_if_stale
         expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
+      end
+
+      it "serializes concurrent generation and rechecks staleness after waiting" do
+        generator = described_class.new
+        generation_started = Queue.new
+        release_generation = Queue.new
+        second_completed = Queue.new
+        generation_count = 0
+
+        allow(generator).to receive(:add_generated_pack_to_server_bundle)
+        allow(generator).to receive(:clean_non_generated_files_with_feedback)
+        allow(generator).to receive(:clean_generated_directories_with_feedback)
+        allow(generator).to receive(:generated_files_present_and_up_to_date?).and_return(false, true)
+        allow(generator).to receive(:generate_packs) do
+          generation_count += 1
+          generation_started << true
+          release_generation.pop
+        end
+
+        first_thread = Thread.new { generator.generate_packs_if_stale }
+        generation_started.pop
+
+        second_thread = Thread.new do
+          generator.generate_packs_if_stale
+          second_completed << true
+        end
+
+        sleep 0.1
+        expect { second_completed.pop(true) }.to raise_error(ThreadError)
+
+        release_generation << true
+        first_thread.join
+        second_thread.join
+
+        expect(generation_count).to eq(1)
+      ensure
+        first_thread&.kill if first_thread&.alive?
+        second_thread&.kill if second_thread&.alive?
       end
 
       it "generate packs if a new component is added" do
