@@ -3090,6 +3090,25 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when the selected JavaScript package manager is unavailable" do
+    let(:install_generator) { described_class.new }
+
+    before do
+      allow(GeneratorMessages).to receive(:detect_package_manager).and_return("pnpm")
+      allow(GeneratorMessages).to receive(:package_manager_executable_available?).with("pnpm").and_return(false)
+      allow(install_generator).to receive(:cli_exists?) { |command| command == "npm" }
+    end
+
+    specify "missing_package_manager? reports the selected manager and available alternatives" do
+      expect(install_generator.send(:missing_package_manager?)).to be true
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("package manager 'pnpm' was selected")
+      expect(error_text).to include("available")
+      expect(error_text).to include("npm")
+    end
+  end
+
   context "when force-checking Pro gem without pro-related flags" do
     let(:install_generator) { described_class.new([], { pro: false, rsc: false }) }
     let(:fake_pid) { 12_345 }

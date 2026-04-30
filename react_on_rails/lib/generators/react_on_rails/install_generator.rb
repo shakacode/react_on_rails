@@ -946,10 +946,12 @@ module ReactOnRails
       end
 
       def missing_package_manager?
-        package_managers = %w[npm pnpm yarn bun]
-        missing = package_managers.none? { |pm| cli_exists?(pm) }
+        selected_package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
+        return false if GeneratorMessages.package_manager_executable_available?(selected_package_manager)
 
-        if missing
+        available_package_managers = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.select { |pm| cli_exists?(pm) }
+
+        if available_package_managers.empty?
           error = <<~MSG.strip
             🚫 No JavaScript package manager found on your system.
 
@@ -967,7 +969,16 @@ module ReactOnRails
           return true
         end
 
-        false
+        error = <<~MSG.strip
+          🚫 JavaScript package manager '#{selected_package_manager}' was selected, but the command was not found.
+
+          React on Rails selected this package manager from REACT_ON_RAILS_PACKAGE_MANAGER,
+          package.json, or your lockfiles. Install #{selected_package_manager}, remove the stale
+          lockfile/configuration, or set REACT_ON_RAILS_PACKAGE_MANAGER to one of the available
+          package managers: #{available_package_managers.join(', ')}.
+        MSG
+        GeneratorMessages.add_error(error)
+        true
       end
 
       def jsx_in_js_files_present?
