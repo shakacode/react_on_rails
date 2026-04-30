@@ -2802,9 +2802,11 @@ module ReactOnRails
     end
 
     def deploy_script_references_deprecated_task?(full_path)
+      # Only `#` comments matter for the scanned file types: Procfile, Dockerfile*,
+      # and bin/* scripts all use `#`. None use `//`, so we don't filter it.
       full_path.binread.each_line.any? do |line|
         stripped = line.lstrip
-        !stripped.start_with?("#", "//") && stripped.include?(DEPRECATED_RENDERER_CACHE_TASK)
+        !stripped.start_with?("#") && stripped.include?(DEPRECATED_RENDERER_CACHE_TASK)
       end
     end
 

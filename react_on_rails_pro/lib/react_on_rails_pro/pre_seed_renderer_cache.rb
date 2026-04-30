@@ -172,7 +172,12 @@ module ReactOnRailsPro
       begin
         File.symlink(relative_source_path, destination)
       rescue Errno::EEXIST
-        return if matching_symlink?(destination, relative_source_path)
+        if matching_symlink?(destination, relative_source_path)
+          puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
+               "(concurrent creator won a second race after we cleared a stale link); " \
+               "leaving existing link."
+          return
+        end
 
         raise
       end

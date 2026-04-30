@@ -136,7 +136,8 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
         end
       end
 
-      expect { described_class.call(mode: :symlink) }.not_to raise_error
+      expect { described_class.call(mode: :symlink) }
+        .to output(/concurrent creator won a second race/).to_stdout
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
       expect(File.realpath(dest_file)).to eq(server_bundle_path)
     end

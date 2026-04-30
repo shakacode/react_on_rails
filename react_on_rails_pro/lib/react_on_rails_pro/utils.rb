@@ -184,14 +184,18 @@ module ReactOnRailsPro
 
     # Uses the same plain-Ruby blank check as enforce_cache_dir_env_var! so a
     # whitespace-only env var (e.g. RENDERER_SERVER_BUNDLE_CACHE_PATH=" ") is
-    # treated as unset by both call sites — otherwise the guard would raise
-    # while this resolver would silently return " " as the cache path.
+    # treated as unset by both call sites. The raw env value is returned (not
+    # stripped) so the Rails-side pre-seed lands in the same directory the Node
+    # renderer reads — packages/react-on-rails-pro-node-renderer/src/shared/
+    # configBuilder.ts consumes these env vars verbatim, and a stripped value
+    # here would silently diverge from the renderer's view when an env file
+    # accidentally includes leading/trailing whitespace.
     def self.resolve_renderer_cache_dir
-      preferred = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").strip
-      return preferred unless preferred.empty?
+      preferred = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "")
+      return preferred unless preferred.strip.empty?
 
-      legacy = ENV.fetch("RENDERER_BUNDLE_PATH", "").strip
-      if legacy.empty?
+      legacy = ENV.fetch("RENDERER_BUNDLE_PATH", "")
+      if legacy.strip.empty?
         Rails.root.join(".node-renderer-bundles").to_s
       else
         RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize do

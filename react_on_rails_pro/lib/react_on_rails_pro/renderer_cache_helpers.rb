@@ -89,10 +89,15 @@ module ReactOnRailsPro
       File.rename(tmp_file, dest)
       puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
     ensure
-      # `tmp_file` is only nil if `mkdir_p` raised before assignment. After a
-      # successful rename the path no longer exists on disk, but `rm_f` is a
-      # no-op for missing files, so this is safe in both the success and
-      # failure paths.
+      # `tmp_file` is nil when the assignment line was never reached — Ruby
+      # initialises locals to nil before the method body runs, so the `if
+      # tmp_file` guard only matters when `mkdir_p` raises (or any other
+      # exception ahead of the assignment).
+      #
+      # On the success path `tmp_file` is a truthy string but the file no
+      # longer exists on disk after the rename, and `rm_f` is a no-op for
+      # missing files — so this `ensure` is harmless on success and cleans up
+      # the partial copy on failure.
       FileUtils.rm_f(tmp_file) if tmp_file
     end
 

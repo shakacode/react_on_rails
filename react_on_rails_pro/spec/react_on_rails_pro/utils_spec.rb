@@ -497,6 +497,45 @@ module ReactOnRailsPro
         end
       end
     end
+
+    describe ".resolve_renderer_cache_dir" do
+      before do
+        described_class.send(:reset_renderer_bundle_path_deprecation_warned!)
+      end
+
+      after do
+        ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
+        ENV.delete("RENDERER_BUNDLE_PATH")
+        described_class.send(:reset_renderer_bundle_path_deprecation_warned!)
+      end
+
+      it "returns RENDERER_SERVER_BUNDLE_CACHE_PATH verbatim, including surrounding whitespace" do
+        ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "  /tmp/renderer-cache  "
+
+        # Whitespace is preserved so the Rails pre-seed lands in the same path
+        # the Node renderer reads (it consumes the env var verbatim in
+        # configBuilder.ts).
+        expect(described_class.resolve_renderer_cache_dir).to eq("  /tmp/renderer-cache  ")
+      end
+
+      it "returns RENDERER_BUNDLE_PATH verbatim when only the deprecated var is set" do
+        ENV["RENDERER_BUNDLE_PATH"] = " /tmp/legacy-cache "
+
+        expect { @result = described_class.resolve_renderer_cache_dir }
+          .to output(/RENDERER_BUNDLE_PATH is deprecated/).to_stderr
+        expect(@result).to eq(" /tmp/legacy-cache ")
+      end
+
+      it "treats whitespace-only env values as unset and falls back to the default" do
+        ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "  "
+        ENV["RENDERER_BUNDLE_PATH"] = "\t\n"
+        allow(Rails).to receive(:root).and_return(Pathname.new("/app"))
+
+        expect { @result = described_class.resolve_renderer_cache_dir }
+          .not_to output(/deprecated/).to_stderr
+        expect(@result).to eq("/app/.node-renderer-bundles")
+      end
+    end
   end
 end
 # rubocop:enable Metrics/ModuleLength

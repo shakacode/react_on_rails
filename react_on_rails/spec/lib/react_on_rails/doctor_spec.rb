@@ -2643,7 +2643,7 @@ RSpec.describe ReactOnRails::Doctor do
         )
         File.write(
           File.join(tmpdir, "Dockerfile"),
-          "// previously: rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n" \
+          "# previously: rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n" \
           "RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache\n"
         )
         allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
