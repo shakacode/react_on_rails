@@ -27,7 +27,6 @@ git_diff_base_fetch_refspec() {
 git_diff_base_fetch_remote_branch() {
   local branch="$1"
   local mode="$2"
-  local quiet="${3:-false}"
   local depth="${GIT_DIFF_BASE_FETCH_DEPTH:-50}"
   local fetch_args=()
   local refspec
@@ -50,11 +49,7 @@ git_diff_base_fetch_remote_branch() {
       ;;
   esac
 
-  if [ "$quiet" = "true" ]; then
-    git fetch "${fetch_args[@]}" 2>/dev/null
-  else
-    git fetch "${fetch_args[@]}"
-  fi
+  git fetch "${fetch_args[@]}"
 }
 
 git_diff_base_current_remote_branch() {
@@ -121,7 +116,7 @@ git_diff_base_resolve() {
 
   if current_remote_branch="$(git_diff_base_current_remote_branch "$current_ref")"; then
     if [ "$current_remote_branch" != "$remote_branch" ]; then
-      git_diff_base_fetch_remote_branch "$current_remote_branch" initial true || true
+      git_diff_base_fetch_remote_branch "$current_remote_branch" initial || true
     fi
   else
     current_remote_branch=""
@@ -152,7 +147,7 @@ git_diff_base_resolve() {
       fi
 
       if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
-        if git_diff_base_fetch_remote_branch "$current_remote_branch" deepen true; then
+        if git_diff_base_fetch_remote_branch "$current_remote_branch" deepen; then
           fetched=true
         fi
       fi
@@ -176,7 +171,7 @@ git_diff_base_resolve() {
       fi
 
       if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
-        git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow true || true
+        git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow || true
         if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"
           return 0
