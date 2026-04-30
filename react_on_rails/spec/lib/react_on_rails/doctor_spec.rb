@@ -2530,6 +2530,44 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when JS tests mock the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "jest.mock('react-on-rails', () => ({ authenticityHeaders: jest.fn() }));\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+      end
+    end
+
+    context "when TypeScript declaration files augment the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/types/react-on-rails.d.ts",
+                       "declare module 'react-on-rails' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails.d.ts") }).to be true
+      end
+    end
+
     context "when JS files correctly import from 'react-on-rails-pro'" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
