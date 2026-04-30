@@ -55,7 +55,9 @@ test_worker = ENV.fetch("TEST_ENV_NUMBER", "0")
 test_worker = "0" if test_worker.empty?
 
 ENV["RENDERER_PORT"] ||= (3900 + test_worker.to_i).to_s
-ENV["RENDERER_URL"] ||= "http://127.0.0.1:#{ENV.fetch('RENDERER_PORT')}"
+renderer_url = "http://127.0.0.1:#{ENV.fetch('RENDERER_PORT')}"
+ENV["REACT_RENDERER_URL"] ||= renderer_url
+ENV["RENDERER_URL"] ||= renderer_url
 ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
   File.expand_path("../tmp/node-renderer-bundles-test-#{test_worker}", __dir__)
 
@@ -154,7 +156,12 @@ RSpec.configure do |config|
   rescue Errno::ESRCH, Errno::ECHILD
     # Already stopped.
   rescue Timeout::Error
-    Process.kill("KILL", @rsc_node_renderer_pid)
+    begin
+      Process.kill("KILL", @rsc_node_renderer_pid)
+      Process.wait(@rsc_node_renderer_pid)
+    rescue Errno::ESRCH, Errno::ECHILD
+      # Already stopped.
+    end
   end
 end
 ```
