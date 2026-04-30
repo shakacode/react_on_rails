@@ -239,6 +239,25 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
         end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
       end
 
+      # Regression: `accepts_bundle_hash_argument?` rejects signatures that have
+      # zero positional parameters even when the required upload keywords are
+      # present. A plausible mistake is to swap the positional `bundle_hash` for
+      # a `bundle_hash:` keyword; the adapter would still raise at upload time
+      # because the stager passes `bundle_hash` positionally.
+      it "rejects kwarg-only upload signatures with no positional bundle_hash" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(bundle:, assets:) = [bundle, assets]
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
+
       it "rejects adapters that require extra positional upload arguments" do
         adapter = Class.new do
           def self.previous_bundle_hashes = []

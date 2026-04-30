@@ -563,4 +563,20 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       expect(described_class::DISCOVERY_TIMEOUT_SECONDS).to eq(10)
     end
   end
+
+  # Guards against a future rename of the temp/backup suffixes drifting out of
+  # sync with TEMPORARY_DIRECTORY_PATTERN — that would silently break the sweep.
+  describe "TEMPORARY_DIRECTORY_PATTERN" do
+    let(:bundle_dir) { "/tmp/cache/abc123" }
+
+    it "matches temporary_bundle_directory output" do
+      staging_dir = described_class.send(:temporary_bundle_directory, bundle_dir)
+      expect(File.basename(staging_dir)).to match(described_class::TEMPORARY_DIRECTORY_PATTERN)
+    end
+
+    it "matches the .previous-<pid>-<hex> backup suffix produced by replace_bundle_directory" do
+      backup_basename = "abc123.previous-#{Process.pid}-#{SecureRandom.hex(6)}"
+      expect(backup_basename).to match(described_class::TEMPORARY_DIRECTORY_PATTERN)
+    end
+  end
 end

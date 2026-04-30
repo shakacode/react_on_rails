@@ -435,6 +435,21 @@ describe ReactOnRailsPro::AssetsPrecompile do
       end
     end
 
+    # Documents the intentional behavior that any non-dev/non-test env (staging,
+    # production, qa, preview, custom envs) publishes to the configured adapter.
+    # Guards against the skip list being widened by accident — staging deploys
+    # need to seed the artifact store so the next staging-→-staging or
+    # staging-→-production rolling deploy can pre-seed the previous hash.
+    it "publishes in environments other than development and test (e.g. staging)" do
+      allow(adapter).to receive(:upload)
+      %w[staging production qa preview anything-else].each do |env_name|
+        allow(Rails).to receive(:env).and_return(ActiveSupport::StringInquirer.new(env_name))
+        described_class.publish_current_bundle_if_configured
+      end
+
+      expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: []).exactly(5).times
+    end
+
     it "warns and continues when upload times out" do
       stub_const("ReactOnRailsPro::AssetsPrecompile::UPLOAD_TIMEOUT_SECONDS", 0.05)
       allow(adapter).to receive(:upload) { sleep 1 }

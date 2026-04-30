@@ -66,7 +66,7 @@ module ReactOnRailsPro
 
     def self.handle_missing_adapter
       env_override = ENV["PREVIOUS_BUNDLE_HASHES"].to_s.strip
-      return if env_override.empty?
+      return nil if env_override.empty?
 
       # PREVIOUS_BUNDLE_HASHES overrides *discovery*; the adapter is still required
       # to fetch the actual bundle files. Refuse to proceed rather than raise a raw
@@ -74,6 +74,7 @@ module ReactOnRailsPro
       warn "[ReactOnRailsPro] PREVIOUS_BUNDLE_HASHES=#{env_override.inspect} is set but no " \
            "rolling_deploy_adapter is configured. Rolling-deploy seeding requires both. " \
            "Set config.rolling_deploy_adapter to enable. Skipping previous-hash seeding."
+      nil
     end
     private_class_method :handle_missing_adapter
 
@@ -120,6 +121,10 @@ module ReactOnRailsPro
 
       bundle_dir = bundle_directory(cache_dir, hash)
       staging_dir = temporary_bundle_directory(bundle_dir)
+      # Create the staging dir explicitly so a permission error here surfaces with a
+      # clear "Failed to seed previous bundle hash" attribution rather than as a
+      # downstream copy/symlink failure inside `stage_previous_file`.
+      FileUtils.mkdir_p(staging_dir)
       stage_previous_file(
         payload[:bundle],
         File.join(staging_dir, "#{hash}.js"),
@@ -230,6 +235,11 @@ module ReactOnRailsPro
     end
     private_class_method :warn_non_file_asset_payload
 
+    # Only checks that the required RSC basenames *appear* in the payload's asset
+    # list. Existence and file-ness of those paths on disk are validated downstream
+    # by `valid_asset_payload?`, which attributes any missing required RSC files
+    # via `warn_missing_asset_payload`. Splitting the two passes lets each warning
+    # attribute the failure mode (contract gap vs. dangling path) accurately.
     def self.valid_required_rsc_payload?(asset_paths, hash)
       missing = required_rsc_asset_basenames - asset_paths.map { |path| File.basename(path) }
       return true if missing.empty?
@@ -286,6 +296,13 @@ module ReactOnRailsPro
     end
     private_class_method :stage_file
 
+    # No-ops when `cache_dir` does not exist yet. On Docker-style deploys (cache
+    # rebuilt from an immutable image layer each release) that's the desired
+    # behavior. On persistent-volume deploys where the cache survives across
+    # releases but `cache_dir` was wiped between runs, orphaned `.staging-*` /
+    # `.previous-*` dirs from a prior run would re-appear when the volume is
+    # remounted under a fresh, empty `cache_dir` — they'll be swept on the next
+    # successful seeding pass once `cache_dir` is recreated, not this one.
     def self.sweep_stale_temporary_directories(cache_dir)
       return unless Dir.exist?(cache_dir)
 
@@ -348,6 +365,15 @@ module ReactOnRailsPro
     end
     private_class_method :bundle_directory
 
+    # There is a brief window between the two `mv` calls below where `bundle_dir`
+    # does not exist on disk. A renderer lookup for this hash during that window
+    # would miss the cache and fall back to the runtime 410-retry path — a single
+    # cold-start, not a correctness regression. On Linux/same-filesystem deploys
+    # `File.rename` is atomic at the kernel level, so the window is sub-millisecond.
+    # On cross-filesystem or NFS mounts, `FileUtils.mv` falls back to copy+delete
+    # and the window can widen to seconds. The trade-off is intentional: this
+    # design favors full-replacement atomicity (no half-staged dir ever observed)
+    # over zero-downtime swap, since the 410-retry fallback bounds the worst case.
     def self.replace_bundle_directory(staging_dir, bundle_dir)
       backup_dir = nil
       if File.exist?(bundle_dir)
