@@ -105,15 +105,12 @@ If you are moving an older `react-rails` app to React on Rails while it is still
    # or: pnpm add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
    ```
 
-   ```js
+   ```diff
    // babel.config.js
-   module.exports = {
-     plugins: [
-       // ...existing plugins,
-       '@babel/plugin-transform-optional-chaining',
-       '@babel/plugin-transform-nullish-coalescing-operator',
-     ],
-   };
+      plugins: [
+   +    '@babel/plugin-transform-optional-chaining',
+   +    '@babel/plugin-transform-nullish-coalescing-operator',
+      ],
    ```
 
 3. Transpile the React on Rails CommonJS build from `node_modules` so Webpack 4 can parse it consistently:
