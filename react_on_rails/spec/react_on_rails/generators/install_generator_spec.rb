@@ -1622,6 +1622,8 @@ describe InstallGenerator, type: :generator do
       assert_file "config/webpack/serverWebpackConfig.js" do |content|
         expect(content).to include("RSCWebpackPlugin")
         expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
       end
     end
 
@@ -1838,6 +1840,8 @@ describe InstallGenerator, type: :generator do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("clientReferences: rscClientReferences")
+          expect(content).to include("directory: resolve(config.source_path)")
         end
       end
 
@@ -1845,6 +1849,8 @@ describe InstallGenerator, type: :generator do
         assert_file "config/rspack/clientWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("clientReferences: rscClientReferences")
+          expect(content).to include("directory: resolve(config.source_path)")
         end
       end
 

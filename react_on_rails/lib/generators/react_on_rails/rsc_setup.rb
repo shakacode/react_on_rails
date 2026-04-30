@@ -386,7 +386,17 @@ module ReactOnRails
         gsub_file(
           config_path,
           %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)},
-          "\\1\nconst { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+          <<~'JS'.chomp
+            \1
+            const { resolve } = require('path');
+            const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+            const rscClientReferences = {
+              directory: resolve(config.source_path),
+              recursive: true,
+              include: /\.(js|ts|jsx|tsx)$/,
+            };
+          JS
         )
 
         # Add rscBundle parameter to configureServer function
@@ -401,7 +411,9 @@ module ReactOnRails
         rsc_plugin_code = "// Add RSC plugin for server bundle (handles client component references)\n  " \
                           "// Skip for RSC bundle - it doesn't need RSCWebpackPlugin\n  " \
                           "if (!rscBundle) {\n    " \
-                          "serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));\n  " \
+                          "serverWebpackConfig.plugins.push(\n      " \
+                          "new RSCWebpackPlugin({ isServer: true, clientReferences: rscClientReferences }),\n    " \
+                          ");\n  " \
                           "}"
         gsub_file(
           config_path,
@@ -425,12 +437,25 @@ module ReactOnRails
         gsub_file(
           config_path,
           %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)},
-          "\\1\nconst { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+          <<~'JS'.chomp
+            \1
+            const { config } = require('shakapacker');
+            const { resolve } = require('path');
+            const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+            const rscClientReferences = {
+              directory: resolve(config.source_path),
+              recursive: true,
+              include: /\.(js|ts|jsx|tsx)$/,
+            };
+          JS
         )
 
         # Add RSCWebpackPlugin to client config before return statement
         rsc_plugin_code = "  // Add React Server Components plugin for client bundle\n  " \
-                          "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));"
+                          "clientConfig.plugins.push(\n    " \
+                          "new RSCWebpackPlugin({ isServer: false, clientReferences: rscClientReferences }),\n  " \
+                          ");"
         gsub_file(
           config_path,
           /^( *return clientConfig;)$/,

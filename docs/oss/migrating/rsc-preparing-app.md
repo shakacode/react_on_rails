@@ -265,7 +265,7 @@ module.exports = {
 };
 ```
 
-> **`clientReferences`**: If omitted, the plugin defaults to scanning the entire project root recursively (`{ directory: ".", recursive: true, include: /\.(js|ts|jsx|tsx)$/ }`), which works but is slow on large codebases. Setting `directory` to your app's source directory (e.g., `'./client/app'`) limits the scan to only the files that could contain `'use client'` directives.
+> **`clientReferences`**: Always point this at your application source directory. If omitted, the plugin defaults to scanning the entire project root recursively (`{ directory: ".", recursive: true, include: /\.(js|ts|jsx|tsx)$/ }`). That can accidentally discover vendored gem templates under paths such as `vendor/bundle` in CI and make webpack compile files that are not part of your app. Setting `directory` to your app's source directory (e.g., `'./client/app'`) limits the scan to only the files that could contain `'use client'` directives.
 
 ### 4c. Add RSCWebpackPlugin to the client webpack config
 
