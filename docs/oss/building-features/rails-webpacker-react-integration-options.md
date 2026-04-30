@@ -86,6 +86,59 @@ const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptio
 module.exports = commonWebpackConfig;
 ```
 
+## Legacy Webpacker / Webpack 4 migration shims
+
+If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5, Webpack 4, and React 16 or 17, prefer upgrading to Shakapacker first when you can. When you need an incremental migration before that tooling upgrade, keep the compatibility shim explicit and narrow:
+
+1. Import the package root from application packs:
+
+   ```diff
+   - import ReactOnRails from 'react-on-rails/client';
+   + import ReactOnRails from 'react-on-rails';
+   ```
+
+2. Ensure Babel can parse modern syntax used by current packages:
+
+   ```bash
+   yarn add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
+   # or: npm install -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
+   # or: pnpm add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
+   ```
+
+   ```js
+   // babel.config.js
+   module.exports = {
+     plugins: [
+       '@babel/plugin-transform-optional-chaining',
+       '@babel/plugin-transform-nullish-coalescing-operator',
+     ],
+   };
+   ```
+
+3. Transpile the React on Rails CommonJS build from `node_modules` so Webpack 4 can parse it consistently:
+
+   ```js
+   // config/webpack/environment.js
+   const { environment } = require('@rails/webpacker');
+
+   environment.loaders.append('react-on-rails-cjs', {
+     test: /\.cjs$/,
+     include: /node_modules\/react-on-rails/,
+     use: [
+       {
+         loader: 'babel-loader',
+         options: {
+           cacheDirectory: true,
+         },
+       },
+     ],
+   });
+
+   module.exports = environment;
+   ```
+
+Keep this rule scoped to `node_modules/react-on-rails`; broad `node_modules` transpilation can slow legacy builds and introduce unrelated Babel differences. After you upgrade the app to Shakapacker/Webpack 5 or newer, remove the shim and use the package entry points documented for current installs.
+
 ---
 
 ## HMR and React Hot Reloading
