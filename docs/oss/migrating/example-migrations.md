@@ -1,5 +1,9 @@
 # Example Migrations
 
+> **See also:** [Examples and Migration References](../getting-started/examples-and-references.md)
+> for the broader index of public reference repos (starters, in-repo samples, RSC demos,
+> and live demos). This page focuses specifically on migration references.
+
 Teams evaluating React on Rails are usually not starting from a blank Rails app.
 
 They already have one of these:
@@ -39,6 +43,10 @@ examples here after they have landed or stabilized enough to inspect.
    demonstrates a Rails 7-era `react-rails` → `react_on_rails` migration with
    Shakapacker client/server bundles and SSR setup, based on
    [ganchdev/react-rails-example](https://github.com/ganchdev/react-rails-example)
+3. [react-on-rails-example-open-flights](https://github.com/shakacode/react-on-rails-example-open-flights) —
+   larger example app that shows React on Rails replacing `react-rails` in a
+   more realistic codebase, useful when the smaller migration above does not
+   match the scale of your application
 
 ### In-progress migration work
 
