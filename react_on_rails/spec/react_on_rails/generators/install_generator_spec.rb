@@ -3095,8 +3095,7 @@ describe InstallGenerator, type: :generator do
 
     before do
       allow(GeneratorMessages).to receive(:detect_package_manager).and_return("pnpm")
-      allow(GeneratorMessages).to receive(:package_manager_executable_available?).with("pnpm").and_return(false)
-      allow(install_generator).to receive(:cli_exists?) { |command| command == "npm" }
+      allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "npm" }
     end
 
     specify "missing_package_manager? reports the selected manager and available alternatives" do
@@ -3106,6 +3105,13 @@ describe InstallGenerator, type: :generator do
       expect(error_text).to include("package manager 'pnpm' was selected")
       expect(error_text).to include("available")
       expect(error_text).to include("npm")
+    end
+
+    specify "missing_package_manager? uses the shared package manager executable check for alternatives" do
+      install_generator.send(:missing_package_manager?)
+
+      expect(GeneratorMessages).to have_received(:package_manager_executable_available?).with("pnpm")
+      expect(GeneratorMessages).to have_received(:package_manager_executable_available?).with("npm")
     end
   end
 
