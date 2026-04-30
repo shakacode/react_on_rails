@@ -97,7 +97,7 @@ If you are moving an older `react-rails` app to React on Rails while it is still
    + import ReactOnRails from 'react-on-rails';
    ```
 
-2. Ensure Babel can parse modern syntax used by current packages:
+2. Ensure Babel can parse modern syntax used by current packages. Add these plugins to your existing Babel config without replacing existing presets or plugins:
 
    ```bash
    yarn add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
@@ -109,6 +109,7 @@ If you are moving an older `react-rails` app to React on Rails while it is still
    // babel.config.js
    module.exports = {
      plugins: [
+       // ...existing plugins,
        '@babel/plugin-transform-optional-chaining',
        '@babel/plugin-transform-nullish-coalescing-operator',
      ],
@@ -123,7 +124,7 @@ If you are moving an older `react-rails` app to React on Rails while it is still
 
    environment.loaders.append('react-on-rails-cjs', {
      test: /\.cjs$/,
-     include: /node_modules\/react-on-rails/,
+     include: /node_modules[\\/]react-on-rails[\\/]/,
      use: [
        {
          loader: 'babel-loader',
