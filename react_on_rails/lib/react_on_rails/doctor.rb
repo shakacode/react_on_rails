@@ -2928,8 +2928,13 @@ module ReactOnRails
     def installed_react_version
       # Use Node's own module resolution to find the actually installed React,
       # which handles hoisted dependencies in monorepos and pnpm workspaces.
-      stdout, _stderr, status = Open3.capture3("node", "-e",
-                                               "console.log(require.resolve('react/package.json'))")
+      # Resolve from the configured package root so nested client/ layouts work.
+      script = "console.log(require.resolve('react/package.json'))"
+      stdout, _stderr, status = if resolved_package_root.empty?
+                                  Open3.capture3("node", "-e", script)
+                                else
+                                  Open3.capture3("node", "-e", script, chdir: resolved_package_root)
+                                end
       return nil unless status.success?
 
       resolved_path = stdout.strip
@@ -2942,9 +2947,10 @@ module ReactOnRails
     end
 
     def declared_react_version
-      return nil unless File.exist?("package.json")
+      package_json_path = resolved_package_json_path
+      return nil unless File.exist?(package_json_path)
 
-      package_json = JSON.parse(File.read("package.json"))
+      package_json = JSON.parse(File.read(package_json_path))
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
       version_str = all_deps["react"]
       return nil unless version_str

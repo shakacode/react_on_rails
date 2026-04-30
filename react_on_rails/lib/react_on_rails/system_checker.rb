@@ -445,14 +445,15 @@ module ReactOnRails
     end
 
     def detect_used_package_manager
-      # Check for lock files to determine which package manager is being used
-      if File.exist?("yarn.lock")
+      # Check for lock files next to the configured package.json to support
+      # legacy apps that keep their JS package tree under client/.
+      if File.exist?(resolved_package_path("yarn.lock"))
         "yarn"
-      elsif File.exist?("pnpm-lock.yaml")
+      elsif File.exist?(resolved_package_path("pnpm-lock.yaml"))
         "pnpm"
-      elsif File.exist?("bun.lock") || File.exist?("bun.lockb")
+      elsif File.exist?(resolved_package_path("bun.lock")) || File.exist?(resolved_package_path("bun.lockb"))
         "bun"
-      elsif File.exist?("package-lock.json")
+      elsif File.exist?(resolved_package_path("package-lock.json"))
         "npm"
       end
     end

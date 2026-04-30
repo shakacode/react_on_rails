@@ -23,6 +23,16 @@ module ReactOnRails
       Rails.root.join(node_modules_location, "package.json").to_s
     end
 
+    def resolved_package_root
+      package_root = File.dirname(resolved_package_json_path)
+      package_root == "." ? "" : package_root
+    end
+
+    def resolved_package_path(filename)
+      package_root = resolved_package_root
+      package_root.empty? ? filename : File.join(package_root, filename)
+    end
+
     def resolved_webpack_config_path
       webpack_config_candidates.find { |path| File.file?(path) }
     end

@@ -69,6 +69,45 @@ bundle exec rails generate react_on_rails:install
 
 The generator adds the React on Rails initializer, `bin/dev`, Shakapacker config, example routes, and the server bundle entrypoint.
 
+### Nested `client/` package roots
+
+Some legacy Rails apps keep `package.json`, lockfiles, `node_modules`, and the webpack config under `client/`.
+You can keep that layout during an incremental migration instead of moving every JavaScript file to the Rails root in
+the first PR.
+
+First, point React on Rails diagnostics at the real package root:
+
+```ruby
+# config/initializers/react_on_rails.rb
+config.node_modules_location = "client"
+```
+
+Then keep root-level binstubs and config files as thin wrappers so Rails, Shakapacker, and CI still have the paths they
+expect:
+
+```bash
+#!/usr/bin/env bash
+# bin/shakapacker
+set -euo pipefail
+cd "$(dirname "$0")/.."
+exec ./client/node_modules/.bin/webpack --config ./config/webpack/webpack.config.js "$@"
+```
+
+```js
+// config/webpack/webpack.config.js
+module.exports = require('../../client/config/webpack/webpack.config.js');
+```
+
+```text
+# Procfile.dev
+web: bin/rails server
+js: bin/shakapacker --watch --mode development
+```
+
+Use the same pattern for any static-assets Procfile or custom `bin/dev` launcher: keep the Rails-facing command at the
+repo root, but delegate the actual JavaScript executable to `client/node_modules/.bin`. Once the migration is stable, you
+can decide separately whether moving the package root to the Rails root is worth the churn.
+
 ## 2. Replace Vite layout tags
 
 A typical Vite layout looks like this:

@@ -2963,6 +2963,27 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when React is installed in a configured nested JS workspace" do
+      it "uses the configured package root for node module resolution" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("client")
+            File.write("client/package.json", '{"dependencies":{"react":"^19.0.0"}}')
+            FileUtils.mkdir_p("client/node_modules/react")
+            File.write("client/node_modules/react/package.json", '{"version":"19.0.4"}')
+            allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+            allow(ReactOnRails).to receive(:configuration).and_return(
+              instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+            )
+
+            doctor.send(:check_rsc_react_version)
+            success_msgs = checker.messages.select { |m| m[:type] == :success }
+            expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+          end
+        end
+      end
+    end
+
     context "when React is not installed" do
       around do |example|
         Dir.mktmpdir do |tmpdir|

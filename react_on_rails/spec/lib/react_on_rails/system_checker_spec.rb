@@ -938,6 +938,17 @@ RSpec.describe ReactOnRails::SystemChecker do
 
         expect(checker.send(:detect_used_package_manager)).to eq("bun")
       end
+
+      it "checks lockfiles next to a configured nested package.json" do
+        rails_root = Pathname.new("/tmp/myapp")
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(File).to receive(:exist?).with(rails_root.join("client", "yarn.lock").to_s).and_return(true)
+
+        expect(checker.send(:detect_used_package_manager)).to eq("yarn")
+      end
     end
   end
 
