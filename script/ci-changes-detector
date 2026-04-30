@@ -3,7 +3,13 @@
 # Analyzes git changes to determine which CI jobs need to run
 # Usage: script/ci-changes-detector [base-ref]
 
+# shellcheck disable=SC2221,SC2222
+# Case patterns intentionally keep legacy top-level and recursive globs side by side.
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=script/lib/git-diff-base
+source "$SCRIPT_DIR/lib/git-diff-base"
 
 BASE_REF="${1:-origin/main}"
 CURRENT_REF="${2:-HEAD}"
@@ -19,26 +25,17 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Fetch the base ref if it's a remote ref
-if [[ "$BASE_REF" == origin/* ]]; then
-  BASE_BRANCH="${BASE_REF#origin/}"
-  if ! git fetch origin "$BASE_BRANCH" --depth=50 2>/dev/null; then
-    echo "${RED}Error: Failed to fetch $BASE_REF${NC}"
-    echo "Please check your network connection and try again."
-    exit 1
-  fi
-fi
-
-# Validate that the base ref exists
-if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
-  echo "${RED}Error: Base ref '$BASE_REF' does not exist${NC}"
-  echo "Available branches:"
-  git branch -a | head -10
+# Resolve the merge base before diffing. Three-dot diffs fail in shallow clones
+# when the common ancestor is outside the fixed fetch depth.
+if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" required); then
+  echo -e "${RED}Error: Unable to resolve a diff base for $BASE_REF...$CURRENT_REF${NC}" >&2
+  echo "Available branches:" >&2
+  git branch -a | head -10 >&2
   exit 1
 fi
 
 # Get list of changed files (committed + uncommitted)
-CHANGED_FILES=$(git diff --name-only "$BASE_REF"..."$CURRENT_REF" 2>/dev/null || echo "")
+CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF")
 
 # For local development, also include uncommitted changes
 if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
@@ -174,7 +171,7 @@ done <<< "$CHANGED_FILES"
 
 # Output results
 echo "=== CI Changes Analysis ==="
-echo "Base: $BASE_REF | Current: $CURRENT_REF"
+echo "Base: $BASE_REF | Current: $CURRENT_REF | Merge base: $MERGE_BASE"
 echo ""
 
 if [ "$DOCS_ONLY" = true ]; then

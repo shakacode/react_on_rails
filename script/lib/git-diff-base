@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+
+# Shared helpers for scripts that need a reliable merge-base in shallow clones.
+# Source this file from bash scripts; do not execute it directly.
+
+git_diff_base_remote_branch() {
+  local ref="$1"
+
+  case "$ref" in
+    origin/*)
+      printf '%s\n' "${ref#origin/}"
+      ;;
+    refs/remotes/origin/*)
+      printf '%s\n' "${ref#refs/remotes/origin/}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+git_diff_base_fetch_refspec() {
+  local branch="$1"
+  printf '+refs/heads/%s:refs/remotes/origin/%s\n' "$branch" "$branch"
+}
+
+git_diff_base_fetch_remote_branch() {
+  local branch="$1"
+  local mode="$2"
+  local depth="${GIT_DIFF_BASE_FETCH_DEPTH:-50}"
+  local refspec
+
+  refspec="$(git_diff_base_fetch_refspec "$branch")"
+
+  case "$mode" in
+    initial)
+      git fetch --depth="$depth" origin "$refspec" 2>/dev/null
+      ;;
+    deepen)
+      git fetch --deepen="$depth" origin "$refspec" 2>/dev/null
+      ;;
+    unshallow)
+      git fetch --unshallow origin "$refspec" 2>/dev/null
+      ;;
+    *)
+      echo "Unknown fetch mode '$mode'" >&2
+      return 1
+      ;;
+  esac
+}
+
+git_diff_base_current_remote_branch() {
+  local current_ref="$1"
+  local upstream
+
+  if git_diff_base_remote_branch "$current_ref"; then
+    return 0
+  fi
+
+  if [ "$current_ref" = "HEAD" ]; then
+    if [ -n "${GITHUB_HEAD_REF:-}" ]; then
+      printf '%s\n' "$GITHUB_HEAD_REF"
+      return 0
+    fi
+
+    if upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)"; then
+      git_diff_base_remote_branch "$upstream"
+      return
+    fi
+  elif upstream="$(git rev-parse --abbrev-ref --symbolic-full-name "${current_ref}@{upstream}" 2>/dev/null)"; then
+    git_diff_base_remote_branch "$upstream"
+    return
+  fi
+
+  return 1
+}
+
+git_diff_base_verify_ref() {
+  local ref="$1"
+
+  git rev-parse --verify "$ref^{commit}" >/dev/null 2>&1
+}
+
+git_diff_base_merge_base() {
+  local base_ref="$1"
+  local current_ref="$2"
+
+  git merge-base "$base_ref" "$current_ref" 2>/dev/null
+}
+
+git_diff_base_resolve() {
+  local base_ref="$1"
+  local current_ref="$2"
+  local fetch_policy="${3:-required}"
+  local max_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-20}"
+  local remote_branch=""
+  local current_remote_branch=""
+  local merge_base
+
+  if remote_branch="$(git_diff_base_remote_branch "$base_ref")"; then
+    if ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
+      if [ "$fetch_policy" = "required" ]; then
+        echo "Error: failed to fetch $base_ref from origin" >&2
+        return 1
+      fi
+    fi
+  else
+    remote_branch=""
+  fi
+
+  if current_remote_branch="$(git_diff_base_current_remote_branch "$current_ref")"; then
+    if [ "$current_remote_branch" != "$remote_branch" ]; then
+      git_diff_base_fetch_remote_branch "$current_remote_branch" initial || true
+    fi
+  else
+    current_remote_branch=""
+  fi
+
+  if ! git_diff_base_verify_ref "$base_ref"; then
+    echo "Error: base ref '$base_ref' does not exist locally" >&2
+    return 1
+  fi
+
+  if ! git_diff_base_verify_ref "$current_ref"; then
+    echo "Error: current ref '$current_ref' does not exist locally" >&2
+    return 1
+  fi
+
+  if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+    printf '%s\n' "$merge_base"
+    return 0
+  fi
+
+  if [ -n "$remote_branch" ]; then
+    local attempt=1
+    while [ "$attempt" -le "$max_attempts" ]; do
+      local fetched=false
+
+      if git_diff_base_fetch_remote_branch "$remote_branch" deepen; then
+        fetched=true
+      fi
+
+      if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
+        if git_diff_base_fetch_remote_branch "$current_remote_branch" deepen; then
+          fetched=true
+        fi
+      fi
+
+      if [ "$fetched" = false ]; then
+        break
+      fi
+
+      if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+        printf '%s\n' "$merge_base"
+        return 0
+      fi
+
+      attempt=$((attempt + 1))
+    done
+
+    if [ "$(git rev-parse --is-shallow-repository 2>/dev/null || echo false)" = "true" ]; then
+      if git_diff_base_fetch_remote_branch "$remote_branch" unshallow; then
+        if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+          printf '%s\n' "$merge_base"
+          return 0
+        fi
+      fi
+
+      if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
+        git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow || true
+        if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+          printf '%s\n' "$merge_base"
+          return 0
+        fi
+      fi
+    fi
+  fi
+
+  echo "Error: unable to find a merge base between $base_ref and $current_ref" >&2
+  if [ -n "$remote_branch" ]; then
+    echo "Fetch more history for origin/$remote_branch or run git fetch --unshallow origin." >&2
+  fi
+  return 1
+}
