@@ -144,6 +144,21 @@ describe GeneratorMessages do
       expect(described_class.detect_package_manager).to eq("yarn")
     end
 
+    it "detects a bare packageManager name even when it has no Corepack version" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lockb")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package-lock.json")).and_return(false)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
+                                   .and_return('{"packageManager": "pnpm"}')
+
+      expect(described_class.detect_package_manager).to eq("pnpm")
+    end
+
     it "ignores an unsupported packageManager value and falls through to lockfiles" do
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
@@ -288,6 +303,13 @@ describe GeneratorMessages do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path)
                                    .and_return('{"packageManager":"pnpm"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
+    it "returns false when packageManager has an empty version after the separator" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm@"}')
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 

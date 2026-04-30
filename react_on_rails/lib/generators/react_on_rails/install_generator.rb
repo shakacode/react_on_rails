@@ -142,8 +142,8 @@ module ReactOnRails
       # lockfile with a newer pnpm but never committed `packageManager` get a runtime
       # that can still read the lockfile. Users who need exact reproducibility should
       # commit `packageManager` to their package.json instead.
-      CI_PNPM_FALLBACK_MINOR = "10"
-      private_constant :CI_PNPM_FALLBACK_MINOR
+      CI_PNPM_FALLBACK_VERSION = "10"
+      private_constant :CI_PNPM_FALLBACK_VERSION
 
       # Main generator entry point
       #
@@ -290,7 +290,7 @@ module ReactOnRails
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
                  { package_manager: package_manager, has_lockfile: has_lockfile,
                    package_manager_declared: package_manager_declared,
-                   pnpm_fallback_version: CI_PNPM_FALLBACK_MINOR,
+                   pnpm_fallback_version: CI_PNPM_FALLBACK_VERSION,
                    has_active_record: has_active_record, has_rspec: has_rspec })
         @ci_workflow_generated = true
       end

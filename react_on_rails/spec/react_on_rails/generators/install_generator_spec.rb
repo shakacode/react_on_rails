@@ -2050,9 +2050,9 @@ describe InstallGenerator, type: :generator do
     # Existing Shakapacker apps skip the seeding path, so the CI scaffold has to pin the
     # version itself or the workflow fails before dependency install.
     it "pins a pnpm version in the setup step" do
-      # Anchor to the constant so silent drift between `CI_PNPM_FALLBACK_MINOR`
+      # Anchor to the constant so silent drift between `CI_PNPM_FALLBACK_VERSION`
       # and the rendered template would fail this test.
-      fallback_version = described_class.send(:const_get, :CI_PNPM_FALLBACK_MINOR)
+      fallback_version = described_class.send(:const_get, :CI_PNPM_FALLBACK_VERSION)
       assert_file ".github/workflows/ci.yml" do |content|
         expect(content).to include("uses: pnpm/action-setup@v4")
         expect(content).to match(

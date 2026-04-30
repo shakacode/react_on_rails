@@ -29,6 +29,7 @@ exclude = [
   '^https://careersatdoordash\.com',  # Cloudflare bot challenge returns 403
   '^https://www\.linkedin\.com',
   '^https://reactrails\.slack\.com',
+  '^https://invite\.reactrails\.com/?$',  # Returns 403 for automated requests
   '^https://docs\.google\.com',  # Private docs require auth
   '^https://claude\.ai',  # Returns 403 for automated requests
 
@@ -88,6 +89,7 @@ exclude = [
   '^https://(www\.)?yourmechanic\.com',  # Returns 403/503
   '^https?://(www\.)?hvmn\.com',  # Returns 503 from CI
   '^https://(www\.)?hawaiichee\.com/?$', # Intermittent 500 from CI
+  '^https://(www\.)?110grill\.com/?$', # Returns 403 for automated requests
 
   # ============================================================================
   # EXTERNAL SITES THAT TIMEOUT DURING CI CHECKS

@@ -34,13 +34,10 @@ module GeneratorMessages
     end
 
     def package_manager_from_content(content)
-      declared = content["packageManager"]
-      # Corepack requires `<name>@<version>`; treat a bare `"pnpm"` (no `@version`)
-      # as undeclared so the CI scaffold still pins a fallback — `pnpm/action-setup`
-      # has nothing to resolve from a versionless field.
-      return nil unless declared.is_a?(String) && declared.include?("@")
+      raw_declared = content["packageManager"]
+      return nil unless raw_declared.is_a?(String)
 
-      name = declared.split("@").first&.strip&.downcase
+      name = raw_declared.strip.split("@", 2).first&.strip&.downcase
       supported_package_manager?(name) ? name : nil
     end
 
@@ -68,7 +65,7 @@ module GeneratorMessages
                 end
       return false unless content
 
-      declared = package_manager_from_content(content)
+      declared = versioned_package_manager_from_content(content)
       return false if declared.nil?
       return true if manager.nil?
 
@@ -113,6 +110,21 @@ module GeneratorMessages
     # Pipeline internals — external callers should go through `detect_package_manager`
     # (which accepts `package_json:` for the read-once case). Reachable from sibling
     # sub-modules (e.g. CiSection) via `include` without a receiver; tests use `send`.
+
+    # Corepack requires `<name>@<version>`; a bare `"pnpm"` still expresses package-manager
+    # intent for generator command selection, but `pnpm/action-setup` has no version to
+    # resolve from it, so the CI scaffold must still pin a fallback.
+    def versioned_package_manager_from_content(content)
+      raw_declared = content["packageManager"]
+      return nil unless raw_declared.is_a?(String)
+
+      declared = raw_declared.strip
+      match = declared.match(/\A([^@\s]+)@\S+/)
+      return nil unless match
+
+      name = match[1].strip.downcase
+      supported_package_manager?(name) ? name : nil
+    end
 
     def detect_package_manager_from_package_json(app_root: Dir.pwd)
       content = read_package_json(app_root)
