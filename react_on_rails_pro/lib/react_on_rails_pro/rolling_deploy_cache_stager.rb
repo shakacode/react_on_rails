@@ -356,6 +356,7 @@ module ReactOnRailsPro
       end
 
       FileUtils.mv(staging_dir, bundle_dir)
+      puts "[ReactOnRailsPro] Staged previous bundle hash into #{bundle_dir}"
       remove_previous_bundle_backup(backup_dir)
     rescue StandardError
       restore_previous_bundle_directory(backup_dir, bundle_dir)
@@ -377,13 +378,15 @@ module ReactOnRailsPro
       return unless backup_dir && File.exist?(backup_dir)
 
       FileUtils.rm_rf(bundle_dir)
-      # The `unless File.exist?` guard catches the narrow TOCTOU window where
-      # another writer recreates `bundle_dir` between the rm_rf and the mv.
-      # We deliberately skip the mv in that case rather than overwriting that
-      # writer's work — the runtime 410-retry path is still a valid fallback,
-      # and `backup_dir` will be swept by `sweep_stale_temporary_directories`
-      # on the next run.
-      FileUtils.mv(backup_dir, bundle_dir) unless File.exist?(bundle_dir)
+      # Catch the narrow TOCTOU window where another writer recreates
+      # bundle_dir between rm_rf and mv; warn through the rescue path instead
+      # of overwriting that writer's work.
+      if File.exist?(bundle_dir)
+        raise ReactOnRailsPro::Error,
+              "Cannot restore previous rolling-deploy bundle directory because #{bundle_dir} already exists."
+      end
+
+      FileUtils.mv(backup_dir, bundle_dir)
     rescue StandardError => e
       warn "[ReactOnRailsPro] Could not restore previous rolling-deploy bundle directory #{backup_dir} " \
            "to #{bundle_dir}: #{e.class}: #{e.message}. Runtime 410-retry remains the fallback."

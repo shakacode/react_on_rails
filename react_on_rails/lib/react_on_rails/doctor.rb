@@ -763,9 +763,7 @@ module ReactOnRails
 
       report_sync_changes(result)
       report_skipped_specs(result)
-      if result.changes.any?
-        checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
-      end
+      checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
     rescue StandardError => e
       checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
     end
@@ -2970,8 +2968,8 @@ module ReactOnRails
       cache_dir = ReactOnRailsPro::Utils.resolve_renderer_cache_dir
       if File.directory?(cache_dir)
         temp_dir_pattern = rolling_deploy_temp_dir_pattern
-        subdirs = Dir.children(cache_dir).select do |c|
-          File.directory?(File.join(cache_dir, c)) && !c.match?(temp_dir_pattern)
+        subdirs = Dir.children(cache_dir).select do |entry|
+          File.directory?(File.join(cache_dir, entry)) && !entry.match?(temp_dir_pattern)
         end
         checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (#{subdirs.length} bundle-hash subdir(s))")
       else

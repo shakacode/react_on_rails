@@ -2672,6 +2672,33 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when renderer cache contains rolling-deploy temporary directories" do
+      let(:cache_dir) { Dir.mktmpdir }
+      let(:adapter) do
+        Module.new do
+          def self.previous_bundle_hashes = %w[abc]
+          def self.fetch(_hash); end
+          def self.upload(_hash, **_opts); end
+        end
+      end
+
+      before do
+        FileUtils.mkdir_p(File.join(cache_dir, "abc"))
+        FileUtils.mkdir_p(File.join(cache_dir, "abc.staging-1234-deadbeef12"))
+        FileUtils.mkdir_p(File.join(cache_dir, "abc.previous-1234-feedface12"))
+        cache_dir_value = cache_dir
+        ReactOnRailsPro::Utils.define_singleton_method(:resolve_renderer_cache_dir) { cache_dir_value }
+      end
+
+      after { FileUtils.rm_rf(cache_dir) }
+
+      it "excludes temporary directories from the bundle-hash count" do
+        doctor.send(:check_rolling_deploy_adapter)
+        info = checker.messages.select { |m| m[:type] == :info }
+        expect(info.map { |m| m[:content] }).to include(a_string_matching(/\(1 bundle-hash subdir\(s\)\)/))
+      end
+    end
+
     context "when adapter is missing required methods" do
       let(:adapter) do
         Module.new do

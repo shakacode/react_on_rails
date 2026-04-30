@@ -61,9 +61,11 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "copies bundle + assets into <cache>/<hash>/ in :copy mode" do
-      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
-
       bundle_dir = File.join(cache_dir, "abc123")
+      promoted_bundle_dir = File.join(File.realpath(cache_dir), "abc123")
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/Staged previous bundle hash into #{Regexp.escape(promoted_bundle_dir)}/).to_stdout
+
       expect(File.exist?(File.join(bundle_dir, "abc123.js"))).to be(true)
       expect(File.exist?(File.join(bundle_dir, "loadable-stats.json"))).to be(true)
       expect(File.symlink?(File.join(bundle_dir, "abc123.js"))).to be(false)
@@ -378,6 +380,36 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when restore finds the bundle directory recreated by another process" do
+    let(:src_bundle) { source_file("bundle-new.js", contents: "// new bundle") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
+    let(:bundle_dir) { File.join(cache_dir, "abc123") }
+    let(:existing_bundle) { File.join(bundle_dir, "abc123.js") }
+
+    before do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(existing_bundle, "// existing bundle")
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["abc123"])
+      allow(adapter).to receive(:fetch).with("abc123").and_return(bundle: src_bundle, assets: [src_asset])
+      allow(FileUtils).to receive(:mv).and_wrap_original do |original, source, destination, *args|
+        raise Errno::EIO, "promotion failed" if source.to_s.include?("abc123.staging-")
+
+        original.call(source, destination, *args)
+      end
+      allow(FileUtils).to receive(:rm_rf).and_wrap_original do |original, path, *args|
+        original.call(path, *args)
+        FileUtils.mkdir_p(bundle_dir) if path.to_s.end_with?("/abc123")
+      end
+    end
+
+    it "warns instead of silently skipping backup restore" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/Could not restore previous rolling-deploy bundle directory/).to_stderr
+
+      expect(Dir.children(cache_dir).grep(/abc123\.previous/)).not_to be_empty
+    end
+  end
+
   context "when refreshing an existing seeded hash cannot remove the old backup after promotion" do
     let(:src_bundle) { source_file("bundle-new.js", contents: "// new bundle") }
     let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
@@ -405,25 +437,29 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
   end
 
   context "when stale temporary bundle directories are present" do
-    let(:stale_staging_dir) { File.join(cache_dir, "abc123.staging-1234-deadbeef") }
-    let(:fresh_previous_dir) { File.join(cache_dir, "abc123.previous-1234-feedface") }
+    let(:stale_staging_dir) { File.join(cache_dir, "abc123.staging-1234-deadbeef12") }
+    let(:fresh_previous_dir) { File.join(cache_dir, "abc123.previous-1234-feedface12") }
+    let(:hash_like_dir) { File.join(cache_dir, "release.staging-123-deadbeef") }
 
     before do
       stub_const("ReactOnRailsPro::RollingDeployCacheStager::STALE_TEMP_DIR_TTL_SECONDS", 60)
       allow(adapter).to receive_messages(previous_bundle_hashes: [])
       FileUtils.mkdir_p(stale_staging_dir)
       FileUtils.mkdir_p(fresh_previous_dir)
+      FileUtils.mkdir_p(hash_like_dir)
       old_time = Time.now - 120
       File.utime(old_time, old_time, stale_staging_dir)
+      File.utime(old_time, old_time, hash_like_dir)
     end
 
-    it "removes stale temp directories and keeps fresh ones" do
+    it "removes stale temp directories while preserving hash-like names outside the temp pattern" do
       expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
         .to output(/Removed stale rolling-deploy temp directory/).to_stderr
         .and output(/No previous bundle hashes/).to_stdout
 
       expect(File.exist?(stale_staging_dir)).to be(false)
       expect(File.exist?(fresh_previous_dir)).to be(true)
+      expect(File.exist?(hash_like_dir)).to be(true)
     end
 
     it "does not match real bundle hash dirs that look superficially similar" do
