@@ -68,6 +68,13 @@ module GeneratorMessages
       SUPPORTED_PACKAGE_MANAGERS.include?(package_manager)
     end
 
+    def package_manager_executable_available?(package_manager)
+      return false unless supported_package_manager?(package_manager)
+
+      which_command = Gem.win_platform? ? "where" : "which"
+      system(which_command, package_manager, out: File::NULL, err: File::NULL)
+    end
+
     private
 
     # Pipeline internals — external callers should go through `detect_package_manager`
