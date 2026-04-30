@@ -56,6 +56,41 @@ Deprecated options:
    If you have any of them set, see [Error Reporting and Tracing](./error-reporting-and-tracing.md) for the new way to set up error reporting and tracing.
 1. **includeTimerPolyfills** - Renamed to `stubTimers`.
 
+## Runtime Globals for SSR and RSC
+
+The node renderer executes uploaded JavaScript bundles inside isolated VM contexts. Those contexts do not automatically inherit every global from the host Node.js process.
+
+| Runtime path              | Execution environment                 | Global guarantees                                                                                                                                             |
+| ------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client bundle             | Browser                               | Browser APIs such as `window`, `document`, and browser `fetch` are available. Node.js globals are not.                                                        |
+| Server bundle (SSR)       | Node renderer VM context              | JavaScript built-ins are available. With `supportModules: true`, the globals listed above are injected.                                                       |
+| RSC bundle payload render | Node renderer VM context for RSC code | Uses the same VM context rules as the server bundle. The bundle is built for RSC, but host Node.js globals still need to be bundled, polyfilled, or injected. |
+
+`supportModules` does **not** inject `fetch`, `Headers`, `Request`, or `Response`. Even if the Node.js process that launches the renderer has those globals, code inside the renderer VM will not see them unless you provide them. That means Server Components should not assume that "modern Node" global `fetch` is available in the server or RSC bundle.
+
+Prefer passing application data from Rails controllers through props when the data belongs to your Rails app. When a Server Component really needs to call an external HTTP API from the renderer, choose one of these approaches:
+
+1. Import a server-side HTTP client in the component code, such as `node-fetch`, and let your bundler include it in the RSC/server bundle.
+2. Inject host globals through `additionalContext`:
+
+```js
+import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
+
+const { fetch, Headers, Request, Response } = globalThis;
+
+reactOnRailsProNodeRenderer({
+  supportModules: true,
+  additionalContext: {
+    fetch,
+    Headers,
+    Request,
+    Response,
+  },
+});
+```
+
+If your Node.js runtime does not provide these globals, install a fetch implementation and pass that implementation through `additionalContext` instead.
+
 ## Example Launch Files
 
 ### Testing example:

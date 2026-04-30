@@ -808,11 +808,11 @@ for the current recommendation. See also
 
 ### Node Renderer VM Context -- Missing Globals
 
-**Symptoms:** Cryptic errors like `ReferenceError: performance is not defined` or `ReferenceError: require is not defined` when rendering Server Components. Often triggered by `React.lazy()` which calls `performance.now()` internally in development mode.
+**Symptoms:** Cryptic errors like `ReferenceError: performance is not defined`, `ReferenceError: fetch is not defined`, or `ReferenceError: require is not defined` when rendering Server Components. Often triggered by code that assumes the renderer VM inherits every global from the host Node.js process.
 
-**Root cause:** The node renderer runs the **server bundle** in an isolated V8 VM context (`vm.createContext`). By default, the VM context only includes basic globals. Node.js-specific globals like `performance`, `Buffer`, `TextDecoder`, etc. must be explicitly added. Critically, `require()` is also not available in the VM sandbox.
+**Root cause:** The node renderer runs uploaded bundles in isolated V8 VM contexts (`vm.createContext`). By default, each VM context only includes basic globals. Node.js-specific globals like `performance`, `Buffer`, `TextDecoder`, etc. must be explicitly added. Critically, `require()` is also not available in the VM sandbox.
 
-> **Important:** This constraint applies only to the **server bundle** (SSR). The **RSC bundle** runs in full Node.js and does not have these limitations. See the [Bundle Architecture Reference](../../pro/react-server-components/rendering-flow.md#bundle-architecture-reference) for a comparison.
+> **Important:** This VM global constraint applies to the **server bundle** (SSR) and to the **RSC bundle** when the node renderer executes it to generate an RSC payload. See the [Bundle Architecture Reference](../../pro/react-server-components/rendering-flow.md#bundle-architecture-reference) for a comparison.
 
 **Fix:** Enable `supportModules` in your node renderer configuration to inject common Node.js globals:
 
@@ -840,12 +840,18 @@ module.exports = {
   supportModules: true,
   additionalContext: {
     // Add any globals that aren't in the default supportModules set.
+    fetch: globalThis.fetch,
+    Headers: globalThis.Headers,
+    Request: globalThis.Request,
+    Response: globalThis.Response,
     // Example: override `performance` with a deterministic stub if rendered
     // output embeds timing values and you need byte-stable SSR.
     performance: { now: () => 0 },
   },
 };
 ```
+
+If your Node.js runtime does not provide the fetch globals, use a bundled HTTP client such as `node-fetch` from the component code or pass a fetch implementation through `additionalContext`. See [Node Renderer JavaScript Configuration](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
 
 #### Handling Node Builtins -- `externals` vs `resolve.fallback`
 

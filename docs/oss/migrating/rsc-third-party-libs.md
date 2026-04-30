@@ -355,18 +355,18 @@ Use `client-only` for:
 
 ## Library Compatibility Decision Matrix
 
-| Category          | RSC-Native Choices                                                | Requires `'use client'` Wrapper              | Avoid / Migrate Away From                          |
-| ----------------- | ----------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
-| **Styling**       | Tailwind, CSS Modules, Panda CSS                                  | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
-| **UI Components** | shadcn/ui, Radix (non-interactive)                                | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
-| **Forms**         | Rails controller endpoints + standard forms                       | React Hook Form, TanStack Form               | Formik (less maintained)                           |
-| **Animation**     | CSS animations, Tailwind animate                                  | Framer Motion/Motion, React Spring           | --                                                 |
-| **Charts**        | Nivo (SSR support)                                                | Recharts, Tremor, Chart.js                   | --                                                 |
-| **Data Fetching** | React on Rails Pro streaming, native `fetch` in Server Components | TanStack Query (with hydration), Apollo, SWR | --                                                 |
-| **State**         | Server Component props, `React.cache`                             | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
-| **i18n**          | Rails I18n + `createIntl` (Server), `IntlProvider` (Client)       | react-i18next (hooks require `'use client'`) | --                                                 |
-| **Auth**          | Rails auth (Devise, etc.) via controller props                    | --                                           | --                                                 |
-| **Date Utils**    | date-fns, dayjs (pure functions)                                  | --                                           | Moment.js (not tree-shakable)                      |
+| Category          | RSC-Native Choices                                             | Requires `'use client'` Wrapper              | Avoid / Migrate Away From                          |
+| ----------------- | -------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- |
+| **Styling**       | Tailwind, CSS Modules, Panda CSS                               | vanilla-extract (with workaround)            | styled-components (maintenance mode), Emotion      |
+| **UI Components** | shadcn/ui, Radix (non-interactive)                             | MUI, Chakra, Mantine, Radix (interactive)    | CSS-in-JS-dependent UI libs without migration path |
+| **Forms**         | Rails controller endpoints + standard forms                    | React Hook Form, TanStack Form               | Formik (less maintained)                           |
+| **Animation**     | CSS animations, Tailwind animate                               | Framer Motion/Motion, React Spring           | --                                                 |
+| **Charts**        | Nivo (SSR support)                                             | Recharts, Tremor, Chart.js                   | --                                                 |
+| **Data Fetching** | React on Rails Pro streaming, bundled or injected HTTP clients | TanStack Query (with hydration), Apollo, SWR | --                                                 |
+| **State**         | Server Component props, `React.cache`                          | Zustand, Jotai (v2.6+), Redux Toolkit        | Recoil (discontinued)                              |
+| **i18n**          | Rails I18n + `createIntl` (Server), `IntlProvider` (Client)    | react-i18next (hooks require `'use client'`) | --                                                 |
+| **Auth**          | Rails auth (Devise, etc.) via controller props                 | --                                           | --                                                 |
+| **Date Utils**    | date-fns, dayjs (pure functions)                               | --                                           | Moment.js (not tree-shakable)                      |
 
 ## Common Mistakes
 
