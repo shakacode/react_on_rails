@@ -25,7 +25,12 @@ export function createResultObject(
 }
 
 export function convertToError(e: unknown): Error {
-  return e instanceof Error ? e : new Error(String(e));
+  if (e instanceof Error) {
+    return e;
+  }
+
+  const ErrorWithCause = Error as new (message?: string, options?: { cause?: unknown }) => Error;
+  return new ErrorWithCause(String(e), { cause: e });
 }
 
 export function validateComponent(componentObj: RegisteredComponent, componentName: string) {
