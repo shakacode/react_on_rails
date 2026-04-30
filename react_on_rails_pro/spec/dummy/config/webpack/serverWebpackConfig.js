@@ -25,6 +25,25 @@ const configureServer = (rscBundle = false) => {
   // entry value will result in changing the client config!
   // Using webpack-merge into an empty object avoids this issue.
   const serverWebpackConfig = commonWebpackConfig();
+  const serverAliases = { ...(serverWebpackConfig.resolve?.alias || {}) };
+  // Drop the client-only StrictMode shim — same reason as the RSC config:
+  // the SSR bundle must not pull a browser entry point if anything resolves
+  // `react-on-rails-pro/client` server-side.
+  delete serverAliases['react-on-rails-pro/client$'];
+  serverWebpackConfig.resolve = {
+    ...serverWebpackConfig.resolve,
+    alias: {
+      ...serverAliases,
+      'react-on-rails-pro$': path.resolve(
+        __dirname,
+        '..',
+        '..',
+        'client',
+        'app',
+        'strictModeReactOnRailsProNode.js',
+      ),
+    },
+  };
 
   // We just want the single server bundle entry
   const serverEntry = {

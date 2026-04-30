@@ -8,7 +8,7 @@
 
 ---
 
-[![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md)[![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Coverage Status](https://coveralls.io/repos/shakacode/react_on_rails/badge.svg?branch=main&service=github)](https://coveralls.io/github/shakacode/react_on_rails?branch=main) [![Gem Downloads](https://img.shields.io/gem/dt/react_on_rails)](https://rubygems.org/gems/react_on_rails)
+[![License](https://img.shields.io/badge/license-mit-green.svg)](LICENSE.md)[![Gem Version](https://badge.fury.io/rb/react_on_rails.svg)](https://badge.fury.io/rb/react_on_rails) [![npm version](https://badge.fury.io/js/react-on-rails.svg)](https://badge.fury.io/js/react-on-rails) [![Gem Downloads](https://img.shields.io/gem/dt/react_on_rails)](https://rubygems.org/gems/react_on_rails)
 
 [![Integration Tests](https://github.com/shakacode/react_on_rails/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/integration-tests.yml)
 [![Gem Tests](https://github.com/shakacode/react_on_rails/actions/workflows/gem-tests.yml/badge.svg)](https://github.com/shakacode/react_on_rails/actions/workflows/gem-tests.yml)
@@ -115,7 +115,8 @@ Start with the docs here:
 - [GitHub Discussions](https://github.com/shakacode/react_on_rails/discussions)
   for questions
 - [GitHub Issues](https://github.com/shakacode/react_on_rails/issues) for bugs
-- [React + Rails Slack](https://invite.reactrails.com) for community chat
+- [React + Rails Slack](https://reactrails.slack.com) for community chat
+  (existing members; non-members, please use GitHub Discussions above)
 - [Commercial support](mailto:react_on_rails@shakacode.com) for upgrades,
   consulting, and Pro guidance
 - [AI Agent User Guide](AGENTS_USER_GUIDE.md) for AI coding assistants

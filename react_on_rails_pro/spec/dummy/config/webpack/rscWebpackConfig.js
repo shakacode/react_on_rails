@@ -34,11 +34,16 @@ const configureRsc = () => {
   // For the RSC bundle, we must override these aliases to point to the react-server
   // entry files directly, so that React's server-specific code is bundled correctly.
   const rootNodeModules = resolve(__dirname, '..', '..', '..', '..', '..', 'node_modules');
+  const rscAliases = { ...(rscConfig.resolve?.alias || {}) };
+  delete rscAliases['react-on-rails-pro$'];
+  // Drop the client-only StrictMode shim so RSC imports of `react-on-rails-pro/client` don't pull
+  // in a browser entry point inside the React server bundle.
+  delete rscAliases['react-on-rails-pro/client$'];
   rscConfig.resolve = {
     ...rscConfig.resolve,
     conditionNames: ['react-server', '...'],
     alias: {
-      ...rscConfig.resolve?.alias,
+      ...rscAliases,
       // Override React aliases to use react-server entry points
       react: resolve(rootNodeModules, 'react', 'react.react-server.js'),
       'react/jsx-runtime': resolve(rootNodeModules, 'react', 'jsx-runtime.react-server.js'),

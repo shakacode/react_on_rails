@@ -49,7 +49,7 @@ describe DevTestsGenerator, type: :generator do
     it "adds test-related gems to Gemfile" do
       assert_file("Gemfile") do |contents|
         expect(contents).to match("gem \"rspec-rails\", group: :test")
-        expect(contents).to match("gem \"coveralls\", require: false")
+        expect(contents).to match("gem \"simplecov\", require: false, group: :test")
         # chromedriver-helper was removed as it's deprecated since 2019
         # Modern selenium-webdriver (4.x) handles driver management automatically
       end

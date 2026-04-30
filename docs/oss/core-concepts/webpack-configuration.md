@@ -110,8 +110,10 @@ serverWebpackConfig.output = {
 
 **For older Shakapacker versions:** Use hardcoded paths and manual configuration as shown in the generator templates.
 
-Per the example repo [shakacode/react_on_rails_demo_ssr_hmr](https://github.com/shakacode/react_on_rails_demo_ssr_hmr),
-you should consider keeping your codebase mostly consistent with the defaults for [Shakapacker](https://github.com/shakacode/shakapacker).
+Per the maintained SSR + HMR tutorial repo listed in
+[Examples and migration references](../getting-started/examples-and-references.md),
+you should consider keeping your codebase mostly consistent with the defaults
+for [Shakapacker](https://github.com/shakacode/shakapacker).
 
 # React on Rails
 
@@ -121,7 +123,7 @@ A key decision in your use React on Rails is whether you go with the Shakapacker
 
 ## Option 1: Default Generator Setup: Shakapacker app/javascript
 
-Typical Shakapacker apps have a standard directory structure as documented in the [Shakapacker README](https://github.com/shakacode/shakapacker/blob/master/README.md#configuration-and-code). If you follow [the basic tutorial](../getting-started/tutorial.md), you will see this pattern in action. In order to customize the Webpack configuration, consult the [Shakapacker webpack customization docs](https://github.com/shakacode/shakapacker#webpack-configuration).
+Typical Shakapacker apps have a standard directory structure documented in the [Shakapacker README](https://github.com/shakacode/shakapacker/blob/master/README.md#configuration-and-code). If you follow [the basic tutorial](../getting-started/tutorial.md), you will see this pattern in action. In order to customize the Webpack configuration, consult the [Shakapacker webpack customization docs](https://github.com/shakacode/shakapacker#webpack-configuration).
 
 The _advantage_ of using Shakapacker to configure Webpack is that there is very little code needed to get started, and you don't need to understand really anything about Webpack customization.
 

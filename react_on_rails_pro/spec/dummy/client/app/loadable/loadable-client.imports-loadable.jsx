@@ -5,16 +5,17 @@ import { loadableReady } from '@loadable/component';
 import { HelmetProvider } from '@dr.pogodin/react-helmet';
 
 import ClientApp from './LoadableApp';
+import { wrapElementInStrictMode } from '../strictModeSupport';
 
 const App = (props, railsContext, domNodeId) => {
   loadableReady(() => {
     const el = document.getElementById(domNodeId);
-    hydrateRoot(
-      el,
+    const reactElement = wrapElementInStrictMode(
       <HelmetProvider>
         {React.createElement(ClientApp, { ...props, path: railsContext.pathname })}
       </HelmetProvider>,
     );
+    hydrateRoot(el, reactElement);
   });
 };
 

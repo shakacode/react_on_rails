@@ -18,10 +18,10 @@
 - #2766 upload-assets endpoint copies all files into all target bundle directories, duplicating bundles -> #2768
 - #2614 Replace NDJSON envelope with length-prefixed protocol for Node→Ruby streaming -> #2615
 - #2526 RSC migration docs: Structural and framing improvements -> #2661
-- #2496 Tracking: Improve RSC/Pro demo DX, version sync, and safety checks -> shakacode/react_on_rails#2797, shakacode/react_on_rails-demos#112
+- #2496 Tracking: Improve RSC/Pro demo DX, version sync, and safety checks -> shakacode/react_on_rails#2797, shakacode/react-on-rails-demos#112
 - #2457 Make bundle hash depend on asset content for fully immutable bundle directories -> #2534
-- #2347 Enhancement: Extensible bin/dev precompile pattern as alternative to precompile_hook -> shakacode/react_on_rails-demos#112
-- #1960 feat: add Lefthook for Git hooks management -> shakacode/package_json#32, shakacode/react_on_rails-demos#112
+- #2347 Enhancement: Extensible bin/dev precompile pattern as alternative to precompile_hook -> shakacode/react-on-rails-demos#112
+- #1960 feat: add Lefthook for Git hooks management -> shakacode/package_json#32, shakacode/react-on-rails-demos#112
 
 ## Wave Definitions
 

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
+import { wrapElementInStrictMode } from '../strictModeSupport';
 
 const hydrateOrRender = (domEl, reactEl, prerender) => {
   if (prerender) {
@@ -16,11 +17,11 @@ const hydrateOrRender = (domEl, reactEl, prerender) => {
 export default (props, _railsContext, domNodeId) => {
   const { prerender } = props;
 
-  const reactElement = (
+  const reactElement = wrapElementInStrictMode(
     <div>
       <h1 id="manual-render">Manual Render Example</h1>
       <p>If you can see this, you can register renderer functions.</p>
-    </div>
+    </div>,
   );
 
   hydrateOrRender(document.getElementById(domNodeId), reactElement, prerender);

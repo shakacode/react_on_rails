@@ -1,6 +1,6 @@
 # Rspack Generator Option Implementation
 
-This document summarizes the implementation of the `--rspack` option for the React on Rails generator, based on the patterns from [PR #20 in react_on_rails-demos](https://github.com/shakacode/react_on_rails-demos/pull/20).
+This document summarizes the implementation of the `--rspack` option for the React on Rails generator, based on the patterns from [PR #20 in react-on-rails-demos](https://github.com/shakacode/react-on-rails-demos/pull/20).
 
 ## Overview
 

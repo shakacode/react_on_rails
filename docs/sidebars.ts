@@ -27,6 +27,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         'getting-started/quick-start',
+        'getting-started/examples-and-references',
         'getting-started/create-react-on-rails-app',
         'getting-started/tutorial',
         'getting-started/installation-into-an-existing-rails-app',

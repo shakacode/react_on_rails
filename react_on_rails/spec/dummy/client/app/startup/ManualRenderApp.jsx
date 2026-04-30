@@ -1,12 +1,13 @@
 import React from 'react';
 import ReactDOMClient from 'react-dom/client';
+import { wrapElementInStrictMode } from '../strictModeSupport';
 
 export default (props, _railsContext, domNodeId) => {
-  const reactElement = (
+  const reactElement = wrapElementInStrictMode(
     <div>
       <h1 id="manual-render">Manual Render Example</h1>
       <p>If you can see this, you can register renderer functions.</p>
-    </div>
+    </div>,
   );
 
   const domNode = document.getElementById(domNodeId);

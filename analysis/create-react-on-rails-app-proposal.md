@@ -71,7 +71,7 @@ npx create-react-on-rails-app my-app --pro
 - Use same CI/CD pipeline
 - Published separately to NPM
 
-### 3. Code Reuse from react_on_rails-demos
+### 3. Code Reuse from react-on-rails-demos
 
 **Approach:** Port Ruby script logic to TypeScript shell orchestration
 
@@ -385,11 +385,11 @@ npx create-react-on-rails-app my-app --pro
    - Show Pro feature overview
    - Provide upgrade path from open source
 
-## Integration with react_on_rails-demos
+## Integration with react-on-rails-demos
 
 ### Current State
 
-The [react_on_rails-demos](https://github.com/shakacode/react_on_rails-demos) repository has Ruby scripts:
+The [react-on-rails-demos](https://github.com/shakacode/react-on-rails-demos) repository has Ruby scripts:
 
 - `bin/new-demo` - Creates basic demos
 - `bin/scaffold-demo` - Creates advanced demos with options
@@ -492,7 +492,7 @@ system("npx create-react-on-rails-app #{name} #{flags.join(' ')}")
 
 ### Phase 7: Integration (Week 7)
 
-1. Update react_on_rails-demos to use CLI tool
+1. Update react-on-rails-demos to use CLI tool
 2. Deprecate duplicate Ruby scripts
 3. Update demos documentation
 
@@ -531,11 +531,11 @@ system("npx create-react-on-rails-app #{name} #{flags.join(' ')}")
 ## Resources
 
 - **Original Issue:** https://github.com/shakacode/react_on_rails/issues/1637
-- **react_on_rails-demos:** https://github.com/shakacode/react_on_rails-demos
+- **react-on-rails-demos:** https://github.com/shakacode/react-on-rails-demos
 - **Similar Tools for Reference:**
   - create-react-app: https://github.com/facebook/create-react-app
   - create-next-app: https://github.com/vercel/next.js/tree/canary/packages/create-next-app
-  - create-remix: https://github.com/remix-run/remix/tree/main/packages/create-remix
+  - create-remix: https://github.com/remix-run/remix
 
 ## Next Steps
 

@@ -113,7 +113,8 @@ Webpack's HMR allows the replacement of modules for React in-place without reloa
 
 [github.com/pmmmwh/react-refresh-webpack-plugin](https://github.com/pmmmwh/react-refresh-webpack-plugin)
 
-You can see an [example commit adding this in the SSR HMR demo](https://github.com/shakacode/react_on_rails_demo_ssr_hmr/commit/7e53803fce7034f5ecff335db1f400a5743a87e7).
+You can see an example commit in the maintained SSR + HMR tutorial repo that
+[adds React Refresh](https://github.com/shakacode/react-on-rails-demo-ssr-hmr/commit/7e53803fce7034f5ecff335db1f400a5743a87e7).
 
 1. Add react refresh packages:
    ```bash

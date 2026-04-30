@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 # TODO: This file is not used for CI
-require "coveralls/rake/task" if ENV["USE_COVERALLS"] == "TRUE"
 
 require "pathname"
 require "active_support/core_ext/string"
@@ -23,12 +22,14 @@ namespace :run_rspec do
     run_tests_in(spec_dummy_dir)
   end
 
-  desc "(HACK) Run RSpec on spec/empty_spec in order to have SimpleCov generate a coverage report from cache"
+  desc "(HACK) Run RSpec on spec/empty_spec.rb — set COVERAGE=true to generate a SimpleCov report from cache"
   task :empty do
-    sh %(#{ENV['USE_COVERALLS'] ? 'COVERAGE=true' : ''} rspec spec/empty_spec.rb)
+    if ENV["COVERAGE"] == "true"
+      sh "bundle exec rspec spec/empty_spec.rb"
+    else
+      puts "Skipping run_rspec:empty (set COVERAGE=true to generate a SimpleCov report from cache)"
+    end
   end
-
-  Coveralls::RakeTask.new if ENV["USE_COVERALLS"] == "TRUE"
 
   desc "run all tests"
   task run_rspec: %i[gem dummy empty js_tests] do
@@ -71,7 +72,6 @@ def run_tests_in(dir, options = {})
   command_name = options.fetch(:command_name, path.basename)
   rspec_args = options.fetch(:rspec_args, "")
   env_vars = +"#{options.fetch(:env_vars, '')} TEST_ENV_COMMAND_NAME=\"#{command_name}\""
-  env_vars << "COVERAGE=true" if ENV["USE_COVERALLS"]
   sh_in_dir(path.realpath, "#{env_vars} bundle exec rspec #{rspec_args}")
 end
 
