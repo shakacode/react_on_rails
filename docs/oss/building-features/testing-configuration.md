@@ -37,6 +37,183 @@ class ActiveSupport::TestCase
 end
 ```
 
+## RSC And Node Renderer System Tests
+
+React Server Components add one more moving part to the standard test setup: system tests need compiled client, server, and RSC bundles, and the Rails test process must be able to reach a node-renderer process that uses the test bundle cache.
+
+Use this recipe for Capybara, system, and end-to-end tests that exercise `stream_react_component`, `RSCRoute`, or the `rsc_payload_route`.
+
+### 1. Set Renderer ENV Before Rails Boots
+
+The Pro initializer reads renderer settings while Rails boots. Set test renderer ENV values before requiring `config/environment` in `spec/rails_helper.rb`.
+
+```ruby
+# spec/rails_helper.rb
+ENV["RAILS_ENV"] ||= "test"
+
+test_worker = ENV.fetch("TEST_ENV_NUMBER", "0")
+test_worker = "0" if test_worker.empty?
+
+ENV["RENDERER_PORT"] ||= (3900 + test_worker.to_i).to_s
+ENV["RENDERER_URL"] ||= "http://127.0.0.1:#{ENV.fetch('RENDERER_PORT')}"
+ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
+  File.expand_path("../tmp/node-renderer-bundles-test-#{test_worker}", __dir__)
+
+require_relative "../config/environment"
+```
+
+If you run tests in parallel, each worker needs its own `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH`. Sharing a renderer cache across parallel workers can produce stale-bundle and missing-bundle failures that look like flaky RSC timeouts.
+
+### 2. Compile Test Bundles Up Front
+
+Configure the React on Rails test helper to compile assets before the first RSC example. Your `build_test_command` must build all bundles needed by the test environment, not only the browser bundle.
+
+```ruby
+# config/initializers/react_on_rails.rb
+ReactOnRails.configure do |config|
+  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"
+end
+```
+
+```ruby
+# spec/rails_helper.rb
+require "react_on_rails/test_helper"
+
+RSpec.configure do |config|
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :rsc)
+
+  config.define_derived_metadata(file_path: %r{spec/(system|features|requests)}) do |metadata|
+    metadata[:rsc] = true
+  end
+end
+```
+
+You can keep the default `:js`, `:server_rendering`, and `:controller` tags instead if that already matches your suite. The important part is that the build runs before the first request that can upload bundles to the node renderer.
+
+### 3. Start One Test Renderer Per Worker
+
+Start the renderer in `before(:suite)` after assets are compiled and stop it in `after(:suite)`. The example below assumes your app has a `node-renderer` package script.
+
+```ruby
+# spec/support/rsc_node_renderer.rb
+require "fileutils"
+require "socket"
+require "timeout"
+
+module RscNodeRenderer
+  module_function
+
+  def wait_until_ready!(host:, port:, timeout_seconds: 15)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
+
+    loop do
+      TCPSocket.open(host, port) { return }
+    rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH
+      raise "Node renderer did not boot on #{host}:#{port}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+
+      sleep 0.1
+    end
+  end
+end
+
+RSpec.configure do |config|
+  config.before(:suite) do
+    next unless ENV["RSC_NODE_RENDERER_TESTS"] == "1"
+
+    ReactOnRails::TestHelper.ensure_assets_compiled
+
+    cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH")
+    FileUtils.rm_rf(cache_path)
+    FileUtils.mkdir_p(cache_path)
+
+    renderer_env = {
+      "NODE_ENV" => "test",
+      "RAILS_ENV" => "test",
+      "RENDERER_PORT" => ENV.fetch("RENDERER_PORT"),
+      "RENDERER_SERVER_BUNDLE_CACHE_PATH" => cache_path
+    }
+
+    @rsc_node_renderer_pid = Process.spawn(
+      renderer_env,
+      "pnpm",
+      "run",
+      "node-renderer",
+      chdir: Rails.root.to_s,
+      out: Rails.root.join("log/node-renderer-test.log").to_s,
+      err: [:child, :out]
+    )
+
+    RscNodeRenderer.wait_until_ready!(host: "127.0.0.1", port: ENV.fetch("RENDERER_PORT").to_i)
+  end
+
+  config.after(:suite) do
+    next unless @rsc_node_renderer_pid
+
+    Process.kill("TERM", @rsc_node_renderer_pid)
+    Timeout.timeout(5) { Process.wait(@rsc_node_renderer_pid) }
+  rescue Errno::ESRCH, Errno::ECHILD
+    # Already stopped.
+  rescue Timeout::Error
+    Process.kill("KILL", @rsc_node_renderer_pid)
+  end
+end
+```
+
+In CI, set `RSC_NODE_RENDERER_TESTS=1` for jobs that need the renderer. For local development, leaving it unset lets you run non-RSC specs without starting another process.
+
+### 4. Write A Capybara RSC Smoke Test
+
+Keep the first system test boring: visit a route that streams one Server Component and assert on visible HTML plus one hydrated Client Component interaction.
+
+```ruby
+RSpec.describe "Story page", :rsc, :js, type: :system do
+  it "renders the streamed RSC page and hydrates client controls" do
+    visit story_path("ruby-rails-react")
+
+    expect(page).to have_css("h1", text: "Ruby, Rails, and React")
+    expect(page).to have_button("Save")
+
+    click_button "Save"
+    expect(page).to have_text("Saved")
+  end
+end
+```
+
+Request specs are still useful for the payload endpoint:
+
+```ruby
+RSpec.describe "RSC payload endpoint", :rsc, type: :request do
+  it "returns an RSC payload stream" do
+    get "/rsc_payload/StoryPage", params: { props: { slug: "ruby-rails-react" }.to_json }
+
+    expect(response).to have_http_status(:ok)
+    expect(response.media_type).to eq("application/x-ndjson")
+    expect(response.body).to include("html")
+  end
+end
+```
+
+### 5. Stub External APIs At The Right Boundary
+
+Ruby stubbing tools such as WebMock and VCR only intercept requests from the Rails process. They do not intercept HTTP requests made by JavaScript running inside the separate node-renderer process.
+
+Prefer one of these patterns:
+
+- Fetch external data in Rails, stub it with WebMock/VCR, and pass deterministic props into the RSC tree.
+- Point Node-rendered code at a local fake API server started by the test harness.
+- Inject an API base URL through props or environment variables so tests never call the real service.
+
+Avoid letting system tests depend on live third-party APIs. RSC failures from external API drift usually look like renderer timeouts or missing payload chunks, which sends debugging in the wrong direction.
+
+### 6. Parallelization Checklist
+
+- Use one renderer port per worker.
+- Use one renderer bundle cache directory per worker.
+- Clear the renderer cache before starting the renderer.
+- Compile assets before the renderer accepts requests.
+- Do not share a mutable fake API server across workers unless it isolates state per worker.
+- If flakes remain, serialize the RSC system-test group first, then re-enable parallelism once port/cache isolation is proven.
+
 ## Two Approaches to Test Asset Compilation
 
 React on Rails supports two mutually exclusive approaches for compiling webpack assets during tests:
