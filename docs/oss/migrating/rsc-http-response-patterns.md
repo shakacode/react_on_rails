@@ -113,7 +113,7 @@ def show
 end
 ```
 
-Do not model route redirects as Server Component return values. React on Rails render-functions may expose redirect metadata for client routers, but React on Rails does not turn that metadata into an actual HTTP redirect for the page response. See [Redirect Information](../core-concepts/render-functions.md#8-redirect-information).
+Do not model route redirects as Server Component return values. React on Rails render-functions may expose redirect metadata for client routers, but React on Rails does not turn that metadata into an actual HTTP redirect for the page response. See [Redirect Information](../core-concepts/render-functions.md#8-redirect-information-legacy).
 
 If a streamed response has already started and an error forces navigation, the fallback is client-side navigation or an error shell, not a true HTTP redirect. Treat that as an exception path, not the normal route design.
 

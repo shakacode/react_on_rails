@@ -227,6 +227,7 @@ const sidebars: SidebarsConfig = {
                 'migrating/rsc-component-patterns',
                 'migrating/rsc-context-and-state',
                 'migrating/rsc-data-fetching',
+                'migrating/rsc-http-response-patterns',
                 'migrating/rsc-third-party-libs',
                 'migrating/rsc-troubleshooting',
                 'migrating/rsc-flight-payload',
