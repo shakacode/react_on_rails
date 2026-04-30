@@ -50,8 +50,13 @@ pnpm --filter react-on-rails-pro-node-renderer run build
 
 ```bash
 cd react_on_rails_pro/spec/dummy
-pnpm run node-renderer:fresh   # builds the package, then starts the renderer
+pnpm run node-renderer:fresh   # builds, then starts the renderer standalone
 ```
+
+This starts the renderer in the foreground on port 3800. For a full-stack dummy
+run, either stop it before Step 2 and let `bin/dev` start the renderer, or leave
+it running and comment out the `node-renderer:` line in `Procfile.dev` before
+running `bin/dev`.
 
 **Watch mode (recommended when iterating on the renderer source):**
 
