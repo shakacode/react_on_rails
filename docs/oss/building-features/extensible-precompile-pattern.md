@@ -156,7 +156,7 @@ For larger apps, prefer a small Ruby or shell script over a very long command st
 # bin/build-react-on-rails
 # frozen_string_literal: true
 
-mode = ARGV.fetch(0)
+mode = ARGV.fetch(0, nil)
 
 system("yarn res:build", exception: true)
 
