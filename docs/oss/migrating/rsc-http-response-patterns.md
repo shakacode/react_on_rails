@@ -61,7 +61,7 @@ def show
   story = Story.find_by(id: params[:id])
   return render("errors/not_found", status: :not_found) unless story
 
-  @story_props = StorySerializer.render_as_hash(story)
+  @story_props = { story: StorySerializer.render_as_hash(story) }
   stream_view_containing_react_components(template: "stories/show")
 end
 ```
@@ -74,9 +74,9 @@ def show
 
   if story.nil?
     response.status = 404
-    @story_props = { notFound: true, requestedId: params[:id] }
+    @story_props = { notFound: true, story: nil, requestedId: params[:id] }
   else
-    @story_props = StorySerializer.render_as_hash(story)
+    @story_props = { story: StorySerializer.render_as_hash(story) }
   end
 
   stream_view_containing_react_components(template: "stories/show")
@@ -104,11 +104,11 @@ Use Rails redirects before streaming:
 ```ruby
 def show
   story = Story.find_by(id: params[:id])
-  return redirect_to(stories_path, alert: "Story not found") unless story
+  return redirect_to(stories_path, alert: "Story not found", status: :see_other) unless story
 
   return redirect_to(sign_in_path, status: :see_other) unless can?(:read, story)
 
-  @story_props = StorySerializer.render_as_hash(story)
+  @story_props = { story: StorySerializer.render_as_hash(story) }
   stream_view_containing_react_components(template: "stories/show")
 end
 ```
@@ -132,10 +132,10 @@ For public pages, let Rails decide freshness before rendering:
 ```ruby
 def show
   story = Story.published.find_by!(slug: params[:slug])
+  response.set_header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
   return unless stale?(story, public: true)
 
-  response.set_header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
-  @story_props = PublicStorySerializer.render_as_hash(story)
+  @story_props = { story: PublicStorySerializer.render_as_hash(story) }
   stream_view_containing_react_components(template: "stories/show")
 end
 ```
