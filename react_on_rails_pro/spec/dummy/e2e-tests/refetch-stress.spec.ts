@@ -2,14 +2,13 @@ import { test, expect } from '@playwright/test';
 
 const STRESS_URL = '/server_router/refetch-stress';
 
-// Use the port the dev server happens to be running on. CI/local can override
-// PLAYWRIGHT_BASE_URL or BASE_URL; default matches the dummy app's typical
-// dev setup.
-const BASE = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3002';
-
 test.describe('Imperative RSC refetch — stress scenarios (Issue 3106)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${BASE}${STRESS_URL}`);
+    // Relative URL — Playwright prepends `use.baseURL` from playwright.config.ts
+    // (`http://localhost:3000/`). For local runs against a non-standard port,
+    // change baseURL in playwright.config.ts (it does not currently honor a
+    // BASE_URL env var override).
+    await page.goto(STRESS_URL);
     await expect(page.getByTestId('stress-time-ref-handle')).toBeVisible();
   });
 
