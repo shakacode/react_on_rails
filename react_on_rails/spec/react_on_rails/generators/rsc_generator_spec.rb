@@ -100,6 +100,7 @@ describe RscGenerator, type: :generator do
         assert_file "config/webpack/serverWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("isServer: true")
         end
       end
 
@@ -115,6 +116,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
           expect(content).to include("clientReferences: rscClientReferences")
           expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include("isServer: false")
         end
       end
 
@@ -124,6 +126,38 @@ describe RscGenerator, type: :generator do
           expect(content).to include("RSC_BUNDLE_ONLY")
           expect(content).to include("rscConfig")
         end
+      end
+    end
+  end
+
+  context "when the client webpack config already imports Shakapacker config" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        "const { config } = require('shakapacker');\n#{base_client_webpack_content}"
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not inject a duplicate config import" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("const { config } = require('shakapacker');").length).to eq(1)
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
       end
     end
   end
@@ -640,6 +674,7 @@ describe RscGenerator, type: :generator do
         assert_file "config/rspack/serverWebpackConfig.js" do |content|
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("react-on-rails-rsc/WebpackPlugin")
+          expect(content).to include("isServer: true")
         end
       end
 
@@ -654,6 +689,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("RSCWebpackPlugin")
           expect(content).to include("clientReferences: rscClientReferences")
           expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include("isServer: false")
         end
       end
 
@@ -728,6 +764,7 @@ describe RscGenerator, type: :generator do
           expect(content).to include("if (!rscBundle)")
           expect(content).to include("clientReferences: rscClientReferences")
           expect(content).to include("directory: resolve(config.source_path)")
+          expect(content).to include("isServer: true")
         end
       end
 

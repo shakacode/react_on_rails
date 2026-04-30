@@ -383,20 +383,18 @@ module ReactOnRails
         return if content.include?("RSCWebpackPlugin")
 
         # Add RSCWebpackPlugin import after bundler require
+        server_injected_imports = [
+          "\\1",
+          "const { resolve } = require('path');",
+          "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+          "",
+          rsc_client_references_js
+        ].join("\n")
+
         gsub_file(
           config_path,
           %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)},
-          <<~'JS'.chomp
-            \1
-            const { resolve } = require('path');
-            const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
-
-            const rscClientReferences = {
-              directory: resolve(config.source_path),
-              recursive: true,
-              include: /\.(js|ts|jsx|tsx)$/,
-            };
-          JS
+          server_injected_imports
         )
 
         # Add rscBundle parameter to configureServer function
@@ -434,21 +432,19 @@ module ReactOnRails
         return if content.include?("RSCWebpackPlugin")
 
         # Add RSCWebpackPlugin import after commonWebpackConfig import
+        injected_imports = [
+          "\\1",
+          ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(content)),
+          "const { resolve } = require('path');",
+          "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+          "",
+          rsc_client_references_js
+        ].compact.join("\n")
+
         gsub_file(
           config_path,
           %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)},
-          <<~'JS'.chomp
-            \1
-            const { config } = require('shakapacker');
-            const { resolve } = require('path');
-            const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
-
-            const rscClientReferences = {
-              directory: resolve(config.source_path),
-              recursive: true,
-              include: /\.(js|ts|jsx|tsx)$/,
-            };
-          JS
+          injected_imports
         )
 
         # Add RSCWebpackPlugin to client config before return statement
@@ -506,6 +502,20 @@ module ReactOnRails
 
         content = File.read(File.join(destination_root, scob_path))
         content.include?("rscWebpackConfig") ? [] : ["rscWebpackConfig in ServerClientOrBoth.js"]
+      end
+
+      def rsc_client_references_js
+        <<~'JS'.chomp
+          const rscClientReferences = {
+            directory: resolve(config.source_path),
+            recursive: true,
+            include: /\.(js|ts|jsx|tsx)$/,
+          };
+        JS
+      end
+
+      def shakapacker_config_imported?(content)
+        content.match?(/^\s*const\s+\{[^\n}]*\bconfig\b[^\n}]*\}\s*=\s*require\(['"]shakapacker['"]\);?/)
       end
 
       def resolve_hello_server_layout_name
