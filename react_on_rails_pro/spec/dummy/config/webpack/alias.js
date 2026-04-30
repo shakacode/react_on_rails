@@ -14,6 +14,15 @@ module.exports = {
       'react-dom': resolve(rootNodeModules, 'react-dom'),
       'react-dom/client': resolve(rootNodeModules, 'react-dom', 'client'),
       'react-dom/server': resolve(rootNodeModules, 'react-dom', 'server'),
+      'react-on-rails-pro$': resolve(__dirname, '..', '..', 'client', 'app', 'strictModeReactOnRailsPro.js'),
+      'react-on-rails-pro/client$': resolve(
+        __dirname,
+        '..',
+        '..',
+        'client',
+        'app',
+        'strictModeReactOnRailsProClient.js',
+      ),
     },
   },
 };

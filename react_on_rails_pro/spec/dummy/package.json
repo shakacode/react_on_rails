@@ -95,6 +95,7 @@
   },
   "scripts": {
     "test": "pnpm run build:test && pnpm run lint && rspec",
+    "test:js": "jest ./tests",
     "lint": "cd ../.. && nps lint",
     "e2e-test": "npx playwright test",
     "postinstall": "test -f post-pnpm-install.local && ./post-pnpm-install.local || true",

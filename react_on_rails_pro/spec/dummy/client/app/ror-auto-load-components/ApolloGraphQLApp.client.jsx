@@ -4,6 +4,7 @@ import React from 'react';
 import { ApolloProvider, ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
 import { hydrateRoot } from 'react-dom/client';
 import ApolloGraphQL from '../components/ApolloGraphQL';
+import { wrapElementInStrictMode } from '../strictModeSupport';
 
 export default (_props, _railsContext, domNodeId) => {
   const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
@@ -22,10 +23,10 @@ export default (_props, _railsContext, domNodeId) => {
     ssrForceFetchDelay: 100,
   });
   const el = document.getElementById(domNodeId);
-  const App = (
+  const App = wrapElementInStrictMode(
     <ApolloProvider client={client}>
       <ApolloGraphQL />
-    </ApolloProvider>
+    </ApolloProvider>,
   );
   hydrateRoot(el, App);
 };

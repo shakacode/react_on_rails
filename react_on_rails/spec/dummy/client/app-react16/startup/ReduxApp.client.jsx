@@ -12,6 +12,9 @@ import reducers from '../../app/reducers/reducersIndex';
 import composeInitialState from '../../app/store/composeInitialState';
 
 import HelloWorldContainer from '../../app/components/HelloWorldContainer';
+// Intentional cross-tree import: the React 16 dummy entries reuse the StrictMode helper from the
+// React 19 `app/` tree. Keep the import path in sync if `app/strictModeSupport` is moved.
+import { wrapElementInStrictMode } from '../../app/strictModeSupport';
 
 /*
  *  Export a function that takes the props and returns a ReactComponent.
@@ -37,10 +40,10 @@ export default (props, railsContext, domNodeId) => {
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
   const renderApp = (Komponent) => {
-    const element = (
+    const element = wrapElementInStrictMode(
       <Provider store={store}>
         <Komponent />
-      </Provider>
+      </Provider>,
     );
 
     render(element, document.getElementById(domNodeId));
