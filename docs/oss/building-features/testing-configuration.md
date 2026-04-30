@@ -118,6 +118,8 @@ module RscNodeRenderer
   end
 end
 
+rsc_node_renderer_pid = nil
+
 RSpec.configure do |config|
   config.before(:suite) do
     next unless ENV["RSC_NODE_RENDERER_TESTS"] == "1"
@@ -135,7 +137,7 @@ RSpec.configure do |config|
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => cache_path
     }
 
-    @rsc_node_renderer_pid = Process.spawn(
+    rsc_node_renderer_pid = Process.spawn(
       renderer_env,
       "pnpm",
       "run",
@@ -149,19 +151,21 @@ RSpec.configure do |config|
   end
 
   config.after(:suite) do
-    next unless @rsc_node_renderer_pid
+    next unless rsc_node_renderer_pid
 
-    Process.kill("TERM", @rsc_node_renderer_pid)
-    Timeout.timeout(5) { Process.wait(@rsc_node_renderer_pid) }
+    Process.kill("TERM", rsc_node_renderer_pid)
+    Timeout.timeout(5) { Process.wait(rsc_node_renderer_pid) }
   rescue Errno::ESRCH, Errno::ECHILD
     # Already stopped.
   rescue Timeout::Error
     begin
-      Process.kill("KILL", @rsc_node_renderer_pid)
-      Process.wait(@rsc_node_renderer_pid)
+      Process.kill("KILL", rsc_node_renderer_pid)
+      Process.wait(rsc_node_renderer_pid)
     rescue Errno::ESRCH, Errno::ECHILD
       # Already stopped.
     end
+  ensure
+    rsc_node_renderer_pid = nil
   end
 end
 ```
