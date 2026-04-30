@@ -38,7 +38,12 @@ module ReactOnRailsPro
     DISCOVERY_TIMEOUT_SECONDS = 10
     FETCH_TIMEOUT_SECONDS = 30
     STALE_TEMP_DIR_TTL_SECONDS = 3600
-    TEMPORARY_DIRECTORY_PATTERN = /\.(?:staging|previous)-\d+-[0-9a-f]+\z/
+    # Match temp dirs created by `temporary_bundle_directory` (and the analogous
+    # `.previous-` backup suffix in `replace_bundle_directory`). The minimum
+    # widths (`\d{4,}` PID, `[0-9a-f]{8,}` random) defeat false positives where
+    # a real bundle hash happens to end with `.staging-<digits>-<hex>` — without
+    # them, a hash like `bundle.staging-1-abc123` could match and be swept.
+    TEMPORARY_DIRECTORY_PATTERN = /\.(?:staging|previous)-\d{4,}-[0-9a-f]{8,}\z/
 
     def self.call(cache_dir:, current_hashes:, mode:)
       adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
@@ -135,6 +140,7 @@ module ReactOnRailsPro
 
       replace_bundle_directory(staging_dir, bundle_dir)
       staging_dir = nil
+      puts "[ReactOnRailsPro] Seeded previous bundle hash #{hash} at #{bundle_dir}."
     rescue StandardError => e
       # Remove only files created by this attempt. If the hash directory was
       # already valid from an earlier seed on a persistent cache volume, keep it
@@ -371,6 +377,12 @@ module ReactOnRailsPro
       return unless backup_dir && File.exist?(backup_dir)
 
       FileUtils.rm_rf(bundle_dir)
+      # The `unless File.exist?` guard catches the narrow TOCTOU window where
+      # another writer recreates `bundle_dir` between the rm_rf and the mv.
+      # We deliberately skip the mv in that case rather than overwriting that
+      # writer's work — the runtime 410-retry path is still a valid fallback,
+      # and `backup_dir` will be swept by `sweep_stale_temporary_directories`
+      # on the next run.
       FileUtils.mv(backup_dir, bundle_dir) unless File.exist?(bundle_dir)
     rescue StandardError => e
       warn "[ReactOnRailsPro] Could not restore previous rolling-deploy bundle directory #{backup_dir} " \

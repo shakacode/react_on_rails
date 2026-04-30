@@ -2731,6 +2731,48 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
+  describe "report_resolved_cache_dir" do
+    let(:doctor) { described_class.new(verbose: false, fix: false) }
+    let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:cache_dir) { Dir.mktmpdir("doctor-cache") }
+
+    before do
+      cache_dir_value = cache_dir
+      pro_module = Module.new
+      utils_module = Module.new
+      utils_module.define_singleton_method(:resolve_renderer_cache_dir) { cache_dir_value }
+      pro_module.const_set(:Utils, utils_module)
+      stub_const("ReactOnRailsPro", pro_module)
+    end
+
+    after { FileUtils.rm_rf(cache_dir) }
+
+    it "excludes leftover staging/backup temp dirs from the bundle-hash count" do
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123"))
+      FileUtils.mkdir_p(File.join(cache_dir, "def456"))
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123.staging-1234-deadbeef"))
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123.previous-1234-feedface"))
+
+      doctor.send(:report_resolved_cache_dir)
+
+      info = checker.messages.find { |m| m[:type] == :info && m[:content].include?(cache_dir) }
+      expect(info[:content]).to include("(2 bundle-hash subdir(s))")
+    end
+
+    it "uses the Pro stager constant when the Pro gem is loaded" do
+      stager_module = Module.new
+      stager_module.const_set(:TEMPORARY_DIRECTORY_PATTERN, /\.tempmarker\z/)
+      ReactOnRailsPro.const_set(:RollingDeployCacheStager, stager_module)
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123"))
+      FileUtils.mkdir_p(File.join(cache_dir, "abc123.tempmarker"))
+
+      doctor.send(:report_resolved_cache_dir)
+
+      info = checker.messages.find { |m| m[:type] == :info && m[:content].include?(cache_dir) }
+      expect(info[:content]).to include("(1 bundle-hash subdir(s))")
+    end
+  end
+
   describe "check_deprecated_renderer_cache_task" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }

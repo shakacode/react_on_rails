@@ -2961,13 +2961,29 @@ module ReactOnRails
       end
     end
 
+    # Mirror of ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN
+    # used as a fallback when the Pro gem isn't loaded so doctor still filters
+    # leftover staging/backup dirs out of the bundle-hash count.
+    ROLLING_DEPLOY_TEMP_DIR_PATTERN = /\.(?:staging|previous)-\d{4,}-[0-9a-f]{8,}\z/
+
     def report_resolved_cache_dir
       cache_dir = ReactOnRailsPro::Utils.resolve_renderer_cache_dir
       if File.directory?(cache_dir)
-        subdirs = Dir.children(cache_dir).select { |c| File.directory?(File.join(cache_dir, c)) }
+        temp_dir_pattern = rolling_deploy_temp_dir_pattern
+        subdirs = Dir.children(cache_dir).select do |c|
+          File.directory?(File.join(cache_dir, c)) && !c.match?(temp_dir_pattern)
+        end
         checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (#{subdirs.length} bundle-hash subdir(s))")
       else
         checker.add_info("ℹ️  Resolved renderer cache dir: #{cache_dir} (does not exist yet)")
+      end
+    end
+
+    def rolling_deploy_temp_dir_pattern
+      if defined?(ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN)
+        ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN
+      else
+        ROLLING_DEPLOY_TEMP_DIR_PATTERN
       end
     end
 

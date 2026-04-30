@@ -69,6 +69,11 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       expect(File.symlink?(File.join(bundle_dir, "abc123.js"))).to be(false)
     end
 
+    it "logs a per-hash success message after promotion" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/Seeded previous bundle hash abc123 at/).to_stdout
+    end
+
     it "creates relative symlinks in :symlink mode" do
       described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :symlink)
 
@@ -400,8 +405,8 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
   end
 
   context "when stale temporary bundle directories are present" do
-    let(:stale_staging_dir) { File.join(cache_dir, "abc123.staging-123-deadbeef") }
-    let(:fresh_previous_dir) { File.join(cache_dir, "abc123.previous-123-feedface") }
+    let(:stale_staging_dir) { File.join(cache_dir, "abc123.staging-1234-deadbeef") }
+    let(:fresh_previous_dir) { File.join(cache_dir, "abc123.previous-1234-feedface") }
 
     before do
       stub_const("ReactOnRailsPro::RollingDeployCacheStager::STALE_TEMP_DIR_TTL_SECONDS", 60)
@@ -419,6 +424,19 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
       expect(File.exist?(stale_staging_dir)).to be(false)
       expect(File.exist?(fresh_previous_dir)).to be(true)
+    end
+
+    it "does not match real bundle hash dirs that look superficially similar" do
+      # Hash dir whose suffix has a sub-4-digit PID and sub-8-char hex segment.
+      # The tightened TEMPORARY_DIRECTORY_PATTERN must reject this so a real
+      # bundle is never silently swept after the TTL.
+      false_positive_dir = File.join(cache_dir, "bundle.staging-1-abc123")
+      FileUtils.mkdir_p(false_positive_dir)
+      File.utime(Time.now - 120, Time.now - 120, false_positive_dir)
+
+      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+
+      expect(File.exist?(false_positive_dir)).to be(true)
     end
   end
 
