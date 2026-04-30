@@ -16,11 +16,13 @@ module ReactOnRails
 
         private
 
-        # Globs every *.sock under tmp/sockets/, treating the directory as bin/dev-owned:
-        # any inactive Unix socket there is removed on startup. Apps using Puma or Action
-        # Cable Unix sockets should place them outside tmp/sockets/ to avoid being cleaned.
+        # Targets overmind-named sockets only (`.overmind.sock` at the project root and
+        # `tmp/sockets/overmind*.sock` for copied/renamed variants). Inactive matches are
+        # removed on startup. Other apps' Unix sockets in `tmp/sockets/` (Puma, Action
+        # Cable, custom services) are left untouched even when stale, so a tight
+        # startup race window cannot delete a socket bin/dev does not own.
         def cleanup_overmind_sockets
-          socket_files = [".overmind.sock", "tmp/sockets/overmind.sock", *Dir.glob("tmp/sockets/*.sock")].uniq
+          socket_files = [".overmind.sock", *Dir.glob("tmp/sockets/overmind*.sock")].uniq
           cleaned_any = false
 
           socket_files.each do |socket_file|
@@ -83,6 +85,14 @@ module ReactOnRails
         # Uses Open3.capture2 with a word-list argv (matching ServerManager#find_port_pids)
         # so the no-shell-injection invariant is structural rather than caller-enforced —
         # passing a non-Integer pid in the future cannot introduce a shell metacharacter.
+        #
+        # Returns nil when:
+        #   - `lsof` is absent (Errno::ENOENT) — common on minimal Alpine/CI images,
+        #   - `lsof` runs but produces no `n` line (process exited or kernel withholds info),
+        #   - any other unexpected error.
+        # The nil return causes `cleanup_rails_pid_file` to keep the PID file as a safe
+        # fallback. The "lsof not found" branch silently skips the cross-directory check;
+        # set DEBUG=1 to surface the cause on stderr.
         def working_directory_for_pid(pid)
           stdout, = Open3.capture2("lsof", "-a", "-p", pid.to_s, "-d", "cwd", "-Fn", err: File::NULL)
           path_line = stdout.lines.find { |line| line.start_with?("n") }
@@ -90,9 +100,20 @@ module ReactOnRails
           return nil if path.nil? || path.empty?
 
           path
-        rescue StandardError
-          # lsof command not found or other error
+        rescue StandardError => e
+          log_lsof_error(pid, e)
           nil
+        end
+
+        def log_lsof_error(pid, error)
+          return unless ENV["DEBUG"]
+
+          if error.is_a?(Errno::ENOENT)
+            warn "bin/dev: `lsof` not found; cross-directory PID check skipped (#{error.message})."
+          else
+            warn "bin/dev: could not determine working directory for PID #{pid} " \
+                 "(#{error.class}: #{error.message})."
+          end
         end
 
         def same_working_directory?(left, right)

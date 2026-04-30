@@ -1049,8 +1049,12 @@ module ReactOnRails
 
           # Normalize for downstream URL construction and mismatch checks so
           # `RENDERER_PORT=" 3800 "` doesn't leak whitespace into the derived
-          # URL or the warning body.
+          # URL or the warning body. Also write the stripped value back to ENV
+          # so the Procfile's `${RENDERER_PORT:-3800}` expansion propagates the
+          # clean value to the node renderer subprocess instead of forwarding
+          # the whitespace-padded original.
           port = raw_port.strip
+          ENV["RENDERER_PORT"] = port if port != raw_port
 
           if url.nil? || url.empty?
             # Only RENDERER_PORT set: derive the URL so Rails reaches the right port.

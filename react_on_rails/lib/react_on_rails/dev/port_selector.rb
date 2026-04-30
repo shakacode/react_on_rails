@@ -51,6 +51,12 @@ module ReactOnRails
         # The :renderer key is populated only when a base port is set (it is a
         # Pro-only service and does not participate in auto-detection).
         # :base_port_mode is true only in case 1.
+        #
+        # NOTE: This method mutates ENV. Invalid PORT / SHAKAPACKER_DEV_SERVER_PORT
+        # values are deleted via `read_and_sanitize_port_env!` so ServerManager's
+        # apply_explicit_port_env path doesn't re-warn on the same bad value.
+        # Intended for `bin/dev` startup; do not call from read-only contexts
+        # that expect ENV to survive the call.
         def select_ports
           base = base_port_ports
           return base if base

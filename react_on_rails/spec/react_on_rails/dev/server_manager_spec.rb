@@ -740,11 +740,14 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
       end
 
-      it "accepts RENDERER_PORT with surrounding whitespace (matches PortSelector.valid_port_string?)" do
+      it "accepts RENDERER_PORT with surrounding whitespace and writes the stripped value back to ENV" do
         ENV["RENDERER_PORT"] = "  3801  "
         described_class.start(:development)
         # Derived URL uses the stripped value, not the raw whitespace-padded env.
         expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3801")
+        # ENV is also normalized so the Procfile's ${RENDERER_PORT:-3800} expansion
+        # propagates the clean value to the node renderer subprocess.
+        expect(ENV.fetch("RENDERER_PORT", nil)).to eq("3801")
       end
     end
 

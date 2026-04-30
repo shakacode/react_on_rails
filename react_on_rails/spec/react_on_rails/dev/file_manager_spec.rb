@@ -36,6 +36,17 @@ RSpec.describe ReactOnRails::Dev::FileManager do
       server&.close
     end
 
+    it "leaves non-overmind sockets in tmp/sockets/ alone even when inactive" do
+      FileUtils.mkdir_p("tmp/sockets")
+      File.write("tmp/sockets/puma.sock", "stale puma socket")
+      File.write("tmp/sockets/cable.sock", "stale cable socket")
+
+      described_class.cleanup_stale_files
+
+      expect(File).to exist("tmp/sockets/puma.sock")
+      expect(File).to exist("tmp/sockets/cable.sock")
+    end
+
     it "removes a server pid file copied from another app directory" do
       write_server_pid("12345")
       allow(described_class).to receive(:process_running?).with(12_345).and_return(true)
