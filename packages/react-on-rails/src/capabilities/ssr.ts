@@ -1,8 +1,9 @@
 /* eslint-disable import/prefer-default-export -- named export for consistency with capability API */
 
-import type { RenderParams, ErrorOptions } from '../types/index.ts';
+import type { RenderParams, ErrorOptions, RenderingError } from '../types/index.ts';
 import handleError from '../handleError.ts';
 import serverRenderReactComponent from '../serverRenderReactComponent.ts';
+import { buildLengthPrefixedResult } from '../serverRenderUtils.ts';
 
 // Warn about bundle size when included in browser bundles
 if (typeof window !== 'undefined') {
@@ -25,6 +26,18 @@ export function createSSRCapability() {
 
     serverRenderReactComponent(options: RenderParams): null | string | Promise<string> {
       return serverRenderReactComponent(options);
+    },
+
+    prepareRenderResult(
+      html: string,
+      consoleReplayScript: string,
+      hasErrors: boolean,
+      renderingError: RenderingError | null,
+    ): string {
+      return buildLengthPrefixedResult(html, consoleReplayScript, {
+        hasErrors,
+        error: renderingError ?? undefined,
+      });
     },
   };
 }
