@@ -828,6 +828,31 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         # propagates the clean value to the node renderer subprocess.
         expect(ENV.fetch("RENDERER_PORT", nil)).to eq("3801")
       end
+
+      # URI preserves host case, so `URI.parse("http://LOCALHOST:3900").hostname`
+      # returns "LOCALHOST". Without downcasing in `localhost_renderer_url?`, the
+      # invalid-port remediation path would treat the URL as remote and skip
+      # clearing it, leaving Rails targeting the stale port while node falls
+      # back to 3800.
+      it "clears an uppercase localhost REACT_RENDERER_URL when RENDERER_PORT is invalid" do
+        ENV["RENDERER_PORT"] = "abc"
+        ENV["REACT_RENDERER_URL"] = "http://LOCALHOST:3900"
+        expect { described_class.start(:development) }
+          .to output(%r{Clearing REACT_RENDERER_URL=http://LOCALHOST:3900}).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to be_nil
+      end
+
+      # Sibling helpers in this file use `.strip.empty?` for the same env var;
+      # without that here, a whitespace-only REACT_RENDERER_URL would bypass
+      # the empty check and trigger a confusing mismatch warning instead of
+      # auto-deriving the URL from RENDERER_PORT.
+      it "treats a whitespace-only REACT_RENDERER_URL as empty and derives from RENDERER_PORT" do
+        ENV["RENDERER_PORT"] = "3801"
+        ENV["REACT_RENDERER_URL"] = "   "
+        expect { described_class.start(:development) }
+          .to output(%r{deriving REACT_RENDERER_URL=http://localhost:3801}).to_stderr
+        expect(ENV.fetch("REACT_RENDERER_URL", nil)).to eq("http://localhost:3801")
+      end
     end
 
     context "with IPv6 localhost REACT_RENDERER_URL" do

@@ -1077,7 +1077,7 @@ module ReactOnRails
           port = raw_port.strip
           ENV["RENDERER_PORT"] = port if port != raw_port
 
-          if url.nil? || url.empty?
+          if url.nil? || url.strip.empty?
             # Only RENDERER_PORT set: derive the URL so Rails reaches the right port.
             # Use warn (stderr) so `bin/dev 2>/dev/null` silences this env-mutation
             # log together with every other "I changed your env" warning in this
@@ -1104,7 +1104,7 @@ module ReactOnRails
         # behind a reverse proxy. Remote-side port mismatches are a deployment
         # concern, not something bin/dev can diagnose safely.
         def warn_url_without_port(url)
-          return if url.nil? || url.empty? || !localhost_renderer_url?(url)
+          return if url.nil? || url.strip.empty? || !localhost_renderer_url?(url)
 
           warn "WARNING: REACT_RENDERER_URL=#{url} is set without RENDERER_PORT. " \
                "The node renderer process may bind to a different port than Rails " \
@@ -1116,7 +1116,7 @@ module ReactOnRails
         # Procfile falls back to 3800. Clear the URL so the initializer's
         # default localhost URL matches the renderer's fallback port.
         def clear_local_renderer_url_after_invalid_port(url)
-          return if url.nil? || url.empty? || !localhost_renderer_url?(url)
+          return if url.nil? || url.strip.empty? || !localhost_renderer_url?(url)
 
           warn "WARNING: Clearing REACT_RENDERER_URL=#{url} because invalid " \
                "RENDERER_PORT was ignored; falling back to the default " \
@@ -1161,7 +1161,10 @@ module ReactOnRails
           # Use `.hostname` not `.host`: for IPv6 URLs like `http://[::1]:3800`,
           # `.host` returns `"[::1]"` (with brackets) while `.hostname` returns
           # `"::1"` (bracket-stripped), matching the comparison list below.
-          %w[localhost 127.0.0.1 ::1].include?(URI.parse(url).hostname)
+          # Downcase: URI preserves host case, so `http://LOCALHOST:3900` would
+          # otherwise be treated as non-local and skip the invalid-port URL
+          # remediation path, leaving Rails targeting a stale port.
+          %w[localhost 127.0.0.1 ::1].include?(URI.parse(url).hostname&.downcase)
         rescue URI::InvalidURIError
           false
         end
