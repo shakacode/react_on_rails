@@ -55,8 +55,8 @@ group :development, :test do
   gem "scss_lint", require: false
   gem "fakefs", require: "fakefs/safe"
 
-  # Added for Ruby 3.5+ compatibility to silence warnings.
-  # jbuilder and other gems lazy-require these stdlib bits that became default gems in 3.5.
+  # Ruby 3.5+ removed these from the default gem set; they must now be declared explicitly
+  # to avoid `cannot load such file` errors from gems that lazy-require them (e.g. jbuilder).
   gem "benchmark", require: false
   gem "logger", require: false
   gem "ostruct", require: false

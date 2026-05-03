@@ -15,7 +15,10 @@ rails-rsc-assets: HMR=true RSC_BUNDLE_ONLY=true bin/shakapacker --watch
 # When validating source changes under `packages/react-on-rails-pro-node-renderer/src/**`,
 # either rebuild once (`pnpm --filter react-on-rails-pro-node-renderer run build`) or
 # uncomment the `node-renderer-build` line below to watch and rebuild on every save.
-# Foreman/overmind starts processes concurrently, so on first use wait for the initial
-# build-watch compile or restart `node-renderer` before trusting renderer output.
+# WARNING: build-watch runs `pnpm run clean && tsc --watch`, which deletes `lib/` on
+# startup before the first compile completes. Foreman/overmind starts processes
+# concurrently, so the `node-renderer` process will fail with module-not-found errors
+# until the initial build finishes. On first use, wait for the watcher to emit "Found 0
+# errors" and then restart the `node-renderer` process before trusting renderer output.
 # node-renderer-build: pnpm --filter react-on-rails-pro-node-renderer run build-watch
 node-renderer: RENDERER_PORT=3800 node renderer/node-renderer.js

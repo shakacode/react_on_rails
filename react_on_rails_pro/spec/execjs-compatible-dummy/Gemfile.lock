@@ -207,6 +207,7 @@ GEM
       racc (~> 1.4)
     nokogiri (1.19.2-x86_64-linux-gnu)
       racc (~> 1.4)
+    ostruct (0.6.3)
     package_json (0.2.0)
     pp (0.6.3)
       prettyprint
@@ -334,10 +335,13 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  benchmark
   bootsnap
   capybara
   debug
   jbuilder
+  logger
+  ostruct
   pry
   pry-nav
   puma (>= 5.0)
