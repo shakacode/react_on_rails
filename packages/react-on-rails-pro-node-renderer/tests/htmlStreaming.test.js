@@ -102,7 +102,17 @@ describe('html streaming', () => {
     // RSC Flight payload <script> tags contain the serialized React tree which
     // includes fallback text as data (e.g., "Loading branch1..." inside a JSON
     // string). We only want to assert that the fallback is not rendered as HTML.
-    const secondChunkHtml = chunks[1].replace(/<script[\s\S]*?<\/script>/g, '');
+    // Note: the `i` flag and per-tag matching keep CodeQL's bad-tag-filter and
+    // incomplete-multi-character-sanitization rules happy; this is test-only
+    // string scrubbing for assertions, not security sanitization.
+    // lgtm[js/incomplete-multi-character-sanitization]
+    // lgtm[js/bad-tag-filter]
+    let secondChunkHtml = chunks[1];
+    let prev;
+    do {
+      prev = secondChunkHtml;
+      secondChunkHtml = secondChunkHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
+    } while (prev !== secondChunkHtml);
     expect(secondChunkHtml).not.toContain('<p>Header for AsyncComponentsTreeForTesting</p>');
     expect(secondChunkHtml).not.toContain('<p>Footer for AsyncComponentsTreeForTesting</p>');
     expect(secondChunkHtml).not.toContain('Loading branch1...');

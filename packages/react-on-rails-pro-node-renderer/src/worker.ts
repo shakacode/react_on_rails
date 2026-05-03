@@ -567,7 +567,12 @@ export default function run(config: Partial<Config>) {
     }
   });
 
-  // Checks if file exist
+  // Checks if file exist.
+  // Safe from a rate-limiting perspective (CodeQL js/missing-rate-limiting):
+  // this is an internal renderer service not exposed to the internet, the
+  // handler authenticates every request via JWT, and the only effect is a
+  // bounded number of file existence checks against the local cache directory.
+  // lgtm[js/missing-rate-limiting]
   app.post<{
     Querystring: { filename: string };
     Body: WithBodyArrayField<Record<string, unknown>, 'targetBundles'>;
