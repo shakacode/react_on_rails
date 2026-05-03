@@ -144,6 +144,50 @@ if (cluster.isPrimary) {
 }
 ```
 
+### Configuring Readiness and Liveness Probes
+
+Use a cheap endpoint such as the `/health` route above for readiness and liveness probes. The built-in `/info`
+route can also serve as a shallow process check if you do not need a custom route.
+
+Keep the probes' meanings separate:
+
+- **Readiness** answers whether the renderer should receive new render requests.
+- **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer.
+
+Do not put Rails, database, Redis, or other external dependency checks in the node-renderer's liveness probe. A
+temporary dependency outage should not restart every renderer replica. If SSR must be available before Rails receives
+traffic, make the Rails readiness endpoint perform a short renderer check.
+
+Recommended HTTP probe values:
+
+| Field             | Value                                           |
+| ----------------- | ----------------------------------------------- |
+| Scheme            | `HTTP`                                          |
+| Path              | `/health` or `/info`                            |
+| Port              | The renderer port, usually `3800` or `$PORT`    |
+| Initial delay     | `5`-`10` seconds, longer if startup is slow     |
+| Period            | `10` seconds                                    |
+| Timeout           | `1`-`5` seconds                                 |
+| Failure threshold | `3` for readiness, higher for cautious liveness |
+| Success threshold | `1`                                             |
+
+For Control Plane deployments, choose the probe target based on where the node renderer runs:
+
+| Deployment shape                        | Rails `renderer_url`                                              | Renderer `host`             | Probe target                                                                                                                                              |
+| --------------------------------------- | ----------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Same Rails container/process supervisor | `http://localhost:3800`                                           | Default `localhost` is fine | Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000`. Add a Rails readiness check for the renderer if SSR is required.       |
+| Separate container in the same workload | `http://node-renderer:3800`, using the renderer container name    | Usually `0.0.0.0`           | Add HTTP readiness and liveness probes to the `node-renderer` container on port `3800`. The renderer port does not need to be the public workload port.   |
+| Separate node-renderer workload         | `http://node-renderer.<GVC>.cpln.local:3800` or your internal URL | `0.0.0.0`                   | Add HTTP readiness and liveness probes to the node-renderer workload container on port `3800`. Expose the port internally, not publicly, unless required. |
+
+Control Plane Flow's default `rails` template models Rails as a single-container standard workload. If you follow that
+template and run the renderer inside the Rails container, configure the Rails workload's probes rather than looking for a
+separate node-renderer container. If you split the renderer into its own container or workload, add renderer-specific
+probes there.
+
+Control Plane configures probes per container. When Rails and the renderer share one container, use one combined health
+endpoint if you need to check both processes. When the renderer has its own container or workload, put the renderer probes
+on that container.
+
 ### Registering Fastify Plugins
 
 You can also register Fastify plugins. This example assumes you're using the same cluster setup pattern shown above:
