@@ -140,8 +140,9 @@ module ReactOnRails
       # → latest `10.x.y`) at install time, so this is a major-or-minor floor — not a
       # reproducible patch pin. Bump on each pnpm major so projects that generated a
       # lockfile with a newer pnpm but never committed `packageManager` get a runtime
-      # that can still read the lockfile. Users who need exact reproducibility should
-      # commit `packageManager` to their package.json instead.
+      # that can still read the lockfile. Check https://github.com/pnpm/pnpm/releases
+      # for the current stable major when bumping. Users who need exact reproducibility
+      # should commit `packageManager` to their package.json instead.
       CI_PNPM_FALLBACK_VERSION = "10"
       private_constant :CI_PNPM_FALLBACK_VERSION
 

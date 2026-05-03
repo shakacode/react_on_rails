@@ -21,6 +21,9 @@ module GeneratorMessages
     # (e.g. destination_root in generators) instead of Dir.pwd.
     # Pass package_json: to reuse an already-parsed package.json and avoid a re-read
     # (callers that also inspect scripts/deps should parse once and pass the hash).
+    # Pass package_json: nil to skip JSON detection entirely when the caller has
+    # already determined the file is absent; detection falls through directly to
+    # lockfile heuristics.
     def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
       return env_package_manager if supported_package_manager?(env_package_manager)
@@ -122,7 +125,7 @@ module GeneratorMessages
       match = declared.match(/\A([^@\s]+)@\S+/)
       return nil unless match
 
-      name = match[1].strip.downcase
+      name = match[1].downcase
       supported_package_manager?(name) ? name : nil
     end
 

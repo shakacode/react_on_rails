@@ -2021,13 +2021,13 @@ describe InstallGenerator, type: :generator do
 
     it "omits the pnpm fallback version when packageManager is declared" do
       assert_file ".github/workflows/ci.yml" do |content|
-        setup_pos = content.index("uses: pnpm/action-setup@v4")
-        expect(setup_pos).not_to be_nil
-        next_step_pos = content.index("- name: ", setup_pos + 1) || content.length
-        pnpm_block = content[setup_pos...next_step_pos]
+        expect(content).to include("uses: pnpm/action-setup@v4")
         # `pnpm/action-setup` reads the version from `packageManager` when declared,
         # so the scaffold must not inject a `with: version:` that would override it.
-        expect(pnpm_block).not_to include("version:")
+        # Mirrors the regex used in the "pins a pnpm version" test, minus the value.
+        expect(content).not_to match(
+          %r{pnpm/action-setup@v4\n\s+with:\n(?:\s+\#[^\n]*\n)*\s+version:}
+        )
       end
     end
   end
