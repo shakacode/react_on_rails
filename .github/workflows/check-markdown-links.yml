@@ -27,6 +27,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node-with-retry
+        with:
+          node-version: '22.11.0'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install Prettier dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Check markdown formatting
+        shell: bash
+        run: |
+          markdown_files=()
+          while IFS= read -r -d '' file; do
+            if [ -f "$file" ] && [ ! -L "$file" ]; then
+              markdown_files+=("$file")
+            fi
+          done < <(git ls-files -z -- '*.md' '*.mdx' '*.markdown')
+
+          if [ "${#markdown_files[@]}" -eq 0 ]; then
+            echo "No markdown files to check."
+            exit 0
+          fi
+
+          pnpm exec prettier --check -- "${markdown_files[@]}"
+
       - name: Restore lychee cache
         uses: actions/cache@v4
         with:
