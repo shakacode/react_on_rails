@@ -226,6 +226,14 @@ export function createCoreCapability(registries: Registries) {
       );
     },
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    prepareRenderResult(...args: any[]): any {
+      void args;
+      throw new Error(
+        'prepareRenderResult is not available in the client bundle. Import "react-on-rails" server-side.',
+      );
+    },
+
     // ===================================================================
     // PRO STUBS — overridden by Pro capabilities in react-on-rails-pro
     // ===================================================================
