@@ -434,7 +434,7 @@ export default function run(config: Partial<Config>) {
           } catch (err) {
             const errorResponse = errorResponseResult(
               formatExceptionMessage(
-                'IncrementalRender',
+                { label: 'IncrementalRender', content: '' },
                 err,
                 'Error while handling incremental render request',
               ),
@@ -477,7 +477,7 @@ export default function run(config: Partial<Config>) {
     } catch (err) {
       // If an error occurred during stream processing, send error response
       const errorMessage = formatExceptionMessage(
-        'IncrementalRender',
+        { label: 'IncrementalRender', content: '' },
         err,
         'Error while processing incremental render stream',
       );

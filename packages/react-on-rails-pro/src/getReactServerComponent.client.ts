@@ -15,7 +15,8 @@
 import * as React from 'react';
 import { createFromReadableStream } from 'react-on-rails-rsc/client.browser';
 import { RailsContext } from 'react-on-rails/types';
-import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage, sanitizeNonce } from './utils.ts';
+import { createRSCPayloadKey, fetch, wrapInNewPromise, extractErrorMessage } from './utils.ts';
+import sanitizeNonce from 'react-on-rails/@internal/sanitizeNonce';
 import LengthPrefixedStreamParser from './parseLengthPrefixedStream.ts';
 
 declare global {
