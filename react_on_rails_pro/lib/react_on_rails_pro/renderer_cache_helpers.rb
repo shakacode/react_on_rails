@@ -17,7 +17,7 @@ module ReactOnRailsPro
       # those are silently dropped by `.compact`. RSC manifests, by contrast,
       # are required, so resolve them separately and fail loudly if either
       # resolves to nil rather than letting `.compact` swallow the gap.
-      assets = Array(config.assets_to_copy).dup.compact
+      assets = Array(config.assets_to_copy).compact
 
       if config.enable_rsc_support
         rsc_manifests = [
@@ -141,6 +141,18 @@ module ReactOnRailsPro
             "Please build your bundles before #{action_description} the renderer cache."
     end
 
+    # Defense-in-depth against future regressions in the hash-computation path:
+    # `calc_bundle_hash` always returns a non-empty string today, but a blank
+    # value here would cause `File.join(cache_dir, "")` to resolve to `cache_dir`
+    # itself and stage the bundle as `<cache_dir>/.js` — a hidden file the
+    # renderer never reads. Fail loudly instead of silently mis-staging.
+    def validate_bundle_hash!(hash, path)
+      return unless hash.to_s.strip.empty?
+
+      raise ReactOnRailsPro::Error,
+            "Bundle hash for #{path} is nil or blank; cannot stage renderer cache."
+    end
+
     # Resolves bundle sources as [path, hash] pairs so callers can iterate
     # without needing to re-call pool methods. `pool` must respond to
     # `server_bundle_hash` and (when RSC is enabled) `rsc_bundle_hash`.
@@ -152,13 +164,17 @@ module ReactOnRailsPro
     def bundle_sources(pool, action_description)
       server_bundle_path = ReactOnRails::Utils.server_bundle_js_file_path
       validate_bundle_exists!(server_bundle_path, action_description)
-      sources = [[server_bundle_path, pool.server_bundle_hash]]
+      server_hash = pool.server_bundle_hash
+      validate_bundle_hash!(server_hash, server_bundle_path)
+      sources = [[server_bundle_path, server_hash]]
 
       return sources unless ReactOnRailsPro.configuration.enable_rsc_support
 
       rsc_bundle_path = ReactOnRailsPro::Utils.rsc_bundle_js_file_path
       validate_bundle_exists!(rsc_bundle_path, action_description)
-      sources << [rsc_bundle_path, pool.rsc_bundle_hash]
+      rsc_hash = pool.rsc_bundle_hash
+      validate_bundle_hash!(rsc_hash, rsc_bundle_path)
+      sources << [rsc_bundle_path, rsc_hash]
       sources
     end
   end

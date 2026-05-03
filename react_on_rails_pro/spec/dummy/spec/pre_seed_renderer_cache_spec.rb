@@ -319,6 +319,18 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
   end
 
+  context "when the pool returns a blank server_bundle_hash" do
+    before do
+      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      allow(pool).to receive(:server_bundle_hash).and_return(nil)
+    end
+
+    it "raises rather than staging at <cache_dir>/.js" do
+      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /hash for .* is nil or blank/)
+      expect(File.exist?(File.join(cache_dir, ".js"))).to be(false)
+    end
+  end
+
   context "when RSC manifest is missing but RSC support is enabled" do
     before do
       allow(ReactOnRailsPro.configuration).to receive_messages(enable_rsc_support: true, assets_to_copy: nil)
