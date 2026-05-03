@@ -39,11 +39,13 @@ module ReactOnRailsPro
     FETCH_TIMEOUT_SECONDS = 30
     STALE_TEMP_DIR_TTL_SECONDS = 3600
     # Match temp dirs created by `temporary_bundle_directory` (and the analogous
-    # `.previous-` backup suffix in `replace_bundle_directory`). The minimum
-    # widths (`\d{4,}` PID, `[0-9a-f]{8,}` random) defeat false positives where
-    # a real bundle hash happens to end with `.staging-<digits>-<hex>` — without
-    # them, a hash like `bundle.staging-1-abc123` could match and be swept.
-    TEMPORARY_DIRECTORY_PATTERN = /\.(?:staging|previous)-\d{4,}-[0-9a-f]{8,}\z/
+    # `.previous-` backup suffix in `replace_bundle_directory`). The 8-hex
+    # random suffix defeats false positives where a real bundle hash happens
+    # to end with `.staging-<digits>-<short hex>`. PID is `\d+` rather than
+    # `\d{4,}` because container deployments (Docker, Kubernetes) commonly run
+    # the seeding process as PID 1; a stricter floor would silently leave
+    # PID-1 staging dirs in the cache to accumulate forever.
+    TEMPORARY_DIRECTORY_PATTERN = /\.(?:staging|previous)-\d+-[0-9a-f]{8,}\z/
 
     def self.call(cache_dir:, current_hashes:, mode:)
       adapter = ReactOnRailsPro.configuration.rolling_deploy_adapter
@@ -169,7 +171,15 @@ module ReactOnRailsPro
       return nil unless valid_required_rsc_payload?(asset_paths, hash)
       return nil unless valid_asset_payload?(asset_paths, hash)
 
-      warn_if_missing_loadable_stats(asset_paths, hash)
+      # Attribute PackerUtils / RendererCacheHelpers failures to the loadable-stats
+      # lookup rather than letting the outer adapter#fetch rescue blame the adapter
+      # for an internal framework error (manifest absent, malformed, etc.).
+      begin
+        warn_if_missing_loadable_stats(asset_paths, hash)
+      rescue StandardError => e
+        warn "[ReactOnRailsPro] Could not check loadable-stats.json for #{hash.inspect}: " \
+             "#{e.class}: #{e.message}. Continuing with the seeded payload."
+      end
       payload
     rescue Timeout::Error
       warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) timed out after " \
@@ -379,6 +389,15 @@ module ReactOnRailsPro
       if File.exist?(bundle_dir)
         backup_dir = "#{bundle_dir}.previous-#{Process.pid}-#{SecureRandom.hex(6)}"
         FileUtils.mv(bundle_dir, backup_dir)
+      end
+
+      # Guard against a concurrent writer recreating bundle_dir between the
+      # backup move and this promotion. Without this check FileUtils.mv would
+      # nest staging_dir *inside* the racing dir (yielding `<hash>/<staging-dir>/<hash>.js`),
+      # and renderer lookups would miss the cache. The rescue below restores
+      # the backup so the previous good copy remains servable.
+      if File.exist?(bundle_dir)
+        raise "Concurrent writer recreated #{bundle_dir} between backup and promote; aborting promotion"
       end
 
       FileUtils.mv(staging_dir, bundle_dir)

@@ -103,16 +103,17 @@ In practice this means a `staging` deploy hits the same artifact store as produc
 
 ## Edge cases and error handling
 
-| Scenario                                | Behavior                                                                     |
-| --------------------------------------- | ---------------------------------------------------------------------------- |
-| Adapter not configured                  | No-op. Only the current hash is staged.                                      |
-| `previous_bundle_hashes` returns `[]`   | Log "No previous bundle hashes to seed" and continue.                        |
-| `previous_bundle_hashes` raises         | Warn, skip previous-hash seeding, continue. Current-hash staging unaffected. |
-| `fetch(hash)` returns `nil`             | Warn, skip that hash. Runtime 410-retry remains the fallback.                |
-| `fetch(hash)` raises                    | Warn, skip that hash. Runtime 410-retry remains the fallback.                |
-| `fetch(hash)` omits required RSC assets | Warn, skip that hash. Runtime 410-retry remains the fallback.                |
-| Returned hash matches current hash      | Deduplicated — not refetched.                                                |
-| `upload` raises in `assets:precompile`  | Warn but don't fail precompile. Next deploy degrades, not this one.          |
+| Scenario                                                                | Behavior                                                                                                                                                        |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Adapter not configured                                                  | No-op. Only the current hash is staged.                                                                                                                         |
+| `previous_bundle_hashes` returns `[]`                                   | Log "No previous bundle hashes to seed" and continue.                                                                                                           |
+| `previous_bundle_hashes` raises                                         | Warn, skip previous-hash seeding, continue. Current-hash staging unaffected.                                                                                    |
+| `fetch(hash)` returns `nil`                                             | Warn, skip that hash. Runtime 410-retry remains the fallback.                                                                                                   |
+| `fetch(hash)` raises                                                    | Warn, skip that hash. Runtime 410-retry remains the fallback.                                                                                                   |
+| `fetch(hash)` omits required RSC assets                                 | Warn, skip that hash. Runtime 410-retry remains the fallback.                                                                                                   |
+| `fetch(hash)` returns any asset path that doesn't exist or isn't a file | Warn, skip that hash (strict: applies to non-required assets too — adapters must return only paths that exist on disk). Runtime 410-retry remains the fallback. |
+| Returned hash matches current hash                                      | Deduplicated — not refetched.                                                                                                                                   |
+| `upload` raises in `assets:precompile`                                  | Warn but don't fail precompile. Next deploy degrades, not this one.                                                                                             |
 
 ## Local temp directory cleanup
 

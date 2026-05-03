@@ -283,6 +283,33 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
         expect(File.exist?(File.join(cache_dir, "no-stats", "no-stats.js"))).to be(true)
       end
     end
+
+    # Regression: an exception inside the loadable-stats lookup (e.g. webpack
+    # manifest absent or malformed) was being caught by the outer adapter#fetch
+    # rescue and logged as `rolling_deploy_adapter#fetch raised ...`, blaming
+    # the adapter for an internal framework error.
+    context "when loadable-stats lookup itself raises" do
+      before do
+        allow(ReactOnRailsPro::RendererCacheHelpers)
+          .to receive(:loadable_stats_asset_path)
+          .and_raise(Errno::ENOENT, "manifest absent")
+      end
+
+      it "attributes the error to the loadable-stats lookup, not adapter#fetch" do
+        expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+          .to output(/Could not check loadable-stats\.json for "no-stats".*Errno::ENOENT/m).to_stderr
+      end
+
+      it "does not blame adapter#fetch for the loadable-stats lookup failure" do
+        expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+          .not_to output(/rolling_deploy_adapter#fetch.*raised/).to_stderr
+      end
+
+      it "still stages the bundle when the loadable-stats lookup fails" do
+        described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+        expect(File.exist?(File.join(cache_dir, "no-stats", "no-stats.js"))).to be(true)
+      end
+    end
   end
 
   context "when adapter#fetch returns an asset path that does not exist" do
@@ -410,6 +437,40 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  context "when a concurrent writer recreates bundle_dir between backup and promote" do
+    let(:src_bundle) { source_file("bundle-new.js", contents: "// new bundle") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
+    let(:bundle_dir) { File.join(cache_dir, "abc123") }
+    let(:existing_bundle) { File.join(bundle_dir, "abc123.js") }
+
+    before do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(existing_bundle, "// existing bundle")
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["abc123"])
+      allow(adapter).to receive(:fetch).with("abc123").and_return(bundle: src_bundle, assets: [src_asset])
+      # Simulate the race: after the backup mv succeeds, another process
+      # recreates bundle_dir before the promotion mv runs.
+      allow(FileUtils).to receive(:mv).and_wrap_original do |original, source, destination, *args|
+        result = original.call(source, destination, *args)
+        FileUtils.mkdir_p(bundle_dir) if destination.to_s.include?("abc123.previous-")
+        result
+      end
+    end
+
+    # Regression: without the existence guard, FileUtils.mv would have nested
+    # the staging dir inside the racing bundle_dir, hiding the seeded payload
+    # from renderer lookups (404 → 410-retry storm). The guard now raises and
+    # the rescue path restores the backup so the previous good copy is kept.
+    it "aborts the promotion and restores the backup so the previous bundle stays servable" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/Failed to seed previous bundle hash abc123.*Concurrent writer recreated/m).to_stderr
+
+      expect(File.exist?(existing_bundle)).to be(true)
+      expect(File.read(existing_bundle)).to eq("// existing bundle")
+      expect(Dir.children(cache_dir).grep(/abc123\.staging/)).to be_empty
+    end
+  end
+
   context "when refreshing an existing seeded hash cannot remove the old backup after promotion" do
     let(:src_bundle) { source_file("bundle-new.js", contents: "// new bundle") }
     let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
@@ -439,7 +500,10 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
   context "when stale temporary bundle directories are present" do
     let(:stale_staging_dir) { File.join(cache_dir, "abc123.staging-1234-deadbeef12") }
     let(:fresh_previous_dir) { File.join(cache_dir, "abc123.previous-1234-feedface12") }
-    let(:hash_like_dir) { File.join(cache_dir, "release.staging-123-deadbeef") }
+    # Hash-like name with a sub-8-char hex tail — caught by the [0-9a-f]{8,}
+    # floor regardless of the relaxed `\d+` PID. Confirms the hex floor still
+    # protects real-but-superficially-similar bundle hashes from being swept.
+    let(:hash_like_dir) { File.join(cache_dir, "release.staging-123-abc") }
 
     before do
       stub_const("ReactOnRailsPro::RollingDeployCacheStager::STALE_TEMP_DIR_TTL_SECONDS", 60)
@@ -463,9 +527,9 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
 
     it "does not match real bundle hash dirs that look superficially similar" do
-      # Hash dir whose suffix has a sub-4-digit PID and sub-8-char hex segment.
-      # The tightened TEMPORARY_DIRECTORY_PATTERN must reject this so a real
-      # bundle is never silently swept after the TTL.
+      # Hash dir whose suffix has a sub-8-char hex segment. The hex floor
+      # defeats the false positive even though the PID floor was relaxed
+      # to `\d+` for Docker PID-1 deployments.
       false_positive_dir = File.join(cache_dir, "bundle.staging-1-abc123")
       FileUtils.mkdir_p(false_positive_dir)
       File.utime(Time.now - 120, Time.now - 120, false_positive_dir)
@@ -473,6 +537,16 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
 
       expect(File.exist?(false_positive_dir)).to be(true)
+    end
+
+    it "sweeps stale Docker PID-1 staging dirs (regression: pattern previously required 4+ digit PID)" do
+      pid1_staging_dir = File.join(cache_dir, "abc.staging-1-#{SecureRandom.hex(6)}")
+      FileUtils.mkdir_p(pid1_staging_dir)
+      File.utime(Time.now - 7200, Time.now - 7200, pid1_staging_dir)
+
+      described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy)
+
+      expect(File.exist?(pid1_staging_dir)).to be(false)
     end
   end
 
@@ -577,6 +651,18 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     it "matches the .previous-<pid>-<hex> backup suffix produced by replace_bundle_directory" do
       backup_basename = "abc123.previous-#{Process.pid}-#{SecureRandom.hex(6)}"
       expect(backup_basename).to match(described_class::TEMPORARY_DIRECTORY_PATTERN)
+    end
+
+    # Regression: the pattern formerly required `\d{4,}` for the PID, which
+    # silently excluded Docker/Kubernetes pods running the seeding process as
+    # PID 1. Confirm both `.staging-1-<hex>` and `.previous-1-<hex>` match so
+    # crashed PID-1 stagings/backups are swept on the next cycle.
+    it "matches PID-1 .staging suffixes (Docker/Kubernetes deployments)" do
+      expect("abc.staging-1-#{SecureRandom.hex(6)}").to match(described_class::TEMPORARY_DIRECTORY_PATTERN)
+    end
+
+    it "matches PID-1 .previous suffixes (Docker/Kubernetes deployments)" do
+      expect("abc.previous-1-#{SecureRandom.hex(6)}").to match(described_class::TEMPORARY_DIRECTORY_PATTERN)
     end
   end
 end

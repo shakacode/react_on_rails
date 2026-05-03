@@ -763,7 +763,9 @@ module ReactOnRails
 
       report_sync_changes(result)
       report_skipped_specs(result)
-      checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      if result.changes.any?
+        checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      end
     rescue StandardError => e
       checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
     end
@@ -2951,18 +2953,23 @@ module ReactOnRails
       if defined?(ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS)
         ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
       else
-        # Must match ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS.
-        # The Pro spec at react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
-        # asserts the constant equals 10, so changing it there without updating this
-        # fallback will fail that spec.
+        # Must match the canonical Pro constant. Bidirectional pointers:
+        #   Pro file:     react_on_rails_pro/lib/react_on_rails_pro/rolling_deploy_cache_stager.rb
+        #   Pro constant: ReactOnRailsPro::RollingDeployCacheStager::DISCOVERY_TIMEOUT_SECONDS
+        #   Pro guard:    react_on_rails_pro/spec/dummy/spec/rolling_deploy_cache_stager_spec.rb
+        #                 (describe "DISCOVERY_TIMEOUT_SECONDS" → expects this fallback to equal Pro constant)
+        # The Pro spec catches drift in the Pro→OSS direction. If you change
+        # the value here without updating the Pro constant + spec, doctor will
+        # silently use a different timeout from the live stager.
         10
       end
     end
 
     # Mirror of ReactOnRailsPro::RollingDeployCacheStager::TEMPORARY_DIRECTORY_PATTERN
     # used as a fallback when the Pro gem isn't loaded so doctor still filters
-    # leftover staging/backup dirs out of the bundle-hash count.
-    ROLLING_DEPLOY_TEMP_DIR_PATTERN = /\.(?:staging|previous)-\d{4,}-[0-9a-f]{8,}\z/
+    # leftover staging/backup dirs out of the bundle-hash count. PID is `\d+`
+    # to match container deployments (Docker/Kubernetes) where seeding runs as PID 1.
+    ROLLING_DEPLOY_TEMP_DIR_PATTERN = /\.(?:staging|previous)-\d+-[0-9a-f]{8,}\z/
 
     def report_resolved_cache_dir
       cache_dir = ReactOnRailsPro::Utils.resolve_renderer_cache_dir

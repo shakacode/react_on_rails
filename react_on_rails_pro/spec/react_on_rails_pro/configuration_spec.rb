@@ -285,6 +285,25 @@ module ReactOnRailsPro # rubocop:disable Metrics/ModuleLength
           end
         end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
       end
+
+      # Regression: `**nil` (the `:nokey` parameter kind) explicitly forbids
+      # keyword arguments. Without an explicit guard the options-hash branch
+      # would treat `(hash, opts = {}, **nil)` as compatible because it has one
+      # required and one optional positional, but the runtime call shape
+      # `upload(hash, bundle: ..., assets: ...)` raises ArgumentError.
+      it "rejects upload signatures that explicitly forbid keywords with **nil" do
+        adapter = Class.new do
+          def self.previous_bundle_hashes = []
+          def self.fetch(_hash) = nil
+          def self.upload(_hash, _options = {}, **nil); end
+        end
+
+        expect do
+          ReactOnRailsPro.configure do |config|
+            config.rolling_deploy_adapter = adapter
+          end
+        end.to raise_error(ReactOnRailsPro::Error, /upload\(bundle_hash, bundle:, assets:\)/)
+      end
     end
 
     describe ".renderer_url" do

@@ -458,6 +458,20 @@ describe ReactOnRailsPro::AssetsPrecompile do
         .to output(/rolling_deploy_adapter#upload for abc123 timed out after 0.05s/).to_stderr
     end
 
+    # Regression: per the rolling-deploy contract, an adapter#upload failure
+    # must degrade the *next* deploy's seeding, not fail *this* deploy's
+    # assets:precompile. Without the per-hash rescue, a transient adapter
+    # error (network blip, bucket permission glitch) would abort precompile
+    # and break the build.
+    it "warns and continues precompile when adapter#upload raises" do
+      allow(adapter).to receive(:upload).and_raise(RuntimeError, "S3 upload boom")
+
+      expect { described_class.publish_current_bundle_if_configured }
+        .to output(/rolling_deploy_adapter#upload for abc123 raised RuntimeError: S3 upload boom/).to_stderr
+
+      expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [])
+    end
+
     it "warns and skips publication when the server bundle hash is blank" do
       allow(ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool)
         .to receive(:server_bundle_hash).and_return(nil)
@@ -539,6 +553,37 @@ describe ReactOnRailsPro::AssetsPrecompile do
           .to output(/Skipping invalid assets.*not a file:.*rolling-deploy-upload-directory-asset/m).to_stderr
 
         expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
+      end
+    end
+
+    # Regression: filter_existing_assets must classify each invalid entry
+    # correctly when the same payload contains both kinds of failure. Without
+    # the partition step a mixed payload could mis-label one bucket as the
+    # other in the warning, hiding which entries actually went missing.
+    context "when collect_assets returns a mix of valid, missing, and non-file paths" do
+      let(:valid_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-valid.js") }
+      let(:missing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-missing.js") }
+      let(:directory_asset) { Dir.mktmpdir("rolling-deploy-upload-mixed-dir") }
+
+      before do
+        File.write(valid_asset, "// valid asset")
+        FileUtils.rm_f(missing_asset)
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:collect_assets)
+          .and_return([valid_asset, missing_asset, directory_asset])
+        allow(adapter).to receive(:upload)
+      end
+
+      after do
+        FileUtils.rm_f(valid_asset)
+        FileUtils.rm_rf(directory_asset)
+      end
+
+      it "uploads only the valid entries and warns about both invalid kinds in a single line" do
+        warning_pattern = /Skipping invalid assets.*missing:.*rolling-deploy-upload-missing.*not a file:.*mixed-dir/m
+        expect { described_class.publish_current_bundle_if_configured }
+          .to output(warning_pattern).to_stderr
+
+        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [valid_asset])
       end
     end
 

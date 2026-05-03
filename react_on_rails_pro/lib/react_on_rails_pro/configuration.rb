@@ -323,12 +323,20 @@ module ReactOnRailsPro
       # Ruby 3 only converts keywords to an options hash when the callee has no
       # explicit keyword parameters. `upload(hash, options = {}, region:)` still
       # rejects the `bundle:` / `assets:` call shape used by assets precompile.
-      return false if params.any? { |type, _name| ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS.include?(type) }
+      # `**nil` (the `:nokey` parameter kind) explicitly forbids keywords too,
+      # so reject it for the same reason.
+      return false if explicitly_forbids_upload_keywords?(params)
       return true if params.any? { |type, _name| type == :rest }
 
       required_positionals = params.count { |type, _name| type == :req }
       optional_positionals = params.count { |type, _name| type == :opt }
       required_positionals == 1 && optional_positionals.positive?
+    end
+
+    def explicitly_forbids_upload_keywords?(params)
+      params.any? do |type, _name|
+        type == :nokey || ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS.include?(type)
+      end
     end
 
     def setup_renderer_password
