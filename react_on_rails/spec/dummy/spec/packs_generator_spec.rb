@@ -400,6 +400,21 @@ module ReactOnRails
         end.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
       end
 
+      it "does not require a generated server bundle when server bundle output is not configured" do
+        generator = described_class.new
+        server_bundle_path = generated_server_bundle_file_path
+        old_server_bundle = ReactOnRails.configuration.server_bundle_js_file
+        ReactOnRails.configuration.server_bundle_js_file = nil
+        FileUtils.mkdir_p(generated_directory)
+        FileUtils.rm_f(server_bundle_path)
+        allow(generator).to receive(:stale_or_missing_packs?).and_return(false)
+
+        expect(generator.send(:generated_files_present_and_up_to_date?)).to be(true)
+      ensure
+        ReactOnRails.configuration.server_bundle_js_file = old_server_bundle
+        FileUtils.touch(server_bundle_path) if server_bundle_path
+      end
+
       it "adds a single import statement to the server bundle" do
         test_string = "// import statement added by react_on_rails:generate_packs"
         same_instance = described_class.instance

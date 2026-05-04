@@ -68,8 +68,12 @@ module ReactOnRails
     private
 
     def generated_files_present_and_up_to_date?
+      server_bundle_ready =
+        ReactOnRails.configuration.server_bundle_js_file.blank? ||
+        File.exist?(generated_server_bundle_file_path)
+
       Dir.exist?(generated_packs_directory_path) &&
-        File.exist?(generated_server_bundle_file_path) &&
+        server_bundle_ready &&
         !stale_or_missing_packs?
     end
 
