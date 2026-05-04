@@ -171,6 +171,12 @@ else
 end
 ```
 
+Make the script executable before wiring it into the build commands:
+
+```bash
+chmod +x bin/build-react-on-rails
+```
+
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
