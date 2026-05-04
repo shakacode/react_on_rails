@@ -106,7 +106,7 @@ Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` c
 ## Built-in Endpoints
 
 The renderer currently registers `/info` as a plain `GET` route outside the authenticated render and asset endpoints
-([source](https://github.com/shakacode/react_on_rails/blob/main/packages/react-on-rails-pro-node-renderer/src/worker.ts)).
+([source](https://github.com/shakacode/react_on_rails/tree/main/packages/react-on-rails-pro-node-renderer)).
 It does not require the renderer password and returns `node_version` and `renderer_version`. Treat it as a shallow
 process check and keep the renderer on `localhost` or private networking if those runtime version details should not be
 exposed.
@@ -192,10 +192,10 @@ The `./master` and `./worker` exports provide direct access to the node-renderer
 
 For application-level readiness, use a cheap endpoint such as the `/health` route in
 [Adding a Health Check Endpoint](#adding-a-health-check-endpoint). Startup and liveness usually only need a lightweight
-TCP check against the renderer port because the readiness probe still gates traffic with an application-level check after
-the startup probe succeeds. The health check route should return `200 OK` when the process can accept probe traffic. The
-built-in [`/info`](#built-in-endpoints) route can also serve as a shallow process check if you do not need a custom
-route.
+TCP check against the renderer port when you also configure an application-level readiness probe. The readiness probe
+then gates traffic after the startup probe succeeds. The health check route should return `200 OK` when the process can
+accept probe traffic. The built-in [`/info`](#built-in-endpoints) route can also serve as a shallow process check if you
+do not need a custom route.
 
 Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
 Fastify setup.
