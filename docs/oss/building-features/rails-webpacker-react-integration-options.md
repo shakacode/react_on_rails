@@ -86,9 +86,13 @@ const commonWebpackConfig = () => merge({}, baseClientWebpackConfig, commonOptio
 module.exports = commonWebpackConfig;
 ```
 
+---
+
 ## Legacy Webpacker / Webpack 4 migration shims
 
-If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5, Webpack 4, and React 16 or 17, prefer upgrading to Shakapacker first when you can. These shims are required for [React on Rails 16.6.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1660---2026-04-09) or newer on Webpacker 5 / Webpack 4. Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. When you need an incremental migration before that tooling upgrade, keep the compatibility shim explicit and narrow:
+If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5, Webpack 4, and React 16 or 17, prefer upgrading to Shakapacker first when you can.
+
+Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. Starting with [React on Rails 16.6.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1660---2026-04-09), the following shims may be needed on Webpacker 5 / Webpack 4. Apply only the ones that match the errors you see, and keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
 
@@ -121,15 +125,15 @@ If you are moving an older `react-rails` app to React on Rails while it is still
    };
    ```
 
-3. Transpile the React on Rails CommonJS build from `node_modules` so Webpack 4 can parse it consistently. This rule inherits your project's `babel.config.js`, so complete Step 2 before adding it:
+3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed. This rule inherits your project's `babel.config.js`, so complete Step 2 before adding it:
 
    ```js
    // config/webpack/environment.js
    // Webpacker 5 uses '@rails/webpacker', not 'shakapacker'.
    const { environment } = require('@rails/webpacker');
 
-   environment.loaders.append('react-on-rails-cjs', {
-     test: /\.cjs$/,
+   environment.loaders.append('react-on-rails-js', {
+     test: /\.[cm]?js$/,
      include: /node_modules[\\/]react-on-rails[\\/]/,
      use: [
        {
@@ -141,6 +145,8 @@ If you are moving an older `react-rails` app to React on Rails while it is still
      ],
    });
 
+   // If your environment.js already has other configuration, add the
+   // loaders.append block before the existing module.exports line.
    module.exports = environment;
    ```
 
