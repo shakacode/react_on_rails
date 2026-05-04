@@ -8,22 +8,23 @@ explicitly mitigating CI runtime noise.
 The goal is to compare React on Rails rendering operations against their own historical baselines, not to produce broad
 marketing benchmarks from noisy shared runners.
 
-This plan extends the existing benchmark infrastructure in `benchmarks/bench.rb`, `benchmarks/k6.ts`, and
-`.github/workflows/benchmark.yml`; it should stay aligned with the max-rate strategy in
-`internal/planning/library-benchmarking.md`.
+This plan extends the existing benchmark infrastructure in `benchmarks/bench.rb`, `benchmarks/k6.ts`,
+`benchmarks/bench-node-renderer.rb`, and `.github/workflows/benchmark.yml`; it should stay aligned with the max-rate
+strategy in `internal/planning/library-benchmarking.md`. Pro Node Renderer paths should build on the existing Vegeta
+HTTP/2 Cleartext benchmark rather than duplicating that transport setup in k6.
 
 ## Operations Matrix
 
 Start with a small, representative matrix before adding more routes:
 
-| Area                  | Operation                                 | Primary metric              | Notes                                                                   |
-| --------------------- | ----------------------------------------- | --------------------------- | ----------------------------------------------------------------------- |
-| Client rendering      | `react_component` with `prerender: false` | mount timing                | Measures browser-side startup overhead without server markup to hydrate |
-| Traditional SSR       | `react_component` with `prerender: true`  | server render duration      | Covers ExecJS and Node Renderer paths                                   |
-| Hash SSR              | `react_component_hash`                    | render duration and payload | Covers render-functions returning objects                               |
-| Streaming SSR         | `stream_react_component`                  | TTFB, response end, LCP     | Pro-only path; requires Node Renderer and Suspense-friendly examples    |
-| RSC payload rendering | `rsc_payload_react_component`             | payload bytes and duration  | Pro-only path, benchmark separately                                     |
-| Fragment caching      | cached component hit and miss             | hit latency and miss cost   | Separates cache effectiveness from SSR cost                             |
+| Area                  | Operation                                 | Primary metric              | Notes                                                                                    |
+| --------------------- | ----------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------- |
+| Client rendering      | `react_component` with `prerender: false` | route RPS and HTTP latency  | Uses existing HTTP benchmark output; browser mount timing is follow-up instrumentation   |
+| Traditional SSR       | `react_component` with `prerender: true`  | server render duration      | Covers ExecJS and Node Renderer paths                                                    |
+| Hash SSR              | `react_component_hash`                    | render duration and payload | Covers render-functions returning objects                                                |
+| Streaming SSR         | `stream_react_component`                  | TTFB, response end, LCP     | Pro-only path; requires Node Renderer and Suspense-friendly examples                     |
+| RSC payload rendering | `rsc_payload_react_component`             | payload bytes and duration  | Pro-only path; needs static route or explicit target because required params are skipped |
+| Fragment caching      | cached component hit and miss             | hit latency and miss cost   | Separates cache effectiveness from SSR cost                                              |
 
 ## First PR Scope
 
@@ -39,19 +40,21 @@ Recommended OSS first slice:
 Recommended Pro slice, tracked separately from the OSS implementation PR:
 
 1. Streaming route with a small Suspense boundary
-2. RSC payload route with representative payload size measurements
+2. RSC payload route with representative payload size measurements. Use a static benchmark route with no required URL
+   params, teach `benchmarks/bench.rb` how to provide a default component name, or run `benchmarks/k6.ts` with an explicit
+   `TARGET_URL`; automatic route discovery currently skips required-parameter routes such as `/rsc_payload/:component_name`.
 
 ## Noise Controls
 
 Use these controls before treating results as regressions:
 
 - Warm each route before measuring.
-- Run alternating route order instead of grouped route order so cache and process state are less biased.
+- Implement alternating route order in `benchmarks/bench.rb`; routes currently run in `rails routes` order, so this is a
+  prerequisite before using route ordering as a noise-control signal.
 - Record sample count, runner type, Ruby version, Node version, React version, and bundle mode with every result.
-- Keep the current max-rate throughput baseline from `internal/planning/library-benchmarking.md` and surface the existing
-  k6 latency stats (`p50`, `p90`, `p99`, and `max`) beside RPS instead of relying only on averages.
-- Treat new percentile requirements as result-collection work: update `benchmarks/bench.rb`, the exported summary shape,
-  and the workflow reporting before adding metrics that the current runner does not publish.
+- Keep the current max-rate throughput baseline from `internal/planning/library-benchmarking.md`.
+- Preserve the existing `benchmarks/bench.rb` summary metrics (`RPS`, `p50`, `p90`, `p99`, and `max`) and make sure CI
+  summaries, artifacts, and Bencher reporting surface those values consistently.
 - Require repeated or overlapping alerts before opening an issue or failing CI.
 - Keep hard CI gates disabled until the benchmark gate tuning in
   [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) has a stable baseline.
@@ -81,5 +84,6 @@ same mode.
 
 - `benchmarks/bench.rb`
 - `benchmarks/k6.ts`
+- `benchmarks/bench-node-renderer.rb`
 - `.github/workflows/benchmark.yml`
 - `internal/planning/library-benchmarking.md`
