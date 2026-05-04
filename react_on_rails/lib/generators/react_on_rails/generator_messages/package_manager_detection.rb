@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "react_on_rails/utils"
 
 module GeneratorMessages
   # Package-manager detection helpers used by the install generator and the
@@ -71,7 +72,7 @@ module GeneratorMessages
     def package_manager_executable_available?(package_manager)
       return false unless supported_package_manager?(package_manager)
 
-      which_command = Gem.win_platform? ? "where" : "which"
+      which_command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
       system(which_command, package_manager, out: File::NULL, err: File::NULL)
     end
 

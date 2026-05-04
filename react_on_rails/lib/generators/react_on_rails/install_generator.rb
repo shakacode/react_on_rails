@@ -949,7 +949,9 @@ module ReactOnRails
         selected_package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
         return false if GeneratorMessages.package_manager_executable_available?(selected_package_manager)
 
-        available_package_managers = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.select { |pm| cli_exists?(pm) }
+        available_package_managers = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.select do |pm|
+          GeneratorMessages.package_manager_executable_available?(pm)
+        end
 
         if available_package_managers.empty?
           error = <<~MSG.strip
@@ -973,9 +975,9 @@ module ReactOnRails
           🚫 JavaScript package manager '#{selected_package_manager}' was selected, but the command was not found.
 
           React on Rails selected this package manager from REACT_ON_RAILS_PACKAGE_MANAGER,
-          package.json, or your lockfiles. Install #{selected_package_manager}, remove the stale
-          lockfile/configuration, or set REACT_ON_RAILS_PACKAGE_MANAGER to one of the available
-          package managers: #{available_package_managers.join(', ')}.
+          package.json, your lockfiles, or the default npm fallback. Install #{selected_package_manager},
+          update your package manager configuration, or set REACT_ON_RAILS_PACKAGE_MANAGER to one of
+          the available package managers: #{available_package_managers.join(', ')}.
         MSG
         GeneratorMessages.add_error(error)
         true

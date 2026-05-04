@@ -207,7 +207,7 @@ describe GeneratorMessages do
     end
 
     it "checks whether supported package manager commands exist" do
-      allow(Gem).to receive(:win_platform?).and_return(false)
+      allow(ReactOnRails::Utils).to receive(:running_on_windows?).and_return(false)
       allow(described_class).to receive(:system)
         .with("which", "pnpm", out: File::NULL, err: File::NULL)
         .and_return(true)
