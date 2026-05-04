@@ -184,10 +184,11 @@ The `./master` and `./worker` exports provide direct access to the node-renderer
 
 For application-level readiness, use a cheap endpoint such as the `/health` route in
 [Adding a Health Check Endpoint](#adding-a-health-check-endpoint). Startup and liveness usually only need a lightweight
-TCP check against the renderer port. The health check route should return `200 OK` when the process can accept probe
-traffic. The built-in `/info` route can also serve as a shallow process check if you do not need a custom route; it is
-always registered by the renderer, does not require the renderer password in any environment, and returns `node_version`
-and `renderer_version`.
+TCP check against the renderer port because the readiness probe still gates traffic with an application-level check after
+the startup probe succeeds. The health check route should return `200 OK` when the process can accept probe traffic. The
+built-in `/info` route can also serve as a shallow process check if you do not need a custom route; it is always
+registered by the renderer, does not require the renderer password in any environment, and returns `node_version` and
+`renderer_version`.
 
 Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
 Fastify setup.
@@ -221,12 +222,12 @@ listener. Use one of these probe styles instead:
 
 Recommended starting values:
 
-| Probe                     | Starting point                                                                                                                                                                                                    |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup                   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point.   |
-| Readiness (custom route)  | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health`. Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`.                                                 |
-| Readiness (built-in info) | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the custom-route readiness probe.                                                         |
-| Liveness                  | `tcpSocket` on the renderer port. Use `periodSeconds: 10` and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses. |
+| Probe                     | Starting point                                                                                                                                                                                                                                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup                   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point.                                          |
+| Readiness (custom route)  | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with [`configureFastify`](#adding-a-health-check-endpoint). Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`. |
+| Readiness (built-in info) | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the custom-route readiness probe.                                                                                                |
+| Liveness                  | `tcpSocket` on the renderer port. Use `periodSeconds: 10` and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                                        |
 
 Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
 does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
