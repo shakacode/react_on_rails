@@ -107,7 +107,7 @@ require "timeout"
 module RscNodeRenderer
   module_function
 
-  def wait_until_ready!(host:, port:, timeout_seconds: 15)
+  def wait_until_ready!(host:, port:, timeout_seconds: 30)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
 
     loop do
@@ -130,14 +130,18 @@ RSpec.configure do |config|
 
     ReactOnRails::TestHelper.ensure_assets_compiled
 
-    cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH")
+    cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH") do
+      raise "Set RENDERER_SERVER_BUNDLE_CACHE_PATH before starting the test renderer (see Step 1)."
+    end
     FileUtils.rm_rf(cache_path)
     FileUtils.mkdir_p(cache_path)
 
     renderer_env = {
       "NODE_ENV" => "test",
       "RAILS_ENV" => "test",
-      "RENDERER_PORT" => ENV.fetch("RENDERER_PORT"),
+      "RENDERER_PORT" => ENV.fetch("RENDERER_PORT") do
+        raise "Set RENDERER_PORT before starting the test renderer (see Step 1)."
+      end,
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => cache_path
     }
 
@@ -204,7 +208,9 @@ RSpec.describe "RSC payload endpoint", :rsc, type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.media_type).to eq("application/x-ndjson")
-    expect(response.body).to include("html")
+
+    chunks = response.body.lines.map { |line| JSON.parse(line) }
+    expect(chunks.any? { |chunk| chunk.key?("html") }).to be(true)
   end
 end
 ```
