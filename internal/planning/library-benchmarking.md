@@ -68,10 +68,10 @@ to represent a real regression before restoring a hard gate, where CI fails the 
 
 ### Baseline Dependency
 
-Do not re-enable the hard gate until the Bencher reporting baseline fix from
-[PR 3148](https://github.com/shakacode/react_on_rails/pull/3148) has landed and at least 30 post-merge main runs have
-built fresh history. Runs count whether or not they fire alerts because the goal is history volume, not a clean streak.
-Threshold tuning against missing or sparse baseline history will mostly tune the noise.
+The Bencher reporting baseline fix from [PR 3148](https://github.com/shakacode/react_on_rails/pull/3148) landed on
+2026-04-23. Do not re-enable the hard gate until at least 30 post-merge main runs have built fresh history. Runs count
+whether or not they fire alerts because the goal is history volume, not a clean streak. Threshold tuning against missing
+or sparse baseline history will mostly tune the noise.
 
 ### Tuning Sequence
 
@@ -89,8 +89,10 @@ Threshold tuning against missing or sparse baseline history will mostly tune the
 ### Acceptance Criteria
 
 - At least 5 consecutive non-docs main pushes, meaning pushes that modify files outside `docs/`, `*.md`, and
-  `internal/`, pass the warning-mode check with the current code.
-- The regression tracker accumulates only sustained or overlapping alerts, not a new random alert set on each run.
+  `internal/`, pass the warning-mode check with the current code. Track the running count in
+  [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
+- Bencher is configured to require the same `(benchmark, measure)` pair to alert on consecutive runs before filing or
+  failing; a single noisy run does not trigger the gate.
 - A deliberately introduced local regression still triggers an alert under the tuned settings. The developer re-enabling
   the gate should add a temporary controller delay to a benchmarked route, verify an alert fires, and then revert the
   delay.
