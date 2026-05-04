@@ -39,6 +39,7 @@ jobs:
       - name: Setup Node
         uses: ./.github/actions/setup-node-with-retry
         with:
+          # Pin to 22.11.0 (LTS) to avoid V8 bug in 22.21.0
           node-version: '22.11.0'
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
