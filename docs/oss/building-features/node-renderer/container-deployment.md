@@ -414,6 +414,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      failureThreshold: 3
    ```
    > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep -i http2`. If curl is unavailable, use `tcpSocket` as a fallback.
+   > `initialDelaySeconds` is omitted here because Kubernetes defers readiness probes until the startup probe above succeeds. If you skip the startup probe, add an appropriate `initialDelaySeconds`.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
    ```yaml
    livenessProbe:

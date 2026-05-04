@@ -103,7 +103,7 @@ And add a root-level script to the `scripts` section of your `package.json`
 
 Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` command for your app).
 
-## Adding a Health Check Endpoint
+## Custom Fastify Configuration
 
 For advanced use cases, such as adding custom routes, registering Fastify plugins, or hooking into the request lifecycle,
 you can configure the Fastify server directly by importing the `master` and `worker` modules instead of using
@@ -112,6 +112,8 @@ you can configure the Fastify server directly by importing the `master` and `wor
 The advanced examples below use ES modules for readability. If you want this file to keep running
 as `node renderer/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
 example above or switch the file to `.mjs` or `"type": "module"`.
+
+### Adding a Health Check Endpoint
 
 A common need is a `/health` endpoint for container health checks:
 
@@ -139,6 +141,44 @@ if (cluster.isPrimary) {
   run(config);
 }
 ```
+
+The sample `/health` route is intentionally shallow. Add warm-up or readiness-gate logic inside this handler if
+readiness should wait for renderer-specific initialization.
+
+### Registering Fastify Plugins
+
+You can also register Fastify plugins. This example assumes you're using the same cluster setup pattern shown above:
+
+```js
+// In the worker branch of your cluster setup (see example above)
+import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';
+import cors from '@fastify/cors';
+
+configureFastify((app) => {
+  // Register a plugin
+  app.register(cors, {
+    origin: true,
+  });
+});
+
+// Add request logging
+configureFastify((app) => {
+  app.addHook('onRequest', (request, reply, done) => {
+    try {
+      console.log(`Request: ${request.method} ${request.url}`);
+      done();
+    } catch (err) {
+      done(err);
+    }
+  });
+});
+```
+
+> **Note:** The `configureFastify` function must be called before calling `run()`. Multiple callbacks can be registered and will execute in order. You can use `app.ready()` in your callback to ensure all plugins are loaded before performing operations that depend on them.
+
+### API Stability
+
+The `./master` and `./worker` exports provide direct access to the node-renderer internals. While we strive to maintain backwards compatibility, these are considered advanced APIs. If you only need basic configuration, prefer using the standard `reactOnRailsProNodeRenderer` function with the configuration options documented above.
 
 ## Configuring Startup, Readiness, and Liveness Probes
 
@@ -179,11 +219,15 @@ listener. Use one of these probe styles instead:
 
 Recommended starting values:
 
-| Probe     | Starting point                                                                                                                                                                                                                                                                                                                                                                                                              |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different, and see the `port` option at the top of this page for Heroku or Control Plane). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point.                                                                                                                              |
-| Readiness | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` for a custom route, or `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info` if no custom route is configured. Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`. Substitute `3800` with your actual port in Kubernetes YAML exec arrays; shell variable expansion does not apply there. |
-| Liveness  | `tcpSocket` on the renderer port, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                                                                                                                                                                                                              |
+| Probe                     | Starting point                                                                                                                                                                                                    |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup                   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point.   |
+| Readiness (custom route)  | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health`. Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`.                                                 |
+| Readiness (built-in info) | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the custom-route readiness probe.                                                         |
+| Liveness                  | `tcpSocket` on the renderer port. Use `periodSeconds: 10` and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses. |
+
+Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
+does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
 
 `--max-time 4` is intentionally shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero
 exit code before Kubernetes terminates the probe process.
@@ -212,38 +256,3 @@ Control Plane configures probes per container. When Rails and the renderer share
 health endpoint if you need to check both processes. For example, make the Rails readiness endpoint perform a short TCP
 connection check to `localhost:3800` and return `503` if the renderer is unreachable. When the renderer has its own
 container or workload, put the renderer probes on that container.
-
-## Registering Fastify Plugins
-
-You can also register Fastify plugins. This example assumes you're using the same cluster setup pattern shown above:
-
-```js
-// In the worker branch of your cluster setup (see example above)
-import run, { configureFastify } from 'react-on-rails-pro-node-renderer/worker';
-import cors from '@fastify/cors';
-
-configureFastify((app) => {
-  // Register a plugin
-  app.register(cors, {
-    origin: true,
-  });
-});
-
-// Add request logging
-configureFastify((app) => {
-  app.addHook('onRequest', (request, reply, done) => {
-    try {
-      console.log(`Request: ${request.method} ${request.url}`);
-      done();
-    } catch (err) {
-      done(err);
-    }
-  });
-});
-```
-
-> **Note:** The `configureFastify` function must be called before calling `run()`. Multiple callbacks can be registered and will execute in order. You can use `app.ready()` in your callback to ensure all plugins are loaded before performing operations that depend on them.
-
-## API Stability
-
-The `./master` and `./worker` exports provide direct access to the node-renderer internals. While we strive to maintain backwards compatibility, these are considered advanced APIs. If you only need basic configuration, prefer using the standard `reactOnRailsProNodeRenderer` function with the configuration options documented above.
