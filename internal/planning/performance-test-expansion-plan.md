@@ -8,30 +8,38 @@ explicitly mitigating CI runtime noise.
 The goal is to compare React on Rails rendering operations against their own historical baselines, not to produce broad
 marketing benchmarks from noisy shared runners.
 
+This plan extends the existing benchmark infrastructure in `benchmarks/bench.rb`, `benchmarks/k6.ts`, and
+`.github/workflows/benchmark.yml`; it should stay aligned with the max-rate strategy in
+`internal/planning/library-benchmarking.md`.
+
 ## Operations Matrix
 
 Start with a small, representative matrix before adding more routes:
 
-| Area                  | Operation                                 | Primary metric              | Notes                                       |
-| --------------------- | ----------------------------------------- | --------------------------- | ------------------------------------------- |
-| Client rendering      | `react_component` with `prerender: false` | mount and hydration timing  | Measures browser-side startup overhead      |
-| Traditional SSR       | `react_component` with `prerender: true`  | server render duration      | Covers ExecJS and Node Renderer paths       |
-| Hash SSR              | `react_component_hash`                    | render duration and payload | Covers render-functions returning objects   |
-| Streaming SSR         | `stream_react_component`                  | TTFB, response end, LCP     | Requires Suspense-friendly examples         |
-| RSC payload rendering | `rsc_payload_react_component`             | payload bytes and duration  | Pro-only path, benchmark separately         |
-| Fragment caching      | cached component hit and miss             | hit latency and miss cost   | Separates cache effectiveness from SSR cost |
+| Area                  | Operation                                 | Primary metric              | Notes                                                                   |
+| --------------------- | ----------------------------------------- | --------------------------- | ----------------------------------------------------------------------- |
+| Client rendering      | `react_component` with `prerender: false` | mount timing                | Measures browser-side startup overhead without server markup to hydrate |
+| Traditional SSR       | `react_component` with `prerender: true`  | server render duration      | Covers ExecJS and Node Renderer paths                                   |
+| Hash SSR              | `react_component_hash`                    | render duration and payload | Covers render-functions returning objects                               |
+| Streaming SSR         | `stream_react_component`                  | TTFB, response end, LCP     | Pro-only path; requires Node Renderer and Suspense-friendly examples    |
+| RSC payload rendering | `rsc_payload_react_component`             | payload bytes and duration  | Pro-only path, benchmark separately                                     |
+| Fragment caching      | cached component hit and miss             | hit latency and miss cost   | Separates cache effectiveness from SSR cost                             |
 
 ## First PR Scope
 
 The first implementation PR should add only one or two routes per category and should reuse existing dummy app examples
 where possible. Avoid building a large benchmark suite until the noise profile is understood.
 
-Recommended first slice:
+Recommended OSS first slice:
 
 1. Client-only component route
 2. Traditional SSR route with the same component and props
-3. Streaming route with a small Suspense boundary
-4. Cached SSR route with explicit hit and miss measurements
+3. Cached SSR route with explicit hit and miss measurements
+
+Recommended Pro slice, tracked separately from the OSS implementation PR:
+
+1. Streaming route with a small Suspense boundary
+2. RSC payload route with representative payload size measurements
 
 ## Noise Controls
 
@@ -40,7 +48,10 @@ Use these controls before treating results as regressions:
 - Warm each route before measuring.
 - Run alternating route order instead of grouped route order so cache and process state are less biased.
 - Record sample count, runner type, Ruby version, Node version, React version, and bundle mode with every result.
-- Track median and p95, not only averages.
+- Keep the current max-rate throughput baseline from `internal/planning/library-benchmarking.md` and surface the existing
+  k6 latency stats (`p50`, `p90`, `p99`, and `max`) beside RPS instead of relying only on averages.
+- Treat new percentile requirements as result-collection work: update `benchmarks/bench.rb`, the exported summary shape,
+  and the workflow reporting before adding metrics that the current runner does not publish.
 - Require repeated or overlapping alerts before opening an issue or failing CI.
 - Keep hard CI gates disabled until the benchmark gate tuning in
   [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) has a stable baseline.
@@ -59,8 +70,16 @@ same mode.
 
 ## Acceptance Criteria
 
-- The expanded suite covers client-only rendering, traditional SSR, streaming SSR, and at least one cache path.
+- The OSS suite covers client-only rendering, traditional SSR, and at least one cache path.
+- The Pro suite covers streaming SSR and RSC payload rendering where the Node Renderer is available.
 - Results include enough metadata to compare runs meaningfully.
 - CI behavior is advisory until noise controls are proven.
 - Regression detection favors sustained movement over single-run spikes.
 - Documentation tells contributors which benchmark to run for each rendering area.
+
+## See Also
+
+- `benchmarks/bench.rb`
+- `benchmarks/k6.ts`
+- `.github/workflows/benchmark.yml`
+- `internal/planning/library-benchmarking.md`
