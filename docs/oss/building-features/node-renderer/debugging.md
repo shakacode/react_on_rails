@@ -14,7 +14,7 @@ It is a `pnpm` workspace app and already points at the local packages in this mo
 
 ### Quick start: debugging with the full stack running
 
-If you already have the dummy app running via `bin/dev` (which uses `Procfile.dev`), the node renderer is already listening on port 3800 with `--inspect` enabled. To debug:
+If you already have the dummy app running via `bin/dev` (which uses `Procfile.dev`), the node renderer is listening on port 3800 but without `--inspect`. To attach a debugger you first need to restart it with `--inspect` — either stop the renderer process and run `pnpm run node-renderer:debug`, or temporarily add `--inspect` to the `node-renderer:` entry in `Procfile.dev` and `overmind restart node-renderer`. Then:
 
 1. Open `chrome://inspect` in Chrome and connect to the renderer process.
 2. Use overmind to isolate renderer logs: `overmind connect node-renderer` (Ctrl-B to detach).
@@ -42,7 +42,7 @@ Use this when you need full control over the renderer process — different flag
 1. If you want to attach a debugger instead, run:
    ```bash
    cd react_on_rails_pro/spec/dummy
-   pnpm run node-renderer-debug
+   pnpm run node-renderer:debug
    ```
 1. Reload the page that triggers the SSR issue and reproduce the problem.
 1. If you change Ruby code in loaded gems, restart the Rails server.

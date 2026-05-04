@@ -2,7 +2,7 @@
 
 Automated tests can pass while the development environment is completely broken. CI starts services explicitly and runs in a controlled environment — it does not exercise `bin/dev`, Procfile orchestration, or the actual browser experience. This guide ensures agents verify the dev environment works end-to-end before submitting a PR.
 
-**Related:** [PR Testing Guide](pr-testing-guide.md), [Testing Build Scripts](testing-build-scripts.md)
+**Related:** [PR Testing Guide](pr-testing-guide.md), [Testing Build Scripts](testing-build-scripts.md), [Validating Node Renderer Changes](validating-node-renderer-changes.md)
 
 ## The Rule
 

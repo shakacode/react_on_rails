@@ -40,6 +40,12 @@ gem "bootsnap", require: false
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[mri windows]
+
+  # Ruby 3.5+ removed these from the default gem set; they must now be declared explicitly
+  # to avoid `cannot load such file` errors from gems that lazy-require them (e.g. jbuilder).
+  gem "benchmark", require: false
+  gem "logger", require: false
+  gem "ostruct", require: false
 end
 
 group :development do
