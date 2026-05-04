@@ -113,8 +113,7 @@ module RscNodeRenderer
     loop do
       TCPSocket.open(host, port).close
       break
-    rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH,
-           Errno::ECONNRESET, Errno::ENETUNREACH
+    rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ECONNRESET
       raise "Node renderer did not boot on #{host}:#{port}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
 
       sleep 0.1
@@ -131,7 +130,7 @@ RSpec.configure do |config|
     ReactOnRails::TestHelper.ensure_assets_compiled
 
     cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH") do
-      raise "Set RENDERER_SERVER_BUNDLE_CACHE_PATH before starting the test renderer (see Step 1)."
+      raise "Set RENDERER_SERVER_BUNDLE_CACHE_PATH before requiring config/environment."
     end
     FileUtils.rm_rf(cache_path)
     FileUtils.mkdir_p(cache_path)
@@ -140,14 +139,14 @@ RSpec.configure do |config|
       "NODE_ENV" => "test",
       "RAILS_ENV" => "test",
       "RENDERER_PORT" => ENV.fetch("RENDERER_PORT") do
-        raise "Set RENDERER_PORT before starting the test renderer (see Step 1)."
+        raise "Set RENDERER_PORT before requiring config/environment."
       end,
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => cache_path
     }
 
     rsc_node_renderer_pid = Process.spawn(
       renderer_env,
-      "pnpm",
+      "pnpm", # replace with "npm" or "yarn" if that is your package manager
       "run",
       "node-renderer",
       chdir: Rails.root.to_s,
@@ -177,6 +176,10 @@ RSpec.configure do |config|
   end
 end
 ```
+
+Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`.
+
+The explicit `ensure_assets_compiled` call above is intentional: the renderer needs bundles before it boots. Step 2 still wires compilation to `:rsc` examples for suites that do not start the renderer.
 
 In CI, set `RSC_NODE_RENDERER_TESTS=1` for jobs that need the renderer. For local development, leaving it unset lets you run non-RSC specs without starting another process.
 
