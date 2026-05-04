@@ -88,13 +88,14 @@ Threshold tuning against missing or sparse baseline history will mostly tune the
 
 ### Acceptance Criteria
 
-- At least 5 consecutive non-docs main pushes pass the warning-mode check with the current code.
+- At least 5 consecutive non-docs main pushes, meaning pushes that modify files outside `docs/`, `*.md`, and
+  `internal/`, pass the warning-mode check with the current code.
 - The regression tracker accumulates only sustained or overlapping alerts, not a new random alert set on each run.
 - A deliberately introduced local regression still triggers an alert under the tuned settings. The developer re-enabling
   the gate should add a temporary controller delay to a benchmarked route, verify an alert fires, and then revert the
   delay.
-- The hard gate is restored only after the tuned settings meet the false-positive target chosen for the project, such as
-  no more than 1 noisy failure in 20 unchanged-performance runs.
+- The hard gate is restored only after the tuned settings meet the project false-positive target: no more than 1 noisy
+  failure in 20 unchanged-performance runs.
 
 See [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) for the tracking discussion and historical
 alert-overlap evidence.
