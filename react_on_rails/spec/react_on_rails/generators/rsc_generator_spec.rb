@@ -233,6 +233,76 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when existing RSC webpack configs lack scoped client references" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      limit_chunk_plugin = "serverWebpackConfig.plugins.unshift(" \
+                           "new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));"
+      old_rsc_plugin = <<~JS.chomp
+        if (!rscBundle) {
+          serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+        }
+
+        #{limit_chunk_plugin}
+      JS
+      simulate_existing_file(
+        "config/webpack/serverWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          #{pro_server_webpack_content
+            .sub('const configureServer = () => {', 'const configureServer = (rscBundle = false) => {')
+            .sub(limit_chunk_plugin, old_rsc_plugin)}
+        JS
+      )
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          #{base_client_webpack_content.sub(
+            'return clientConfig;',
+            "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));\n\n  return clientConfig;"
+          )}
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "updates the existing server plugin to use scoped client references" do
+      assert_file "config/webpack/serverWebpackConfig.js" do |content|
+        rsc_plugin_import = "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+        expect(content.scan(rsc_plugin_import).length).to eq(1)
+        expect(content).to include("const { resolve } = require('path');")
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: true")
+      end
+    end
+
+    it "updates the existing client plugin to use scoped client references" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        rsc_plugin_import = "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
+        expect(content.scan(rsc_plugin_import).length).to eq(1)
+        expect(content).to include("const { config } = require('shakapacker');")
+        expect(content).to include("const { resolve } = require('path');")
+        expect(content).to include("clientReferences: rscClientReferences")
+        expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("isServer: false")
+      end
+    end
+  end
+
   context "when the client webpack config uses aliased imports" do
     before(:all) do
       prepare_destination

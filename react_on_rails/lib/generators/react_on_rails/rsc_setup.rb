@@ -379,8 +379,10 @@ module ReactOnRails
 
         content = File.read(full_path)
 
-        # Skip if RSCWebpackPlugin is already configured
-        return if content.include?("RSCWebpackPlugin")
+        if content.include?("RSCWebpackPlugin")
+          update_existing_rsc_webpack_config(config_path, content, is_server: true)
+          return
+        end
 
         # Add RSCWebpackPlugin import after bundler require
         server_injected_imports = [
@@ -428,8 +430,10 @@ module ReactOnRails
 
         content = File.read(full_path)
 
-        # Skip if RSCWebpackPlugin is already configured
-        return if content.include?("RSCWebpackPlugin")
+        if content.include?("RSCWebpackPlugin")
+          update_existing_rsc_webpack_config(config_path, content, is_server: false)
+          return
+        end
 
         # Add RSCWebpackPlugin import after commonWebpackConfig import
         injected_imports = [
@@ -512,6 +516,40 @@ module ReactOnRails
             include: /\.(js|ts|jsx|tsx)$/,
           };
         JS
+      end
+
+      def update_existing_rsc_webpack_config(config_path, content, is_server:)
+        return if content.include?("clientReferences: rscClientReferences")
+
+        add_rsc_client_references_setup(config_path, content, is_server: is_server)
+
+        gsub_file(
+          config_path,
+          /new RSCWebpackPlugin\(\{\s*isServer: #{is_server}\s*\}\)/,
+          "new RSCWebpackPlugin({ isServer: #{is_server}, clientReferences: rscClientReferences })"
+        )
+      end
+
+      def add_rsc_client_references_setup(config_path, content, is_server:)
+        injected_imports = [
+          "\\1",
+          ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(content)),
+          ("const { resolve } = require('path');" unless path_resolve_imported?(content)),
+          "",
+          rsc_client_references_js
+        ].compact.join("\n")
+
+        import_pattern = if is_server
+                           Regexp.new(
+                             "(const bundler = config\\.assets_bundler.*\n" \
+                             ".*require\\('@rspack/core'\\).*\n" \
+                             ".*: require\\('webpack'\\);)"
+                           )
+                         else
+                           %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)}
+                         end
+
+        gsub_file(config_path, import_pattern, injected_imports)
       end
 
       def shakapacker_config_imported?(content)
