@@ -181,6 +181,9 @@ Recommended starting values:
 | Readiness | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` for a custom route, or `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info` if no custom route is configured. Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`. Substitute `3800` with your actual port in Kubernetes YAML exec arrays; shell variable expansion does not apply there. |
 | Liveness  | `tcpSocket` on the renderer port, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                                                                                                                                                                                                              |
 
+`--max-time 4` is intentionally shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero
+exit code before Kubernetes terminates the probe process.
+
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes.
 
