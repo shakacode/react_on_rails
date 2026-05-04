@@ -144,12 +144,15 @@ if (cluster.isPrimary) {
 }
 ```
 
-### Configuring Startup, Readiness, and Liveness Probes
+## Configuring Startup, Readiness, and Liveness Probes
 
 Use a cheap endpoint such as the `/health` route above for startup, readiness, and liveness probes. The health check route
 should return `200 OK` when the process can accept probe traffic. The built-in `/info` route can also serve as a shallow
 process check if you do not need a custom route; it is always registered by the renderer, does not require the renderer
 password in any environment, and returns `node_version` and `renderer_version`.
+
+Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
+Fastify setup.
 
 > **Security note:** `/info` exposes runtime version details to anyone who can reach the renderer port. Keep the renderer
 > on `localhost` or private networking, or add a custom `/health` route if you need a less revealing probe response.
@@ -180,11 +183,11 @@ listener. Use one of these probe styles instead:
 
 Recommended starting values:
 
-| Probe     | Starting point                                                                                                                                                                                                                                                        |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup   | `tcpSocket` on the renderer port (`$RENDERER_PORT`, default `3800`; see [port configuration](#node-renderer-javascript-configuration) for Heroku or Control Plane). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point. |
-| Readiness | `exec` with `curl -sf --http2-prior-knowledge http://localhost:3800/info`, `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`.                                                                                                                        |
-| Liveness  | `tcpSocket` on the renderer port, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                                                        |
+| Probe     | Starting point                                                                                                                                                                                                                                                                                                                            |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup   | `tcpSocket` on the renderer port (`$RENDERER_PORT`, default `3800`; see the `port` option at the top of this page for Heroku or Control Plane). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point.                                                                                         |
+| Readiness | `exec` with `curl -sf --http2-prior-knowledge http://localhost:${RENDERER_PORT:-3800}/health` for a custom route, or `http://localhost:${RENDERER_PORT:-3800}/info` if no custom route is configured. Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`. Substitute your actual port in Kubernetes YAML exec arrays. |
+| Liveness  | `tcpSocket` on the renderer port, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                                                                                                                            |
 
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes.
@@ -192,11 +195,11 @@ Kubernetes YAML examples, including startup, readiness, and liveness probes.
 For Control Plane deployments, choose the probe target based on where the node renderer runs. Renderer probe targets
 below mean `tcpSocket` or h2c-aware `exec` probes, not HTTP/1.1 `httpGet` probes directly against the renderer.
 
-| Deployment shape                        | Rails `renderer_url`                                                                                                                                                                                                                                     | Renderer `host`             | Probe target                                                                                                                                                    |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Same Rails container/process supervisor | `http://localhost:3800`                                                                                                                                                                                                                                  | Default `localhost` is fine | Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000`. Add a renderer check to Rails readiness if SSR is required.                  |
-| Separate container in the same workload | `http://localhost:3800`                                                                                                                                                                                                                                  | Default `localhost` is fine | Add `tcpSocket` or h2c-aware `exec` probes to the `node-renderer` container on the renderer port. Binding to `0.0.0.0` also works if your platform requires it. |
-| Separate node-renderer workload         | `http://node-renderer.<GVC_NAME>.cpln.local:3800` or your internal URL (`<GVC_NAME>` is your Control Plane Global Virtual Cloud name; see Control Plane's [service-to-service endpoint format](https://docs.controlplane.com/guides/service-to-service)) | `0.0.0.0`                   | Add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port internally, not publicly, unless required.         |
+| Deployment shape                        | Rails `renderer_url`                                                                                                                                                                                                                                                                                                            | Renderer `host`             | Probe target                                                                                                                                                    |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Same Rails container/process supervisor | `http://localhost:3800`                                                                                                                                                                                                                                                                                                         | Default `localhost` is fine | Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000`. Add a renderer check to Rails readiness if SSR is required.                  |
+| Separate container in the same workload | `http://localhost:3800`                                                                                                                                                                                                                                                                                                         | Default `localhost` is fine | Add `tcpSocket` or h2c-aware `exec` probes to the `node-renderer` container on the renderer port. Binding to `0.0.0.0` also works if your platform requires it. |
+| Separate node-renderer workload         | `http://node-renderer.<GVC_NAME>.cpln.local:3800` or your internal URL (`<GVC_NAME>` is your Control Plane Global Virtual Cloud name; generic format: `http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:<PORT>`; see Control Plane's [service-to-service endpoint format](https://docs.controlplane.com/guides/service-to-service)) | `0.0.0.0`                   | Add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port internally, not publicly, unless required.         |
 
 [Control Plane Flow](https://github.com/shakacode/control-plane-flow)'s default `rails` template models Rails as a
 single-container standard workload. If you follow that template and run the renderer inside the Rails container,
@@ -208,11 +211,7 @@ health endpoint if you need to check both processes. For example, make the Rails
 connection check to `localhost:3800` and return `503` if the renderer is unreachable. When the renderer has its own
 container or workload, put the renderer probes on that container.
 
-For separate Control Plane workloads, the internal URL format is
-`http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:<PORT>` (for example,
-`http://node-renderer.my-gvc.cpln.local:3800`).
-
-### Registering Fastify Plugins
+## Registering Fastify Plugins
 
 You can also register Fastify plugins. This example assumes you're using the same cluster setup pattern shown above:
 
@@ -243,6 +242,6 @@ configureFastify((app) => {
 
 > **Note:** The `configureFastify` function must be called before calling `run()`. Multiple callbacks can be registered and will execute in order. You can use `app.ready()` in your callback to ensure all plugins are loaded before performing operations that depend on them.
 
-### API Stability
+## API Stability
 
 The `./master` and `./worker` exports provide direct access to the node-renderer internals. While we strive to maintain backwards compatibility, these are considered advanced APIs. If you only need basic configuration, prefer using the standard `reactOnRailsProNodeRenderer` function with the configuration options documented above.
