@@ -90,7 +90,7 @@ module.exports = commonWebpackConfig;
 
 ## Legacy Webpacker / Webpack 4 migration shims
 
-If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5, Webpack 4, and React 16 or 17, prefer upgrading to Shakapacker first when you can.
+If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5 / Webpack 4, prefer upgrading to Shakapacker first when you can.
 
 Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims. Apply only the ones that match the errors you see, and keep each shim explicit and narrow:
 
@@ -100,6 +100,8 @@ Webpack 4 does not support the `exports` field in `package.json`, so subpath imp
    - import ReactOnRails from 'react-on-rails/client';
    + import ReactOnRails from 'react-on-rails';
    ```
+
+   The root import uses the full build and may log a browser console warning about bundled server-rendering code. That is expected for this temporary shim; remove the shim and return to the current client entry point after upgrading to Shakapacker/Webpack 5 or newer.
 
 2. Ensure Babel can parse modern syntax used by current packages. Add these plugins to your existing Babel config without replacing existing presets or plugins:
 
@@ -151,6 +153,8 @@ Webpack 4 does not support the `exports` field in `package.json`, so subpath imp
    ```
 
 Keep this rule scoped to `node_modules/react-on-rails`; broad `node_modules` transpilation can slow legacy builds and introduce unrelated Babel differences. After you upgrade the app to Shakapacker/Webpack 5 or newer, remove the shim and use the package entry points documented for current installs.
+
+If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Update `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails, for example `transformIgnorePatterns: ['/node_modules/(?!react-on-rails/)']`.
 
 ---
 
