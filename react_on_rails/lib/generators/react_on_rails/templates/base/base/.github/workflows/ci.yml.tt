@@ -31,8 +31,8 @@ jobs:
           # pin, add `"packageManager": "pnpm@<your-version>"` to package.json,
           # then delete `with:` and these comments.
           version: "<%= config[:pnpm_fallback_version] %>"
-<%- end -%>
 
+<%- end -%>
 <%- end -%>
 <%- if config[:package_manager] == 'bun' -%>
       - name: Set up Bun

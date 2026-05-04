@@ -19,7 +19,8 @@ module GeneratorMessages
     #
     # Pass app_root: to resolve paths against a specific directory
     # (e.g. destination_root in generators) instead of Dir.pwd.
-    # Pass package_json: to reuse an already-parsed package.json and avoid a re-read
+    # Pass package_json: PACKAGE_JSON_UNSET (the default) to read package.json from disk.
+    # Pass package_json: <parsed_hash> to reuse an already-parsed package.json and avoid a re-read
     # (callers that also inspect scripts/deps should parse once and pass the hash).
     # Pass package_json: nil to skip JSON detection entirely when the caller has
     # already determined the file is absent; detection falls through directly to
@@ -110,8 +111,7 @@ module GeneratorMessages
 
     private
 
-    # Pipeline internals — external callers should go through `detect_package_manager`
-    # (which accepts `package_json:` for the read-once case). Reachable from sibling
+    # Remaining pipeline internals — not part of the public API. Reachable from sibling
     # sub-modules (e.g. CiSection) via `include` without a receiver; tests use `send`.
 
     # Stricter sibling of `package_manager_from_content`: requires the full
