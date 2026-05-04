@@ -36,6 +36,24 @@ RSpec.describe ReactOnRails::Dev::FileManager do
       server&.close
     end
 
+    it "removes an overmind socket file whose path is too long for a UNIX socket address" do
+      FileUtils.mkdir_p("tmp/sockets")
+      socket_file = "tmp/sockets/overmind-#{'a' * 100}.sock"
+      File.write(socket_file, "copied socket")
+
+      expect(described_class.cleanup_stale_files).to be true
+      expect(File).not_to exist(socket_file)
+    end
+
+    it "removes an overmind socket file when socket allocation fails" do
+      FileUtils.mkdir_p("tmp/sockets")
+      File.write("tmp/sockets/overmind.sock", "copied socket")
+      allow(Socket).to receive(:new).and_raise(Errno::EMFILE)
+
+      expect(described_class.cleanup_stale_files).to be true
+      expect(File).not_to exist("tmp/sockets/overmind.sock")
+    end
+
     it "leaves non-overmind sockets in tmp/sockets/ alone even when inactive" do
       FileUtils.mkdir_p("tmp/sockets")
       File.write("tmp/sockets/puma.sock", "stale puma socket")

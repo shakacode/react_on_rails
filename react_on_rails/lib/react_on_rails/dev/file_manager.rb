@@ -84,8 +84,9 @@ module ReactOnRails
         def socket_active?(socket_path)
           return false unless File.exist?(socket_path)
 
-          socket = Socket.new(Socket::AF_UNIX, Socket::SOCK_STREAM, 0)
+          socket = nil
           begin
+            socket = Socket.new(Socket::AF_UNIX, Socket::SOCK_STREAM, 0)
             socket.connect_nonblock(Socket.sockaddr_un(socket_path))
             true
           rescue IO::WaitWritable
@@ -99,10 +100,10 @@ module ReactOnRails
             socket.getsockopt(Socket::SOL_SOCKET, Socket::SO_ERROR).int.zero?
           rescue Errno::EISCONN
             true
-          rescue SystemCallError, IOError
+          rescue ArgumentError, SystemCallError, IOError
             false
           ensure
-            socket.close
+            socket&.close
           end
         end
 

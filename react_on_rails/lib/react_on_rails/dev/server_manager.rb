@@ -68,11 +68,24 @@ module ReactOnRails
         # #base_port_hash so no "Base port detected" banner prints during a kill.
         def killable_ports
           base = PortSelector.base_port_hash
-          return pro_renderer_active? ? [3000, 3001, 3800] : [3000, 3001] unless base
+          return default_killable_ports unless base
 
           ports = [base[:rails], base[:webpack]]
           ports << base[:renderer] if pro_renderer_active?
           ports
+        end
+
+        def default_killable_ports
+          ports = [3000, 3001]
+          ports << configured_renderer_port_for_kill if pro_renderer_active?
+          ports
+        end
+
+        def configured_renderer_port_for_kill
+          raw_port = ENV.fetch("RENDERER_PORT", nil)
+          return raw_port.strip.to_i if valid_port_string?(raw_port)
+
+          3800
         end
 
         def development_processes
