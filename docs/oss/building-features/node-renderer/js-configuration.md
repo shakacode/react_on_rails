@@ -103,14 +103,6 @@ And add a root-level script to the `scripts` section of your `package.json`
 
 Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` command for your app).
 
-## Custom Fastify Configuration
-
-For advanced use cases, you can customize the Fastify server instance by importing the `master` and `worker` modules directly. This is useful for:
-
-- Adding custom routes (e.g., `/health` for container health checks)
-- Registering Fastify plugins
-- Adding custom hooks for logging or monitoring
-
 ## Adding a Health Check Endpoint
 
 When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
@@ -183,11 +175,11 @@ listener. Use one of these probe styles instead:
 
 Recommended starting values:
 
-| Probe     | Starting point                                                                                                                                                                                                                                                                                                                                                                 |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Startup   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different, and see the `port` option at the top of this page for Heroku or Control Plane). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point.                                                                                 |
-| Readiness | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` for a custom route, or `http://localhost:3800/info` if no custom route is configured. Use `timeoutSeconds: 5`, `periodSeconds: 10`, and `failureThreshold: 3`. Substitute `3800` with your actual port in Kubernetes YAML exec arrays; shell variable expansion does not apply there. |
-| Liveness  | `tcpSocket` on the renderer port, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                                                                                                                                                                 |
+| Probe     | Starting point                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different, and see the `port` option at the top of this page for Heroku or Control Plane). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point.                                                                                                                              |
+| Readiness | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` for a custom route, or `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info` if no custom route is configured. Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`. Substitute `3800` with your actual port in Kubernetes YAML exec arrays; shell variable expansion does not apply there. |
+| Liveness  | `tcpSocket` on the renderer port, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                                                                                                                                                                                                              |
 
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes.
