@@ -77,8 +77,8 @@ or sparse baseline history will mostly tune the noise.
 
 1. Keep the gate in warning mode while gathering the new baseline.
 2. Compare adjacent main runs by shared `(benchmark, measure)` alert pairs using the Bencher dashboard or the
-   overlap-comparison method tracked in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). A
-   near-disjoint alert set means runner noise is still dominating.
+   overlap-comparison method tracked in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). Alert
+   overlap below roughly 20% across two adjacent runs means runner noise is still dominating.
 3. Prefer threshold changes that require stronger evidence before failure:
    - widen the Bencher boundary from `0.95` toward `0.99`
    - add a `--threshold-min-sample-size` once each `(branch, benchmark, measure)` pair has enough history
@@ -97,7 +97,8 @@ or sparse baseline history will mostly tune the noise.
   the gate should add a temporary controller delay to a benchmarked route, verify an alert fires, and then revert the
   delay.
 - The hard gate is restored only after the tuned settings meet the project false-positive target: no more than 1 noisy
-  failure in 20 unchanged-performance runs.
+  failure in 20 unchanged-performance runs. If the gate later exceeds this rate on main, revert it to warning mode and
+  re-tune thresholds before trying to re-enable it again.
 
 See [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) for the tracking discussion and historical
 alert-overlap evidence.
