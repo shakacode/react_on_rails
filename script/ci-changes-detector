@@ -31,7 +31,10 @@ if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" required); th
 fi
 
 # Get list of changed files (committed + uncommitted)
-CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF")
+CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF") || {
+  echo "Error: git diff failed for $MERGE_BASE..$CURRENT_REF" >&2
+  exit 1
+}
 
 # For local development, also include uncommitted changes
 if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
