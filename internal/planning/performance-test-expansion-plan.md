@@ -54,7 +54,9 @@ Use these controls before treating results as regressions:
 - Record sample count, runner type, Ruby version, Node version, React version, and bundle mode with every result.
 - Keep the current max-rate throughput baseline from `internal/planning/library-benchmarking.md`.
 - Preserve the existing `benchmarks/bench.rb` summary metrics (`RPS`, `p50`, `p90`, `p99`, and `max`) and make sure CI
-  summaries, artifacts, and Bencher reporting surface those values consistently.
+  summaries, artifacts, and Bencher reporting surface those values consistently. The current runner intentionally uses
+  `p90` and `p99` instead of `p95`; adding `p95` should update the k6 trend stats, summary table, artifacts, and Bencher
+  reporting together.
 - Require repeated or overlapping alerts before opening an issue or failing CI.
 - Keep hard CI gates disabled until the benchmark gate tuning in
   [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) has a stable baseline.
