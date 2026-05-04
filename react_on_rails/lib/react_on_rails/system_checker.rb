@@ -433,15 +433,11 @@ module ReactOnRails
     end
 
     def node_missing?
-      command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
-      _stdout, _stderr, status = Open3.capture3(command, "node")
-      !status.success?
+      !ReactOnRails::Utils.command_exists?("node")
     end
 
     def cli_exists?(command)
-      which_command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
-      _stdout, _stderr, status = Open3.capture3(which_command, command)
-      status.success?
+      ReactOnRails::Utils.command_exists?(command)
     end
 
     def detect_used_package_manager

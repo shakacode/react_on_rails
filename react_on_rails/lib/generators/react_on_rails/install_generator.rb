@@ -734,8 +734,7 @@ module ReactOnRails
       end
 
       def cli_exists?(command)
-        which_command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
-        system(which_command, command, out: File::NULL, err: File::NULL)
+        ReactOnRails::Utils.command_exists?(command)
       end
 
       def normalize_bin_dev_content(content)

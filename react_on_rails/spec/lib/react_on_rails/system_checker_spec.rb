@@ -605,14 +605,14 @@ RSpec.describe ReactOnRails::SystemChecker do
   describe "private methods" do
     describe "#cli_exists?" do
       it "returns true when command exists" do
-        allow(Open3).to receive(:capture3).with("which", "npm")
-                    .and_return(["", "", instance_double(Process::Status, success?: true)])
+        allow(ReactOnRails::Utils).to receive(:command_exists?).with("npm").and_return(true)
+
         expect(checker.send(:cli_exists?, "npm")).to be true
       end
 
       it "returns false when command does not exist" do
-        allow(Open3).to receive(:capture3).with("which", "nonexistent")
-                    .and_return(["", "", instance_double(Process::Status, success?: false)])
+        allow(ReactOnRails::Utils).to receive(:command_exists?).with("nonexistent").and_return(false)
+
         expect(checker.send(:cli_exists?, "nonexistent")).to be false
       end
     end

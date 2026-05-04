@@ -72,8 +72,7 @@ module GeneratorMessages
     def package_manager_executable_available?(package_manager)
       return false unless supported_package_manager?(package_manager)
 
-      which_command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
-      system(which_command, package_manager, out: File::NULL, err: File::NULL)
+      ReactOnRails::Utils.command_exists?(package_manager)
     end
 
     private

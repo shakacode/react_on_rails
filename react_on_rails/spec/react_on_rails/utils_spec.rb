@@ -76,6 +76,17 @@ module ReactOnRails
         .and_return("localhost:3035")
     end
 
+    describe ".command_exists?" do
+      it "checks whether a command exists" do
+        allow(described_class).to receive(:running_on_windows?).and_return(false)
+        allow(described_class).to receive(:system)
+          .with("which", "pnpm", out: File::NULL, err: File::NULL)
+          .and_return(true)
+
+        expect(described_class.command_exists?("pnpm")).to be(true)
+      end
+    end
+
     context "when server_bundle_path cleared" do
       before do
         allow(Rails).to receive(:root).and_return(File.expand_path("."))
