@@ -77,15 +77,26 @@ module ReactOnRails
 
         def default_killable_ports
           ports = [3000, 3001]
-          ports << configured_renderer_port_for_kill if pro_renderer_active?
+          if pro_renderer_active?
+            renderer_port = configured_renderer_port_for_kill
+            ports << renderer_port if renderer_port
+          end
           ports
         end
 
         def configured_renderer_port_for_kill
           raw_port = ENV.fetch("RENDERER_PORT", nil)
           return raw_port.strip.to_i if valid_port_string?(raw_port)
+          return nil if remote_renderer_url_configured?
 
           3800
+        end
+
+        def remote_renderer_url_configured?
+          %w[REACT_RENDERER_URL RENDERER_URL].any? do |var|
+            url = ENV.fetch(var, nil)
+            !url.nil? && !url.strip.empty? && !localhost_renderer_url?(url)
+          end
         end
 
         def development_processes

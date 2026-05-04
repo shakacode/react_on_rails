@@ -1214,6 +1214,19 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       described_class.kill_processes
     end
+
+    it "does not target the default renderer port for a remote renderer URL" do
+      ENV["REACT_RENDERER_URL"] = "https://renderer.internal:3800"
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
+
+      described_class.kill_processes
+    end
   end
 
   describe ".find_port_pids" do
