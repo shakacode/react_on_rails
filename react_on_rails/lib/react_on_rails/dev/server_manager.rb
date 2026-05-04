@@ -87,9 +87,26 @@ module ReactOnRails
         def configured_renderer_port_for_kill
           raw_port = ENV.fetch("RENDERER_PORT", nil)
           return raw_port.strip.to_i if valid_port_string?(raw_port)
+
+          local_url_port = local_renderer_url_port_for_kill
+          return local_url_port if local_url_port
           return nil if remote_renderer_url_configured?
 
           3800
+        end
+
+        def local_renderer_url_port_for_kill
+          %w[REACT_RENDERER_URL RENDERER_URL].each do |var|
+            url = ENV.fetch(var, nil)
+            next if url.nil? || url.strip.empty? || !localhost_renderer_url?(url)
+            next unless url.match?(URL_WITH_EXPLICIT_PORT_RE)
+
+            return URI.parse(url).port
+          rescue URI::InvalidURIError
+            next
+          end
+
+          nil
         end
 
         def remote_renderer_url_configured?
