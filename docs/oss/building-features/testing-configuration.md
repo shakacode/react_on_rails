@@ -56,13 +56,15 @@ test_worker = "0" if test_worker.empty?
 
 ENV["RENDERER_PORT"] ||= (3900 + test_worker.to_i).to_s
 renderer_url = "http://127.0.0.1:#{ENV.fetch('RENDERER_PORT')}"
-ENV["REACT_RENDERER_URL"] ||= renderer_url
-ENV["RENDERER_URL"] ||= renderer_url
+ENV["REACT_RENDERER_URL"] ||= renderer_url # used by config.renderer_url = ENV["REACT_RENDERER_URL"]
+ENV["RENDERER_URL"] ||= renderer_url       # used by some older/custom initializers
 ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
   File.expand_path("../tmp/node-renderer-bundles-test-#{test_worker}", __dir__)
 
 require_relative "../config/environment"
 ```
+
+`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID so every worker gets a unique port and cache path.
 
 If you run tests in parallel, each worker needs its own `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH`. Sharing a renderer cache across parallel workers can produce stale-bundle and missing-bundle failures that look like flaky RSC timeouts.
 
@@ -84,13 +86,13 @@ require "react_on_rails/test_helper"
 RSpec.configure do |config|
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :rsc)
 
-  config.define_derived_metadata(file_path: %r{spec/(system|features|requests)}) do |metadata|
+  config.define_derived_metadata(file_path: %r{spec/(system|features)}) do |metadata|
     metadata[:rsc] = true
   end
 end
 ```
 
-You can keep the default `:js`, `:server_rendering`, and `:controller` tags instead if that already matches your suite. The important part is that the build runs before the first request that can upload bundles to the node renderer.
+Tag request specs that hit the RSC payload endpoint explicitly with `:rsc`. You can keep the default `:js`, `:server_rendering`, and `:controller` tags instead if that already matches your suite. The important part is that the build runs before the first request that can upload bundles to the node renderer.
 
 ### 3. Start One Test Renderer Per Worker
 
@@ -109,8 +111,10 @@ module RscNodeRenderer
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
 
     loop do
-      TCPSocket.open(host, port) { return }
-    rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH
+      TCPSocket.open(host, port).close
+      break
+    rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH,
+           Errno::ECONNRESET, Errno::ENETUNREACH
       raise "Node renderer did not boot on #{host}:#{port}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
 
       sleep 0.1
@@ -179,6 +183,7 @@ Keep the first system test boring: visit a route that streams one Server Compone
 ```ruby
 RSpec.describe "Story page", :rsc, :js, type: :system do
   it "renders the streamed RSC page and hydrates client controls" do
+    # Replace story_path and selectors with your app's RSC route and content.
     visit story_path("ruby-rails-react")
 
     expect(page).to have_css("h1", text: "Ruby, Rails, and React")
