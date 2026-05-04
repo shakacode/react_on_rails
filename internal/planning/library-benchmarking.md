@@ -64,19 +64,21 @@ Options to improve accuracy if needed:
 
 The benchmark workflow currently treats main-regression alerts as warnings because single-run Bencher alerts on
 GitHub-hosted runners have been dominated by environmental noise. The goal is to make a fired alert much more likely
-to represent a real regression before restoring a hard gate.
+to represent a real regression before restoring a hard gate, where CI fails the job instead of posting a warning.
 
 ### Baseline Dependency
 
 Do not re-enable the hard gate until the Bencher reporting baseline fix from
 [PR 3148](https://github.com/shakacode/react_on_rails/pull/3148) has landed and at least 30 post-merge main runs have
-built fresh history. Threshold tuning against missing or sparse baseline history will mostly tune the noise.
+built fresh history. Runs count whether or not they fire alerts because the goal is history volume, not a clean streak.
+Threshold tuning against missing or sparse baseline history will mostly tune the noise.
 
 ### Tuning Sequence
 
 1. Keep the gate in warning mode while gathering the new baseline.
-2. Compare adjacent main runs by shared `(benchmark, measure)` alert pairs. A near-disjoint alert set means runner noise
-   is still dominating.
+2. Compare adjacent main runs by shared `(benchmark, measure)` alert pairs using the Bencher dashboard or the
+   overlap-comparison method tracked in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). A
+   near-disjoint alert set means runner noise is still dominating.
 3. Prefer threshold changes that require stronger evidence before failure:
    - widen the Bencher boundary from `0.95` toward `0.99`
    - add a `--threshold-min-sample-size` once each `(branch, benchmark, measure)` pair has enough history
@@ -88,8 +90,9 @@ built fresh history. Threshold tuning against missing or sparse baseline history
 
 - At least 5 consecutive non-docs main pushes pass the warning-mode check with the current code.
 - The regression tracker accumulates only sustained or overlapping alerts, not a new random alert set on each run.
-- A deliberately introduced local regression, such as an added controller delay on a benchmarked route, still triggers an
-  alert under the tuned settings.
+- A deliberately introduced local regression still triggers an alert under the tuned settings. The developer re-enabling
+  the gate should add a temporary controller delay to a benchmarked route, verify an alert fires, and then revert the
+  delay.
 - The hard gate is restored only after the tuned settings meet the false-positive target chosen for the project, such as
   no more than 1 noisy failure in 20 unchanged-performance runs.
 
