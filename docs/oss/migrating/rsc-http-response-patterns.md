@@ -74,7 +74,7 @@ def show
 
   if story.nil?
     response.status = :not_found
-    @story_props = { notFound: true, story: nil, requestedId: params[:id]&.to_i }
+    @story_props = { notFound: true, story: nil }
   else
     @story_props = { story: StorySerializer.render_as_hash(story) }
   end
@@ -86,10 +86,7 @@ end
 Then keep the React component purely presentational:
 
 ```tsx
-type StoryPageProps = {
-  notFound?: boolean;
-  story: Story | null;
-};
+type StoryPageProps = { notFound: true; story: null } | { notFound?: false; story: Story };
 
 export default function StoryPage({ notFound, story }: StoryPageProps) {
   if (notFound) {
@@ -177,7 +174,10 @@ Pass decisions as data, not as hidden HTTP side effects:
 ```
 
 ```tsx
-export default function StoryPage({ story, viewer, responsePolicy }) {
+type ResponsePolicy = { canonicalUrl: string };
+type StoryPageProps = { story: Story; viewer: Viewer; responsePolicy: ResponsePolicy };
+
+export default function StoryPage({ story, viewer, responsePolicy }: StoryPageProps) {
   return (
     <>
       <link rel="canonical" href={responsePolicy.canonicalUrl} />
