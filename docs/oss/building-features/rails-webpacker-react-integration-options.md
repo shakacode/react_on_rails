@@ -88,7 +88,7 @@ module.exports = commonWebpackConfig;
 
 ## Legacy Webpacker / Webpack 4 migration shims
 
-If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5, Webpack 4, and React 16 or 17, prefer upgrading to Shakapacker first when you can. When you need an incremental migration before that tooling upgrade, keep the compatibility shim explicit and narrow:
+If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5, Webpack 4, and React 16 or 17, prefer upgrading to Shakapacker first when you can. These shims are required for React on Rails 16.6.0 or newer on Webpacker 5 / Webpack 4. When you need an incremental migration before that tooling upgrade, keep the compatibility shim explicit and narrow:
 
 1. Import the package root from application packs:
 
@@ -105,12 +105,20 @@ If you are moving an older `react-rails` app to React on Rails while it is still
    # or: pnpm add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
    ```
 
+   Add the plugins to the top-level `plugins` array, not inside an `env`-conditional block:
+
    ```diff
    // babel.config.js
-      plugins: [
-   +    '@babel/plugin-transform-optional-chaining',
-   +    '@babel/plugin-transform-nullish-coalescing-operator',
-      ],
+   module.exports = {
+     presets: [
+       // keep existing presets
+     ],
+     plugins: [
+   +   '@babel/plugin-transform-optional-chaining',
+   +   '@babel/plugin-transform-nullish-coalescing-operator',
+       // keep existing plugins
+     ],
+   };
    ```
 
 3. Transpile the React on Rails CommonJS build from `node_modules` so Webpack 4 can parse it consistently:
