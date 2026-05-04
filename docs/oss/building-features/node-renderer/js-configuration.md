@@ -188,7 +188,8 @@ Recommended starting values:
 `--max-time 4` is intentionally shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero
 exit code before Kubernetes terminates the probe process.
 
-Readiness and liveness omit `initialDelaySeconds` because Kubernetes defers them until the startup probe succeeds.
+Readiness and liveness omit `initialDelaySeconds` here because Kubernetes defers them until the startup probe succeeds.
+If you skip the startup probe, add an appropriate `initialDelaySeconds` to each.
 
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes.
