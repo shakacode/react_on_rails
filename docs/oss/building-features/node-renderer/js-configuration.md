@@ -197,8 +197,8 @@ Fastify setup.
 
 Keep the probes' meanings separate:
 
-- **Startup** answers whether the renderer has finished booting; keep it separate from liveness so slow startup does not
-  cause premature restarts.
+- **Startup** answers whether the renderer has finished booting; keep it separate from liveness and readiness probes so
+  slow startup does not cause premature restarts or prematurely block traffic.
 - **Readiness** answers whether the renderer should receive new render requests.
 - **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer.
 
