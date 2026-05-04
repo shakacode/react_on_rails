@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  markdown-link-check:
+  markdown-format-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter='{.}'
 
       - name: Check markdown formatting
         shell: bash
@@ -56,6 +56,11 @@ jobs:
           fi
 
           pnpm exec prettier --check -- "${markdown_files[@]}"
+
+  markdown-link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Restore lychee cache
         uses: actions/cache@v4
