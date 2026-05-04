@@ -88,7 +88,7 @@ module.exports = commonWebpackConfig;
 
 ## Legacy Webpacker / Webpack 4 migration shims
 
-If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5, Webpack 4, and React 16 or 17, prefer upgrading to Shakapacker first when you can. These shims are required for React on Rails 16.6.0 or newer on Webpacker 5 / Webpack 4. When you need an incremental migration before that tooling upgrade, keep the compatibility shim explicit and narrow:
+If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5, Webpack 4, and React 16 or 17, prefer upgrading to Shakapacker first when you can. These shims are required for React on Rails 16.6.0 or newer on Webpacker 5 / Webpack 4. Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. When you need an incremental migration before that tooling upgrade, keep the compatibility shim explicit and narrow:
 
 1. Import the package root from application packs:
 
@@ -121,7 +121,7 @@ If you are moving an older `react-rails` app to React on Rails while it is still
    };
    ```
 
-3. Transpile the React on Rails CommonJS build from `node_modules` so Webpack 4 can parse it consistently:
+3. Transpile the React on Rails CommonJS build from `node_modules` so Webpack 4 can parse it consistently. This rule inherits your project's `babel.config.js`, so complete Step 2 before adding it:
 
    ```js
    // config/webpack/environment.js
