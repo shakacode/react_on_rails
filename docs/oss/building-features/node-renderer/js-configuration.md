@@ -107,11 +107,13 @@ Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` c
 
 For advanced use cases, such as adding custom routes, registering Fastify plugins, or hooking into the request lifecycle,
 you can configure the Fastify server directly by importing the `master` and `worker` modules instead of using
-`reactOnRailsProNodeRenderer`. A common need is a `/health` endpoint for container health checks:
+`reactOnRailsProNodeRenderer`.
 
 The advanced examples below use ES modules for readability. If you want this file to keep running
 as `node renderer/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
 example above or switch the file to `.mjs` or `"type": "module"`.
+
+A common need is a `/health` endpoint for container health checks:
 
 ```js
 import masterRun from 'react-on-rails-pro-node-renderer/master';
