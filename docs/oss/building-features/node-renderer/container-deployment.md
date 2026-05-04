@@ -413,7 +413,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      periodSeconds: 5
      failureThreshold: 3
    ```
-   > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep HTTP2`. If curl is unavailable, use `tcpSocket` as a fallback.
+   > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep -i http2`. If curl is unavailable, use `tcpSocket` as a fallback.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
    ```yaml
    livenessProbe:

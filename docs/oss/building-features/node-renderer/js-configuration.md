@@ -105,7 +105,9 @@ Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` c
 
 ## Adding a Health Check Endpoint
 
-When running the node-renderer in Docker or Kubernetes, you may need a `/health` endpoint for container health checks:
+For advanced use cases, such as adding custom routes, registering Fastify plugins, or hooking into the request lifecycle,
+you can configure the Fastify server directly by importing the `master` and `worker` modules instead of using
+`reactOnRailsProNodeRenderer`. A common need is a `/health` endpoint for container health checks:
 
 The advanced examples below use ES modules for readability. If you want this file to keep running
 as `node renderer/node-renderer.js`, either keep using the CommonJS pattern shown in the simple
@@ -170,7 +172,7 @@ listener. Use one of these probe styles instead:
 | `exec` probe | Application-level readiness check with an h2c-aware client, for example `curl --http2-prior-knowledge`.                      |
 | HTTP/1.1     | Only if you probe Rails, a separate HTTP/1.1 health sidecar/port, or another endpoint that is not the renderer h2c listener. |
 
-> **Note:** The `exec` probe requires curl with HTTP/2 support. Verify with `curl --version | grep HTTP2`. If unavailable,
+> **Note:** The `exec` probe requires curl with HTTP/2 support. Verify with `curl --version | grep -i http2`. If unavailable,
 > use a `tcpSocket` readiness probe as a fallback.
 
 Recommended starting values:
@@ -183,6 +185,8 @@ Recommended starting values:
 
 `--max-time 4` is intentionally shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero
 exit code before Kubernetes terminates the probe process.
+
+Readiness and liveness omit `initialDelaySeconds` because Kubernetes defers them until the startup probe succeeds.
 
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes.
