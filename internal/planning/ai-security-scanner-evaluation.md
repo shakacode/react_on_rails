@@ -22,12 +22,16 @@ licensing boundaries.
 
 ## Candidate Scanner Categories
 
-Use this point-in-time candidate list from the issue if the products still offer an appropriate plan at evaluation time:
+Start with this point-in-time vendor shortlist from the issue if the products still offer an appropriate plan at
+evaluation time:
 
 - ZeroPath
 - Corgea
 - Almanax
 - DryRun
+
+If the named vendors are unavailable or unsuitable, look for tools in these categories:
+
 - AI-native SAST scanners
 - AI-assisted dependency reachability scanners
 - AI review tools that can reason about business logic and security intent
@@ -41,13 +45,14 @@ validating.
 Use a fixed branch and commit for the first comparison so results are reproducible:
 
 1. Current `main`
-2. A private fork, private Gist, or existing vulnerable-by-design project that verifies the scanner can catch a known
-   issue without publishing intentionally vulnerable code in the public React on Rails repository
+2. A private, access-controlled fork or an established vulnerable-by-design training project that verifies the scanner
+   can catch a known issue without publishing intentionally vulnerable code in the public React on Rails repository
 3. A branch with a known-safe refactor to measure false positives on normal code motion
 
 The intentionally vulnerable fixture should be small and obvious, such as unsafe template evaluation in a test-only file.
 Do not commit intentionally vulnerable fixtures, secrets, real credentials, or exploit-ready application behavior to a
-public branch of this repository.
+public branch of this repository. Keep any private positive-control fixture non-indexable, clearly labeled test-only, and
+inert: no operational code paths, real network calls, or reusable exploit payloads.
 
 ## Scoring Criteria
 
@@ -70,7 +75,10 @@ Score each scanner against the same rubric:
 2. Run the scan without enabling CI blocking.
 3. Export raw findings with sensitive details into a private Notion or Google Doc if needed; summarize only sanitized,
    verified results in the public issue after exposure details are fixed or disproven.
+   Limit access to repository maintainers or the security triage group, omit secrets and credentials, redact reproduction
+   snippets, and delete or archive raw notes after the finding is resolved.
 4. For each high or critical finding, reproduce locally or write down why it is not reachable.
+   Batch-triage medium findings after the high/critical pass. Skip informational findings unless a pattern emerges.
 5. Fix only verified vulnerabilities or correctness bugs.
 6. Summarize scanner signal in the issue before trying the next scanner.
 
