@@ -88,58 +88,61 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
         .to output(/Pre-staged renderer cache: .* -> .*Symlinked asset: .* ->/m).to_stdout
     end
 
-    it "treats a concurrent matching symlink as success" do
-      # Simulates two processes racing through make_relative_symlink: the
-      # other process recreated the destination between rm_f and File.symlink,
-      # so our syscall raises EEXIST. The guard should swallow that instead
-      # of propagating.
-      allow(File).to receive(:symlink).and_wrap_original do |original, source, destination|
-        original.call(source, destination)
-        raise Errno::EEXIST
-      end
-
-      expect { described_class.call(mode: :symlink) }.not_to raise_error
-    end
-
-    it "replaces a mismatched symlink created by a concurrent stage" do
+    it "atomically replaces an existing stale symlink" do
       stale_source = "stale-server-bundle.js"
-      created_stale_link = false
-      allow(File).to receive(:symlink).and_wrap_original do |original, source, destination|
-        unless created_stale_link
-          created_stale_link = true
-          original.call(stale_source, destination)
-          raise Errno::EEXIST
-        end
-
-        original.call(source, destination)
-      end
-
-      expect { described_class.call(mode: :symlink) }.to output(/replaced stale symlink/).to_stdout
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
+      FileUtils.mkdir_p(bundle_dir)
+      File.symlink(stale_source, dest_file)
+
+      expect { described_class.call(mode: :symlink) }.to output(/Pre-staged renderer cache: .* ->/).to_stdout
       expect(File.realpath(dest_file)).to eq(server_bundle_path)
     end
 
-    it "treats a concurrent matching symlink during stale replacement as success" do
-      stale_source = "stale-server-bundle.js"
-      symlink_calls = 0
-      allow(File).to receive(:symlink).and_wrap_original do |original, source, destination|
-        symlink_calls += 1
-        case symlink_calls
-        when 1
-          original.call(stale_source, destination)
-          raise Errno::EEXIST
-        when 2
-          original.call(source, destination)
-          raise Errno::EEXIST
-        else
-          original.call(source, destination)
-        end
-      end
+    it "cleans up the temporary symlink when atomic replacement fails" do
+      allow(SecureRandom).to receive(:hex).and_call_original
+      allow(SecureRandom).to receive(:hex).with(4).and_return("abcd1234")
+      allow(File).to receive(:rename).and_call_original
+      allow(File).to receive(:rename)
+        .with(a_string_matching(/\.tmp-#{Process.pid}-abcd1234\z/), anything)
+        .and_raise(Errno::EIO, "rename failed")
 
-      expect { described_class.call(mode: :symlink) }
-        .to output(/concurrent creator won a second race/).to_stdout
+      expect { described_class.call(mode: :symlink) }.to raise_error(Errno::EIO)
+      expect(Dir.glob(File.join(bundle_dir, "*.tmp-*"))).to be_empty
+    end
+
+    it "does not remove the destination before replacing a stale symlink" do
+      stale_source = "stale-server-bundle.js"
       dest_file = File.join(bundle_dir, "#{bundle_hash}.js")
+      FileUtils.mkdir_p(bundle_dir)
+      File.symlink(stale_source, dest_file)
+
+      allow(FileUtils).to receive(:rm_f).and_call_original
+
+      described_class.call(mode: :symlink)
+
+      expect(FileUtils).not_to have_received(:rm_f).with(dest_file)
       expect(File.realpath(dest_file)).to eq(server_bundle_path)
+    end
+
+    it "reads each RSC manifest path once so required validation shares the asset snapshot" do
+      client_manifest_path = path_in_webpack_folder("react-client-manifest.json")
+      server_client_manifest_path = path_in_webpack_folder("react-server-client-manifest.json")
+      File.write(client_manifest_path, "{}")
+      File.write(server_client_manifest_path, "{}")
+      allow(ReactOnRailsPro.configuration).to receive_messages(enable_rsc_support: true, assets_to_copy: nil)
+      allow(ReactOnRailsPro::Utils).to receive_messages(rsc_bundle_js_file_path: server_bundle_path)
+      expect(ReactOnRailsPro::Utils).to receive(:react_client_manifest_file_path).once.and_return(client_manifest_path)
+      expect(ReactOnRailsPro::Utils)
+        .to receive(:react_server_client_manifest_file_path).once.and_return(server_client_manifest_path)
+      pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
+      allow(pool).to receive(:rsc_bundle_hash).and_return("rsc-hash")
+
+      described_class.call(mode: :symlink)
+    ensure
+      if defined?(client_manifest_path)
+        FileUtils.rm_f(client_manifest_path)
+        FileUtils.rm_f(server_client_manifest_path)
+      end
     end
 
     it "logs mode-accurate prefixes (Pre-staged / Symlinked) instead of copy-oriented wording" do
@@ -174,6 +177,13 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     ensure
       FileUtils.rm_rf(tmpdir)
       ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
+    end
+
+    it "raises when the preferred env var is whitespace-only" do
+      ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "  "
+
+      expect { described_class.call(mode: :copy) }
+        .to raise_error(ReactOnRailsPro::Error, /whitespace-only/)
     end
 
     it "does not raise in :symlink mode even without an env var" do

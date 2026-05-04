@@ -81,8 +81,7 @@ Rake::Task["assets:precompile"]
     .clear_prerequisites
     .enhance([:environment, "react_on_rails:assets:compile_environment"])
     .enhance do
-  ENV["MODE"] = "symlink"
-  Rake::Task["react_on_rails_pro:pre_seed_renderer_cache"].invoke
+  ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink)
 end
 ```
 

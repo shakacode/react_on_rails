@@ -3,6 +3,7 @@
 require "fileutils"
 require "pathname"
 require "react_on_rails_pro/renderer_cache_helpers"
+require "securerandom"
 
 module ReactOnRailsPro
   # Stages the Node Renderer bundle cache in the renderer's expected directory
@@ -31,8 +32,7 @@ module ReactOnRailsPro
       puts "[ReactOnRailsPro] Staging renderer cache (mode: #{mode}) in: #{cache_dir}"
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
 
-      assets = RendererCacheHelpers.collect_assets
-      rsc_required_paths = RendererCacheHelpers.required_rsc_asset_paths
+      assets, rsc_required_paths = RendererCacheHelpers.collect_assets_with_required_paths
 
       RendererCacheHelpers.bundle_sources(pool, action_description(mode)).each do |src_bundle_path, bundle_hash|
         bundle_dir = File.join(cache_dir, bundle_hash.to_s)
@@ -60,12 +60,14 @@ module ReactOnRailsPro
       return unless mode == :copy
       return if Rails.env.development? || Rails.env.test?
 
-      # Use a plain-Ruby check (no ActiveSupport .present?) so whitespace-only
-      # values are treated as "not set" and the guard remains portable.
+      # Only development and test are exempt; custom environments (ci, staging,
+      # review, etc.) must set the env var explicitly because their default cache
+      # path can differ from the Node renderer's default, causing silent
+      # mis-staging.
       # RENDERER_BUNDLE_PATH remains accepted for compatibility, but new deploys
       # should migrate to RENDERER_SERVER_BUNDLE_CACHE_PATH.
-      return unless ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").strip.empty? &&
-                    ENV.fetch("RENDERER_BUNDLE_PATH", "").strip.empty?
+      return if ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", nil).to_s != "" ||
+                ENV.fetch("RENDERER_BUNDLE_PATH", nil).to_s != ""
 
       raise ReactOnRailsPro::Error, <<~MSG.strip
         Pre-seeding the renderer cache in copy mode (#{Rails.env}) requires an explicit
@@ -119,10 +121,9 @@ module ReactOnRailsPro
     end
     private_class_method :stage_assets
 
-    # Replaces `destination` with a relative symlink to `source`. Not atomic:
-    # if the process is killed between `rm_f` and `File.symlink` the destination
-    # is briefly absent. In practice the renderer's 410->refetch retry at
-    # request time recovers from a missing bundle, so the brief gap is benign.
+    # Creates a temporary symlink alongside `destination` and renames it into
+    # place atomically. POSIX rename replaces an existing symlink without a
+    # delete-first gap, so concurrent renderer reads never see a missing bundle.
     def self.make_relative_symlink(source, destination, log_prefix)
       destination_dir = Pathname.new(destination).dirname
 
@@ -151,44 +152,13 @@ module ReactOnRailsPro
                 "it may have been removed after mkdir_p (race with an external cleanup)."
         end
       relative_source_path = source_path.relative_path_from(destination_dir_real)
-      FileUtils.rm_f(destination)
-      begin
-        File.symlink(relative_source_path, destination)
-        puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
-      rescue Errno::EEXIST
-        replace_existing_symlink(destination, relative_source_path, log_prefix)
-      end
+      tmp = "#{destination}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}"
+      File.symlink(relative_source_path, tmp)
+      File.rename(tmp, destination)
+      puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
+    ensure
+      FileUtils.rm_f(tmp) if tmp
     end
     private_class_method :make_relative_symlink
-
-    def self.replace_existing_symlink(destination, relative_source_path, log_prefix)
-      if matching_symlink?(destination, relative_source_path)
-        puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
-             "(concurrent creator won the race); leaving existing link."
-        return
-      end
-
-      FileUtils.rm_f(destination)
-      begin
-        File.symlink(relative_source_path, destination)
-      rescue Errno::EEXIST
-        if matching_symlink?(destination, relative_source_path)
-          puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
-               "(concurrent creator won a second race after we cleared a stale link); " \
-               "leaving existing link."
-          return
-        end
-
-        raise
-      end
-      puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination} " \
-           "(replaced stale symlink)"
-    end
-    private_class_method :replace_existing_symlink
-
-    def self.matching_symlink?(destination, relative_source_path)
-      File.symlink?(destination) && File.readlink(destination) == relative_source_path.to_s
-    end
-    private_class_method :matching_symlink?
   end
 end

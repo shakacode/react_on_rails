@@ -182,20 +182,12 @@ module ReactOnRailsPro
     RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX = Mutex.new
     private_constant :RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX
 
-    # Uses the same plain-Ruby blank check as enforce_cache_dir_env_var! so a
-    # whitespace-only env var (e.g. RENDERER_SERVER_BUNDLE_CACHE_PATH=" ") is
-    # treated as unset by both call sites. The raw env value is returned (not
-    # stripped) so the Rails-side pre-seed lands in the same directory the Node
-    # renderer reads — packages/react-on-rails-pro-node-renderer/src/shared/
-    # configBuilder.ts consumes these env vars verbatim, and a stripped value
-    # here would silently diverge from the renderer's view when an env file
-    # accidentally includes leading/trailing whitespace.
     def self.resolve_renderer_cache_dir
-      preferred = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "")
-      return preferred unless preferred.strip.empty?
+      preferred = renderer_cache_env_value("RENDERER_SERVER_BUNDLE_CACHE_PATH")
+      return preferred if preferred
 
-      legacy = ENV.fetch("RENDERER_BUNDLE_PATH", "")
-      if legacy.strip.empty?
+      legacy = renderer_cache_env_value("RENDERER_BUNDLE_PATH")
+      if legacy.nil?
         Rails.root.join(".node-renderer-bundles").to_s
       else
         RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize do
@@ -209,14 +201,18 @@ module ReactOnRailsPro
       end
     end
 
-    # :nodoc: Test helper — resets the one-time deprecation-warning guard so
-    # specs can exercise both the "warning fires" and "warning suppressed" paths
-    # without leaking state between examples. Private so production callers can't
-    # inadvertently reset the once-per-process guard; specs invoke it via `send`.
+    def self.renderer_cache_env_value(name)
+      value = ENV.fetch(name, "")
+      whitespace_only = !value.empty? && value.strip.empty?
+      raise ReactOnRailsPro::Error, "#{name} is whitespace-only; set or unset it." if whitespace_only
+
+      value.empty? ? nil : value
+    end
+    private_class_method :renderer_cache_env_value
+
+    # :nodoc: Test helper for resetting the one-time deprecation-warning guard.
     def self.reset_renderer_bundle_path_deprecation_warned!
-      RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize do
-        @renderer_bundle_path_deprecation_warned = nil
-      end
+      RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX.synchronize { @renderer_bundle_path_deprecation_warned = false }
     end
     private_class_method :reset_renderer_bundle_path_deprecation_warned!
 

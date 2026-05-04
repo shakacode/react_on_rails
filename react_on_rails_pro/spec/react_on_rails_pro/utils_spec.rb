@@ -526,14 +526,19 @@ module ReactOnRailsPro
         expect(@result).to eq(" /tmp/legacy-cache ")
       end
 
-      it "treats whitespace-only env values as unset and falls back to the default" do
+      it "raises when the preferred env var is whitespace-only" do
         ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "  "
-        ENV["RENDERER_BUNDLE_PATH"] = "\t\n"
-        allow(Rails).to receive(:root).and_return(Pathname.new("/app"))
+        ENV["RENDERER_BUNDLE_PATH"] = "/tmp/legacy-cache"
 
-        expect { @result = described_class.resolve_renderer_cache_dir }
-          .not_to output(/deprecated/).to_stderr
-        expect(@result).to eq("/app/.node-renderer-bundles")
+        expect { described_class.resolve_renderer_cache_dir }
+          .to raise_error(ReactOnRailsPro::Error, /RENDERER_SERVER_BUNDLE_CACHE_PATH is whitespace-only/)
+      end
+
+      it "raises when the deprecated env var is whitespace-only" do
+        ENV["RENDERER_BUNDLE_PATH"] = "\t\n"
+
+        expect { described_class.resolve_renderer_cache_dir }
+          .to raise_error(ReactOnRailsPro::Error, /RENDERER_BUNDLE_PATH is whitespace-only/)
       end
     end
   end

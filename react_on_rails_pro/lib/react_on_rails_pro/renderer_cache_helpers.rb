@@ -12,6 +12,10 @@ module ReactOnRailsPro
     module_function
 
     def collect_assets
+      collect_assets_with_required_paths.first
+    end
+
+    def collect_assets_with_required_paths
       config = ReactOnRailsPro.configuration
       # assets_to_copy may include nil entries (user-configured, optional);
       # those are silently dropped by `.compact`. RSC manifests, by contrast,
@@ -20,21 +24,29 @@ module ReactOnRailsPro
       assets = Array(config.assets_to_copy).compact
 
       if config.enable_rsc_support
-        rsc_manifests = [
-          ReactOnRailsPro::Utils.react_client_manifest_file_path,
-          ReactOnRailsPro::Utils.react_server_client_manifest_file_path
-        ]
-        if rsc_manifests.any?(&:nil?)
-          raise ReactOnRailsPro::Error,
-                "RSC manifest path resolved to nil. " \
-                "Check react_client_manifest_file and react_server_client_manifest_file configuration."
-        end
+        rsc_manifests = rsc_manifest_paths
         assets.concat(rsc_manifests)
+      else
+        rsc_manifests = []
       end
 
       unique = assets.uniq(&:to_s)
       warn_on_duplicate_basenames(unique)
-      unique
+      [unique, required_rsc_asset_paths(rsc_manifests)]
+    end
+
+    def rsc_manifest_paths
+      manifests = [
+        ReactOnRailsPro::Utils.react_client_manifest_file_path,
+        ReactOnRailsPro::Utils.react_server_client_manifest_file_path
+      ]
+      if manifests.any?(&:nil?)
+        raise ReactOnRailsPro::Error,
+              "RSC manifest path resolved to nil. " \
+              "Check react_client_manifest_file and react_server_client_manifest_file configuration."
+      end
+
+      manifests
     end
 
     # `stage_assets` writes each asset into `bundle_dir` using only its basename,
@@ -119,13 +131,10 @@ module ReactOnRailsPro
     #
     # URL-backed manifests (dev server) cannot be staged; exclude them so
     # `each_stageable_asset` does not see them as "required" and raise.
-    def required_rsc_asset_paths
+    def required_rsc_asset_paths(manifests = nil)
       return Set.new unless ReactOnRailsPro.configuration.enable_rsc_support
 
-      manifests = [
-        ReactOnRailsPro::Utils.react_client_manifest_file_path,
-        ReactOnRailsPro::Utils.react_server_client_manifest_file_path
-      ]
+      manifests ||= rsc_manifest_paths
       Set.new(
         manifests
           .reject { |path| http_url?(path) }
