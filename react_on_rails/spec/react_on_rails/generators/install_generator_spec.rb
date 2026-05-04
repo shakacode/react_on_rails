@@ -3104,14 +3104,13 @@ describe InstallGenerator, type: :generator do
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("package manager 'pnpm' was selected")
       expect(error_text).to include("default npm fallback")
-      expect(error_text).to include("available")
-      expect(error_text).to include("npm")
+      expect(error_text).to include("available package managers: npm")
     end
 
     specify "missing_package_manager? uses the shared executable check for alternatives" do
       install_generator.send(:missing_package_manager?)
 
-      expect(GeneratorMessages).to have_received(:package_manager_executable_available?).with("pnpm").at_least(:once)
+      expect(GeneratorMessages).to have_received(:package_manager_executable_available?).with("pnpm").once
       expect(GeneratorMessages).to have_received(:package_manager_executable_available?).with("npm")
     end
   end

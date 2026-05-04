@@ -949,7 +949,10 @@ module ReactOnRails
         selected_package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
         return false if GeneratorMessages.package_manager_executable_available?(selected_package_manager)
 
-        available_package_managers = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.select do |pm|
+        available_package_managers = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.reject do |pm|
+          pm == selected_package_manager
+        end
+        available_package_managers = available_package_managers.select do |pm|
           GeneratorMessages.package_manager_executable_available?(pm)
         end
 
