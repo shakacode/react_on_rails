@@ -56,7 +56,8 @@ instead of this docs page.
 
 That keeps the public docs focused on durable references while the meta issue can
 carry working notes about draft PRs, maintainer coordination, blockers, and proof
-artifacts that may change quickly.
+artifacts that may change quickly. See the [Proof artifact template](#proof-artifact-template)
+for the recommended fields to capture.
 
 When a public migration becomes a stable reference, add it to the published example
 list above with a short proof note.
@@ -135,6 +136,7 @@ Copy this table when opening a migration PR:
 
 ```markdown
 <!-- Use "not claimed" for evidence fields that do not apply. Use "none" for Known blockers when there are none. -->
+<!-- Validation is required. -->
 
 | Field                     | Value |
 | ------------------------- | ----- |
