@@ -341,6 +341,7 @@ describe('ClientRenderer', () => {
     // tracked in one test doesn't bleed into the next.
     afterEach(async () => {
       await triggerPageUnload();
+      document.body.innerHTML = '';
     });
 
     it('invokes the teardown returned by a renderer function on page unload', async () => {

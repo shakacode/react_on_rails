@@ -11,8 +11,18 @@ import { supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
-// Track all rendered roots for cleanup
-const renderedRoots = new Map<string, { root: RenderReturnType; domNode: Element }>();
+type RendererTeardown = () => void | Promise<void>;
+
+type RenderedRoot = {
+  domNode: Element;
+  root?: RenderReturnType;
+  teardown?: RendererTeardown;
+};
+
+type RendererResult = undefined | RendererTeardown | Promise<undefined | RendererTeardown>;
+
+// Track all rendered roots and renderer-function teardowns for cleanup
+const renderedRoots = new Map<string, RenderedRoot>();
 
 function initializeStore(el: Element, railsContext: RailsContext): void {
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
@@ -33,11 +43,62 @@ function domNodeIdForEl(el: Element): string {
   return el.getAttribute('data-dom-id') || '';
 }
 
+function isRendererTeardown(value: unknown): value is RendererTeardown {
+  return typeof value === 'function';
+}
+
+function isPromiseLikeRendererResult(value: RendererResult): value is Promise<undefined | RendererTeardown> {
+  return !!(value as Promise<undefined | RendererTeardown> | undefined)?.then;
+}
+
+function trackRendererTeardown(
+  domNodeId: string,
+  domNode: Element,
+  rendererResult: RendererResult,
+  componentName: string,
+): void {
+  renderedRoots.set(domNodeId, { domNode });
+
+  const storeTeardown = (resolvedResult: undefined | RendererTeardown): void => {
+    if (!isRendererTeardown(resolvedResult)) return;
+
+    const renderedRoot = renderedRoots.get(domNodeId);
+    if (renderedRoot?.domNode === domNode) {
+      renderedRoot.teardown = resolvedResult;
+    }
+  };
+
+  if (isPromiseLikeRendererResult(rendererResult)) {
+    void rendererResult.then(storeTeardown).catch((error: unknown) => {
+      console.error(`Error resolving renderer teardown for component ${componentName}:`, error);
+    });
+    return;
+  }
+
+  storeTeardown(rendererResult);
+}
+
+async function unmountRenderedRoot({ root, domNode, teardown }: RenderedRoot): Promise<void> {
+  if (teardown) {
+    await teardown();
+    return;
+  }
+
+  if (supportsRootApi && root && typeof root === 'object' && 'unmount' in root) {
+    // React 18+ Root API
+    root.unmount();
+  } else {
+    // React 16-17 legacy API
+    unmountComponentAtNode(domNode);
+  }
+}
+
 function delegateToRenderer(
   componentObj: RegisteredComponent,
   props: Record<string, unknown>,
   railsContext: RailsContext,
   domNodeId: string,
+  domNode: Element,
   trace: boolean,
 ): boolean {
   const { name, component, isRenderer } = componentObj;
@@ -53,11 +114,14 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
     }
 
     // Call the renderer function with the expected signature
-    (component as (props: Record<string, unknown>, railsContext: RailsContext, domNodeId: string) => void)(
-      props,
-      railsContext,
-      domNodeId,
-    );
+    const rendererResult = (
+      component as (
+        props: Record<string, unknown>,
+        railsContext: RailsContext,
+        domNodeId: string,
+      ) => RendererResult
+    )(props, railsContext, domNodeId);
+    trackRendererTeardown(domNodeId, domNode, rendererResult, name);
     return true;
   }
 
@@ -94,28 +158,17 @@ function renderElement(el: Element, railsContext: RailsContext): void {
           return;
         }
         // DOM node was replaced (e.g., via async HTML injection) - clean up the old root
-        try {
-          if (
-            supportsRootApi &&
-            existing.root &&
-            typeof existing.root === 'object' &&
-            'unmount' in existing.root
-          ) {
-            existing.root.unmount();
-          } else {
-            unmountComponentAtNode(existing.domNode);
-          }
-        } catch (unmountError) {
+        void unmountRenderedRoot(existing).catch((unmountError: unknown) => {
           // Ignore unmount errors for replaced nodes
           if (trace) {
             console.log(`Error unmounting replaced component: ${name}`, unmountError);
           }
-        }
+        });
         renderedRoots.delete(domNodeId);
       }
 
       const componentObj = ComponentRegistry.get(name);
-      if (delegateToRenderer(componentObj, props, railsContext, domNodeId, trace)) {
+      if (delegateToRenderer(componentObj, props, railsContext, domNodeId, domNode, trace)) {
         return;
       }
 
@@ -204,21 +257,18 @@ export function reactOnRailsComponentLoaded(domId: string): Promise<void> {
  * Unmount all rendered React components and clear roots.
  * This should be called on page unload to prevent memory leaks.
  */
-function unmountAllComponents(): void {
-  renderedRoots.forEach(({ root, domNode }) => {
+async function unmountAllComponents(): Promise<void> {
+  const renderedRootEntries = [...renderedRoots.values()];
+  renderedRoots.clear();
+
+  for (const renderedRoot of renderedRootEntries) {
     try {
-      if (supportsRootApi && root && typeof root === 'object' && 'unmount' in root) {
-        // React 18+ Root API
-        root.unmount();
-      } else {
-        // React 16-17 legacy API
-        unmountComponentAtNode(domNode);
-      }
+      // eslint-disable-next-line no-await-in-loop
+      await unmountRenderedRoot(renderedRoot);
     } catch (error) {
       console.error('Error unmounting component:', error);
     }
-  });
-  renderedRoots.clear();
+  }
 }
 
 // Register cleanup on page unload
