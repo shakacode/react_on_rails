@@ -122,15 +122,18 @@ Use this template in the migration PR description, linked issue, or a short `doc
 | Baseline ref              | Commit SHA, branch, or tag before the migration                                                         |
 | Migration ref             | Commit SHA, branch, this PR, or another PR after the migration                                          |
 | Route or component        | The exact Rails route, controller action, or React mount point                                          |
+| React on Rails version    | Target gem/npm package version, branch, or "this PR"                                                    |
 | Starting integration      | `react-rails`, `vite_rails`, custom helper, or older React on Rails                                     |
 | Migration slice           | What changed and what intentionally stayed out of scope                                                 |
 | Performance evidence      | Response timing, HTML size, JS bytes, asset count, Lighthouse/WebPageTest/RUM metrics, or "not claimed" |
 | Maintainability evidence  | Removed custom bridge code, smaller mount boundary, standardized helper usage, or "not claimed"         |
-| Validation                | Test commands, build commands, browser smoke checks, screenshots, CI links, or "not claimed"            |
+| Validation                | Test commands, build commands, browser smoke checks, screenshots, or CI links; this field is required   |
 | Known blockers or caveats | Native services, old lockfiles, auth setup, browser-only flows, environment assumptions, or "none"      |
 | Honest summary sentence   | One sentence maintainers can reuse without overstating the result                                       |
 
 Copy this table when opening a migration PR:
+
+<!-- Use "not claimed" for evidence fields that do not apply. Use "none" for Known blockers when there are none. -->
 
 ```markdown
 | Field                     | Value |
@@ -138,6 +141,7 @@ Copy this table when opening a migration PR:
 | Baseline ref              |       |
 | Migration ref             |       |
 | Route or component        |       |
+| React on Rails version    |       |
 | Starting integration      |       |
 | Migration slice           |       |
 | Performance evidence      |       |
@@ -152,7 +156,7 @@ Example summary sentences:
 - "This migration is performance-first: the route ships fewer JavaScript bytes and keeps the same Rails response contract."
 - "This migration is maintainability-first: it replaces a custom Rails-side React bridge with a standard React on Rails helper while preserving route behavior."
 - "This migration is a setup proof: it demonstrates the minimum config changes needed for a legacy stack, but does not claim route-level speedup."
-- "This migration delivers both: the route ships fewer bytes (performance) and removes a custom bridge helper (maintainability)."
+- "This mixed-result migration delivers both: the route ships fewer bytes (performance) and removes a custom bridge helper (maintainability)."
 
 ## Contribute an example
 
