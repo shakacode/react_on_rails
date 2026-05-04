@@ -74,7 +74,7 @@ def show
 
   if story.nil?
     response.status = :not_found
-    @story_props = { notFound: true, story: nil, requestedId: params[:id].to_i }
+    @story_props = { notFound: true, story: nil, requestedId: params[:id]&.to_i }
   else
     @story_props = { story: StorySerializer.render_as_hash(story) }
   end
@@ -86,7 +86,12 @@ end
 Then keep the React component purely presentational:
 
 ```tsx
-export default function StoryPage({ notFound, story }) {
+type StoryPageProps = {
+  notFound?: boolean;
+  story: Story | null;
+};
+
+export default function StoryPage({ notFound, story }: StoryPageProps) {
   if (notFound) {
     return <NotFoundMessage />;
   }
@@ -133,7 +138,9 @@ For public pages, let Rails decide freshness before rendering:
 
 ```ruby
 def show
-  story = Story.published.find_by!(slug: params[:slug])
+  story = Story.published.find_by(slug: params[:slug])
+  return render(template: "errors/not_found", status: :not_found) unless story
+
   return unless stale?(
     story,
     public: true,
@@ -144,6 +151,8 @@ def show
   stream_view_containing_react_components(template: "stories/show")
 end
 ```
+
+Rails 7.1+ supports `cache_control:` on `stale?`. On older Rails versions, set the full `Cache-Control` header directly and keep the explicit freshness guard before streaming.
 
 When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy or keep the response private:
 
