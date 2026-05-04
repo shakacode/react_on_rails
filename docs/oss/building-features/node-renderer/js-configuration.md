@@ -156,6 +156,8 @@ in any environment, and returns `node_version` and `renderer_version`.
 
 Keep the probes' meanings separate:
 
+- **Startup** answers whether the renderer has finished booting; keep it separate from liveness so slow startup does not
+  cause premature restarts.
 - **Readiness** answers whether the renderer should receive new render requests.
 - **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer.
 
@@ -163,8 +165,9 @@ Do not put Rails, database, Redis, or other external dependency checks in the no
 temporary dependency outage should not restart every renderer replica. If SSR must be available before Rails receives
 traffic, make the Rails readiness endpoint perform a short renderer check.
 
-The renderer listens with cleartext HTTP/2 (h2c). Kubernetes `httpGet` probes and other HTTP/1.1-only probes are not
-compatible with that listener. Use one of these probe styles instead:
+The renderer listens with cleartext HTTP/2 (h2c). Do not configure a Kubernetes `httpGet` probe, Control Plane HTTP
+probe, or any other HTTP/1.1-only probe directly against the renderer port; those probes are rejected by the h2c
+listener. Use one of these probe styles instead:
 
 | Probe style  | When to use it                                                                                                               |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -183,7 +186,8 @@ Recommended starting values:
 See [Node Renderer: Container Deployment](./container-deployment.md#startup-errors-err_stream_premature_close) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes.
 
-For Control Plane deployments, choose the probe target based on where the node renderer runs:
+For Control Plane deployments, choose the probe target based on where the node renderer runs. Renderer probe targets
+below mean `tcpSocket` or h2c-aware `exec` probes, not HTTP/1.1 `httpGet` probes directly against the renderer.
 
 | Deployment shape                        | Rails `renderer_url`                                                                                                                                                                                                                           | Renderer `host`             | Probe target                                                                                                                                                    |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
