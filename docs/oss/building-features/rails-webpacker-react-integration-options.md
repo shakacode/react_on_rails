@@ -92,7 +92,7 @@ module.exports = commonWebpackConfig;
 
 If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5, Webpack 4, and React 16 or 17, prefer upgrading to Shakapacker first when you can.
 
-Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. Starting with [React on Rails 16.6.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1660---2026-04-09), the following shims may be needed on Webpacker 5 / Webpack 4. Apply only the ones that match the errors you see, and keep each shim explicit and narrow:
+Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims. Apply only the ones that match the errors you see, and keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
 
@@ -125,7 +125,7 @@ Webpack 4 does not support the `exports` field in `package.json`, so subpath imp
    };
    ```
 
-3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed. This rule inherits your project's `babel.config.js`, so complete Step 2 before adding it:
+3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed. This rule inherits your project's `babel.config.js`, so first confirm that your config handles optional chaining and nullish coalescing by following Step 2 above or by using existing `@babel/preset-env` targets that already include those transforms:
 
    ```js
    // config/webpack/environment.js
