@@ -488,6 +488,9 @@ module ReactOnRails
         content = File.read(path)
         missing = []
         missing << "RSCWebpackPlugin in serverWebpackConfig.js" unless content.include?("RSCWebpackPlugin")
+        if content.include?("RSCWebpackPlugin") && !content.include?("clientReferences: rscClientReferences")
+          missing << "scoped clientReferences in serverWebpackConfig.js"
+        end
         missing << "rscBundle parameter in serverWebpackConfig.js" unless content.include?("rscBundle")
         missing
       end
@@ -497,7 +500,12 @@ module ReactOnRails
         return [] unless File.exist?(path)
 
         content = File.read(path)
-        content.include?("RSCWebpackPlugin") ? [] : ["RSCWebpackPlugin in clientWebpackConfig.js"]
+        missing = []
+        missing << "RSCWebpackPlugin in clientWebpackConfig.js" unless content.include?("RSCWebpackPlugin")
+        if content.include?("RSCWebpackPlugin") && !content.include?("clientReferences: rscClientReferences")
+          missing << "scoped clientReferences in clientWebpackConfig.js"
+        end
+        missing
       end
 
       def check_rsc_scob_config
@@ -521,6 +529,11 @@ module ReactOnRails
       def update_existing_rsc_webpack_config(config_path, content, is_server:)
         return if content.include?("clientReferences: rscClientReferences")
 
+        unless content.include?("rscClientReferences") ||
+               rsc_client_references_setup_anchor?(content, is_server: is_server)
+          return
+        end
+
         add_rsc_client_references_setup(config_path, content, is_server: is_server)
 
         gsub_file(
@@ -530,7 +543,13 @@ module ReactOnRails
         )
       end
 
+      def rsc_client_references_setup_anchor?(content, is_server:)
+        content.match?(rsc_client_references_setup_import_pattern(is_server: is_server))
+      end
+
       def add_rsc_client_references_setup(config_path, content, is_server:)
+        return if content.include?("rscClientReferences")
+
         injected_imports = [
           "\\1",
           ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(content)),
@@ -539,17 +558,19 @@ module ReactOnRails
           rsc_client_references_js
         ].compact.join("\n")
 
-        import_pattern = if is_server
-                           Regexp.new(
-                             "(const bundler = config\\.assets_bundler.*\n" \
-                             ".*require\\('@rspack/core'\\).*\n" \
-                             ".*: require\\('webpack'\\);)"
-                           )
-                         else
-                           %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)}
-                         end
+        gsub_file(config_path, rsc_client_references_setup_import_pattern(is_server: is_server), injected_imports)
+      end
 
-        gsub_file(config_path, import_pattern, injected_imports)
+      def rsc_client_references_setup_import_pattern(is_server:)
+        if is_server
+          Regexp.new(
+            "(const bundler = config\\.assets_bundler.*\n" \
+            ".*require\\('@rspack/core'\\).*\n" \
+            ".*: require\\('webpack'\\);)"
+          )
+        else
+          %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)}
+        end
       end
 
       def shakapacker_config_imported?(content)
