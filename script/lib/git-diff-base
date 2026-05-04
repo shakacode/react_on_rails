@@ -102,7 +102,7 @@ git_diff_base_current_remote_branch() {
 
     if upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)"; then
       git_diff_base_remote_branch "$upstream"
-      return
+      return $?
     fi
   elif upstream="$(git rev-parse --abbrev-ref --symbolic-full-name "${current_ref}@{upstream}" 2>/dev/null)"; then
     git_diff_base_remote_branch "$upstream"
@@ -136,6 +136,15 @@ git_diff_base_resolve() {
   local remote_branch=""
   local current_remote_branch=""
   local merge_base
+
+  case "$fetch_policy" in
+    required|optional)
+      ;;
+    *)
+      echo "Error: unknown fetch policy '$fetch_policy' (expected required or optional)" >&2
+      return 1
+      ;;
+  esac
 
   if remote_branch="$(git_diff_base_base_remote_branch "$base_ref")"; then
     if git_diff_base_is_shallow_repository && ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
@@ -216,12 +225,6 @@ git_diff_base_resolve() {
           printf '%s\n' "$merge_base"
           return 0
         fi
-      fi
-    elif [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
-      git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow || true
-      if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
-        printf '%s\n' "$merge_base"
-        return 0
       fi
     fi
   fi
