@@ -10,9 +10,10 @@ This is a planning document. It does not change package versions, build configur
 
 ## Current Repository Signal
 
-The workspace package ranges already allow React 19.2.x through `^19.0.3` in the root, dummy app, and Pro dummy app
-package manifests. The current `pnpm-lock.yaml` resolves React and React DOM entries in the 19.2.x line for the main
-workspace. That means the first implementation step is verification, not necessarily a broad package-range change.
+The workspace package ranges already allow React 19.2.x through `^19.0.3` for `react` and `react-dom`, plus `^19.0.4`
+for `react-on-rails-rsc`, in the root, dummy app, and Pro dummy app package manifests. The current `pnpm-lock.yaml`
+resolves React and React DOM entries in the 19.2.x line for the main workspace. That means the first implementation
+step is verification, not necessarily a broad package-range change.
 
 ## React 19.2.x Verification Checklist
 
@@ -28,8 +29,10 @@ Use a dedicated branch for the actual version verification work:
    - `bundle exec rubocop`
    - `bundle exec rake rbs:validate`
    - targeted RSpec for React rendering, doctor, generators, and dummy SSR paths
-4. Run at least one generated-app path that installs dependencies from scratch.
-5. Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
+4. Run Playwright E2E coverage for SSR and hydration paths from the dummy app, for example
+   `cd react_on_rails/spec/dummy && pnpm test:e2e`.
+5. Run at least one generated-app path that installs dependencies from scratch.
+6. Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
    examples.
 
 ## Partial Pre-Rendering Definition
@@ -39,16 +42,19 @@ too loosely:
 
 - The Rails route still owns routing, authentication, headers, caching, and status codes.
 - React on Rails owns React registration, SSR, streaming, and hydration boundaries.
-- The Node Renderer may render a stable shell while dynamic server data resolves later through streaming, RSC payloads,
-  or Rails cache-backed fragments.
+- Streaming SSR means the Node Renderer starts work during the request and flushes chunks as Suspense boundaries,
+  server data, and RSC payloads resolve.
+- True partial pre-rendering would require a reusable static shell, rendered ahead of dynamic data at build time or at a
+  cache layer such as Rails HTTP caching or a CDN, with dynamic holes filled by a later streaming pass.
 - The feature must not require moving a Rails app into a frontend-framework routing model.
 
 ## Candidate Implementation Shapes
 
 Evaluate these in order:
 
-1. **Documented pattern only**: show how to combine Rails fragment caching, `stream_react_component`, Suspense, and RSC
-   boundaries to get a partial-pre-rendering style result without new public APIs.
+1. **Documented pattern only**: show how to combine Rails fragment caching, `react_component` plus Suspense, and RSC
+   boundaries to get a static-shell or streaming-SSR style result without new OSS public APIs. The Pro version of the
+   pattern can use `stream_react_component` for streaming delivery.
 2. **Helper-level ergonomics**: add an option or wrapper around existing streaming helpers only if repeated app code
    emerges across examples.
 3. **Renderer protocol support**: add Node Renderer request metadata only if the helper-level approach cannot express the
