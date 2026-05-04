@@ -40,7 +40,6 @@ fi
 # local history is still insufficient, the resolver fails instead of running an
 # unsafe shallow three-dot diff.
 if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" optional); then
-  echo "If you are offline, run 'git fetch origin' when you are next online." >&2
   exit 1
 fi
 

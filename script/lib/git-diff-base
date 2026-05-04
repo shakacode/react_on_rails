@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 
 # Shared helpers for scripts that need a reliable merge-base in shallow clones.
 # Source this file from bash scripts; do not execute it directly.
@@ -17,6 +17,34 @@ git_diff_base_remote_branch() {
       return 1
       ;;
   esac
+}
+
+git_diff_base_sha_ref() {
+  local ref="$1"
+
+  case "$ref" in
+    ""|*[!0-9a-fA-F]*)
+      return 1
+      ;;
+    *)
+      [ "${#ref}" -ge 7 ]
+      ;;
+  esac
+}
+
+git_diff_base_base_remote_branch() {
+  local base_ref="$1"
+
+  if git_diff_base_remote_branch "$base_ref"; then
+    return 0
+  fi
+
+  if git_diff_base_sha_ref "$base_ref" && [ -n "${GITHUB_BASE_REF:-}" ]; then
+    printf '%s\n' "$GITHUB_BASE_REF"
+    return 0
+  fi
+
+  return 1
 }
 
 git_diff_base_fetch_refspec() {
@@ -41,7 +69,11 @@ git_diff_base_fetch_remote_branch() {
       fetch_args=(--deepen="$depth" origin "$refspec")
       ;;
     unshallow)
-      fetch_args=(--unshallow origin "$refspec")
+      if git_diff_base_is_shallow_repository; then
+        fetch_args=(--unshallow origin "$refspec")
+      else
+        fetch_args=(origin "$refspec")
+      fi
       ;;
     *)
       echo "Unknown fetch mode '$mode'" >&2
@@ -49,8 +81,8 @@ git_diff_base_fetch_remote_branch() {
       ;;
   esac
 
-  # git_diff_base_resolve prints only the merge-base SHA on stdout; keep any
-  # fetch output on stderr so callers can safely use command substitution.
+  # Redirect to stderr so the caller's $(...) captures only the merge-base SHA,
+  # not fetch noise.
   git fetch "${fetch_args[@]}" >&2
 }
 
@@ -105,7 +137,7 @@ git_diff_base_resolve() {
   local current_remote_branch=""
   local merge_base
 
-  if remote_branch="$(git_diff_base_remote_branch "$base_ref")"; then
+  if remote_branch="$(git_diff_base_base_remote_branch "$base_ref")"; then
     if git_diff_base_is_shallow_repository && ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
       if [ "$fetch_policy" = "required" ]; then
         echo "Error: failed to fetch $base_ref from origin" >&2
@@ -124,7 +156,8 @@ git_diff_base_resolve() {
     current_remote_branch=""
   fi
 
-  if ! git_diff_base_verify_ref "$base_ref"; then
+  if ! git_diff_base_verify_ref "$base_ref" &&
+    { ! git_diff_base_is_shallow_repository || [ -z "$remote_branch" ]; }; then
     echo "Error: base ref '$base_ref' does not exist locally" >&2
     return 1
   fi
@@ -134,18 +167,20 @@ git_diff_base_resolve() {
     return 1
   fi
 
-  if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+  if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
     printf '%s\n' "$merge_base"
     return 0
   fi
 
-  if [ -n "$remote_branch" ]; then
+  if [ -n "$remote_branch" ] || [ -n "$current_remote_branch" ]; then
     local attempt=1
+    local fetched
     local max_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-20}"
-    while [ "$attempt" -le "$max_attempts" ] && git_diff_base_is_shallow_repository; do
-      local fetched=false
+    while [ "$attempt" -le "$max_attempts" ]; do
+      git_diff_base_is_shallow_repository || break
+      fetched=false
 
-      if git_diff_base_fetch_remote_branch "$remote_branch" deepen; then
+      if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" deepen; then
         fetched=true
       fi
 
@@ -159,7 +194,7 @@ git_diff_base_resolve() {
         break
       fi
 
-      if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+      if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
         printf '%s\n' "$merge_base"
         return 0
       fi
@@ -168,8 +203,8 @@ git_diff_base_resolve() {
     done
 
     if git_diff_base_is_shallow_repository; then
-      if git_diff_base_fetch_remote_branch "$remote_branch" unshallow; then
-        if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+      if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" unshallow; then
+        if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"
           return 0
         fi
@@ -177,10 +212,16 @@ git_diff_base_resolve() {
 
       if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
         git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow || true
-        if merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+        if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"
           return 0
         fi
+      fi
+    elif [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
+      git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow || true
+      if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+        printf '%s\n' "$merge_base"
+        return 0
       fi
     fi
   fi
