@@ -59,7 +59,7 @@ For simple not-found cases, return a Rails response before streaming:
 ```ruby
 def show
   story = Story.find_by(id: params[:id])
-  return render("errors/not_found", status: :not_found) unless story
+  return render(template: "errors/not_found", status: :not_found) unless story
 
   @story_props = { story: StorySerializer.render_as_hash(story) }
   stream_view_containing_react_components(template: "stories/show")
@@ -74,7 +74,7 @@ def show
 
   if story.nil?
     response.status = :not_found
-    @story_props = { notFound: true, story: nil, requestedId: params[:id] }
+    @story_props = { notFound: true, story: nil, requestedId: params[:id].to_i }
   else
     @story_props = { story: StorySerializer.render_as_hash(story) }
   end
@@ -127,7 +127,7 @@ For personalized pages, prefer private browser caching with revalidation:
 response.set_header("Cache-Control", "private, no-cache")
 ```
 
-Use `no-store` instead when sensitive responses must never be cached.
+`no-cache` allows the browser to store the response but forces revalidation before reuse. Use `no-store` instead when sensitive responses must never be cached.
 
 For public pages, let Rails decide freshness before rendering:
 
