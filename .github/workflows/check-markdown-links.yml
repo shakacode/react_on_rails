@@ -37,7 +37,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install Prettier dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Check markdown formatting
