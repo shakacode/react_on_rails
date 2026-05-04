@@ -11,7 +11,7 @@ mechanics.
 Not every `react-rails` app is a good candidate for a low-friction first migration. Before you start, classify what you have:
 
 - **Rails-owned island mounts on Shakapacker 6+ and Rails 6+.** This is the smoothest path. The generator + the steps below usually get you there with small, localized edits. (Note: `server_bundle_output_path` auto-detection requires Shakapacker 9.0+; on 6–8, set it explicitly in the initializer.)
-- **Webpacker-era apps (`gem "webpacker"`, Webpack 4).** Current React on Rails does not support Webpacker — `react_on_rails doctor` flags it as a removed breaking-change issue, and the gem requires `shakapacker >= 6.0`. You must migrate off Webpacker before installing current React on Rails. See [Preferred path for Webpacker-era apps](#preferred-path-for-webpacker-era-apps) below.
+- **Webpacker-era apps (`gem "webpacker"`, Webpack 4).** Current React on Rails targets Shakapacker, not Webpacker, as the recommended baseline — `react_on_rails doctor` flags Webpacker as a removed breaking-change issue, and the gem requires `shakapacker >= 6.0`. Migrate off Webpacker before installing current React on Rails when you can. If you need a temporary Webpacker 5 / Webpack 4 bridge for a React 16 or 17 app, see the [Legacy Webpacker / Webpack 4 migration shims](../building-features/rails-webpacker-react-integration-options.md#legacy-webpacker--webpack-4-migration-shims) and verify the full app locally.
 - **Client-routed SPA shells (Rails is mostly a shell around a React Router / TanStack Router app).** Render the top-level SPA component from one ERB view using `react_component` (or `react_component_hash` when SSR needs to return multiple regions such as `componentHtml`, `title`, and other head tags).
   - One `react_component` call mounts the whole app.
   - If you additionally want to break the SPA into several Rails-owned islands, treat that as a separate product decision rather than bundling it with the bundler/integration change.
@@ -33,7 +33,7 @@ If the app still uses `gem "webpacker"`, the recommended path is:
 1. **Migrate to Shakapacker first, as its own PR.** Keep the bundler change separate from the React on Rails change. This makes each step reviewable and isolates any compatibility issues. See the [Shakapacker v6 upgrade guide](https://github.com/shakacode/shakapacker/blob/v6.6.0/docs/v6_upgrade.md) for the concrete Webpacker → Shakapacker steps.
 2. **Then run the React on Rails install generator** against the Shakapacker-based app.
 
-The generator is not designed to bridge Webpack 4 + Webpacker to current React on Rails defaults for you — it assumes a Shakapacker baseline. If you cannot migrate off Webpacker yet, pin `react_on_rails` to `~> 14.2` (v15.0.0 is retracted; v16 is the release that removed Webpacker support) rather than trying to use current React on Rails with Webpacker.
+The generator is not designed to bridge Webpack 4 + Webpacker to current React on Rails defaults for you — it assumes a Shakapacker baseline. If you cannot migrate off Webpacker yet and need the lowest-risk supported path, pin `react_on_rails` to `~> 14.2` (v15.0.0 is retracted; v16 is the release that removed Webpacker support). If you need to try current React on Rails before the Shakapacker upgrade, use the [Legacy Webpacker / Webpack 4 migration shims](../building-features/rails-webpacker-react-integration-options.md#legacy-webpacker--webpack-4-migration-shims) as a narrow, temporary bridge and test the app's build locally.
 
 ## Preflight
 
@@ -281,4 +281,4 @@ then treat the migration as:
 5. Replace helper syntax and component registration.
 6. Review `bin/dev`, `config/shakapacker.yml`, and webpack config diffs before committing.
 
-Current React on Rails does not support `gem "webpacker"`. The install generator adds Shakapacker rather than enforcing a hard install-time block, and `react_on_rails doctor` flags Webpacker as a removed/breaking-change issue when it detects `config/webpacker.yml` or `bin/webpacker`. Migrate to Shakapacker first (step 1 above) rather than budgeting time for Webpacker compatibility shims.
+Current React on Rails targets Shakapacker, not `gem "webpacker"`, as the recommended baseline. The install generator adds Shakapacker rather than enforcing a hard install-time block, and `react_on_rails doctor` flags Webpacker as a removed/breaking-change issue when it detects `config/webpacker.yml` or `bin/webpacker`. Migrate to Shakapacker first (step 1 above) when you can; use the [Legacy Webpacker / Webpack 4 migration shims](../building-features/rails-webpacker-react-integration-options.md#legacy-webpacker--webpack-4-migration-shims) only as a narrow bridge when the bundler migration cannot happen first.
