@@ -156,7 +156,12 @@ For larger apps, prefer a small Ruby or shell script over a very long command st
 # bin/build-react-on-rails
 # frozen_string_literal: true
 
-mode = ARGV.fetch(0, nil)
+mode = ARGV.first
+
+unless %w[test production].include?(mode)
+  warn "Usage: bin/build-react-on-rails test|production"
+  exit 1
+end
 
 system("yarn res:build", exception: true)
 
@@ -165,9 +170,6 @@ when "test"
   system({ "RAILS_ENV" => "test" }, "bin/shakapacker", exception: true)
 when "production"
   system({ "RAILS_ENV" => "production", "NODE_ENV" => "production" }, "bin/shakapacker", exception: true)
-else
-  warn "Usage: bin/build-react-on-rails test|production"
-  exit 1
 end
 ```
 
