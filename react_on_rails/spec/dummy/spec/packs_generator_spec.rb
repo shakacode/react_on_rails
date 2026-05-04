@@ -434,7 +434,7 @@ module ReactOnRails
         end
 
         first_thread = Thread.new { generator.generate_packs_if_stale }
-        generation_started.pop
+        expect(generation_started.pop(timeout: 5)).to be(true)
 
         second_thread = Thread.new do
           Thread.current[:packs_generator_spec_thread] = :second
@@ -442,12 +442,12 @@ module ReactOnRails
           second_completed << true
         end
 
-        second_lock_attempted.pop
+        expect(second_lock_attempted.pop(timeout: 5)).to be(true)
         expect { second_completed.pop(true) }.to raise_error(ThreadError)
 
         release_generation << true
-        first_thread.join
-        second_thread.join
+        expect(first_thread.join(5)).to eq(first_thread)
+        expect(second_thread.join(5)).to eq(second_thread)
 
         expect(generation_count).to eq(1)
       ensure

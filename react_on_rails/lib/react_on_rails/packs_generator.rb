@@ -98,7 +98,7 @@ module ReactOnRails
 
       lock_acquired = false
       File.open(lock_path, File::RDWR) do |lock_file|
-        lock_acquired = lock_file.flock(File::LOCK_EX | File::LOCK_NB)
+        lock_acquired = lock_file.flock(File::LOCK_EX | File::LOCK_NB) != false
         next unless lock_acquired
 
         lock_file.rewind
