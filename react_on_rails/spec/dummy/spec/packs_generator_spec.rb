@@ -415,9 +415,14 @@ module ReactOnRails
         generator = described_class.new
         generation_started = Queue.new
         release_generation = Queue.new
+        second_lock_attempted = Queue.new
         second_completed = Queue.new
         generation_count = 0
 
+        allow(generator).to receive(:with_generated_packs_lock).and_wrap_original do |original, *args, **kwargs, &block|
+          second_lock_attempted << true if Thread.current[:packs_generator_spec_thread] == :second
+          original.call(*args, **kwargs, &block)
+        end
         allow(generator).to receive(:add_generated_pack_to_server_bundle)
         allow(generator).to receive(:clean_non_generated_files_with_feedback)
         allow(generator).to receive(:clean_generated_directories_with_feedback)
@@ -432,11 +437,12 @@ module ReactOnRails
         generation_started.pop
 
         second_thread = Thread.new do
+          Thread.current[:packs_generator_spec_thread] = :second
           generator.generate_packs_if_stale
           second_completed << true
         end
 
-        sleep 0.1
+        second_lock_attempted.pop
         expect { second_completed.pop(true) }.to raise_error(ThreadError)
 
         release_generation << true
@@ -447,6 +453,24 @@ module ReactOnRails
       ensure
         first_thread&.kill if first_thread&.alive?
         second_thread&.kill if second_thread&.alive?
+      end
+
+      it "clears stale lock contents without unlinking the lock file" do
+        generator = described_class.new
+        lock_path = generator.send(:generated_packs_lock_path)
+        FileUtils.mkdir_p(lock_path.dirname)
+        File.write(lock_path, "pid=stale\n")
+        FileUtils.touch(lock_path, mtime: Time.now - described_class::GENERATED_PACKS_LOCK_TTL_SECONDS - 1)
+
+        original_inode = File.stat(lock_path).ino
+
+        generator.send(:clear_stale_generated_packs_lock, lock_path)
+
+        expect(File.exist?(lock_path)).to be(true)
+        expect(File.stat(lock_path).ino).to eq(original_inode)
+        expect(File.read(lock_path)).to eq("")
+      ensure
+        FileUtils.rm_f(lock_path) if lock_path
       end
 
       it "generate packs if a new component is added" do

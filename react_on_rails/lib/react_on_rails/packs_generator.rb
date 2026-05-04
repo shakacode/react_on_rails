@@ -76,7 +76,7 @@ module ReactOnRails
     def with_generated_packs_lock(verbose: false)
       lock_path = generated_packs_lock_path
       FileUtils.mkdir_p(lock_path.dirname)
-      remove_stale_generated_packs_lock(lock_path, verbose: verbose)
+      clear_stale_generated_packs_lock(lock_path, verbose: verbose)
 
       File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |lock_file|
         puts Rainbow("🔒 Waiting for generated packs lock at #{lock_path}").yellow if verbose
@@ -88,21 +88,24 @@ module ReactOnRails
 
         yield
       ensure
-        lock_file&.flock(File::LOCK_UN)
+        lock_file.flock(File::LOCK_UN)
       end
     end
 
-    def remove_stale_generated_packs_lock(lock_path, verbose: false)
+    def clear_stale_generated_packs_lock(lock_path, verbose: false)
       return unless File.exist?(lock_path)
       return unless File.mtime(lock_path) < Time.now - GENERATED_PACKS_LOCK_TTL_SECONDS
 
+      lock_acquired = false
       File.open(lock_path, File::RDWR) do |lock_file|
-        next unless lock_file.flock(File::LOCK_EX | File::LOCK_NB)
+        lock_acquired = lock_file.flock(File::LOCK_EX | File::LOCK_NB)
+        next unless lock_acquired
 
-        FileUtils.rm_f(lock_path)
-        puts Rainbow("🧹 Removed stale generated packs lock at #{lock_path}").yellow if verbose
+        lock_file.rewind
+        lock_file.truncate(0)
+        puts Rainbow("🧹 Cleared stale generated packs lock at #{lock_path}").yellow if verbose
       ensure
-        lock_file&.flock(File::LOCK_UN)
+        lock_file.flock(File::LOCK_UN) if lock_acquired
       end
     rescue Errno::ENOENT
       nil
