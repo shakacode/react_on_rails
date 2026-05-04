@@ -385,11 +385,11 @@ module ReactOnRails
         # Add RSCWebpackPlugin import after bundler require
         server_injected_imports = [
           "\\1",
-          "const { resolve } = require('path');",
+          ("const { resolve } = require('path');" unless path_resolve_imported?(content)),
           "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
           "",
           rsc_client_references_js
-        ].join("\n")
+        ].compact.join("\n")
 
         gsub_file(
           config_path,
@@ -524,13 +524,12 @@ module ReactOnRails
       end
 
       def commonjs_named_imported?(content, package_name, binding_name)
-        content.lines.any? do |line|
-          match = line.match(
-            /^\s*const\s+\{(?<bindings>[^\n}]*)\}\s*=\s*require\(['"]#{Regexp.escape(package_name)}['"]\);?/
-          )
-          next false unless match
+        pattern = /^\s*const\s+\{([^}]*)\}\s*=\s*require\(['"]#{Regexp.escape(package_name)}['"]\);?/m
 
-          match[:bindings].split(",").any? do |binding|
+        content.scan(pattern).any? do |captures|
+          bindings = captures.first
+
+          bindings.split(",").any? do |binding|
             binding = binding.strip
             binding == binding_name || binding.start_with?("#{binding_name} =")
           end
