@@ -144,7 +144,7 @@ if (cluster.isPrimary) {
 }
 ```
 
-### Configuring Readiness and Liveness Probes
+### Configuring Startup, Readiness, and Liveness Probes
 
 Use a cheap endpoint such as the `/health` route above for startup, readiness, and liveness probes. The health check route
 should return `200 OK` when the process can accept probe traffic. The built-in `/info` route can also serve as a shallow
