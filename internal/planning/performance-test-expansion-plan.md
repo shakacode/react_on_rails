@@ -19,7 +19,7 @@ Start with a small, representative matrix before adding more routes:
 
 | Area                  | Operation                                 | Primary metric              | Notes                                                                                    |
 | --------------------- | ----------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------- |
-| Client rendering      | `react_component` with `prerender: false` | route RPS and HTTP latency  | Uses existing HTTP benchmark output; browser mount timing is follow-up instrumentation   |
+| Client rendering      | `react_component` with `prerender: false` | RPS, p50, p90, p99, max     | Uses existing HTTP benchmark output; browser mount timing is follow-up instrumentation   |
 | Traditional SSR       | `react_component` with `prerender: true`  | server render duration      | Covers ExecJS and Node Renderer paths                                                    |
 | Hash SSR              | `react_component_hash`                    | render duration and payload | Covers render-functions returning objects                                                |
 | Streaming SSR         | `stream_react_component`                  | TTFB, response end, LCP     | Pro-only path; requires Node Renderer and Suspense-friendly examples                     |
@@ -44,11 +44,15 @@ Recommended Pro slice, tracked separately from the OSS implementation PR:
    params, teach `benchmarks/bench.rb` how to provide a default component name, or run `benchmarks/k6.ts` with an explicit
    `TARGET_URL`; automatic route discovery currently skips required-parameter routes such as `/rsc_payload/:component_name`.
 
+Use `benchmarks/bench.rb`/`benchmarks/k6.ts` for Rails HTTP routes such as streaming SSR. Use
+`benchmarks/bench-node-renderer.rb` for direct Pro Node Renderer transport coverage unless that script is extended to cover
+full Rails streaming behavior.
+
 ## Noise Controls
 
 Use these controls before treating results as regressions:
 
-- Warm each route before measuring.
+- Keep the existing per-route warm-up before k6 measurement and expand it if routes need more stable startup behavior.
 - Implement alternating route order in `benchmarks/bench.rb`; routes currently run in `rails routes` order, so this is a
   prerequisite before using route ordering as a noise-control signal.
 - Record sample count, runner type, Ruby version, Node version, React version, and bundle mode with every result.
@@ -79,7 +83,8 @@ same mode.
 - The Pro suite covers streaming SSR and RSC payload rendering where the Node Renderer is available.
 - Results include enough metadata to compare runs meaningfully.
 - CI behavior is advisory until noise controls are proven.
-- Regression detection favors sustained movement over single-run spikes.
+- Regression detection favors sustained movement over single-run spikes and uses the current `p50`, `p90`, `p99`, and
+  `max` metrics until `p95` is added explicitly.
 - Documentation tells contributors which benchmark to run for each rendering area.
 
 ## See Also
