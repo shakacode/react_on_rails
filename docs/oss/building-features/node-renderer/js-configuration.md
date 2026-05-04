@@ -103,6 +103,12 @@ And add a root-level script to the `scripts` section of your `package.json`
 
 Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` command for your app).
 
+## Built-in Endpoints
+
+The renderer always registers `/info`. It does not require the renderer password in any environment and returns
+`node_version` and `renderer_version`. Treat it as a shallow process check and keep the renderer on `localhost` or
+private networking if those runtime version details should not be exposed.
+
 ## Custom Fastify Configuration
 
 For advanced use cases, such as adding custom routes, registering Fastify plugins, or hooking into the request lifecycle,
@@ -186,9 +192,8 @@ For application-level readiness, use a cheap endpoint such as the `/health` rout
 [Adding a Health Check Endpoint](#adding-a-health-check-endpoint). Startup and liveness usually only need a lightweight
 TCP check against the renderer port because the readiness probe still gates traffic with an application-level check after
 the startup probe succeeds. The health check route should return `200 OK` when the process can accept probe traffic. The
-built-in `/info` route can also serve as a shallow process check if you do not need a custom route; it is always
-registered by the renderer, does not require the renderer password in any environment, and returns `node_version` and
-`renderer_version`.
+built-in [`/info`](#built-in-endpoints) route can also serve as a shallow process check if you do not need a custom
+route.
 
 Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
 Fastify setup.
@@ -217,6 +222,9 @@ listener. Use one of these probe styles instead:
 | `exec` probe | Application-level readiness check with an h2c-aware client, for example `curl --http2-prior-knowledge`.                      |
 | HTTP/1.1     | Only if you probe Rails, a separate HTTP/1.1 health sidecar/port, or another endpoint that is not the renderer h2c listener. |
 
+A passing `tcpSocket` probe means the h2c listener has bound to the port; cluster workers might still be warming up.
+Keep an application-level readiness probe if traffic should wait for worker initialization.
+
 > **Note:** The `exec` probe requires curl with HTTP/2 support. Verify with `curl --version | grep -i http2`. If unavailable,
 > use a `tcpSocket` readiness probe as a fallback.
 
@@ -224,7 +232,7 @@ Recommended starting values:
 
 | Probe                     | Starting point                                                                                                                                                                                                                                           |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup                   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point.                                          |
+| Startup                   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point, giving about a 40-second startup window. |
 | Readiness (custom route)  | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with [`configureFastify`](#adding-a-health-check-endpoint). Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`. |
 | Readiness (built-in info) | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the custom-route readiness probe.                                                                                                |
 | Liveness                  | `tcpSocket` on the renderer port. Use `periodSeconds: 10` and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                                        |
