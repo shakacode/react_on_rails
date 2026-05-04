@@ -1166,6 +1166,21 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.kill_processes
     end
 
+    it "skips the base-port-derived renderer port when Pro renderer support is inactive" do
+      allow(ReactOnRails::Dev::PortSelector)
+        .to receive(:base_port_hash)
+        .and_return({ rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true })
+      allow(described_class).to receive(:pro_renderer_active?).and_return(false)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":5001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":5002", err: File::NULL)
+
+      described_class.kill_processes
+    end
+
     it "targets the default renderer port when Pro renderer support is active without a base port" do
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
