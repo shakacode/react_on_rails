@@ -423,6 +423,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      periodSeconds: 10
      failureThreshold: 3
    ```
+   > **Note:** `initialDelaySeconds` is omitted here because Kubernetes defers liveness probes until the startup probe above succeeds. If you skip the startup probe, add an appropriate `initialDelaySeconds`.
 
 ### OOM Tracking
 
