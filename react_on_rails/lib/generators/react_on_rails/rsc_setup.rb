@@ -385,9 +385,12 @@ module ReactOnRails
         end
 
         # Add RSCWebpackPlugin import after bundler require
+        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: true)
+        return if rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server: true)
+
         server_injected_imports = [
           "\\1",
-          ("const { resolve } = require('path');" unless path_resolve_imported?(content)),
+          ("const { resolve } = require('path');" unless path_resolve_imported?(existing_imports_content)),
           "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
           "",
           rsc_client_references_js
@@ -436,10 +439,13 @@ module ReactOnRails
         end
 
         # Add RSCWebpackPlugin import after commonWebpackConfig import
+        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: false)
+        return if rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server: false)
+
         injected_imports = [
           "\\1",
-          ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(content)),
-          ("const { resolve } = require('path');" unless path_resolve_imported?(content)),
+          ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(existing_imports_content)),
+          ("const { resolve } = require('path');" unless path_resolve_imported?(existing_imports_content)),
           "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
           "",
           rsc_client_references_js
@@ -527,20 +533,27 @@ module ReactOnRails
       end
 
       def update_existing_rsc_webpack_config(config_path, content, is_server:)
-        return if content.include?("clientReferences: rscClientReferences")
+        return if rsc_plugin_uses_scoped_client_references?(content)
 
-        unless content.include?("rscClientReferences") ||
+        unless rsc_client_references_defined?(content) ||
                rsc_client_references_setup_anchor?(content, is_server: is_server)
           return
         end
+
+        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: is_server)
+        return if rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server: is_server)
 
         add_rsc_client_references_setup(config_path, content, is_server: is_server)
 
         gsub_file(
           config_path,
-          /new RSCWebpackPlugin\(\{\s*isServer: #{is_server}\s*\}\)/,
-          "new RSCWebpackPlugin({ isServer: #{is_server}, clientReferences: rscClientReferences })"
+          /new RSCWebpackPlugin\(\{([^}]*)isServer: #{is_server}([^}]*)\}\)/,
+          "new RSCWebpackPlugin({\\1isServer: #{is_server}, clientReferences: rscClientReferences\\2})"
         )
+      end
+
+      def rsc_plugin_uses_scoped_client_references?(content)
+        content.match?(/new RSCWebpackPlugin\([^)]*clientReferences:\s*rscClientReferences/)
       end
 
       def rsc_client_references_setup_anchor?(content, is_server:)
@@ -548,12 +561,15 @@ module ReactOnRails
       end
 
       def add_rsc_client_references_setup(config_path, content, is_server:)
-        return if content.include?("rscClientReferences")
+        return if rsc_client_references_defined?(content)
+
+        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: is_server)
+        return if rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server: is_server)
 
         injected_imports = [
           "\\1",
-          ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(content)),
-          ("const { resolve } = require('path');" unless path_resolve_imported?(content)),
+          ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(existing_imports_content)),
+          ("const { resolve } = require('path');" unless path_resolve_imported?(existing_imports_content)),
           "",
           rsc_client_references_js
         ].compact.join("\n")
@@ -573,8 +589,29 @@ module ReactOnRails
         end
       end
 
+      def rsc_client_references_defined?(content)
+        content.match?(/^\s*const\s+rscClientReferences\b/)
+      end
+
+      def content_before_rsc_setup_anchor(content, is_server:)
+        anchor = content.match(rsc_client_references_setup_import_pattern(is_server: is_server))
+        return content unless anchor
+
+        content[0...anchor.end(0)]
+      end
+
+      def rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server:)
+        resolve_imported_later = path_resolve_imported?(content) && !path_resolve_imported?(existing_imports_content)
+        config_imported_later = !is_server &&
+                                shakapacker_config_imported?(content) &&
+                                !shakapacker_config_imported?(existing_imports_content)
+
+        resolve_imported_later || config_imported_later
+      end
+
       def shakapacker_config_imported?(content)
-        commonjs_named_imported?(content, "shakapacker", "config")
+        commonjs_named_imported?(content, "shakapacker", "config") ||
+          content.match?(/^\s*const\s+config\s*=\s*require\(['"]shakapacker['"]\)\.config/)
       end
 
       def path_resolve_imported?(content)

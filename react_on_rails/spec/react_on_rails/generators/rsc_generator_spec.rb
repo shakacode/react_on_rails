@@ -249,7 +249,7 @@ describe RscGenerator, type: :generator do
                            "new bundler.optimize.LimitChunkCountPlugin({ maxChunks: 1 }));"
       old_rsc_plugin = <<~JS.chomp
         if (!rscBundle) {
-          serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ isServer: true }));
+          serverWebpackConfig.plugins.push(new RSCWebpackPlugin({ chunkName: 'server', isServer: true }));
         }
 
         #{limit_chunk_plugin}
@@ -258,6 +258,7 @@ describe RscGenerator, type: :generator do
         "config/webpack/serverWebpackConfig.js",
         <<~JS
           const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          // clientReferences: rscClientReferences
           #{pro_server_webpack_content
             .sub('const configureServer = () => {', 'const configureServer = (rscBundle = false) => {')
             .sub(limit_chunk_plugin, old_rsc_plugin)}
@@ -266,10 +267,12 @@ describe RscGenerator, type: :generator do
       simulate_existing_file(
         "config/webpack/clientWebpackConfig.js",
         <<~JS
+          const config = require('shakapacker').config;
           const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          // clientReferences: rscClientReferences
           #{base_client_webpack_content.sub(
             'return clientConfig;',
-            "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));\n\n  return clientConfig;"
+            "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false, chunkName: 'client' }));\n\n  return clientConfig;"
           )}
         JS
       )
@@ -286,6 +289,7 @@ describe RscGenerator, type: :generator do
         expect(content).to include("const { resolve } = require('path');")
         expect(content).to include("clientReferences: rscClientReferences")
         expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("chunkName: 'server'")
         expect(content).to include("isServer: true")
       end
     end
@@ -294,10 +298,12 @@ describe RscGenerator, type: :generator do
       assert_file "config/webpack/clientWebpackConfig.js" do |content|
         rsc_plugin_import = "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
         expect(content.scan(rsc_plugin_import).length).to eq(1)
-        expect(content).to include("const { config } = require('shakapacker');")
+        expect(content).to include("const config = require('shakapacker').config;")
+        expect(content).not_to include("const { config } = require('shakapacker');")
         expect(content).to include("const { resolve } = require('path');")
         expect(content).to include("clientReferences: rscClientReferences")
         expect(content).to include("directory: resolve(config.source_path)")
+        expect(content).to include("chunkName: 'client'")
         expect(content).to include("isServer: false")
       end
     end
