@@ -49,7 +49,9 @@ git_diff_base_fetch_remote_branch() {
       ;;
   esac
 
-  git fetch "${fetch_args[@]}"
+  # git_diff_base_resolve prints only the merge-base SHA on stdout; keep any
+  # fetch output on stderr so callers can safely use command substitution.
+  git fetch "${fetch_args[@]}" >&2
 }
 
 git_diff_base_current_remote_branch() {
@@ -104,7 +106,7 @@ git_diff_base_resolve() {
   local merge_base
 
   if remote_branch="$(git_diff_base_remote_branch "$base_ref")"; then
-    if ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
+    if git_diff_base_is_shallow_repository && ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
       if [ "$fetch_policy" = "required" ]; then
         echo "Error: failed to fetch $base_ref from origin" >&2
         return 1
@@ -115,7 +117,7 @@ git_diff_base_resolve() {
   fi
 
   if current_remote_branch="$(git_diff_base_current_remote_branch "$current_ref")"; then
-    if [ "$current_remote_branch" != "$remote_branch" ]; then
+    if [ "$current_remote_branch" != "$remote_branch" ] && git_diff_base_is_shallow_repository; then
       git_diff_base_fetch_remote_branch "$current_remote_branch" initial || true
     fi
   else
@@ -138,9 +140,10 @@ git_diff_base_resolve() {
   fi
 
   if [ -n "$remote_branch" ]; then
-    local fetched
-    while git_diff_base_is_shallow_repository; do
-      fetched=false
+    local attempt=1
+    local max_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-20}"
+    while [ "$attempt" -le "$max_attempts" ] && git_diff_base_is_shallow_repository; do
+      local fetched=false
 
       if git_diff_base_fetch_remote_branch "$remote_branch" deepen; then
         fetched=true
@@ -160,6 +163,8 @@ git_diff_base_resolve() {
         printf '%s\n' "$merge_base"
         return 0
       fi
+
+      attempt=$((attempt + 1))
     done
 
     if git_diff_base_is_shallow_repository; then

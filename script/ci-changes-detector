@@ -3,8 +3,6 @@
 # Analyzes git changes to determine which CI jobs need to run
 # Usage: script/ci-changes-detector [base-ref]
 
-# shellcheck disable=SC2221,SC2222
-# Case patterns intentionally keep legacy top-level and recursive globs side by side.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,7 +18,6 @@ if [[ "$BASE_REF" =~ ^0+$ ]]; then
 fi
 
 # Colors for output
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
@@ -28,7 +25,6 @@ NC='\033[0m' # No Color
 # Resolve the merge base before diffing. Three-dot diffs fail in shallow clones
 # when the common ancestor is outside the fixed fetch depth.
 if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" required); then
-  echo -e "${RED}Error: Unable to resolve a diff base for $BASE_REF...$CURRENT_REF${NC}" >&2
   echo "Available branches:" >&2
   git branch -a | head -10 >&2
   exit 1
@@ -67,6 +63,8 @@ UNCATEGORIZED_CHANGED=false
 
 # Analyze each changed file
 while IFS= read -r file; do
+  # Case patterns intentionally keep legacy top-level and recursive globs side by side.
+  # shellcheck disable=SC2221,SC2222
   case "$file" in
     # Documentation files
     *.md|*.mdx|*.markdown|*.rst|*.txt|docs/*|docs/**/*|.lychee.toml)

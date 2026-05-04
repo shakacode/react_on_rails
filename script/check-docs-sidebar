@@ -35,11 +35,11 @@ if [ ! -f "$SIDEBAR_FILE" ]; then
   exit 1
 fi
 
-# Best-effort fetch of a remote base ref, then require a real merge base. If we
-# are offline but already have enough cached history locally, this still works;
-# otherwise the script fails instead of running an unsafe shallow three-dot diff.
+# Best-effort fetch of a remote base ref, then require a real merge base. The
+# optional fetch policy only permits continuing past fetch failures; if cached
+# local history is still insufficient, the resolver fails instead of running an
+# unsafe shallow three-dot diff.
 if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" optional); then
-  echo -e "${RED}Error: Unable to resolve a diff base for $BASE_REF...$CURRENT_REF${NC}" >&2
   echo "If you are offline, run 'git fetch origin' when you are next online." >&2
   exit 1
 fi
