@@ -247,6 +247,7 @@ GEM
       racc (~> 1.4)
     nokogiri (1.19.2-x86_64-linux-gnu)
       racc (~> 1.4)
+    ostruct (0.6.3)
     package_json (0.2.0)
     parallel (1.27.0)
     parser (3.3.10.0)
@@ -475,6 +476,7 @@ PLATFORMS
 
 DEPENDENCIES
   amazing_print
+  benchmark
   bootsnap
   bundler
   capybara (>= 3.38.0)
@@ -490,9 +492,11 @@ DEPENDENCIES
   jquery-rails
   launchy
   listen
+  logger
   net-http
   net-imap
   net-smtp
+  ostruct
   pg
   pry (>= 0.14.1)
   pry-byebug!

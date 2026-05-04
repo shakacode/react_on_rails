@@ -58,6 +58,16 @@ The node renderer is a standalone Fastify HTTP server (separate Node.js process)
 - Integrations: Sentry, Honeybadger (optional peer deps)
 - Protocol versioning: `protocolVersion` in package.json must match gem expectations
 
+**Validating source changes against the dummy app:** the dummy consumes the _built_
+`packages/react-on-rails-pro-node-renderer/lib/**`, so edits under `src/**` are not
+picked up until the package is rebuilt. Use one of:
+
+- `pnpm --filter react-on-rails-pro-node-renderer run build` (one-shot)
+- `cd react_on_rails_pro/spec/dummy && pnpm run node-renderer:fresh` (rebuild + start)
+- `pnpm --filter react-on-rails-pro-node-renderer run build-watch` (watch in another shell)
+
+See `.claude/docs/validating-node-renderer-changes.md` for the full checklist.
+
 ### Yalc Dependency Chain
 
 Pro dummy's preinstall builds and links packages in this order:

@@ -63,17 +63,13 @@ module ReactOnRails
         # derived ports when REACT_ON_RAILS_BASE_PORT / CONDUCTOR_PORT is set,
         # so `bin/dev kill` in a worktree on ports 5000/5001/5002 targets the
         # right ports instead of the 3000/3001 default. Falls back to
-        # [3000, 3001] when no base port is configured. Uses PortSelector's
+        # [3000, 3001] when no base port is configured, plus the default
+        # renderer port when Pro renderer support is active. Uses PortSelector's
         # pure #base_port_hash so no "Base port detected" banner prints during
         # a kill.
-        #
-        # The renderer port (base+2) is always included, even for OSS users
-        # without Pro who have no renderer process. Harmless in practice — lsof
-        # will find nothing on that port — but it is a slight expansion of the
-        # kill surface vs. the previous hard-coded [3000, 3001].
         def killable_ports
           base = PortSelector.base_port_hash
-          return [3000, 3001] unless base
+          return pro_renderer_active? ? [3000, 3001, 3800] : [3000, 3001] unless base
 
           [base[:rails], base[:webpack], base[:renderer]]
         end

@@ -227,7 +227,7 @@ module ReactOnRails
         # also need to unset the next var.
         def invalid_base_port_warning(var, raw, reason, idx)
           msg = "WARNING: #{var}=#{raw.inspect} is #{reason}; ignoring."
-          remaining = BASE_PORT_ENV_VARS[(idx + 1)..].reject { |v| ENV.fetch(v, "").empty? }
+          remaining = BASE_PORT_ENV_VARS[(idx + 1)..].reject { |v| ENV.fetch(v, "").strip.empty? }
           return msg if remaining.empty?
 
           msg + " Base port mode will still activate from #{remaining.join(', ')}; " \

@@ -1165,6 +1165,22 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       described_class.kill_processes
     end
+
+    it "targets the default renderer port when Pro renderer support is active without a base port" do
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL).and_return(["3801", nil])
+
+      allow(Process).to receive(:pid).and_return(9999)
+      expect(Process).to receive(:kill).with("TERM", 3801)
+
+      described_class.kill_processes
+    end
   end
 
   describe ".find_port_pids" do
