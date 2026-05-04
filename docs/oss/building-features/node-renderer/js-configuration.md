@@ -182,10 +182,11 @@ The `./master` and `./worker` exports provide direct access to the node-renderer
 
 ## Configuring Startup, Readiness, and Liveness Probes
 
-Use a cheap endpoint such as the `/health` route above for startup, readiness, and liveness probes. The health check route
-should return `200 OK` when the process can accept probe traffic. The built-in `/info` route can also serve as a shallow
-process check if you do not need a custom route; it is always registered by the renderer, does not require the renderer
-password in any environment, and returns `node_version` and `renderer_version`.
+Use a cheap endpoint such as the `/health` route in
+[Adding a Health Check Endpoint](#adding-a-health-check-endpoint) for startup, readiness, and liveness probes. The health
+check route should return `200 OK` when the process can accept probe traffic. The built-in `/info` route can also serve
+as a shallow process check if you do not need a custom route; it is always registered by the renderer, does not require
+the renderer password in any environment, and returns `node_version` and `renderer_version`.
 
 Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
 Fastify setup.
