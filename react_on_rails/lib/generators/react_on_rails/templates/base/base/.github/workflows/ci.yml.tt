@@ -25,8 +25,9 @@ jobs:
 <%- unless config[:package_manager_declared] -%>
         with:
           # `pnpm/action-setup` requires a version unless package.json declares
-          # `packageManager` (e.g. `"pnpm@10.0.0"`). Remove `with:` once you add
-          # that field — pnpm/action-setup will read the pin from there.
+          # `packageManager` (Corepack). To use your lockfile's exact pnpm version,
+          # add `"packageManager": "pnpm@<your-version>"` to package.json, then
+          # remove `with:` and these comments.
           version: "<%= config[:pnpm_fallback_version] %>"
 <%- end -%>
 
