@@ -177,11 +177,11 @@ listener. Use one of these probe styles instead:
 
 Recommended starting values:
 
-| Probe     | Starting point                                                                                                                                                                                                          |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup   | `tcpSocket` on the renderer port, usually `3800` or `$RENDERER_PORT`; use `$PORT` only if the renderer listens there. Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point. |
-| Readiness | `exec` with `curl -sf --http2-prior-knowledge http://localhost:3800/info`, `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`.                                                                          |
-| Liveness  | `tcpSocket` on the renderer port, `periodSeconds: 10`, and `failureThreshold: 3`. Increase only if your environment has slow storage or frequent transient pauses.                                                      |
+| Probe     | Starting point                                                                                                                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup   | `tcpSocket` on the renderer port, usually `3800` or `$RENDERER_PORT`; use `$PORT` only if the renderer listens there. Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point.         |
+| Readiness | `exec` with `curl -sf --http2-prior-knowledge http://localhost:3800/info`, `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`. Requires curl with HTTP/2 support; use `tcpSocket` as a fallback if unavailable. |
+| Liveness  | `tcpSocket` on the renderer port, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                  |
 
 > **Note:** The `exec` probe requires curl with HTTP/2 support. Verify with `curl --version | grep HTTP2`. If unavailable,
 > use a `tcpSocket` readiness probe as a fallback.
