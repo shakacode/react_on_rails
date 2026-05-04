@@ -73,7 +73,7 @@ def show
   story = Story.find_by(id: params[:id])
 
   if story.nil?
-    response.status = 404
+    response.status = :not_found
     @story_props = { notFound: true, story: nil, requestedId: params[:id] }
   else
     @story_props = { story: StorySerializer.render_as_hash(story) }
@@ -121,19 +121,24 @@ If a streamed response has already started and an error forces navigation, the f
 
 Set cache headers in Rails before streaming. The streamed HTML can include serialized props and embedded RSC payloads, so cache it with the same care you would use for any Rails response that contains user-specific data.
 
-For personalized pages, prefer private or no-store policies:
+For personalized pages, prefer private browser caching with revalidation:
 
 ```ruby
-response.set_header("Cache-Control", "private, no-store")
+response.set_header("Cache-Control", "private, no-cache")
 ```
+
+Use `no-store` instead when sensitive responses must never be cached.
 
 For public pages, let Rails decide freshness before rendering:
 
 ```ruby
 def show
   story = Story.published.find_by!(slug: params[:slug])
-  response.set_header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
-  return unless stale?(story, public: true)
+  return unless stale?(
+    story,
+    public: true,
+    cache_control: { max_age: 60, stale_while_revalidate: 300 }
+  )
 
   @story_props = { story: PublicStorySerializer.render_as_hash(story) }
   stream_view_containing_react_components(template: "stories/show")
@@ -157,7 +162,6 @@ Pass decisions as data, not as hidden HTTP side effects:
   story: StorySerializer.render_as_hash(story),
   viewer: ViewerSerializer.render_as_hash(current_user),
   responsePolicy: {
-    cache: "private",
     canonicalUrl: story_url(story)
   }
 }
@@ -173,6 +177,8 @@ export default function StoryPage({ story, viewer, responsePolicy }) {
   );
 }
 ```
+
+Native `<link>` hoisting requires React 19. On React 18, use `react-helmet` or emit canonical URLs from the Rails layout instead. See [React 19 Native Metadata](../building-features/react-19-native-metadata.md).
 
 React can render metadata, route chrome, empty states, and branded error UI from these props. Rails remains the source of truth for the actual HTTP semantics.
 
