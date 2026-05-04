@@ -115,7 +115,7 @@ Use maintainability notes when that is the honest win. Do not force a weak bench
 
 ### Proof artifact template
 
-Use this template in the migration PR description, linked issue, or a short `docs/` note in the example repository. Fill in the fields that match the claim and mark fields that do not apply as `"not claimed"`.
+Use this template in the migration PR description, linked issue, or a short `docs/` note in the example repository. Fill in the fields that match the claim, mark evidence fields that do not apply as `"not claimed"`, and mark "Known blockers or caveats" as `"none"` when there are none.
 
 | Field                     | What to record                                                                                          |
 | ------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -152,7 +152,7 @@ Example summary sentences:
 - "This migration is performance-first: the route ships fewer JavaScript bytes and keeps the same Rails response contract."
 - "This migration is maintainability-first: it replaces a custom Rails-side React bridge with a standard React on Rails helper while preserving route behavior."
 - "This migration is a setup proof: it demonstrates the minimum config changes needed for a legacy stack, but does not claim route-level speedup."
-- "This migration delivers both: the route ships fewer bytes and removes a custom bridge helper while preserving route behavior."
+- "This migration delivers both: the route ships fewer bytes (performance) and removes a custom bridge helper (maintainability)."
 
 ## Contribute an example
 
