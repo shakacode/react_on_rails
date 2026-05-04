@@ -73,7 +73,9 @@ test.describe('Imperative RSC refetch — stress scenarios (Issue 3106)', () => 
 
   test('6. rapid double-click: UI ends up showing the latest payload', async ({ page }) => {
     const before = await page.getByTestId('stress-time-rapid').textContent();
-    await page.getByTestId('rapid-button').click();
+    const rapidButton = page.getByTestId('rapid-button');
+    await rapidButton.click();
+    await rapidButton.click();
     await expect
       .poll(() => page.getByTestId('stress-time-rapid').textContent(), { timeout: 5000 })
       .not.toBe(before);
