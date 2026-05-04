@@ -54,6 +54,12 @@ group :development, :test do
   gem "rbs", require: false
   gem "scss_lint", require: false
   gem "fakefs", require: "fakefs/safe"
+
+  # Ruby 3.5+ removed these from the default gem set; they must now be declared explicitly
+  # to avoid `cannot load such file` errors from gems that lazy-require them (e.g. jbuilder).
+  gem "benchmark", require: false
+  gem "logger", require: false
+  gem "ostruct", require: false
 end
 
 group :test do
