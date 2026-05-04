@@ -2570,6 +2570,44 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when Vitest tests import the actual base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "const mod = await vi.importActual('react-on-rails/client');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+      end
+    end
+
+    context "when Vitest tests import the base package mock without a receiver" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "const mod = await importMock('react-on-rails');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
+      end
+    end
+
     context "when TypeScript declaration files augment the base package after a Pro migration" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -2616,6 +2654,27 @@ RSpec.describe ReactOnRails::Doctor do
             FileUtils.mkdir_p("app/javascript/packs")
             File.write("app/javascript/packs/app.test.ts",
                        "jest.mock('react-on-rails-pro', () => ({ authenticityHeaders: jest.fn() }));\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_base_package_imports)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when Vitest tests correctly import actual 'react-on-rails-pro'" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.test.ts",
+                       "const mod = await vi.importActual('react-on-rails-pro');\n")
             example.run
           end
         end
