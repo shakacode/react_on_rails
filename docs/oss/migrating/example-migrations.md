@@ -133,9 +133,9 @@ Use this template in the migration PR description, linked issue, or a short `doc
 
 Copy this table when opening a migration PR:
 
+```markdown
 <!-- Use "not claimed" for evidence fields that do not apply. Use "none" for Known blockers when there are none. -->
 
-```markdown
 | Field                     | Value |
 | ------------------------- | ----- |
 | Baseline ref              |       |
