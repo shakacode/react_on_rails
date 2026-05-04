@@ -520,7 +520,7 @@ module ReactOnRails
 
       def path_resolve_imported?(content)
         commonjs_named_imported?(content, "path", "resolve") ||
-          content.match?(/^\s*const\s+resolve\s*=/)
+          content.match?(/^\s*const\s+resolve\s*=\s*require\(['"]path['"]\)/)
       end
 
       def commonjs_named_imported?(content, package_name, binding_name)
