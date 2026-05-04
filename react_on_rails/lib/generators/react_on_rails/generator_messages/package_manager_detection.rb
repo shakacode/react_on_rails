@@ -114,10 +114,10 @@ module GeneratorMessages
     # (which accepts `package_json:` for the read-once case). Reachable from sibling
     # sub-modules (e.g. CiSection) via `include` without a receiver; tests use `send`.
 
-    # Stricter sibling of `package_manager_from_content`: requires `<name>@<version>`.
-    # A bare `"pnpm"` still expresses package-manager intent for generator command
-    # selection, but `pnpm/action-setup` has no version to resolve from it, so the
-    # CI scaffold must still pin a fallback.
+    # Stricter sibling of `package_manager_from_content`: requires the full
+    # `<name>@<version>` Corepack form. A bare `"pnpm"` still expresses package-manager
+    # intent for generator command selection, but `pnpm/action-setup` has no version to
+    # resolve from it, so the CI scaffold must still pin a fallback.
     def versioned_package_manager_from_content(content)
       raw_declared = content["packageManager"]
       return nil unless raw_declared.is_a?(String)

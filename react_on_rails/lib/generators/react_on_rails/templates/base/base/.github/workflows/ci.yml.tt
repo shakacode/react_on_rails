@@ -25,9 +25,11 @@ jobs:
 <%- unless config[:package_manager_declared] -%>
         with:
           # `pnpm/action-setup` requires a version unless package.json declares
-          # `packageManager` (Corepack). To use your lockfile's exact pnpm version,
-          # add `"packageManager": "pnpm@<your-version>"` to package.json, then
-          # remove `with:` and these comments.
+          # `packageManager` (Corepack). Verify this matches the pnpm version
+          # that generated your `pnpm-lock.yaml` — pnpm major bumps occasionally
+          # change defaults that affect dependency resolution. To remove this
+          # pin, add `"packageManager": "pnpm@<your-version>"` to package.json,
+          # then delete `with:` and these comments.
           version: "<%= config[:pnpm_fallback_version] %>"
 <%- end -%>
 
