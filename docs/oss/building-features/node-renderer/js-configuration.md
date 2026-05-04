@@ -198,8 +198,8 @@ route.
 Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
 Fastify setup.
 
-> **Security note:** `/info` exposes runtime version details to anyone who can reach the renderer port. Keep the renderer
-> on `localhost` or private networking, or add a custom `/health` route if you need a less revealing probe response.
+> **Security note:** See [Built-in Endpoints](#built-in-endpoints) for the note on `/info` exposing runtime version
+> details.
 
 Keep the probes' meanings separate:
 
