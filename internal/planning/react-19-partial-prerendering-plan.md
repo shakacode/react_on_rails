@@ -29,8 +29,10 @@ Use a dedicated branch for the actual version verification work:
    - `bundle exec rubocop`
    - `bundle exec rake rbs:validate`
    - targeted RSpec for React rendering, doctor, generators, and dummy SSR paths
-4. Run Playwright E2E coverage for SSR and hydration paths from the dummy app, for example
+4. Run Playwright E2E coverage for SSR, hydration, and RSC payload paths from the dummy app, for example
    `cd react_on_rails/spec/dummy && pnpm test:e2e`.
+   Run the Pro dummy E2E to verify `stream_react_component` and RSC rendering under 19.2.x:
+   `cd react_on_rails_pro/spec/dummy && pnpm test:e2e` or equivalent RSC-specific RSpec coverage.
 5. Run at least one generated-app path that installs dependencies from scratch.
 6. Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
    examples.
