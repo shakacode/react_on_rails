@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "httpx"
 require "socket"
 
 # httpx (as of 1.7.x) does not call setsockopt(TCP_NODELAY, 1) on its sockets,
@@ -13,7 +12,7 @@ require "socket"
 # (HTTP/2, persistent), this reclaims ~30-40% throughput and cuts p99 latency
 # from ~45ms to ~12-21ms under load.
 #
-# Remove this patch once upstream httpx ships TCP_NODELAY by default
+# Manually remove this patch once upstream httpx ships TCP_NODELAY by default
 # (see https://github.com/HoneyryderChuck/httpx).
 module ReactOnRailsPro
   module HttpxTcpNodelayPatch
