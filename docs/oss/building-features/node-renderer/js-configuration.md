@@ -105,9 +105,11 @@ Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` c
 
 ## Built-in Endpoints
 
-The renderer always registers `/info`. It does not require the renderer password in any environment and returns
-`node_version` and `renderer_version`. Treat it as a shallow process check and keep the renderer on `localhost` or
-private networking if those runtime version details should not be exposed.
+The renderer currently registers `/info` as a plain `GET` route outside the authenticated render and asset endpoints
+([source](https://github.com/shakacode/react_on_rails/blob/master/packages/react-on-rails-pro-node-renderer/src/worker.ts)).
+It does not require the renderer password and returns `node_version` and `renderer_version`. Treat it as a shallow
+process check and keep the renderer on `localhost` or private networking if those runtime version details should not be
+exposed.
 
 ## Custom Fastify Configuration
 
@@ -235,7 +237,7 @@ Recommended starting values:
 | Startup                   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point, giving about a 40-second startup window. |
 | Readiness (custom route)  | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with [`configureFastify`](#adding-a-health-check-endpoint). Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`. |
 | Readiness (built-in info) | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the custom-route readiness probe.                                                                                                |
-| Liveness                  | `tcpSocket` on the renderer port. Use `periodSeconds: 10` and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has slow storage or frequent transient pauses.                                        |
+| Liveness                  | `tcpSocket` on the renderer port. Use `periodSeconds: 10` and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has heavy CPU bursts or frequent transient pauses.                                    |
 
 Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
 does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
