@@ -207,11 +207,12 @@ The `./master` and `./worker` exports provide direct access to the node-renderer
 ## Configuring Startup, Readiness, and Liveness Probes
 
 For application-level readiness, use a cheap endpoint such as the `/health` route in
-[Adding a Health Check Endpoint](#adding-a-health-check-endpoint). Startup and liveness usually only need a lightweight
-TCP check against the renderer port when you also configure an application-level readiness probe. The readiness probe
-then gates traffic after the startup probe succeeds. The health check route should return `200 OK` when the process can
-accept probe traffic. The built-in [`/info`](#built-in-endpoints) route can also serve as a shallow process check if you
-do not need a custom route.
+[Adding a Health Check Endpoint](#adding-a-health-check-endpoint). Startup probes gate the initial boot sequence, while
+liveness probes detect stuck containers after startup; both can use a lightweight `tcpSocket` check when you also
+configure an application-level readiness probe. The readiness probe performs the application-level check that gates
+traffic after the startup probe succeeds. The health check route should return `200 OK` when the process can accept probe
+traffic. The built-in [`/info`](#built-in-endpoints) route can also serve as a shallow process check if you do not need a
+custom route.
 
 Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
 Fastify setup.

@@ -390,7 +390,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 **Mitigation:**
 
-1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are incompatible with this listener. Use a TCP probe, an `exec` probe (for example with `curl -sf --max-time 4 --http2-prior-knowledge`, which requires curl with HTTP/2 support in your container image), or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Adding a Health Check Endpoint](./js-configuration.md#adding-a-health-check-endpoint)). Configure your container orchestrator to wait for it before routing traffic.
+1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are incompatible with this listener. Use a TCP probe, an `exec` probe (for example with `curl -sf --max-time <N> --http2-prior-knowledge`, where `<N>` is roughly 1 second shorter than the probe timeout; this requires curl with HTTP/2 support in your container image), or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Adding a Health Check Endpoint](./js-configuration.md#adding-a-health-check-endpoint)). Configure your container orchestrator to wait for it before routing traffic.
 2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
    ```yaml
    startupProbe:
@@ -418,6 +418,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    > **Note:** Replace `/info` with `/health` if you registered that route via `configureFastify`.
    >
    > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep -i http2`. If curl is unavailable, use `tcpSocket` as a fallback.
+   >
+   > **Note:** `--max-time 4` is intentionally 1 second shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero exit code before Kubernetes terminates the probe process. Use the same pattern for other probe systems, such as Docker Compose's `--max-time 2` with `timeout: 3s`.
    >
    > **Note:** `initialDelaySeconds` is omitted here because Kubernetes defers readiness probes until the startup probe above succeeds. If you skip the startup probe, add an appropriate `initialDelaySeconds`.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
