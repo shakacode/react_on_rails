@@ -146,6 +146,7 @@ const config = {
 // Register a custom health check route
 configureFastify((app) => {
   app.get('/health', async () => {
+    // Add awaited readiness gates here if this endpoint should wait for renderer warm-up.
     return { status: 'ok' };
   });
 });
