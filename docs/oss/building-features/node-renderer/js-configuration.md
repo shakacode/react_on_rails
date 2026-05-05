@@ -151,7 +151,9 @@ if (cluster.isPrimary) {
 ```
 
 The sample `/health` route is intentionally shallow. Add warm-up or readiness-gate logic inside this handler if
-readiness should wait for renderer-specific initialization.
+readiness should wait for renderer-specific initialization. Kubernetes exec probes treat any non-zero curl exit code as a
+failure; the response body is irrelevant to probe semantics, so you can return whatever payload is useful for debugging,
+such as `{ status: 'ok', workers: 4 }`.
 
 ### Registering Fastify Plugins
 
@@ -232,13 +234,13 @@ Keep an application-level readiness probe if traffic should wait for worker init
 
 Recommended starting values:
 
-| Probe                     | Starting point                                                                                                                                                                                                                                           |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup                   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, and `failureThreshold: 6` as a starting point, giving about a 40-second startup window. |
-| Readiness (custom route)  | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with [`configureFastify`](#adding-a-health-check-endpoint). Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`. |
-| Readiness (built-in info) | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the custom-route readiness probe.                                                                                                |
-| Readiness fallback        | `tcpSocket` on the renderer port only if curl with HTTP/2 support is unavailable. This checks port reachability, not application readiness.                                                                                                              |
-| Liveness                  | `tcpSocket` on the renderer port. Use `periodSeconds: 10` and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has heavy CPU bursts or frequent transient pauses.                                    |
+| Probe                     | Starting point                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup                   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different). Use `initialDelaySeconds: 10`, `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes default `timeoutSeconds: 1` for a TCP connection check. Total startup window: `initialDelaySeconds + periodSeconds * failureThreshold = 10 + 5 * 6 = 40` seconds. |
+| Readiness (custom route)  | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with [`configureFastify`](#adding-a-health-check-endpoint). Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`.                                                                                                                     |
+| Readiness (built-in info) | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the custom-route readiness probe. `/info` is unauthenticated and exposes runtime version details; see the [security note](#built-in-endpoints) and keep the renderer on private networking.                                                          |
+| Readiness fallback        | `tcpSocket` on the renderer port only if curl with HTTP/2 support is unavailable. This checks port reachability, not application readiness.                                                                                                                                                                                                                                  |
+| Liveness                  | `tcpSocket` on the renderer port. Use `periodSeconds: 10` and `failureThreshold: 3`, matching the Container Deployment examples. Increase only if your environment has heavy CPU bursts or frequent transient pauses.                                                                                                                                                        |
 
 Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
 does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
