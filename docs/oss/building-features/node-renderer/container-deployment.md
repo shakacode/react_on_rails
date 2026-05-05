@@ -437,6 +437,10 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 > such as `--max-time 3`. Readiness and liveness omit `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers
 > them until the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe
 > support, add an appropriate `initialDelaySeconds`.
+>
+> **Security:** `/info` is unauthenticated even when `password` is configured. Keep the renderer on `localhost` or
+> private networking if exposing node and renderer version details is a concern; see
+> [Built-in Endpoints](./js-configuration.md#built-in-endpoints).
 
 1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are incompatible with this listener. Use a TCP probe, an `exec` probe with an h2c-aware client such as `curl --http2-prior-knowledge`, or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Adding a Health Check Endpoint](./js-configuration.md#adding-a-health-check-endpoint)). Configure your container orchestrator to wait for it before routing traffic.
 2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
@@ -622,7 +626,7 @@ spec:
             failureThreshold: 3
 
           # tcpSocket fallback if curl lacks HTTP/2 support:
-          # Replace the livenessProbe above with this whole block.
+          # Delete the livenessProbe exec block above and replace it with this block:
           # livenessProbe:
           #   tcpSocket:
           #     port: 3800
