@@ -208,7 +208,7 @@ services:
       RENDERER_HOST: '0.0.0.0'
       NODE_OPTIONS: '--max-old-space-size=512'
     healthcheck:
-      test: ['CMD', 'curl', '-sf', '--http2-prior-knowledge', 'http://localhost:3800/info']
+      test: ['CMD', 'curl', '-sf', '--max-time', '2', '--http2-prior-knowledge', 'http://localhost:3800/info']
       interval: 5s
       timeout: 3s
       retries: 5
