@@ -255,7 +255,7 @@ For liveness, a fully blocked Node.js event loop may still accept TCP connection
 h2c-aware `exec` liveness probe with a short `--max-time` if you need stricter hung-process detection.
 
 > **Note:** The `exec` probe requires curl with HTTP/2 support. Verify with `curl --version | grep -i http2`. If unavailable,
-> use a `tcpSocket` readiness probe as a fallback.
+> use a `tcpSocket` probe as a fallback.
 
 Recommended starting values:
 

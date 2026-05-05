@@ -430,8 +430,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >   above succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
    >   appropriate `initialDelaySeconds`.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
-   > [!WARNING]
-   > Upgrading from a `tcpSocket` liveness probe? Run `curl --version | grep -i http2` in your container before switching.
+   > **Warning:** Upgrading from a `tcpSocket` liveness probe? Run `curl --version | grep -i http2` in your container
+   > before switching.
    > If curl lacks HTTP/2 support, keep the `tcpSocket` probe or add HTTP/2-capable curl support to your image.
    ```yaml
    livenessProbe:
@@ -493,7 +493,9 @@ In production, `logLevel: 'warn'` is sufficient unless actively debugging.
 
 A complete pod spec for the sidecar pattern:
 
-> See the liveness probe upgrade note above before switching from a `tcpSocket` probe to the `exec` probe shown here.
+> Before switching from a `tcpSocket` probe to the `exec` liveness probe shown here, run
+> `curl --version | grep -i http2` in your container image. If curl lacks HTTP/2 support, keep `tcpSocket` or add
+> HTTP/2-capable curl support.
 
 ```yaml
 apiVersion: apps/v1
