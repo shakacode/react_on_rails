@@ -4,16 +4,14 @@ require "fileutils"
 require "securerandom"
 require "set"
 
+require "react_on_rails_pro/error"
+
 module ReactOnRailsPro
   # Shared helpers for staging the Node Renderer bundle cache. Used by both
   # PreSeedRendererCache (copies files for Docker images) and
   # PrepareNodeRenderBundles (symlinks for same-filesystem workflows).
   module RendererCacheHelpers
     module_function
-
-    def collect_assets
-      collect_assets_with_required_paths.first
-    end
 
     def collect_assets_with_required_paths
       config = ReactOnRailsPro.configuration
@@ -101,10 +99,10 @@ module ReactOnRailsPro
       File.rename(tmp_file, dest)
       puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
     ensure
-      # `tmp_file` is nil when the assignment line was never reached — Ruby
-      # initialises locals to nil before the method body runs, so the `if
-      # tmp_file` guard only matters when `mkdir_p` raises (or any other
-      # exception ahead of the assignment).
+      # `tmp_file` is nil if execution never reached the assignment — Ruby's
+      # parser pre-allocates a nil slot for every local variable it sees as an
+      # assignment target, so the `if tmp_file` guard catches the case where
+      # `mkdir_p` raises before the assignment runs.
       #
       # On the success path `tmp_file` is a truthy string but the file no
       # longer exists on disk after the rename, and `rm_f` is a no-op for

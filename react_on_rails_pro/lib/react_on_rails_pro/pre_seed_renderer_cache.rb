@@ -65,9 +65,12 @@ module ReactOnRailsPro
       # path can differ from the Node renderer's default, causing silent
       # mis-staging.
       # RENDERER_BUNDLE_PATH remains accepted for compatibility, but new deploys
-      # should migrate to RENDERER_SERVER_BUNDLE_CACHE_PATH.
-      return if ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", nil).to_s != "" ||
-                ENV.fetch("RENDERER_BUNDLE_PATH", nil).to_s != ""
+      # should migrate to RENDERER_SERVER_BUNDLE_CACHE_PATH. Whitespace-only
+      # values are treated as unset here so the user gets the actionable Docker
+      # guidance instead of the lower-level "whitespace-only" error from
+      # renderer_cache_env_value.
+      return if !ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").strip.empty? ||
+                !ENV.fetch("RENDERER_BUNDLE_PATH", "").strip.empty?
 
       raise ReactOnRailsPro::Error, <<~MSG.strip
         Pre-seeding the renderer cache in copy mode (#{Rails.env}) requires an explicit
@@ -152,7 +155,7 @@ module ReactOnRailsPro
                 "it may have been removed after mkdir_p (race with an external cleanup)."
         end
       relative_source_path = source_path.relative_path_from(destination_dir_real)
-      tmp = "#{destination}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}"
+      tmp = "#{destination}.tmp-#{Process.pid}-#{SecureRandom.hex(6)}"
       File.symlink(relative_source_path, tmp)
       File.rename(tmp, destination)
       puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"

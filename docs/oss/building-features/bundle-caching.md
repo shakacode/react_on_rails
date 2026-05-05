@@ -104,6 +104,7 @@ The goal is that Ruby only changes that don't affect your webpack bundles don't 
 This task is called automatically if you're using bundle caching. The automatic staging uses the same bundle-hash cache layout as the renderer's runtime upload flow and the copy-based `react_on_rails_pro:pre_seed_renderer_cache` task used for Docker/image-build workflows.
 
 ```ruby
+  # Remove this line — pre-staging is now automatic when bundle caching is enabled.
   Rake::Task['react_on_rails_pro:pre_stage_bundle_for_node_renderer'].invoke
 ```
 

@@ -2779,13 +2779,23 @@ module ReactOnRails
       # Skip leading-comment lines (`#` Procfile/shell, `//` Dockerfile-style)
       # so files that mention the old task only inside a comment do not trip
       # the migration nudge.
+      # Per-file rescue so a transient failure on one path (e.g. Errno::EACCES)
+      # does not abort the whole scan and silently skip the rest. The outer
+      # rescue catches anything that escapes the per-file guard.
       matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
         full_path = Rails.root.join(path)
         next false unless full_path.file?
         # Skip files larger than 1 MB; deploy scripts should be tiny.
         next false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
 
-        deploy_script_references_deprecated_task?(full_path)
+        begin
+          deploy_script_references_deprecated_task?(full_path)
+        rescue StandardError => e
+          checker.add_warning(
+            "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
+          )
+          false
+        end
       end
 
       return if matches.empty?
@@ -2798,7 +2808,7 @@ module ReactOnRails
         Docker/image builds) and MODE=symlink for same-filesystem workflows.
       MSG
     rescue StandardError => e
-      checker.add_warning("⚠️  Could not scan for deprecated renderer-cache task references: #{e.message}")
+      checker.add_warning("⚠️  Could not complete scan for deprecated renderer-cache task references: #{e.message}")
     end
 
     def deploy_script_references_deprecated_task?(full_path)

@@ -2623,11 +2623,11 @@ RSpec.describe ReactOnRails::Doctor do
 
       after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
 
-      it "captures the error as a warning instead of failing the doctor check" do
+      it "captures the error as a warning that names the offending file" do
         expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? do |m|
-                 m[:content].include?("Could not scan for deprecated renderer-cache task")
+                 m[:content].include?("Could not scan Procfile for deprecated renderer-cache task")
                end).to be(true)
       end
     end

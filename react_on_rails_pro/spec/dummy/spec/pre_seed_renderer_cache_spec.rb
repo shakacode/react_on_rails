@@ -100,10 +100,10 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
 
     it "cleans up the temporary symlink when atomic replacement fails" do
       allow(SecureRandom).to receive(:hex).and_call_original
-      allow(SecureRandom).to receive(:hex).with(4).and_return("abcd1234")
+      allow(SecureRandom).to receive(:hex).with(6).and_return("abcd1234efff")
       allow(File).to receive(:rename).and_call_original
       allow(File).to receive(:rename)
-        .with(a_string_matching(/\.tmp-#{Process.pid}-abcd1234\z/), anything)
+        .with(a_string_matching(/\.tmp-#{Process.pid}-abcd1234efff\z/), anything)
         .and_raise(Errno::EIO, "rename failed")
 
       expect { described_class.call(mode: :symlink) }.to raise_error(Errno::EIO)
@@ -179,11 +179,13 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     end
 
-    it "raises when the preferred env var is whitespace-only" do
+    it "raises the actionable Docker guidance when the preferred env var is whitespace-only" do
       ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "  "
 
       expect { described_class.call(mode: :copy) }
-        .to raise_error(ReactOnRailsPro::Error, /whitespace-only/)
+        .to raise_error(ReactOnRailsPro::Error, /RENDERER_SERVER_BUNDLE_CACHE_PATH/)
+    ensure
+      ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     end
 
     it "does not raise in :symlink mode even without an env var" do
