@@ -23,7 +23,8 @@ licensing boundaries.
 ## Candidate Scanner Categories
 
 Start with this point-in-time vendor shortlist from the issue if the products still offer an appropriate plan at
-evaluation time:
+evaluation time. Before scheduling each scan, confirm the current product name, URL, OSS or trial plan, and language
+coverage so the evaluation does not drift from the market.
 
 - ZeroPath
 - Corgea
@@ -56,18 +57,26 @@ inert: no operational code paths, real network calls, or reusable exploit payloa
 
 ## Scoring Criteria
 
-Score each scanner against the same rubric:
+Score each scanner against the same rubric (1 = poor, 3 = acceptable, 5 = excellent). Use the weight column to make
+security signal and operational cost comparable across evaluators.
 
-| Criterion                 | Question                                                                           |
-| ------------------------- | ---------------------------------------------------------------------------------- |
-| Actionability             | Does the finding name the concrete file, behavior, and reachable path?             |
-| Correctness               | Can we reproduce or disprove the finding locally?                                  |
-| False-positive rate       | How many findings are noise after local verification?                              |
-| Ruby/Rails coverage       | Does it understand Rails generators, helpers, and server rendering paths?          |
-| TypeScript/React coverage | Does it understand package exports, SSR utilities, and browser/runtime boundaries? |
-| Permission model          | Can it run with minimal GitHub permissions?                                        |
-| CI fit                    | Can results be advisory first, without failing every PR?                           |
-| Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                      |
+| Criterion                 | Question                                                                           | Score (1-5) | Weight (0-1) |
+| ------------------------- | ---------------------------------------------------------------------------------- | ----------- | ------------ |
+| Actionability             | Does the finding name the concrete file, behavior, and reachable path?             |             | 1.0          |
+| Correctness               | Can we reproduce or disprove the finding locally?                                  |             | 1.0          |
+| False-positive rate       | How many findings are noise after local verification?                              |             | 0.9          |
+| Ruby/Rails coverage       | Does it understand Rails generators, helpers, and server rendering paths?          |             | 0.8          |
+| TypeScript/React coverage | Does it understand package exports, SSR utilities, and browser/runtime boundaries? |             | 0.8          |
+| Permission model          | Can it run with minimal GitHub permissions?                                        |             | 0.7          |
+| CI fit                    | Can results be advisory first, without failing every PR?                           |             | 0.7          |
+| Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                      |             | 0.5          |
+
+Anchor examples:
+
+- Actionability: 5 means file, reachable path, and reproduction steps; 1 means a vague pattern or generic warning.
+- Correctness: 5 means locally reproduced or disproven with a clear command; 1 means the scanner cannot explain the
+  finding.
+- False-positive rate: 5 means most surfaced findings survive local verification; 1 means the report is mostly noise.
 
 ## First-Pass Workflow
 
@@ -75,14 +84,19 @@ Score each scanner against the same rubric:
 2. Run the scan without enabling CI blocking.
 3. Export raw findings with sensitive details into a private Notion or Google Doc if needed; summarize only sanitized,
    verified results in the public issue after exposure details are fixed or disproven.
-   Limit access to repository maintainers or the security triage group, omit secrets and credentials, redact reproduction
-   snippets, and delete or archive raw notes after the finding is resolved.
+   - Limit access to repository maintainers or the security triage group; omit secrets and credentials; redact
+     reproduction snippets.
+   - Delete or archive raw notes after the finding is resolved.
 4. For each high or critical finding, reproduce locally or write down why it is not reachable.
    Batch-triage medium findings after the high/critical pass. Skip informational findings unless a pattern emerges.
 5. Fix only verified vulnerabilities or correctness bugs.
+   If a verified vulnerability affects released gem or npm package code, keep exposure details private until patched and
+   coordinate with maintainers or the security triage group before public disclosure.
 6. Summarize scanner signal in the issue before trying the next scanner.
 
 ## Adoption Bar
+
+**Owner:** See [Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018) for tracking and assignment.
 
 Do not add a scanner to CI until all of these are true:
 
