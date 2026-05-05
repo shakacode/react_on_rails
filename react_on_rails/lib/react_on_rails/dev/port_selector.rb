@@ -30,7 +30,9 @@ module ReactOnRails
       # best-effort until Conductor documents it. If a future release changes
       # the meaning (e.g. CONDUCTOR_PORT becomes the Rails port itself rather
       # than a block base), the derived offsets below will land on the wrong
-      # ports.
+      # ports — users would see port-conflict failures at runtime rather than
+      # a clear misconfiguration error. A future "validate derived ports are
+      # reachable on startup" path could surface this earlier.
       #
       # Escape hatch: REACT_ON_RAILS_BASE_PORT takes precedence, so users can
       # override the CONDUCTOR_PORT interpretation without code changes.
@@ -52,13 +54,19 @@ module ReactOnRails
         # Pro-only service and does not participate in auto-detection).
         # :base_port_mode is true only in case 1.
         #
-        # NOTE: This method mutates ENV. Invalid PORT / SHAKAPACKER_DEV_SERVER_PORT
-        # values are deleted via `read_and_sanitize_port_env!` so ServerManager's
-        # apply_explicit_port_env path doesn't re-warn on the same bad value.
-        # Intended for `bin/dev` startup; do not call from read-only contexts
-        # that expect ENV to survive the call.
-        def select_ports
-          base = base_port_ports
+        # NOTE: This method mutates ENV.
+        # @side_effect Deletes invalid PORT / SHAKAPACKER_DEV_SERVER_PORT
+        #   values via `read_and_sanitize_port_env!` so ServerManager's
+        #   apply_explicit_port_env path doesn't re-warn on the same bad
+        #   value. Intended for `bin/dev` startup; do not call from
+        #   read-only contexts that expect ENV to survive the call. See
+        #   `read_and_sanitize_port_env!` (which uses the `!` suffix to make
+        #   the mutation explicit at the inner call site).
+        # @param pro_renderer [Boolean] when false, suppresses the renderer
+        #   port-in-use warning so OSS apps without a node renderer don't
+        #   see "port X (renderer)" noise on a coincidentally-bound base+2.
+        def select_ports(pro_renderer: true)
+          base = base_port_ports(pro_renderer: pro_renderer)
           return base if base
 
           rails_port   = explicit_rails_port
@@ -108,14 +116,14 @@ module ReactOnRails
         # Callers that need the derived ports without user-facing output
         # (e.g. ServerManager#kill_processes, which shouldn't print a banner
         # while killing) should use #base_port_hash instead.
-        def base_port_ports
+        def base_port_ports(pro_renderer: true)
           bp, source = base_port_with_source
           return nil unless bp
 
           ports = derive_ports_from_base(bp)
           puts "Base port #{bp} detected via #{source}. Using Rails :#{ports[:rails]}, " \
                "webpack :#{ports[:webpack]}, renderer :#{ports[:renderer]}"
-          warn_if_derived_ports_in_use(bp, ports)
+          warn_if_derived_ports_in_use(bp, ports, pro_renderer: pro_renderer)
           ports
         end
 
@@ -155,7 +163,7 @@ module ReactOnRails
           return false if stripped.empty?
           return false unless stripped.match?(/\A\d+\z/)
 
-          stripped.to_i.between?(1, 65_535)
+          stripped.to_i.between?(1, TCP_PORT_MAX)
         end
 
         private
@@ -172,8 +180,14 @@ module ReactOnRails
         # Advisory: surface early conflicts when a base port's derived ports are
         # already bound (e.g. two worktrees share a base). Does not fail — the
         # actual bind at server start gives the definitive error.
-        def warn_if_derived_ports_in_use(base, ports)
-          %i[rails webpack renderer].each do |role|
+        #
+        # Skips the renderer port when `pro_renderer` is false: OSS apps don't
+        # run a node renderer, so "port base+2 (renderer) is already in use"
+        # would be confusing noise on a coincidental collision with an
+        # unrelated local service.
+        def warn_if_derived_ports_in_use(base, ports, pro_renderer: true)
+          roles = pro_renderer ? %i[rails webpack renderer] : %i[rails webpack]
+          roles.each do |role|
             port_num = ports[role]
             warn "WARNING: port #{port_num} (#{role}, derived from base #{base}) is already in use." \
               unless port_available?(port_num)

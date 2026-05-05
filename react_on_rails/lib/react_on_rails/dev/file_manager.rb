@@ -6,6 +6,14 @@ require "socket"
 module ReactOnRails
   module Dev
     class FileManager
+      # Bounded probe so a stuck server with a full accept queue (rare for a
+      # local overmind socket but theoretically possible) cannot stall
+      # bin/dev startup indefinitely. UNIX domain socket connect() to a dead
+      # listener typically fails in microseconds, so 150 ms is conservative
+      # while keeping worst-case overhead low across many stale sockets.
+      SOCKET_PROBE_TIMEOUT_SECS = 0.15
+      private_constant :SOCKET_PROBE_TIMEOUT_SECS
+
       class << self
         def cleanup_stale_files
           socket_cleanup = cleanup_overmind_sockets
@@ -73,14 +81,6 @@ module ReactOnRails
           true
         end
 
-        # Bounded probe so a stuck server with a full accept queue (rare for a
-        # local overmind socket but theoretically possible) cannot stall
-        # bin/dev startup indefinitely. UNIXSocket.open uses a blocking
-        # connect(2) with no timeout; switching to connect_nonblock + IO.select
-        # gives us a deadline.
-        SOCKET_PROBE_TIMEOUT_SECS = 1.0
-        private_constant :SOCKET_PROBE_TIMEOUT_SECS
-
         def socket_active?(socket_path)
           return false unless File.exist?(socket_path)
 
@@ -131,10 +131,8 @@ module ReactOnRails
         end
 
         def working_directory_via_proc(pid)
-          path = File.readlink("/proc/#{pid}/cwd")
-          return nil if path.nil? || path.empty?
-
-          path
+          # File.readlink either returns a non-empty String or raises.
+          File.readlink("/proc/#{pid}/cwd")
         rescue Errno::ENOENT, Errno::EACCES, Errno::EPERM, NotImplementedError
           # /proc not present (macOS, BSD), no permission to read this PID's cwd,
           # or readlink unsupported on this platform. Fall through to lsof.

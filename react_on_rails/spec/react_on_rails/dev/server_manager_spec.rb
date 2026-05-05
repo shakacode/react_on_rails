@@ -346,6 +346,17 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         described_class.start(:production_like)
         expect(ENV.fetch("PORT", nil)).to eq("4242")
       end
+
+      it "exits cleanly when find_available_port raises NoPortAvailable" do
+        # Mirrors the existing rescue in `configure_ports`. Without the rescue
+        # in `run_production_like`, an exhausted port range produced an
+        # unhandled Ruby backtrace instead of a one-line warning.
+        allow(ReactOnRails::Dev::PortSelector).to receive(:find_available_port)
+          .and_raise(ReactOnRails::Dev::PortSelector::NoPortAvailable, "No port found")
+        ENV["PORT"] = "abc"
+        expect_any_instance_of(Kernel).to receive(:exit).with(1)
+        expect { described_class.start(:production_like) }.to output(/No port found/).to_stderr
+      end
     end
 
     context "when configuring ports" do
@@ -1138,10 +1149,26 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       # Make sure no processes are found so cleanup_socket_files gets called
       allow(Open3).to receive(:capture2).and_return(["", nil])
 
+      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([])
       allow(File).to receive(:exist?).with(".overmind.sock").and_return(true)
-      allow(File).to receive(:exist?).with("tmp/sockets/overmind.sock").and_return(false)
       allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
       expect(File).to receive(:delete).with(".overmind.sock")
+
+      described_class.kill_processes
+    end
+
+    it "cleans up renamed/copied overmind sockets via the same glob FileManager uses" do
+      # Mirrors FileManager#cleanup_overmind_sockets: variants like
+      # overmind-4100.sock from copied app dirs must also be removed during
+      # `bin/dev kill`, not just at startup.
+      allow(Open3).to receive(:capture2).and_return(["", nil])
+
+      copied = "tmp/sockets/overmind-4100.sock"
+      allow(Dir).to receive(:glob).with("tmp/sockets/overmind*.sock").and_return([copied])
+      allow(File).to receive(:exist?).with(".overmind.sock").and_return(false)
+      allow(File).to receive(:exist?).with(copied).and_return(true)
+      allow(File).to receive(:exist?).with("tmp/pids/server.pid").and_return(false)
+      expect(File).to receive(:delete).with(copied)
 
       described_class.kill_processes
     end

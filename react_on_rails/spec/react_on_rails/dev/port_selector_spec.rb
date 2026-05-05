@@ -62,6 +62,20 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         expect(result).to include(rails: 5000, webpack: 5001, renderer: 5002)
       end
 
+      it "skips the renderer port-in-use warning when pro_renderer is false (OSS)" do
+        allow(described_class).to receive(:port_available?).and_return(false)
+        expect { described_class.select_ports(pro_renderer: false) }
+          .to output(/port 5000 \(rails.+already in use.+port 5001 \(webpack.+already in use/m).to_stderr
+        expect { described_class.select_ports(pro_renderer: false) }
+          .not_to output(/port 5002 \(renderer/).to_stderr
+      end
+
+      it "still warns about the renderer port when pro_renderer is true (default)" do
+        allow(described_class).to receive(:port_available?).and_return(false)
+        expect { described_class.select_ports }
+          .to output(/port 5002 \(renderer, derived from base 5000\) is already in use/).to_stderr
+      end
+
       it "prints a base port message" do
         expect { described_class.select_ports }.to output(/Base port 5000 detected/).to_stdout
       end

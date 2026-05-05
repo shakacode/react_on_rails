@@ -66,6 +66,13 @@ module ReactOnRails
         # [3000, 3001] when no base port is configured, plus the renderer port
         # when Pro renderer support is active. Uses PortSelector's pure
         # #base_port_hash so no "Base port detected" banner prints during a kill.
+        #
+        # `pro_renderer_active?` here is evaluated against the kill-time
+        # environment, where RENDERER_PORT / REACT_RENDERER_URL set by
+        # `configure_ports` in the *previous* `bin/dev` session are not
+        # exported into the new shell. So in OSS apps the renderer port is
+        # included only when the Pro gem is actually loaded — this is the
+        # intended behavior, not a bug.
         def killable_ports
           base = PortSelector.base_port_hash
           return default_killable_ports unless base
@@ -98,10 +105,13 @@ module ReactOnRails
         def local_renderer_url_port_for_kill
           %w[REACT_RENDERER_URL RENDERER_URL].each do |var|
             url = ENV.fetch(var, nil)
-            next if url.nil? || url.strip.empty? || !localhost_renderer_url?(url)
+            next if url.nil? || url.strip.empty?
+
+            parsed = URI.parse(url)
+            next unless localhost_hostname?(parsed.hostname)
             next unless url.match?(URL_WITH_EXPLICIT_PORT_RE)
 
-            return URI.parse(url).port
+            return parsed.port
           rescue URI::InvalidURIError
             next
           end
@@ -188,7 +198,11 @@ module ReactOnRails
         end
 
         def cleanup_socket_files
-          files = [".overmind.sock", "tmp/sockets/overmind.sock", "tmp/pids/server.pid"]
+          # Mirrors FileManager#cleanup_overmind_sockets so renamed/copied
+          # variants like overmind-4100.sock are removed during `bin/dev kill`,
+          # not just at startup.
+          overmind_sockets = Dir.glob("tmp/sockets/overmind*.sock")
+          files = [".overmind.sock", *overmind_sockets, "tmp/pids/server.pid"].uniq
           killed_any = false
 
           files.each do |file|
@@ -685,7 +699,14 @@ module ReactOnRails
               # Clear the bad value first so procfile_port falls back to its default
               # (3001) instead of `"abc".to_i == 0`, which would scan from port 0.
               ENV.delete("PORT")
-              ENV["PORT"] = PortSelector.find_available_port(procfile_port(procfile)).to_s
+              # Match configure_ports' clean-exit behavior on exhaustion so
+              # `bin/dev prod` surfaces a one-line error instead of a backtrace.
+              begin
+                ENV["PORT"] = PortSelector.find_available_port(procfile_port(procfile)).to_s
+              rescue PortSelector::NoPortAvailable => e
+                warn e.message
+                exit 1
+              end
             end
             sync_renderer_port_and_url
           end
@@ -928,7 +949,9 @@ module ReactOnRails
           # Single call: select_ports internally consults base_port_ports and
           # returns the same hash when base-port mode is active, so we branch
           # on :base_port_mode instead of calling base_port_ports twice.
-          selected = PortSelector.select_ports
+          # Pass pro_renderer so OSS apps don't get a "port base+2 (renderer)
+          # is already in use" warning for a port they don't actually use.
+          selected = PortSelector.select_ports(pro_renderer: pro_renderer_active?)
           if selected[:base_port_mode]
             apply_base_port_env(selected)
           else
@@ -947,7 +970,7 @@ module ReactOnRails
         # configure_ports) do that so it fires in every mode regardless of
         # whether base-port mode is active.
         def apply_base_port_if_active
-          selected = PortSelector.base_port_ports
+          selected = PortSelector.base_port_ports(pro_renderer: pro_renderer_active?)
           return false unless selected
 
           apply_base_port_env(selected)
@@ -973,7 +996,10 @@ module ReactOnRails
           if current.nil? || current.strip.empty?
             warn "WARNING: RENDERER_URL is set but REACT_RENDERER_URL is not. " \
                  "RENDERER_URL was renamed to REACT_RENDERER_URL; update your " \
-                 "env var to avoid silent fallback to the default renderer URL."
+                 "env var to avoid silent fallback to the default renderer URL. " \
+                 "Note: RENDERER_URL still activates the Pro renderer path here, " \
+                 "so base-port mode will derive RENDERER_PORT/REACT_RENDERER_URL " \
+                 "from it until the variable is renamed."
             return
           end
 
@@ -1027,6 +1053,12 @@ module ReactOnRails
         # of the renderer env vars (so they're configuring a renderer manually
         # without the Pro gem). Keeps OSS environments clean while not
         # silently dropping renderer env for any caller who actually wants it.
+        #
+        # The legacy `RENDERER_URL` (renamed to `REACT_RENDERER_URL`) is
+        # intentionally included so users mid-migration who still export
+        # `RENDERER_URL` keep base-port renderer-derivation behavior. The
+        # rename reminder lives in `warn_if_legacy_renderer_url_env_used`,
+        # which calls out that the legacy var still triggers this path.
         def pro_renderer_active?
           return true if Gem.loaded_specs.key?("react_on_rails_pro")
 
@@ -1076,7 +1108,16 @@ module ReactOnRails
         # warn_if_port_will_be_overridden's symmetry for base-port mode.
         def overwrite_invalid_port_env(var_name, derived_port)
           existing = ENV.fetch(var_name, nil)
-          return if valid_port_string?(existing)
+          if valid_port_string?(existing)
+            # Strip and write back so a whitespace-padded `" 3000 "` does not
+            # leak into the Procfile's `${PORT:-3000}` expansion (which would
+            # forward the spaces verbatim to `rails s -p`). Matches the
+            # normalization already done for RENDERER_PORT in
+            # sync_renderer_port_and_url.
+            stripped = existing.strip
+            ENV[var_name] = stripped if stripped != existing
+            return
+          end
 
           unless existing.nil? || existing.strip.empty?
             warn "WARNING: #{var_name}=#{existing.inspect} is not a valid port; " \
@@ -1092,7 +1133,10 @@ module ReactOnRails
         def sync_renderer_port_and_url
           raw_port = ENV.fetch("RENDERER_PORT", nil)
           url = ENV.fetch("REACT_RENDERER_URL", nil)
-          return warn_url_without_port(url) if raw_port.nil? || raw_port.strip.empty?
+          if raw_port.nil? || raw_port.strip.empty?
+            warn_url_without_port(url)
+            return
+          end
 
           # Reuse the canonical port-string predicate so whitespace handling and
           # range checks match PortSelector exactly (`" 3800 "` is accepted
@@ -1121,7 +1165,8 @@ module ReactOnRails
             # log together with every other "I changed your env" warning in this
             # file — stdout would leak through the same silencing attempt.
             derived = "http://localhost:#{port}"
-            warn "RENDERER_PORT=#{port} set without REACT_RENDERER_URL; deriving REACT_RENDERER_URL=#{derived}."
+            warn "WARNING: RENDERER_PORT=#{port} set without REACT_RENDERER_URL; " \
+                 "deriving REACT_RENDERER_URL=#{derived}."
             ENV["REACT_RENDERER_URL"] = derived
           elsif url_port_mismatch?(url, port)
             # Both set but inconsistent — SSR will silently break otherwise.
@@ -1196,15 +1241,19 @@ module ReactOnRails
         end
 
         def localhost_renderer_url?(url)
-          # Use `.hostname` not `.host`: for IPv6 URLs like `http://[::1]:3800`,
-          # `.host` returns `"[::1]"` (with brackets) while `.hostname` returns
-          # `"::1"` (bracket-stripped), matching the comparison list below.
-          # Downcase: URI preserves host case, so `http://LOCALHOST:3900` would
-          # otherwise be treated as non-local and skip the invalid-port URL
-          # remediation path, leaving Rails targeting a stale port.
-          %w[localhost 127.0.0.1 ::1].include?(URI.parse(url).hostname&.downcase)
+          localhost_hostname?(URI.parse(url).hostname)
         rescue URI::InvalidURIError
           false
+        end
+
+        # Use `.hostname` not `.host`: for IPv6 URLs like `http://[::1]:3800`,
+        # `.host` returns `"[::1]"` (with brackets) while `.hostname` returns
+        # `"::1"` (bracket-stripped), matching the comparison list below.
+        # Downcase: URI preserves host case, so `http://LOCALHOST:3900` would
+        # otherwise be treated as non-local and skip the invalid-port URL
+        # remediation path, leaving Rails targeting a stale port.
+        def localhost_hostname?(hostname)
+          %w[localhost 127.0.0.1 ::1].include?(hostname&.downcase)
         end
 
         # Callers are expected to have normalized ENV["PORT"] beforehand:
