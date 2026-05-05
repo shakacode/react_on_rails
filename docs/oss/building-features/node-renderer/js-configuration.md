@@ -145,7 +145,7 @@ const config = {
 
 // Register a custom health check route
 configureFastify((app) => {
-  app.get('/health', async () => {
+  app.get('/health', async (request, reply) => {
     return { status: 'ok' };
   });
 });
@@ -260,14 +260,14 @@ Recommended starting values:
 Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
 does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
 
-> **Note (startup window):** With these values, the container restarts only if all six consecutive startup checks fail.
-> Checks occur at approximately 10, 15, 20, 25, 30, and 35 seconds. Increase `failureThreshold` or `periodSeconds` if
-> startup regularly takes longer.
+> **Note (startup window):** With these values, the first check fires at `initialDelaySeconds` (10 s), then every
+> `periodSeconds` (5 s) thereafter, and the container restarts only if all six consecutive startup checks fail. Increase
+> `failureThreshold` or `periodSeconds` if startup regularly takes longer.
 > The 10-second initial delay is a conservative starting point for images that take a moment to boot before opening the
 > port; reduce it, or omit it, if your renderer consistently starts in under 5 seconds.
 
-`--max-time 4` is intentionally shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero
-exit code before Kubernetes terminates the probe process.
+See the probe examples in [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest)
+for the rationale behind `--max-time 4` relative to `timeoutSeconds: 5`.
 
 Readiness and liveness omit `initialDelaySeconds` here because Kubernetes defers them until the startup probe succeeds.
 If you skip the startup probe, add an appropriate `initialDelaySeconds` to each.
