@@ -2,7 +2,7 @@
 
 require "socket"
 
-# httpx (as of 1.7.x) does not call setsockopt(TCP_NODELAY, 1) on its sockets,
+# httpx (all currently supported versions, >= 1.5) does not call setsockopt(TCP_NODELAY, 1) on its sockets,
 # while net-http and async-http both do. With Nagle on, small HTTP/2 frame
 # writes interact with Linux's delayed-ACK timer (tcp_delack_min = 40ms),
 # producing a bimodal latency distribution with a second mode at ~40ms.
