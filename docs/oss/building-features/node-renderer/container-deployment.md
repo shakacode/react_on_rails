@@ -167,6 +167,7 @@ require "socket"
 # app-level authentication callbacks on unauthenticated probe requests.
 class HealthController < ActionController::Base
   def show
+    # Opens and immediately closes; raises if the renderer port is unreachable.
     Socket.tcp("localhost", ENV.fetch("RENDERER_PORT", "3800").to_i, connect_timeout: 1) {}
     head :ok
   rescue IOError, SocketError, SystemCallError
@@ -471,8 +472,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 > **Probe command notes:** `exec` probes require curl with HTTP/2 support in your image. Verify with
 > `curl --version | grep -i http2`; if unavailable, use `tcpSocket` as a fallback. Set curl `--max-time` shorter than the
 > orchestrator timeout so curl returns a clean non-zero exit code before Kubernetes terminates the probe process. These
-> examples use `--max-time 4` with `timeoutSeconds: 5`; on heavily loaded nodes, widen the gap by reducing `--max-time`,
-> such as `--max-time 3`. Readiness and liveness omit `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers
+> examples use `--max-time 4` with `timeoutSeconds: 5`; on heavily loaded nodes, leave more buffer by reducing `--max-time`
+> to `3`, giving a 2-second gap instead of 1. Readiness and liveness omit `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers
 > them until the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe
 > support, add an appropriate `initialDelaySeconds`.
 
@@ -643,6 +644,7 @@ spec:
             failureThreshold: 6
             timeoutSeconds: 1
           readinessProbe:
+            # Omit initialDelaySeconds only if the startupProbe above is configured.
             exec:
               command:
                 - curl
@@ -655,6 +657,7 @@ spec:
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
+            # UPGRADE WARNING: verify curl HTTP/2 support before replacing an existing tcpSocket probe.
             # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
             # If unavailable, replace this exec probe with a tcpSocket probe on port 3800.
             # Omit initialDelaySeconds only if the startupProbe above is configured.
