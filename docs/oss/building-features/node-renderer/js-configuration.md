@@ -261,8 +261,9 @@ Recommended starting values:
 
 - **Startup**: Use `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if
   different). TCP is enough here because readiness below gates traffic; startup only shields liveness during boot. Start
-  with `initialDelaySeconds: 10` (first check fires at 10 s; total budget is `10 + (6 * 5) = 40 s`), `periodSeconds: 5`,
-  `failureThreshold: 6`, and the Kubernetes default `timeoutSeconds: 1` for a TCP connection check.
+  with `initialDelaySeconds: 10` (first check fires at 10 s; the sixth and final failure fires at
+  `10 + ((6 - 1) * 5) = 35 s`), `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes default
+  `timeoutSeconds: 1` for a TCP connection check.
 - **Readiness (custom route)**: Use `exec` with
   `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with
   [`configureFastify`](#adding-a-health-check-endpoint). Start with `timeoutSeconds: 5`, `periodSeconds: 5`, and

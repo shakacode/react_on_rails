@@ -174,6 +174,9 @@ class HealthController < ActionController::Base
 end
 ```
 
+If the renderer uses a non-default port, set `RENDERER_PORT` in the Rails container environment too, or replace the
+`ENV.fetch` call with a shared Rails config value derived from `renderer_url`.
+
 ### Separate Container In The Same Workload
 
 Keep the Rails `renderer_url` as `http://localhost:3800`. Use `0.0.0.0` for the renderer `host` when you rely on
@@ -511,6 +514,10 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive. The probe below changes the
    liveness check from `tcpSocket` to `exec`; if you are upgrading an existing deployment, verify curl HTTP/2 support
    first:
+
+   > **Before upgrading:** Run `curl --version | grep -i http2` inside your container image. If HTTP/2 support is absent,
+   > use the `tcpSocket` fallback shown below instead of this `exec` block.
+
    ```yaml
    livenessProbe:
      # Omit initialDelaySeconds only if the startupProbe above is configured.
@@ -528,6 +535,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      periodSeconds: 10
      failureThreshold: 3
    ```
+
    > **Notes:**
    >
    > - Use `/info` by default. Only substitute `/health` for liveness if that route avoids external dependency checks and
@@ -670,6 +678,7 @@ spec:
 >   # Omit initialDelaySeconds only if the startupProbe above is configured.
 >   tcpSocket:
 >     port: 3800
+>   # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
 >   timeoutSeconds: 1
 >   periodSeconds: 10
 >   failureThreshold: 3
