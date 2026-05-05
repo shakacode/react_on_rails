@@ -36,6 +36,22 @@ describe('serverRenderUtils', () => {
       expect((error as Error & { cause?: unknown }).cause).toBe(42);
     });
 
+    it('wraps null thrown values', () => {
+      const error = convertToError(null);
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toBe('null');
+      expect((error as Error & { cause?: unknown }).cause).toBeNull();
+    });
+
+    it('wraps undefined thrown values', () => {
+      const error = convertToError(undefined);
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toBe('undefined');
+      expect((error as Error & { cause?: unknown }).cause).toBeUndefined();
+    });
+
     it('wraps circular-reference objects without throwing', () => {
       const circular: Record<string, unknown> = {};
       circular.self = circular;

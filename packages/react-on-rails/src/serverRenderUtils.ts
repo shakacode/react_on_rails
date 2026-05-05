@@ -29,12 +29,13 @@ function isCrossRealmError(e: unknown): e is { message?: unknown } {
 }
 
 function stringifyThrownValue(e: unknown): string {
-  if (isCrossRealmError(e) && typeof e.message === 'string') {
-    return e.message;
+  if (isCrossRealmError(e)) {
+    return typeof e.message === 'string' ? e.message : Object.prototype.toString.call(e);
   }
 
   if (typeof e === 'object' && e !== null) {
     try {
+      // JSON.stringify can return undefined without throwing, for example when toJSON returns undefined.
       return JSON.stringify(e) ?? Object.prototype.toString.call(e);
     } catch {
       return Object.prototype.toString.call(e);
