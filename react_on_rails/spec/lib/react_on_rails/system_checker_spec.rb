@@ -121,16 +121,21 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when package managers are available" do
       before do
+        rails_root = Pathname.new("/tmp/myapp")
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: rails_root.to_s)
+        )
         allow(checker).to receive(:cli_exists?).with("npm").and_return(true)
         allow(checker).to receive(:cli_exists?).with("yarn").and_return(true)
         allow(checker).to receive(:cli_exists?).with("pnpm").and_return(false)
         allow(checker).to receive(:cli_exists?).with("bun").and_return(false)
         # Mock file existence checks for lock files so detect_used_package_manager returns nil
-        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lock").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lockb").and_return(false)
-        allow(File).to receive(:exist?).with("package-lock.json").and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lockb").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("package-lock.json").to_s).and_return(false)
       end
 
       it "adds a success message" do
@@ -923,18 +928,28 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     describe "#detect_used_package_manager" do
       it "returns bun when bun.lock exists" do
-        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lock").and_return(true)
+        rails_root = Pathname.new("/tmp/myapp")
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: rails_root.to_s)
+        )
+        allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(true)
 
         expect(checker.send(:detect_used_package_manager)).to eq("bun")
       end
 
       it "returns bun when bun.lockb exists" do
-        allow(File).to receive(:exist?).with("yarn.lock").and_return(false)
-        allow(File).to receive(:exist?).with("pnpm-lock.yaml").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lock").and_return(false)
-        allow(File).to receive(:exist?).with("bun.lockb").and_return(true)
+        rails_root = Pathname.new("/tmp/myapp")
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: rails_root.to_s)
+        )
+        allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("bun.lockb").to_s).and_return(true)
 
         expect(checker.send(:detect_used_package_manager)).to eq("bun")
       end

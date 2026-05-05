@@ -2068,8 +2068,10 @@ RSpec.describe ReactOnRails::Doctor do
 
     it "adds explicit guidance that Gemfile constraints are not auto-fixed" do
       result = ReactOnRails::VersionSynchronizer::Result.new(
-        changes: [],
-        changed_files: [],
+        changes: [
+          { section: "dependencies", package: "react-on-rails", from: "^16.0.0", to: "16.5.0" }
+        ],
+        changed_files: ["package.json"],
         unsupported_specs: [],
         missing_source_specs: []
       )

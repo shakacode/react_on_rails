@@ -90,7 +90,7 @@ expect:
 # bin/shakapacker
 set -euo pipefail
 cd "$(dirname "$0")/.."
-exec ./client/node_modules/.bin/webpack --config ./config/webpack/webpack.config.js "$@"
+exec ./client/node_modules/.bin/shakapacker "$@"
 ```
 
 ```js
