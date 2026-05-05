@@ -147,6 +147,10 @@ type RenderFunctionAsyncResult = Promise<
 
 type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult;
 
+type RendererTeardown = () => void | Promise<void>;
+
+type RendererResult = undefined | RendererTeardown | PromiseLike<undefined | RendererTeardown>;
+
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
 /**
@@ -174,13 +178,23 @@ type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
  * anotherRenderFunction.renderFunction = true;
  */
 interface RenderFunction {
-  (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
+  (props?: any, railsContext?: RailsContext): RenderFunctionResult;
   // We allow specifying that the function is RenderFunction and not a React Function Component
   // by setting this property
   renderFunction?: true;
 }
 
-type ReactComponentOrRenderFunction = ReactComponent | RenderFunction;
+/**
+ * Renderer functions receive the DOM node id as their third argument and own
+ * mounting/unmounting their tree. Returning a teardown lets React on Rails run
+ * cleanup when the page unloads or when that DOM node id is replaced.
+ */
+interface RendererFunction {
+  (props: any, railsContext: RailsContext, domNodeId: string): RendererResult;
+  renderFunction?: true;
+}
+
+type ReactComponentOrRenderFunction = ReactComponent | RenderFunction | RendererFunction;
 
 type PipeableOrReadableStream = PipeableStream | NodeJS.ReadableStream;
 
@@ -189,7 +203,10 @@ export type {
   ReactComponent,
   AuthenticityHeaders,
   RenderFunction,
+  RendererFunction,
   RenderFunctionResult,
+  RendererTeardown,
+  RendererResult,
   Store,
   StoreGenerator,
   CreateReactOutputResult,

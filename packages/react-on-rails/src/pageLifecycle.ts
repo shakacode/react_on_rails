@@ -26,6 +26,9 @@ function runPageLoadedCallbacks(): void {
 
 function runPageUnloadedCallbacks(): void {
   currentPageState = 'unload';
+  // Browser navigation events do not await async listeners. Keep unload
+  // callbacks fire-and-forget; each callback must own any async cleanup it
+  // starts.
   pageUnloadedCallbacks.forEach((callback) => {
     void callback();
   });
@@ -130,6 +133,8 @@ export function onPageLoaded(callback: PageLifecycleCallback): void {
 
 export function onPageUnloaded(callback: PageLifecycleCallback): void {
   if (currentPageState === 'unload') {
+    // Match runPageUnloadedCallbacks: late unload subscribers are invoked
+    // without awaiting their result.
     void callback();
   }
   pageUnloadedCallbacks.add(callback);

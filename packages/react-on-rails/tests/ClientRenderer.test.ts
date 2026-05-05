@@ -8,7 +8,7 @@ import ComponentRegistry from '../src/ComponentRegistry.ts';
 import StoreRegistry from '../src/StoreRegistry.ts';
 import * as pageLifecycle from '../src/pageLifecycle.ts';
 import * as reactApis from '../src/reactApis.cts';
-import type { RenderFunction } from '../src/types/index.ts';
+import type { RendererFunction } from '../src/types/index.ts';
 
 const triggerPageUnload = (pageLifecycle as unknown as { __triggerPageUnload: () => Promise<void> })
   .__triggerPageUnload;
@@ -408,11 +408,8 @@ describe('ClientRenderer', () => {
       const teardown = jest.fn();
       // Three explicit params so ComponentRegistry classifies this as `isRenderer`
       // (`renderFunction && component.length === 3`).
-      function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
-        return teardown;
-      }
-      // Cast widens RenderFunction's return type to allow returning a teardown.
-      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      const Renderer: RendererFunction = (_props, _railsContext, _domNodeId) => teardown;
+      ComponentRegistry.register({ Renderer });
       setupRendererDom('Renderer', 'renderer-unload');
 
       renderComponent('renderer-unload');
@@ -427,13 +424,10 @@ describe('ClientRenderer', () => {
 
       const teardown1 = jest.fn();
       const teardown2 = jest.fn();
-      let nextTeardown: jest.Mock = teardown1;
+      let nextTeardown: () => void = teardown1;
 
-      function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
-        return nextTeardown;
-      }
-      // Cast widens RenderFunction's return type to allow returning a teardown.
-      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      const Renderer: RendererFunction = (_props, _railsContext, _domNodeId) => nextTeardown;
+      ComponentRegistry.register({ Renderer });
       const target1 = setupRendererDom('Renderer', 'renderer-replace');
 
       renderComponent('renderer-replace');
@@ -456,11 +450,11 @@ describe('ClientRenderer', () => {
     it('does not throw on page unload when the renderer returns nothing', async () => {
       setupRailsContext();
 
-      function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
+      const Renderer: RendererFunction = (_props, _railsContext, _domNodeId) => {
         // Returning a teardown is optional; not returning one is a no-op on unmount.
-      }
-      // Cast widens RenderFunction's return type to allow returning a teardown.
-      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+        return undefined;
+      };
+      ComponentRegistry.register({ Renderer });
       setupRendererDom('Renderer', 'renderer-noop');
 
       renderComponent('renderer-noop');
@@ -474,8 +468,8 @@ describe('ClientRenderer', () => {
       function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
         return { then: 42 };
       }
-      // Cast widens RenderFunction's return type to allow exercising invalid renderer output.
-      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      // Cast allows exercising invalid renderer output.
+      ComponentRegistry.register({ Renderer: Renderer as unknown as RendererFunction });
       setupRendererDom('Renderer', 'renderer-non-promise-then');
 
       expect(() => renderComponent('renderer-non-promise-then')).not.toThrow();
@@ -487,10 +481,8 @@ describe('ClientRenderer', () => {
       const teardown = jest.fn();
       // Async renderer: the framework awaits the renderer's promise and stores
       // the teardown it resolves to.
-      async function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
-        return teardown;
-      }
-      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      const Renderer: RendererFunction = async (_props, _railsContext, _domNodeId) => teardown;
+      ComponentRegistry.register({ Renderer });
       setupRendererDom('Renderer', 'renderer-async');
 
       renderComponent('renderer-async');
@@ -512,12 +504,11 @@ describe('ClientRenderer', () => {
       const teardown = jest.fn();
       let resolveRenderer: (resolvedTeardown: () => void) => void;
 
-      function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
-        return new Promise<() => void>((resolve) => {
+      const Renderer: RendererFunction = (_props, _railsContext, _domNodeId) =>
+        new Promise<() => void>((resolve) => {
           resolveRenderer = resolve;
         });
-      }
-      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      ComponentRegistry.register({ Renderer });
       setupRendererDom('Renderer', 'renderer-async-unload-race');
 
       renderComponent('renderer-async-unload-race');
@@ -527,6 +518,47 @@ describe('ClientRenderer', () => {
       await unloadPromise;
 
       expect(teardown).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits for a pending async renderer teardown before rendering a replacement with the same domNodeId', async () => {
+      setupRailsContext();
+
+      const events: string[] = [];
+      let renderCount = 0;
+      let resolveFirstRenderer: (resolvedTeardown: () => void) => void;
+
+      const Renderer: RendererFunction = (_props, _railsContext, _domNodeId) => {
+        renderCount += 1;
+        if (renderCount === 1) {
+          return new Promise<() => void>((resolve) => {
+            resolveFirstRenderer = resolve;
+          });
+        }
+
+        events.push('second render');
+        return () => {
+          events.push('second teardown');
+        };
+      };
+      ComponentRegistry.register({ Renderer });
+      const target1 = setupRendererDom('Renderer', 'renderer-async-replace-race');
+
+      renderComponent('renderer-async-replace-race');
+
+      target1.remove();
+      const target2 = document.createElement('div');
+      target2.id = 'renderer-async-replace-race';
+      document.body.appendChild(target2);
+
+      renderComponent('renderer-async-replace-race');
+      resolveFirstRenderer!(() => {
+        events.push('first teardown');
+      });
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      expect(events).toEqual(['first teardown', 'second render']);
     });
   });
 });

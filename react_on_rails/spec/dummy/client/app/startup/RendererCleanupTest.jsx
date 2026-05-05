@@ -2,6 +2,8 @@
 import React, { useEffect } from 'react';
 import { reactRender, unmountComponentAtNode } from 'react-on-rails/reactApis';
 
+// Intentionally use the package React DOM compatibility wrapper so this
+// fixture exercises renderer cleanup under React 16/17 and React 18+.
 // The cleanup inside useEffect runs only when React unmounts the tree. When
 // the framework invokes the teardown returned below, React fires this cleanup,
 // and the counter on window goes up. We use a counter rather than a boolean

@@ -1,5 +1,12 @@
 import type { ReactElement } from 'react';
-import type { RegisteredComponent, RailsContext, RenderReturnType } from './types/index.ts';
+import type {
+  RegisteredComponent,
+  RailsContext,
+  RendererFunction,
+  RendererResult,
+  RendererTeardown,
+  RenderReturnType,
+} from './types/index.ts';
 import ComponentRegistry from './ComponentRegistry.ts';
 import StoreRegistry from './StoreRegistry.ts';
 import createReactOutput from './createReactOutput.ts';
@@ -11,20 +18,17 @@ import { supportsRootApi, unmountComponentAtNode } from './reactApis.cts';
 
 const REACT_ON_RAILS_STORE_ATTRIBUTE = 'data-js-react-on-rails-store';
 
-type RendererTeardown = () => void | Promise<void>;
-
 type RenderedRoot = {
   domNode: Element;
   root?: RenderReturnType;
   teardown?: RendererTeardown;
   pendingTeardown?: Promise<undefined | RendererTeardown>;
-  isRenderer?: boolean;
+  isRenderer?: true;
 };
-
-type RendererResult = undefined | RendererTeardown | PromiseLike<undefined | RendererTeardown>;
 
 // Track all rendered roots and renderer-function teardowns for cleanup
 const renderedRoots = new Map<string, RenderedRoot>();
+const pendingUnmounts = new Map<string, Promise<void>>();
 
 function initializeStore(el: Element, railsContext: RailsContext): void {
   const name = el.getAttribute(REACT_ON_RAILS_STORE_ATTRIBUTE) || '';
@@ -127,13 +131,7 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
     }
 
     // Call the renderer function with the expected signature
-    const rendererResult = (
-      component as (
-        props: Record<string, unknown>,
-        railsContext: RailsContext,
-        domNodeId: string,
-      ) => RendererResult
-    )(props, railsContext, domNodeId);
+    const rendererResult = (component as RendererFunction)(props, railsContext, domNodeId);
     trackRendererTeardown(domNodeId, domNode, rendererResult, name);
     return true;
   }
@@ -155,6 +153,12 @@ function renderElement(el: Element, railsContext: RailsContext): void {
   try {
     const domNode = document.getElementById(domNodeId);
     if (domNode) {
+      const pendingUnmount = pendingUnmounts.get(domNodeId);
+      if (pendingUnmount) {
+        void pendingUnmount.then(() => renderElement(el, railsContext));
+        return;
+      }
+
       // Check if this component was already rendered by a previous call
       // This prevents hydration errors when reactOnRailsPageLoaded() is called multiple times
       // (e.g., for asynchronously loaded content)
@@ -171,13 +175,32 @@ function renderElement(el: Element, railsContext: RailsContext): void {
           return;
         }
         // DOM node was replaced (e.g., via async HTML injection) - clean up the old root
+        renderedRoots.delete(domNodeId);
+        if (existing.isRenderer) {
+          const replacementUnmount = unmountRenderedRoot(existing)
+            .catch((unmountError: unknown) => {
+              // Ignore unmount errors for replaced nodes
+              if (trace) {
+                console.log(`Error unmounting replaced component: ${name}`, unmountError);
+              }
+            })
+            .finally(() => {
+              if (pendingUnmounts.get(domNodeId) === replacementUnmount) {
+                pendingUnmounts.delete(domNodeId);
+              }
+            });
+
+          pendingUnmounts.set(domNodeId, replacementUnmount);
+          void replacementUnmount.then(() => renderElement(el, railsContext));
+          return;
+        }
+
         void unmountRenderedRoot(existing).catch((unmountError: unknown) => {
           // Ignore unmount errors for replaced nodes
           if (trace) {
             console.log(`Error unmounting replaced component: ${name}`, unmountError);
           }
         });
-        renderedRoots.delete(domNodeId);
       }
 
       const componentObj = ComponentRegistry.get(name);
