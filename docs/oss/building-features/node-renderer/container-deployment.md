@@ -175,6 +175,8 @@ class HealthController < ActionController::Base
     # Opens and immediately closes; raises if the renderer port is unreachable.
     # A successful TCP connection means the h2c listener is bound, not that
     # cluster workers are ready. Pair with the startup probe to shield liveness.
+    # In this same-container topology, Rails and the renderer share a network namespace.
+    # Probe localhost even if other deployment shapes use a service host.
     # connect_timeout is supported by the Ruby versions in this guide's prerequisites.
     renderer_port = URI.parse(ReactOnRailsPro.configuration.renderer_url).port
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) {}

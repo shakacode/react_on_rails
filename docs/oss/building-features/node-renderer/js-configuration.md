@@ -170,9 +170,10 @@ The sample `/health` route is intentionally shallow and omits handler parameters
 also passes `request` and `reply` to handlers if you need to inspect headers, set status codes, or customize the
 response. Add warm-up or readiness-gate logic inside this handler if readiness should wait for renderer-specific
 initialization. To signal not-ready, add `reply` to the handler parameters and call
-`reply.code(503).send({ status: 'warming_up' })`. Kubernetes exec probes treat any non-zero curl exit code as a failure;
-the response body is irrelevant to probe semantics, so you can return whatever payload is useful for debugging, such as
-`{ status: 'ok', workers: 4 }`.
+`reply.code(503).send({ status: 'warming_up' })`. The `-f` flag in `curl -sf` causes curl to exit non-zero for HTTP
+4xx/5xx responses, so a `503` from this handler correctly fails the probe. Kubernetes exec probes treat any non-zero curl
+exit code as a failure; the response body is irrelevant to probe semantics, so you can return whatever payload is useful
+for debugging, such as `{ status: 'ok', workers: 4 }`.
 
 Routes registered with `configureFastify` do not automatically use the renderer's render and asset authentication
 prechecks. A custom `/health` route like the one above is reachable without the renderer password unless you add your own
