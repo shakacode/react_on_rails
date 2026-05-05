@@ -169,11 +169,12 @@ if (cluster.isPrimary) {
 The sample `/health` route is intentionally shallow and omits handler parameters because it does not need them. Fastify
 also passes `request` and `reply` to handlers if you need to inspect headers, set status codes, or customize the
 response. Add warm-up or readiness-gate logic inside this handler if readiness should wait for renderer-specific
-initialization. To signal not-ready, add `reply` to the handler parameters and call
-`reply.code(503).send({ status: 'warming_up' })`. The `-f` flag in `curl -sf` causes curl to exit non-zero for HTTP
-4xx/5xx responses, so a `503` from this handler correctly fails the probe. Kubernetes exec probes treat any non-zero curl
-exit code as a failure; the response body is irrelevant to probe semantics, so you can return whatever payload is useful
-for debugging, such as `{ status: 'ok', workers: 4 }`.
+initialization. To signal not-ready while keeping Fastify's return-value style, add `reply` to the handler parameters,
+set the status with `reply.code(503)`, and return `{ status: 'warming_up' }` from that branch. Do not call `reply.send()`
+and then return another response object. The `-f` flag in `curl -sf` causes curl to exit non-zero for HTTP 4xx/5xx
+responses, so a `503` from this handler correctly fails the probe. Kubernetes exec probes treat any non-zero curl exit
+code as a failure; the response body is irrelevant to probe semantics, so you can return whatever payload is useful for
+debugging, such as `{ status: 'ok', workers: 4 }`.
 
 Routes registered with `configureFastify` do not automatically use the renderer's render and asset authentication
 prechecks. A custom `/health` route like the one above is reachable without the renderer password unless you add your own
@@ -290,8 +291,9 @@ does not apply there. See the `port` option at the top of this page for Heroku o
 > **Note (startup window):** With these values, the first check fires at `initialDelaySeconds` (10 s), then every
 > `periodSeconds` (5 s) thereafter, and the container restarts only if all six consecutive startup checks fail. Increase
 > `failureThreshold` or `periodSeconds` if startup regularly takes longer.
-> The 10-second initial delay is a conservative starting point for images that take a moment to boot before opening the
-> port; reduce it, or omit it, if your renderer consistently starts in under 5 seconds.
+> The 10-second initial delay only shifts when the first check fires. Omitting it starts checks immediately; the
+> failure window still comes from `failureThreshold * periodSeconds`. Reduce `initialDelaySeconds` if your renderer
+> reliably opens the port within 1-2 seconds, or keep it to avoid noisy early-failure log entries.
 
 Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.20+ (startup probe GA) defers them until
 the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an

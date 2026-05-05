@@ -158,6 +158,8 @@ variable.
 
 ```ruby
 # Override Rails 7.1+'s built-in /up route to add the renderer TCP check.
+# If you already have custom /up logic, use a distinct path such as /healthz
+# to avoid silently replacing existing health behavior.
 get "up", to: "health#show"
 ```
 
@@ -177,8 +179,11 @@ class HealthController < ActionController::Base
     # cluster workers are ready. Pair with the startup probe to shield liveness.
     # In this same-container topology, Rails and the renderer share a network namespace.
     # Probe localhost even if other deployment shapes use a service host.
+    # If renderer_url omits a port, use the Node Renderer default instead of URI's HTTP default.
     # connect_timeout is supported by the Ruby versions in this guide's prerequisites.
-    renderer_port = URI.parse(ReactOnRailsPro.configuration.renderer_url).port
+    renderer_url = ReactOnRailsPro.configuration.renderer_url
+    renderer_uri = URI.parse(renderer_url)
+    renderer_port = renderer_url.match?(/:\d+(?:[\/?#]|$)/) ? renderer_uri.port : 3800
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) {}
     head :ok
   rescue SocketError, SystemCallError, URI::Error, TypeError
