@@ -399,6 +399,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      initialDelaySeconds: 10
      periodSeconds: 5
      failureThreshold: 6
+     timeoutSeconds: 1
    ```
 3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. Prefer an `exec` probe with an h2c-aware client for application-level readiness. Use `tcpSocket` only as a minimal fallback that confirms the port is accepting connections:
    ```yaml
@@ -423,14 +424,17 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    > - `--max-time 4` is intentionally 1 second shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero exit code
    >   before Kubernetes terminates the probe process. Use the same pattern for other probe systems, such as Docker Compose's
    >   `--max-time 2` with `timeout: 3s`.
-   > - On heavily loaded nodes, use a wider margin, such as `--max-time 3`, if you see occasional unexpected probe failures.
+   > - On heavily loaded nodes, increase the safety buffer, such as `--max-time 3` (a 2-second margin instead of 1), if
+   >   you see occasional unexpected probe failures.
    > - `initialDelaySeconds` is omitted here because Kubernetes defers readiness probes until the startup probe above succeeds.
    >   If you skip the startup probe, add an appropriate `initialDelaySeconds`.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
-   > **Upgrading from a `tcpSocket` liveness probe?** Run `curl --version | grep -i http2` in your container before
-   > switching. If curl lacks HTTP/2 support, keep the `tcpSocket` probe or add HTTP/2-capable curl support to your image.
+   > [!WARNING]
+   > Upgrading from a `tcpSocket` liveness probe? Run `curl --version | grep -i http2` in your container before switching.
+   > If curl lacks HTTP/2 support, keep the `tcpSocket` probe or add HTTP/2-capable curl support to your image.
    ```yaml
    livenessProbe:
+     # Omit initialDelaySeconds only if the startupProbe above is configured.
      # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
      # If unavailable, replace exec with a tcpSocket probe on port 3800.
      exec:
@@ -452,7 +456,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >   If curl is unavailable, use `tcpSocket` as a fallback.
    > - `--max-time 4` is intentionally 1 second shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero exit code
    >   before Kubernetes terminates the probe process.
-   > - On heavily loaded nodes, use a wider margin, such as `--max-time 3`, if you see occasional unexpected restarts.
+   > - On heavily loaded nodes, increase the safety buffer, such as `--max-time 3` (a 2-second margin instead of 1), if
+   >   you see occasional unexpected restarts.
    > - `initialDelaySeconds` is omitted here because Kubernetes defers liveness probes until the startup probe above succeeds.
    >   If you skip the startup probe, add an appropriate `initialDelaySeconds`.
 
@@ -486,8 +491,7 @@ In production, `logLevel: 'warn'` is sufficient unless actively debugging.
 
 A complete pod spec for the sidecar pattern:
 
-> **Upgrading from a `tcpSocket` liveness probe?** Run `curl --version | grep -i http2` in your container before switching.
-> If curl lacks HTTP/2 support, keep the `tcpSocket` probe or add HTTP/2-capable curl support to your image.
+> See the liveness probe upgrade note above before switching from a `tcpSocket` probe to the `exec` probe shown here.
 
 ```yaml
 apiVersion: apps/v1
@@ -551,6 +555,7 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
             failureThreshold: 6
+            timeoutSeconds: 1
           readinessProbe:
             exec:
               command:
@@ -564,6 +569,7 @@ spec:
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
+            # Omit initialDelaySeconds only if the startupProbe above is configured.
             # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
             # If unavailable, replace exec with a tcpSocket probe on port 3800.
             exec:

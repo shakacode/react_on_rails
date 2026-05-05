@@ -269,9 +269,10 @@ Recommended starting values:
   checks port reachability, not application readiness.
 - **Liveness**: Prefer `exec` with
   `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info` when curl with HTTP/2 support is available.
+  If you are upgrading from a `tcpSocket` liveness probe, verify curl has HTTP/2 support in the image before switching.
   Start with `timeoutSeconds: 5`, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment
-  examples. Use `tcpSocket` only if curl is unavailable. Raise `failureThreshold`, and optionally `periodSeconds`, if heavy
-  CPU bursts or frequent transient pauses trigger false-positive restarts.
+  examples. Use `tcpSocket` only if curl is unavailable. Raise `failureThreshold`, and optionally `periodSeconds`, if
+  heavy CPU bursts or frequent transient pauses trigger false-positive restarts.
 
 Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
 does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
@@ -287,8 +288,8 @@ If you skip the startup probe, add an appropriate `initialDelaySeconds` to each.
 
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes, and for the rationale behind `--max-time 4`
-relative to `timeoutSeconds: 5`. On heavily loaded nodes, use a wider margin, such as `--max-time 3`, if you see
-occasional unexpected restarts.
+relative to `timeoutSeconds: 5`. On heavily loaded nodes, increase the safety buffer, such as `--max-time 3` (a 2-second
+margin instead of 1), if you see occasional unexpected restarts.
 
 ### Control Plane Deployment Shapes
 
