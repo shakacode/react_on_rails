@@ -170,7 +170,7 @@ class HealthController < ActionController::Base
     # Opens and immediately closes; raises if the renderer port is unreachable.
     Socket.tcp("localhost", ENV.fetch("RENDERER_PORT", "3800").to_i, connect_timeout: 1) {}
     head :ok
-  rescue IOError, SocketError, SystemCallError
+  rescue SocketError, SystemCallError
     head :service_unavailable
   end
 end
@@ -296,7 +296,7 @@ services:
 
 > **Note:** In Docker Compose, the containers do not share a network namespace (unlike Kubernetes sidecars), so the renderer must bind to `0.0.0.0` and Rails must connect via the service name (`renderer`).
 > The Compose example uses `--max-time 2` with `timeout: 3s` for fast local feedback; the Kubernetes examples use
-> `--max-time 4` with `timeoutSeconds: 5` to allow a little more scheduler and node-load jitter.
+> `--max-time 3` with `timeoutSeconds: 5` to allow more scheduler and node-load jitter.
 
 ## Host Binding for Container Environments
 
@@ -472,8 +472,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 > **Probe command notes:** `exec` probes require curl with HTTP/2 support in your image. Verify with
 > `curl --version | grep -i http2`; if unavailable, use `tcpSocket` as a fallback. Set curl `--max-time` shorter than the
 > orchestrator timeout so curl returns a clean non-zero exit code before Kubernetes terminates the probe process. These
-> examples use `--max-time 4` with `timeoutSeconds: 5`; on heavily loaded nodes, leave more buffer by reducing `--max-time`
-> to `3`, giving a 2-second gap instead of 1. Readiness and liveness omit `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers
+> examples use `--max-time 3` with `timeoutSeconds: 5`, leaving a 2-second buffer. Readiness and liveness omit
+> `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers
 > them until the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe
 > support, add an appropriate `initialDelaySeconds`.
 
@@ -500,7 +500,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
          - curl
          - -sf
          - --max-time
-         - '4'
+        - '3'
          - --http2-prior-knowledge
          - http://localhost:3800/info
      timeoutSeconds: 5
@@ -530,7 +530,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
          - curl
          - -sf
          - --max-time
-         - '4'
+        - '3'
          - --http2-prior-knowledge
          - http://localhost:3800/info
      timeoutSeconds: 5
@@ -650,7 +650,7 @@ spec:
                 - curl
                 - -sf
                 - --max-time
-                - '4'
+                - '3'
                 - --http2-prior-knowledge
                 - http://localhost:3800/info
             timeoutSeconds: 5
@@ -666,7 +666,7 @@ spec:
                 - curl
                 - -sf
                 - --max-time
-                - '4'
+                - '3'
                 - --http2-prior-knowledge
                 - http://localhost:3800/info
             timeoutSeconds: 5
@@ -691,7 +691,7 @@ spec:
 > **Readiness endpoint:** The manifest uses `/info` for copy-paste safety because that endpoint is built in. Replace
 > `/info` with `/health` in the readiness probe after registering that route via `configureFastify` if readiness should
 > wait for renderer-specific warm-up checks.
->
+
 > **Note:** Both containers use the same Docker image, ensuring the React on Rails gem and Node Renderer package versions are always aligned.
 
 ## Troubleshooting

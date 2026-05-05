@@ -169,8 +169,10 @@ if (cluster.isPrimary) {
 The sample `/health` route is intentionally shallow and omits handler parameters because it does not need them. Fastify
 also passes `request` and `reply` to handlers if you need to inspect headers, set status codes, or customize the
 response. Add warm-up or readiness-gate logic inside this handler if readiness should wait for renderer-specific
-initialization. Kubernetes exec probes treat any non-zero curl exit code as a failure; the response body is irrelevant to
-probe semantics, so you can return whatever payload is useful for debugging, such as `{ status: 'ok', workers: 4 }`.
+initialization. To signal not-ready, add `reply` to the handler parameters and return
+`reply.code(503).send({ status: 'warming_up' })`. Kubernetes exec probes treat any non-zero curl exit code as a failure;
+the response body is irrelevant to probe semantics, so you can return whatever payload is useful for debugging, such as
+`{ status: 'ok', workers: 4 }`.
 
 Routes registered with `configureFastify` do not automatically use the renderer's render and asset authentication
 prechecks. A custom `/health` route like the one above is reachable without the renderer password unless you add your own
@@ -265,17 +267,17 @@ Recommended starting values:
   `10 + ((6 - 1) * 5) = 35 s`), `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes default
   `timeoutSeconds: 1` for a TCP connection check.
 - **Readiness (custom route)**: Use `exec` with
-  `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with
+  `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/health` after registering the route with
   [`configureFastify`](#adding-a-health-check-endpoint). Start with `timeoutSeconds: 5`, `periodSeconds: 5`, and
   `failureThreshold: 3`.
 - **Readiness (built-in info)**: Use `exec` with
-  `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the
+  `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the
   custom-route readiness probe. `/info` is unauthenticated and exposes runtime version details; see the
   [security note](#built-in-endpoints) and keep the renderer on private networking.
 - **Readiness fallback**: Use `tcpSocket` on the renderer port only if curl with HTTP/2 support is unavailable. This
   checks port reachability, not application readiness.
 - **Liveness**: Prefer `exec` with
-  `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info` when curl with HTTP/2 support is available.
+  `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/info` when curl with HTTP/2 support is available.
   If you are upgrading from a `tcpSocket` liveness probe, verify curl has HTTP/2 support in the image before switching.
   Start with `timeoutSeconds: 5`, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment
   examples. Use `tcpSocket` only if curl is unavailable. Raise `failureThreshold`, and optionally `periodSeconds`, if
