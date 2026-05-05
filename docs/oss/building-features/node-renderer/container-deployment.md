@@ -531,9 +531,9 @@ In production, `logLevel: 'warn'` is sufficient unless actively debugging.
 
 A complete pod spec for the sidecar pattern:
 
-> Before switching from a `tcpSocket` probe to the `exec` liveness probe shown here, run
-> `curl --version | grep -i http2` in your container image. If curl lacks HTTP/2 support, keep `tcpSocket` or add
-> HTTP/2-capable curl support. A ready-to-use `tcpSocket` fallback block is shown immediately below this YAML.
+> The `exec` liveness probe shown here requires curl with HTTP/2 support. Run `curl --version | grep -i http2` in
+> your container image before upgrading an existing `tcpSocket` probe. If curl lacks HTTP/2 support, keep `tcpSocket`
+> or add HTTP/2-capable curl support. A ready-to-use `tcpSocket` fallback block is shown immediately below this YAML.
 
 ```yaml
 apiVersion: apps/v1
@@ -610,12 +610,9 @@ spec:
             timeoutSeconds: 5
             periodSeconds: 5
             failureThreshold: 3
-          # WARNING: exec probe requires curl with HTTP/2 support in this image.
-          # Verify: curl --version | grep -i http2.
-          # If unavailable, replace this block with the tcpSocket fallback shown below.
           livenessProbe:
-            # CHANGED from tcpSocket to exec. If upgrading an existing deployment,
-            # verify curl --http2-prior-knowledge works in your image before switching.
+            # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
+            # If unavailable, replace this exec probe with a tcpSocket probe on port 3800.
             # Omit initialDelaySeconds only if the startupProbe above is configured.
             exec:
               command:

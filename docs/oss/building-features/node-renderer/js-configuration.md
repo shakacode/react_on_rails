@@ -153,7 +153,7 @@ const config = {
 configureFastify((app) => {
   app.get('/health', async () => {
     // Example: await a worker-pool warm-up signal before returning 200.
-    // await rendererReady(); // replace with your actual warm-up check
+    // await yourWarmUpCheck(); // replace with your actual warm-up check
     return { status: 'ok' };
   });
 });
