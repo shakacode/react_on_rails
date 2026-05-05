@@ -426,8 +426,9 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >   `--max-time 2` with `timeout: 3s`.
    > - On heavily loaded nodes, increase the safety buffer, such as `--max-time 3` (a 2-second margin instead of 1), if
    >   you see occasional unexpected probe failures.
-   > - `initialDelaySeconds` is omitted here because Kubernetes defers readiness probes until the startup probe above succeeds.
-   >   If you skip the startup probe, add an appropriate `initialDelaySeconds`.
+   > - `initialDelaySeconds` is omitted here because Kubernetes 1.18+ defers readiness probes until the startup probe
+   >   above succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
+   >   appropriate `initialDelaySeconds`.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
    > [!WARNING]
    > Upgrading from a `tcpSocket` liveness probe? Run `curl --version | grep -i http2` in your container before switching.
@@ -458,8 +459,9 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >   before Kubernetes terminates the probe process.
    > - On heavily loaded nodes, increase the safety buffer, such as `--max-time 3` (a 2-second margin instead of 1), if
    >   you see occasional unexpected restarts.
-   > - `initialDelaySeconds` is omitted here because Kubernetes defers liveness probes until the startup probe above succeeds.
-   >   If you skip the startup probe, add an appropriate `initialDelaySeconds`.
+   > - `initialDelaySeconds` is omitted here because Kubernetes 1.18+ defers liveness probes until the startup probe
+   >   above succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
+   >   appropriate `initialDelaySeconds`.
 
 ### OOM Tracking
 
@@ -568,10 +570,11 @@ spec:
             timeoutSeconds: 5
             periodSeconds: 5
             failureThreshold: 3
+          # WARNING: exec probe requires curl with HTTP/2 support in this image.
+          # Verify: curl --version | grep -i http2.
+          # If unavailable, replace exec below with a tcpSocket probe on port 3800.
           livenessProbe:
             # Omit initialDelaySeconds only if the startupProbe above is configured.
-            # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
-            # If unavailable, replace exec with a tcpSocket probe on port 3800.
             exec:
               command:
                 - curl

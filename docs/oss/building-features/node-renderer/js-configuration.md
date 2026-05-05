@@ -111,6 +111,12 @@ It does not use the render or asset authentication prechecks, so it remains acce
 when `password` is configured. The route returns `node_version` and `renderer_version`. Treat it as a shallow process
 check and keep the renderer on `localhost` or private networking if those runtime version details should not be exposed.
 
+Verify it locally:
+
+```bash
+curl -s --http2-prior-knowledge http://localhost:3800/info
+```
+
 Example response:
 
 ```json
@@ -283,8 +289,9 @@ does not apply there. See the `port` option at the top of this page for Heroku o
 > The 10-second initial delay is a conservative starting point for images that take a moment to boot before opening the
 > port; reduce it, or omit it, if your renderer consistently starts in under 5 seconds.
 
-Readiness and liveness omit `initialDelaySeconds` here because Kubernetes defers them until the startup probe succeeds.
-If you skip the startup probe, add an appropriate `initialDelaySeconds` to each.
+Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.18+ defers them until the startup probe
+succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an appropriate
+`initialDelaySeconds` to each.
 
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes, and for the rationale behind `--max-time 4`
