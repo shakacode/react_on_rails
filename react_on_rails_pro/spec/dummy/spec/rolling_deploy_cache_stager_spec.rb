@@ -250,6 +250,31 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
+  # Regression: a hash that passes SAFE_HASH_PATTERN's character class can also
+  # match TEMPORARY_DIRECTORY_PATTERN (e.g. an OCI-style release tag like
+  # `release.staging-1-deadbeefcafe`). Without sanitize_hashes also rejecting
+  # the temp-dir shape, the next sweep_stale_temporary_directories pass would
+  # silently evict a freshly-staged valid cache entry.
+  context "when adapter returns a hash that looks like a staging temp directory" do
+    let(:src_bundle) { source_file("bundle-ok.js") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
+    let(:temp_like_hash) { "release.staging-1-deadbeefcafe" }
+
+    before do
+      allow(adapter).to receive_messages(previous_bundle_hashes: [temp_like_hash, "safe-hash"])
+      allow(adapter).to receive(:fetch).with("safe-hash").and_return(bundle: src_bundle, assets: [src_asset])
+    end
+
+    it "rejects the temp-like hash so stale-temp sweeping cannot delete a valid cache entry" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/invalid hash values \(rejected\): \["#{temp_like_hash}"\]/).to_stderr
+
+      expect(adapter).not_to have_received(:fetch).with(temp_like_hash)
+      expect(File.exist?(File.join(cache_dir, temp_like_hash))).to be(false)
+      expect(File.exist?(File.join(cache_dir, "safe-hash", "safe-hash.js"))).to be(true)
+    end
+  end
+
   context "when the adapter omits loadable-stats.json" do
     let(:src_bundle) { source_file("bundle-without-stats.js") }
 

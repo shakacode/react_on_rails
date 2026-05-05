@@ -342,6 +342,13 @@ module ReactOnRailsPro
     end
     private_class_method :temporary_bundle_directory
 
+    # Even after SAFE_HASH_PATTERN, a hash like `release.staging-1-abcdef12345678`
+    # is allowed by the character class but also matches TEMPORARY_DIRECTORY_PATTERN
+    # — staging that hash would create a directory the next sweep silently evicts.
+    # Webpack content hashes are pure hex and won't collide, but the protocol is
+    # open to user-supplied adapters whose hashes could embed dots (OCI tags,
+    # human-readable release names, etc.). Reject both buckets in one pass so the
+    # warning lists every offending hash for the operator at the source.
     def self.sanitize_hashes(hash_values, source_label:)
       hashes = Array(hash_values).map { |value| value.to_s.strip }.reject(&:empty?)
       invalid = hashes.grep_v(SAFE_HASH_PATTERN)
