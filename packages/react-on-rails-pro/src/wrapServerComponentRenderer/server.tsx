@@ -13,7 +13,7 @@
  */
 
 import * as React from 'react';
-import type { RenderFunction, ReactComponentOrRenderFunction } from 'react-on-rails/types';
+import type { ReactComponent, ReactComponentOrRenderFunction, RenderFunction } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { assertRailsContextWithServerStreamingCapabilities } from 'react-on-rails/types';
 import getReactServerComponent from '../getReactServerComponent.server.ts';
@@ -69,7 +69,7 @@ const wrapServerComponentRenderer = (
 
     const Component = isRenderFunction(componentOrRenderFunction)
       ? await componentOrRenderFunction(props, railsContext)
-      : componentOrRenderFunction;
+      : (componentOrRenderFunction as ReactComponent);
 
     if (typeof Component !== 'function') {
       throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);

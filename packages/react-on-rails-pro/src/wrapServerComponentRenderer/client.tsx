@@ -14,7 +14,7 @@
 
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
-import { ReactComponentOrRenderFunction, RenderFunction } from 'react-on-rails/types';
+import type { ReactComponent, ReactComponentOrRenderFunction, RenderFunction } from 'react-on-rails/types';
 import isRenderFunction from 'react-on-rails/isRenderFunction';
 import { ensureReactUseAvailable } from 'react-on-rails/reactApis';
 import { createRSCProvider } from '../RSCProvider.tsx';
@@ -52,7 +52,7 @@ const wrapServerComponentRenderer = (
   const wrapper: RenderFunction = async (props, railsContext, domNodeId) => {
     const Component = isRenderFunction(componentOrRenderFunction)
       ? await componentOrRenderFunction(props, railsContext, domNodeId)
-      : componentOrRenderFunction;
+      : (componentOrRenderFunction as ReactComponent);
 
     if (typeof Component !== 'function') {
       throw new Error(`wrapServerComponentRenderer: component '${componentName}' is not a function`);
