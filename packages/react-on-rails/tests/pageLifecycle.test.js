@@ -143,22 +143,26 @@ describe('pageLifecycle', () => {
     setReadyState('complete');
     jest.doMock('../src/turbolinksUtils.ts', () => createNavigationMock());
     const turbolinksUtils = require('../src/turbolinksUtils.ts');
-    const { onPageUnloaded, refreshPageEventListeners } = importPageLifecycle();
-    const callback = jest.fn();
+    const { onPageLoaded, onPageUnloaded, refreshPageEventListeners } = importPageLifecycle();
+    const loadedCallback = jest.fn();
+    const unloadedCallback = jest.fn();
 
-    onPageUnloaded(callback);
+    onPageLoaded(loadedCallback);
+    onPageUnloaded(unloadedCallback);
 
+    expect(loadedCallback).toHaveBeenCalledTimes(1);
     expect(addEventListenerSpy).not.toHaveBeenCalledWith('turbo:before-cache', expect.any(Function));
 
     turbolinksUtils.turboInstalled.mockReturnValue(true);
     refreshPageEventListeners();
 
     expect(addEventListenerSpy).toHaveBeenCalledWith('turbo:before-cache', expect.any(Function));
+    expect(loadedCallback).toHaveBeenCalledTimes(1);
 
     const beforeCacheHandler = getEventHandler('turbo:before-cache');
     beforeCacheHandler();
 
-    expect(callback).toHaveBeenCalledTimes(1);
+    expect(unloadedCallback).toHaveBeenCalledTimes(1);
   });
 
   describe('with Turbolinks 5 navigation library', () => {

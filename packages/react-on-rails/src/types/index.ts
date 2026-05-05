@@ -149,7 +149,12 @@ type RenderFunctionResult = RenderFunctionSyncResult | RenderFunctionAsyncResult
 
 type RendererTeardown = () => void | Promise<void>;
 
-type RendererResult = undefined | RendererTeardown | PromiseLike<undefined | RendererTeardown>;
+// Renderer functions may intentionally return nothing; TypeScript infers that as
+// void, not undefined, for users who annotate their function as RendererFunction.
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+type RendererResolvedResult = void | RendererTeardown;
+
+type RendererResult = RendererResolvedResult | PromiseLike<RendererResolvedResult>;
 
 type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
 
@@ -214,6 +219,7 @@ export type {
   RendererFunction,
   RenderFunctionResult,
   RendererTeardown,
+  RendererResolvedResult,
   RendererResult,
   Store,
   StoreGenerator,

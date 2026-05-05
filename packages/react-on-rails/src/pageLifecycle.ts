@@ -24,6 +24,12 @@ function runPageLoadedCallbacks(): void {
   });
 }
 
+function runPageLoadedCallbacksIfNeeded(): void {
+  if (currentPageState === 'load') return;
+
+  runPageLoadedCallbacks();
+}
+
 function runPageUnloadedCallbacks(): void {
   currentPageState = 'unload';
   // Browser navigation events do not await async listeners. Keep unload
@@ -41,7 +47,7 @@ function setupPageNavigationListeners(): void {
   const hasNavigationLibrary = (turbolinksInstalled() && turbolinksSupported()) || turboInstalled();
   if (!hasNavigationLibrary) {
     debugTurbolinks('NO NAVIGATION LIBRARY: running page loaded callbacks immediately');
-    runPageLoadedCallbacks();
+    runPageLoadedCallbacksIfNeeded();
     return;
   }
 
@@ -55,7 +61,7 @@ function setupPageNavigationListeners(): void {
     document.addEventListener('turbo:before-cache', runPageUnloadedCallbacks);
     document.addEventListener('turbo:render', runPageLoadedCallbacks);
     turboEventListenersInstalled = true;
-    runPageLoadedCallbacks();
+    runPageLoadedCallbacksIfNeeded();
   } else if (turbolinksVersion5()) {
     if (turbolinks5EventListenersInstalled) return;
 
@@ -65,7 +71,7 @@ function setupPageNavigationListeners(): void {
     document.addEventListener('turbolinks:before-render', runPageUnloadedCallbacks);
     document.addEventListener('turbolinks:render', runPageLoadedCallbacks);
     turbolinks5EventListenersInstalled = true;
-    runPageLoadedCallbacks();
+    runPageLoadedCallbacksIfNeeded();
   } else {
     if (turbolinks2EventListenersInstalled) return;
 

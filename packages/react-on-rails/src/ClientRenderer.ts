@@ -3,6 +3,7 @@ import type {
   RegisteredComponent,
   RailsContext,
   RendererFunction,
+  RendererResolvedResult,
   RendererResult,
   RendererTeardown,
   RenderReturnType,
@@ -22,7 +23,7 @@ type RenderedRoot = {
   domNode: Element;
   root?: RenderReturnType;
   teardown?: RendererTeardown;
-  pendingTeardown?: Promise<undefined | RendererTeardown>;
+  pendingTeardown?: Promise<RendererResolvedResult>;
   isRenderer?: true;
 };
 
@@ -53,9 +54,7 @@ function isRendererTeardown(value: unknown): value is RendererTeardown {
   return typeof value === 'function';
 }
 
-function isPromiseLikeRendererResult(
-  value: RendererResult,
-): value is PromiseLike<undefined | RendererTeardown> {
+function isPromiseLikeRendererResult(value: RendererResult): value is PromiseLike<RendererResolvedResult> {
   return typeof (value as { then?: unknown })?.then === 'function';
 }
 
@@ -68,9 +67,11 @@ function trackRendererTeardown(
   const renderedRoot: RenderedRoot = { domNode, isRenderer: true };
   renderedRoots.set(domNodeId, renderedRoot);
 
-  const storeTeardown = (resolvedResult: undefined | RendererTeardown): undefined | RendererTeardown => {
+  const storeTeardown = (resolvedResult: RendererResolvedResult): RendererResolvedResult => {
     if (!isRendererTeardown(resolvedResult)) return undefined;
 
+    // Cache for synchronous unmounts and keep pendingTeardown resolving to the
+    // same function for async renderer results.
     renderedRoot.teardown = resolvedResult;
     return resolvedResult;
   };
@@ -155,11 +156,10 @@ function queueRenderAfterPendingUnmount(
   });
 
   pendingUnmounts.set(domNodeId, queuedRender);
-  void queuedRender.catch((error: unknown) => {
+  void queuedRender.catch(() => {
     if (pendingUnmounts.get(domNodeId) === queuedRender) {
       pendingUnmounts.delete(domNodeId);
     }
-    console.error('Error rendering component after pending unmount:', error);
   });
 }
 
