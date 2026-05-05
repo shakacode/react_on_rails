@@ -293,9 +293,8 @@ Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.20+ 
 the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
 appropriate `initialDelaySeconds` to each.
 
-See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
-Kubernetes YAML examples, including startup, readiness, and liveness probes, and for the rationale behind `--max-time 4`
-relative to `timeoutSeconds: 5`. On heavily loaded nodes, increase the safety buffer, such as `--max-time 3` (a 2-second
-margin instead of 1), if you see occasional unexpected restarts.
+See [Node Renderer: Container Deployment](./container-deployment.md#startup-errors-err_stream_premature_close) for full
+Kubernetes YAML examples and the shared probe command notes for curl HTTP/2 support, `--max-time` buffers, and
+`initialDelaySeconds` guidance.
 For Control Plane topology-specific `renderer_url`, host binding, and probe target guidance, see
 [Control Plane Deployment Shapes](./container-deployment.md#control-plane-deployment-shapes).
