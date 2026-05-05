@@ -500,7 +500,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
          - curl
          - -sf
          - --max-time
-        - '3'
+         - '3'
          - --http2-prior-knowledge
          - http://localhost:3800/info
      timeoutSeconds: 5
@@ -530,7 +530,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
          - curl
          - -sf
          - --max-time
-        - '3'
+         - '3'
          - --http2-prior-knowledge
          - http://localhost:3800/info
      timeoutSeconds: 5
