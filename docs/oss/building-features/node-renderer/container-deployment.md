@@ -150,16 +150,21 @@ When Rails and the renderer share one container, use one combined Rails health e
 processes. For example, make the Rails readiness endpoint perform a short TCP connection check to `localhost:3800` and
 return `503` if the renderer is unreachable.
 
-```ruby
-# config/routes.rb
-get "up", to: "health#show"
+`config/routes.rb`:
 
-# app/controllers/health_controller.rb
+```ruby
+# Override Rails 7.1+'s built-in /up route to add the renderer TCP check.
+get "up", to: "health#show"
+```
+
+`app/controllers/health_controller.rb`:
+
+```ruby
 require "socket"
 
 class HealthController < ApplicationController
   def show
-    Socket.tcp("localhost", 3800, connect_timeout: 1) { |socket| socket.close }
+    Socket.tcp("localhost", 3800, connect_timeout: 1) {}
     head :ok
   rescue IOError, SocketError, SystemCallError
     head :service_unavailable
@@ -177,11 +182,18 @@ renderer to `0.0.0.0` because Kubernetes and platform TCP probes originate from 
 pod or workload IP, not container-local loopback. `exec` probes run a command inside the container, so `localhost` works
 there.
 
+> **Probe YAML:** For Control Plane readiness and liveness fields, reuse the individual `exec` or `tcpSocket` probe blocks
+> from [Kubernetes Sidecar Manifest](#kubernetes-sidecar-manifest). Attach them to the node-renderer container in this
+> workload instead of to a separate Kubernetes pod spec.
+
 ### Separate Node-Renderer Workload
 
 Set the Rails `renderer_url` to `http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:3800`, use `0.0.0.0` for the renderer
 `host`, and add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port
 internally, not publicly, unless required.
+
+Use the same Control Plane probe fields as the same-workload case, but attach them to the separate node-renderer workload
+container.
 
 Replace `<WORKLOAD_NAME>` with the renderer workload name and `<GVC_NAME>` with your Control Plane Global Virtual Cloud
 name. Use your actual renderer port if it is not `3800`; see Control Plane's
