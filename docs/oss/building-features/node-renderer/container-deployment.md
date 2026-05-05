@@ -156,8 +156,9 @@ Keep the Rails `renderer_url` as `http://localhost:3800`. Use `0.0.0.0` for the 
 `tcpSocket` probes; `localhost` is fine for `exec`-only probes.
 
 Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind the
-renderer to `0.0.0.0` because Kubernetes and platform TCP probes connect to the pod or workload IP, not container-local
-loopback.
+renderer to `0.0.0.0` because Kubernetes and platform TCP probes originate from outside the container and connect to the
+pod or workload IP, not container-local loopback. `exec` probes run a command inside the container, so `localhost` works
+there.
 
 ### Separate Node-Renderer Workload
 
@@ -531,7 +532,7 @@ A complete pod spec for the sidecar pattern:
 
 > Before switching from a `tcpSocket` probe to the `exec` liveness probe shown here, run
 > `curl --version | grep -i http2` in your container image. If curl lacks HTTP/2 support, keep `tcpSocket` or add
-> HTTP/2-capable curl support.
+> HTTP/2-capable curl support. A ready-to-use `tcpSocket` fallback block is shown immediately below this YAML.
 
 ```yaml
 apiVersion: apps/v1
