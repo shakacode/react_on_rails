@@ -24,8 +24,37 @@ export function createResultObject(
   };
 }
 
+function isCrossRealmError(e: unknown): e is { message?: unknown } {
+  return typeof e === 'object' && e !== null && Object.prototype.toString.call(e) === '[object Error]';
+}
+
+function stringifyThrownValue(e: unknown): string {
+  if (isCrossRealmError(e)) {
+    return typeof e.message === 'string' ? e.message : Object.prototype.toString.call(e);
+  }
+
+  if (typeof e === 'object' && e !== null) {
+    try {
+      // JSON.stringify can return undefined without throwing, for example when toJSON returns undefined.
+      return JSON.stringify(e) ?? Object.prototype.toString.call(e);
+    } catch {
+      return Object.prototype.toString.call(e);
+    }
+  }
+
+  return String(e);
+}
+
 export function convertToError(e: unknown): Error {
-  return e instanceof Error ? e : new Error(String(e));
+  if (e instanceof Error) {
+    return e;
+  }
+
+  const message = stringifyThrownValue(e);
+  // tsconfig uses es2020 libs, which do not type Error.cause even though supported runtimes provide it.
+  const error = new Error(message) as Error & { cause?: unknown };
+  error.cause = e;
+  return error;
 }
 
 export function validateComponent(componentObj: RegisteredComponent, componentName: string) {
