@@ -145,8 +145,8 @@ const config = {
 
 // Register a custom health check route
 configureFastify((app) => {
-  app.get('/health', (request, reply) => {
-    reply.send({ status: 'ok' });
+  app.get('/health', async (_request, _reply) => {
+    return { status: 'ok' };
   });
 });
 
@@ -163,6 +163,11 @@ The sample `/health` route is intentionally shallow. Add warm-up or readiness-ga
 readiness should wait for renderer-specific initialization. Kubernetes exec probes treat any non-zero curl exit code as a
 failure; the response body is irrelevant to probe semantics, so you can return whatever payload is useful for debugging,
 such as `{ status: 'ok', workers: 4 }`.
+
+Routes registered with `configureFastify` do not automatically use the renderer's render and asset authentication
+prechecks. A custom `/health` route like the one above is reachable without the renderer password unless you add your own
+Fastify authentication. Keep probe routes shallow and non-sensitive, and keep the renderer on `localhost` or private
+networking.
 
 ### Registering Fastify Plugins
 
