@@ -159,11 +159,11 @@ if (cluster.isPrimary) {
 }
 ```
 
-The sample `/health` route is intentionally shallow. Fastify also passes `request` and `reply` to handlers if you need to
-inspect headers, set status codes, or customize the response. Add warm-up or readiness-gate logic inside this handler if
-readiness should wait for renderer-specific initialization. Kubernetes exec probes treat any non-zero curl exit code as a
-failure; the response body is irrelevant to probe semantics, so you can return whatever payload is useful for debugging,
-such as `{ status: 'ok', workers: 4 }`.
+The sample `/health` route is intentionally shallow and omits handler parameters because it does not need them. Fastify
+also passes `request` and `reply` to handlers if you need to inspect headers, set status codes, or customize the
+response. Add warm-up or readiness-gate logic inside this handler if readiness should wait for renderer-specific
+initialization. Kubernetes exec probes treat any non-zero curl exit code as a failure; the response body is irrelevant to
+probe semantics, so you can return whatever payload is useful for debugging, such as `{ status: 'ok', workers: 4 }`.
 
 Routes registered with `configureFastify` do not automatically use the renderer's render and asset authentication
 prechecks. A custom `/health` route like the one above is reachable without the renderer password unless you add your own
@@ -245,18 +245,31 @@ listener. Use one of these probe styles instead:
 A passing `tcpSocket` probe means the h2c listener has bound to the port; cluster workers might still be warming up.
 Keep an application-level readiness probe if traffic should wait for worker initialization.
 
+For liveness, a fully blocked Node.js event loop may still accept TCP connections and pass a `tcpSocket` check. Use an
+h2c-aware `exec` liveness probe with a short `--max-time` if you need stricter hung-process detection.
+
 > **Note:** The `exec` probe requires curl with HTTP/2 support. Verify with `curl --version | grep -i http2`. If unavailable,
 > use a `tcpSocket` readiness probe as a fallback.
 
 Recommended starting values:
 
-| Probe                     | Starting point                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Startup                   | `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if different). TCP is enough here because readiness below gates traffic; startup only shields liveness during boot. Start with `initialDelaySeconds: 10`, `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes default `timeoutSeconds: 1` for a TCP connection check. |
-| Readiness (custom route)  | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with [`configureFastify`](#adding-a-health-check-endpoint). Use `timeoutSeconds: 5`, `periodSeconds: 5`, and `failureThreshold: 3`.                                                                                                                       |
-| Readiness (built-in info) | `exec` with `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the custom-route readiness probe. `/info` is unauthenticated and exposes runtime version details; see the [security note](#built-in-endpoints) and keep the renderer on private networking.                                                            |
-| Readiness fallback        | `tcpSocket` on the renderer port only if curl with HTTP/2 support is unavailable. This checks port reachability, not application readiness.                                                                                                                                                                                                                                    |
-| Liveness                  | `tcpSocket` on the renderer port. Use `periodSeconds: 10` and `failureThreshold: 3`, matching the Container Deployment examples. Raise `failureThreshold`, and optionally `periodSeconds`, only if heavy CPU bursts or frequent transient pauses trigger false-positive restarts.                                                                                              |
+- **Startup**: Use `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if
+  different). TCP is enough here because readiness below gates traffic; startup only shields liveness during boot. Start
+  with `initialDelaySeconds: 10`, `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes default
+  `timeoutSeconds: 1` for a TCP connection check.
+- **Readiness (custom route)**: Use `exec` with
+  `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with
+  [`configureFastify`](#adding-a-health-check-endpoint). Start with `timeoutSeconds: 5`, `periodSeconds: 5`, and
+  `failureThreshold: 3`.
+- **Readiness (built-in info)**: Use `exec` with
+  `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/info`. Use the same timing settings as the
+  custom-route readiness probe. `/info` is unauthenticated and exposes runtime version details; see the
+  [security note](#built-in-endpoints) and keep the renderer on private networking.
+- **Readiness fallback**: Use `tcpSocket` on the renderer port only if curl with HTTP/2 support is unavailable. This
+  checks port reachability, not application readiness.
+- **Liveness**: Use `tcpSocket` on the renderer port. Start with `periodSeconds: 10` and `failureThreshold: 3`, matching
+  the Container Deployment examples. Raise `failureThreshold`, and optionally `periodSeconds`, only if heavy CPU bursts
+  or frequent transient pauses trigger false-positive restarts.
 
 Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
 does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
@@ -267,34 +280,48 @@ does not apply there. See the `port` option at the top of this page for Heroku o
 > The 10-second initial delay is a conservative starting point for images that take a moment to boot before opening the
 > port; reduce it, or omit it, if your renderer consistently starts in under 5 seconds.
 
-See the probe examples in [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest)
-for the rationale behind `--max-time 4` relative to `timeoutSeconds: 5`.
-
 Readiness and liveness omit `initialDelaySeconds` here because Kubernetes defers them until the startup probe succeeds.
 If you skip the startup probe, add an appropriate `initialDelaySeconds` to each.
 
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
-Kubernetes YAML examples, including startup, readiness, and liveness probes.
+Kubernetes YAML examples, including startup, readiness, and liveness probes, and for the rationale behind `--max-time 4`
+relative to `timeoutSeconds: 5`.
 
-For Control Plane deployments, choose the probe target based on where the node renderer runs. Renderer probe targets
-below mean `tcpSocket` or h2c-aware `exec` probes, not HTTP/1.1 `httpGet` probes directly against the renderer.
+### Control Plane Deployment Shapes
 
-| Deployment shape                        | Rails `renderer_url`                                | Renderer `host`                                                           | Probe target                                                                                                                                                                                                                                                 |
-| --------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Same Rails container/process supervisor | `http://localhost:3800`                             | Default `localhost` is fine                                               | Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000`. Add a renderer check to Rails readiness if SSR is required.                                                                                                               |
-| Separate container in the same workload | `http://localhost:3800`                             | Use `0.0.0.0` for `tcpSocket`; `localhost` is fine for `exec`-only probes | Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind the renderer to `0.0.0.0` because Kubernetes and platform TCP probes connect to the pod or workload IP, not container-local loopback. |
-| Separate node-renderer workload         | `http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:3800` | `0.0.0.0`                                                                 | Add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port internally, not publicly, unless required.                                                                                                      |
+For Control Plane deployments, choose the probe target based on where the node renderer runs. Control Plane configures
+probes per container. Renderer probe targets below mean `tcpSocket` or h2c-aware `exec` probes, not HTTP/1.1 `httpGet`
+probes directly against the renderer.
 
 [Control Plane Flow](https://github.com/shakacode/control-plane-flow)'s default `rails` template models Rails as a
 single-container standard workload. If you follow that template and run the renderer inside the Rails container,
 configure the Rails workload's probes rather than looking for a separate node-renderer container. If you split the
 renderer into its own container or workload, add renderer-specific probes there.
 
-For a separate Control Plane workload, replace `<WORKLOAD_NAME>` with the renderer workload name and `<GVC_NAME>` with
-your Control Plane Global Virtual Cloud name. Use your actual renderer port if it is not `3800`; see Control Plane's
-[service-to-service endpoint format](https://docs.controlplane.com/guides/service-to-service).
+#### Same Rails Container Or Process Supervisor
 
-Control Plane configures probes per container. When Rails and the renderer share one container, use one combined Rails
-health endpoint if you need to check both processes. For example, make the Rails readiness endpoint perform a short TCP
-connection check to `localhost:3800` and return `503` if the renderer is unreachable. When the renderer has its own
-container or workload, put the renderer probes on that container.
+Set the Rails `renderer_url` to `http://localhost:3800`. The renderer can keep the default `localhost` host binding.
+Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000`.
+
+When Rails and the renderer share one container, use one combined Rails health endpoint if you need to check both
+processes. For example, make the Rails readiness endpoint perform a short TCP connection check to `localhost:3800` and
+return `503` if the renderer is unreachable.
+
+#### Separate Container In The Same Workload
+
+Keep the Rails `renderer_url` as `http://localhost:3800`. Use `0.0.0.0` for the renderer `host` when you rely on
+`tcpSocket` probes; `localhost` is fine for `exec`-only probes.
+
+Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind the
+renderer to `0.0.0.0` because Kubernetes and platform TCP probes connect to the pod or workload IP, not container-local
+loopback.
+
+#### Separate Node-Renderer Workload
+
+Set the Rails `renderer_url` to `http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:3800`, use `0.0.0.0` for the renderer
+`host`, and add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port
+internally, not publicly, unless required.
+
+Replace `<WORKLOAD_NAME>` with the renderer workload name and `<GVC_NAME>` with your Control Plane Global Virtual Cloud
+name. Use your actual renderer port if it is not `3800`; see Control Plane's
+[service-to-service endpoint format](https://docs.controlplane.com/guides/service-to-service).

@@ -208,8 +208,8 @@ services:
       RENDERER_HOST: '0.0.0.0'
       NODE_OPTIONS: '--max-old-space-size=512'
     healthcheck:
-      # Keep --max-time below Docker's 3 s timeout so curl exits cleanly rather than
-      # being killed mid-request. Kubernetes examples use 4 s because their probe timeout is 5 s.
+      # Set --max-time roughly 1 s below the orchestrator's probe timeout so curl exits
+      # cleanly with a non-zero code rather than being killed mid-request (2 s here with timeout: 3s).
       test: ['CMD', 'curl', '-sf', '--max-time', '2', '--http2-prior-knowledge', 'http://localhost:3800/info']
       interval: 5s
       timeout: 3s
