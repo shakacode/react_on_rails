@@ -496,7 +496,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    ```
    > **Notes:**
    >
-   > - Keep liveness shallow. Use `/health` only if that route avoids external dependency checks and readiness gates.
+   > - Use `/info` by default. Only substitute `/health` for liveness if that route avoids external dependency checks and
+   >   readiness gates.
    > - See the probe command notes above for curl HTTP/2 support, `--max-time`, loaded-node buffers, and
    >   `initialDelaySeconds` guidance.
 
@@ -613,6 +614,8 @@ spec:
           # Verify: curl --version | grep -i http2.
           # If unavailable, replace this block with the tcpSocket fallback shown below.
           livenessProbe:
+            # CHANGED from tcpSocket to exec. If upgrading an existing deployment,
+            # verify curl --http2-prior-knowledge works in your image before switching.
             # Omit initialDelaySeconds only if the startupProbe above is configured.
             exec:
               command:
@@ -632,6 +635,7 @@ spec:
 >
 > ```yaml
 > livenessProbe:
+>   # Omit initialDelaySeconds only if the startupProbe above is configured.
 >   tcpSocket:
 >     port: 3800
 >   timeoutSeconds: 1
