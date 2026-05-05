@@ -2616,6 +2616,7 @@ RSpec.describe ReactOnRails::Doctor do
             {
               "unmock.test.ts" => "jest.unmock('react-on-rails');\n",
               "do-mock.test.ts" => "jest.doMock('react-on-rails/client', () => ({}));\n",
+              "do-unmock.test.ts" => "vi.doUnmock('react-on-rails/client');\n",
               "dont-mock.test.ts" => "jest.dontMock('react-on-rails');\n",
               "require-actual.test.ts" => "const mod = jest.requireActual('react-on-rails');\n",
               "require-mock.test.ts" => "const mod = jest.requireMock('react-on-rails/client');\n",
@@ -2633,6 +2634,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
         expect(warning_content).to include("unmock.test.ts")
         expect(warning_content).to include("do-mock.test.ts")
+        expect(warning_content).to include("do-unmock.test.ts")
         expect(warning_content).to include("dont-mock.test.ts")
         expect(warning_content).to include("require-actual.test.ts")
         expect(warning_content).to include("require-mock.test.ts")

@@ -2756,7 +2756,7 @@ module ReactOnRails
     # the method-name list is Jest/Vitest-specific enough that false positives are negligible.
     BASE_PACKAGE_MOCK_PATTERN = %r{
       \b(?:\w+\.)?
-      (?:mock|unmock|doMock|dontMock|requireActual|requireMock|importActual|importMock)
+      (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
       \s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]
     }x
     # In Ruby, ^ matches the start of any line, so this catches declarations anywhere in the file.
