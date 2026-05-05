@@ -4,6 +4,8 @@ This guide covers status codes, redirects, and cache headers when Rails owns the
 
 > **Part 5 of the [RSC Migration Series](migrating-to-rsc.md)** | Previous: [Data Fetching Migration](rsc-data-fetching.md) | Next: [Third-Party Library Compatibility](rsc-third-party-libs.md)
 
+> **Note:** The streaming helpers shown in this guide (`ReactOnRailsPro::Stream`, `stream_view_containing_react_components`, and `stream_react_component`) require React on Rails Pro. The same HTTP ownership rules apply to non-streaming Rails responses; use the rendering helper that matches your app.
+
 ## Core Rule: Rails Decides Before Rendering
 
 React Server Components decide what UI to render. Rails still decides the HTTP response:
@@ -123,13 +125,13 @@ If a streamed response has already started and an error forces navigation, the f
 
 Set cache headers in Rails before streaming. The streamed HTML can include serialized props and embedded RSC payloads, so cache it with the same care you would use for any Rails response that contains user-specific data.
 
-For personalized pages, prefer private browser caching with revalidation:
+For personalized pages, prefer private HTTP caching with revalidation:
 
 ```ruby
 response.set_header("Cache-Control", "private, no-cache")
 ```
 
-`no-cache` allows the browser to store the response but forces revalidation before reuse. Use `no-store` instead when sensitive responses must never be cached.
+`no-cache` allows HTTP caches to store the response but requires revalidation with the origin before each reuse. Use `no-store` instead when sensitive responses must never be cached by anyone.
 
 For public pages, let Rails decide freshness before rendering:
 
