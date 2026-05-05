@@ -242,8 +242,8 @@ listener. Use one of these probe styles instead:
 
 | Probe style  | When to use it                                                                                                                 |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `tcpSocket`  | Startup checks and fallback readiness or liveness checks when curl with HTTP/2 support is unavailable.                         |
 | `exec` probe | Application-level readiness and stricter liveness checks with an h2c-aware client, for example `curl --http2-prior-knowledge`. |
+| `tcpSocket`  | Startup checks and fallback readiness or liveness checks when curl with HTTP/2 support is unavailable.                         |
 | HTTP/1.1     | Only if you probe Rails, a separate HTTP/1.1 health sidecar/port, or another endpoint that is not the renderer h2c listener.   |
 
 A passing `tcpSocket` probe means the h2c listener has bound to the port; cluster workers might still be warming up.
@@ -264,8 +264,8 @@ Recommended starting values:
 - **Startup**: Use `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if
   different). TCP is enough here because readiness below gates traffic; startup only shields liveness during boot. Start
   with `initialDelaySeconds: 10` (first check fires at 10 s; the sixth and final failure fires at
-  `10 + ((6 - 1) * 5) = 35 s`), `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes default
-  `timeoutSeconds: 1` for a TCP connection check.
+  `10 + ((6 - 1) * 5) = 35 s` after container start), `periodSeconds: 5`, `failureThreshold: 6`, and the Kubernetes
+  default `timeoutSeconds: 1` for a TCP connection check.
 - **Readiness (custom route)**: Use `exec` with
   `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/health` after registering the route with
   [`configureFastify`](#adding-a-health-check-endpoint). Start with `timeoutSeconds: 5`, `periodSeconds: 5`, and

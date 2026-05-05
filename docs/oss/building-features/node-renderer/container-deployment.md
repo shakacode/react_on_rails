@@ -173,6 +173,8 @@ require "uri"
 class HealthController < ActionController::Base
   def show
     # Opens and immediately closes; raises if the renderer port is unreachable.
+    # A successful TCP connection means the h2c listener is bound, not that
+    # cluster workers are ready. Pair with the startup probe to shield liveness.
     # connect_timeout is supported by the Ruby versions in this guide's prerequisites.
     renderer_port = URI.parse(ReactOnRailsPro.configuration.renderer_url).port
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) {}
@@ -289,8 +291,8 @@ services:
       RENDERER_HOST: '0.0.0.0'
       NODE_OPTIONS: '--max-old-space-size=512'
     healthcheck:
-      # Set --max-time roughly 1 s below the orchestrator's probe timeout so curl exits
-      # cleanly with a non-zero code rather than being killed mid-request (2 s here with timeout: 3s).
+      # --max-time 2 leaves a 1 s buffer below the 3 s orchestrator timeout so curl exits
+      # cleanly with a non-zero code rather than being killed mid-request.
       test: ['CMD', 'curl', '-sf', '--max-time', '2', '--http2-prior-knowledge', 'http://localhost:3800/info']
       interval: 5s
       timeout: 3s
@@ -473,6 +475,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 **Mitigation:**
 
+> [!NOTE]
 > **Probe command notes:** `exec` probes require curl with HTTP/2 support in your image. Verify with
 > `curl --version | grep -i http2`; if unavailable, use `tcpSocket` as a fallback. Set curl `--max-time` shorter than the
 > orchestrator timeout so curl returns a clean non-zero exit code before Kubernetes terminates the probe process. These
@@ -603,6 +606,20 @@ A complete pod spec for the sidecar pattern:
 > HTTP/2 support, keep `tcpSocket` or add HTTP/2-capable curl support. If you cannot verify curl before rollout, use the
 > `tcpSocket` fallback block below and upgrade to `exec` later.
 
+> **Liveness fallback option:** The manifest below uses `exec` (preferred). If curl lacks HTTP/2 support in your image,
+> replace the manifest's `livenessProbe` with this `tcpSocket` block before applying it:
+>
+> ```yaml
+> livenessProbe:
+>   # Omit initialDelaySeconds only if the startupProbe above is configured.
+>   tcpSocket:
+>     port: 3800
+>   # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
+>   timeoutSeconds: 1
+>   periodSeconds: 10
+>   failureThreshold: 3
+> ```
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -696,20 +713,6 @@ spec:
             periodSeconds: 10
             failureThreshold: 3
 ```
-
-> **Liveness fallback option:** The manifest above uses `exec` (preferred). If curl lacks HTTP/2 support in your image,
-> replace that `livenessProbe` with this `tcpSocket` block:
->
-> ```yaml
-> livenessProbe:
->   # Omit initialDelaySeconds only if the startupProbe above is configured.
->   tcpSocket:
->     port: 3800
->   # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
->   timeoutSeconds: 1
->   periodSeconds: 10
->   failureThreshold: 3
-> ```
 
 > **Readiness endpoint:** The manifest uses `/info` for copy-paste safety because that endpoint is built in. Replace
 > `/info` with `/health` in the readiness probe after registering that route via `configureFastify` if readiness should
