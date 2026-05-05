@@ -160,13 +160,14 @@ get "up", to: "health#show"
 `app/controllers/health_controller.rb`:
 
 ```ruby
+# Ruby stdlib; loaded explicitly for the Socket.tcp readiness check.
 require "socket"
 
 # Inherits from ActionController::Base (not ApplicationController) to avoid
 # app-level authentication callbacks on unauthenticated probe requests.
 class HealthController < ActionController::Base
   def show
-    Socket.tcp("localhost", ENV.fetch("RENDERER_PORT", 3800).to_i, connect_timeout: 1) {}
+    Socket.tcp("localhost", ENV.fetch("RENDERER_PORT", "3800").to_i, connect_timeout: 1) {}
     head :ok
   rescue IOError, SocketError, SystemCallError
     head :service_unavailable

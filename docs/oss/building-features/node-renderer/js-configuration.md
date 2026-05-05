@@ -152,7 +152,7 @@ const config = {
 // Register a custom health check route
 configureFastify((app) => {
   app.get('/health', () => {
-    // Switch to an async handler if readiness should wait for warm-up checks.
+    // Return a Promise or use async/await if warm-up checks involve async operations.
     return { status: 'ok' };
   });
 });
