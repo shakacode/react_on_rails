@@ -2468,7 +2468,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
   end
 
-  describe "check_base_package_imports" do
+  describe "check_base_package_references" do
     let(:doctor) { described_class.new(verbose: false, fix: false) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
@@ -2485,7 +2485,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning with file paths" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("custom-bundle.js") }).to be true
@@ -2505,7 +2505,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
       end
@@ -2524,7 +2524,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
       end
@@ -2543,7 +2543,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("Found references to 'react-on-rails'") }).to be true
@@ -2564,7 +2564,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
       end
@@ -2583,7 +2583,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
       end
@@ -2602,7 +2602,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
       end
@@ -2629,7 +2629,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning for each stale helper reference" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
         expect(warning_content).to include("unmock.test.ts")
         expect(warning_content).to include("do-mock.test.ts")
@@ -2653,7 +2653,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.size).to eq(1)
         expect(warning_msgs.first[:content]).to include("react-on-rails.d.ts")
@@ -2673,7 +2673,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports success" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
       end
@@ -2692,7 +2692,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports success" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(warning_msgs).to be_empty
@@ -2713,7 +2713,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports success" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(warning_msgs).to be_empty
@@ -2734,7 +2734,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports success" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(warning_msgs).to be_empty
@@ -2750,7 +2750,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "reports success (no files to scan)" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
       end
@@ -2775,7 +2775,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "scans the custom source_path and reports warning" do
-        doctor.send(:check_base_package_imports)
+        doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("client/app/packs/app.js") }).to be true

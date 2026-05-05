@@ -2716,7 +2716,7 @@ module ReactOnRails
       check_pro_initializer_existence
       ensure_rails_environment_loaded
       check_pro_renderer_mode
-      check_base_package_imports
+      check_base_package_references
     end
 
     def check_pro_initializer_existence
@@ -2752,28 +2752,20 @@ module ReactOnRails
     # RSC), and may cause "component not registered" errors at runtime.
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
-    BASE_PACKAGE_MOCK_METHODS = /mock|unmock|doMock|dontMock|requireActual|requireMock|importActual|importMock/
+    BASE_PACKAGE_MOCK_METHOD_NAMES = "mock|unmock|doMock|dontMock|requireActual|requireMock|importActual|importMock"
     BASE_PACKAGE_MOCK_PATTERN =
-      %r{\b(?:\w+\.)?(?:#{BASE_PACKAGE_MOCK_METHODS.source})\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]}
+      %r{\b(?:\w+\.)?(?:#{BASE_PACKAGE_MOCK_METHOD_NAMES})\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]}
+    # In Ruby, ^ matches the start of any line, so this catches declarations anywhere in the file.
     BASE_PACKAGE_DECLARE_MODULE_PATTERN = %r{^\s*declare\s+module\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_REFERENCE_PATTERNS = [
+      BASE_PACKAGE_IMPORT_PATTERN,
+      BASE_PACKAGE_REQUIRE_PATTERN,
+      BASE_PACKAGE_MOCK_PATTERN,
+      BASE_PACKAGE_DECLARE_MODULE_PATTERN
+    ].freeze
 
-    def check_base_package_imports # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
-      source_path = resolve_js_source_path
-      js_extensions = %w[js jsx ts tsx]
-      js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
-      files_with_base_reference = []
-
-      js_patterns.each do |pattern|
-        Dir.glob(pattern).each do |file|
-          content = File.read(file)
-          next unless content.match?(BASE_PACKAGE_IMPORT_PATTERN) ||
-                      content.match?(BASE_PACKAGE_REQUIRE_PATTERN) ||
-                      content.match?(BASE_PACKAGE_MOCK_PATTERN) ||
-                      content.match?(BASE_PACKAGE_DECLARE_MODULE_PATTERN)
-
-          files_with_base_reference << file
-        end
-      end
+    def check_base_package_references
+      files_with_base_reference = files_with_base_package_references(resolve_js_source_path)
 
       if files_with_base_reference.empty?
         checker.add_success("✅ No base 'react-on-rails' references found (Pro package used correctly)")
@@ -2788,12 +2780,26 @@ module ReactOnRails
           Fix: Replace base-package references with their Pro equivalents:
             import ReactOnRails from 'react-on-rails-pro';         // ES import (server)
             import ReactOnRails from 'react-on-rails-pro/client';  // ES import (client)
-            jest.mock('react-on-rails-pro', ...);                  // Jest/Vitest mock
+            jest.mock('react-on-rails-pro', ...);                  // Jest/Vitest mock helper
             declare module 'react-on-rails-pro' { ... }            // TypeScript augmentation
         MSG
       end
     rescue StandardError => e
       checker.add_warning("⚠️  Could not scan for base package references: #{e.message}")
+    end
+
+    def files_with_base_package_references(source_path)
+      js_extensions = %w[js jsx ts tsx]
+      # The **/*.ts glob also includes .d.ts declaration files.
+      js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
+
+      js_patterns.flat_map do |pattern|
+        Dir.glob(pattern).select { |file| base_package_reference?(File.read(file)) }
+      end
+    end
+
+    def base_package_reference?(content)
+      BASE_PACKAGE_REFERENCE_PATTERNS.any? { |reference_pattern| content.match?(reference_pattern) }
     end
 
     # ── React Server Components ────────────────────────────────────
