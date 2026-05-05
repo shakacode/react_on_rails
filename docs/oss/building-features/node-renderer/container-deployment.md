@@ -162,7 +162,7 @@ get "up", to: "health#show"
 ```ruby
 require "socket"
 
-class HealthController < ApplicationController
+class HealthController < ActionController::Base
   def show
     Socket.tcp("localhost", 3800, connect_timeout: 1) {}
     head :ok
