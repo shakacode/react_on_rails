@@ -497,15 +497,15 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
          - --max-time
          - '4'
          - --http2-prior-knowledge
-         - http://localhost:3800/health
+         - http://localhost:3800/info
      timeoutSeconds: 5
      periodSeconds: 5
      failureThreshold: 3
    ```
    > **Notes:**
    >
-   > - Use `/health` after registering that route via `configureFastify`; otherwise use `/info` for a shallow readiness
-   >   check.
+   > - The YAML uses `/info` so it works before custom Fastify routes exist. Replace `/info` with `/health` after
+   >   registering that route via `configureFastify` if readiness should wait for renderer-specific warm-up checks.
    > - See the probe command notes above for curl HTTP/2 support, `--max-time`, loaded-node buffers, and
    >   `initialDelaySeconds` guidance.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive. The probe below changes the
@@ -641,7 +641,7 @@ spec:
                 - --max-time
                 - '4'
                 - --http2-prior-knowledge
-                - http://localhost:3800/health
+                - http://localhost:3800/info
             timeoutSeconds: 5
             periodSeconds: 5
             failureThreshold: 3
@@ -675,7 +675,9 @@ spec:
 >   failureThreshold: 3
 > ```
 
-> **Note:** Replace `/info` with `/health` if you registered a `/health` route via `configureFastify`.
+> **Readiness endpoint:** The manifest uses `/info` for copy-paste safety because that endpoint is built in. Replace
+> `/info` with `/health` in the readiness probe after registering that route via `configureFastify` if readiness should
+> wait for renderer-specific warm-up checks.
 >
 > **Note:** Both containers use the same Docker image, ensuring the React on Rails gem and Node Renderer package versions are always aligned.
 
