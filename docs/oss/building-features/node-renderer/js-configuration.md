@@ -289,51 +289,13 @@ does not apply there. See the `port` option at the top of this page for Heroku o
 > The 10-second initial delay is a conservative starting point for images that take a moment to boot before opening the
 > port; reduce it, or omit it, if your renderer consistently starts in under 5 seconds.
 
-Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.18+ defers them until the startup probe
-succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an appropriate
-`initialDelaySeconds` to each.
+Readiness and liveness omit `initialDelaySeconds` here because Kubernetes 1.20+ (startup probe GA) defers them until
+the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
+appropriate `initialDelaySeconds` to each.
 
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes, and for the rationale behind `--max-time 4`
 relative to `timeoutSeconds: 5`. On heavily loaded nodes, increase the safety buffer, such as `--max-time 3` (a 2-second
 margin instead of 1), if you see occasional unexpected restarts.
-
-### Control Plane Deployment Shapes
-
-For Control Plane deployments, choose the probe target based on where the node renderer runs. Control Plane configures
-probes per container. Renderer probe targets below mean `tcpSocket` or h2c-aware `exec` probes, not HTTP/1.1 `httpGet`
-probes directly against the renderer.
-
-[Control Plane Flow](https://github.com/shakacode/control-plane-flow)'s default `rails` template models Rails as a
-single-container standard workload. If you follow that template and run the renderer inside the Rails container,
-configure the Rails workload's probes rather than looking for a separate node-renderer container. If you split the
-renderer into its own container or workload, add renderer-specific probes there.
-
-#### Same Rails Container Or Process Supervisor
-
-Set the Rails `renderer_url` to `http://localhost:3800`. The renderer can keep the default `localhost` host binding.
-Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000` in Rails 7.1+ or a custom endpoint in
-earlier Rails versions.
-
-When Rails and the renderer share one container, use one combined Rails health endpoint if you need to check both
-processes. For example, make the Rails readiness endpoint perform a short TCP connection check to `localhost:3800` and
-return `503` if the renderer is unreachable.
-
-#### Separate Container In The Same Workload
-
-Keep the Rails `renderer_url` as `http://localhost:3800`. Use `0.0.0.0` for the renderer `host` when you rely on
-`tcpSocket` probes; `localhost` is fine for `exec`-only probes.
-
-Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind the
-renderer to `0.0.0.0` because Kubernetes and platform TCP probes connect to the pod or workload IP, not container-local
-loopback.
-
-#### Separate Node-Renderer Workload
-
-Set the Rails `renderer_url` to `http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:3800`, use `0.0.0.0` for the renderer
-`host`, and add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port
-internally, not publicly, unless required.
-
-Replace `<WORKLOAD_NAME>` with the renderer workload name and `<GVC_NAME>` with your Control Plane Global Virtual Cloud
-name. Use your actual renderer port if it is not `3800`; see Control Plane's
-[service-to-service endpoint format](https://docs.controlplane.com/guides/service-to-service).
+For Control Plane topology-specific `renderer_url`, host binding, and probe target guidance, see
+[Control Plane Deployment Shapes](./container-deployment.md#control-plane-deployment-shapes).

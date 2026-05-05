@@ -129,6 +129,46 @@ end
 
 > **Recommendation:** Start with a single container. Move to sidecar containers if you need per-process memory/CPU visibility (e.g., to diagnose OOM restarts). Separate workloads are rarely justified unless you have a specific need for independent scaling at high replica counts.
 
+## Control Plane Deployment Shapes
+
+For Control Plane deployments, choose the probe target based on where the node renderer runs. Control Plane configures
+probes per container. Renderer probe targets below mean `tcpSocket` or h2c-aware `exec` probes, not HTTP/1.1 `httpGet`
+probes directly against the renderer.
+
+[Control Plane Flow](https://github.com/shakacode/control-plane-flow)'s default `rails` template models Rails as a
+single-container standard workload. If you follow that template and run the renderer inside the Rails container,
+configure the Rails workload's probes rather than looking for a separate node-renderer container. If you split the
+renderer into its own container or workload, add renderer-specific probes there.
+
+### Same Rails Container Or Process Supervisor
+
+Set the Rails `renderer_url` to `http://localhost:3800`. The renderer can keep the default `localhost` host binding.
+Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000` in Rails 7.1+ or a custom endpoint in
+earlier Rails versions.
+
+When Rails and the renderer share one container, use one combined Rails health endpoint if you need to check both
+processes. For example, make the Rails readiness endpoint perform a short TCP connection check to `localhost:3800` and
+return `503` if the renderer is unreachable.
+
+### Separate Container In The Same Workload
+
+Keep the Rails `renderer_url` as `http://localhost:3800`. Use `0.0.0.0` for the renderer `host` when you rely on
+`tcpSocket` probes; `localhost` is fine for `exec`-only probes.
+
+Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind the
+renderer to `0.0.0.0` because Kubernetes and platform TCP probes connect to the pod or workload IP, not container-local
+loopback.
+
+### Separate Node-Renderer Workload
+
+Set the Rails `renderer_url` to `http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:3800`, use `0.0.0.0` for the renderer
+`host`, and add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port
+internally, not publicly, unless required.
+
+Replace `<WORKLOAD_NAME>` with the renderer workload name and `<GVC_NAME>` with your Control Plane Global Virtual Cloud
+name. Use your actual renderer port if it is not `3800`; see Control Plane's
+[service-to-service endpoint format](https://docs.controlplane.com/guides/service-to-service).
+
 ## Dockerfile Example
 
 > **Why the renderer entry point lives in a dedicated `renderer/` directory:** Production Docker builds commonly strip JavaScript sources after the client bundles are built, since the Rails app no longer needs them at runtime. Keeping the renderer entry point in its own top-level directory (separate from `client/`) makes it trivial to exclude from that cleanup — the Node Renderer process still needs its entry file and dependencies at runtime.
@@ -426,8 +466,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >   `--max-time 2` with `timeout: 3s`.
    > - On heavily loaded nodes, increase the safety buffer, such as `--max-time 3` (a 2-second margin instead of 1), if
    >   you see occasional unexpected probe failures.
-   > - `initialDelaySeconds` is omitted here because Kubernetes 1.18+ defers readiness probes until the startup probe
-   >   above succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
+   > - `initialDelaySeconds` is omitted here because Kubernetes 1.20+ (startup probe GA) defers readiness probes until
+   >   the startup probe above succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
    >   appropriate `initialDelaySeconds`.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
    > **Warning:** Upgrading from a `tcpSocket` liveness probe? Run `curl --version | grep -i http2` in your container
@@ -459,8 +499,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >   before Kubernetes terminates the probe process.
    > - On heavily loaded nodes, increase the safety buffer, such as `--max-time 3` (a 2-second margin instead of 1), if
    >   you see occasional unexpected restarts.
-   > - `initialDelaySeconds` is omitted here because Kubernetes 1.18+ defers liveness probes until the startup probe
-   >   above succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
+   > - `initialDelaySeconds` is omitted here because Kubernetes 1.20+ (startup probe GA) defers liveness probes until
+   >   the startup probe above succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an
    >   appropriate `initialDelaySeconds`.
 
 ### OOM Tracking
@@ -574,9 +614,12 @@ spec:
             failureThreshold: 3
           # WARNING: exec probe requires curl with HTTP/2 support in this image.
           # Verify: curl --version | grep -i http2.
-          # If unavailable, replace exec below with a tcpSocket probe on port 3800.
+          # If unavailable, use the commented tcpSocket fallback inside the livenessProbe.
           livenessProbe:
             # Omit initialDelaySeconds only if the startupProbe above is configured.
+            # Fallback if curl with HTTP/2 support is unavailable:
+            # tcpSocket:
+            #   port: 3800
             exec:
               command:
                 - curl
