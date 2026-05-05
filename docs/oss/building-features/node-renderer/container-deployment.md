@@ -162,9 +162,11 @@ get "up", to: "health#show"
 ```ruby
 require "socket"
 
+# Inherits from ActionController::Base (not ApplicationController) to avoid
+# app-level authentication callbacks on unauthenticated probe requests.
 class HealthController < ActionController::Base
   def show
-    Socket.tcp("localhost", 3800, connect_timeout: 1) {}
+    Socket.tcp("localhost", ENV.fetch("RENDERER_PORT", 3800).to_i, connect_timeout: 1) {}
     head :ok
   rescue IOError, SocketError, SystemCallError
     head :service_unavailable
@@ -495,14 +497,15 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
          - --max-time
          - '4'
          - --http2-prior-knowledge
-         - http://localhost:3800/info
+         - http://localhost:3800/health
      timeoutSeconds: 5
      periodSeconds: 5
      failureThreshold: 3
    ```
    > **Notes:**
    >
-   > - Replace `/info` with `/health` if you registered a `/health` route via `configureFastify`.
+   > - Use `/health` after registering that route via `configureFastify`; otherwise use `/info` for a shallow readiness
+   >   check.
    > - See the probe command notes above for curl HTTP/2 support, `--max-time`, loaded-node buffers, and
    >   `initialDelaySeconds` guidance.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive. The probe below changes the
@@ -638,7 +641,7 @@ spec:
                 - --max-time
                 - '4'
                 - --http2-prior-knowledge
-                - http://localhost:3800/info
+                - http://localhost:3800/health
             timeoutSeconds: 5
             periodSeconds: 5
             failureThreshold: 3
