@@ -2804,12 +2804,11 @@ module ReactOnRails
     end
 
     def base_package_reference_file?(file)
-      base_package_reference?(File.read(file, encoding: "UTF-8"))
-    rescue Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError
-      false
-    rescue ArgumentError => e
-      raise unless e.message.include?("invalid byte sequence")
+      content = File.binread(file).force_encoding("UTF-8")
+      return false unless content.valid_encoding?
 
+      base_package_reference?(content)
+    rescue Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError
       false
     end
 
