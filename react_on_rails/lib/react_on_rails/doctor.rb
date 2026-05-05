@@ -2752,16 +2752,18 @@ module ReactOnRails
     # RSC), and may cause "component not registered" errors at runtime.
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
-    # Intentionally matches bare helpers and one receiver level (jest.mock, vi.mock, etc.);
-    # deeper chains like globalThis.jest.mock are rare enough to skip. The method-name
-    # list is Jest/Vitest-specific enough that false positives are negligible.
+    # Match Jest/Vitest helpers with one receiver level (jest.mock, vi.mock, etc.).
+    # Vitest's importActual/importMock may also be used as bare helpers.
     BASE_PACKAGE_MOCK_PATTERN = %r{
-      \b(?:\w+\.)?
-      (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
+      \b(?:
+        \w+\.(?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
+        |
+        (?:importActual|importMock)
+      )
       \s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]
     }x
     # In Ruby, ^ matches the start of any line, so this catches declarations anywhere in the file.
-    BASE_PACKAGE_DECLARE_MODULE_PATTERN = %r{^\s*declare\s+module\s+['"]react-on-rails(?:/[^'"]*)?['"]}
+    BASE_PACKAGE_DECLARE_MODULE_PATTERN = %r{^\s*(?:export\s+)?declare\s+module\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REFERENCE_PATTERNS = [
       BASE_PACKAGE_IMPORT_PATTERN,
       BASE_PACKAGE_REQUIRE_PATTERN,
@@ -2801,7 +2803,7 @@ module ReactOnRails
 
       js_patterns.flat_map do |pattern|
         Dir.glob(pattern).select { |file| base_package_reference_file?(file) }
-      end
+      end.sort.uniq
     end
 
     def base_package_reference_file?(file)

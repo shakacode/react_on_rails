@@ -2607,6 +2607,25 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when non-test code has a bare mock helper that references the base package string" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/factory.ts",
+                       "mock('react-on-rails', factory);\n")
+            example.run
+          end
+        end
+      end
+
+      it "does not warn" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("factory.ts") }).to be false
+      end
+    end
+
     context "when JS tests use additional mock helpers after a Pro migration" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -2676,6 +2695,25 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails-client.d.ts") }).to be true
+      end
+    end
+
+    context "when TypeScript declarations export augmentations for the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/types/react-on-rails-export.d.ts",
+                       "export declare module 'react-on-rails' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails-export.d.ts") }).to be true
       end
     end
 
