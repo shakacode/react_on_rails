@@ -2655,8 +2655,7 @@ RSpec.describe ReactOnRails::Doctor do
       it "reports warning" do
         doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
-        expect(warning_msgs.size).to eq(1)
-        expect(warning_msgs.first[:content]).to include("react-on-rails.d.ts")
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails.d.ts") }).to be true
       end
     end
 

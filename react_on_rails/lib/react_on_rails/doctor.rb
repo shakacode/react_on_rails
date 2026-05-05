@@ -2752,9 +2752,13 @@ module ReactOnRails
     # RSC), and may cause "component not registered" errors at runtime.
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
-    BASE_PACKAGE_MOCK_METHOD_NAMES = "mock|unmock|doMock|dontMock|requireActual|requireMock|importActual|importMock"
-    BASE_PACKAGE_MOCK_PATTERN =
-      %r{\b(?:\w+\.)?(?:#{BASE_PACKAGE_MOCK_METHOD_NAMES})\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]}
+    # Intentionally matches any receiver (jest.mock, vi.mock, bare mock(), etc.);
+    # the method-name list is Jest/Vitest-specific enough that false positives are negligible.
+    BASE_PACKAGE_MOCK_PATTERN = %r{
+      \b(?:\w+\.)?
+      (?:mock|unmock|doMock|dontMock|requireActual|requireMock|importActual|importMock)
+      \s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]
+    }x
     # In Ruby, ^ matches the start of any line, so this catches declarations anywhere in the file.
     BASE_PACKAGE_DECLARE_MODULE_PATTERN = %r{^\s*declare\s+module\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REFERENCE_PATTERNS = [
