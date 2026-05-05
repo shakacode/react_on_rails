@@ -2052,7 +2052,7 @@ describe InstallGenerator, type: :generator do
     it "pins a pnpm version in the setup step" do
       # Anchor to the constant so silent drift between `CI_PNPM_FALLBACK_VERSION`
       # and the rendered template would fail this test.
-      fallback_version = described_class.send(:const_get, :CI_PNPM_FALLBACK_VERSION)
+      fallback_version = described_class.const_get(:CI_PNPM_FALLBACK_VERSION)
       assert_file ".github/workflows/ci.yml" do |content|
         expect(content).to include("uses: pnpm/action-setup@v4")
         expect(content).to match(
