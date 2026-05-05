@@ -28,7 +28,7 @@ Consider this approach if you:
 When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice:
 
 1. Move custom one-time tasks into `run_precompile_tasks` in `bin/dev`.
-2. Remove matching shell fragments from `Procfile.dev`, `Procfile.dev-static-assets`, and `Procfile.dev-prod-assets`.
+2. Remove matching shell fragments from `Procfile.dev` and any project-specific variants (for example, `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`).
 3. Remove or comment out `precompile_hook` in `config/shakapacker.yml` unless you still need Shakapacker to run a separate hook.
 4. Add the same required build steps to `build_test_command` and `build_production_command`.
 5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
@@ -163,7 +163,7 @@ unless %w[test production].include?(mode)
   exit 1
 end
 
-system("yarn res:build", exception: true)
+system("yarn res:build", exception: true) # replace with your own pre-build step(s)
 
 case mode
 when "test"
