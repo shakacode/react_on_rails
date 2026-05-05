@@ -437,7 +437,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 > such as `--max-time 3`. Readiness and liveness omit `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers
 > them until the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe
 > support, add an appropriate `initialDelaySeconds`.
->
+
 > **Security:** `/info` is unauthenticated even when `password` is configured. Keep the renderer on `localhost` or
 > private networking if exposing node and renderer version details is a concern; see
 > [Built-in Endpoints](./js-configuration.md#built-in-endpoints).
@@ -610,7 +610,7 @@ spec:
             failureThreshold: 3
           # WARNING: exec probe requires curl with HTTP/2 support in this image.
           # Verify: curl --version | grep -i http2.
-          # If unavailable, use the tcpSocket fallback block below instead.
+          # If unavailable, replace this block with the tcpSocket fallback shown below.
           livenessProbe:
             # Omit initialDelaySeconds only if the startupProbe above is configured.
             exec:
@@ -624,16 +624,19 @@ spec:
             timeoutSeconds: 5
             periodSeconds: 10
             failureThreshold: 3
-
-          # tcpSocket fallback if curl lacks HTTP/2 support:
-          # Delete the livenessProbe exec block above and replace it with this block:
-          # livenessProbe:
-          #   tcpSocket:
-          #     port: 3800
-          #   timeoutSeconds: 1
-          #   periodSeconds: 10
-          #   failureThreshold: 3
 ```
+
+> **Liveness fallback option:** The manifest above uses `exec` (preferred). If curl lacks HTTP/2 support in your image,
+> replace that `livenessProbe` with this `tcpSocket` block:
+>
+> ```yaml
+> livenessProbe:
+>   tcpSocket:
+>     port: 3800
+>   timeoutSeconds: 1
+>   periodSeconds: 10
+>   failureThreshold: 3
+> ```
 
 > **Note:** Replace `/info` with `/health` if you registered a `/health` route via `configureFastify`.
 >
