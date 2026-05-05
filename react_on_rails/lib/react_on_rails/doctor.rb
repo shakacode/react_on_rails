@@ -2752,8 +2752,9 @@ module ReactOnRails
     # RSC), and may cause "component not registered" errors at runtime.
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
-    # Intentionally matches any receiver (jest.mock, vi.mock, bare mock(), etc.);
-    # the method-name list is Jest/Vitest-specific enough that false positives are negligible.
+    # Intentionally matches bare helpers and one receiver level (jest.mock, vi.mock, etc.);
+    # deeper chains like globalThis.jest.mock are rare enough to skip. The method-name
+    # list is Jest/Vitest-specific enough that false positives are negligible.
     BASE_PACKAGE_MOCK_PATTERN = %r{
       \b(?:\w+\.)?
       (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
@@ -2800,7 +2801,7 @@ module ReactOnRails
 
       js_patterns.flat_map do |pattern|
         Dir.glob(pattern).select { |file| base_package_reference_file?(file) }
-      end.uniq
+      end
     end
 
     def base_package_reference_file?(file)
@@ -2808,8 +2809,6 @@ module ReactOnRails
       return false unless content.valid_encoding?
 
       base_package_reference?(content)
-    rescue Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError
-      false
     end
 
     def base_package_reference?(content)
