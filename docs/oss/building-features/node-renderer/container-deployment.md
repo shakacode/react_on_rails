@@ -425,8 +425,15 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
    ```yaml
    livenessProbe:
-     tcpSocket:
-       port: 3800
+     exec:
+       command:
+         - curl
+         - -sf
+         - --max-time
+         - '4'
+         - --http2-prior-knowledge
+         - http://localhost:3800/info
+     timeoutSeconds: 5
      periodSeconds: 10
      failureThreshold: 3
    ```
@@ -537,8 +544,15 @@ spec:
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            tcpSocket:
-              port: 3800
+            exec:
+              command:
+                - curl
+                - -sf
+                - --max-time
+                - '4'
+                - --http2-prior-knowledge
+                - http://localhost:3800/info
+            timeoutSeconds: 5
             periodSeconds: 10
             failureThreshold: 3
 ```
