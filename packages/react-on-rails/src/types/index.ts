@@ -192,6 +192,10 @@ interface RenderFunction {
  * Renderer functions receive the DOM node id as their third argument and own
  * mounting/unmounting their tree. Returning a teardown lets React on Rails run
  * cleanup when the page unloads or when that DOM node id is replaced.
+ *
+ * ComponentRegistry classifies renderers by arity (`component.length === 3`).
+ * Setting `renderFunction = true` alone still creates a render function, not a
+ * cleanup-aware renderer.
  */
 interface RendererFunction {
   (props: any, railsContext: RailsContext, domNodeId: string): RendererResult;

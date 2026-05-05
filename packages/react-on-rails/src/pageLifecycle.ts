@@ -141,6 +141,10 @@ export function onPageLoaded(callback: PageLifecycleCallback): void {
   initializePageEventListeners();
 }
 
+/**
+ * Registers a page-unload callback. Browser and Turbo navigation events do not
+ * await these callbacks, so async cleanup starts on unload but may finish later.
+ */
 export function onPageUnloaded(callback: PageLifecycleCallback): void {
   if (currentPageState === 'unload') {
     // Match runPageUnloadedCallbacks: late unload subscribers are invoked

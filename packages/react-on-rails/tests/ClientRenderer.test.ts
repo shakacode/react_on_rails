@@ -422,14 +422,18 @@ describe('ClientRenderer', () => {
       expect(teardown).toHaveBeenCalledTimes(1);
     });
 
-    it('invokes the teardown when the DOM node at the same domNodeId is replaced', () => {
+    it('invokes the teardown when the DOM node at the same domNodeId is replaced', async () => {
       setupRailsContext();
 
       const teardown1 = jest.fn();
       const teardown2 = jest.fn();
       let nextTeardown: () => void = teardown1;
+      let renderCount = 0;
 
-      const Renderer: RendererFunction = (_props, _railsContext, _domNodeId) => nextTeardown;
+      const Renderer: RendererFunction = (_props, _railsContext, _domNodeId) => {
+        renderCount += 1;
+        return nextTeardown;
+      };
       ComponentRegistry.register({ Renderer });
       const target1 = setupRendererDom('Renderer', 'renderer-replace');
 
@@ -443,9 +447,13 @@ describe('ClientRenderer', () => {
 
       nextTeardown = teardown2;
       renderComponent('renderer-replace');
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
 
       // The framework calls teardown1 before mounting on the new node;
       // teardown2 stays armed until the next unmount.
+      expect(renderCount).toBe(2);
       expect(teardown1).toHaveBeenCalledTimes(1);
       expect(teardown2).toHaveBeenCalledTimes(0);
     });
@@ -610,6 +618,50 @@ describe('ClientRenderer', () => {
 
       expect(renderCount).toBe(2);
       expect(events).toEqual(['first teardown', 'render 2']);
+    });
+
+    it('does not run a queued replacement render after page unload starts', async () => {
+      setupRailsContext();
+
+      const events: string[] = [];
+      let renderCount = 0;
+      let resolveFirstRenderer: (resolvedTeardown: () => void) => void;
+
+      const Renderer: RendererFunction = (_props, _railsContext, _domNodeId) => {
+        renderCount += 1;
+        if (renderCount === 1) {
+          return new Promise<() => void>((resolve) => {
+            resolveFirstRenderer = resolve;
+          });
+        }
+
+        events.push('queued render');
+        return () => {
+          events.push('queued teardown');
+        };
+      };
+      ComponentRegistry.register({ Renderer });
+      const target1 = setupRendererDom('Renderer', 'renderer-unload-cancels-queued-render');
+
+      renderComponent('renderer-unload-cancels-queued-render');
+
+      target1.remove();
+      const target2 = document.createElement('div');
+      target2.id = 'renderer-unload-cancels-queued-render';
+      document.body.appendChild(target2);
+      renderComponent('renderer-unload-cancels-queued-render');
+
+      const unloadPromise = triggerPageUnload();
+      resolveFirstRenderer!(() => {
+        events.push('first teardown');
+      });
+      await unloadPromise;
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      expect(renderCount).toBe(1);
+      expect(events).toEqual(['first teardown']);
     });
   });
 });

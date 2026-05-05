@@ -31,6 +31,7 @@ After a release, run `/update-changelog` in Claude Code to analyze commits, writ
 #### Changed
 
 - **[Pro]** **Pro generator now creates the Node Renderer at `renderer/node-renderer.js`**: The canonical location for the Node Renderer entry point is now a dedicated top-level `renderer/` directory instead of `client/`, making it straightforward to exclude from production Docker builds that strip JS sources after bundling. Docs and Pro `spec/dummy` now use the new path consistently. Existing apps are unaffected — the generator skips files that already exist (including a legacy `client/node-renderer.js`). Fixes [Issue 3073](https://github.com/shakacode/react_on_rails/issues/3073). [PR 3165](https://github.com/shakacode/react_on_rails/pull/3165) by [justin808](https://github.com/justin808).
+- **Turbo cleanup now runs before Turbo snapshots pages**: React on Rails now unmounts on `turbo:before-cache` instead of `turbo:before-render`, preventing live React DOM from being frozen into Turbo's snapshot cache. Apps with custom `turbo:before-render` cleanup workarounds may need to remove those workarounds to avoid double cleanup. [PR 3210](https://github.com/shakacode/react_on_rails/pull/3210) by [AbanoubGhadban](https://github.com/AbanoubGhadban).
 
 #### Fixed
 

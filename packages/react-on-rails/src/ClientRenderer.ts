@@ -90,7 +90,8 @@ function trackRendererTeardown(
 
 async function unmountRenderedRoot(renderedRoot: RenderedRoot): Promise<void> {
   const { root, domNode, isRenderer } = renderedRoot;
-  const teardown = renderedRoot.teardown || (await renderedRoot.pendingTeardown);
+  const teardown =
+    renderedRoot.teardown ?? (renderedRoot.pendingTeardown ? await renderedRoot.pendingTeardown : undefined);
 
   if (teardown) {
     await teardown();
@@ -144,6 +145,8 @@ function queueRenderAfterPendingUnmount(
   pendingUnmount: Promise<void>,
   render: () => void,
 ): void {
+  // queuedRender is captured by reference below. The promise callback runs
+  // asynchronously, so the const is initialized by the time the callback fires.
   const queuedRender = pendingUnmount.then(() => {
     if (pendingUnmounts.get(domNodeId) !== queuedRender) return;
 
@@ -312,6 +315,7 @@ export function reactOnRailsComponentLoaded(domId: string): Promise<void> {
 async function unmountAllComponents(): Promise<void> {
   const renderedRootEntries = [...renderedRoots.values()];
   renderedRoots.clear();
+  pendingUnmounts.clear();
 
   const results = await Promise.allSettled(
     renderedRootEntries.map((renderedRoot) => unmountRenderedRoot(renderedRoot)),
