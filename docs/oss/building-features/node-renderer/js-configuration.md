@@ -106,10 +106,10 @@ Run the renderer with `pnpm run node-renderer` (or the equivalent `npm`/`yarn` c
 ## Built-in Endpoints
 
 The React on Rails Pro node renderer registers `/info` as a plain `GET` route outside the authenticated render and asset
-endpoints.
-It does not use the render or asset authentication prechecks, so it remains accessible without the renderer password even
-when `password` is configured. The route returns `node_version` and `renderer_version`. Treat it as a shallow process
-check and keep the renderer on `localhost` or private networking if those runtime version details should not be exposed.
+endpoints, and it does not use the render or asset authentication prechecks, so it remains accessible without the renderer
+password even when `password` is configured. The route returns `node_version` and `renderer_version`. Treat it as a
+shallow process check and keep the renderer on `localhost` or private networking if those runtime version details should
+not be exposed.
 
 Verify it locally:
 

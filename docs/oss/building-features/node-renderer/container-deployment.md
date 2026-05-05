@@ -150,6 +150,10 @@ When Rails and the renderer share one container, use one combined Rails health e
 processes. For example, make the Rails readiness endpoint perform a short TCP connection check to `localhost:3800` and
 return `503` if the renderer is unreachable.
 
+Because this guide covers React on Rails Pro's Node Renderer, the Rails endpoint below reads the same
+`ReactOnRailsPro.configuration.renderer_url` value used for SSR requests rather than requiring a second port environment
+variable.
+
 `config/routes.rb`:
 
 ```ruby
@@ -169,6 +173,7 @@ require "uri"
 class HealthController < ActionController::Base
   def show
     # Opens and immediately closes; raises if the renderer port is unreachable.
+    # connect_timeout is supported by the Ruby versions in this guide's prerequisites.
     renderer_port = URI.parse(ReactOnRailsPro.configuration.renderer_url).port
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) {}
     head :ok
@@ -492,6 +497,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      timeoutSeconds: 1
    ```
 3. **Readiness probe** — Ensure traffic is only routed to the renderer when it's ready to accept requests. Prefer an `exec` probe with an h2c-aware client for application-level readiness. Use `tcpSocket` only as a minimal fallback that confirms the port is accepting connections:
+
    ```yaml
    readinessProbe:
      exec:
@@ -506,12 +512,29 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      periodSeconds: 5
      failureThreshold: 3
    ```
+
    > **Notes:**
    >
    > - The YAML uses `/info` so it works before custom Fastify routes exist. Replace `/info` with `/health` after
    >   registering that route via `configureFastify` if readiness should wait for renderer-specific warm-up checks.
+   > - Before upgrading an existing readiness probe, keep curl's `--max-time` lower than `timeoutSeconds`. If switching
+   >   from `tcpSocket` to `exec`, verify curl HTTP/2 support in the image first.
    > - See the probe command notes above for curl HTTP/2 support, `--max-time`, loaded-node buffers, and
    >   `initialDelaySeconds` guidance.
+
+   > **Readiness fallback option:** If curl lacks HTTP/2 support in your image, replace that `readinessProbe` with this
+   > `tcpSocket` block. This checks port reachability, not application-level readiness:
+   >
+   > ```yaml
+   > readinessProbe:
+   >   tcpSocket:
+   >     port: 3800
+   >   # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
+   >   timeoutSeconds: 1
+   >   periodSeconds: 5
+   >   failureThreshold: 3
+   > ```
+
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive. The probe below changes the
    liveness check from `tcpSocket` to `exec`; if you are upgrading an existing deployment, verify curl HTTP/2 support
    first:
