@@ -2,6 +2,8 @@ import { Script } from 'node:vm';
 
 import { convertToError } from '../src/serverRenderUtils.ts';
 
+type ErrorWithCause = Error & { cause?: unknown };
+
 describe('serverRenderUtils', () => {
   describe('convertToError', () => {
     it('returns Error instances unchanged', () => {
@@ -17,7 +19,7 @@ describe('serverRenderUtils', () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe('{"message":"plain object failure"}');
-      expect((error as Error & { cause?: unknown }).cause).toBe(thrownValue);
+      expect((error as ErrorWithCause).cause).toBe(thrownValue);
     });
 
     it('wraps a thrown string with the string as the message and cause', () => {
@@ -25,7 +27,7 @@ describe('serverRenderUtils', () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe('something went wrong');
-      expect((error as Error & { cause?: unknown }).cause).toBe('something went wrong');
+      expect((error as ErrorWithCause).cause).toBe('something went wrong');
     });
 
     it('wraps a thrown number', () => {
@@ -33,7 +35,7 @@ describe('serverRenderUtils', () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe('42');
-      expect((error as Error & { cause?: unknown }).cause).toBe(42);
+      expect((error as ErrorWithCause).cause).toBe(42);
     });
 
     it('wraps null thrown values', () => {
@@ -41,7 +43,7 @@ describe('serverRenderUtils', () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe('null');
-      expect((error as Error & { cause?: unknown }).cause).toBeNull();
+      expect((error as ErrorWithCause).cause).toBeNull();
     });
 
     it('wraps undefined thrown values', () => {
@@ -49,7 +51,7 @@ describe('serverRenderUtils', () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe('undefined');
-      expect((error as Error & { cause?: unknown }).cause).toBeUndefined();
+      expect((error as ErrorWithCause).cause).toBeUndefined();
     });
 
     it('wraps circular-reference objects without throwing', () => {
@@ -60,7 +62,7 @@ describe('serverRenderUtils', () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe('[object Object]');
-      expect((error as Error & { cause?: unknown }).cause).toBe(circular);
+      expect((error as ErrorWithCause).cause).toBe(circular);
     });
 
     it('wraps errors thrown from another JavaScript realm with their original message', () => {
@@ -70,7 +72,19 @@ describe('serverRenderUtils', () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toBe('cross-realm failure');
-      expect((error as Error & { cause?: unknown }).cause).toBe(thrownValue);
+      expect((error as ErrorWithCause).cause).toBe(thrownValue);
+    });
+
+    it('wraps cross-realm errors with non-string messages using the error tag', () => {
+      const thrownValue: unknown = new Script(
+        'const error = new Error(); error.message = 42; error',
+      ).runInNewContext();
+
+      const error = convertToError(thrownValue);
+
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toBe('[object Error]');
+      expect((error as ErrorWithCause).cause).toBe(thrownValue);
     });
   });
 });

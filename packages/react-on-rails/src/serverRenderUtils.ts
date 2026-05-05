@@ -25,7 +25,7 @@ export function createResultObject(
 }
 
 function isCrossRealmError(e: unknown): e is { message?: unknown } {
-  return Object.prototype.toString.call(e) === '[object Error]';
+  return typeof e === 'object' && e !== null && Object.prototype.toString.call(e) === '[object Error]';
 }
 
 function stringifyThrownValue(e: unknown): string {
@@ -51,9 +51,10 @@ export function convertToError(e: unknown): Error {
   }
 
   const message = stringifyThrownValue(e);
-  // tsconfig uses es2020 libs, which do not type ErrorOptions even though supported runtimes provide Error.cause.
-  const ErrorWithCause = Error as new (message?: string, options?: { cause?: unknown }) => Error;
-  return new ErrorWithCause(message, { cause: e });
+  // tsconfig uses es2020 libs, which do not type Error.cause even though supported runtimes provide it.
+  const error = new Error(message) as Error & { cause?: unknown };
+  error.cause = e;
+  return error;
 }
 
 export function validateComponent(componentObj: RegisteredComponent, componentName: string) {
