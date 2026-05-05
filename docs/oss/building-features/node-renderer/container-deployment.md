@@ -415,7 +415,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      periodSeconds: 5
      failureThreshold: 3
    ```
-   > **Note:** Replace `/info` with `/health` if you registered that route via `configureFastify`.
+   > **Note:** Replace `/info` with `/health` if you registered a `/health` route via `configureFastify`.
    >
    > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep -i http2`. If curl is unavailable, use `tcpSocket` as a fallback.
    >
@@ -543,7 +543,7 @@ spec:
             failureThreshold: 3
 ```
 
-> **Readiness target:** Replace `/info` with `/health` if you registered that route via `configureFastify`.
+> **Note:** Replace `/info` with `/health` if you registered a `/health` route via `configureFastify`.
 >
 > **Note:** Both containers use the same Docker image, ensuring the React on Rails gem and Node Renderer package versions are always aligned.
 

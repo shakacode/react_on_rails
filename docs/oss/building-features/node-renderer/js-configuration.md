@@ -145,7 +145,7 @@ const config = {
 
 // Register a custom health check route
 configureFastify((app) => {
-  app.get('/health', async (_request, _reply) => {
+  app.get('/health', async () => {
     return { status: 'ok' };
   });
 });
@@ -263,6 +263,8 @@ does not apply there. See the `port` option at the top of this page for Heroku o
 > **Note (startup window):** With these values, the container restarts only if all six consecutive startup checks fail.
 > Checks occur at approximately 10, 15, 20, 25, 30, and 35 seconds. Increase `failureThreshold` or `periodSeconds` if
 > startup regularly takes longer.
+> The 10-second initial delay is a conservative starting point for images that take a moment to boot before opening the
+> port; reduce it, or omit it, if your renderer consistently starts in under 5 seconds.
 
 `--max-time 4` is intentionally shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero
 exit code before Kubernetes terminates the probe process.
@@ -276,19 +278,19 @@ Kubernetes YAML examples, including startup, readiness, and liveness probes.
 For Control Plane deployments, choose the probe target based on where the node renderer runs. Renderer probe targets
 below mean `tcpSocket` or h2c-aware `exec` probes, not HTTP/1.1 `httpGet` probes directly against the renderer.
 
-| Deployment shape                        | Rails `renderer_url`                              | Renderer `host`                                                           | Probe target                                                                                                                                                                                                                                                 |
-| --------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Same Rails container/process supervisor | `http://localhost:3800`                           | Default `localhost` is fine                                               | Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000`. Add a renderer check to Rails readiness if SSR is required.                                                                                                               |
-| Separate container in the same workload | `http://localhost:3800`                           | Use `0.0.0.0` for `tcpSocket`; `localhost` is fine for `exec`-only probes | Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind the renderer to `0.0.0.0` because Kubernetes and platform TCP probes connect to the pod or workload IP, not container-local loopback. |
-| Separate node-renderer workload         | `http://node-renderer.<GVC_NAME>.cpln.local:3800` | `0.0.0.0`                                                                 | Add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port internally, not publicly, unless required.                                                                                                      |
+| Deployment shape                        | Rails `renderer_url`                                | Renderer `host`                                                           | Probe target                                                                                                                                                                                                                                                 |
+| --------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Same Rails container/process supervisor | `http://localhost:3800`                             | Default `localhost` is fine                                               | Probe the `rails` container's Rails health endpoint, such as `/up` on port `3000`. Add a renderer check to Rails readiness if SSR is required.                                                                                                               |
+| Separate container in the same workload | `http://localhost:3800`                             | Use `0.0.0.0` for `tcpSocket`; `localhost` is fine for `exec`-only probes | Add h2c-aware `exec` probes against `localhost:3800` or `tcpSocket` probes on the renderer port. For `tcpSocket`, bind the renderer to `0.0.0.0` because Kubernetes and platform TCP probes connect to the pod or workload IP, not container-local loopback. |
+| Separate node-renderer workload         | `http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:3800` | `0.0.0.0`                                                                 | Add `tcpSocket` or h2c-aware `exec` probes to the node-renderer workload container. Expose the renderer port internally, not publicly, unless required.                                                                                                      |
 
 [Control Plane Flow](https://github.com/shakacode/control-plane-flow)'s default `rails` template models Rails as a
 single-container standard workload. If you follow that template and run the renderer inside the Rails container,
 configure the Rails workload's probes rather than looking for a separate node-renderer container. If you split the
 renderer into its own container or workload, add renderer-specific probes there.
 
-For a separate Control Plane workload, `<GVC_NAME>` is your Control Plane Global Virtual Cloud name. The generic internal
-endpoint format is `http://<WORKLOAD_NAME>.<GVC_NAME>.cpln.local:<PORT>`; see Control Plane's
+For a separate Control Plane workload, replace `<WORKLOAD_NAME>` with the renderer workload name and `<GVC_NAME>` with
+your Control Plane Global Virtual Cloud name. Use your actual renderer port if it is not `3800`; see Control Plane's
 [service-to-service endpoint format](https://docs.controlplane.com/guides/service-to-service).
 
 Control Plane configures probes per container. When Rails and the renderer share one container, use one combined Rails
