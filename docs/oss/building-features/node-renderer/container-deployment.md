@@ -409,7 +409,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
          - --max-time
          - '4'
          - --http2-prior-knowledge
-        - http://localhost:3800/info
+         - http://localhost:3800/info
      timeoutSeconds: 5
      periodSeconds: 5
      failureThreshold: 3
