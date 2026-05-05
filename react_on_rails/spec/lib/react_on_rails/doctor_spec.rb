@@ -2660,6 +2660,25 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when TypeScript declaration files augment a base package subpath after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/types/react-on-rails-client.d.ts",
+                       "declare module 'react-on-rails/client' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails-client.d.ts") }).to be true
+      end
+    end
+
     context "when module files use ESM or CommonJS extensions after a Pro migration" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -2679,6 +2698,27 @@ RSpec.describe ReactOnRails::Doctor do
         warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
         expect(warning_content).to include("esm-entry.mjs")
         expect(warning_content).to include("cjs-entry.cjs")
+      end
+    end
+
+    context "when one scanned file has invalid UTF-8 content" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/app.js",
+                       "import ReactOnRails from 'react-on-rails';\n")
+            File.binwrite("app/javascript/packs/binary.js", "\xFF")
+            example.run
+          end
+        end
+      end
+
+      it "skips the unreadable file and keeps scanning the rest" do
+        doctor.send(:check_base_package_references)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include("app.js")
+        expect(warning_content).not_to include("Could not scan")
       end
     end
 
@@ -2750,6 +2790,27 @@ RSpec.describe ReactOnRails::Doctor do
             FileUtils.mkdir_p("app/javascript/types")
             File.write("app/javascript/types/react-on-rails-pro.d.ts",
                        "declare module 'react-on-rails-pro' {\n  export function register(): void;\n}\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when TypeScript declarations correctly augment a Pro package subpath" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/types")
+            File.write("app/javascript/types/react-on-rails-pro-client.d.ts",
+                       "declare module 'react-on-rails-pro/client' {\n  export function register(): void;\n}\n")
             example.run
           end
         end

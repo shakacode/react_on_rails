@@ -2799,8 +2799,18 @@ module ReactOnRails
       js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
 
       js_patterns.flat_map do |pattern|
-        Dir.glob(pattern).select { |file| base_package_reference?(File.read(file)) }
+        Dir.glob(pattern).select { |file| base_package_reference_file?(file) }
       end.uniq
+    end
+
+    def base_package_reference_file?(file)
+      base_package_reference?(File.read(file, encoding: "UTF-8"))
+    rescue Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError
+      false
+    rescue ArgumentError => e
+      raise unless e.message.include?("invalid byte sequence")
+
+      false
     end
 
     def base_package_reference?(content)
