@@ -2800,7 +2800,7 @@ module ReactOnRails
 
       js_patterns.flat_map do |pattern|
         Dir.glob(pattern).select { |file| base_package_reference?(File.read(file)) }
-      end
+      end.uniq
     end
 
     def base_package_reference?(content)

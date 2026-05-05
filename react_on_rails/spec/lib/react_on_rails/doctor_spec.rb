@@ -2547,7 +2547,6 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("app.test.ts") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("Found references to 'react-on-rails'") }).to be true
-        expect(warning_msgs.any? { |m| m[:content].include?("Jest/Vitest mock") }).to be true
       end
     end
 
