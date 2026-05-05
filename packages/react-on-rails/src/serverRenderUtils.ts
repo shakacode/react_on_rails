@@ -24,13 +24,32 @@ export function createResultObject(
   };
 }
 
+function stringifyThrownValue(e: unknown): string {
+  if (typeof e === 'object' && e !== null) {
+    try {
+      const json = JSON.stringify(e);
+      if (json !== undefined) {
+        return json;
+      }
+    } catch {
+      return Object.prototype.toString.call(e);
+    }
+
+    return Object.prototype.toString.call(e);
+  }
+
+  return String(e);
+}
+
 export function convertToError(e: unknown): Error {
   if (e instanceof Error) {
     return e;
   }
 
+  const message = stringifyThrownValue(e);
+  // tsconfig uses es2020 libs, which do not type ErrorOptions even though supported runtimes provide Error.cause.
   const ErrorWithCause = Error as new (message?: string, options?: { cause?: unknown }) => Error;
-  return new ErrorWithCause(String(e), { cause: e });
+  return new ErrorWithCause(message, { cause: e });
 }
 
 export function validateComponent(componentObj: RegisteredComponent, componentName: string) {
