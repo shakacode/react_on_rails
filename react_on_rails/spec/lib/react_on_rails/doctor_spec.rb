@@ -2616,6 +2616,7 @@ RSpec.describe ReactOnRails::Doctor do
             {
               "unmock.test.ts" => "jest.unmock('react-on-rails');\n",
               "do-mock.test.ts" => "jest.doMock('react-on-rails/client', () => ({}));\n",
+              "do-unmock.test.ts" => "vi.doUnmock('react-on-rails');\n",
               "dont-mock.test.ts" => "jest.dontMock('react-on-rails');\n",
               "require-actual.test.ts" => "const mod = jest.requireActual('react-on-rails');\n",
               "require-mock.test.ts" => "const mod = jest.requireMock('react-on-rails/client');\n",
@@ -2633,6 +2634,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
         expect(warning_content).to include("unmock.test.ts")
         expect(warning_content).to include("do-mock.test.ts")
+        expect(warning_content).to include("do-unmock.test.ts")
         expect(warning_content).to include("dont-mock.test.ts")
         expect(warning_content).to include("require-actual.test.ts")
         expect(warning_content).to include("require-mock.test.ts")
@@ -2656,6 +2658,28 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails.d.ts") }).to be true
+      end
+    end
+
+    context "when module files use ESM or CommonJS extensions after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/esm-entry.mjs",
+                       "import ReactOnRails from 'react-on-rails';\n")
+            File.write("app/javascript/packs/cjs-entry.cjs",
+                       "const ReactOnRails = require('react-on-rails/client');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for each module file" do
+        doctor.send(:check_base_package_references)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include("esm-entry.mjs")
+        expect(warning_content).to include("cjs-entry.cjs")
       end
     end
 

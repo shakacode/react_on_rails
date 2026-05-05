@@ -2756,7 +2756,7 @@ module ReactOnRails
     # the method-name list is Jest/Vitest-specific enough that false positives are negligible.
     BASE_PACKAGE_MOCK_PATTERN = %r{
       \b(?:\w+\.)?
-      (?:mock|unmock|doMock|dontMock|requireActual|requireMock|importActual|importMock)
+      (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
       \s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]
     }x
     # In Ruby, ^ matches the start of any line, so this catches declarations anywhere in the file.
@@ -2784,6 +2784,7 @@ module ReactOnRails
           Fix: Replace base-package references with their Pro equivalents:
             import ReactOnRails from 'react-on-rails-pro';         // ES import (server)
             import ReactOnRails from 'react-on-rails-pro/client';  // ES import (client)
+            const ReactOnRails = require('react-on-rails-pro');    // CommonJS require
             jest.mock('react-on-rails-pro', ...);                  // Jest/Vitest mock helper
             declare module 'react-on-rails-pro' { ... }            // TypeScript augmentation
         MSG
@@ -2793,7 +2794,7 @@ module ReactOnRails
     end
 
     def files_with_base_package_references(source_path)
-      js_extensions = %w[js jsx ts tsx]
+      js_extensions = %w[js jsx ts tsx mjs cjs]
       # The **/*.ts glob also includes .d.ts declaration files.
       js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
 
@@ -2803,6 +2804,8 @@ module ReactOnRails
     end
 
     def base_package_reference?(content)
+      # Content-based matching intentionally catches comments and string literals
+      # so stale migration references stay visible.
       BASE_PACKAGE_REFERENCE_PATTERNS.any? { |reference_pattern| content.match?(reference_pattern) }
     end
 
