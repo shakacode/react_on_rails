@@ -54,6 +54,9 @@ jest.mock('../src/pageLifecycle.ts', () => {
       // no-op: tests drive lifecycle via __triggerPageUnload only.
       // The real implementation fires immediately when currentPageState === 'load'.
     },
+    refreshPageEventListeners: () => {
+      // no-op: listener setup is not exercised in these unit tests.
+    },
     __triggerPageUnload: async () => {
       for (const cb of [...unloadCallbacks]) {
         // eslint-disable-next-line no-await-in-loop
@@ -559,6 +562,54 @@ describe('ClientRenderer', () => {
       });
 
       expect(events).toEqual(['first teardown', 'second render']);
+    });
+
+    it('coalesces concurrent replacement renders while an async renderer teardown is pending', async () => {
+      setupRailsContext();
+
+      const events: string[] = [];
+      let renderCount = 0;
+      let resolveFirstRenderer: (resolvedTeardown: () => void) => void;
+
+      const Renderer: RendererFunction = (_props, _railsContext, _domNodeId) => {
+        renderCount += 1;
+        if (renderCount === 1) {
+          return new Promise<() => void>((resolve) => {
+            resolveFirstRenderer = resolve;
+          });
+        }
+
+        events.push(`render ${renderCount}`);
+        return () => {
+          events.push(`teardown ${renderCount}`);
+        };
+      };
+      ComponentRegistry.register({ Renderer });
+      const target1 = setupRendererDom('Renderer', 'renderer-async-replace-coalesce');
+
+      renderComponent('renderer-async-replace-coalesce');
+
+      target1.remove();
+      const target2 = document.createElement('div');
+      target2.id = 'renderer-async-replace-coalesce';
+      document.body.appendChild(target2);
+      renderComponent('renderer-async-replace-coalesce');
+
+      target2.remove();
+      const target3 = document.createElement('div');
+      target3.id = 'renderer-async-replace-coalesce';
+      document.body.appendChild(target3);
+      renderComponent('renderer-async-replace-coalesce');
+
+      resolveFirstRenderer!(() => {
+        events.push('first teardown');
+      });
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+      expect(renderCount).toBe(2);
+      expect(events).toEqual(['first teardown', 'render 2']);
     });
   });
 });

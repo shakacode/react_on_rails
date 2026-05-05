@@ -49,6 +49,9 @@ function setupPageNavigationListeners(): void {
     if (turboEventListenersInstalled) return;
 
     debugTurbolinks('TURBO DETECTED: adding event listeners for turbo:before-cache and turbo:render.');
+    // turbo:before-cache fires before Turbo snapshots the current page for its
+    // cache. Unmounting here prevents live React DOM from being frozen into the
+    // snapshot; turbo:before-render fires after the snapshot and is too late.
     document.addEventListener('turbo:before-cache', runPageUnloadedCallbacks);
     document.addEventListener('turbo:render', runPageLoadedCallbacks);
     turboEventListenersInstalled = true;
@@ -112,6 +115,13 @@ function initializePageEventListeners(): void {
   }
 }
 
+/**
+ * Refreshes page navigation listeners, e.g. after enabling Turbo via setOptions.
+ *
+ * Page-unload callbacks registered via onPageUnloaded are fired with void and
+ * are not awaited. Async teardowns may still be running when the next page
+ * begins rendering.
+ */
 export function refreshPageEventListeners(): void {
   if (typeof window === 'undefined') return;
 

@@ -176,9 +176,13 @@ type StreamableComponentResult = ReactElement | Promise<ReactElement | string>;
  * // Option 2: Using renderFunction property
  * const anotherRenderFunction = (props) => { ... };
  * anotherRenderFunction.renderFunction = true;
+ *
+ * The optional third domNodeId parameter remains for TypeScript compatibility.
+ * Renderer callbacks that use domNodeId and return teardown functions should be
+ * typed as RendererFunction instead.
  */
 interface RenderFunction {
-  (props?: any, railsContext?: RailsContext): RenderFunctionResult;
+  (props?: any, railsContext?: RailsContext, domNodeId?: string): RenderFunctionResult;
   // We allow specifying that the function is RenderFunction and not a React Function Component
   // by setting this property
   renderFunction?: true;

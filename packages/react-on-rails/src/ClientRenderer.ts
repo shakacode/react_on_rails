@@ -56,7 +56,7 @@ function isRendererTeardown(value: unknown): value is RendererTeardown {
 function isPromiseLikeRendererResult(
   value: RendererResult,
 ): value is PromiseLike<undefined | RendererTeardown> {
-  return typeof (value as { then?: unknown } | undefined)?.then === 'function';
+  return typeof (value as { then?: unknown })?.then === 'function';
 }
 
 function trackRendererTeardown(
@@ -139,6 +139,27 @@ DELEGATING TO RENDERER ${name} for dom node with id: ${domNodeId} with props, ra
   return false;
 }
 
+function queueRenderAfterPendingUnmount(
+  domNodeId: string,
+  pendingUnmount: Promise<void>,
+  render: () => void,
+): void {
+  const queuedRender = pendingUnmount.then(() => {
+    if (pendingUnmounts.get(domNodeId) !== queuedRender) return;
+
+    pendingUnmounts.delete(domNodeId);
+    render();
+  });
+
+  pendingUnmounts.set(domNodeId, queuedRender);
+  void queuedRender.catch((error: unknown) => {
+    if (pendingUnmounts.get(domNodeId) === queuedRender) {
+      pendingUnmounts.delete(domNodeId);
+    }
+    console.error('Error rendering component after pending unmount:', error);
+  });
+}
+
 /**
  * Used for client rendering by ReactOnRails. Either calls ReactDOM.hydrate, ReactDOM.render, or
  * delegates to a renderer registered by the user.
@@ -155,7 +176,7 @@ function renderElement(el: Element, railsContext: RailsContext): void {
     if (domNode) {
       const pendingUnmount = pendingUnmounts.get(domNodeId);
       if (pendingUnmount) {
-        void pendingUnmount.then(() => renderElement(el, railsContext));
+        queueRenderAfterPendingUnmount(domNodeId, pendingUnmount, () => renderElement(el, railsContext));
         return;
       }
 
@@ -177,21 +198,16 @@ function renderElement(el: Element, railsContext: RailsContext): void {
         // DOM node was replaced (e.g., via async HTML injection) - clean up the old root
         renderedRoots.delete(domNodeId);
         if (existing.isRenderer) {
-          const replacementUnmount = unmountRenderedRoot(existing)
-            .catch((unmountError: unknown) => {
-              // Ignore unmount errors for replaced nodes
-              if (trace) {
-                console.log(`Error unmounting replaced component: ${name}`, unmountError);
-              }
-            })
-            .finally(() => {
-              if (pendingUnmounts.get(domNodeId) === replacementUnmount) {
-                pendingUnmounts.delete(domNodeId);
-              }
-            });
+          const replacementUnmount = unmountRenderedRoot(existing).catch((unmountError: unknown) => {
+            // Ignore unmount errors for replaced nodes
+            if (trace) {
+              console.log(`Error unmounting replaced component: ${name}`, unmountError);
+            }
+          });
 
-          pendingUnmounts.set(domNodeId, replacementUnmount);
-          void replacementUnmount.then(() => renderElement(el, railsContext));
+          queueRenderAfterPendingUnmount(domNodeId, replacementUnmount, () =>
+            renderElement(el, railsContext),
+          );
           return;
         }
 
