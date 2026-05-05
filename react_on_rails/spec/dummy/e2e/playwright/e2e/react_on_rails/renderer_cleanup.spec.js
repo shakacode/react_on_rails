@@ -32,17 +32,21 @@ test.describe('Renderer function teardown', () => {
     // pages with background pollers/analytics).
     await expect(page.locator('[data-testid="renderer-cleanup-tree"]')).toBeVisible();
     expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(0);
+    await page.evaluate(() => localStorage.removeItem('__rendererCleanupCount__'));
 
-    // Trigger a Turbo navigation. Window globals persist across Turbo visits, so the
-    // counter incremented during unmount on the previous page is visible on the new page.
-    await Promise.all([page.waitForURL('**/manual_render_test'), page.click('#renderer-cleanup-leave-link')]);
+    // Trigger a Turbo navigation. The fixture records cleanup in localStorage so
+    // the assertion survives Turbo-triggered reloads when tracked assets force a full refresh.
+    await Promise.all([
+      page.waitForURL('**/manual_render_test'),
+      page.locator('#renderer-cleanup-leave-link').click(),
+    ]);
     // Wait for content unique to the destination page rather than `networkidle`.
     await expect(page.locator('#ManualRenderComponent-1')).toBeVisible();
 
     // The framework called the teardown, root.unmount() ran, the tree's
-    // useEffect cleanup fired, and the counter is 1. `|| 0` so a missing
-    // counter reads `Received: 0` instead of `Received: undefined` in failures.
-    expect(await page.evaluate(() => window.__rendererCleanupCount__ || 0)).toBe(1);
+    // useEffect cleanup fired, and the persisted counter is 1. localStorage
+    // survives Turbo-triggered reloads when tracked assets force a full refresh.
+    expect(await page.evaluate(() => localStorage.getItem('__rendererCleanupCount__'))).toBe('1');
   });
 
   test('invokes the renderer-returned teardown when the same domNodeId is replaced', async ({ page }) => {
@@ -61,8 +65,11 @@ test.describe('Renderer function teardown', () => {
       old.replaceWith(replacement);
       // Returning the promise so Playwright awaits it — protects this assertion
       // if reactOnRailsPageLoaded ever becomes truly async at the call site.
-      // eslint-disable-next-line no-undef
-      return ReactOnRails.reactOnRailsPageLoaded();
+      const reactOnRails = window.ReactOnRails;
+      if (!reactOnRails) {
+        throw new Error('ReactOnRails global not found; check client-bundle.js registration');
+      }
+      return reactOnRails.reactOnRailsPageLoaded();
     });
 
     // The prior teardown ran on same-id replacement, unmounting the old root

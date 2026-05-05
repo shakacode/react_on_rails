@@ -13,6 +13,9 @@ const pageLoadedCallbacks = new Set<PageLifecycleCallback>();
 const pageUnloadedCallbacks = new Set<PageLifecycleCallback>();
 
 let currentPageState: PageState = 'initial';
+let turboEventListenersInstalled = false;
+let turbolinks5EventListenersInstalled = false;
+let turbolinks2EventListenersInstalled = false;
 
 function runPageLoadedCallbacks(): void {
   currentPageState = 'load';
@@ -40,21 +43,30 @@ function setupPageNavigationListeners(): void {
   }
 
   if (turboInstalled()) {
-    debugTurbolinks('TURBO DETECTED: adding event listeners for turbo:before-render and turbo:render.');
-    document.addEventListener('turbo:before-render', runPageUnloadedCallbacks);
+    if (turboEventListenersInstalled) return;
+
+    debugTurbolinks('TURBO DETECTED: adding event listeners for turbo:before-cache and turbo:render.');
+    document.addEventListener('turbo:before-cache', runPageUnloadedCallbacks);
     document.addEventListener('turbo:render', runPageLoadedCallbacks);
+    turboEventListenersInstalled = true;
     runPageLoadedCallbacks();
   } else if (turbolinksVersion5()) {
+    if (turbolinks5EventListenersInstalled) return;
+
     debugTurbolinks(
       'TURBOLINKS 5 DETECTED: adding event listeners for turbolinks:before-render and turbolinks:render.',
     );
     document.addEventListener('turbolinks:before-render', runPageUnloadedCallbacks);
     document.addEventListener('turbolinks:render', runPageLoadedCallbacks);
+    turbolinks5EventListenersInstalled = true;
     runPageLoadedCallbacks();
   } else {
+    if (turbolinks2EventListenersInstalled) return;
+
     debugTurbolinks('TURBOLINKS 2 DETECTED: adding event listeners for page:before-unload and page:change.');
     document.addEventListener('page:before-unload', runPageUnloadedCallbacks);
     document.addEventListener('page:change', runPageLoadedCallbacks);
+    turbolinks2EventListenersInstalled = true;
   }
 }
 
@@ -95,6 +107,17 @@ function initializePageEventListeners(): void {
       document.addEventListener('readystatechange', initialPageLoadHandler);
     }
   }
+}
+
+export function refreshPageEventListeners(): void {
+  if (typeof window === 'undefined') return;
+
+  if (!isPageLifecycleInitialized || document.readyState !== 'complete') {
+    initializePageEventListeners();
+    return;
+  }
+
+  setupPageNavigationListeners();
 }
 
 export function onPageLoaded(callback: PageLifecycleCallback): void {

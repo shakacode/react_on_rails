@@ -11,6 +11,7 @@ import type {
 import * as Authenticity from '../Authenticity.ts';
 import buildConsoleReplay, { consoleReplay } from '../buildConsoleReplay.ts';
 import reactHydrateOrRender from '../reactHydrateOrRender.ts';
+import { refreshPageEventListeners } from '../pageLifecycle.ts';
 import createReactOutput from '../createReactOutput.ts';
 
 const DEFAULT_OPTIONS = {
@@ -73,6 +74,9 @@ export function createCoreCapability(registries: Registries) {
 
       if (typeof turbo !== 'undefined') {
         this.options.turbo = turbo;
+        if (turbo) {
+          refreshPageEventListeners();
+        }
       }
 
       if (typeof debugMode !== 'undefined') {

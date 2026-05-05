@@ -17,6 +17,7 @@ type RenderedRoot = {
   domNode: Element;
   root?: RenderReturnType;
   teardown?: RendererTeardown;
+  isRenderer?: boolean;
 };
 
 type RendererResult = undefined | RendererTeardown | Promise<undefined | RendererTeardown>;
@@ -48,7 +49,7 @@ function isRendererTeardown(value: unknown): value is RendererTeardown {
 }
 
 function isPromiseLikeRendererResult(value: RendererResult): value is Promise<undefined | RendererTeardown> {
-  return !!(value as Promise<undefined | RendererTeardown> | undefined)?.then;
+  return typeof (value as { then?: unknown } | undefined)?.then === 'function';
 }
 
 function trackRendererTeardown(
@@ -57,7 +58,7 @@ function trackRendererTeardown(
   rendererResult: RendererResult,
   componentName: string,
 ): void {
-  renderedRoots.set(domNodeId, { domNode });
+  renderedRoots.set(domNodeId, { domNode, isRenderer: true });
 
   const storeTeardown = (resolvedResult: undefined | RendererTeardown): void => {
     if (!isRendererTeardown(resolvedResult)) return;
@@ -78,11 +79,15 @@ function trackRendererTeardown(
   storeTeardown(rendererResult);
 }
 
-async function unmountRenderedRoot({ root, domNode, teardown }: RenderedRoot): Promise<void> {
+async function unmountRenderedRoot({ root, domNode, teardown, isRenderer }: RenderedRoot): Promise<void> {
   if (teardown) {
     await teardown();
     return;
   }
+
+  // Renderer functions that return no teardown own their root, so the
+  // framework has nothing safe to unmount.
+  if (isRenderer && !root) return;
 
   if (supportsRootApi && root && typeof root === 'object' && 'unmount' in root) {
     // React 18+ Root API
@@ -261,14 +266,14 @@ async function unmountAllComponents(): Promise<void> {
   const renderedRootEntries = [...renderedRoots.values()];
   renderedRoots.clear();
 
-  for (const renderedRoot of renderedRootEntries) {
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      await unmountRenderedRoot(renderedRoot);
-    } catch (error) {
-      console.error('Error unmounting component:', error);
+  const results = await Promise.allSettled(
+    renderedRootEntries.map((renderedRoot) => unmountRenderedRoot(renderedRoot)),
+  );
+  results.forEach((result) => {
+    if (result.status === 'rejected') {
+      console.error('Error unmounting component:', result.reason);
     }
-  }
+  });
 }
 
 // Register cleanup on page unload

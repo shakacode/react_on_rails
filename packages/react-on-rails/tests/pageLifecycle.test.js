@@ -132,11 +132,33 @@ describe('pageLifecycle', () => {
       onPageLoaded(callback);
 
       // Should add Turbo event listeners
-      expect(addEventListenerSpy).toHaveBeenCalledWith('turbo:before-render', expect.any(Function));
+      expect(addEventListenerSpy).toHaveBeenCalledWith('turbo:before-cache', expect.any(Function));
       expect(addEventListenerSpy).toHaveBeenCalledWith('turbo:render', expect.any(Function));
       // Callback should be called immediately
       expect(callback).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('adds Turbo listeners when Turbo is enabled after initial non-navigation setup', () => {
+    setReadyState('complete');
+    jest.doMock('../src/turbolinksUtils.ts', () => createNavigationMock());
+    const turbolinksUtils = require('../src/turbolinksUtils.ts');
+    const { onPageUnloaded, refreshPageEventListeners } = importPageLifecycle();
+    const callback = jest.fn();
+
+    onPageUnloaded(callback);
+
+    expect(addEventListenerSpy).not.toHaveBeenCalledWith('turbo:before-cache', expect.any(Function));
+
+    turbolinksUtils.turboInstalled.mockReturnValue(true);
+    refreshPageEventListeners();
+
+    expect(addEventListenerSpy).toHaveBeenCalledWith('turbo:before-cache', expect.any(Function));
+
+    const beforeCacheHandler = getEventHandler('turbo:before-cache');
+    beforeCacheHandler();
+
+    expect(callback).toHaveBeenCalledTimes(1);
   });
 
   describe('with Turbolinks 5 navigation library', () => {

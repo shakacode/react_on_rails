@@ -7,10 +7,14 @@ import { renderComponent, reactOnRailsComponentLoaded } from '../src/ClientRende
 import ComponentRegistry from '../src/ComponentRegistry.ts';
 import StoreRegistry from '../src/StoreRegistry.ts';
 import * as pageLifecycle from '../src/pageLifecycle.ts';
+import * as reactApis from '../src/reactApis.cts';
 import type { RenderFunction } from '../src/types/index.ts';
 
 const triggerPageUnload = (pageLifecycle as unknown as { __triggerPageUnload: () => Promise<void> })
   .__triggerPageUnload;
+const unmountComponentAtNodeMock = reactApis.unmountComponentAtNode as jest.MockedFunction<
+  typeof reactApis.unmountComponentAtNode
+>;
 
 // Mock React DOM methods since we're testing client-side rendering
 jest.mock('../src/reactHydrateOrRender.ts', () => ({
@@ -22,6 +26,12 @@ jest.mock('../src/reactHydrateOrRender.ts', () => ({
   }),
 }));
 
+jest.mock('../src/reactApis.cts', () => ({
+  __esModule: true,
+  ...jest.requireActual('../src/reactApis.cts'),
+  unmountComponentAtNode: jest.fn(),
+}));
+
 // Mock pageLifecycle so we can drive the unload sweep deterministically.
 // In the real module, `runPageUnloadedCallbacks` is fired by Turbo events that
 // jsdom doesn't emit. The stub captures every callback the framework registers
@@ -29,17 +39,21 @@ jest.mock('../src/reactHydrateOrRender.ts', () => ({
 // exposes a `__triggerPageUnload` helper tests use to invoke them.
 jest.mock('../src/pageLifecycle.ts', () => {
   // Mirror the real module's Set-backed semantics so the same callback can't
-  // register twice. We do NOT drain on trigger: ClientRenderer registers
-  // `unmountAllComponents` once at module load and that callback is itself
-  // idempotent (iterates and clears `renderedRoots`), so re-firing it from the
-  // describe-block `afterEach` is harmless and is what keeps test state clean.
+  // register twice. The framework registers `unmountAllComponents` once at
+  // module load; this mock does not drain callbacks because the describe-block
+  // `afterEach` re-fires that idempotent callback to clear `renderedRoots`.
+  // Tests that register additional unload callbacks should remove them in
+  // their own teardown, or those callbacks will persist across tests.
   const unloadCallbacks = new Set<() => void | Promise<void>>();
   return {
     __esModule: true,
     onPageUnloaded: (cb: () => void | Promise<void>) => {
       unloadCallbacks.add(cb);
     },
-    onPageLoaded: () => {},
+    onPageLoaded: () => {
+      // no-op: tests drive lifecycle via __triggerPageUnload only.
+      // The real implementation fires immediately when currentPageState === 'load'.
+    },
     __triggerPageUnload: async () => {
       for (const cb of [...unloadCallbacks]) {
         // eslint-disable-next-line no-await-in-loop
@@ -62,6 +76,7 @@ describe('ClientRenderer', () => {
     // Reset any global state
     // eslint-disable-next-line no-underscore-dangle, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
     delete (globalThis as any).__REACT_ON_RAILS_EVENT_HANDLERS_RAN_ONCE__;
+    unmountComponentAtNodeMock.mockClear();
   });
 
   afterEach(() => {
@@ -159,6 +174,49 @@ describe('ClientRenderer', () => {
     // `Renderer function teardown on unmount` describe block below — it
     // exercises invocation, the teardown contract, same-id replacement, and
     // the optional-teardown guard.
+
+    it('unmounts non-renderer components when the render helper does not return a root', async () => {
+      const railsContextElement = document.createElement('div');
+      railsContextElement.id = 'js-react-on-rails-context';
+      railsContextElement.textContent = JSON.stringify({
+        railsEnv: 'test',
+        inMailer: false,
+        i18nLocale: 'en',
+        i18nDefaultLocale: 'en',
+        rorVersion: '13.0.0',
+        rorPro: false,
+        href: 'http://localhost:3000',
+        location: 'http://localhost:3000',
+        scheme: 'http',
+        host: 'localhost',
+        port: 3000,
+        pathname: '/',
+        search: null,
+        httpAcceptLanguage: 'en',
+        serverSide: false,
+        componentRegistryTimeout: 0,
+      });
+      document.body.appendChild(railsContextElement);
+
+      const TestComponent: React.FC = () => React.createElement('div', null, 'Hello');
+      ComponentRegistry.register({ TestComponent });
+
+      const componentElement = document.createElement('div');
+      componentElement.className = 'js-react-on-rails-component';
+      componentElement.setAttribute('data-component-name', 'TestComponent');
+      componentElement.setAttribute('data-dom-id', 'test-component-no-root');
+      componentElement.textContent = JSON.stringify({});
+      document.body.appendChild(componentElement);
+
+      const targetNode = document.createElement('div');
+      targetNode.id = 'test-component-no-root';
+      document.body.appendChild(targetNode);
+
+      renderComponent('test-component-no-root');
+      await triggerPageUnload();
+
+      expect(unmountComponentAtNodeMock).toHaveBeenCalledWith(targetNode);
+    });
   });
 
   describe('reactOnRailsComponentLoaded', () => {
@@ -408,6 +466,19 @@ describe('ClientRenderer', () => {
       renderComponent('renderer-noop');
 
       await expect(triggerPageUnload()).resolves.not.toThrow();
+    });
+
+    it('does not treat objects with a non-function then property as renderer promises', () => {
+      setupRailsContext();
+
+      function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
+        return { then: 42 };
+      }
+      // Cast widens RenderFunction's return type to allow exercising invalid renderer output.
+      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      setupRendererDom('Renderer', 'renderer-non-promise-then');
+
+      expect(() => renderComponent('renderer-non-promise-then')).not.toThrow();
     });
 
     it('invokes the teardown returned by an async renderer function on page unload', async () => {

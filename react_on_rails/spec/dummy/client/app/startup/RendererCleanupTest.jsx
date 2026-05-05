@@ -11,6 +11,8 @@ const TrackedTree = () => {
   useEffect(
     () => () => {
       window.__rendererCleanupCount__ = (window.__rendererCleanupCount__ || 0) + 1;
+      const storedCount = Number(window.localStorage.getItem('__rendererCleanupCount__') || 0);
+      window.localStorage.setItem('__rendererCleanupCount__', String(storedCount + 1));
     },
     [],
   );
