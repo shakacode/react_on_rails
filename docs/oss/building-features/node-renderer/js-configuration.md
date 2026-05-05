@@ -287,7 +287,8 @@ If you skip the startup probe, add an appropriate `initialDelaySeconds` to each.
 
 See [Node Renderer: Container Deployment](./container-deployment.md#kubernetes-sidecar-manifest) for full
 Kubernetes YAML examples, including startup, readiness, and liveness probes, and for the rationale behind `--max-time 4`
-relative to `timeoutSeconds: 5`.
+relative to `timeoutSeconds: 5`. On heavily loaded nodes, use a wider margin, such as `--max-time 3`, if you see
+occasional unexpected restarts.
 
 ### Control Plane Deployment Shapes
 

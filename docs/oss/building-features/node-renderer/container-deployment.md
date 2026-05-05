@@ -423,9 +423,12 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    > - `--max-time 4` is intentionally 1 second shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero exit code
    >   before Kubernetes terminates the probe process. Use the same pattern for other probe systems, such as Docker Compose's
    >   `--max-time 2` with `timeout: 3s`.
+   > - On heavily loaded nodes, use a wider margin, such as `--max-time 3`, if you see occasional unexpected probe failures.
    > - `initialDelaySeconds` is omitted here because Kubernetes defers readiness probes until the startup probe above succeeds.
    >   If you skip the startup probe, add an appropriate `initialDelaySeconds`.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
+   > **Upgrading from a `tcpSocket` liveness probe?** Run `curl --version | grep -i http2` in your container before
+   > switching. If curl lacks HTTP/2 support, keep the `tcpSocket` probe or add HTTP/2-capable curl support to your image.
    ```yaml
    livenessProbe:
      # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
@@ -449,6 +452,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >   If curl is unavailable, use `tcpSocket` as a fallback.
    > - `--max-time 4` is intentionally 1 second shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero exit code
    >   before Kubernetes terminates the probe process.
+   > - On heavily loaded nodes, use a wider margin, such as `--max-time 3`, if you see occasional unexpected restarts.
    > - `initialDelaySeconds` is omitted here because Kubernetes defers liveness probes until the startup probe above succeeds.
    >   If you skip the startup probe, add an appropriate `initialDelaySeconds`.
 
@@ -481,6 +485,9 @@ In production, `logLevel: 'warn'` is sufficient unless actively debugging.
 ## Kubernetes Sidecar Manifest
 
 A complete pod spec for the sidecar pattern:
+
+> **Upgrading from a `tcpSocket` liveness probe?** Run `curl --version | grep -i http2` in your container before switching.
+> If curl lacks HTTP/2 support, keep the `tcpSocket` probe or add HTTP/2-capable curl support to your image.
 
 ```yaml
 apiVersion: apps/v1
