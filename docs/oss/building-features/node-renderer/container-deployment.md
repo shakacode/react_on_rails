@@ -433,8 +433,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 > **Probe command notes:** `exec` probes require curl with HTTP/2 support in your image. Verify with
 > `curl --version | grep -i http2`; if unavailable, use `tcpSocket` as a fallback. Set curl `--max-time` shorter than the
 > orchestrator timeout so curl returns a clean non-zero exit code before Kubernetes terminates the probe process. These
-> examples use `--max-time 4` with `timeoutSeconds: 5`; on heavily loaded nodes, increase the safety buffer, such as
-> `--max-time 3`. Readiness and liveness omit `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers
+> examples use `--max-time 4` with `timeoutSeconds: 5`; on heavily loaded nodes, widen the gap by reducing `--max-time`,
+> such as `--max-time 3`. Readiness and liveness omit `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers
 > them until the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe
 > support, add an appropriate `initialDelaySeconds`.
 
@@ -620,18 +620,16 @@ spec:
             timeoutSeconds: 5
             periodSeconds: 10
             failureThreshold: 3
-```
 
-> **tcpSocket fallback:** If curl with HTTP/2 support is unavailable in your image, replace the `livenessProbe` above with:
->
-> ```yaml
-> livenessProbe:
->   tcpSocket:
->     port: 3800
->   timeoutSeconds: 1
->   periodSeconds: 10
->   failureThreshold: 3
-> ```
+          # tcpSocket fallback if curl lacks HTTP/2 support:
+          # Replace the livenessProbe above with this whole block.
+          # livenessProbe:
+          #   tcpSocket:
+          #     port: 3800
+          #   timeoutSeconds: 1
+          #   periodSeconds: 10
+          #   failureThreshold: 3
+```
 
 > **Note:** Replace `/info` with `/health` if you registered a `/health` route via `configureFastify`.
 >
