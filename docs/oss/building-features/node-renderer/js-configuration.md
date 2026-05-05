@@ -299,5 +299,6 @@ appropriate `initialDelaySeconds` to each.
 See [Node Renderer: Container Deployment](./container-deployment.md#startup-errors-err_stream_premature_close) for full
 Kubernetes YAML examples and the shared probe command notes for curl HTTP/2 support, `--max-time` buffers, and
 `initialDelaySeconds` guidance.
+
 For Control Plane topology-specific `renderer_url`, host binding, and probe target guidance, see
 [Control Plane Deployment Shapes](./container-deployment.md#control-plane-deployment-shapes).

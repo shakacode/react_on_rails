@@ -177,7 +177,7 @@ class HealthController < ActionController::Base
     renderer_port = URI.parse(ReactOnRailsPro.configuration.renderer_url).port
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) {}
     head :ok
-  rescue SocketError, SystemCallError
+  rescue SocketError, SystemCallError, URI::Error, TypeError
     head :service_unavailable
   end
 end
@@ -597,10 +597,11 @@ In production, `logLevel: 'warn'` is sufficient unless actively debugging.
 
 A complete pod spec for the sidecar pattern:
 
-> The `exec` liveness probe shown here requires curl with HTTP/2 support. Run `curl --version | grep -i http2` in
-> your container image before upgrading an existing `tcpSocket` probe. If curl lacks HTTP/2 support, keep `tcpSocket`
-> or add HTTP/2-capable curl support. If you cannot verify curl before rollout, keep your existing `tcpSocket` liveness
-> probe and upgrade to `exec` later. A ready-to-use `tcpSocket` fallback block is shown immediately below this YAML.
+> [!WARNING]
+> The `exec` liveness probe in this copy-paste manifest requires curl with HTTP/2 support. Run
+> `curl --version | grep -i http2` in your container image before replacing an existing `tcpSocket` probe. If curl lacks
+> HTTP/2 support, keep `tcpSocket` or add HTTP/2-capable curl support. If you cannot verify curl before rollout, use the
+> `tcpSocket` fallback block below and upgrade to `exec` later.
 
 ```yaml
 apiVersion: apps/v1
