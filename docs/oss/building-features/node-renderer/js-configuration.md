@@ -152,8 +152,7 @@ const config = {
 // Register a custom health check route
 configureFastify((app) => {
   app.get('/health', async () => {
-    // Example: await a worker-pool warm-up signal before returning 200.
-    // await yourWarmUpCheck(); // replace with your actual warm-up check
+    // Add renderer-specific warm-up checks here if readiness should wait.
     return { status: 'ok' };
   });
 });
@@ -262,7 +261,7 @@ Recommended starting values:
 
 - **Startup**: Use `tcpSocket` on the renderer port (`3800` by default; use your configured `RENDERER_PORT` value if
   different). TCP is enough here because readiness below gates traffic; startup only shields liveness during boot. Start
-  with `initialDelaySeconds: 10` (first check fires at 10 s; total budget is `10 + 6 x 5 = 40 s`), `periodSeconds: 5`,
+  with `initialDelaySeconds: 10` (first check fires at 10 s; total budget is `10 + (6 * 5) = 40 s`), `periodSeconds: 5`,
   `failureThreshold: 6`, and the Kubernetes default `timeoutSeconds: 1` for a TCP connection check.
 - **Readiness (custom route)**: Use `exec` with
   `curl -sf --max-time 4 --http2-prior-knowledge http://localhost:3800/health` after registering the route with

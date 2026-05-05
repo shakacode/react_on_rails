@@ -150,6 +150,23 @@ When Rails and the renderer share one container, use one combined Rails health e
 processes. For example, make the Rails readiness endpoint perform a short TCP connection check to `localhost:3800` and
 return `503` if the renderer is unreachable.
 
+```ruby
+# config/routes.rb
+get "up", to: "health#show"
+
+# app/controllers/health_controller.rb
+require "socket"
+
+class HealthController < ApplicationController
+  def show
+    Socket.tcp("localhost", 3800, connect_timeout: 1) { |socket| socket.close }
+    head :ok
+  rescue IOError, SocketError, SystemCallError
+    head :service_unavailable
+  end
+end
+```
+
 ### Separate Container In The Same Workload
 
 Keep the Rails `renderer_url` as `http://localhost:3800`. Use `0.0.0.0` for the renderer `host` when you rely on
@@ -259,6 +276,8 @@ services:
 ```
 
 > **Note:** In Docker Compose, the containers do not share a network namespace (unlike Kubernetes sidecars), so the renderer must bind to `0.0.0.0` and Rails must connect via the service name (`renderer`).
+> The Compose example uses `--max-time 2` with `timeout: 3s` for fast local feedback; the Kubernetes examples use
+> `--max-time 4` with `timeoutSeconds: 5` to allow a little more scheduler and node-load jitter.
 
 ## Host Binding for Container Environments
 
@@ -533,7 +552,8 @@ A complete pod spec for the sidecar pattern:
 
 > The `exec` liveness probe shown here requires curl with HTTP/2 support. Run `curl --version | grep -i http2` in
 > your container image before upgrading an existing `tcpSocket` probe. If curl lacks HTTP/2 support, keep `tcpSocket`
-> or add HTTP/2-capable curl support. A ready-to-use `tcpSocket` fallback block is shown immediately below this YAML.
+> or add HTTP/2-capable curl support. If you cannot verify curl before rollout, keep your existing `tcpSocket` liveness
+> probe and upgrade to `exec` later. A ready-to-use `tcpSocket` fallback block is shown immediately below this YAML.
 
 ```yaml
 apiVersion: apps/v1
