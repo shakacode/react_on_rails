@@ -160,24 +160,23 @@ get "up", to: "health#show"
 `app/controllers/health_controller.rb`:
 
 ```ruby
-# Ruby stdlib; loaded explicitly for the Socket.tcp readiness check.
+# Ruby stdlib; loaded explicitly for the URI/Socket readiness check.
 require "socket"
+require "uri"
 
 # Inherits from ActionController::Base (not ApplicationController) to avoid
 # app-level authentication callbacks on unauthenticated probe requests.
 class HealthController < ActionController::Base
   def show
     # Opens and immediately closes; raises if the renderer port is unreachable.
-    Socket.tcp("localhost", ENV.fetch("RENDERER_PORT", "3800").to_i, connect_timeout: 1) {}
+    renderer_port = URI.parse(ReactOnRailsPro.configuration.renderer_url).port
+    Socket.tcp("localhost", renderer_port, connect_timeout: 1) {}
     head :ok
   rescue SocketError, SystemCallError
     head :service_unavailable
   end
 end
 ```
-
-If the renderer uses a non-default port, set `RENDERER_PORT` in the Rails container environment too, or replace the
-`ENV.fetch` call with a shared Rails config value derived from `renderer_url`.
 
 ### Separate Container In The Same Workload
 

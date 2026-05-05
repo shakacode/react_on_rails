@@ -169,7 +169,7 @@ if (cluster.isPrimary) {
 The sample `/health` route is intentionally shallow and omits handler parameters because it does not need them. Fastify
 also passes `request` and `reply` to handlers if you need to inspect headers, set status codes, or customize the
 response. Add warm-up or readiness-gate logic inside this handler if readiness should wait for renderer-specific
-initialization. To signal not-ready, add `reply` to the handler parameters and return
+initialization. To signal not-ready, add `reply` to the handler parameters and call
 `reply.code(503).send({ status: 'warming_up' })`. Kubernetes exec probes treat any non-zero curl exit code as a failure;
 the response body is irrelevant to probe semantics, so you can return whatever payload is useful for debugging, such as
 `{ status: 'ok', workers: 4 }`.
