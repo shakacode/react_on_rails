@@ -73,6 +73,7 @@ function trackRendererTeardown(
     // Cache for synchronous unmounts and keep pendingTeardown resolving to the
     // same function for async renderer results.
     renderedRoot.teardown = resolvedResult;
+    renderedRoot.pendingTeardown = undefined;
     return resolvedResult;
   };
 
@@ -146,14 +147,14 @@ function queueRenderAfterPendingUnmount(
   pendingUnmount: Promise<void>,
   render: () => void,
 ): void {
-  // queuedRender is captured by reference below. The promise callback runs
-  // asynchronously, so the const is initialized by the time the callback fires.
+  const queuedRenderRef: { current?: Promise<void> } = {};
   const queuedRender = pendingUnmount.then(() => {
-    if (pendingUnmounts.get(domNodeId) !== queuedRender) return;
+    if (pendingUnmounts.get(domNodeId) !== queuedRenderRef.current) return;
 
     pendingUnmounts.delete(domNodeId);
     render();
   });
+  queuedRenderRef.current = queuedRender;
 
   pendingUnmounts.set(domNodeId, queuedRender);
   void queuedRender.catch(() => {
