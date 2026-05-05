@@ -208,6 +208,7 @@ services:
       RENDERER_HOST: '0.0.0.0'
       NODE_OPTIONS: '--max-old-space-size=512'
     healthcheck:
+      # Keep --max-time below timeout so curl exits before Docker kills the probe.
       test: ['CMD', 'curl', '-sf', '--max-time', '2', '--http2-prior-knowledge', 'http://localhost:3800/info']
       interval: 5s
       timeout: 3s
