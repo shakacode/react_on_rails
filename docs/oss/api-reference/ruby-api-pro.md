@@ -92,7 +92,7 @@ Requires the controller to include `ReactOnRailsPro::AsyncRendering` and call `e
 <%= sidebar.value %>
 ```
 
-Use `async_react_component` for independent legacy React roots that are still rendered through `react_component`. For RSC migration work, the streaming helper remains `stream_react_component`; the "async props" pattern refers to Rails providing props while streaming SSR progressively flushes HTML.
+> **Note:** Use `async_react_component` for independent legacy React roots that are still rendered through `react_component`. For RSC migration work, the streaming helper is `stream_react_component`; the "async props" pattern refers to Rails providing props while streaming SSR progressively flushes HTML.
 
 ### `cached_async_react_component(component_name, options = {}, &block)`
 

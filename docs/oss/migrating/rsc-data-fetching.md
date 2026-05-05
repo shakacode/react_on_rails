@@ -67,7 +67,7 @@ For pages with multiple data sources, use [`stream_react_component`](#data-fetch
 
 In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree. This approach is sometimes called **async props** because Rails owns the data and React streams Suspense boundaries to the browser as the tree resolves.
 
-The helper name is still `stream_react_component`. Existing Pro helpers named `async_react_component` and `cached_async_react_component` are for concurrently rendering separate legacy React roots; RSC payload generation uses `rsc_payload_react_component` without a separate `_with_async_props` suffix.
+The RSC streaming helper is `stream_react_component`. Existing Pro helpers named `async_react_component` and `cached_async_react_component` are for concurrently rendering separate legacy React roots; RSC payload generation uses `rsc_payload_react_component` without a separate `_with_async_props` suffix.
 
 This is the recommended data fetching pattern for React on Rails because:
 
