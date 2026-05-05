@@ -24,18 +24,21 @@ export function createResultObject(
   };
 }
 
+function isCrossRealmError(e: unknown): e is { message?: unknown } {
+  return Object.prototype.toString.call(e) === '[object Error]';
+}
+
 function stringifyThrownValue(e: unknown): string {
+  if (isCrossRealmError(e) && typeof e.message === 'string') {
+    return e.message;
+  }
+
   if (typeof e === 'object' && e !== null) {
     try {
-      const json = JSON.stringify(e);
-      if (json !== undefined) {
-        return json;
-      }
+      return JSON.stringify(e) ?? Object.prototype.toString.call(e);
     } catch {
       return Object.prototype.toString.call(e);
     }
-
-    return Object.prototype.toString.call(e);
   }
 
   return String(e);
