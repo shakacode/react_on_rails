@@ -415,13 +415,16 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      periodSeconds: 5
      failureThreshold: 3
    ```
-   > **Note:** Replace `/info` with `/health` if you registered a `/health` route via `configureFastify`.
+   > **Notes:**
    >
-   > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep -i http2`. If curl is unavailable, use `tcpSocket` as a fallback.
-   >
-   > **Note:** `--max-time 4` is intentionally 1 second shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero exit code before Kubernetes terminates the probe process. Use the same pattern for other probe systems, such as Docker Compose's `--max-time 2` with `timeout: 3s`.
-   >
-   > **Note:** `initialDelaySeconds` is omitted here because Kubernetes defers readiness probes until the startup probe above succeeds. If you skip the startup probe, add an appropriate `initialDelaySeconds`.
+   > - Replace `/info` with `/health` if you registered a `/health` route via `configureFastify`.
+   > - The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep -i http2`.
+   >   If curl is unavailable, use `tcpSocket` as a fallback.
+   > - `--max-time 4` is intentionally 1 second shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero exit code
+   >   before Kubernetes terminates the probe process. Use the same pattern for other probe systems, such as Docker Compose's
+   >   `--max-time 2` with `timeout: 3s`.
+   > - `initialDelaySeconds` is omitted here because Kubernetes defers readiness probes until the startup probe above succeeds.
+   >   If you skip the startup probe, add an appropriate `initialDelaySeconds`.
 4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive:
    ```yaml
    livenessProbe:
@@ -437,7 +440,15 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
      periodSeconds: 10
      failureThreshold: 3
    ```
-   > **Note:** `initialDelaySeconds` is omitted here because Kubernetes defers liveness probes until the startup probe above succeeds. If you skip the startup probe, add an appropriate `initialDelaySeconds`.
+   > **Notes:**
+   >
+   > - Keep liveness shallow. Use `/health` only if that route avoids external dependency checks and readiness gates.
+   > - The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep -i http2`.
+   >   If curl is unavailable, use `tcpSocket` as a fallback.
+   > - `--max-time 4` is intentionally 1 second shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero exit code
+   >   before Kubernetes terminates the probe process.
+   > - `initialDelaySeconds` is omitted here because Kubernetes defers liveness probes until the startup probe above succeeds.
+   >   If you skip the startup probe, add an appropriate `initialDelaySeconds`.
 
 ### OOM Tracking
 

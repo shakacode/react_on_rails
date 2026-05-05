@@ -207,26 +207,21 @@ The `./master` and `./worker` exports provide direct access to the node-renderer
 
 ## Configuring Startup, Readiness, and Liveness Probes
 
-For application-level readiness, use a cheap endpoint such as the `/health` route in
-[Adding a Health Check Endpoint](#adding-a-health-check-endpoint). Startup probes gate the initial boot sequence, while
-liveness probes detect stuck containers after startup. Startup can use a lightweight `tcpSocket` check; liveness should
-prefer an h2c-aware `exec` check when curl is available. The readiness probe performs the application-level check that
-gates traffic after the startup probe succeeds. The health check route should return `200 OK` when the process can accept
-probe traffic. The built-in [`/info`](#built-in-endpoints) route can also serve as a shallow process check if you do not
-need a custom route.
+Keep the three probe types distinct:
+
+- **Startup** answers whether the renderer has finished booting. Separate it from readiness and liveness so slow startup
+  does not cause premature restarts or block traffic.
+- **Readiness** answers whether the renderer should receive new render requests. Use an application-level endpoint such
+  as the `/health` route in [Adding a Health Check Endpoint](#adding-a-health-check-endpoint), or the built-in `/info`
+  endpoint for a shallow process check.
+- **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer. Prefer an
+  h2c-aware `exec` check when curl is available.
 
 Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
-Fastify setup.
+Fastify setup. The health check route should return `200 OK` when the process can accept probe traffic.
 
 > **Security note:** See [Built-in Endpoints](#built-in-endpoints) for the note on `/info` exposing runtime version
 > details.
-
-Keep the probes' meanings separate:
-
-- **Startup** answers whether the renderer has finished booting; keep it separate from liveness and readiness probes so
-  slow startup does not cause premature restarts or prematurely block traffic.
-- **Readiness** answers whether the renderer should receive new render requests.
-- **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer.
 
 Do not put Rails, database, Redis, or other external dependency checks in the node-renderer's liveness probe. A
 temporary dependency outage should not restart every renderer replica. If SSR must be available before Rails receives
