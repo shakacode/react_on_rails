@@ -2608,6 +2608,38 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when JS tests use additional mock helpers after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            {
+              "unmock.test.ts" => "jest.unmock('react-on-rails');\n",
+              "do-mock.test.ts" => "jest.doMock('react-on-rails/client', () => ({}));\n",
+              "dont-mock.test.ts" => "jest.dontMock('react-on-rails');\n",
+              "require-actual.test.ts" => "const mod = jest.requireActual('react-on-rails');\n",
+              "require-mock.test.ts" => "const mod = jest.requireMock('react-on-rails/client');\n",
+              "vitest-mock.test.ts" => "vi.mock('react-on-rails', () => ({ authenticityHeaders: vi.fn() }));\n"
+            }.each do |filename, content|
+              File.write("app/javascript/packs/#{filename}", content)
+            end
+            example.run
+          end
+        end
+      end
+
+      it "reports warning for each stale helper reference" do
+        doctor.send(:check_base_package_imports)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include("unmock.test.ts")
+        expect(warning_content).to include("do-mock.test.ts")
+        expect(warning_content).to include("dont-mock.test.ts")
+        expect(warning_content).to include("require-actual.test.ts")
+        expect(warning_content).to include("require-mock.test.ts")
+        expect(warning_content).to include("vitest-mock.test.ts")
+      end
+    end
+
     context "when TypeScript declaration files augment the base package after a Pro migration" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -2623,8 +2655,8 @@ RSpec.describe ReactOnRails::Doctor do
       it "reports warning" do
         doctor.send(:check_base_package_imports)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
-        expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails.d.ts") }).to be true
-        expect(warning_msgs.any? { |m| m[:content].include?("TypeScript augmentation") }).to be true
+        expect(warning_msgs.size).to eq(1)
+        expect(warning_msgs.first[:content]).to include("react-on-rails.d.ts")
       end
     end
 
