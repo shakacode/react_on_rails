@@ -22,7 +22,7 @@ Start with a small, representative matrix before adding more routes:
 | Client rendering      | `react_component` with `prerender: false` | RPS, p50, p90, p99, max | Uses existing HTTP benchmark output; browser mount timing is follow-up instrumentation                 |
 | Traditional SSR       | `react_component` with `prerender: true`  | RPS, p50, p90, p99, max | Covers ExecJS and Node Renderer paths; server render duration requires separate instrumentation        |
 | Hash SSR              | `react_component_hash`                    | RPS, p50, p90, p99, max | Covers render-functions returning objects; payload-size capture requires tooling extension             |
-| Streaming SSR         | `stream_react_component`                  | TTFB, response end      | Pro-only path; LCP requires separate browser instrumentation such as Playwright or Lighthouse          |
+| Streaming SSR         | `stream_react_component`                  | RPS, p50, p90, p99, max | Pro-only Rails HTTP path; TTFB/response-end reporting is a required extension before new thresholds    |
 | RSC payload rendering | `rsc_payload_react_component`             | RPS, p50, p90, p99, max | Pro-only path; needs static route or explicit target, and payload-size capture needs tooling extension |
 | Fragment caching      | cached component hit and miss             | hit latency, miss cost  | Separates cache effectiveness from SSR cost                                                            |
 
@@ -42,7 +42,9 @@ Hash SSR is deferred to a follow-on PR after the initial OSS noise profile is un
 Recommended Pro slice, tracked separately from the OSS implementation PR under
 [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169):
 
-1. Streaming route with a small Suspense boundary
+1. Streaming route with a small Suspense boundary. Start with the existing HTTP summary metrics, then add explicit
+   TTFB/response-end capture in the k6 artifacts, CI summary, and Bencher output before defining streaming-specific
+   thresholds. LCP remains separate browser instrumentation such as Playwright or Lighthouse.
 2. RSC payload route with representative payload size measurements. Use a static benchmark route with no required URL
    params, teach `benchmarks/bench.rb` how to provide a default component name, or run `benchmarks/k6.ts` with an explicit
    `TARGET_URL`; automatic route discovery currently skips required-parameter routes such as `/rsc_payload/:component_name`.
@@ -88,7 +90,8 @@ same mode.
 ## Acceptance Criteria
 
 - The OSS suite covers client-only rendering, traditional SSR, and at least one cache path.
-- The Pro suite covers streaming SSR and RSC payload rendering where the Node Renderer is available.
+- The Pro suite covers streaming SSR and RSC payload rendering where the Node Renderer is available. Streaming-specific
+  TTFB/response-end thresholds are only introduced after those metrics are captured in artifacts and reporting.
 - Results include enough metadata to compare runs meaningfully.
 - CI behavior is advisory until noise controls are proven.
 - Regression detection favors sustained movement over single-run spikes and uses the current `p50`, `p90`, `p99`, and
