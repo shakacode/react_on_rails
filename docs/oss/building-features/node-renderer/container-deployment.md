@@ -409,11 +409,13 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
          - --max-time
          - '4'
          - --http2-prior-knowledge
-         - http://localhost:3800/info # or /health if registered via configureFastify
+        - http://localhost:3800/info
      timeoutSeconds: 5
      periodSeconds: 5
      failureThreshold: 3
    ```
+   > **Note:** Replace `/info` with `/health` if you registered that route via `configureFastify`.
+   >
    > **Note:** The `exec` probe requires curl with HTTP/2 support in your image. Verify with `curl --version | grep -i http2`. If curl is unavailable, use `tcpSocket` as a fallback.
    >
    > **Note:** `initialDelaySeconds` is omitted here because Kubernetes defers readiness probes until the startup probe above succeeds. If you skip the startup probe, add an appropriate `initialDelaySeconds`.
@@ -527,7 +529,7 @@ spec:
                 - --max-time
                 - '4'
                 - --http2-prior-knowledge
-                - http://localhost:3800/info # or /health if registered via configureFastify
+                - http://localhost:3800/info
             timeoutSeconds: 5
             periodSeconds: 5
             failureThreshold: 3
@@ -538,6 +540,8 @@ spec:
             failureThreshold: 3
 ```
 
+> **Readiness target:** Replace `/info` with `/health` if you registered that route via `configureFastify`.
+>
 > **Note:** Both containers use the same Docker image, ensuring the React on Rails gem and Node Renderer package versions are always aligned.
 
 ## Troubleshooting

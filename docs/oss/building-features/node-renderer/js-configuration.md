@@ -111,6 +111,15 @@ It does not use the render or asset authentication prechecks, so it remains acce
 when `password` is configured. The route returns `node_version` and `renderer_version`. Treat it as a shallow process
 check and keep the renderer on `localhost` or private networking if those runtime version details should not be exposed.
 
+Example response:
+
+```json
+{
+  "node_version": "v20.17.0",
+  "renderer_version": "1.4.2"
+}
+```
+
 ## Custom Fastify Configuration
 
 For advanced use cases, such as adding custom routes, registering Fastify plugins, or hooking into the request lifecycle,
@@ -245,8 +254,9 @@ Recommended starting values:
 Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
 does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.
 
-> **Note (startup window):** `initialDelaySeconds + periodSeconds * failureThreshold = 10 + 5 * 6 = 40` seconds total
-> before Kubernetes gives up on startup.
+> **Note (startup window):** With these values, Kubernetes can make failed startup checks at about 10, 15, 20, 25, 30,
+> and 35 seconds before restarting the container. Increase `failureThreshold` or `periodSeconds` if startup regularly
+> takes longer.
 
 `--max-time 4` is intentionally shorter than `timeoutSeconds: 5` so `curl` returns a clean non-zero
 exit code before Kubernetes terminates the probe process.
