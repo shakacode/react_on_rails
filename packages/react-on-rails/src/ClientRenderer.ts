@@ -17,10 +17,11 @@ type RenderedRoot = {
   domNode: Element;
   root?: RenderReturnType;
   teardown?: RendererTeardown;
+  pendingTeardown?: Promise<undefined | RendererTeardown>;
   isRenderer?: boolean;
 };
 
-type RendererResult = undefined | RendererTeardown | Promise<undefined | RendererTeardown>;
+type RendererResult = undefined | RendererTeardown | PromiseLike<undefined | RendererTeardown>;
 
 // Track all rendered roots and renderer-function teardowns for cleanup
 const renderedRoots = new Map<string, RenderedRoot>();
@@ -48,7 +49,9 @@ function isRendererTeardown(value: unknown): value is RendererTeardown {
   return typeof value === 'function';
 }
 
-function isPromiseLikeRendererResult(value: RendererResult): value is Promise<undefined | RendererTeardown> {
+function isPromiseLikeRendererResult(
+  value: RendererResult,
+): value is PromiseLike<undefined | RendererTeardown> {
   return typeof (value as { then?: unknown } | undefined)?.then === 'function';
 }
 
@@ -58,36 +61,41 @@ function trackRendererTeardown(
   rendererResult: RendererResult,
   componentName: string,
 ): void {
-  renderedRoots.set(domNodeId, { domNode, isRenderer: true });
+  const renderedRoot: RenderedRoot = { domNode, isRenderer: true };
+  renderedRoots.set(domNodeId, renderedRoot);
 
-  const storeTeardown = (resolvedResult: undefined | RendererTeardown): void => {
-    if (!isRendererTeardown(resolvedResult)) return;
+  const storeTeardown = (resolvedResult: undefined | RendererTeardown): undefined | RendererTeardown => {
+    if (!isRendererTeardown(resolvedResult)) return undefined;
 
-    const renderedRoot = renderedRoots.get(domNodeId);
-    if (renderedRoot?.domNode === domNode) {
-      renderedRoot.teardown = resolvedResult;
-    }
+    renderedRoot.teardown = resolvedResult;
+    return resolvedResult;
   };
 
   if (isPromiseLikeRendererResult(rendererResult)) {
-    void rendererResult.then(storeTeardown).catch((error: unknown) => {
-      console.error(`Error resolving renderer teardown for component ${componentName}:`, error);
-    });
+    renderedRoot.pendingTeardown = Promise.resolve(rendererResult)
+      .then(storeTeardown)
+      .catch((error: unknown) => {
+        console.error(`Error resolving renderer teardown for component ${componentName}:`, error);
+        return undefined;
+      });
     return;
   }
 
   storeTeardown(rendererResult);
 }
 
-async function unmountRenderedRoot({ root, domNode, teardown, isRenderer }: RenderedRoot): Promise<void> {
+async function unmountRenderedRoot(renderedRoot: RenderedRoot): Promise<void> {
+  const { root, domNode, isRenderer } = renderedRoot;
+  const teardown = renderedRoot.teardown || (await renderedRoot.pendingTeardown);
+
   if (teardown) {
     await teardown();
     return;
   }
 
-  // Renderer functions that return no teardown own their root, so the
-  // framework has nothing safe to unmount.
-  if (isRenderer && !root) return;
+  // Renderer functions own their mounted tree. Without a returned teardown,
+  // the framework has no React root or DOM contract it can safely unmount.
+  if (isRenderer) return;
 
   if (supportsRootApi && root && typeof root === 'object' && 'unmount' in root) {
     // React 18+ Root API

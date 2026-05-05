@@ -505,5 +505,28 @@ describe('ClientRenderer', () => {
 
       expect(teardown).toHaveBeenCalledTimes(1);
     });
+
+    it('invokes an async renderer teardown when page unload starts before the renderer promise resolves', async () => {
+      setupRailsContext();
+
+      const teardown = jest.fn();
+      let resolveRenderer: (resolvedTeardown: () => void) => void;
+
+      function Renderer(_props: unknown, _railsContext: unknown, _domNodeId: unknown) {
+        return new Promise<() => void>((resolve) => {
+          resolveRenderer = resolve;
+        });
+      }
+      ComponentRegistry.register({ Renderer: Renderer as unknown as RenderFunction });
+      setupRendererDom('Renderer', 'renderer-async-unload-race');
+
+      renderComponent('renderer-async-unload-race');
+      const unloadPromise = triggerPageUnload();
+      resolveRenderer!(teardown);
+
+      await unloadPromise;
+
+      expect(teardown).toHaveBeenCalledTimes(1);
+    });
   });
 });
