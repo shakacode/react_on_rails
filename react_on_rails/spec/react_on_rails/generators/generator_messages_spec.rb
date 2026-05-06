@@ -200,17 +200,14 @@ describe GeneratorMessages do
   end
 
   describe ".package_manager_executable_available?" do
-    it "returns false for unsupported package managers without shelling out" do
-      expect(described_class).not_to receive(:system)
+    it "returns false for unsupported package managers without checking PATH" do
+      expect(ReactOnRails::Utils).not_to receive(:command_available?)
 
       expect(described_class.package_manager_executable_available?("foo")).to be(false)
     end
 
-    it "checks whether supported package manager commands exist" do
-      allow(ReactOnRails::Utils).to receive(:running_on_windows?).and_return(false)
-      allow(described_class).to receive(:system)
-        .with("which", "pnpm", out: File::NULL, err: File::NULL)
-        .and_return(true)
+    it "delegates to ReactOnRails::Utils.command_available? for supported package managers" do
+      allow(ReactOnRails::Utils).to receive(:command_available?).with("pnpm").and_return(true)
 
       expect(described_class.package_manager_executable_available?("pnpm")).to be(true)
     end

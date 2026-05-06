@@ -161,6 +161,11 @@ module ReactOnRails
       (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
     end
 
+    def self.command_available?(command)
+      which_command = running_on_windows? ? "where" : "which"
+      !!system(which_command, command, out: File::NULL, err: File::NULL)
+    end
+
     def self.rails_version_less_than(version)
       @rails_version_less_than ||= {}
 
