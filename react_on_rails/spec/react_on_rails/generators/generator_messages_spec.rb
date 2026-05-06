@@ -3,6 +3,20 @@
 require_relative "../support/generator_spec_helper"
 
 describe GeneratorMessages do
+  shared_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env" do
+    around do |example|
+      original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
+      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      example.run
+    ensure
+      if original
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
+      else
+        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      end
+    end
+  end
+
   it "has an empty messages array" do
     expect(described_class.messages).to be_empty
   end
@@ -96,17 +110,7 @@ describe GeneratorMessages do
   end
 
   describe ".detect_package_manager" do
-    around do |example|
-      original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
-      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      example.run
-    ensure
-      if original
-        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
-      else
-        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      end
-    end
+    include_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env"
 
     it "returns bun when bun.lock exists" do
       allow(File).to receive(:exist?).and_call_original
@@ -189,21 +193,20 @@ describe GeneratorMessages do
   end
 
   describe ".detect_package_manager_with_source" do
-    around do |example|
-      original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
-      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      example.run
-    ensure
-      if original
-        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
-      else
-        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      end
-    end
+    include_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env"
 
     it "returns :env when REACT_ON_RAILS_PACKAGE_MANAGER is set to a supported value" do
       ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "pnpm"
       expect(described_class.detect_package_manager_with_source).to eq(["pnpm", :env])
+    end
+
+    it "falls through to lockfile detection when REACT_ON_RAILS_PACKAGE_MANAGER is unsupported" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "unknown"
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(true)
+
+      expect(described_class.detect_package_manager_with_source).to eq(["yarn", :lockfile])
     end
 
     it "returns :package_json when packageManager field is present and env is not set" do
@@ -259,6 +262,48 @@ describe GeneratorMessages do
       allow(ReactOnRails::Utils).to receive(:command_available?).with("pnpm").and_return(true)
 
       expect(described_class.package_manager_executable_available?("pnpm")).to be(true)
+    end
+  end
+
+  describe ".lockfile_filename_for" do
+    let(:app_root) { Dir.mktmpdir }
+
+    after { FileUtils.rm_rf(app_root) }
+
+    it "returns the lockfile filename when the file exists" do
+      {
+        "yarn" => "yarn.lock",
+        "pnpm" => "pnpm-lock.yaml",
+        "npm" => "package-lock.json"
+      }.each do |pm, lockfile|
+        FileUtils.touch(File.join(app_root, lockfile))
+        expect(described_class.lockfile_filename_for(pm, app_root: app_root)).to eq(lockfile)
+        File.delete(File.join(app_root, lockfile))
+      end
+    end
+
+    it "returns nil when the lockfile is not on disk for yarn/pnpm/npm" do
+      %w[yarn pnpm npm].each do |pm|
+        expect(described_class.lockfile_filename_for(pm, app_root: app_root)).to be_nil
+      end
+    end
+
+    it "resolves bun.lock when only bun.lock exists" do
+      FileUtils.touch(File.join(app_root, "bun.lock"))
+      expect(described_class.lockfile_filename_for("bun", app_root: app_root)).to eq("bun.lock")
+    end
+
+    it "resolves bun.lockb when only bun.lockb exists" do
+      FileUtils.touch(File.join(app_root, "bun.lockb"))
+      expect(described_class.lockfile_filename_for("bun", app_root: app_root)).to eq("bun.lockb")
+    end
+
+    it "returns nil for bun when neither bun.lock nor bun.lockb is on disk" do
+      expect(described_class.lockfile_filename_for("bun", app_root: app_root)).to be_nil
+    end
+
+    it "returns nil for an unsupported package manager" do
+      expect(described_class.lockfile_filename_for("foo", app_root: app_root)).to be_nil
     end
   end
 

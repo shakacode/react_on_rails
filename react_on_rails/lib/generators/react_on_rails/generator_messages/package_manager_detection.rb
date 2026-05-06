@@ -61,13 +61,18 @@ module GeneratorMessages
     end
 
     # Used by error messages so the user can locate the lockfile that picked
-    # a missing manager. Returns nil when no matching lockfile is on disk.
+    # a missing manager. Returns the actual on-disk filename, or nil when no
+    # matching lockfile is on disk.
+    LOCKFILE_CANDIDATES_BY_MANAGER = {
+      "yarn" => ["yarn.lock"],
+      "pnpm" => ["pnpm-lock.yaml"],
+      "bun" => ["bun.lock", "bun.lockb"],
+      "npm" => ["package-lock.json"]
+    }.freeze
+
     def lockfile_filename_for(package_manager, app_root: Dir.pwd)
-      case package_manager
-      when "yarn" then "yarn.lock"
-      when "pnpm" then "pnpm-lock.yaml"
-      when "bun"  then %w[bun.lock bun.lockb].find { |name| File.exist?(File.join(app_root, name)) }
-      when "npm"  then "package-lock.json"
+      LOCKFILE_CANDIDATES_BY_MANAGER[package_manager]&.find do |name|
+        File.exist?(File.join(app_root, name))
       end
     end
 
