@@ -3103,7 +3103,7 @@ describe InstallGenerator, type: :generator do
 
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("package manager 'pnpm' was selected")
-      expect(error_text).to include("default npm fallback")
+      expect(error_text).to include("Selection order: REACT_ON_RAILS_PACKAGE_MANAGER")
       expect(error_text).to include("available package managers: npm")
     end
 
