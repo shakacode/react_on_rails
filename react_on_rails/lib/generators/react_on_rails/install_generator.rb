@@ -991,6 +991,8 @@ module ReactOnRails
           lockfile ? "Selected via the #{lockfile} lockfile on disk." : "Selected via a lockfile on disk."
         when :default
           "Selected via the npm default fallback (no env var, packageManager field, or lockfile detected)."
+        else
+          raise ArgumentError, "Unknown package manager source: #{source.inspect}"
         end
       end
 
