@@ -968,11 +968,12 @@ module ReactOnRails
           return true
         end
 
+        action_separator = source == :default ? " or " : ", update the source above, or "
         error = <<~MSG.strip
           🚫 JavaScript package manager '#{selected}' was selected, but the command was not found.
 
           #{package_manager_source_description(selected, source)}
-          Install '#{selected}', update the source above, or set REACT_ON_RAILS_PACKAGE_MANAGER
+          Install '#{selected}'#{action_separator}set REACT_ON_RAILS_PACKAGE_MANAGER
           to one of the available package managers: #{available_package_managers.join(', ')}.
         MSG
         GeneratorMessages.add_error(error)

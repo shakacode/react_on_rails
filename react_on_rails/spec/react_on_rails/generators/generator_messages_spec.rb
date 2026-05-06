@@ -96,14 +96,13 @@ describe GeneratorMessages do
   end
 
   describe ".detect_package_manager" do
-    let(:original_package_manager_env) { ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil) }
-
     around do |example|
+      original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
       ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
       example.run
-
-      if original_package_manager_env
-        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_package_manager_env
+    ensure
+      if original
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
       else
         ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
       end
@@ -190,14 +189,13 @@ describe GeneratorMessages do
   end
 
   describe ".detect_package_manager_with_source" do
-    let(:original_package_manager_env) { ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil) }
-
     around do |example|
+      original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
       ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
       example.run
-
-      if original_package_manager_env
-        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_package_manager_env
+    ensure
+      if original
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
       else
         ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
       end

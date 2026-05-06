@@ -3120,6 +3120,17 @@ describe InstallGenerator, type: :generator do
 
       expect(GeneratorMessages.messages.join("\n")).to include("pnpm-lock.yaml lockfile on disk")
     end
+
+    specify "missing_package_manager? omits 'update the source above' when source is :default" do
+      allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["npm", :default])
+      allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "yarn" }
+
+      install_generator.send(:missing_package_manager?)
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).not_to include("update the source above")
+      expect(error_text).to include("Install 'npm' or set REACT_ON_RAILS_PACKAGE_MANAGER")
+    end
   end
 
   context "when no JavaScript package manager is available at all" do
