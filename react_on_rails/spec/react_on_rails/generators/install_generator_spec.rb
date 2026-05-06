@@ -2315,44 +2315,19 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "when detecting existing bin-files on *nix" do
+  context "when detecting node availability" do
     let(:install_generator) { described_class.new }
 
-    specify "when node is exist" do
-      stub_const("RUBY_PLATFORM", "linux")
-      allow(install_generator).to receive(:`).with("which node").and_return("/path/to/bin")
+    specify "missing_node? returns false when node is on PATH" do
+      allow(ReactOnRails::Utils).to receive(:command_available?).with("node").and_return(true)
       allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
+
       expect(install_generator.send(:missing_node?)).to be false
     end
-  end
 
-  context "when detecting missing bin-files on *nix" do
-    let(:install_generator) { described_class.new }
+    specify "missing_node? returns true when node is missing" do
+      allow(ReactOnRails::Utils).to receive(:command_available?).with("node").and_return(false)
 
-    specify "when node is missing" do
-      stub_const("RUBY_PLATFORM", "linux")
-      allow(install_generator).to receive(:`).with("which node").and_return("")
-      expect(install_generator.send(:missing_node?)).to be true
-    end
-  end
-
-  context "when detecting existing bin-files on windows" do
-    let(:install_generator) { described_class.new }
-
-    specify "when node is exist" do
-      stub_const("RUBY_PLATFORM", "mswin")
-      allow(install_generator).to receive(:`).with("where node").and_return("/path/to/bin")
-      allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
-      expect(install_generator.send(:missing_node?)).to be false
-    end
-  end
-
-  context "when detecting missing bin-files on windows" do
-    let(:install_generator) { described_class.new }
-
-    specify "when node is missing" do
-      stub_const("RUBY_PLATFORM", "mswin")
-      allow(install_generator).to receive(:`).with("where node").and_return("")
       expect(install_generator.send(:missing_node?)).to be true
     end
   end

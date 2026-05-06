@@ -443,9 +443,7 @@ module ReactOnRails
       end
 
       def missing_node?
-        node_missing = ReactOnRails::Utils.running_on_windows? ? `where node`.blank? : `which node`.blank?
-
-        if node_missing
+        unless ReactOnRails::Utils.command_available?("node")
           error = <<~MSG.strip
             🚫 Node.js is required but not found on your system.
 
