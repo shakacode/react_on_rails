@@ -21,15 +21,26 @@ module GeneratorMessages
     # Pass package_json: to reuse an already-parsed package.json and avoid a re-read
     # (callers that also inspect scripts/deps should parse once and pass the hash).
     def detect_package_manager(app_root: Dir.pwd, package_json: nil)
+      detect_package_manager_with_source(app_root: app_root, package_json: package_json).first
+    end
+
+    # source is one of :env, :package_json, :lockfile, :default — used to
+    # name the originating source when surfacing detection errors.
+    def detect_package_manager_with_source(app_root: Dir.pwd, package_json: nil)
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
-      return env_package_manager if supported_package_manager?(env_package_manager)
+      return [env_package_manager, :env] if supported_package_manager?(env_package_manager)
 
       pm_from_json = if package_json
                        package_manager_from_content(package_json)
                      else
                        detect_package_manager_from_package_json(app_root: app_root)
                      end
-      pm_from_json || detect_package_manager_from_lockfiles(app_root: app_root) || "npm"
+      return [pm_from_json, :package_json] if pm_from_json
+
+      pm_from_lockfile = detect_package_manager_from_lockfiles(app_root: app_root)
+      return [pm_from_lockfile, :lockfile] if pm_from_lockfile
+
+      ["npm", :default]
     end
 
     def package_manager_from_content(content)
@@ -47,6 +58,17 @@ module GeneratorMessages
       return "npm" if File.exist?(File.join(app_root, "package-lock.json"))
 
       nil
+    end
+
+    # Used by error messages so the user can locate the lockfile that picked
+    # a missing manager. Returns nil when no matching lockfile is on disk.
+    def lockfile_filename_for(package_manager, app_root: Dir.pwd)
+      case package_manager
+      when "yarn" then "yarn.lock"
+      when "pnpm" then "pnpm-lock.yaml"
+      when "bun"  then %w[bun.lock bun.lockb].find { |name| File.exist?(File.join(app_root, name)) }
+      when "npm"  then "package-lock.json"
+      end
     end
 
     # Returns true only when a lockfile for the specific package manager exists.

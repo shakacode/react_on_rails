@@ -189,6 +189,57 @@ describe GeneratorMessages do
     end
   end
 
+  describe ".detect_package_manager_with_source" do
+    let(:original_package_manager_env) { ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil) }
+
+    around do |example|
+      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      example.run
+
+      if original_package_manager_env
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_package_manager_env
+      else
+        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      end
+    end
+
+    it "returns :env when REACT_ON_RAILS_PACKAGE_MANAGER is set to a supported value" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "pnpm"
+      expect(described_class.detect_package_manager_with_source).to eq(["pnpm", :env])
+    end
+
+    it "returns :package_json when packageManager field is present and env is not set" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
+                                   .and_return('{"packageManager": "yarn@3.6.0"}')
+
+      expect(described_class.detect_package_manager_with_source).to eq(["yarn", :package_json])
+    end
+
+    it "returns :lockfile when only a lockfile picks the manager" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(true)
+
+      expect(described_class.detect_package_manager_with_source).to eq(["pnpm", :lockfile])
+    end
+
+    it "returns :default when nothing else picks a manager" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lockb")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package-lock.json")).and_return(false)
+
+      expect(described_class.detect_package_manager_with_source).to eq(["npm", :default])
+    end
+  end
+
   describe ".supported_package_manager?" do
     it "returns true for supported managers and false otherwise" do
       expect(described_class.supported_package_manager?("npm")).to be(true)

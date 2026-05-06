@@ -945,11 +945,11 @@ module ReactOnRails
       end
 
       def missing_package_manager?
-        selected_package_manager = GeneratorMessages.detect_package_manager(app_root: destination_root)
-        return false if GeneratorMessages.package_manager_executable_available?(selected_package_manager)
+        selected, source = GeneratorMessages.detect_package_manager_with_source(app_root: destination_root)
+        return false if GeneratorMessages.package_manager_executable_available?(selected)
 
         available_package_managers = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.select do |pm|
-          pm != selected_package_manager && GeneratorMessages.package_manager_executable_available?(pm)
+          pm != selected && GeneratorMessages.package_manager_executable_available?(pm)
         end
 
         if available_package_managers.empty?
@@ -971,14 +971,28 @@ module ReactOnRails
         end
 
         error = <<~MSG.strip
-          🚫 JavaScript package manager '#{selected_package_manager}' was selected, but the command was not found.
+          🚫 JavaScript package manager '#{selected}' was selected, but the command was not found.
 
-          Selection order: REACT_ON_RAILS_PACKAGE_MANAGER env var → `packageManager` in package.json → lockfile → npm fallback.
-          Install '#{selected_package_manager}', update the source that picked it, or set
-          REACT_ON_RAILS_PACKAGE_MANAGER to one of the available package managers: #{available_package_managers.join(', ')}.
+          #{package_manager_source_description(selected, source)}
+          Install '#{selected}', update the source above, or set REACT_ON_RAILS_PACKAGE_MANAGER
+          to one of the available package managers: #{available_package_managers.join(', ')}.
         MSG
         GeneratorMessages.add_error(error)
         true
+      end
+
+      def package_manager_source_description(selected, source)
+        case source
+        when :env
+          "Selected via the REACT_ON_RAILS_PACKAGE_MANAGER environment variable."
+        when :package_json
+          "Selected via the `packageManager` field in package.json."
+        when :lockfile
+          lockfile = GeneratorMessages.lockfile_filename_for(selected, app_root: destination_root)
+          lockfile ? "Selected via the #{lockfile} lockfile on disk." : "Selected via a lockfile on disk."
+        when :default
+          "Selected via the npm default fallback (no env var, packageManager field, or lockfile detected)."
+        end
       end
 
       def jsx_in_js_files_present?

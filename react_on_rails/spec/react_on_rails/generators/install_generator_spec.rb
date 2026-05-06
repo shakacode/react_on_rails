@@ -3094,7 +3094,7 @@ describe InstallGenerator, type: :generator do
     let(:install_generator) { described_class.new }
 
     before do
-      allow(GeneratorMessages).to receive(:detect_package_manager).and_return("pnpm")
+      allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["pnpm", :package_json])
       allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "npm" }
     end
 
@@ -3103,7 +3103,7 @@ describe InstallGenerator, type: :generator do
 
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("package manager 'pnpm' was selected")
-      expect(error_text).to include("Selection order: REACT_ON_RAILS_PACKAGE_MANAGER")
+      expect(error_text).to include("`packageManager` field in package.json")
       expect(error_text).to include("available package managers: npm")
     end
 
@@ -3115,12 +3115,44 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  context "when each detection source picks the missing package manager" do
+    let(:install_generator) { described_class.new }
+
+    before do
+      allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "npm" }
+    end
+
+    {
+      env: "REACT_ON_RAILS_PACKAGE_MANAGER environment variable",
+      package_json: "`packageManager` field in package.json",
+      default: "npm default fallback"
+    }.each do |source, phrase|
+      specify "missing_package_manager? names the #{source} source in the error" do
+        allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["pnpm", source])
+
+        install_generator.send(:missing_package_manager?)
+
+        expect(GeneratorMessages.messages.join("\n")).to include(phrase)
+      end
+    end
+
+    specify "missing_package_manager? names the actual lockfile filename when a lockfile picks the manager" do
+      allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["pnpm", :lockfile])
+      allow(GeneratorMessages).to receive(:lockfile_filename_for).with("pnpm",
+                                                                       app_root: anything).and_return("pnpm-lock.yaml")
+
+      install_generator.send(:missing_package_manager?)
+
+      expect(GeneratorMessages.messages.join("\n")).to include("pnpm-lock.yaml lockfile on disk")
+    end
+  end
+
   context "when no JavaScript package manager is available at all" do
     let(:install_generator) { described_class.new }
 
     before do
       allow(GeneratorMessages).to receive_messages(
-        detect_package_manager: "npm",
+        detect_package_manager_with_source: ["npm", :default],
         package_manager_executable_available?: false
       )
     end
