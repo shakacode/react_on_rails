@@ -3090,7 +3090,7 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "when each detection source picks the missing package manager" do
+  context "when the detection source picks the missing package manager" do
     let(:install_generator) { described_class.new }
 
     before do
