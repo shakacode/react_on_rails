@@ -3131,6 +3131,17 @@ describe InstallGenerator, type: :generator do
       expect(error_text).not_to include("update the source above")
       expect(error_text).to include("Install 'npm' or set REACT_ON_RAILS_PACKAGE_MANAGER")
     end
+
+    specify "missing_package_manager? omits 'update the source above' when source is :env" do
+      allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["pnpm", :env])
+      allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "npm" }
+
+      install_generator.send(:missing_package_manager?)
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).not_to include("update the source above")
+      expect(error_text).to include("Install 'pnpm' or set REACT_ON_RAILS_PACKAGE_MANAGER")
+    end
   end
 
   context "when no JavaScript package manager is available at all" do

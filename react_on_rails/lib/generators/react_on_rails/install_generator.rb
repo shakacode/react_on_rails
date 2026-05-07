@@ -985,7 +985,7 @@ module ReactOnRails
           return true
         end
 
-        action_separator = source == :default ? " or " : ", update the source above, or "
+        action_separator = %i[default env].include?(source) ? " or " : ", update the source above, or "
         error = <<~MSG.strip
           🚫 JavaScript package manager '#{selected}' was selected, but the command was not found.
 
