@@ -3174,13 +3174,13 @@ describe InstallGenerator, type: :generator do
 
   describe "#warn_if_unsupported_env_package_manager" do
     let(:install_generator) { described_class.new }
-    let(:original_env) { ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil) }
 
     around do |example|
+      original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
       example.run
     ensure
-      if original_env
-        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_env
+      if original
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
       else
         ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
       end
