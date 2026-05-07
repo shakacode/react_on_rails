@@ -11,6 +11,7 @@ import cluster from 'cluster';
 import type { Readable } from 'stream';
 import { ReadableStream } from 'stream/web';
 import { promisify, TextEncoder } from 'util';
+import { AsyncLocalStorage } from 'async_hooks';
 import type { ReactOnRails as ROR } from 'react-on-rails' with { 'resolution-mode': 'import' };
 import type { Context } from 'vm';
 
@@ -212,6 +213,16 @@ export async function buildVM(filePath: string) {
       };
 
       const contextObject = { sharedConsoleHistory, runOnOtherBundle };
+
+      // PPR globals — injected unconditionally, independent of `supportModules`.
+      // PPR (Partial Prerendering) requires AbortController/AbortSignal for prerender
+      // abort timing and AsyncLocalStorage for phase tracking across async boundaries.
+      // Code that doesn't use PPR is unaffected by these globals being present.
+      extendContext(contextObject, {
+        AbortController,
+        AbortSignal,
+        AsyncLocalStorage,
+      });
 
       if (supportModules) {
         // IMPORTANT: When adding anything to this object, update:

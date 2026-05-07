@@ -1,0 +1,18 @@
+<h1>PPR — All Dynamic</h1>
+<p>
+  Every Suspense boundary calls <code>usePostpone()</code>. The cached shell consists only of the
+  surrounding markup; every section is filled per-request via <code>resumeToPipeableStream</code>.
+</p>
+
+<%= ppr_react_component(
+      "PPRAllDynamicDemo",
+      cache_key: "ppr-all-dynamic-v1",
+      props: {
+        currentTime: Time.current.iso8601(3),
+        userName: cookies[:demo_user_name].presence || "Guest",
+      },
+      trace: true,
+      id: "PPRAllDynamicDemo-react-component-0",
+    ) %>
+
+<p><%= link_to "Back to comprehensive demo", ppr_demo_path %></p>

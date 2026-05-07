@@ -1,0 +1,15 @@
+<h1>PPR — Fully Static</h1>
+<p>
+  No <code>usePostpone()</code> calls anywhere. After the first hit, the cached shell is the entire page;
+  resume is skipped because <code>postponedState</code> came back null from prerender.
+</p>
+
+<%= ppr_react_component(
+      "PPRStaticOnlyDemo",
+      cache_key: "ppr-static-only-v1",
+      props: {},
+      trace: true,
+      id: "PPRStaticOnlyDemo-react-component-0",
+    ) %>
+
+<p><%= link_to "Back to comprehensive demo", ppr_demo_path %></p>

@@ -17,6 +17,11 @@ ReactOnRailsPro.configure do |config|
   config.renderer_password = "myPassword1"
 
   config.enable_rsc_support = true
+
+  # Partial Prerendering — enables ppr_react_component helper. Requires React 19.2+ and the
+  # Pro node renderer (ExecJS doesn't have AbortController/streams).
+  config.enable_ppr_support = true
+  config.ppr_prerender_timeout_ms = 5_000
   config.renderer_url = ENV.fetch("RENDERER_URL", "http://localhost:3800")
   config.rsc_payload_generation_url_path = "rsc_payload/"
 

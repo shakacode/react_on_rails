@@ -42,6 +42,7 @@
     "./reactHydrateOrRender": "./lib/reactHydrateOrRender.js",
     "./turbolinksUtils": "./lib/turbolinksUtils.js",
     "./isRenderFunction": "./lib/isRenderFunction.js",
+    "./rscMarker": "./lib/rscMarker.js",
     "./ReactOnRails.client": "./lib/ReactOnRails.client.js",
     "./ReactOnRails.full": "./lib/ReactOnRails.full.js",
     "./handleError": "./lib/handleError.js",

@@ -278,11 +278,65 @@ module ReactOnRailsProHelper
     end
   end
 
+  # Renders a React component using Partial Prerendering (PPR).
+  #
+  # Phase A (lazy on first hit): React renders everything it can; an AbortController fires
+  # after `prerender_timeout_ms` (default 8s) so any pending Suspense boundary becomes a
+  # postponed hole. The shell HTML + serialized postponed state are cached together.
+  #
+  # Phase B (every hit after): The cached shell streams immediately as the first chunk; React's
+  # `resumeToPipeableStream` then fills only the postponed boundaries with per-request data.
+  #
+  # Components that need request-varying data (cookies, session, headers, current_user) MUST be
+  # placed inside a `<Suspense>` boundary that calls `usePostpone()` from
+  # `react-on-rails-pro/postpone`. Sibling boundaries that resolve before the abort fires are
+  # baked into the cached shell.
+  #
+  # @param component_name [String] Name of the registered React component (must NOT be an RSC
+  #   component — PPR + RSC composition is intentionally deferred in v1).
+  # @param raw_options [Hash] Options forwarded to the rendering pipeline. Required keys:
+  #   - :cache_key — String/Array/Proc. Must be present (mirrors `cached_stream_react_component`).
+  # @option raw_options [Hash] :props Component props (passed as a block recommended? No — props
+  #   are part of the cache key, so they must be evaluated. Pass via :props directly.)
+  # @option raw_options [Integer] :prerender_timeout_ms Per-call override of the abort timer.
+  # @option raw_options [Hash] :cache_options Forwarded to Rails.cache.fetch (`:expires_in`, etc.)
+  # @option raw_options [Boolean] :if / :unless Conditional caching (mirrors other Pro helpers).
+  # @option raw_options [Proc] :on_complete Forwarded to the streaming pipeline.
+  # @raise [ReactOnRailsPro::Error] when PPR is not enabled or :cache_key is missing.
+  def ppr_react_component(component_name, raw_options = {})
+    ReactOnRailsPro::PPR.ensure_supported!
+    unless raw_options[:cache_key]
+      raise ReactOnRailsPro::Error,
+            "Option 'cache_key' is required for ppr_react_component"
+    end
+
+    on_complete = raw_options.delete(:on_complete)
+    timeout_ms = raw_options.delete(:prerender_timeout_ms) ||
+                 ReactOnRailsPro.configuration.ppr_prerender_timeout_ms
+
+    # Step 1: cache lookup (or build the shell on miss)
+    shell_data = if ReactOnRailsPro::Cache.use_cache?(raw_options)
+                   cache_key = ReactOnRailsPro::PPR.cache_key(component_name, raw_options)
+                   Rails.logger.debug { "[ReactOnRailsPro] PPR cache_key=#{cache_key.inspect}" }
+                   Rails.cache.fetch(cache_key, raw_options[:cache_options] || {}) do
+                     internal_ppr_prerender(component_name, raw_options.merge(prerender_timeout_ms: timeout_ms))
+                   end
+                 else
+                   internal_ppr_prerender(component_name, raw_options.merge(prerender_timeout_ms: timeout_ms))
+                 end
+
+    # Step 2: stream the shell + resume any postponed boundaries
+    consumer_stream_async(on_complete: on_complete) do
+      internal_ppr_resume(component_name, raw_options, shell_data: shell_data)
+    end
+  end
+
   if defined?(ScoutApm)
     include ScoutApm::Tracer
     instrument_method :cached_react_component, type: "ReactOnRails", name: "cached_react_component"
     instrument_method :cached_react_component_hash, type: "ReactOnRails", name: "cached_react_component_hash"
     instrument_method :cached_stream_react_component, type: "ReactOnRails", name: "cached_stream_react_component"
+    instrument_method :ppr_react_component, type: "ReactOnRails", name: "ppr_react_component"
   end
 
   private
@@ -518,6 +572,55 @@ module ReactOnRailsProHelper
     json_stream.transform do |chunk|
       "#{chunk.to_json}\n".html_safe
     end
+  end
+
+  # Phase A — non-streaming prerender. Returns a Hash describing the cached shell:
+  #   { shell_html:, postponed_state:, console_replay_script:, has_errors:, error_message: }
+  # Cache writes only happen when has_errors is false (Rails.cache.fetch's block must return
+  # a value to be written; if has_errors is true we raise, so the cache stays clean).
+  def internal_ppr_prerender(component_name, options)
+    timeout_ms = options.delete(:prerender_timeout_ms) ||
+                 ReactOnRailsPro.configuration.ppr_prerender_timeout_ms
+    options = options.merge(
+      prerender: true,
+      render_mode: :ppr_prerender,
+      skip_prerender_cache: true,
+      ppr_prerender_timeout_ms: timeout_ms
+    )
+
+    result = internal_react_component(component_name, options)[:result]
+    result_hash = result.is_a?(Hash) ? result : {}
+
+    if result_hash["hasErrors"]
+      raise ReactOnRailsPro::Error,
+            "PPR prerender failed for #{component_name}: #{result_hash['errorMessage'] || result_hash['html']}"
+    end
+
+    {
+      shell_html: result_hash["pprShellHtml"].to_s,
+      postponed_state: result_hash["pprPostponedState"],
+      console_replay_script: result_hash["consoleReplayScript"].to_s,
+      has_errors: false,
+      ppr_version: ReactOnRailsPro::PPR::CACHE_VERSION
+    }
+  end
+
+  # Phase B — streaming resume. Streams the cached shell as the first chunk and then pipes the
+  # resume output (which fills postponed boundaries with per-request data).
+  def internal_ppr_resume(component_name, raw_options, shell_data:)
+    options = raw_options.merge(
+      prerender: true,
+      render_mode: :ppr_resume,
+      skip_prerender_cache: true,
+      ppr_shell_html: shell_data[:shell_html],
+      ppr_postponed_state: shell_data[:postponed_state]
+    )
+    result = internal_react_component(component_name, options)
+    build_react_component_result_for_server_streamed_content(
+      rendered_html_stream: result[:result],
+      component_specification_tag: result[:tag],
+      render_options: result[:render_options]
+    )
   end
 
   def build_react_component_result_for_server_streamed_content(

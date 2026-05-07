@@ -38,6 +38,11 @@ Rails.application.routes.draw do
   get "stream_error_demo" => "pages#stream_error_demo", as: :stream_error_demo
   get "stream_shell_error_demo" => "pages#stream_shell_error_demo", as: :stream_shell_error_demo
   get "stream_async_components" => "pages#stream_async_components", as: :stream_async_components
+  # PPR (Partial Prerendering) demo routes
+  get "ppr_demo" => "pages#ppr_demo", as: :ppr_demo
+  get "ppr_static_only_demo" => "pages#ppr_static_only_demo", as: :ppr_static_only_demo
+  get "ppr_all_dynamic_demo" => "pages#ppr_all_dynamic_demo", as: :ppr_all_dynamic_demo
+  post "ppr_demo_clear_cache" => "pages#ppr_demo_clear_cache", as: :ppr_demo_clear_cache
   get "stream_async_components_for_testing" => "pages#stream_async_components_for_testing",
       as: :stream_async_components_for_testing
   get "cached_stream_async_components_for_testing" => "pages#cached_stream_async_components_for_testing",

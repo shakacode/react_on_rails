@@ -155,11 +155,24 @@ module ReactOnRails
         # - :html_streaming: Progressive SSR using renderToPipeableStream (non-blocking and rendering incrementally)
         # - :rsc_payload_streaming: Server Components serialized in React flight format
         #   (non-blocking and rendering incrementally).
+        # - :ppr_prerender: Partial Prerendering — build the static shell once, returning a Hash
+        #   with shellHtml + postponedState. Non-streaming over the wire (one Promise<Hash>).
+        # - :ppr_resume: Partial Prerendering — stream the cached shell first, then fill postponed
+        #   boundaries via React's resumeToPipeableStream. Streaming over the wire.
         options.fetch(:render_mode, :sync)
       end
 
       def streaming?
-        # Returns true if the component should be rendered incrementally
+        # Returns true if the component should be rendered incrementally over the wire.
+        # NOTE: callers that need "the legacy streaming behaviors" (RSC payload injection, the
+        # Pro stream cache wrap, etc.) must use html_or_rsc_streaming? instead — PPR resume
+        # streams but does not want those legacy behaviors.
+        %i[html_streaming rsc_payload_streaming ppr_resume].include?(render_mode)
+      end
+
+      def html_or_rsc_streaming?
+        # Returns true for the legacy streaming modes (HTML streaming + RSC payload streaming).
+        # Use this instead of streaming? in code paths that should NOT engage for PPR.
         %i[html_streaming rsc_payload_streaming].include?(render_mode)
       end
 
@@ -171,6 +184,18 @@ module ReactOnRails
       def html_streaming?
         # Returns true if the component should be rendered incrementally
         render_mode == :html_streaming
+      end
+
+      def ppr_prerender?
+        render_mode == :ppr_prerender
+      end
+
+      def ppr_resume?
+        render_mode == :ppr_resume
+      end
+
+      def ppr?
+        ppr_prerender? || ppr_resume?
       end
 
       def store_dependencies

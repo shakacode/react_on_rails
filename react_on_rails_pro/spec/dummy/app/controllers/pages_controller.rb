@@ -96,6 +96,26 @@ class PagesController < ApplicationController # rubocop:disable Metrics/ClassLen
     stream_view_containing_react_components(template: "/pages/stream_async_components")
   end
 
+  # PPR demo pages — rendered through the streaming pipeline because the resume phase streams.
+  # The first request lazily prerenders + caches the shell; subsequent requests stream from cache.
+  def ppr_demo
+    stream_view_containing_react_components(template: "/pages/ppr_demo")
+  end
+
+  def ppr_static_only_demo
+    stream_view_containing_react_components(template: "/pages/ppr_static_only_demo")
+  end
+
+  def ppr_all_dynamic_demo
+    stream_view_containing_react_components(template: "/pages/ppr_all_dynamic_demo")
+  end
+
+  # Test convenience: clear all PPR cache entries so the next visit cold-starts again.
+  def ppr_demo_clear_cache
+    Rails.cache.clear
+    head :no_content
+  end
+
   def stream_async_components_for_testing
     stream_view_containing_react_components(template: "/pages/stream_async_components_for_testing")
   end

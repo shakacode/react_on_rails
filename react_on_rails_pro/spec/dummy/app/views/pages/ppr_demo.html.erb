@@ -1,0 +1,32 @@
+<h1>PPR Comprehensive Demo</h1>
+<p>
+  <%= link_to "Static-only PPR demo", ppr_static_only_demo_path %> |
+  <%= link_to "All-dynamic PPR demo", ppr_all_dynamic_demo_path %>
+</p>
+
+<p>
+  This page is rendered with <code>ppr_react_component</code>. The first hit prerenders + caches
+  the static shell; subsequent hits stream the cached shell immediately and fill the postponed
+  boundaries via React's <code>resumeToPipeableStream</code>.
+</p>
+
+<%= ppr_react_component(
+      "PPRComprehensiveDemo",
+      cache_key: ["ppr-demo-v1", request.host],
+      props: {
+        currentTime: Time.current.iso8601(3),
+        userName: cookies[:demo_user_name].presence || "Guest",
+        cartItemCount: rand(0..9),
+      },
+      trace: true,
+      id: "PPRComprehensiveDemo-react-component-0",
+    ) %>
+
+<hr/>
+<h3>How to verify PPR is working</h3>
+<ol>
+  <li>Reload this page once. The first request blocks while the shell is built (default 8s).</li>
+  <li>Reload again. The shell streams immediately; only the dynamic sections wait for resume.</li>
+  <li>Compare timestamps inside dynamic sections vs the synchronous banner — dynamic timestamps
+      change on every request, the banner / static products stay the same.</li>
+</ol>

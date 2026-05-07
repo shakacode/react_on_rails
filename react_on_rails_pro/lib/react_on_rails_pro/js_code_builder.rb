@@ -105,13 +105,20 @@ module ReactOnRailsPro
     private
 
     def rsc_streaming?(render_request)
-      ReactOnRailsPro.configuration.enable_rsc_support && render_request.streaming?
+      # NOTE: PPR resume is technically streaming over the wire but we do NOT want to engage
+      # the RSC payload injection / generateRSCPayload manifest plumbing here. Use
+      # html_or_rsc_streaming? rather than streaming? so PPR routes around this branch.
+      ReactOnRailsPro.configuration.enable_rsc_support && render_request.html_or_rsc_streaming?
     end
 
     # Returns a JavaScript expression for the render function name.
     # For RSC streaming, this is a ternary expression (not a simple string literal).
     def resolve_render_function_js_expr(render_request)
-      if rsc_streaming?(render_request)
+      if render_request.ppr_prerender?
+        "'prerenderReactComponentForPPR'"
+      elsif render_request.ppr_resume?
+        "'resumeReactComponentForPPR'"
+      elsif rsc_streaming?(render_request)
         "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
       else
         "'serverRenderReactComponent'"

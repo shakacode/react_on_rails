@@ -59,20 +59,34 @@ module ReactOnRailsPro
       # @return [String] JavaScript code that will render the React component on the server
       def render(props_string, rails_context, redux_stores, react_component_name, render_options)
         render_function_name =
-          if ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
+          if render_options.ppr_prerender?
+            "'prerenderReactComponentForPPR'"
+          elsif render_options.ppr_resume?
+            "'resumeReactComponentForPPR'"
+          elsif ReactOnRailsPro.configuration.enable_rsc_support && render_options.html_or_rsc_streaming?
             # Select appropriate function based on whether the rendering request is running on server or rsc bundle
             # As the same rendering request is used to generate the rsc payload and SSR the component.
             "ReactOnRails.isRSCBundle ? 'serverRenderRSCReactComponent' : 'streamServerRenderedReactComponent'"
           else
             "'serverRenderReactComponent'"
           end
-        rsc_params = if ReactOnRailsPro.configuration.enable_rsc_support && render_options.streaming?
+        rsc_params = if ReactOnRailsPro.configuration.enable_rsc_support && render_options.html_or_rsc_streaming?
                        config = ReactOnRailsPro.configuration
                        react_client_manifest_file = config.react_client_manifest_file
                        react_server_client_manifest_file = config.react_server_client_manifest_file
                        <<-JS
                           railsContext.reactClientManifestFileName = #{react_client_manifest_file.to_json};
                           railsContext.reactServerClientManifestFileName = #{react_server_client_manifest_file.to_json};
+                       JS
+                     else
+                       ""
+                     end
+        ppr_params = if render_options.ppr?
+                       <<-JS
+                          railsContext.pprPhase = #{render_options.ppr_prerender? ? '"prerender"' : '"resume"'};
+                          railsContext.pprPrerenderTimeoutMs = #{render_options.internal_option(:ppr_prerender_timeout_ms).to_json};
+                          railsContext.pprShellHtml = #{render_options.internal_option(:ppr_shell_html).to_json};
+                          railsContext.pprPostponedState = #{render_options.internal_option(:ppr_postponed_state).to_json};
                        JS
                      else
                        ""
@@ -84,6 +98,7 @@ module ReactOnRailsPro
         (function(componentName = #{react_component_name.to_json}, props = undefined) {
           var railsContext = #{rails_context};
           #{rsc_params}
+          #{ppr_params}
           #{generate_rsc_payload_js_function(render_options)}
           #{ssr_pre_hook_js}
           #{redux_stores}

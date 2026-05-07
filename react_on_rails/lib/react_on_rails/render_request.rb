@@ -52,8 +52,24 @@ module ReactOnRails
       render_options.streaming?
     end
 
+    def html_or_rsc_streaming?
+      render_options.html_or_rsc_streaming?
+    end
+
     def rsc_payload_streaming?
       render_options.rsc_payload_streaming?
+    end
+
+    def ppr_prerender?
+      render_options.ppr_prerender?
+    end
+
+    def ppr_resume?
+      render_options.ppr_resume?
+    end
+
+    def ppr?
+      render_options.ppr?
     end
 
     private

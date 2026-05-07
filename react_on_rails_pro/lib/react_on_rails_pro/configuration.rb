@@ -34,7 +34,9 @@ module ReactOnRailsPro
       rsc_bundle_js_file: Configuration::DEFAULT_RSC_BUNDLE_JS_FILE,
       react_client_manifest_file: Configuration::DEFAULT_REACT_CLIENT_MANIFEST_FILE,
       react_server_client_manifest_file: Configuration::DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE,
-      concurrent_component_streaming_buffer_size: Configuration::DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE
+      concurrent_component_streaming_buffer_size: Configuration::DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
+      enable_ppr_support: Configuration::DEFAULT_ENABLE_PPR_SUPPORT,
+      ppr_prerender_timeout_ms: Configuration::DEFAULT_PPR_PRERENDER_TIMEOUT_MS
     )
   end
 
@@ -63,6 +65,13 @@ module ReactOnRailsPro
     DEFAULT_REACT_CLIENT_MANIFEST_FILE = "react-client-manifest.json"
     DEFAULT_REACT_SERVER_CLIENT_MANIFEST_FILE = "react-server-client-manifest.json"
     DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE = 64
+    DEFAULT_ENABLE_PPR_SUPPORT = false
+    # Default abort timeout (in milliseconds) for the PPR prerender phase. The first request to
+    # a `ppr_react_component` page blocks while React renders the static shell; the AbortController
+    # fires this many ms after the prerender starts, capturing all completed Suspense siblings
+    # into the shell and marking still-pending boundaries as postponed holes. Tunable per-call
+    # via `ppr_react_component(..., prerender_timeout_ms:)`.
+    DEFAULT_PPR_PRERENDER_TIMEOUT_MS = 8_000
 
     attr_accessor :renderer_url, :renderer_password, :tracing,
                   :server_renderer, :renderer_use_fallback_exec_js, :prerender_caching,
@@ -72,7 +81,7 @@ module ReactOnRailsPro
                   :renderer_request_retry_limit, :throw_js_errors, :ssr_timeout,
                   :profile_server_rendering_js_code, :raise_non_shell_server_rendering_errors, :enable_rsc_support,
                   :rsc_payload_generation_url_path, :rsc_bundle_js_file, :react_client_manifest_file,
-                  :react_server_client_manifest_file
+                  :react_server_client_manifest_file, :enable_ppr_support, :ppr_prerender_timeout_ms
 
     attr_reader :concurrent_component_streaming_buffer_size, :renderer_http_keep_alive_timeout
 
@@ -122,7 +131,9 @@ module ReactOnRailsPro
                    enable_rsc_support: nil, rsc_payload_generation_url_path: nil,
                    rsc_bundle_js_file: nil, react_client_manifest_file: nil,
                    react_server_client_manifest_file: nil,
-                   concurrent_component_streaming_buffer_size: DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE)
+                   concurrent_component_streaming_buffer_size: DEFAULT_CONCURRENT_COMPONENT_STREAMING_BUFFER_SIZE,
+                   enable_ppr_support: DEFAULT_ENABLE_PPR_SUPPORT,
+                   ppr_prerender_timeout_ms: DEFAULT_PPR_PRERENDER_TIMEOUT_MS)
       self.renderer_url = renderer_url
       self.renderer_password = renderer_password
       self.server_renderer = server_renderer
@@ -150,6 +161,8 @@ module ReactOnRailsPro
       self.react_client_manifest_file = react_client_manifest_file
       self.react_server_client_manifest_file = react_server_client_manifest_file
       self.concurrent_component_streaming_buffer_size = concurrent_component_streaming_buffer_size
+      self.enable_ppr_support = enable_ppr_support
+      self.ppr_prerender_timeout_ms = ppr_prerender_timeout_ms
     end
 
     def setup_config_values

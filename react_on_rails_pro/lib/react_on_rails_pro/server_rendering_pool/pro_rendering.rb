@@ -61,8 +61,13 @@ module ReactOnRailsPro
           prerender_cache_key = cache_key(js_code, render_options)
           prerender_cache_hit = true
 
-          result = if render_options.streaming?
+          result = if render_options.html_or_rsc_streaming?
                      render_streaming_with_cache(prerender_cache_key, js_code, render_options)
+                   elsif render_options.ppr_resume?
+                     # PPR resume manages its own cache (the Pro PPR helper caches the shell
+                     # + postponedState as a Hash). Skip the Pro stream cache layer here so we
+                     # don't double-cache or capture per-request dynamic content.
+                     render_on_pool(js_code, render_options)
                    else
                      Rails.cache.fetch(prerender_cache_key) do
                        prerender_cache_hit = false

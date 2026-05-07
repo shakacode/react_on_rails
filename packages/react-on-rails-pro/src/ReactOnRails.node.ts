@@ -14,11 +14,24 @@
 
 import { createSSRCapability } from 'react-on-rails/@internal/capabilities/ssr';
 import { createProStreamingCapability } from './capabilities/proStreaming.ts';
+import { createProPPRCapability } from './capabilities/proPPR.ts';
 import createReactOnRailsPro from './createReactOnRailsPro.ts';
 
 const currentGlobal = globalThis.ReactOnRails || null;
+// PPR capability is registered on the Node SSR entry only — NOT on the RSC bundle entry.
+// PPR + RSC composition is intentionally deferred (see RFC #3244). Registering the capability
+// is cheap: the React PPR APIs are loaded lazily on first prerenderReactComponentForPPR /
+// resumeReactComponentForPPR call, so apps using older React versions are unaffected unless
+// they actually invoke a PPR helper.
 const ReactOnRails = createReactOnRailsPro(
-  [createSSRCapability(), createProStreamingCapability()],
+  // The PPR capability adds two new render functions that the Ruby side dispatches by
+  // render_mode (`:ppr_prerender`, `:ppr_resume`). They aren't part of `ReactOnRailsInternal`
+  // (the OSS interface), so the cast widens to allow capability-specific extensions.
+  [
+    createSSRCapability(),
+    createProStreamingCapability(),
+    createProPPRCapability() as Record<string, unknown>,
+  ],
   currentGlobal,
 );
 

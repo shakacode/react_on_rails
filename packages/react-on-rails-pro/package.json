@@ -56,7 +56,8 @@
     },
     "./RSCRoute": "./lib/RSCRoute.js",
     "./RSCProvider": "./lib/RSCProvider.js",
-    "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js"
+    "./ServerComponentFetchError": "./lib/ServerComponentFetchError.js",
+    "./postpone": "./lib/postpone.js"
   },
   "dependencies": {
     "react-on-rails": "workspace:*"

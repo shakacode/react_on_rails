@@ -14,6 +14,7 @@
 
 import * as React from 'react';
 import { ReactComponent, RenderFunction } from 'react-on-rails/types';
+import { markAsRSCComponent } from 'react-on-rails/rscMarker';
 import ReactOnRails from '../ReactOnRails.client.ts';
 import RSCRoute from '../RSCRoute.tsx';
 import wrapServerComponentRenderer from '../wrapServerComponentRenderer/server.tsx';
@@ -39,9 +40,12 @@ import wrapServerComponentRenderer from '../wrapServerComponentRenderer/server.t
 const registerServerComponent = (components: Record<string, ReactComponent>) => {
   const componentsWrappedInRSCRoute: Record<string, RenderFunction> = {};
   for (const [componentName] of Object.entries(components)) {
-    componentsWrappedInRSCRoute[componentName] = wrapServerComponentRenderer(
-      (props: unknown) => <RSCRoute componentName={componentName} componentProps={props} />,
-      componentName,
+    // Tag the wrapper so non-RSC paths (e.g. PPR) can refuse it cleanly.
+    componentsWrappedInRSCRoute[componentName] = markAsRSCComponent(
+      wrapServerComponentRenderer(
+        (props: unknown) => <RSCRoute componentName={componentName} componentProps={props} />,
+        componentName,
+      ),
     );
   }
 
