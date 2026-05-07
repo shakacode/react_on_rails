@@ -3201,7 +3201,7 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_if_unsupported_env_package_manager)
 
-      expect(GeneratorMessages.messages).to be_empty
+      expect(GeneratorMessages.messages).to eq([])
     end
 
     specify "does not warn when REACT_ON_RAILS_PACKAGE_MANAGER is unset" do
@@ -3209,7 +3209,7 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_if_unsupported_env_package_manager)
 
-      expect(GeneratorMessages.messages).to be_empty
+      expect(GeneratorMessages.messages).to eq([])
     end
 
     specify "does not warn when REACT_ON_RAILS_PACKAGE_MANAGER is empty or whitespace" do
@@ -3217,7 +3217,7 @@ describe InstallGenerator, type: :generator do
 
       install_generator.send(:warn_if_unsupported_env_package_manager)
 
-      expect(GeneratorMessages.messages).to be_empty
+      expect(GeneratorMessages.messages).to eq([])
     end
   end
 
