@@ -60,13 +60,6 @@ module GeneratorMessages
       supported_package_manager?(name) ? name : nil
     end
 
-    def detect_package_manager_from_lockfiles(app_root: Dir.pwd)
-      LOCKFILE_CANDIDATES_BY_MANAGER.each do |pm, candidates|
-        return pm if candidates.any? { |name| File.exist?(File.join(app_root, name)) }
-      end
-      nil
-    end
-
     def lockfile_filename_for(package_manager, app_root: Dir.pwd)
       LOCKFILE_CANDIDATES_BY_MANAGER[package_manager]&.find do |name|
         File.exist?(File.join(app_root, name))
@@ -77,8 +70,12 @@ module GeneratorMessages
     # that's not on disk (e.g. `packageManager: pnpm` without `pnpm-lock.yaml`, which
     # breaks `actions/setup-node`'s cache step).
     def lockfile_for_manager?(package_manager, app_root: Dir.pwd)
-      LOCKFILE_CANDIDATES_BY_MANAGER.fetch(package_manager, []).any? do |name|
-        File.exist?(File.join(app_root, name))
+      !lockfile_filename_for(package_manager, app_root: app_root).nil?
+    end
+
+    def detect_package_manager_from_lockfiles(app_root: Dir.pwd)
+      LOCKFILE_CANDIDATES_BY_MANAGER.keys.find do |pm|
+        lockfile_for_manager?(pm, app_root: app_root)
       end
     end
 
