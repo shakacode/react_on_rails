@@ -417,6 +417,8 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
+        warn_if_unsupported_env_package_manager
+
         # Non-blocking: warn about dirty worktree but don't prevent installation.
         # A clean tree makes the generator diff easier to review, but blocking would
         # be too strict for a generator that creates many new files.
@@ -440,6 +442,19 @@ module ReactOnRails
         end
 
         !(missing_node? || missing_package_manager? || (!has_worktree_issues && missing_pro_gem?))
+      end
+
+      def warn_if_unsupported_env_package_manager
+        env_value = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip
+        return if env_value.nil? || env_value.empty?
+        return if GeneratorMessages.supported_package_manager?(env_value.downcase)
+
+        supported = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.join(", ")
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  REACT_ON_RAILS_PACKAGE_MANAGER='#{env_value}' is not a supported package manager.
+          Supported values: #{supported}.
+          Falling through to package.json / lockfile / npm-default detection.
+        MSG
       end
 
       def missing_node?

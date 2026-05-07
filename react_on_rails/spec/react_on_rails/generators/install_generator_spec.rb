@@ -3172,6 +3172,55 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  describe "#warn_if_unsupported_env_package_manager" do
+    let(:install_generator) { described_class.new }
+    let(:original_env) { ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil) }
+
+    around do |example|
+      example.run
+    ensure
+      if original_env
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_env
+      else
+        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      end
+    end
+
+    specify "warns when REACT_ON_RAILS_PACKAGE_MANAGER is set to an unsupported value" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "rush"
+
+      install_generator.send(:warn_if_unsupported_env_package_manager)
+
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("REACT_ON_RAILS_PACKAGE_MANAGER='rush' is not a supported package manager")
+      expect(warning_text).to include("Supported values: npm, pnpm, yarn, bun")
+    end
+
+    specify "does not warn when REACT_ON_RAILS_PACKAGE_MANAGER is supported" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "pnpm"
+
+      install_generator.send(:warn_if_unsupported_env_package_manager)
+
+      expect(GeneratorMessages.messages).to be_empty
+    end
+
+    specify "does not warn when REACT_ON_RAILS_PACKAGE_MANAGER is unset" do
+      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+
+      install_generator.send(:warn_if_unsupported_env_package_manager)
+
+      expect(GeneratorMessages.messages).to be_empty
+    end
+
+    specify "does not warn when REACT_ON_RAILS_PACKAGE_MANAGER is empty or whitespace" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "   "
+
+      install_generator.send(:warn_if_unsupported_env_package_manager)
+
+      expect(GeneratorMessages.messages).to be_empty
+    end
+  end
+
   context "when force-checking Pro gem without pro-related flags" do
     let(:install_generator) { described_class.new([], { pro: false, rsc: false }) }
     let(:fake_pid) { 12_345 }
