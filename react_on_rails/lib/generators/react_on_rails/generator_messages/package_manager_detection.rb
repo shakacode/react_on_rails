@@ -10,6 +10,15 @@ module GeneratorMessages
   module PackageManagerDetection
     SUPPORTED_PACKAGE_MANAGERS = %w[npm pnpm yarn bun].freeze
 
+    # Hash insertion order is the detection priority used by
+    # detect_package_manager_from_lockfiles (yarn → pnpm → bun → npm).
+    LOCKFILE_CANDIDATES_BY_MANAGER = {
+      "yarn" => ["yarn.lock"],
+      "pnpm" => ["pnpm-lock.yaml"],
+      "bun" => ["bun.lock", "bun.lockb"],
+      "npm" => ["package-lock.json"]
+    }.freeze
+
     # Detects the package manager in priority order:
     # 1. REACT_ON_RAILS_PACKAGE_MANAGER env variable
     # 2. packageManager field in package.json (Corepack standard)
@@ -52,23 +61,11 @@ module GeneratorMessages
     end
 
     def detect_package_manager_from_lockfiles(app_root: Dir.pwd)
-      return "yarn" if File.exist?(File.join(app_root, "yarn.lock"))
-      return "pnpm" if File.exist?(File.join(app_root, "pnpm-lock.yaml"))
-      return "bun" if File.exist?(File.join(app_root, "bun.lock")) || File.exist?(File.join(app_root, "bun.lockb"))
-      return "npm" if File.exist?(File.join(app_root, "package-lock.json"))
-
+      LOCKFILE_CANDIDATES_BY_MANAGER.each do |pm, candidates|
+        return pm if candidates.any? { |name| File.exist?(File.join(app_root, name)) }
+      end
       nil
     end
-
-    # Used by error messages so the user can locate the lockfile that picked
-    # a missing manager. Returns the actual on-disk filename, or nil when no
-    # matching lockfile is on disk.
-    LOCKFILE_CANDIDATES_BY_MANAGER = {
-      "yarn" => ["yarn.lock"],
-      "pnpm" => ["pnpm-lock.yaml"],
-      "bun" => ["bun.lock", "bun.lockb"],
-      "npm" => ["package-lock.json"]
-    }.freeze
 
     def lockfile_filename_for(package_manager, app_root: Dir.pwd)
       LOCKFILE_CANDIDATES_BY_MANAGER[package_manager]&.find do |name|
@@ -76,19 +73,12 @@ module GeneratorMessages
       end
     end
 
-    # Returns true only when a lockfile for the specific package manager exists.
-    # Used by the CI scaffold so `cache:` / `<pm> install` never reference a
-    # lockfile that is not actually on disk (e.g. `packageManager: pnpm` without
-    # `pnpm-lock.yaml`, which breaks `actions/setup-node`'s cache step).
+    # Used by the CI scaffold so `cache:` / `<pm> install` never reference a lockfile
+    # that's not on disk (e.g. `packageManager: pnpm` without `pnpm-lock.yaml`, which
+    # breaks `actions/setup-node`'s cache step).
     def lockfile_for_manager?(package_manager, app_root: Dir.pwd)
-      case package_manager
-      when "yarn" then File.exist?(File.join(app_root, "yarn.lock"))
-      when "pnpm" then File.exist?(File.join(app_root, "pnpm-lock.yaml"))
-      when "bun"
-        File.exist?(File.join(app_root, "bun.lock")) ||
-          File.exist?(File.join(app_root, "bun.lockb"))
-      when "npm" then File.exist?(File.join(app_root, "package-lock.json"))
-      else false
+      LOCKFILE_CANDIDATES_BY_MANAGER.fetch(package_manager, []).any? do |name|
+        File.exist?(File.join(app_root, name))
       end
     end
 
