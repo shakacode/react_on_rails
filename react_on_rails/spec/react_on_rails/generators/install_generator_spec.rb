@@ -3188,6 +3188,7 @@ describe InstallGenerator, type: :generator do
 
     around do |example|
       original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
+      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
       example.run
     ensure
       if original
