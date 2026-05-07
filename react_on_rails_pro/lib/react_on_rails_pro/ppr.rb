@@ -17,9 +17,16 @@ module ReactOnRailsPro
     # Compose the PPR cache key. Mirrors `ReactOnRailsPro::Cache.react_component_cache_key`
     # (component + bundle digest + dep digest + user cache_key) and adds a 'ror_pro_ppr-vN'
     # namespace so PPR cache entries don't collide with other Pro caches.
+    #
+    # The effective `ppr_prerender_timeout_ms` is included so changing the timeout invalidates
+    # the cache: a different timeout produces a different set of resolved-vs-postponed
+    # boundaries in the shell.
     def cache_key(component_name, options)
+      timeout = options[:ppr_prerender_timeout_ms] ||
+                ReactOnRailsPro.configuration.ppr_prerender_timeout_ms
       [
         "ror_pro_ppr-v#{CACHE_VERSION}",
+        "timeout-#{timeout}",
         *ReactOnRailsPro::Cache.react_component_cache_key(component_name, options.merge(prerender: true))
       ]
     end

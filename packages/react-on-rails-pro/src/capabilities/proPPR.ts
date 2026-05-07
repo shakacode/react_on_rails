@@ -98,10 +98,26 @@ function checkPPRRuntimeOrThrow(): void {
   if (typeof globalThis.AbortSignal !== 'function') missing.push('AbortSignal');
   if (typeof (globalThis as unknown as { AsyncLocalStorage?: unknown }).AsyncLocalStorage !== 'function')
     missing.push('AsyncLocalStorage');
+  // Real timers are required by the prerender abort path. The node renderer's `stubTimers`
+  // option (default true) replaces setTimeout/clearTimeout with no-ops, which would make the
+  // abort timer never fire and PPR would hang until external timeouts. We probe by scheduling
+  // a no-op and checking the returned handle is truthy and clearTimeout is callable.
+  const setT = (globalThis as unknown as { setTimeout?: unknown }).setTimeout;
+  const clearT = (globalThis as unknown as { clearTimeout?: unknown }).clearTimeout;
+  if (typeof setT !== 'function' || typeof clearT !== 'function') {
+    missing.push('setTimeout/clearTimeout');
+  } else {
+    const handle = (setT as (cb: () => void, ms: number) => unknown)(() => {}, 0);
+    // Stubbed timers in the node renderer return undefined.
+    if (handle === undefined || handle === null) missing.push('setTimeout (real, not stubbed)');
+    else (clearT as (h: unknown) => void)(handle);
+  }
   if (missing.length) {
     throw new Error(
       `React on Rails Pro PPR requires runtime globals not available in this VM: ${missing.join(', ')}. ` +
-        `Upgrade your Pro node renderer to a version that injects these globals (>= the version that ships PPR support).`,
+        `Upgrade your Pro node renderer to a version that injects these globals (>= the version that ` +
+        `ships PPR support), and ensure stubTimers is disabled (set RENDERER_STUB_TIMERS=false or ` +
+        `stubTimers: false in the renderer config) so the prerender abort timer can fire.`,
     );
   }
 }
@@ -272,13 +288,43 @@ function resumeReactComponentForPPR(options: PPRRenderOptions): Readable {
   const shellHtml = railsContext.pprShellHtml ?? '';
   const postponedStateJson = railsContext.pprPostponedState ?? null;
 
+  const failBeforeShell = (error: Error): Readable => {
+    renderState.hasErrors = true;
+    renderState.error = error;
+    if (options.throwJsErrors) {
+      emitError(error);
+    } else {
+      const errorHtmlStream = handleError({ e: error, name: options.name, serverSide: true });
+      pipeToTransform(errorHtmlStream);
+    }
+    return readableStream;
+  };
+
+  // VALIDATE the postponed state BEFORE writing the shell chunk. If parsing fails, we want to
+  // surface the error to Rails through the normal error path (and let the helper invalidate the
+  // cache entry), not commit a half-broken response with the shell already on the wire.
+  let parsedPostponedState: unknown = null;
+  if (postponedStateJson) {
+    try {
+      parsedPostponedState = JSON.parse(postponedStateJson);
+    } catch (e) {
+      return failBeforeShell(
+        new Error(
+          `PPR resume: cached postponed state is not valid JSON for "${options.name}". ` +
+            'The cache entry is likely corrupted; clear the PPR cache to recover. ' +
+            `(parse error: ${(e as Error).message})`,
+        ),
+      );
+    }
+  }
+
   // Stream the cached shell as the first chunk immediately. (The transform wraps it in a JSON
   // envelope; Rails-side build_react_component_result_for_server_streamed_content unpacks the
   // first chunk into the component wrapper as usual.)
   writeChunk(shellHtml);
 
   // If there's no postponed state (fully-static page) just end the stream.
-  if (!postponedStateJson) {
+  if (parsedPostponedState === null) {
     endStream();
     return readableStream;
   }
@@ -290,10 +336,9 @@ function resumeReactComponentForPPR(options: PPRRenderOptions): Readable {
       checkPPRRuntimeOrThrow();
       const { resumeToPipeableStream } = await loadPPRReactAPIs();
       const reactElement = await resolveComponentElement(options, railsContext);
-      const postponedState = JSON.parse(postponedStateJson) as unknown;
 
       const passThrough = new PassThrough();
-      const resumeStream = resumeToPipeableStream(reactElement, postponedState, {
+      const resumeStream = resumeToPipeableStream(reactElement, parsedPostponedState, {
         onError: (err) =>
           withPhase('resume', () => {
             renderState.hasErrors = true;
@@ -306,12 +351,18 @@ function resumeReactComponentForPPR(options: PPRRenderOptions): Readable {
       resumeStream.pipe(passThrough);
       pipeToTransform(passThrough);
     } catch (e) {
-      // Pre-stream error: surface via the chunk pipeline as an error chunk.
+      // POST-shell error (after writeChunk): the shell is already on the wire so we can't
+      // redirect to a fresh error page. Surface via the chunk pipeline. Honor throwJsErrors so
+      // tests / strict consumers see the failure rather than a partial render.
       const error = convertToError(e);
       renderState.hasErrors = true;
       renderState.error = error;
-      const errorHtmlStream = handleError({ e: error, name: options.name, serverSide: true });
-      pipeToTransform(errorHtmlStream);
+      if (options.throwJsErrors) {
+        emitError(error);
+      } else {
+        const errorHtmlStream = handleError({ e: error, name: options.name, serverSide: true });
+        pipeToTransform(errorHtmlStream);
+      }
     }
   };
 

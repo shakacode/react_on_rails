@@ -314,9 +314,12 @@ module ReactOnRailsProHelper
     timeout_ms = raw_options.delete(:prerender_timeout_ms) ||
                  ReactOnRailsPro.configuration.ppr_prerender_timeout_ms
 
-    # Step 1: cache lookup (or build the shell on miss)
+    # Step 1: cache lookup (or build the shell on miss). The effective timeout is part of the
+    # cache key — different timeouts lead to different sets of resolved-vs-postponed boundaries
+    # in the cached shell, so they MUST invalidate independently.
     shell_data = if ReactOnRailsPro::Cache.use_cache?(raw_options)
-                   cache_key = ReactOnRailsPro::PPR.cache_key(component_name, raw_options)
+                   key_options = raw_options.merge(ppr_prerender_timeout_ms: timeout_ms)
+                   cache_key = ReactOnRailsPro::PPR.cache_key(component_name, key_options)
                    Rails.logger.debug { "[ReactOnRailsPro] PPR cache_key=#{cache_key.inspect}" }
                    Rails.cache.fetch(cache_key, raw_options[:cache_options] || {}) do
                      internal_ppr_prerender(component_name, raw_options.merge(prerender_timeout_ms: timeout_ms))
@@ -589,17 +592,33 @@ module ReactOnRailsProHelper
     )
 
     result = internal_react_component(component_name, options)[:result]
-    result_hash = result.is_a?(Hash) ? result : {}
 
-    if result_hash["hasErrors"]
+    # Hard-validate the JS-side response BEFORE returning. We must NOT let a malformed
+    # response (e.g. a string, an unexpected Hash shape, a missing pprShellHtml key) through —
+    # if Rails.cache.fetch's block returns a value the cache stores it, even if that value
+    # represents a broken shell. Raise instead so the cache write is skipped.
+    unless result.is_a?(Hash)
       raise ReactOnRailsPro::Error,
-            "PPR prerender failed for #{component_name}: #{result_hash['errorMessage'] || result_hash['html']}"
+            "PPR prerender for #{component_name} returned a #{result.class} instead of a Hash. " \
+            "Expected { pprShellHtml:, pprPostponedState:, hasErrors:, ... }."
+    end
+
+    if result["hasErrors"]
+      raise ReactOnRailsPro::Error,
+            "PPR prerender failed for #{component_name}: #{result['errorMessage'] || result['html']}"
+    end
+
+    unless result.key?("pprShellHtml")
+      raise ReactOnRailsPro::Error,
+            "PPR prerender for #{component_name} returned a Hash without `pprShellHtml`. " \
+            "This usually means the JS bundle does not have the PPR capability registered. " \
+            "Result keys: #{result.keys.inspect}"
     end
 
     {
-      shell_html: result_hash["pprShellHtml"].to_s,
-      postponed_state: result_hash["pprPostponedState"],
-      console_replay_script: result_hash["consoleReplayScript"].to_s,
+      shell_html: result["pprShellHtml"].to_s,
+      postponed_state: result["pprPostponedState"],
+      console_replay_script: result["consoleReplayScript"].to_s,
       has_errors: false,
       ppr_version: ReactOnRailsPro::PPR::CACHE_VERSION
     }
