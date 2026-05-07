@@ -3184,19 +3184,9 @@ describe InstallGenerator, type: :generator do
   end
 
   describe "#warn_if_unsupported_env_package_manager" do
-    let(:install_generator) { described_class.new }
+    include_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env"
 
-    around do |example|
-      original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
-      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      example.run
-    ensure
-      if original
-        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
-      else
-        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      end
-    end
+    let(:install_generator) { described_class.new }
 
     specify "warns when REACT_ON_RAILS_PACKAGE_MANAGER is set to an unsupported value" do
       ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "rush"

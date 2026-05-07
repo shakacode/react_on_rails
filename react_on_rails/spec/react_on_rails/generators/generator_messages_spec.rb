@@ -3,20 +3,6 @@
 require_relative "../support/generator_spec_helper"
 
 describe GeneratorMessages do
-  shared_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env" do
-    around do |example|
-      original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
-      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      example.run
-    ensure
-      if original
-        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
-      else
-        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      end
-    end
-  end
-
   it "has an empty messages array" do
     expect(described_class.messages).to be_empty
   end
