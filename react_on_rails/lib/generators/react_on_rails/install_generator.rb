@@ -954,6 +954,8 @@ module ReactOnRails
           error = <<~MSG.strip
             🚫 No JavaScript package manager found on your system.
 
+            #{package_manager_source_description(selected, source)}
+
             React on Rails requires a JavaScript package manager to install dependencies.
             Please install one of the following:
 

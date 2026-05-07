@@ -3148,7 +3148,27 @@ describe InstallGenerator, type: :generator do
 
       error_text = GeneratorMessages.messages.join("\n")
       expect(error_text).to include("No JavaScript package manager found")
+      expect(error_text).to include("Selected via the npm default fallback")
       expect(error_text).to include("Please install one of the following")
+    end
+  end
+
+  context "when no JavaScript package manager is available but the user had configured one" do
+    let(:install_generator) { described_class.new }
+
+    before do
+      allow(GeneratorMessages).to receive_messages(
+        detect_package_manager_with_source: ["pnpm", :package_json],
+        package_manager_executable_available?: false
+      )
+    end
+
+    specify "missing_package_manager? names the configured source so the user knows their config is involved" do
+      expect(install_generator.send(:missing_package_manager?)).to be true
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("No JavaScript package manager found")
+      expect(error_text).to include("`packageManager` field in package.json")
     end
   end
 
