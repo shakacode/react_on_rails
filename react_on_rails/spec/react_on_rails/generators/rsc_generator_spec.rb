@@ -258,7 +258,6 @@ describe RscGenerator, type: :generator do
         "config/webpack/serverWebpackConfig.js",
         <<~JS
           const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
-          // clientReferences: rscClientReferences
           #{pro_server_webpack_content
             .sub('const configureServer = () => {', 'const configureServer = (rscBundle = false) => {')
             .sub(limit_chunk_plugin, old_rsc_plugin)}
@@ -269,7 +268,6 @@ describe RscGenerator, type: :generator do
         <<~JS
           const config = require('shakapacker').config;
           const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
-          // clientReferences: rscClientReferences
           #{base_client_webpack_content.sub(
             'return clientConfig;',
             "clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false, chunkName: 'client' }));\n\n  return clientConfig;"
@@ -287,10 +285,12 @@ describe RscGenerator, type: :generator do
         rsc_plugin_import = "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');"
         expect(content.scan(rsc_plugin_import).length).to eq(1)
         expect(content).to include("const { resolve } = require('path');")
-        expect(content).to include("clientReferences: rscClientReferences")
+        plugin_config = content[/new RSCWebpackPlugin\(\{([^}]*)\}\)/m, 1]
+        expect(plugin_config).not_to be_nil
+        expect(plugin_config).to include("clientReferences: rscClientReferences")
         expect(content).to include("directory: resolve(config.source_path)")
-        expect(content).to include("chunkName: 'server'")
-        expect(content).to include("isServer: true")
+        expect(plugin_config).to include("chunkName: 'server'")
+        expect(plugin_config).to include("isServer: true")
       end
     end
 
@@ -301,10 +301,12 @@ describe RscGenerator, type: :generator do
         expect(content).to include("const config = require('shakapacker').config;")
         expect(content).not_to include("const { config } = require('shakapacker');")
         expect(content).to include("const { resolve } = require('path');")
-        expect(content).to include("clientReferences: rscClientReferences")
+        plugin_config = content[/new RSCWebpackPlugin\(\{([^}]*)\}\)/m, 1]
+        expect(plugin_config).not_to be_nil
+        expect(plugin_config).to include("clientReferences: rscClientReferences")
         expect(content).to include("directory: resolve(config.source_path)")
-        expect(content).to include("chunkName: 'client'")
-        expect(content).to include("isServer: false")
+        expect(plugin_config).to include("chunkName: 'client'")
+        expect(plugin_config).to include("isServer: false")
       end
     end
   end
