@@ -1022,6 +1022,34 @@ module ReactOnRails
         end
       end
     end
+
+    describe ".command_available?" do
+      it "shells out to which on non-Windows" do
+        allow(described_class).to receive_messages(running_on_windows?: false, system: true)
+
+        expect(described_class.command_available?("node")).to be(true)
+        expect(described_class).to have_received(:system).with("which", "node", out: File::NULL, err: File::NULL)
+      end
+
+      it "shells out to where on Windows" do
+        allow(described_class).to receive_messages(running_on_windows?: true, system: true)
+
+        expect(described_class.command_available?("node")).to be(true)
+        expect(described_class).to have_received(:system).with("where", "node", out: File::NULL, err: File::NULL)
+      end
+
+      it "returns false when the command is missing" do
+        allow(described_class).to receive_messages(running_on_windows?: false, system: false)
+
+        expect(described_class.command_available?("nope")).to be(false)
+      end
+
+      it "coerces nil from system (which/where itself missing) to false" do
+        allow(described_class).to receive_messages(running_on_windows?: false, system: nil)
+
+        expect(described_class.command_available?("anything")).to be(false)
+      end
+    end
   end
 end
 # rubocop:enable Metrics/ModuleLength, Metrics/BlockLength
