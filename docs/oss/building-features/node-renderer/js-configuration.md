@@ -60,11 +60,11 @@ Deprecated options:
 
 The node renderer executes uploaded JavaScript bundles inside isolated VM contexts. Those contexts do not automatically inherit every global from the host Node.js process.
 
-| Runtime path              | Execution environment                 | Global guarantees                                                                                                                                                                                                              |
-| ------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Client bundle             | Browser                               | Browser APIs such as `window`, `document`, and browser `fetch` are available. Node.js globals are not.                                                                                                                         |
-| Server bundle (SSR)       | Node renderer VM context              | JavaScript built-ins are available. With `supportModules: true`, common Node.js globals (`Buffer`, `TextDecoder`, `TextEncoder`, `URLSearchParams`, `ReadableStream`, `process`, `performance`, timer functions) are injected. |
-| RSC bundle payload render | Node renderer VM context for RSC code | Uses the same VM context rules as the server bundle. The bundle is built for RSC, but host Node.js globals still need to be bundled, polyfilled, or injected.                                                                  |
+| Runtime path              | Execution environment                 | Global guarantees                                                                                                                                                                                                                           |
+| ------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client bundle             | Browser                               | Browser APIs such as `window`, `document`, and browser `fetch` are available. Node.js globals are not.                                                                                                                                      |
+| Server bundle (SSR)       | Node renderer VM context              | JavaScript built-ins are available. With the `supportModules` option enabled, common Node.js globals (`Buffer`, `TextDecoder`, `TextEncoder`, `URLSearchParams`, `ReadableStream`, `process`, `performance`, timer functions) are injected. |
+| RSC bundle payload render | Node renderer VM context for RSC code | Uses the same VM context rules as the server bundle. The bundle is built for RSC, but host Node.js globals still need to be bundled, polyfilled, or injected.                                                                               |
 
 `supportModules` does **not** inject `fetch`, `Headers`, `Request`, or `Response`. Even if the Node.js process that launches the renderer has those globals, code inside the renderer VM will not see them unless you provide them. That means Server Components should not assume that "modern Node" global `fetch` is available in the server or RSC bundle.
 
@@ -84,7 +84,7 @@ const ResponseImplementation = globalThis.Response;
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
     'Your Node.js runtime does not expose fetch, Headers, Request, and Response. ' +
-      'Use Node.js 18+ or install a fetch implementation and pass it via additionalContext.',
+      'Use Node.js 18+ or replace the globalThis.* assignments above with a fetch polyfill import.',
   );
 }
 

@@ -841,8 +841,9 @@ module.exports = {
   supportModules: true,
   additionalContext: {
     // Add any globals that aren't in the default supportModules set.
-    // These host globals require Node.js 18+. If any are undefined,
-    // import a polyfill and pass that implementation instead.
+    // These host globals require Node.js 18+. If any are undefined, import a
+    // polyfill and pass that implementation instead. The JavaScript
+    // configuration guide shows a guarded startup example.
     fetch: globalThis.fetch,
     Headers: globalThis.Headers,
     Request: globalThis.Request,
@@ -854,7 +855,7 @@ module.exports = {
 };
 ```
 
-If your Node.js runtime does not provide the fetch globals, use a bundled HTTP client such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici` from the component code, or pass a fetch implementation through `additionalContext`. See [Node Renderer JavaScript Configuration](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
+If your Node.js runtime does not provide the fetch globals, use a bundled HTTP client such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici` from the component code, or pass a fetch implementation through `additionalContext`. See [Node Renderer JavaScript Configuration](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc) for a guarded startup example that fails fast when a required global is missing.
 
 #### Handling Node Builtins -- `externals` vs `resolve.fallback`
 
