@@ -173,7 +173,7 @@ def show
 end
 ```
 
-Rails 7.1+ supports `cache_control:` on `stale?`. On older Rails versions, set the full `Cache-Control` header directly and keep the explicit freshness guard before streaming.
+If `stale?` returns `false`, Rails has already prepared the `304 Not Modified` response; the early return keeps the controller from starting a streamed render after that response has been selected. Rails 7.1+ supports `cache_control:` on `stale?`. On older Rails versions, set the full `Cache-Control` header directly and keep the explicit freshness guard before streaming.
 
 When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy or keep the response private:
 
