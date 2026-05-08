@@ -2860,6 +2860,17 @@ RSpec.describe ReactOnRails::Doctor do
       File.write("node_modules/react/package.json", "{\"version\":\"#{version}\"}")
     end
 
+    def stub_package_root(path)
+      allow(Rails).to receive(:root).and_return(Pathname.new(path))
+      allow(ReactOnRails).to receive(:configuration).and_return(
+        instance_double(ReactOnRails::Configuration, node_modules_location: path)
+      )
+    end
+
+    before do
+      stub_package_root(Dir.pwd)
+    end
+
     context "when React 19.0.4+" do
       around do |example|
         Dir.mktmpdir do |tmpdir|

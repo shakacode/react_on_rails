@@ -2930,11 +2930,7 @@ module ReactOnRails
       # which handles hoisted dependencies in monorepos and pnpm workspaces.
       # Resolve from the configured package root so nested client/ layouts work.
       script = "console.log(require.resolve('react/package.json'))"
-      stdout, _stderr, status = if resolved_package_root.empty?
-                                  Open3.capture3("node", "-e", script)
-                                else
-                                  Open3.capture3("node", "-e", script, chdir: resolved_package_root)
-                                end
+      stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: resolved_package_root)
       return nil unless status.success?
 
       resolved_path = stdout.strip

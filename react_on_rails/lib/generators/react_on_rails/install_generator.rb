@@ -417,6 +417,8 @@ module ReactOnRails
       # js(.coffee) are not checked by this method, but instead produce warning messages
       # and allow the build to continue
       def installation_prerequisites_met?
+        warn_if_unsupported_env_package_manager
+
         # Non-blocking: warn about dirty worktree but don't prevent installation.
         # A clean tree makes the generator diff easier to review, but blocking would
         # be too strict for a generator that creates many new files.
@@ -442,10 +444,21 @@ module ReactOnRails
         !(missing_node? || missing_package_manager? || (!has_worktree_issues && missing_pro_gem?))
       end
 
-      def missing_node?
-        node_missing = ReactOnRails::Utils.running_on_windows? ? `where node`.blank? : `which node`.blank?
+      def warn_if_unsupported_env_package_manager
+        env_value = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip
+        return if env_value.nil? || env_value.empty?
+        return if GeneratorMessages.supported_package_manager?(env_value.downcase)
 
-        if node_missing
+        supported = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.join(", ")
+        GeneratorMessages.add_warning(<<~MSG.strip)
+          ⚠️  REACT_ON_RAILS_PACKAGE_MANAGER='#{env_value}' is not a supported package manager.
+          Supported values: #{supported}.
+          Falling through to package.json / lockfile / npm-default detection.
+        MSG
+      end
+
+      def missing_node?
+        unless ReactOnRails::Utils.command_available?("node")
           error = <<~MSG.strip
             🚫 Node.js is required but not found on your system.
 
@@ -734,8 +747,7 @@ module ReactOnRails
       end
 
       def cli_exists?(command)
-        which_command = ReactOnRails::Utils.running_on_windows? ? "where" : "which"
-        system(which_command, command, out: File::NULL, err: File::NULL)
+        ReactOnRails::Utils.command_available?(command)
       end
 
       def normalize_bin_dev_content(content)
@@ -946,12 +958,18 @@ module ReactOnRails
       end
 
       def missing_package_manager?
-        package_managers = %w[npm pnpm yarn bun]
-        missing = package_managers.none? { |pm| cli_exists?(pm) }
+        selected, source = GeneratorMessages.detect_package_manager_with_source(app_root: destination_root)
+        return false if GeneratorMessages.package_manager_executable_available?(selected)
 
-        if missing
+        available_package_managers = GeneratorMessages::SUPPORTED_PACKAGE_MANAGERS.select do |pm|
+          pm != selected && GeneratorMessages.package_manager_executable_available?(pm)
+        end
+
+        if available_package_managers.empty?
           error = <<~MSG.strip
             🚫 No JavaScript package manager found on your system.
+
+            #{package_manager_source_description(selected, source)}
 
             React on Rails requires a JavaScript package manager to install dependencies.
             Please install one of the following:
@@ -967,7 +985,32 @@ module ReactOnRails
           return true
         end
 
-        false
+        action_separator = %i[default env].include?(source) ? " or " : ", update the source above, or "
+        error = <<~MSG.strip
+          🚫 JavaScript package manager '#{selected}' was selected, but the command was not found.
+
+          #{package_manager_source_description(selected, source)}
+          Install '#{selected}'#{action_separator}set REACT_ON_RAILS_PACKAGE_MANAGER
+          to one of the available package managers: #{available_package_managers.join(', ')}.
+        MSG
+        GeneratorMessages.add_error(error)
+        true
+      end
+
+      def package_manager_source_description(selected, source)
+        case source
+        when :env
+          "Selected via the REACT_ON_RAILS_PACKAGE_MANAGER environment variable."
+        when :package_json
+          "Selected via the `packageManager` field in package.json."
+        when :lockfile
+          lockfile = GeneratorMessages.lockfile_filename_for(selected, app_root: destination_root)
+          lockfile ? "Selected via the #{lockfile} lockfile on disk." : "Selected via a lockfile on disk."
+        when :default
+          "Selected via the npm default fallback (no env var, packageManager field, or lockfile detected)."
+        else
+          raise ArgumentError, "Unknown package manager source: #{source.inspect}"
+        end
       end
 
       def jsx_in_js_files_present?

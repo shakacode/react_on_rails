@@ -7,6 +7,7 @@ import ReactOnRails from 'react-on-rails/client';
 import ReactDOMClient from 'react-dom/client';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
+import { wrapElementInStrictMode } from '../strictModeSupport';
 
 /*
  *  Export a function that returns a ReactComponent, depending on a store named SharedReduxStore.
@@ -32,10 +33,10 @@ export default (props, _railsContext, domNodeId) => {
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
   const renderApp = (Component) => {
-    const element = (
+    const element = wrapElementInStrictMode(
       <Provider store={store}>
         <Component />
-      </Provider>
+      </Provider>,
     );
     render(document.getElementById(domNodeId), element);
   };

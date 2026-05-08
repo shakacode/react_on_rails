@@ -961,6 +961,10 @@ RSpec.describe ReactOnRails::SystemChecker do
           instance_double(ReactOnRails::Configuration, node_modules_location: "client")
         )
         allow(File).to receive(:exist?).with(rails_root.join("client", "yarn.lock").to_s).and_return(true)
+        allow(File).to receive(:exist?).with(rails_root.join("client", "pnpm-lock.yaml").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("client", "bun.lock").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("client", "bun.lockb").to_s).and_return(false)
+        allow(File).to receive(:exist?).with(rails_root.join("client", "package-lock.json").to_s).and_return(false)
 
         expect(checker.send(:detect_used_package_manager)).to eq("yarn")
       end

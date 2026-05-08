@@ -24,8 +24,10 @@ module ReactOnRails
     end
 
     def resolved_package_root
-      package_root = File.dirname(resolved_package_json_path)
-      package_root == "." ? Rails.root.to_s : package_root
+      node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
+      return Rails.root.to_s if node_modules_location.empty? || node_modules_location == Rails.root.to_s
+
+      Rails.root.join(node_modules_location).to_s
     end
 
     def resolved_package_path(filename)

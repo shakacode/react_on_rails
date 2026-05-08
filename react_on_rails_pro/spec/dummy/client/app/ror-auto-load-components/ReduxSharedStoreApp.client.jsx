@@ -9,6 +9,7 @@ import ReactOnRails from 'react-on-rails-pro';
 import { hydrateRoot, createRoot } from 'react-dom/client';
 
 import HelloWorldContainer from '../components/HelloWorldContainer';
+import { wrapElementInStrictMode } from '../strictModeSupport';
 
 const hydrateOrRender = (domEl, reactEl, prerender) => {
   if (prerender) {
@@ -33,10 +34,10 @@ export default (props, _railsContext, domNodeId) => {
 
   // Provider uses this.props.children, so we're not typical React syntax.
   // This allows redux to add additional props to the HelloWorldContainer.
-  const element = (
+  const element = wrapElementInStrictMode(
     <Provider store={store}>
       <HelloWorldContainer />
-    </Provider>
+    </Provider>,
   );
 
   hydrateOrRender(document.getElementById(domNodeId), element, prerender);

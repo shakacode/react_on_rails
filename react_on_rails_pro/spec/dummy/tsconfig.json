@@ -12,6 +12,8 @@
     "client/**/*.tsx",
     "client/**/*.d.ts",
     "e2e-tests/*",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
     "./playwright.config.ts"
   ]
 }
