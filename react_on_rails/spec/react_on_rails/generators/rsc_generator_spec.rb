@@ -356,6 +356,148 @@ describe RscGenerator, type: :generator do
     end
   end
 
+  context "when an existing RSC webpack config already defines custom client references" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+          const customClientReferences = { directory: './custom' };
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({ clientReferences: customClientReferences, isServer: false }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "leaves the custom client references untouched without adding a duplicate property" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("clientReferences:").length).to eq(1)
+        expect(content).to include("clientReferences: customClientReferences")
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+      end
+
+      expect(GeneratorMessages.messages.join("\n")).to include("already defines clientReferences")
+    end
+  end
+
+  context "when required imports appear after the client RSC setup anchor" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          const { config } = require('shakapacker');
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "warns why the scoped client references migration was skipped" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+      end
+
+      expect(GeneratorMessages.messages.join("\n")).to include("required imports ('path'/'shakapacker')")
+    end
+  end
+
+  context "when path is imported into an unusable resolve binding" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const resolve = require('path');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(new RSCWebpackPlugin({ isServer: false }));
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not add a duplicate resolve binding or half-apply scoped client references" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content.scan("const resolve = require('path');").length).to eq(1)
+        expect(content).not_to include("const { resolve } = require('path');")
+        expect(content).not_to include("clientReferences: rscClientReferences")
+        expect(content).not_to include("const rscClientReferences")
+      end
+
+      expect(GeneratorMessages.messages.join("\n")).to include("required imports ('path'/'shakapacker')")
+    end
+  end
+
   context "when the client webpack config uses aliased imports" do
     before(:all) do
       prepare_destination

@@ -386,21 +386,11 @@ module ReactOnRails
 
         # Add RSCWebpackPlugin import after bundler require
         existing_imports_content = content_before_rsc_setup_anchor(content, is_server: true)
-        return if rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server: true)
+        return unless rsc_client_references_setup_anchor_available?(config_path, content, is_server: true)
+        return if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server: true)
 
-        server_injected_imports = [
-          "\\1",
-          ("const { resolve } = require('path');" unless path_resolve_imported?(existing_imports_content)),
-          "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
-          "",
-          rsc_client_references_js
-        ].compact.join("\n")
-
-        gsub_file(
-          config_path,
-          %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)},
-          server_injected_imports
-        )
+        inject_rsc_server_imports(config_path, existing_imports_content)
+        return unless rsc_client_references_setup_ready?(config_path)
 
         # Add rscBundle parameter to configureServer function
         gsub_file(
@@ -440,7 +430,12 @@ module ReactOnRails
 
         # Add RSCWebpackPlugin import after commonWebpackConfig import
         existing_imports_content = content_before_rsc_setup_anchor(content, is_server: false)
-        return if rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server: false)
+        return unless rsc_client_references_setup_anchor_available?(config_path, content, is_server: false)
+        if rsc_setup_blocked_by_later_imports?(
+          config_path, content, existing_imports_content, is_server: false
+        )
+          return
+        end
 
         injected_imports = [
           "\\1",
@@ -456,6 +451,7 @@ module ReactOnRails
           %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)},
           injected_imports
         )
+        return unless rsc_client_references_setup_ready?(config_path)
 
         # Add RSCWebpackPlugin to client config before return statement
         rsc_plugin_code = "  // Add React Server Components plugin for client bundle\n  " \
@@ -532,11 +528,28 @@ module ReactOnRails
         JS
       end
 
+      def inject_rsc_server_imports(config_path, existing_imports_content)
+        server_injected_imports = [
+          "\\1",
+          ("const { resolve } = require('path');" unless path_resolve_imported?(existing_imports_content)),
+          "const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');",
+          "",
+          rsc_client_references_js
+        ].compact.join("\n")
+
+        gsub_file(
+          config_path,
+          %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)},
+          server_injected_imports
+        )
+      end
+
       def update_existing_rsc_webpack_config(config_path, content, is_server:)
         return if rsc_plugin_uses_scoped_client_references?(content)
 
         unless rsc_client_references_defined?(content) ||
                rsc_client_references_setup_anchor?(content, is_server: is_server)
+          warn_missing_rsc_client_references_anchor(config_path)
           return
         end
 
@@ -544,6 +557,7 @@ module ReactOnRails
         return if rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server: is_server)
 
         add_rsc_client_references_setup(config_path, content, is_server: is_server)
+        return unless rsc_client_references_setup_ready?(config_path)
 
         gsub_file(
           config_path,
@@ -602,11 +616,23 @@ module ReactOnRails
 
       def rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server:)
         resolve_imported_later = path_resolve_imported?(content) && !path_resolve_imported?(existing_imports_content)
-        config_imported_later = !is_server &&
-                                shakapacker_config_imported?(content) &&
+        unusable_resolve_binding = path_module_imported_as_resolve?(content) && !path_resolve_imported?(content)
+        config_imported_later = !is_server && shakapacker_config_imported?(content) &&
                                 !shakapacker_config_imported?(existing_imports_content)
 
-        resolve_imported_later || config_imported_later
+        resolve_imported_later || unusable_resolve_binding || config_imported_later
+      end
+
+      def rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server:)
+        return false unless rsc_setup_has_later_required_imports?(content, existing_imports_content,
+                                                                  is_server: is_server)
+
+        required_imports = is_server ? "'path'" : "'path'/'shakapacker'"
+        GeneratorMessages.add_warning(
+          "Could not inject rscClientReferences into #{config_path}: required imports (#{required_imports}) " \
+          "are unavailable before the expected anchor line. Please add clientReferences manually."
+        )
+        true
       end
 
       def shakapacker_config_imported?(content)
@@ -616,7 +642,32 @@ module ReactOnRails
 
       def path_resolve_imported?(content)
         commonjs_named_imported?(content, "path", "resolve") ||
-          content.match?(/^\s*const\s+resolve\s*=\s*require\(['"]path['"]\)/)
+          content.match?(/^\s*const\s+resolve\s*=\s*require\(['"]path['"]\)\.resolve/)
+      end
+
+      def path_module_imported_as_resolve?(content)
+        content.match?(/^\s*const\s+resolve\s*=\s*require\(['"]path['"]\);?/)
+      end
+
+      def rsc_client_references_setup_anchor_available?(config_path, content, is_server:)
+        return true if rsc_client_references_setup_anchor?(content, is_server: is_server)
+
+        warn_missing_rsc_client_references_anchor(config_path)
+        false
+      end
+
+      def rsc_client_references_setup_ready?(config_path)
+        return true if rsc_client_references_defined?(File.read(File.join(destination_root, config_path)))
+
+        warn_missing_rsc_client_references_anchor(config_path)
+        false
+      end
+
+      def warn_missing_rsc_client_references_anchor(config_path)
+        GeneratorMessages.add_warning(
+          "Could not inject rscClientReferences into #{config_path}: expected webpack import anchor was not found. " \
+          "Please add clientReferences manually."
+        )
       end
 
       def commonjs_named_imported?(content, package_name, binding_name)
