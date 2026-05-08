@@ -109,7 +109,6 @@ Start the renderer in `before(:suite)` after assets are compiled and stop it in 
 # spec/support/rsc_node_renderer.rb
 require "fileutils"
 require "socket"
-require "timeout"
 
 module RscNodeRenderer
   module_function
@@ -129,6 +128,7 @@ module RscNodeRenderer
 end
 
 rsc_node_renderer_pid = nil # Closure shared by before(:suite) and after(:suite).
+rsc_node_renderer_waiter = nil # Process.detach thread for reaping abnormal exits.
 
 RSpec.configure do |config|
   config.before(:suite) do
@@ -142,8 +142,14 @@ RSpec.configure do |config|
             "Set it before requiring config/environment so every parallel worker " \
             "gets a unique renderer bundle cache directory."
     end
-    FileUtils.rm_rf(cache_path)
-    FileUtils.mkdir_p(cache_path)
+    expanded_cache_path = File.expand_path(cache_path)
+    tmp_root = File.expand_path(Rails.root.join("tmp").to_s)
+    unless expanded_cache_path.start_with?("#{tmp_root}#{File::SEPARATOR}")
+      raise "RENDERER_SERVER_BUNDLE_CACHE_PATH must be inside Rails.root/tmp " \
+            "(got: #{expanded_cache_path})"
+    end
+    FileUtils.rm_rf(expanded_cache_path)
+    FileUtils.mkdir_p(expanded_cache_path)
 
     renderer_env = {
       "NODE_ENV" => "test",
@@ -153,7 +159,7 @@ RSpec.configure do |config|
               "Set it before requiring config/environment so every parallel worker " \
               "gets a unique renderer port."
       end,
-      "RENDERER_SERVER_BUNDLE_CACHE_PATH" => cache_path
+      "RENDERER_SERVER_BUNDLE_CACHE_PATH" => expanded_cache_path
     }
 
     rsc_node_renderer_pid = Process.spawn(
@@ -165,6 +171,7 @@ RSpec.configure do |config|
       out: Rails.root.join("log/node-renderer-test.log").to_s,
       err: [:child, :out]
     )
+    rsc_node_renderer_waiter = Process.detach(rsc_node_renderer_pid)
 
     renderer_timeout = ENV.fetch("RSC_NODE_RENDERER_BOOT_TIMEOUT", "30").to_i
     RscNodeRenderer.wait_until_ready!(
@@ -179,18 +186,15 @@ RSpec.configure do |config|
     next unless pid
 
     Process.kill("TERM", pid)
-    Timeout.timeout(5) { Process.wait(pid) }
-  rescue Errno::ESRCH, Errno::ECHILD
+    next if rsc_node_renderer_waiter&.join(5)
+
+    Process.kill("KILL", pid)
+    rsc_node_renderer_waiter&.join(5)
+  rescue Errno::ESRCH
     # Already stopped.
-  rescue Timeout::Error
-    begin
-      Process.kill("KILL", pid)
-      Process.wait(pid)
-    rescue Errno::ESRCH, Errno::ECHILD
-      # Already stopped.
-    end
   ensure
     rsc_node_renderer_pid = nil
+    rsc_node_renderer_waiter = nil
   end
 end
 ```
