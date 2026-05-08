@@ -351,10 +351,11 @@ module ReactOnRailsPro
     # warning lists every offending hash for the operator at the source.
     def self.sanitize_hashes(hash_values, source_label:)
       hashes = Array(hash_values).map { |value| value.to_s.strip }.reject(&:empty?)
-      invalid = hashes.grep_v(SAFE_HASH_PATTERN)
+      invalid = (hashes.grep_v(SAFE_HASH_PATTERN) + hashes.grep(TEMPORARY_DIRECTORY_PATTERN)).uniq
       if invalid.any?
         warn "[ReactOnRailsPro] #{source_label} returned invalid hash values (rejected): #{invalid.inspect}. " \
-             "Hashes must match /#{SAFE_HASH_PATTERN.source}/ to stay within the renderer cache directory."
+             "Hashes must match /#{SAFE_HASH_PATTERN.source}/ and not look like renderer-cache staging " \
+             "directories to stay within the renderer cache directory."
       end
       hashes - invalid
     end

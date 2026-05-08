@@ -38,6 +38,10 @@ module ReactOnRailsPro
       [unique, required_rsc_asset_paths(rsc_manifests)]
     end
 
+    def collect_assets
+      collect_assets_with_required_paths.first
+    end
+
     def rsc_manifest_paths
       manifests = {
         react_client_manifest_file_path: ReactOnRailsPro::Utils.react_client_manifest_file_path,
@@ -188,14 +192,13 @@ module ReactOnRailsPro
       source_path = realpath_for_symlink_source(source)
       destination_dir_real = realpath_for_symlink_destination(destination_dir)
       relative_source_path = source_path.relative_path_from(destination_dir_real)
+      tmp_link = "#{destination}.tmp-#{Process.pid}-#{SecureRandom.hex(6)}"
 
-      FileUtils.rm_f(destination)
-      begin
-        File.symlink(relative_source_path, destination)
-        puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
-      rescue Errno::EEXIST
-        replace_existing_symlink(destination, relative_source_path, log_prefix)
-      end
+      File.symlink(relative_source_path.to_s, tmp_link)
+      File.rename(tmp_link, destination)
+      puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
+    ensure
+      FileUtils.rm_f(tmp_link) if tmp_link
     end
 
     def replace_existing_symlink(destination, relative_source_path, log_prefix)
