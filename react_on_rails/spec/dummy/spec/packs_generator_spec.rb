@@ -430,12 +430,12 @@ module ReactOnRails
         generator = described_class.new
         generation_started = Queue.new
         release_generation = Queue.new
-        second_lock_attempted = Queue.new
+        second_about_to_lock = Queue.new
         second_completed = Queue.new
         generation_count = 0
 
         allow(generator).to receive(:with_generated_packs_lock).and_wrap_original do |original, *args, **kwargs, &block|
-          second_lock_attempted << true if Thread.current[:packs_generator_spec_thread] == :second
+          second_about_to_lock << true if Thread.current[:packs_generator_spec_thread] == :second
           original.call(*args, **kwargs, &block)
         end
         allow(generator).to receive(:add_generated_pack_to_server_bundle)
@@ -448,6 +448,7 @@ module ReactOnRails
           release_generation.pop
         end
 
+        ReactOnRails.configuration.auto_load_bundle = true
         first_thread = Thread.new { generator.generate_packs_if_stale }
         expect(generation_started.pop(timeout: 5)).to be(true)
 
@@ -457,7 +458,7 @@ module ReactOnRails
           second_completed << true
         end
 
-        expect(second_lock_attempted.pop(timeout: 5)).to be(true)
+        expect(second_about_to_lock.pop(timeout: 5)).to be(true)
         expect { second_completed.pop(true) }.to raise_error(ThreadError)
 
         release_generation << true
@@ -468,6 +469,8 @@ module ReactOnRails
       ensure
         first_thread&.kill if first_thread&.alive?
         second_thread&.kill if second_thread&.alive?
+        lock_path = generator.send(:generated_packs_lock_path)
+        FileUtils.rm_f(lock_path) if lock_path
       end
 
       it "clears stale lock contents without unlinking the lock file" do
@@ -484,6 +487,19 @@ module ReactOnRails
         expect(File.exist?(lock_path)).to be(true)
         expect(File.stat(lock_path).ino).to eq(original_inode)
         expect(File.read(lock_path)).to eq("")
+      ensure
+        FileUtils.rm_f(lock_path) if lock_path
+      end
+
+      it "ignores inaccessible stale lock files" do
+        generator = described_class.new
+        lock_path = generator.send(:generated_packs_lock_path)
+        FileUtils.mkdir_p(lock_path.dirname)
+        File.write(lock_path, "pid=stale\n")
+        FileUtils.touch(lock_path, mtime: Time.now - described_class::GENERATED_PACKS_LOCK_TTL_SECONDS - 1)
+        allow(File).to receive(:open).with(lock_path, File::RDWR).and_raise(Errno::EACCES)
+
+        expect { generator.send(:clear_stale_generated_packs_lock, lock_path) }.not_to raise_error
       ensure
         FileUtils.rm_f(lock_path) if lock_path
       end

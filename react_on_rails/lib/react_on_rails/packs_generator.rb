@@ -57,11 +57,10 @@ module ReactOnRails
 
         if generated_files_present_and_up_to_date?
           puts Rainbow("✅ Generated packs are up to date, no regeneration needed").green if verbose
-          return
+        else
+          clean_generated_directories_with_feedback(verbose: verbose)
+          generate_packs(verbose: verbose)
         end
-
-        clean_generated_directories_with_feedback(verbose: verbose)
-        generate_packs(verbose: verbose)
       end
     end
 
@@ -83,8 +82,10 @@ module ReactOnRails
       clear_stale_generated_packs_lock(lock_path, verbose: verbose)
 
       File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |lock_file|
-        puts Rainbow("🔒 Waiting for generated packs lock at #{lock_path}").yellow if verbose
+        puts Rainbow("🔒 Acquiring generated packs lock at #{lock_path}").yellow if verbose
+        # flock waits until the holder releases; keep Rails tmp local so serialization is reliable.
         lock_file.flock(File::LOCK_EX)
+        puts Rainbow("🔒 Generated packs lock acquired at #{lock_path}").yellow if verbose
         lock_file.rewind
         lock_file.truncate(0)
         lock_file.write("pid=#{Process.pid}\nstarted_at=#{Time.now.utc}\n")
@@ -111,7 +112,7 @@ module ReactOnRails
       ensure
         lock_file.flock(File::LOCK_UN) if lock_acquired
       end
-    rescue Errno::ENOENT
+    rescue Errno::ENOENT, Errno::EACCES
       nil
     end
 
