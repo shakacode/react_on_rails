@@ -43,9 +43,11 @@ React Server Components add one more moving part to the standard test setup: sys
 
 Use this recipe for Capybara, system, and end-to-end tests that exercise `stream_react_component`, `RSCRoute`, or the `rsc_payload_route`.
 
+This recipe builds on the TestHelper and `build_test_command` approach described in [Two Approaches to Test Asset Compilation](#two-approaches-to-test-asset-compilation). The full lifecycle example is RSpec-focused because it uses `before(:suite)` and `after(:suite)` hooks; Minitest suites can reuse the ENV setup and `ReactOnRails::TestHelper.ensure_assets_compiled` call, but must start and stop the renderer from their own suite-level harness.
+
 ### 1. Set Renderer ENV Before Rails Boots
 
-The Pro initializer reads renderer settings while Rails boots. Set test renderer ENV values before requiring `config/environment` in `spec/rails_helper.rb`.
+The Pro initializer reads renderer settings while Rails boots. Set test renderer ENV values before requiring `config/environment` in `spec/rails_helper.rb`. Generated Pro apps read `REACT_RENDERER_URL`; some older or custom initializers read `RENDERER_URL`, so the example sets both names.
 
 ```ruby
 # spec/rails_helper.rb
@@ -79,9 +81,12 @@ ReactOnRails.configure do |config|
 end
 ```
 
+The Quick Start command only sets `RAILS_ENV` for the minimal browser-bundle case. The RSC recipe also sets `NODE_ENV=test` so JavaScript build scripts, webpack/shakapacker config, and the node-renderer all see the test environment consistently. If your app's build does not branch on `NODE_ENV`, the simpler Quick Start command is still enough for non-RSC tests.
+
 ```ruby
 # spec/rails_helper.rb
 require "react_on_rails/test_helper"
+require_relative "support/rsc_node_renderer"
 
 RSpec.configure do |config|
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :rsc)
@@ -92,11 +97,13 @@ RSpec.configure do |config|
 end
 ```
 
+The optional `:rsc` argument is a TestHelper metatag filter. It tells `configure_rspec_to_compile_assets` to compile before `:rsc` examples instead of every example.
+
 Tag request specs that hit the RSC payload endpoint explicitly with `:rsc`. You can keep the default `:js`, `:server_rendering`, and `:controller` tags instead if that already matches your suite. The important part is that the build runs before the first request that can upload bundles to the node renderer.
 
 ### 3. Start One Test Renderer Per Worker
 
-Start the renderer in `before(:suite)` after assets are compiled and stop it in `after(:suite)`. The example below assumes your app has a `node-renderer` package script.
+Start the renderer in `before(:suite)` after assets are compiled and stop it in `after(:suite)`. The example below assumes your app has a `node-renderer` package script; replace the package-manager command with the one your project uses.
 
 ```ruby
 # spec/support/rsc_node_renderer.rb
@@ -121,16 +128,19 @@ module RscNodeRenderer
   end
 end
 
-rsc_node_renderer_pid = nil
+rsc_node_renderer_pid = nil # Closure shared by before(:suite) and after(:suite).
 
 RSpec.configure do |config|
   config.before(:suite) do
     next unless ENV["RSC_NODE_RENDERER_TESTS"] == "1"
 
+    # Compile before spawning the renderer; tagged examples would compile too late.
     ReactOnRails::TestHelper.ensure_assets_compiled
 
     cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH") do
-      raise "Set RENDERER_SERVER_BUNDLE_CACHE_PATH before requiring config/environment."
+      raise "RENDERER_SERVER_BUNDLE_CACHE_PATH is not set. " \
+            "Set it before requiring config/environment so every parallel worker " \
+            "gets a unique renderer bundle cache directory."
     end
     FileUtils.rm_rf(cache_path)
     FileUtils.mkdir_p(cache_path)
@@ -139,7 +149,9 @@ RSpec.configure do |config|
       "NODE_ENV" => "test",
       "RAILS_ENV" => "test",
       "RENDERER_PORT" => ENV.fetch("RENDERER_PORT") do
-        raise "Set RENDERER_PORT before requiring config/environment."
+        raise "RENDERER_PORT is not set. " \
+              "Set it before requiring config/environment so every parallel worker " \
+              "gets a unique renderer port."
       end,
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => cache_path
     }
@@ -154,20 +166,26 @@ RSpec.configure do |config|
       err: [:child, :out]
     )
 
-    RscNodeRenderer.wait_until_ready!(host: "127.0.0.1", port: ENV.fetch("RENDERER_PORT").to_i)
+    renderer_timeout = ENV.fetch("RSC_NODE_RENDERER_BOOT_TIMEOUT", "30").to_i
+    RscNodeRenderer.wait_until_ready!(
+      host: "127.0.0.1",
+      port: ENV.fetch("RENDERER_PORT").to_i,
+      timeout_seconds: renderer_timeout
+    )
   end
 
   config.after(:suite) do
-    next unless rsc_node_renderer_pid
+    pid = rsc_node_renderer_pid
+    next unless pid
 
-    Process.kill("TERM", rsc_node_renderer_pid)
-    Timeout.timeout(5) { Process.wait(rsc_node_renderer_pid) }
+    Process.kill("TERM", pid)
+    Timeout.timeout(5) { Process.wait(pid) }
   rescue Errno::ESRCH, Errno::ECHILD
     # Already stopped.
   rescue Timeout::Error
     begin
-      Process.kill("KILL", rsc_node_renderer_pid)
-      Process.wait(rsc_node_renderer_pid)
+      Process.kill("KILL", pid)
+      Process.wait(pid)
     rescue Errno::ESRCH, Errno::ECHILD
       # Already stopped.
     end
@@ -177,7 +195,7 @@ RSpec.configure do |config|
 end
 ```
 
-Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`.
+Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
 
 The explicit `ensure_assets_compiled` call above is intentional: the renderer needs bundles before it boots. Step 2 still wires compilation to `:rsc` examples for suites that do not start the renderer.
 
@@ -212,7 +230,7 @@ RSpec.describe "RSC payload endpoint", :rsc, type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.media_type).to eq("application/x-ndjson")
 
-    chunks = response.body.lines.map { |line| JSON.parse(line) }
+    chunks = response.body.lines.map(&:chomp).reject(&:empty?).map { |line| JSON.parse(line) }
     expect(chunks.any? { |chunk| chunk.key?("html") }).to be(true)
   end
 end
