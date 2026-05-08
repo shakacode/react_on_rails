@@ -129,10 +129,9 @@ module ReactOnRailsPro
     #
     # URL-backed manifests (dev server) cannot be staged; exclude them so
     # `each_stageable_asset` does not see them as "required" and raise.
-    def required_rsc_asset_paths(manifests = nil)
+    def required_rsc_asset_paths(manifests)
       return Set.new unless ReactOnRailsPro.configuration.enable_rsc_support
 
-      manifests ||= rsc_manifest_paths
       Set.new(
         manifests
           .reject { |path| http_url?(path) }

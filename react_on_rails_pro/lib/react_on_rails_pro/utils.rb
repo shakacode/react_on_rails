@@ -201,11 +201,13 @@ module ReactOnRailsPro
       end
     end
 
+    # Surrounding whitespace is preserved verbatim (Node renderer reads it raw)
+    # but is almost always a misconfigured CI secret — warn so operators notice.
     def self.renderer_cache_env_value(name)
       value = ENV.fetch(name, "")
-      whitespace_only = !value.empty? && value.strip.empty?
-      raise ReactOnRailsPro::Error, "#{name} is whitespace-only; set or unset it." if whitespace_only
+      raise ReactOnRailsPro::Error, "#{name} is whitespace-only; set or unset it." if value.match?(/\A\s+\z/)
 
+      warn "[ReactOnRailsPro] #{name} has surrounding whitespace; using verbatim." if value != value.strip
       value.empty? ? nil : value
     end
     private_class_method :renderer_cache_env_value

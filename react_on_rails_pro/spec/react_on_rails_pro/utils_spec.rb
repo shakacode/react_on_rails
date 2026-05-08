@@ -515,14 +515,27 @@ module ReactOnRailsPro
         # Whitespace is preserved so the Rails pre-seed lands in the same path
         # the Node renderer reads (it consumes the env var verbatim in
         # configBuilder.ts).
-        expect(described_class.resolve_renderer_cache_dir).to eq("  /tmp/renderer-cache  ")
+        expect { @result = described_class.resolve_renderer_cache_dir }
+          .to output(/RENDERER_SERVER_BUNDLE_CACHE_PATH has surrounding whitespace/).to_stderr
+        expect(@result).to eq("  /tmp/renderer-cache  ")
+      end
+
+      it "does not warn when RENDERER_SERVER_BUNDLE_CACHE_PATH has no surrounding whitespace" do
+        ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "/tmp/renderer-cache"
+
+        expect { @result = described_class.resolve_renderer_cache_dir }.not_to output.to_stderr
+        expect(@result).to eq("/tmp/renderer-cache")
       end
 
       it "returns RENDERER_BUNDLE_PATH verbatim when only the deprecated var is set" do
         ENV["RENDERER_BUNDLE_PATH"] = " /tmp/legacy-cache "
 
+        # Lookahead-based match so the assertion is order-independent: both the
+        # deprecation notice and the whitespace warning must appear, but either
+        # may print first since they come from different code paths.
         expect { @result = described_class.resolve_renderer_cache_dir }
-          .to output(/RENDERER_BUNDLE_PATH is deprecated/).to_stderr
+          .to output(/(?=.*RENDERER_BUNDLE_PATH is deprecated)(?=.*RENDERER_BUNDLE_PATH has surrounding whitespace)/m)
+          .to_stderr
         expect(@result).to eq(" /tmp/legacy-cache ")
       end
 

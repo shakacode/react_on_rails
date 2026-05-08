@@ -63,15 +63,8 @@ module ReactOnRailsPro
     def self.call
       instance.build_or_fetch_bundles
 
-      # Auto-stage via symlink after asset precompile (same-filesystem default,
-      # convenient for dev/CI/Heroku where Rails and the renderer share a disk).
-      #
-      # Docker/image builds should invoke `rake react_on_rails_pro:pre_seed_renderer_cache`
-      # (MODE=copy, the default) as a separate build step to bake the cache into
-      # the image layer. When that happens, the symlinks created here are
-      # superseded by the copy-mode files — harmless, but worth knowing if you
-      # see both symlinks and regular files in the cache directory while
-      # debugging an intermediate build step.
+      # Symlink mode is the same-filesystem default; Docker builds should run
+      # `rake react_on_rails_pro:pre_seed_renderer_cache` (copy mode) instead.
       ReactOnRailsPro::PreSeedRendererCache.call(mode: :symlink) if ReactOnRailsPro.configuration.node_renderer?
     end
 

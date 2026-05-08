@@ -74,8 +74,13 @@ module ReactOnRails
       "Dockerfile.review",
       "bin/deploy",
       "bin/release",
-      "bin/docker-entrypoint"
+      "bin/docker-entrypoint",
+      "config/deploy.rb",
+      "config/deploy/production.rb",
+      ".kamal/deploy.yml",
+      "scripts/deploy.sh"
     ].freeze
+    # Per-file safety gate to bound IO during the scan, not a meaningful size limit.
     RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
 
     def initialize(verbose: false, fix: false)
