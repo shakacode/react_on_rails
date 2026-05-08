@@ -15,6 +15,20 @@ RSpec.configure do |config|
   end
 end
 
+RSpec.shared_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env" do
+  around do |example|
+    original = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
+    ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+    example.run
+  ensure
+    if original
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original
+    else
+      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+    end
+  end
+end
+
 def simulate_existing_rails_files(options)
   simulate_existing_file(".gitignore") if options.fetch(:gitignore, true)
   if options.fetch(:hello_world_file, false)

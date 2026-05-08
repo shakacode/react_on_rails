@@ -142,7 +142,9 @@ describe('serverRenderRSCReactComponent', () => {
 
     if (expectedError) {
       expect(onError).toHaveBeenCalled();
-      expect(onError).toHaveBeenCalledWith(new Error(expectedError));
+      const [emittedError] = onError.mock.calls[0];
+      expect(Object.prototype.toString.call(emittedError)).toBe('[object Error]');
+      expect(emittedError.message).toBe(expectedError);
     }
 
     expectedContents.forEach((text) => {

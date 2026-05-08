@@ -96,18 +96,7 @@ describe GeneratorMessages do
   end
 
   describe ".detect_package_manager" do
-    let(:original_package_manager_env) { ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil) }
-
-    around do |example|
-      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      example.run
-
-      if original_package_manager_env
-        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_package_manager_env
-      else
-        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
-      end
-    end
+    include_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env"
 
     it "returns bun when bun.lock exists" do
       allow(File).to receive(:exist?).and_call_original
@@ -170,6 +159,16 @@ describe GeneratorMessages do
       expect(described_class.detect_package_manager).to eq("yarn")
     end
 
+    it "skips package.json disk detection when package_json: nil is passed explicitly" do
+      expect(described_class).not_to receive(:read_package_json)
+      allow(File).to receive(:exist?).and_call_original
+      %w[yarn.lock pnpm-lock.yaml bun.lock bun.lockb package-lock.json].each do |lockfile|
+        allow(File).to receive(:exist?).with(File.join(Dir.pwd, lockfile)).and_return(false)
+      end
+
+      expect(described_class.detect_package_manager(package_json: nil)).to eq("npm")
+    end
+
     it "returns nil from detect_package_manager_from_package_json for malformed JSON" do
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
@@ -204,6 +203,55 @@ describe GeneratorMessages do
     end
   end
 
+  describe ".detect_package_manager_with_source" do
+    include_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env"
+
+    it "returns :env when REACT_ON_RAILS_PACKAGE_MANAGER is set to a supported value" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "pnpm"
+      expect(described_class.detect_package_manager_with_source).to eq(["pnpm", :env])
+    end
+
+    it "falls through to lockfile detection when REACT_ON_RAILS_PACKAGE_MANAGER is unsupported" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "unknown"
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(true)
+
+      expect(described_class.detect_package_manager_with_source).to eq(["yarn", :lockfile])
+    end
+
+    it "returns :package_json when packageManager field is present and env is not set" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
+                                   .and_return('{"packageManager": "yarn@3.6.0"}')
+
+      expect(described_class.detect_package_manager_with_source).to eq(["yarn", :package_json])
+    end
+
+    it "returns :lockfile when only a lockfile picks the manager" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(true)
+
+      expect(described_class.detect_package_manager_with_source).to eq(["pnpm", :lockfile])
+    end
+
+    it "returns :default when nothing else picks a manager" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "pnpm-lock.yaml")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lock")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "bun.lockb")).and_return(false)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package-lock.json")).and_return(false)
+
+      expect(described_class.detect_package_manager_with_source).to eq(["npm", :default])
+    end
+  end
+
   describe ".supported_package_manager?" do
     it "returns true for supported managers and false otherwise" do
       expect(described_class.supported_package_manager?("npm")).to be(true)
@@ -211,6 +259,62 @@ describe GeneratorMessages do
       expect(described_class.supported_package_manager?("pnpm")).to be(true)
       expect(described_class.supported_package_manager?("bun")).to be(true)
       expect(described_class.supported_package_manager?("foo")).to be(false)
+    end
+  end
+
+  describe ".package_manager_executable_available?" do
+    it "returns false for unsupported package managers without checking PATH" do
+      expect(ReactOnRails::Utils).not_to receive(:command_available?)
+
+      expect(described_class.package_manager_executable_available?("foo")).to be(false)
+    end
+
+    it "delegates to ReactOnRails::Utils.command_available? for supported package managers" do
+      allow(ReactOnRails::Utils).to receive(:command_available?).with("pnpm").and_return(true)
+
+      expect(described_class.package_manager_executable_available?("pnpm")).to be(true)
+    end
+  end
+
+  describe ".lockfile_filename_for" do
+    let(:app_root) { Dir.mktmpdir }
+
+    after { FileUtils.rm_rf(app_root) }
+
+    it "returns the lockfile filename when the file exists" do
+      {
+        "yarn" => "yarn.lock",
+        "pnpm" => "pnpm-lock.yaml",
+        "npm" => "package-lock.json"
+      }.each do |pm, lockfile|
+        FileUtils.touch(File.join(app_root, lockfile))
+        expect(described_class.lockfile_filename_for(pm, app_root: app_root)).to eq(lockfile)
+        File.delete(File.join(app_root, lockfile))
+      end
+    end
+
+    it "returns nil when the lockfile is not on disk for yarn/pnpm/npm" do
+      %w[yarn pnpm npm].each do |pm|
+        expect(described_class.lockfile_filename_for(pm, app_root: app_root)).to be_nil
+      end
+    end
+
+    it "resolves bun.lock when only bun.lock exists" do
+      FileUtils.touch(File.join(app_root, "bun.lock"))
+      expect(described_class.lockfile_filename_for("bun", app_root: app_root)).to eq("bun.lock")
+    end
+
+    it "resolves bun.lockb when only bun.lockb exists" do
+      FileUtils.touch(File.join(app_root, "bun.lockb"))
+      expect(described_class.lockfile_filename_for("bun", app_root: app_root)).to eq("bun.lockb")
+    end
+
+    it "returns nil for bun when neither bun.lock nor bun.lockb is on disk" do
+      expect(described_class.lockfile_filename_for("bun", app_root: app_root)).to be_nil
+    end
+
+    it "returns nil for an unsupported package manager" do
+      expect(described_class.lockfile_filename_for("foo", app_root: app_root)).to be_nil
     end
   end
 

@@ -2357,44 +2357,19 @@ describe InstallGenerator, type: :generator do
     end
   end
 
-  context "when detecting existing bin-files on *nix" do
+  context "when detecting node availability" do
     let(:install_generator) { described_class.new }
 
-    specify "when node is exist" do
-      stub_const("RUBY_PLATFORM", "linux")
-      allow(install_generator).to receive(:`).with("which node").and_return("/path/to/bin")
+    specify "missing_node? returns false when node is on PATH" do
+      allow(ReactOnRails::Utils).to receive(:command_available?).with("node").and_return(true)
       allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
+
       expect(install_generator.send(:missing_node?)).to be false
     end
-  end
 
-  context "when detecting missing bin-files on *nix" do
-    let(:install_generator) { described_class.new }
+    specify "missing_node? returns true when node is missing" do
+      allow(ReactOnRails::Utils).to receive(:command_available?).with("node").and_return(false)
 
-    specify "when node is missing" do
-      stub_const("RUBY_PLATFORM", "linux")
-      allow(install_generator).to receive(:`).with("which node").and_return("")
-      expect(install_generator.send(:missing_node?)).to be true
-    end
-  end
-
-  context "when detecting existing bin-files on windows" do
-    let(:install_generator) { described_class.new }
-
-    specify "when node is exist" do
-      stub_const("RUBY_PLATFORM", "mswin")
-      allow(install_generator).to receive(:`).with("where node").and_return("/path/to/bin")
-      allow(install_generator).to receive(:`).with("node --version 2>/dev/null").and_return("v20.0.0")
-      expect(install_generator.send(:missing_node?)).to be false
-    end
-  end
-
-  context "when detecting missing bin-files on windows" do
-    let(:install_generator) { described_class.new }
-
-    specify "when node is missing" do
-      stub_const("RUBY_PLATFORM", "mswin")
-      allow(install_generator).to receive(:`).with("where node").and_return("")
       expect(install_generator.send(:missing_node?)).to be true
     end
   end
@@ -3129,6 +3104,164 @@ describe InstallGenerator, type: :generator do
 
     specify "missing_pro_gem? returns false without checking gem" do
       expect(install_generator.send(:missing_pro_gem?)).to be false
+    end
+  end
+
+  context "when the selected JavaScript package manager is unavailable" do
+    let(:install_generator) { described_class.new }
+
+    before do
+      allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["pnpm", :package_json])
+      allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "npm" }
+    end
+
+    specify "missing_package_manager? reports the selected manager and available alternatives" do
+      expect(install_generator.send(:missing_package_manager?)).to be true
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("package manager 'pnpm' was selected")
+      expect(error_text).to include("`packageManager` field in package.json")
+      expect(error_text).to include("available package managers: npm")
+    end
+
+    specify "missing_package_manager? uses the shared executable check for alternatives" do
+      install_generator.send(:missing_package_manager?)
+
+      expect(GeneratorMessages).to have_received(:package_manager_executable_available?).with("pnpm").once
+      expect(GeneratorMessages).to have_received(:package_manager_executable_available?).with("npm")
+    end
+  end
+
+  context "when the detection source picks the missing package manager" do
+    let(:install_generator) { described_class.new }
+
+    before do
+      allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "npm" }
+    end
+
+    {
+      env: "REACT_ON_RAILS_PACKAGE_MANAGER environment variable",
+      package_json: "`packageManager` field in package.json",
+      default: "npm default fallback"
+    }.each do |source, phrase|
+      specify "missing_package_manager? names the #{source} source in the error" do
+        allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["pnpm", source])
+
+        install_generator.send(:missing_package_manager?)
+
+        expect(GeneratorMessages.messages.join("\n")).to include(phrase)
+      end
+    end
+
+    specify "missing_package_manager? names the actual lockfile filename when a lockfile picks the manager" do
+      allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["pnpm", :lockfile])
+      allow(GeneratorMessages).to receive(:lockfile_filename_for).with("pnpm",
+                                                                       app_root: anything).and_return("pnpm-lock.yaml")
+
+      install_generator.send(:missing_package_manager?)
+
+      expect(GeneratorMessages.messages.join("\n")).to include("pnpm-lock.yaml lockfile on disk")
+    end
+
+    specify "missing_package_manager? omits 'update the source above' when source is :default" do
+      allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["npm", :default])
+      allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "yarn" }
+
+      install_generator.send(:missing_package_manager?)
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).not_to include("update the source above")
+      expect(error_text).to include("Install 'npm' or set REACT_ON_RAILS_PACKAGE_MANAGER")
+    end
+
+    specify "missing_package_manager? omits 'update the source above' when source is :env" do
+      allow(GeneratorMessages).to receive(:detect_package_manager_with_source).and_return(["pnpm", :env])
+      allow(GeneratorMessages).to receive(:package_manager_executable_available?) { |command| command == "npm" }
+
+      install_generator.send(:missing_package_manager?)
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).not_to include("update the source above")
+      expect(error_text).to include("Install 'pnpm' or set REACT_ON_RAILS_PACKAGE_MANAGER")
+    end
+  end
+
+  context "when no JavaScript package manager is available at all" do
+    let(:install_generator) { described_class.new }
+
+    before do
+      allow(GeneratorMessages).to receive_messages(
+        detect_package_manager_with_source: ["npm", :default],
+        package_manager_executable_available?: false
+      )
+    end
+
+    specify "missing_package_manager? reports that no package manager is installed" do
+      expect(install_generator.send(:missing_package_manager?)).to be true
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("No JavaScript package manager found")
+      expect(error_text).to include("Selected via the npm default fallback")
+      expect(error_text).to include("Please install one of the following")
+    end
+  end
+
+  context "when no JavaScript package manager is available but the user had configured one" do
+    let(:install_generator) { described_class.new }
+
+    before do
+      allow(GeneratorMessages).to receive_messages(
+        detect_package_manager_with_source: ["pnpm", :package_json],
+        package_manager_executable_available?: false
+      )
+    end
+
+    specify "missing_package_manager? names the configured source so the user knows their config is involved" do
+      expect(install_generator.send(:missing_package_manager?)).to be true
+
+      error_text = GeneratorMessages.messages.join("\n")
+      expect(error_text).to include("No JavaScript package manager found")
+      expect(error_text).to include("`packageManager` field in package.json")
+    end
+  end
+
+  describe "#warn_if_unsupported_env_package_manager" do
+    include_context "with clean REACT_ON_RAILS_PACKAGE_MANAGER env"
+
+    let(:install_generator) { described_class.new }
+
+    specify "warns when REACT_ON_RAILS_PACKAGE_MANAGER is set to an unsupported value" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "rush"
+
+      install_generator.send(:warn_if_unsupported_env_package_manager)
+
+      warning_text = GeneratorMessages.messages.join("\n")
+      expect(warning_text).to include("REACT_ON_RAILS_PACKAGE_MANAGER='rush' is not a supported package manager")
+      expect(warning_text).to include("Supported values: npm, pnpm, yarn, bun")
+    end
+
+    specify "does not warn when REACT_ON_RAILS_PACKAGE_MANAGER is supported" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "pnpm"
+
+      install_generator.send(:warn_if_unsupported_env_package_manager)
+
+      expect(GeneratorMessages.messages).to eq([])
+    end
+
+    specify "does not warn when REACT_ON_RAILS_PACKAGE_MANAGER is unset" do
+      ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+
+      install_generator.send(:warn_if_unsupported_env_package_manager)
+
+      expect(GeneratorMessages.messages).to eq([])
+    end
+
+    specify "does not warn when REACT_ON_RAILS_PACKAGE_MANAGER is empty or whitespace" do
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "   "
+
+      install_generator.send(:warn_if_unsupported_env_package_manager)
+
+      expect(GeneratorMessages.messages).to eq([])
     end
   end
 
