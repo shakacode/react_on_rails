@@ -887,7 +887,7 @@ resolve: {
 }
 ```
 
-`resolve.fallback: false` tells webpack not to provide a polyfill for the module — the import resolves to an empty module at build time and no fallback shim is bundled. The RSC bundle does not need this workaround because it runs in full Node.js where `require()` is available and Node builtins work normally.
+`resolve.fallback: false` tells webpack not to provide a polyfill for the module — the import resolves to an empty module at build time and no fallback shim is bundled. Apply the same rule to the RSC bundle when the node renderer executes it: the RSC bundle also runs in a VM context without host `require()` by default, so unresolved externals can crash there too.
 
 ### MessageChannel Not Defined
 
@@ -948,7 +948,7 @@ This injects the polyfill as raw JavaScript at the top of the bundle output, ens
 
 > **When to use the `BannerPlugin` polyfill:** Use it only when the renderer config's `additionalContext` is not accessible (e.g., in a build-only setup without renderer config control). If you encounter recursive stack-overflow errors or unexpected rendering behavior with the synchronous polyfill, switch to the `additionalContext` approach.
 
-> **Note:** This only affects the server bundle. The RSC bundle runs in full Node.js (which has `MessageChannel` since Node 15), and the client bundle runs in the browser (which has native `MessageChannel`).
+> **Note:** This usually affects the server bundle because SSR streaming loads `react-dom/server.browser`. The RSC bundle still follows the node renderer VM global rules, so inject or bundle `MessageChannel` there too if RSC code or its dependencies require it. The client bundle runs in the browser, which has native `MessageChannel`.
 
 ### Version Mismatch -- "Global Object Mismatch"
 
