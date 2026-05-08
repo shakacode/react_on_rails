@@ -427,6 +427,11 @@ module ReactOnRails
       end
 
       it "serializes concurrent generation and rechecks staleness after waiting" do
+        generator = nil
+        first_thread = nil
+        second_thread = nil
+        old_auto = old_auto_load_bundle
+
         generator = described_class.new
         generation_started = Queue.new
         release_generation = Queue.new
@@ -469,8 +474,11 @@ module ReactOnRails
       ensure
         first_thread&.kill if first_thread&.alive?
         second_thread&.kill if second_thread&.alive?
-        lock_path = generator.send(:generated_packs_lock_path)
-        FileUtils.rm_f(lock_path) if lock_path
+        if generator
+          lock_path = generator.send(:generated_packs_lock_path)
+          FileUtils.rm_f(lock_path) if lock_path
+        end
+        ReactOnRails.configuration.auto_load_bundle = old_auto
       end
 
       it "clears stale lock contents without unlinking the lock file" do

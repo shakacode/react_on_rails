@@ -93,6 +93,7 @@ module ReactOnRails
 
         yield
       ensure
+        # Keep the lock file on disk to avoid a TOCTOU gap for concurrent open/create callers.
         lock_file.flock(File::LOCK_UN)
       end
     end
@@ -101,6 +102,7 @@ module ReactOnRails
       return unless File.exist?(lock_path)
       return unless File.mtime(lock_path) < Time.now - GENERATED_PACKS_LOCK_TTL_SECONDS
 
+      # Kernel locks are released when the holder exits; this only clears stale metadata.
       lock_acquired = false
       File.open(lock_path, File::RDWR) do |lock_file|
         lock_acquired = lock_file.flock(File::LOCK_EX | File::LOCK_NB) != false
