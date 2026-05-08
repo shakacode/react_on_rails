@@ -29,7 +29,9 @@ class StoriesController < ApplicationController
   def show
     preflight = StoryPagePreflight.call(params[:id], current_user: current_user)
 
-    return redirect_to(preflight.redirect_path, status: :see_other) if preflight.redirect_path
+    if preflight.redirect_path
+      return redirect_to(preflight.redirect_path, status: preflight.redirect_status || :see_other)
+    end
 
     response.status = preflight.status unless preflight.status.nil?
     response.set_header("Cache-Control", preflight.cache_control) if preflight.cache_control
@@ -44,13 +46,16 @@ The preflight object can expose a small, serializable result:
 
 ```ruby
 class StoryPagePreflight
-  Result = Struct.new(:props, :status, :redirect_path, :cache_control, keyword_init: true)
+  Result = Struct.new(:props, :status, :redirect_path, :redirect_status, :cache_control, keyword_init: true)
 
   def self.call(story_id, current_user:)
+    unless current_user
+      return Result.new(props: {}, redirect_path: "/sign_in", redirect_status: :see_other)
+    end
+
     story = Story.find_by(id: story_id)
 
     return Result.new(props: { notFound: true, story: nil }, status: :not_found) unless story
-    return Result.new(redirect_path: "/sign_in") unless current_user
 
     Result.new(
       props: { story: StorySerializer.render_as_hash(story) },
@@ -74,7 +79,7 @@ Keep the props serializable and intentional. A good preflight result usually con
 
 Avoid making React responsible for route outcomes. React can render a "not found" UI, but Rails should decide whether the response is actually a `404`.
 
-## 404 And Not-Found Routes
+## 404 and Not-Found Routes
 
 The following controller snippets assume the controller includes `ReactOnRailsPro::Stream`, as shown in the preflight example.
 
@@ -173,7 +178,7 @@ def show
 end
 ```
 
-If `stale?` returns `false`, Rails has already prepared the `304 Not Modified` response; the early return keeps the controller from starting a streamed render after that response has been selected. Rails 7.1+ supports `cache_control:` on `stale?`. On older Rails versions, set the full `Cache-Control` header directly and keep the explicit freshness guard before streaming.
+If `stale?` returns `false`, Rails has already prepared the `304 Not Modified` response; the early return keeps the controller from starting a streamed render after that response has been selected. Rails 7.1+ supports `cache_control:` on `stale?`. On older Rails versions, set the full `Cache-Control` header directly and keep the explicit freshness guard before streaming. `stale_while_revalidate` only helps caches that support that extension; unsupported browsers, proxies, and CDNs fall back to the normal `max-age` behavior.
 
 When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy or keep the response private:
 
@@ -191,25 +196,27 @@ Pass decisions as data, not as hidden HTTP side effects:
 @story_props = {
   story: StorySerializer.render_as_hash(story),
   viewer: ViewerSerializer.render_as_hash(current_user),
-  response_policy: {
-    canonical_url: story_url(story)
+  responsePolicy: {
+    canonicalUrl: story_url(story)
   }
 }
 ```
 
 ```tsx
-type ResponsePolicy = { canonical_url: string };
-type StoryPageProps = { story: Story; viewer: Viewer; response_policy: ResponsePolicy };
+type ResponsePolicy = { canonicalUrl: string };
+type StoryPageProps = { story: Story; viewer: Viewer; responsePolicy: ResponsePolicy };
 
-export default function StoryPage({ story, viewer, response_policy }: StoryPageProps) {
+export default function StoryPage({ story, viewer, responsePolicy }: StoryPageProps) {
   return (
     <>
-      <link rel="canonical" href={response_policy.canonical_url} />
+      <link rel="canonical" href={responsePolicy.canonicalUrl} />
       <Story story={story} viewer={viewer} />
     </>
   );
 }
 ```
+
+Use the same serialized key names that the TypeScript component consumes. React on Rails passes prop keys through by default, so choose one casing convention for the route props and keep both sides aligned.
 
 Native `<link>` hoisting requires React 19. On React 18, use `react-helmet` or emit canonical URLs from the Rails layout instead. See [React 19 Native Metadata](../building-features/react-19-native-metadata.md).
 
