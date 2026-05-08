@@ -374,11 +374,16 @@ describe RscGenerator, type: :generator do
           const commonWebpackConfig = require('./commonWebpackConfig');
           const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
           const customClientReferences = { directory: './custom' };
+          const getChunkName = () => 'client';
 
           const configureClient = () => {
             const clientConfig = commonWebpackConfig();
             clientConfig.plugins.push(
-              new RSCWebpackPlugin({ clientReferences: customClientReferences, isServer: false }),
+              new RSCWebpackPlugin({
+                chunkName: getChunkName(),
+                clientReferences: customClientReferences,
+                isServer: false,
+              }),
             );
 
             return clientConfig;
@@ -402,6 +407,53 @@ describe RscGenerator, type: :generator do
       end
 
       expect(GeneratorMessages.messages.join("\n")).to include("already defines clientReferences")
+    end
+  end
+
+  context "when an existing RSC webpack config mentions scoped client references in a comment" do
+    before(:all) do
+      prepare_destination
+      simulate_existing_rails_files(package_json: true)
+      simulate_npm_files(package_json: true)
+      simulate_existing_file("config/initializers/react_on_rails_pro.rb", <<~RUBY)
+        ReactOnRailsPro.configure do |config|
+          config.server_renderer = "NodeRenderer"
+        end
+      RUBY
+      simulate_existing_file("Procfile.dev", "rails: bin/rails s\n")
+      simulate_pro_webpack_files
+      simulate_existing_file(
+        "config/webpack/clientWebpackConfig.js",
+        <<~JS
+          const commonWebpackConfig = require('./commonWebpackConfig');
+          const { RSCWebpackPlugin } = require('react-on-rails-rsc/WebpackPlugin');
+
+          const configureClient = () => {
+            const clientConfig = commonWebpackConfig();
+            clientConfig.plugins.push(
+              new RSCWebpackPlugin({
+                // clientReferences: rscClientReferences
+                isServer: false,
+              }),
+            );
+
+            return clientConfig;
+          };
+
+          module.exports = configureClient;
+        JS
+      )
+
+      Dir.chdir(destination_root) do
+        run_generator(["--force"])
+      end
+    end
+
+    it "does not treat the comment as a configured clientReferences option" do
+      assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        expect(content).to include("const rscClientReferences")
+        expect(content).to match(/^\s*isServer: false, clientReferences: rscClientReferences/)
+      end
     end
   end
 
@@ -526,6 +578,8 @@ describe RscGenerator, type: :generator do
 
     it "injects a usable config import without redeclaring resolve" do
       assert_file "config/webpack/clientWebpackConfig.js" do |content|
+        # An aliased destructuring import does not create the plain `config` binding that
+        # rscClientReferences uses, so the duplicate require is intentional and harmless.
         expect(content.scan("const { config } = require('shakapacker');").length).to eq(1)
         expect(content.scan("const { resolve } = require('path');").length).to eq(1)
         expect(content).to include("const { config: shakapackerConfig } = require('shakapacker');")

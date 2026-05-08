@@ -567,7 +567,27 @@ module ReactOnRails
       end
 
       def rsc_plugin_uses_scoped_client_references?(content)
-        content.match?(/new RSCWebpackPlugin\([^)]*clientReferences:\s*rscClientReferences/)
+        rsc_plugin_option_bodies(content).any? do |options|
+          rsc_plugin_options_without_comments(options).match?(/\bclientReferences\s*:\s*rscClientReferences\b/)
+        end
+      end
+
+      def rsc_plugin_defines_client_references?(content)
+        rsc_plugin_option_bodies(content).any? do |options|
+          rsc_plugin_options_without_comments(options).match?(/\bclientReferences\s*:/)
+        end
+      end
+
+      def rsc_plugin_option_bodies(content)
+        content.scan(/new RSCWebpackPlugin\(\{(.*?)\}\)/m).flatten
+      end
+
+      def rsc_plugin_options_without_comments(options)
+        options.gsub(%r{/\*.*?\*/}m, "").gsub(%r{//.*$}, "")
+      end
+
+      def rsc_plugin_without_client_references_pattern(is_server)
+        /new RSCWebpackPlugin\(\{([^}]*)isServer: #{is_server}([^}]*)\}\)/
       end
 
       def rsc_client_references_setup_anchor?(content, is_server:)
