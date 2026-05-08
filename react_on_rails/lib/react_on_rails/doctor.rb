@@ -729,9 +729,7 @@ module ReactOnRails
 
       report_sync_changes(result)
       report_skipped_specs(result)
-      if result.changes.any?
-        checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
-      end
+      checker.add_info("  ℹ️  FIX=true only updates package.json; update Gemfile constraints manually if needed.")
     rescue StandardError => e
       checker.add_warning("  ⚠️  FIX=true: Could not auto-sync versions: #{e.message}")
     end
@@ -2752,11 +2750,13 @@ module ReactOnRails
     # RSC), and may cause "component not registered" errors at runtime.
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
-    # Match Jest/Vitest helpers with one receiver level (jest.mock, vi.mock, etc.).
+    # Match known Jest/Vitest helpers. Aliased or nested receivers are intentionally
+    # out of scope to avoid warning on arbitrary application methods named `mock`.
     # Vitest's importActual/importMock may also be used as bare helpers.
     BASE_PACKAGE_MOCK_PATTERN = %r{
       \b(?:
-        \w+\.(?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
+        (?:jest|vi|vitest)\.
+        (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
         |
         (?:importActual|importMock)
       )
