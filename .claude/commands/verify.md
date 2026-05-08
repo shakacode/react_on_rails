@@ -8,7 +8,7 @@ Run a local verification loop for the current branch before creating or updating
 2. Inspect the current branch diff with `git status --short` and `git diff --stat origin/main...HEAD`.
 3. Decide the smallest verification set that covers the changed surface area.
 4. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
-5. For formatting failures, run `rake autofix` before hand-editing formatting-only changes.
+5. For formatting failures, run `rake autofix` before manually editing formatting-only changes.
 6. After a fix, restart at the failed command and continue forward. Do not claim a failure is fixed until the failed command passes locally.
 7. Finish with the exact commands run and their pass/fail status.
 
@@ -17,7 +17,6 @@ Run a local verification loop for the current branch before creating or updating
 Use this order unless the changed files make a narrower or broader set clearly appropriate:
 
 1. Formatting and whitespace:
-   - `git diff --check`
    - `git diff --check origin/main...HEAD` for committed branch content before creating or updating a PR
    - `pnpm start format.listDifferent`
 2. Ruby:
@@ -25,6 +24,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `bundle exec rake rbs:validate` when Ruby signatures or public Ruby APIs changed
    - targeted `bundle exec rspec ...` for changed Ruby behavior
 3. JavaScript and TypeScript:
+   - `pnpm run build`
    - `pnpm run lint`
    - `pnpm run type-check`
    - targeted `pnpm run test -- ...` for changed package behavior
