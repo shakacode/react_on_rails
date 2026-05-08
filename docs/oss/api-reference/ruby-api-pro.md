@@ -76,7 +76,7 @@ Requires `enable_rsc_support = true` in configuration.
 <%= rsc_payload_react_component("RSCPage", props: { id: @post.id }) %>
 ```
 
-> **Async props note:** The public RSC payload helper is `rsc_payload_react_component`; there is no separate `_with_async_props` helper name. For RSC routes, resolve data in Rails and pass it through `props`, or let `stream_react_component` stream Suspense boundaries as the component tree renders.
+> **Note:** The public RSC payload helper is `rsc_payload_react_component`; there is no separate `_with_async_props` helper name. Resolve data in Rails and pass it through `props`.
 
 ### `async_react_component(component_name, options = {})`
 
