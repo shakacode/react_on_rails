@@ -24,18 +24,38 @@ Use a controller or service object to gather data and choose the response policy
 
 ```ruby
 class StoriesController < ApplicationController
-  include ReactOnRailsPro::Stream
+  include ReactOnRailsPro::Stream # Requires React on Rails Pro
 
   def show
     preflight = StoryPagePreflight.call(params[:id], current_user: current_user)
 
     return redirect_to(preflight.redirect_path, status: :see_other) if preflight.redirect_path
 
-    response.status = preflight.status if preflight.status
+    response.status = preflight.status unless preflight.status.nil?
     response.set_header("Cache-Control", preflight.cache_control) if preflight.cache_control
 
     @story_props = preflight.props
     stream_view_containing_react_components(template: "stories/show")
+  end
+end
+```
+
+The preflight object can expose a small, serializable result:
+
+```ruby
+class StoryPagePreflight
+  Result = Struct.new(:props, :status, :redirect_path, :cache_control, keyword_init: true)
+
+  def self.call(story_id, current_user:)
+    story = Story.find_by(id: story_id)
+
+    return Result.new(props: { notFound: true, story: nil }, status: :not_found) unless story
+    return Result.new(redirect_path: "/sign_in") unless current_user
+
+    Result.new(
+      props: { story: StorySerializer.render_as_hash(story) },
+      cache_control: "private, no-cache"
+    )
   end
 end
 ```
@@ -55,6 +75,8 @@ Keep the props serializable and intentional. A good preflight result usually con
 Avoid making React responsible for route outcomes. React can render a "not found" UI, but Rails should decide whether the response is actually a `404`.
 
 ## 404 And Not-Found Routes
+
+The following controller snippets assume the controller includes `ReactOnRailsPro::Stream`, as shown in the preflight example.
 
 For simple not-found cases, return a Rails response before streaming:
 
@@ -131,7 +153,7 @@ For personalized pages, prefer private HTTP caching with revalidation:
 response.set_header("Cache-Control", "private, no-cache")
 ```
 
-`no-cache` allows HTTP caches to store the response but requires revalidation with the origin before each reuse. Use `no-store` instead when sensitive responses must never be cached by anyone.
+`private` prevents CDNs and shared proxies from storing the response; `no-cache` allows the browser to store it but requires revalidation with the origin before each reuse. Use `no-store` instead when sensitive responses must never be cached by anyone.
 
 For public pages, let Rails decide freshness before rendering:
 
@@ -169,20 +191,20 @@ Pass decisions as data, not as hidden HTTP side effects:
 @story_props = {
   story: StorySerializer.render_as_hash(story),
   viewer: ViewerSerializer.render_as_hash(current_user),
-  responsePolicy: {
-    canonicalUrl: story_url(story)
+  response_policy: {
+    canonical_url: story_url(story)
   }
 }
 ```
 
 ```tsx
-type ResponsePolicy = { canonicalUrl: string };
-type StoryPageProps = { story: Story; viewer: Viewer; responsePolicy: ResponsePolicy };
+type ResponsePolicy = { canonical_url: string };
+type StoryPageProps = { story: Story; viewer: Viewer; response_policy: ResponsePolicy };
 
-export default function StoryPage({ story, viewer, responsePolicy }: StoryPageProps) {
+export default function StoryPage({ story, viewer, response_policy }: StoryPageProps) {
   return (
     <>
-      <link rel="canonical" href={responsePolicy.canonicalUrl} />
+      <link rel="canonical" href={response_policy.canonical_url} />
       <Story story={story} viewer={viewer} />
     </>
   );
