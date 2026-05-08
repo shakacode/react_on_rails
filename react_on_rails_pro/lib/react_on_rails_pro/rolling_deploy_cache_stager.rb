@@ -276,7 +276,8 @@ module ReactOnRailsPro
     def self.required_rsc_asset_basenames
       return [] unless ReactOnRailsPro.configuration.enable_rsc_support
 
-      RendererCacheHelpers.required_rsc_asset_paths.map { |path| File.basename(path) }
+      rsc_manifest_paths = RendererCacheHelpers.rsc_manifest_paths
+      RendererCacheHelpers.required_rsc_asset_paths(rsc_manifest_paths).map { |path| File.basename(path) }
     end
     private_class_method :required_rsc_asset_basenames
 

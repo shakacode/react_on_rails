@@ -161,7 +161,9 @@ module ReactOnRailsPro
     def self.required_rsc_asset_basenames
       return [] unless ReactOnRailsPro.configuration.enable_rsc_support
 
-      ReactOnRailsPro::RendererCacheHelpers.required_rsc_asset_paths.map { |path| File.basename(path) }
+      rsc_manifest_paths = ReactOnRailsPro::RendererCacheHelpers.rsc_manifest_paths
+      required_asset_paths = ReactOnRailsPro::RendererCacheHelpers.required_rsc_asset_paths(rsc_manifest_paths)
+      required_asset_paths.map { |path| File.basename(path) }
     end
 
     def self.publish_bundle(adapter, hash, bundle, assets, bundle_label)

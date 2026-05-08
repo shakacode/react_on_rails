@@ -592,7 +592,10 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       before do
         allow(config).to receive(:enable_rsc_support).and_return(true)
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:rsc_manifest_paths)
+          .and_return([missing_manifest])
         allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths)
+          .with([missing_manifest])
           .and_return(Set.new([missing_manifest]))
       end
 
