@@ -30,6 +30,7 @@ module ReactOnRails
       RSC_FALLBACK_LAYOUT_NAME = "react_on_rails_rsc"
       RSC_GENERATED_LAYOUT_NAME_PATTERN = /\Areact_on_rails_rsc(?:_(?:[2-9]|[1-9]\d+))?\z/
       MAX_LAYOUT_NAME_ATTEMPTS = 99
+      JS_STRING_DELIMITERS = ["'", '"', "`"].freeze
 
       # Main entry point for RSC setup.
       # Orchestrates creation of all RSC-related files and configuration.
@@ -448,7 +449,7 @@ module ReactOnRails
 
         gsub_file(
           config_path,
-          %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)},
+          rsc_client_references_setup_import_pattern(is_server: false),
           injected_imports
         )
         return unless rsc_client_references_setup_ready?(config_path)
@@ -489,9 +490,12 @@ module ReactOnRails
 
         content = File.read(path)
         missing = []
-        missing << "RSCWebpackPlugin in serverWebpackConfig.js" unless content.include?("RSCWebpackPlugin")
-        if content.include?("RSCWebpackPlugin") && !content.include?("clientReferences: rscClientReferences")
-          missing << "scoped clientReferences in serverWebpackConfig.js"
+        if content.include?("RSCWebpackPlugin")
+          unless rsc_plugin_client_references_configured?(content, is_server: true)
+            missing << "generated scoped clientReferences in serverWebpackConfig.js"
+          end
+        else
+          missing << "RSCWebpackPlugin in serverWebpackConfig.js"
         end
         missing << "rscBundle parameter in serverWebpackConfig.js" unless content.include?("rscBundle")
         missing
@@ -503,9 +507,12 @@ module ReactOnRails
 
         content = File.read(path)
         missing = []
-        missing << "RSCWebpackPlugin in clientWebpackConfig.js" unless content.include?("RSCWebpackPlugin")
-        if content.include?("RSCWebpackPlugin") && !content.include?("clientReferences: rscClientReferences")
-          missing << "scoped clientReferences in clientWebpackConfig.js"
+        if content.include?("RSCWebpackPlugin")
+          unless rsc_plugin_client_references_configured?(content, is_server: false)
+            missing << "generated scoped clientReferences in clientWebpackConfig.js"
+          end
+        else
+          missing << "RSCWebpackPlugin in clientWebpackConfig.js"
         end
         missing
       end
@@ -539,55 +546,454 @@ module ReactOnRails
 
         gsub_file(
           config_path,
-          %r{(const bundler = config\.assets_bundler.*\n.*require\('@rspack/core'\).*\n.*: require\('webpack'\);)},
+          rsc_client_references_setup_import_pattern(is_server: true),
           server_injected_imports
         )
       end
 
       def update_existing_rsc_webpack_config(config_path, content, is_server:)
-        return if rsc_plugin_uses_scoped_client_references?(content)
+        return unless rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server: is_server)
+        return if rsc_plugin_uses_scoped_client_references?(content, is_server: is_server)
+        return unless rewritable_rsc_plugin?(config_path, content, is_server: is_server)
+        return unless ensure_rsc_client_references_setup(config_path, content, is_server: is_server)
 
-        unless rsc_client_references_defined?(content) ||
-               rsc_client_references_setup_anchor?(content, is_server: is_server)
-          warn_missing_rsc_client_references_anchor(config_path)
-          return
+        rewrite_rsc_plugin_client_references(config_path, is_server: is_server) ||
+          warn_missing_rsc_plugin_target(config_path, is_server: is_server)
+      end
+
+      # Detects RSCWebpackPlugin option blocks that the lightweight JS scanner could not parse
+      # cleanly (most often a regex literal with an unmatched `{` / `}` that walks the depth
+      # counter past the real closing brace). When found, we warn and refuse to rewrite anything
+      # in the file so a sibling rewrite cannot accidentally splice into a wrong location.
+      def rsc_plugin_sections_safe_to_rewrite?(config_path, content, is_server:)
+        unparseable = rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:unparseable)
+        return true if unparseable.zero?
+
+        warn_unparseable_rsc_plugin_sections(config_path, unparseable, is_server: is_server)
+        false
+      end
+
+      def rewritable_rsc_plugin?(config_path, content, is_server:)
+        # Mixed same-target plugins are still rewritable: the later rewrite only updates plugins
+        # missing clientReferences and leaves sibling custom clientReferences untouched.
+        return true if rsc_plugin_without_client_references?(content, is_server: is_server)
+
+        if rsc_plugin_defines_client_references?(content, is_server: is_server)
+          GeneratorMessages.add_warning(
+            "Skipped scoped clientReferences migration for #{config_path} because all matching " \
+            "RSCWebpackPlugin instances already define clientReferences (some may already be " \
+            "correctly scoped to rscClientReferences). Please verify manually."
+          )
+          return false
         end
 
-        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: is_server)
-        return if rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server: is_server)
+        warn_missing_rsc_plugin_target(config_path, is_server: is_server)
+        false
+      end
 
-        add_rsc_client_references_setup(config_path, content, is_server: is_server)
-        return unless rsc_client_references_setup_ready?(config_path)
-
-        gsub_file(
-          config_path,
-          /new RSCWebpackPlugin\(\{([^}]*)isServer: #{is_server}([^}]*)\}\)/,
-          "new RSCWebpackPlugin({\\1isServer: #{is_server}, clientReferences: rscClientReferences\\2})"
+      def warn_unparseable_rsc_plugin_sections(config_path, count, is_server:)
+        GeneratorMessages.add_warning(
+          "Skipped scoped clientReferences migration for #{config_path}: #{count} RSCWebpackPlugin " \
+          "options block(s) contain characters this lightweight scanner cannot parse safely " \
+          "(most often a regex literal with an unmatched `{` or `}`, e.g. `/\\{/` or `/[{]/`). " \
+          "Please add `clientReferences: rscClientReferences` manually for any plugin with " \
+          "isServer: #{is_server}."
         )
       end
 
-      def rsc_plugin_uses_scoped_client_references?(content)
-        rsc_plugin_option_bodies(content).any? do |options|
+      def ensure_rsc_client_references_setup(config_path, content, is_server:)
+        return true if scoped_rsc_client_references_defined?(content)
+
+        if rsc_client_references_defined?(content)
+          warn_unscoped_rsc_client_references_helper(config_path)
+          return false
+        end
+
+        unless rsc_client_references_setup_anchor?(content, is_server: is_server)
+          warn_missing_rsc_client_references_anchor(config_path)
+          return false
+        end
+
+        existing_imports_content = content_before_rsc_setup_anchor(content, is_server: is_server)
+        return false if rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content,
+                                                            is_server: is_server)
+
+        add_rsc_client_references_setup(config_path, content, is_server: is_server)
+        rsc_client_references_setup_ready?(config_path)
+      end
+
+      def rsc_plugin_uses_scoped_client_references?(content, is_server:)
+        sections = rsc_plugin_option_sections(content, is_server: is_server)
+        return false if sections.empty?
+        return false unless scoped_rsc_client_references_defined?(content)
+
+        sections.all? do |section|
+          options = section.fetch(:body)
           rsc_plugin_options_without_comments(options).match?(/\bclientReferences\s*:\s*rscClientReferences\b/)
         end
       end
 
-      def rsc_plugin_defines_client_references?(content)
-        rsc_plugin_option_bodies(content).any? do |options|
+      def rsc_plugin_client_references_configured?(content, is_server:)
+        sections = rsc_plugin_option_sections(content, is_server: is_server)
+        return false if sections.empty?
+
+        sections.all? do |section|
+          options = rsc_plugin_options_without_comments(section.fetch(:body))
+          if options.match?(/\bclientReferences\s*:\s*rscClientReferences\b/)
+            scoped_rsc_client_references_defined?(content)
+          else
+            options.match?(/\bclientReferences\s*:/)
+          end
+        end
+      end
+
+      def rsc_plugin_defines_client_references?(content, is_server:)
+        rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
+          options = section.fetch(:body)
           rsc_plugin_options_without_comments(options).match?(/\bclientReferences\s*:/)
         end
       end
 
-      def rsc_plugin_option_bodies(content)
-        content.scan(/new RSCWebpackPlugin\(\{(.*?)\}\)/m).flatten
+      def rsc_plugin_without_client_references?(content, is_server:)
+        rsc_plugin_option_sections(content, is_server: is_server).any? do |section|
+          !rsc_plugin_options_without_comments(section.fetch(:body)).match?(/\bclientReferences\s*:/)
+        end
       end
 
+      # Strips JavaScript line and block comments while preserving string-literal contents,
+      # so `clientReferences:` / `isServer:` substrings inside strings are not mis-detected.
+      # Regex literals (e.g. `/a{2}/`) are still outside this scanner's supported surface
+      # because brace quantifiers can confuse `matching_js_closing_brace`'s depth counter.
       def rsc_plugin_options_without_comments(options)
-        options.gsub(%r{/\*.*?\*/}m, "").gsub(%r{//.*$}, "")
+        result = String.new(capacity: options.length)
+        scan_state = { mode: nil, escaped: false, index: 0 }
+
+        step_options_scan(options, result, scan_state) while scan_state[:index] < options.length
+
+        result
       end
 
-      def rsc_plugin_without_client_references_pattern(is_server)
-        /new RSCWebpackPlugin\(\{([^}]*)isServer: #{is_server}([^}]*)\}\)/
+      def step_options_scan(options, result, scan_state)
+        index = scan_state[:index]
+        char = options[index]
+        next_char = options[index + 1]
+
+        case scan_state[:mode]
+        when :line_comment
+          step_line_comment(scan_state, result, char)
+        when :block_comment
+          step_block_comment(scan_state, char, next_char)
+        when *JS_STRING_DELIMITERS
+          step_string_state(scan_state, result, char)
+        else
+          step_default_state(scan_state, result, char, next_char)
+        end
+      end
+
+      def step_line_comment(scan_state, result, char)
+        if char == "\n"
+          result << char
+          scan_state[:mode] = nil
+        end
+        scan_state[:index] += 1
+      end
+
+      def step_block_comment(scan_state, char, next_char)
+        if char == "*" && next_char == "/"
+          scan_state[:mode] = nil
+          scan_state[:index] += 2
+        else
+          scan_state[:index] += 1
+        end
+      end
+
+      def step_string_state(scan_state, result, char)
+        result << char
+        if scan_state[:escaped]
+          scan_state[:escaped] = false
+        elsif char == "\\"
+          scan_state[:escaped] = true
+        elsif char == scan_state[:mode]
+          scan_state[:mode] = nil
+        end
+        scan_state[:index] += 1
+      end
+
+      def step_default_state(scan_state, result, char, next_char)
+        if char == "/" && next_char == "/"
+          scan_state[:mode] = :line_comment
+          scan_state[:index] += 2
+        elsif char == "/" && next_char == "*"
+          scan_state[:mode] = :block_comment
+          scan_state[:index] += 2
+        else
+          result << char
+          scan_state[:mode] = char if JS_STRING_DELIMITERS.include?(char)
+          scan_state[:index] += 1
+        end
+      end
+
+      def rsc_plugin_option_sections(content, is_server:)
+        rsc_plugin_option_sections_partition(content, is_server: is_server).fetch(:safe)
+      end
+
+      # Returns the matching plugin sections plus a count of `RSCWebpackPlugin(` invocations
+      # whose options block could not be parsed cleanly. An invocation is treated as
+      # unparseable when the depth scanner cannot find a matching `}` (over-count caused by an
+      # unmatched `{` in a regex literal) or when the `}` it finds is not followed by the `)`
+      # that would close the `new RSCWebpackPlugin(...)` call (under-count caused by an
+      # unmatched `}` in a regex literal). Both cases mean a rewrite based on this section
+      # would corrupt the file, so callers must surface a warning instead of silently skipping.
+      def rsc_plugin_option_sections_partition(content, is_server:)
+        safe = []
+        unparseable = 0
+        search_from = 0
+        marker = "new RSCWebpackPlugin("
+
+        # Webpack configs are tiny, so rescanning from the start in js_code_position?
+        # keeps this migration parser simple without a meaningful performance cost.
+        while (call_start = content.index(marker, search_from))
+          unless js_code_position?(content, call_start)
+            search_from = call_start + marker.length
+            next
+          end
+
+          options_start = first_non_space_index(content, call_start + marker.length)
+          unless options_start && content[options_start] == "{"
+            search_from = call_start + marker.length
+            next
+          end
+
+          options_end = matching_js_closing_brace(content, options_start)
+          unless options_end
+            unparseable += 1
+            search_from = options_start + 1
+            next
+          end
+
+          unless rsc_plugin_options_followed_by_close_paren?(content, options_end)
+            unparseable += 1
+            search_from = options_end + 1
+            next
+          end
+
+          body = content[(options_start + 1)...options_end]
+          if rsc_plugin_is_server_match?(body, is_server: is_server)
+            safe << { body: body, body_start: options_start + 1, body_end: options_end }
+          end
+          search_from = options_end + 1
+        end
+
+        { safe: safe, unparseable: unparseable }
+      end
+
+      # Walks forward from the assumed closing `}` of an options object, skipping whitespace
+      # and JS comments, and confirms the next significant character is `)`. Used to detect
+      # when `matching_js_closing_brace` was confused by a regex literal and returned an
+      # earlier `}` than the real options-object close.
+      def rsc_plugin_options_followed_by_close_paren?(content, options_end)
+        state = nil
+        escaped = false
+        index = options_end + 1
+
+        while index < content.length
+          char = content[index]
+          next_char = content[index + 1]
+          state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+          if state
+            index += 1
+            next
+          end
+
+          return content[index] == ")" unless char.match?(/\s/)
+
+          index += 1
+        end
+
+        false
+      end
+
+      def first_non_space_index(content, start_index)
+        index = start_index
+        index += 1 while index < content.length && content[index].match?(/\s/)
+        index < content.length ? index : nil
+      end
+
+      # This lightweight scanner intentionally treats template literals as opaque strings.
+      # Nested template literals inside plugin options are not supported, which is acceptable
+      # for the webpack option objects this migration rewrites. Regex literals are also
+      # outside this scanner's supported surface; callers verify the returned `}` is followed
+      # by `)` via `rsc_plugin_options_followed_by_close_paren?` so that an unmatched `{`/`}`
+      # inside a regex literal surfaces as a warning instead of a corrupt rewrite.
+      def matching_js_closing_brace(content, open_index)
+        depth = 0
+        index = open_index
+        state = nil
+        escaped = false
+
+        while index < content.length
+          char = content[index]
+          # Nil at EOF is safe because downstream comparisons treat it as a non-match.
+          next_char = content[index + 1]
+
+          state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+          if state
+            index += 1
+            next
+          end
+
+          depth += 1 if char == "{"
+          if char == "}"
+            depth -= 1
+            return index if depth.zero?
+          end
+          index += 1
+        end
+
+        nil
+      end
+
+      # Return index is the last consumed character. Line comments leave the newline
+      # for the caller's normal index increment; block comments consume the closing slash.
+      def advance_js_scan_state(state, escaped, char, next_char, index)
+        return [char == "\n" ? nil : :line_comment, escaped, index] if state == :line_comment
+        return advance_js_block_comment_state(escaped, char, next_char, index) if state == :block_comment
+        return advance_js_string_state(state, escaped, char, index) if JS_STRING_DELIMITERS.include?(state)
+
+        advance_js_default_scan_state(escaped, char, next_char, index)
+      end
+
+      def advance_js_block_comment_state(escaped, char, next_char, index)
+        return [nil, escaped, index + 1] if char == "*" && next_char == "/"
+
+        [:block_comment, escaped, index]
+      end
+
+      def advance_js_string_state(state, escaped, char, index)
+        return [state, false, index] if escaped
+        return [state, true, index] if char == "\\"
+        return [nil, escaped, index] if char == state
+
+        [state, escaped, index]
+      end
+
+      def advance_js_default_scan_state(escaped, char, next_char, index)
+        return [:line_comment, escaped, index + 1] if char == "/" && next_char == "/"
+        return [:block_comment, escaped, index + 1] if char == "/" && next_char == "*"
+        return [char, escaped, index] if JS_STRING_DELIMITERS.include?(char)
+
+        [nil, escaped, index]
+      end
+
+      def js_code_position?(content, target_index)
+        state = nil
+        escaped = false
+        index = 0
+
+        while index < target_index
+          char = content[index]
+          next_char = content[index + 1]
+          state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+          index += 1
+        end
+
+        state.nil?
+      end
+
+      def js_top_level_position?(content, target_index)
+        state = nil
+        escaped = false
+        depth = 0
+        index = 0
+
+        while index < target_index
+          char = content[index]
+          next_char = content[index + 1]
+          state, escaped, index = advance_js_scan_state(state, escaped, char, next_char, index)
+          if state
+            index += 1
+            next
+          end
+
+          depth += 1 if char == "{"
+          depth -= 1 if char == "}" && depth.positive?
+          index += 1
+        end
+
+        state.nil? && depth.zero?
+      end
+
+      def rsc_plugin_is_server_match?(options, is_server:)
+        rsc_plugin_options_without_comments(options).match?(
+          /\bisServer\s*:\s*#{Regexp.escape(is_server.to_s)}\b/
+        )
+      end
+
+      def rewrite_rsc_plugin_client_references(config_path, is_server:)
+        full_path = File.join(destination_root, config_path)
+        # Re-read because ensure_rsc_client_references_setup may have just inserted the helper,
+        # making the caller's in-memory body_start/body_end offsets stale.
+        content = File.read(full_path)
+        rewrites = rsc_plugin_option_sections(content, is_server: is_server).filter_map do |candidate|
+          next if rsc_plugin_options_without_comments(candidate.fetch(:body)).match?(/\bclientReferences\s*:/)
+
+          body = candidate.fetch(:body)
+          rewritten_body = add_client_references_to_rsc_plugin_body(body, is_server: is_server)
+          next if rewritten_body == body
+
+          [candidate, rewritten_body]
+        end
+
+        return false if rewrites.empty?
+
+        # Reverse order so earlier offsets stay valid as later sections are spliced.
+        rewrites.reverse_each do |section, rewritten_body|
+          content[section.fetch(:body_start)...section.fetch(:body_end)] = rewritten_body
+        end
+        if options[:pretend]
+          say_status(:pretend, "Would rewrite #{config_path}", :yellow)
+        else
+          # Direct write is intentional: multi-point rewrites cannot be expressed as one
+          # gsub_file call, and pretend mode is already handled above.
+          File.write(full_path, content)
+          say_status(:rewrite, config_path, :green)
+          remind_to_run_formatter(config_path)
+        end
+        true
+      end
+
+      # The rewrite splices `clientReferences: rscClientReferences` directly after `isServer:`
+      # so single-line option objects stay readable. For multi-line option objects this leaves
+      # the new key on the same line as `isServer`, which is valid JS but easy to miss in code
+      # review unless a formatter reflows it. Surface a one-time reminder per file so users on
+      # projects without an autoformatter pipeline are not surprised.
+      def remind_to_run_formatter(config_path)
+        GeneratorMessages.add_info(
+          "Updated #{config_path} with `clientReferences: rscClientReferences`. If your project " \
+          "uses Prettier, run `npx prettier --write #{config_path}` to reflow multi-line option " \
+          "objects."
+        )
+      end
+
+      # Splices the new key directly after `isServer:` rather than at the closing brace.
+      # This keeps single-line option objects readable (`{ isServer: true, clientReferences: ... }`)
+      # at the cost of producing same-line output for multi-line objects when `isServer` is not
+      # the last key — that variant is valid JS and matched by spec coverage; users running
+      # Prettier post-migration will reflow it.
+      def add_client_references_to_rsc_plugin_body(body, is_server:)
+        pattern = /\bisServer\s*:\s*#{Regexp.escape(is_server.to_s)}\b/
+        search_from = 0
+
+        while (matched_is_server = pattern.match(body, search_from))
+          if js_code_position?(body, matched_is_server.begin(0))
+            return "#{body[0...matched_is_server.end(0)]}, clientReferences: rscClientReferences" \
+                   "#{body[matched_is_server.end(0)..]}"
+          end
+
+          search_from = matched_is_server.end(0)
+        end
+
+        body
       end
 
       def rsc_client_references_setup_anchor?(content, is_server:)
@@ -595,11 +1001,15 @@ module ReactOnRails
       end
 
       def add_rsc_client_references_setup(config_path, content, is_server:)
-        return if rsc_client_references_defined?(content)
+        # Keep these guards local too so direct helper calls cannot half-apply the migration.
+        return if scoped_rsc_client_references_defined?(content)
+
+        if rsc_client_references_defined?(content)
+          warn_unscoped_rsc_client_references_helper(config_path)
+          return
+        end
 
         existing_imports_content = content_before_rsc_setup_anchor(content, is_server: is_server)
-        return if rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server: is_server)
-
         injected_imports = [
           "\\1",
           ("const { config } = require('shakapacker');" unless shakapacker_config_imported?(existing_imports_content)),
@@ -613,13 +1023,15 @@ module ReactOnRails
 
       def rsc_client_references_setup_import_pattern(is_server:)
         if is_server
+          # Matches the standard 3-line bundler ternary from the serverWebpackConfig template.
+          # Rspack-only configs without the webpack fallback receive the manual-migration warning.
           Regexp.new(
-            "(const bundler = config\\.assets_bundler.*\n" \
-            ".*require\\('@rspack/core'\\).*\n" \
-            ".*: require\\('webpack'\\);)"
+            "(const bundler = config\\.assets_bundler.*\\r?\\n" \
+            ".*require\\(['\"]@rspack/core['\"]\\).*\\r?\\n" \
+            ".*: require\\(['\"]webpack['\"]\\);)"
           )
         else
-          %r{(const commonWebpackConfig = require\('\./commonWebpackConfig'\);)}
+          %r{(const commonWebpackConfig = require\(['"]\./commonWebpackConfig['"]\);)}
         end
       end
 
@@ -627,46 +1039,98 @@ module ReactOnRails
         content.match?(/^\s*const\s+rscClientReferences\b/)
       end
 
+      def scoped_rsc_client_references_defined?(content)
+        rsc_client_references_defined?(content) &&
+          content.match?(/\bdirectory\s*:\s*resolve\(config\.source_path\)/)
+      end
+
       def content_before_rsc_setup_anchor(content, is_server:)
         anchor = content.match(rsc_client_references_setup_import_pattern(is_server: is_server))
-        return content unless anchor
+        return "" unless anchor
 
         content[0...anchor.end(0)]
       end
 
-      def rsc_setup_has_later_required_imports?(content, existing_imports_content, is_server:)
-        resolve_imported_later = path_resolve_imported?(content) && !path_resolve_imported?(existing_imports_content)
-        unusable_resolve_binding = path_module_imported_as_resolve?(content) && !path_resolve_imported?(content)
-        config_imported_later = !is_server && shakapacker_config_imported?(content) &&
-                                !shakapacker_config_imported?(existing_imports_content)
-
-        resolve_imported_later || unusable_resolve_binding || config_imported_later
-      end
-
       def rsc_setup_blocked_by_later_imports?(config_path, content, existing_imports_content, is_server:)
-        return false unless rsc_setup_has_later_required_imports?(content, existing_imports_content,
-                                                                  is_server: is_server)
+        reason = rsc_setup_blocker_reason(content, existing_imports_content, is_server: is_server)
+        return false unless reason
 
-        required_imports = is_server ? "'path'" : "'path'/'shakapacker'"
         GeneratorMessages.add_warning(
-          "Could not inject rscClientReferences into #{config_path}: required imports (#{required_imports}) " \
-          "are unavailable before the expected anchor line. Please add clientReferences manually."
+          "Could not inject rscClientReferences into #{config_path}: #{reason}. " \
+          "Please add clientReferences manually."
         )
         true
       end
 
+      # Reports the first blocker that prevents the generator from injecting `rscClientReferences`.
+      # Each branch returns a message specific enough that the user can act on it without re-deriving
+      # the cause from a generic "imports unavailable" warning.
+      def rsc_setup_blocker_reason(content, existing_imports_content, is_server:)
+        path_resolve_blocker_reason(content, existing_imports_content) ||
+          shakapacker_config_blocker_reason(content, existing_imports_content, is_server: is_server)
+      end
+
+      def path_resolve_blocker_reason(content, existing_imports_content)
+        return nil if path_resolve_imported?(existing_imports_content)
+
+        if top_level_resolve_binding?(content)
+          "a top-level `resolve` binding already exists that would conflict with the injected " \
+            "`const { resolve } = require('path')`"
+        elsif path_resolve_imported?(content)
+          "the `resolve` import from `path` appears after the expected anchor line — " \
+            "move the import above it"
+        end
+      end
+
+      def shakapacker_config_blocker_reason(content, existing_imports_content, is_server:)
+        return nil if shakapacker_config_imported?(existing_imports_content)
+
+        shakapacker_anywhere = shakapacker_config_imported?(content)
+
+        if is_server
+          if shakapacker_anywhere
+            "shakapacker's `config` is imported after the bundler ternary anchor — " \
+              "move the import above it"
+          else
+            "shakapacker's `config` is not imported in this file — add " \
+              "`const { config } = require('shakapacker');` before the bundler ternary"
+          end
+        elsif shakapacker_anywhere
+          "shakapacker's `config` is imported after the `commonWebpackConfig` anchor — " \
+            "move the import above it"
+        end
+      end
+
       def shakapacker_config_imported?(content)
-        commonjs_named_imported?(content, "shakapacker", "config") ||
-          content.match?(/^\s*const\s+config\s*=\s*require\(['"]shakapacker['"]\)\.config/)
+        return true if commonjs_named_imported?(content, "shakapacker", "config")
+
+        top_level_dot_access_import?(content,
+                                     /^[ \t]*(?:const|let|var)\s+config\s*=\s*require\(['"]shakapacker['"]\)\.config/)
       end
 
       def path_resolve_imported?(content)
-        commonjs_named_imported?(content, "path", "resolve") ||
-          content.match?(/^\s*const\s+resolve\s*=\s*require\(['"]path['"]\)\.resolve/)
+        # Full-module imports (`const path = require('path')`) do not create the bare `resolve` binding
+        # that rscClientReferences uses, so the generator may add a harmless named import alongside them.
+        return true if commonjs_named_imported?(content, "path", "resolve")
+
+        top_level_dot_access_import?(content,
+                                     /^[ \t]*(?:const|let|var)\s+resolve\s*=\s*require\(['"]path['"]\)\.resolve/)
       end
 
-      def path_module_imported_as_resolve?(content)
-        content.match?(/^\s*const\s+resolve\s*=\s*require\(['"]path['"]\);?/)
+      # Verifies that a regex match is at module-scope depth=0 to avoid false positives
+      # from function-scoped `require` calls (which do not produce module-scope bindings).
+      def top_level_dot_access_import?(content, pattern)
+        content.to_enum(:scan, pattern).any? do
+          js_top_level_position?(content, Regexp.last_match.begin(0))
+        end
+      end
+
+      def top_level_resolve_binding?(content)
+        pattern = /^[ \t]*(?:(?:const|let|var)\s+resolve\b|function\s+resolve\s*\()/
+
+        content.to_enum(:scan, pattern).any? do
+          js_top_level_position?(content, Regexp.last_match.begin(0))
+        end
       end
 
       def rsc_client_references_setup_anchor_available?(config_path, content, is_server:)
@@ -677,9 +1141,10 @@ module ReactOnRails
       end
 
       def rsc_client_references_setup_ready?(config_path)
-        return true if rsc_client_references_defined?(File.read(File.join(destination_root, config_path)))
+        return true if options[:pretend]
+        return true if scoped_rsc_client_references_defined?(File.read(File.join(destination_root, config_path)))
 
-        warn_missing_rsc_client_references_anchor(config_path)
+        warn_rsc_client_references_injection_failed(config_path)
         false
       end
 
@@ -690,14 +1155,43 @@ module ReactOnRails
         )
       end
 
-      def commonjs_named_imported?(content, package_name, binding_name)
-        pattern = /^\s*const\s+\{([^}]*)\}\s*=\s*require\(['"]#{Regexp.escape(package_name)}['"]\);?/m
+      def warn_rsc_client_references_injection_failed(config_path)
+        GeneratorMessages.add_warning(
+          "Could not inject rscClientReferences into #{config_path}: expected webpack import anchor was found, " \
+          "but the generated scoped helper setup was not written. Please add clientReferences manually."
+        )
+      end
 
-        content.scan(pattern).any? do |captures|
+      def warn_unscoped_rsc_client_references_helper(config_path)
+        GeneratorMessages.add_warning(
+          "Skipped scoped clientReferences migration for #{config_path} because rscClientReferences already exists " \
+          "but does not point to resolve(config.source_path). Please verify it manually."
+        )
+      end
+
+      def warn_missing_rsc_plugin_target(config_path, is_server:)
+        GeneratorMessages.add_warning(
+          "Could not update RSCWebpackPlugin in #{config_path}: no plugin options with isServer: #{is_server} " \
+          "could be rewritten. Please add clientReferences manually."
+        )
+      end
+
+      def commonjs_named_imported?(content, package_name, binding_name)
+        # `[^}]*` is intentionally newline-permissive (Ruby character classes match `\n`),
+        # so multi-line destructuring like `const {\n  config,\n} = require('shakapacker')` matches.
+        pattern = /^[ \t]*(?:const|let|var)\s+\{([^}]*)\}\s*=\s*require\(['"]#{Regexp.escape(package_name)}['"]\);?/
+
+        content.to_enum(:scan, pattern).any? do |captures|
+          # Module-scope check guards against false positives when the same destructuring
+          # appears inside a function body (which does not produce a module-scope binding).
+          next false unless js_top_level_position?(content, Regexp.last_match.begin(0))
+
           bindings = captures.first
 
           bindings.split(",").any? do |binding|
             binding = binding.strip
+            # Aliases (`config: alias`) do not provide the exact binding that rscClientReferences uses.
+            # The `binding = fallback` form covers JavaScript destructuring defaults.
             binding == binding_name || binding.start_with?("#{binding_name} =")
           end
         end
