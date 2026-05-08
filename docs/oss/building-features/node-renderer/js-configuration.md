@@ -225,8 +225,9 @@ Keep the three probe types distinct:
 - **Readiness** answers whether the renderer should receive new render requests. Use an application-level endpoint such
   as the `/health` route in [Adding a Health Check Endpoint](#adding-a-health-check-endpoint), or the built-in `/info`
   endpoint for a shallow process check.
-- **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer. Prefer an
-  h2c-aware `exec` check when curl is available.
+- **Liveness** answers whether the renderer is stuck badly enough that restarting the container is safer. Prefer
+  `tcpSocket` as the default so transient CPU or GC pauses do not restart an otherwise recoverable renderer; use an
+  h2c-aware `exec` check only when you intentionally need stricter hung-process detection.
 
 Only the custom `/health` route requires `configureFastify`; `tcpSocket` probes and `/info` checks work without custom
 Fastify setup. The health check route should return `200 OK` when the process can accept probe traffic.
@@ -242,11 +243,11 @@ The renderer listens with cleartext HTTP/2 (h2c). Do not configure a Kubernetes 
 probe, or any other HTTP/1.1-only probe directly against the renderer port; those probes are rejected by the h2c
 listener. Use one of these probe styles instead:
 
-| Probe style  | When to use it                                                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `exec` probe | Application-level readiness and stricter liveness checks with an h2c-aware client, for example `curl --http2-prior-knowledge`. |
-| `tcpSocket`  | Startup checks and fallback readiness or liveness checks when curl with HTTP/2 support is unavailable.                         |
-| HTTP/1.1     | Only if you probe Rails, a separate HTTP/1.1 health sidecar/port, or another endpoint that is not the renderer h2c listener.   |
+| Probe style  | When to use it                                                                                                                      |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `tcpSocket`  | Startup checks, default liveness checks, and fallback readiness when curl with HTTP/2 support is unavailable.                       |
+| `exec` probe | Application-level readiness and optional stricter liveness checks with an h2c-aware client, such as `curl --http2-prior-knowledge`. |
+| HTTP/1.1     | Only if you probe Rails, a separate HTTP/1.1 health sidecar/port, or another endpoint that is not the renderer h2c listener.        |
 
 A passing `tcpSocket` probe means the h2c listener has bound to the port; cluster workers might still be warming up.
 Keep an application-level readiness probe if traffic should wait for worker initialization.
@@ -255,8 +256,9 @@ For Kubernetes and platform `tcpSocket` probes, set the renderer `host` to `0.0.
 pod or workload IP, not container-local loopback. The default `localhost` binding is fine for `exec` probes that run
 inside the renderer container.
 
-For liveness, a fully blocked Node.js event loop may still accept TCP connections and pass a `tcpSocket` check. Use an
-h2c-aware `exec` liveness probe with a short `--max-time` if you need stricter hung-process detection.
+For liveness, start with `tcpSocket`. A fully blocked Node.js event loop may still accept TCP connections and pass that
+check, so use an h2c-aware `exec` liveness probe with a short `--max-time` only if you explicitly need stricter
+hung-process detection and have verified curl HTTP/2 support in the image.
 
 > **Note:** The `exec` probe requires curl with HTTP/2 support. Verify with `curl --version | grep -i http2`. If unavailable,
 > use a `tcpSocket` probe as a fallback.
@@ -278,12 +280,14 @@ Recommended starting values:
   [security note](#built-in-endpoints) and keep the renderer on private networking.
 - **Readiness fallback**: Use `tcpSocket` on the renderer port only if curl with HTTP/2 support is unavailable. This
   checks port reachability, not application readiness.
-- **Liveness**: Prefer `exec` with
-  `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/info` when curl with HTTP/2 support is available.
-  If you are upgrading from a `tcpSocket` liveness probe, verify curl has HTTP/2 support in the image before switching.
-  Start with `timeoutSeconds: 5`, `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment
-  examples. Use `tcpSocket` only if curl is unavailable. Raise `failureThreshold`, and optionally `periodSeconds`, if
-  heavy CPU bursts or frequent transient pauses trigger false-positive restarts.
+- **Liveness**: Use `tcpSocket` on the renderer port as the default. Start with `timeoutSeconds: 1`,
+  `periodSeconds: 10`, and `failureThreshold: 3`, matching the Container Deployment examples. Raise
+  `failureThreshold`, and optionally `periodSeconds`, if hard listener checks restart the container too aggressively in
+  your environment.
+- **Optional stricter liveness**: Use
+  `curl -sf --max-time 3 --http2-prior-knowledge http://localhost:3800/info` only when you need liveness to catch a
+  blocked event loop and have verified curl has HTTP/2 support in the image. Keep external dependency and warm-up checks
+  in readiness, not liveness.
 
 Substitute `3800` with your actual renderer port in Kubernetes YAML `exec` arrays; shell variable expansion
 does not apply there. See the `port` option at the top of this page for Heroku or Control Plane.

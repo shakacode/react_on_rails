@@ -188,11 +188,18 @@ class HealthController < ActionController::Base
     renderer_port = renderer_url.match?(/:\d+(?:[\/?#]|$)/) ? renderer_uri.port : 3800
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) {}
     head :ok
-  rescue ArgumentError, SocketError, SystemCallError, URI::Error, TypeError
+  rescue SocketError, SystemCallError
     head :service_unavailable
   end
 end
 ```
+
+> **Topology-specific:** This same-container example always probes `localhost` and only borrows the port from
+> `renderer_url`. Do not reuse it as-is for sidecar or separate-workload topologies where the renderer runs behind a
+> different host.
+>
+> Configuration mistakes such as a missing or malformed `renderer_url` are allowed to surface as 500 errors so they are
+> visible in logs and alerting. Only renderer reachability failures are converted to `503`.
 
 ### Separate Container In The Same Workload
 
@@ -484,19 +491,6 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
 **Mitigation:**
 
-> [!NOTE]
-> **Probe command notes:** `exec` probes require curl with HTTP/2 support in your image. Verify with
-> `curl --version | grep -i http2`; if unavailable, use `tcpSocket` as a fallback. Set curl `--max-time` shorter than the
-> orchestrator timeout so curl returns a clean non-zero exit code before Kubernetes terminates the probe process. These
-> examples use `--max-time 3` with `timeoutSeconds: 5`, leaving a 2-second buffer. Readiness and liveness omit
-> `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers
-> them until the startup probe succeeds. If you skip the startup probe or run an older cluster without startup probe
-> support, add an appropriate `initialDelaySeconds`.
-
-> **Security:** `/info` is unauthenticated even when `password` is configured. Keep the renderer on `localhost` or
-> private networking if exposing node and renderer version details is a concern; see
-> [Built-in Endpoints](./js-configuration.md#built-in-endpoints).
-
 1. **Health check endpoint** — The Node Renderer exposes a built-in `/info` endpoint that returns the node version and renderer version. Because the renderer uses cleartext HTTP/2, Kubernetes `httpGet` probes (HTTP/1.1) are incompatible with this listener. Use a TCP probe, an `exec` probe with an h2c-aware client such as `curl --http2-prior-knowledge`, or a dedicated HTTP/1.1 sidecar/port for probes. For a custom `/health` route with more granular checks, use the `configureFastify()` option (see [JS Configuration: Adding a Health Check Endpoint](./js-configuration.md#adding-a-health-check-endpoint)). Configure your container orchestrator to wait for it before routing traffic.
 2. **Startup probe** — Configure a startup probe with a generous `initialDelaySeconds`:
    ```yaml
@@ -531,7 +525,7 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >   registering that route via `configureFastify` if readiness should wait for renderer-specific warm-up checks.
    > - Before upgrading an existing readiness probe, keep curl's `--max-time` lower than `timeoutSeconds`. If switching
    >   from `tcpSocket` to `exec`, verify curl HTTP/2 support in the image first.
-   > - See the probe command notes above for curl HTTP/2 support, `--max-time`, loaded-node buffers, and
+   > - See the probe command notes below for curl HTTP/2 support, `--max-time`, loaded-node buffers, and
    >   `initialDelaySeconds` guidance.
 
    > **Readiness fallback option:** If curl lacks HTTP/2 support in your image, replace that `readinessProbe` with this
@@ -547,37 +541,61 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >   failureThreshold: 3
    > ```
 
-4. **Liveness probe** — Ensure the renderer is restarted if it becomes unresponsive. The probe below changes the
-   liveness check from `tcpSocket` to `exec`; if you are upgrading an existing deployment, verify curl HTTP/2 support
-   first:
-
-   > **Before upgrading:** Run `curl --version | grep -i http2` inside your container image. If HTTP/2 support is absent,
-   > use the `tcpSocket` fallback shown below instead of this `exec` block.
+4. **Liveness probe** — Ensure the renderer is restarted after hard listener or container failures. Prefer `tcpSocket`
+   for liveness so transient CPU or GC pauses do not trigger an HTTP round-trip failure and restart an otherwise
+   recoverable renderer:
 
    ```yaml
    livenessProbe:
      # Omit initialDelaySeconds only if the startupProbe above is configured.
-     # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
-     # If unavailable, replace this exec probe with a tcpSocket probe on port 3800.
-     exec:
-       command:
-         - curl
-         - -sf
-         - --max-time
-         - '3'
-         - --http2-prior-knowledge
-         - http://localhost:3800/info
-     timeoutSeconds: 5
+     tcpSocket:
+       port: 3800
+     # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
+     timeoutSeconds: 1
      periodSeconds: 10
      failureThreshold: 3
    ```
 
+   > **Stricter liveness option:** If you need liveness to catch a blocked Node.js event loop, and you have verified curl
+   > HTTP/2 support in the image, you can use an h2c-aware `exec` probe with a short `--max-time`. Keep external
+   > dependency checks out of liveness; use readiness for dependency or warm-up gates.
+   >
+   > ```yaml
+   > livenessProbe:
+   >   # Omit initialDelaySeconds only if the startupProbe above is configured.
+   >   # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
+   >   exec:
+   >     command:
+   >       - curl
+   >       - -sf
+   >       - --max-time
+   >       - '3'
+   >       - --http2-prior-knowledge
+   >       - http://localhost:3800/info
+   >   timeoutSeconds: 5
+   >   periodSeconds: 10
+   >   failureThreshold: 3
+   > ```
+
    > **Notes:**
    >
-   > - Use `/info` by default. Only substitute `/health` for liveness if that route avoids external dependency checks and
-   >   readiness gates.
-   > - See the probe command notes above for curl HTTP/2 support, `--max-time`, loaded-node buffers, and
+   > - Keep `/info` as the optional `exec` liveness endpoint. Only substitute `/health` if that route avoids external
+   >   dependency checks and readiness gates.
+   > - See the probe command notes below for curl HTTP/2 support, `--max-time`, loaded-node buffers, and
    >   `initialDelaySeconds` guidance.
+
+> [!NOTE]
+> **Probe command notes:** `exec` probes require curl with HTTP/2 support in your image. Verify with
+> `curl --version | grep -i http2`; if unavailable, use `tcpSocket` as a fallback. Set curl `--max-time` shorter than the
+> orchestrator timeout so curl returns a clean non-zero exit code before Kubernetes terminates the probe process. These
+> examples use `--max-time 3` with `timeoutSeconds: 5` for `exec` probes, leaving a 2-second buffer. Readiness and
+> liveness omit `initialDelaySeconds` because Kubernetes 1.20+ (startup probe GA) defers them until the startup probe
+> succeeds. If you skip the startup probe or run an older cluster without startup probe support, add an appropriate
+> `initialDelaySeconds`.
+
+> **Security:** `/info` is unauthenticated even when `password` is configured. Keep the renderer on `localhost` or
+> private networking if exposing node and renderer version details is a concern; see
+> [Built-in Endpoints](./js-configuration.md#built-in-endpoints).
 
 ### OOM Tracking
 
@@ -609,25 +627,9 @@ In production, `logLevel: 'warn'` is sufficient unless actively debugging.
 
 A complete pod spec for the sidecar pattern:
 
-> [!WARNING]
-> The `exec` liveness probe in this copy-paste manifest requires curl with HTTP/2 support. Run
-> `curl --version | grep -i http2` in your container image before replacing an existing `tcpSocket` probe. If curl lacks
-> HTTP/2 support, keep `tcpSocket` or add HTTP/2-capable curl support. If you cannot verify curl before rollout, use the
-> `tcpSocket` fallback block below and upgrade to `exec` later.
-
-> **Liveness fallback option:** The manifest below uses `exec` (preferred). If curl lacks HTTP/2 support in your image,
-> replace the manifest's `livenessProbe` with this `tcpSocket` block before applying it:
->
-> ```yaml
-> livenessProbe:
->   # Omit initialDelaySeconds only if the startupProbe above is configured.
->   tcpSocket:
->     port: 3800
->   # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
->   timeoutSeconds: 1
->   periodSeconds: 10
->   failureThreshold: 3
-> ```
+> [!NOTE]
+> The manifest uses an h2c-aware `exec` probe for readiness and a `tcpSocket` probe for liveness. Keep that split unless
+> you intentionally need stricter liveness detection and have verified curl HTTP/2 support in the image.
 
 ```yaml
 apiVersion: apps/v1
@@ -706,19 +708,11 @@ spec:
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            # UPGRADE WARNING: verify curl HTTP/2 support before replacing an existing tcpSocket probe.
-            # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
-            # If unavailable, replace this exec probe with a tcpSocket probe on port 3800.
             # Omit initialDelaySeconds only if the startupProbe above is configured.
-            exec:
-              command:
-                - curl
-                - -sf
-                - --max-time
-                - '3'
-                - --http2-prior-knowledge
-                - http://localhost:3800/info
-            timeoutSeconds: 5
+            tcpSocket:
+              port: 3800
+            # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
+            timeoutSeconds: 1
             periodSeconds: 10
             failureThreshold: 3
 ```
