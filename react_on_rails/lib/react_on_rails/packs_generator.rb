@@ -91,7 +91,7 @@ module ReactOnRails
 
         yield
       ensure
-        # Keep the lock file on disk to avoid a TOCTOU gap for concurrent open/create callers.
+        # Release early so the next waiter can proceed even if the block raised.
         lock_file.flock(File::LOCK_UN)
       end
     end
