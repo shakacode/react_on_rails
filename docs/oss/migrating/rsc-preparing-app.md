@@ -551,7 +551,7 @@ If the existing page already uses React on Rails Pro async helpers, keep the nam
 
 - `async_react_component` and `cached_async_react_component` render independent legacy React roots concurrently and return values that you later resolve with `.value`.
 - `stream_react_component` is the helper to use when migrating a Rails view root into streaming SSR/RSC.
-- `rsc_payload_react_component` is the lower-level RSC payload helper; it does not have a separate `_with_async_props` variant.
+- `rsc_payload_react_component` generates the raw NDJSON RSC payload rather than streaming rendered HTML; it does not have a separate `_with_async_props` variant.
 
 In the RSC migration docs, "async props" describes the Rails-owned data pattern: fetch or assemble data in Rails, pass it as `props`, and let streaming SSR flush the component tree progressively.
 
