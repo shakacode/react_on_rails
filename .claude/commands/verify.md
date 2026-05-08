@@ -9,7 +9,7 @@ Run a local verification loop for the current branch before creating or updating
 3. Decide the smallest verification set that covers the changed surface area.
 4. Keep repo-wide commit gates from `AGENTS.md` in the set when you will create a commit, even if the changed surface is narrow.
 5. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
-6. For formatting failures, run `rake autofix` before manually editing formatting-only changes.
+6. For formatting failures, run `rake autofix` instead of manually editing formatting-only changes.
 7. After a fix, restart at the failed command and continue forward. Do not claim a failure is fixed until the failed command passes locally.
 8. Finish with the exact commands run and their pass/fail status.
 
@@ -43,7 +43,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 ## Scope Guide
 
 - Ruby gem changes: run targeted RSpec, `bundle exec rubocop`, and RBS validation when signatures or public APIs changed.
-- Dummy app or integration changes: run `rake run_rspec:dummy` or a targeted dummy spec such as `cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb`.
+- Dummy app or integration changes: run `rake run_rspec:dummy` or a targeted dummy spec such as `cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb`. For changes that affect SSR rendering or client-side behavior, also run `cd react_on_rails/spec/dummy && pnpm test:e2e`.
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`, but do not treat it as a Markdown validator.
