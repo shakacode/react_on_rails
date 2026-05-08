@@ -52,10 +52,8 @@ module ReactOnRails
       with_generated_packs_lock(verbose: verbose) do
         add_generated_pack_to_server_bundle
 
-        # Clean any non-generated files from directories
-        clean_non_generated_files_with_feedback(verbose: verbose)
-
         if generated_files_present_and_up_to_date?
+          clean_non_generated_files_with_feedback(verbose: verbose)
           puts Rainbow("✅ Generated packs are up to date, no regeneration needed").green if verbose
         else
           clean_generated_directories_with_feedback(verbose: verbose)
