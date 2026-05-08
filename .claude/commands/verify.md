@@ -30,7 +30,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - targeted `pnpm run test -- ...` for changed package behavior
 4. Docs:
    - `script/check-docs-sidebar origin/main HEAD` when docs under `docs/` changed
-   - `bin/check-links` when Markdown links were added or edited
+   - project link checker: `bin/check-links` when Markdown links were added or edited
 5. CI workflows:
    - `actionlint` and `yamllint .github/` when any `.github/workflows/` file changed (do NOT run RuboCop on `.yml` files)
 6. Broad suite:
@@ -40,7 +40,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 
 - Ruby gem changes: run targeted RSpec, `bundle exec rubocop`, and RBS validation when signatures or public APIs changed.
 - Dummy app or integration changes: run the relevant dummy RSpec command from `react_on_rails/spec/dummy`.
-- TypeScript package changes: run package tests, `pnpm run lint`, and `pnpm run type-check`.
+- TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, mandatory `bundle exec rubocop`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs.
 - GitHub Actions workflow changes: ask the user first, then run `actionlint` and `yamllint .github/`.
@@ -51,7 +51,7 @@ Use this concise summary:
 
 ```text
 Verification:
-- PASS git diff --check
+- PASS git diff --check origin/main...HEAD
 - PASS pnpm start format.listDifferent
 - FAIL bundle exec rspec path/to/spec.rb
 
