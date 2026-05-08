@@ -32,6 +32,7 @@ module ReactOnRails
     # Auto-registration requires nested_entries support which was added in 7.0.0
     # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
     MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING = "7.0.0"
+    # Longer than any realistic pack generation; LOCK_NB still gates the actual clear.
     GENERATED_PACKS_LOCK_TTL_SECONDS = 120
 
     def self.instance
