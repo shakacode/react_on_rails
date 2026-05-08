@@ -16,6 +16,7 @@ When something goes wrong during RSC migration, start here. This table maps symp
 | Component stays a Client Component after removing `'use client'` | Imported by another `'use client'` file, or RSC bundle not rebuilding          | [Accidental Client Components](#accidental-client-components)                     |
 | Hydration mismatch warnings in console                           | Server/client render output differs (timestamps, browser APIs, invalid HTML)   | [Hydration Mismatches](#hydration-mismatches)                                     |
 | `ReferenceError: performance is not defined`                     | Node renderer VM context missing globals                                       | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
+| `ReferenceError: fetch is not defined`                           | Node renderer VM context missing fetch globals                                 | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
 | `ReferenceError: require is not defined`                         | Server bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback) |
 | `ReferenceError: MessageChannel is not defined`                  | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox   | [MessageChannel Not Defined](#messagechannel-not-defined)                         |
 | SSR hangs or times out on large pages                            | Stream backpressure deadlock                                                   | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                     |
@@ -840,6 +841,8 @@ module.exports = {
   supportModules: true,
   additionalContext: {
     // Add any globals that aren't in the default supportModules set.
+    // These host globals require Node.js 18+. If any are undefined,
+    // import a polyfill and pass that implementation instead.
     fetch: globalThis.fetch,
     Headers: globalThis.Headers,
     Request: globalThis.Request,
@@ -851,7 +854,7 @@ module.exports = {
 };
 ```
 
-If your Node.js runtime does not provide the fetch globals, use a bundled HTTP client such as `node-fetch` from the component code or pass a fetch implementation through `additionalContext`. See [Node Renderer JavaScript Configuration](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
+If your Node.js runtime does not provide the fetch globals, use a bundled HTTP client such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici` from the component code, or pass a fetch implementation through `additionalContext`. See [Node Renderer JavaScript Configuration](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
 
 #### Handling Node Builtins -- `externals` vs `resolve.fallback`
 

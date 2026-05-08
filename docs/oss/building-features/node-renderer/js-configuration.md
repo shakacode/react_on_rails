@@ -70,26 +70,36 @@ The node renderer executes uploaded JavaScript bundles inside isolated VM contex
 
 Prefer passing application data from Rails controllers through props when the data belongs to your Rails app. When a Server Component really needs to call an external HTTP API from the renderer, choose one of these approaches:
 
-1. Import a server-side HTTP client in the component code, such as `node-fetch`, and let your bundler include it in the RSC/server bundle.
+1. Import a server-side HTTP client in the component code, such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici`, and let your bundler include it in the RSC/server bundle.
 2. Inject host globals through `additionalContext`:
 
 ```js
-import { reactOnRailsProNodeRenderer } from 'react-on-rails-pro-node-renderer';
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
-const { fetch, Headers, Request, Response } = globalThis;
+const fetchImplementation = globalThis.fetch;
+const HeadersImplementation = globalThis.Headers;
+const RequestImplementation = globalThis.Request;
+const ResponseImplementation = globalThis.Response;
+
+if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+  throw new Error(
+    'Your Node.js runtime does not expose fetch, Headers, Request, and Response. ' +
+      'Use Node.js 18+ or install a fetch implementation and pass it via additionalContext.',
+  );
+}
 
 reactOnRailsProNodeRenderer({
   supportModules: true,
   additionalContext: {
-    fetch,
-    Headers,
-    Request,
-    Response,
+    fetch: fetchImplementation,
+    Headers: HeadersImplementation,
+    Request: RequestImplementation,
+    Response: ResponseImplementation,
   },
 });
 ```
 
-If your Node.js runtime does not provide these globals, install a fetch implementation and pass that implementation through `additionalContext` instead.
+If your Node.js runtime does not provide these globals, install a fetch implementation and pass that implementation through `additionalContext` instead. For CommonJS launch files, use a CJS-compatible implementation such as `node-fetch` v2 or `undici`; `node-fetch` v3+ is ESM-only.
 
 ## Example Launch Files
 
