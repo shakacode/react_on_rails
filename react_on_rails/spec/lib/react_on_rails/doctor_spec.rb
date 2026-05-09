@@ -2066,10 +2066,39 @@ RSpec.describe ReactOnRails::Doctor do
     let(:doctor) { described_class.new(verbose: false, fix: true) }
     let(:checker) { doctor.instance_variable_get(:@checker) }
 
-    it "adds explicit guidance that Gemfile constraints are not auto-fixed" do
+    it "does not add Gemfile guidance when no package versions changed" do
       result = ReactOnRails::VersionSynchronizer::Result.new(
         changes: [],
         changed_files: [],
+        unsupported_specs: [],
+        missing_source_specs: []
+      )
+      synchronizer = instance_double(ReactOnRails::VersionSynchronizer, sync: result)
+
+      allow(doctor).to receive(:resolved_package_json_path).and_return("package.json")
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with("package.json").and_return(true)
+      allow(ReactOnRails::VersionSynchronizer).to receive(:new).and_return(synchronizer)
+
+      doctor.send(:auto_fix_versions)
+
+      info_messages = checker.messages.select { |msg| msg[:type] == :info }.map { |msg| msg[:content] }
+      expect(info_messages).not_to include(
+        a_string_including("FIX=true only updates package.json; update Gemfile constraints manually if needed.")
+      )
+    end
+
+    it "adds explicit guidance that Gemfile constraints are not auto-fixed when package versions changed" do
+      result = ReactOnRails::VersionSynchronizer::Result.new(
+        changes: [
+          {
+            section: "dependencies",
+            package: "react-on-rails",
+            from: "16.0.0",
+            to: "16.1.0"
+          }
+        ],
+        changed_files: ["package.json"],
         unsupported_specs: [],
         missing_source_specs: []
       )
