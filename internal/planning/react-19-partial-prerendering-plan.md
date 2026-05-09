@@ -17,8 +17,9 @@ This is a planning document. It does not change package versions, build configur
 The workspace package ranges already allow React 19.2.x through `^19.0.3` for `react` and `react-dom`, plus `^19.0.4`
 for `react-on-rails-rsc` (the React on Rails RSC integration package, not a React-team package), in the root, dummy app,
 and Pro dummy app package manifests. To see what versions are currently resolved, run
-`pnpm list -r react react-dom react-on-rails-rsc` from the repo root. Note: `react_on_rails_pro/spec/execjs-compatible-dummy`
-is intentionally pinned to React 18 through pnpm overrides for `app>react` and `app>react-dom`; verification should
+`pnpm list -r --depth=0 react react-dom react-on-rails-rsc` from the repo root. Note:
+`react_on_rails_pro/spec/execjs-compatible-dummy` is intentionally pinned to React 18 through pnpm overrides for `app>react`
+and `app>react-dom`; verification should
 confirm whether that workspace stays on React 18 during this work. That means the first implementation step is
 verification, not necessarily a broad package-range change.
 
@@ -46,11 +47,11 @@ Use a dedicated branch for the actual version verification work:
       dropping React 16/17 support or open a dedicated follow-up ticket recording the reason for keeping it.
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
       React, React DOM, and `react-on-rails-rsc` resolve to compatible versions. Capture the exact
-      `pnpm list -r react react-dom react-on-rails-rsc` output in the verification record, such as a comment on Issue 3255,
-      so the tested React 19.2.x patch version is auditable. Also verify that the resolved `react-on-rails-rsc` version
-      satisfies both the root `^19.0.4` range and the `packages/react-on-rails-pro/package.json` peer dependency ceiling
-      `>= 19.0.2 <= 19.2.3`; a mismatch means the ceiling must be widened before workspace installs stay consistent across
-      OSS and Pro.
+      `pnpm list -r --depth=0 react react-dom react-on-rails-rsc` output in the verification record, such as a comment on
+      Issue 3255, so the tested React 19.2.x patch version is auditable. Also verify that the resolved
+      `react-on-rails-rsc` version satisfies both the root `^19.0.4` range and the
+      `packages/react-on-rails-pro/package.json` peer dependency ceiling `>= 19.0.2 <= 19.2.3`; a mismatch means the ceiling
+      must be widened before workspace installs stay consistent across OSS and Pro.
 - [ ] Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream`
       and `renderToReadableStream` through `@types/react-dom`, lint enforces package style, and tests exercise the
       runtime paths:
@@ -90,12 +91,13 @@ Use a dedicated branch for the actual version verification work:
 - [ ] Run the generated-app suite. Prefer a fresh clone. If a fresh clone is not practical, use the repo root after stashing
       and cleaning:
 
-  > **Warning**: `git clean -fdx` deletes all untracked files and cannot be undone. Stash or commit any in-progress work
-  > first. Note: the default `git stash` omits untracked files; use `git stash -u` to include them before running
-  > `git clean`.
+  > **Warning**: `git clean -fdx` deletes all untracked files, including gitignored files, and cannot be undone. Move or
+  > back up gitignored files, such as `.env`, local credentials, or generated certs, before continuing. For tracked or
+  > non-ignored in-progress work, stash or commit first. Note: `git stash -u` saves untracked non-ignored files, but does
+  > not save gitignored files.
 
   ```bash
-  git stash
+  git stash -u
   git clean -fdx
   pnpm install
   ```
@@ -158,7 +160,8 @@ Evaluate these in order:
 - Existing SSR, streaming SSR, RSC payload rendering, and client hydration tests stay green.
 - The generated-app suite (`bundle exec rake run_rspec:shakapacker_examples_latest`) passes with React 19.2.x.
 - Any public docs that cite an explicit React version are updated or explicitly annotated with a minimum-version note.
-- Any partial pre-rendering proposal includes a same-route benchmark against traditional SSR or streaming SSR.
+- Any partial pre-rendering proposal includes a same-route benchmark against traditional SSR or streaming SSR (see
+  `internal/planning/library-benchmarking.md` for tooling guidance).
 - The first public artifact is documentation or an example unless a missing library API is clearly demonstrated.
 - The feature name and docs explain Rails ownership clearly so users do not expect Next.js-style file-system routing.
 - The decision on the minimum supported React version, including whether React 18.x remains supported, is documented
