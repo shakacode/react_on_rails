@@ -1878,16 +1878,17 @@ RSpec.describe ReactOnRails::Doctor do
   describe "Pro package consistency checks" do
     let(:doctor) { described_class.new }
     let(:checker) { doctor.instance_variable_get(:@checker) }
+    let(:package_json_path) { "/tmp/myapp/package.json" }
 
     before do
       allow(File).to receive(:exist?).and_call_original
-      allow(doctor).to receive(:resolved_package_json_path).and_return("package.json")
-      allow(File).to receive(:exist?).with("package.json").and_return(true)
+      allow(doctor).to receive(:resolved_package_json_path).and_return(package_json_path)
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
     end
 
     context "when both react-on-rails and react-on-rails-pro npm packages are installed" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0", "react-on-rails-pro" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(true)
@@ -1903,7 +1904,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when Pro gem is installed but using base npm package" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive_messages(
@@ -1921,7 +1922,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when Pro npm package is installed without Pro gem" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails-pro" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
@@ -1935,7 +1936,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     context "when packages and gems are consistent" do
       before do
-        allow(File).to receive(:read).with("package.json").and_return(
+        allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails" => "16.4.0" } })
         )
         allow(ReactOnRails::Utils).to receive(:react_on_rails_pro?).and_return(false)
@@ -2903,7 +2904,8 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     def stub_package_root(path)
-      # Pass the same value for both so resolved_package_root short-circuits to Rails.root.
+      # Set Rails.root and node_modules_location to the same absolute value so
+      # resolved_location == Rails.root.cleanpath short-circuits to Rails.root.
       allow(Rails).to receive(:root).and_return(Pathname.new(path))
       allow(ReactOnRails).to receive(:configuration).and_return(
         instance_double(ReactOnRails::Configuration, node_modules_location: path)

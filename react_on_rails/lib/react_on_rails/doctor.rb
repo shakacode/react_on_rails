@@ -2932,10 +2932,7 @@ module ReactOnRails
       script = "console.log(require.resolve('react/package.json'))"
       package_root = resolved_package_root
       unless Dir.exist?(package_root)
-        checker.add_warning(
-          "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
-          "cannot detect installed React"
-        )
+        warn_missing_package_root(package_root)
         return nil
       end
 
@@ -2949,6 +2946,17 @@ module ReactOnRails
       version if version&.match?(/\A\d+\.\d+\.\d+/)
     rescue StandardError
       nil
+    end
+
+    def warn_missing_package_root(package_root)
+      if ReactOnRails.configuration.node_modules_location.to_s.empty?
+        checker.add_warning("⚠️  Rails root #{package_root} does not exist; cannot detect installed React")
+      else
+        checker.add_warning(
+          "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
+          "cannot detect installed React"
+        )
+      end
     end
 
     def declared_react_version

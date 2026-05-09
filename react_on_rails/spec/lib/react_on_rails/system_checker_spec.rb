@@ -227,6 +227,8 @@ RSpec.describe ReactOnRails::SystemChecker do
 
   describe "#check_react_on_rails_npm_package" do
     before do
+      # These examples exercise package parsing, while #resolved_package_root
+      # coverage below pins the absolute path-resolution behavior.
       allow(checker).to receive(:resolved_package_json_path).and_return("package.json")
     end
 
