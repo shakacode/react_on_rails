@@ -89,7 +89,7 @@ expect:
 #!/usr/bin/env bash
 # bin/shakapacker - create this file, then make it executable:
 #   chmod +x bin/shakapacker
-# set -eu fails fast before exec, e.g. when the package root is missing.
+# set -eu: exit immediately on any error (-e) or reference to an unset variable (-u).
 # exec then propagates shakapacker's exit code directly to the caller.
 set -eu
 cd "$(dirname "$0")/.."

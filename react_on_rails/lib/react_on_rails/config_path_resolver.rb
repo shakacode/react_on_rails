@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "set"
+
 module ReactOnRails
   module ConfigPathResolver
     # Keep JS before TS to match generator defaults and to prefer the
@@ -42,9 +44,47 @@ module ReactOnRails
       !Dir.exist?(package_root)
     end
 
+    def package_json_path_for(detection_target)
+      package_json_path = resolved_package_json_path
+      return package_json_path if File.exist?(package_json_path)
+
+      package_root = resolved_package_root
+      if package_root_missing?(package_root)
+        warn_missing_package_root(package_root, detection_target)
+      else
+        warn_missing_package_json(package_json_path, detection_target)
+      end
+      nil
+    end
+
+    def warn_missing_package_root(package_root, detection_target)
+      return unless warned_package_roots.add?(package_root)
+
+      add_warning(missing_package_root_warning(package_root, detection_target))
+    end
+
     def missing_package_root_warning(package_root, detection_target)
       "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
         "cannot detect #{detection_target}. Check config/initializers/react_on_rails.rb."
+    end
+
+    def warn_missing_package_json(package_json_path, detection_target)
+      return unless warned_package_json_paths.add?(package_json_path)
+
+      add_warning(missing_package_json_warning(package_json_path, detection_target))
+    end
+
+    def missing_package_json_warning(package_json_path, detection_target)
+      "⚠️  #{package_json_path} not found; cannot detect #{detection_target}. " \
+        "Check config/initializers/react_on_rails.rb."
+    end
+
+    def warned_package_roots
+      @warned_package_roots ||= Set.new
+    end
+
+    def warned_package_json_paths
+      @warned_package_json_paths ||= Set.new
     end
 
     def resolved_webpack_config_path

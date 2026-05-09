@@ -465,28 +465,6 @@ module ReactOnRails
       end
     end
 
-    def package_json_path_for(detection_target)
-      package_json_path = resolved_package_json_path
-      return package_json_path if File.exist?(package_json_path)
-
-      package_root = resolved_package_root
-      warn_missing_package_root(package_root, detection_target) if package_root_missing?(package_root)
-      nil
-    end
-
-    def warn_missing_package_root(package_root, detection_target)
-      return if missing_package_root_warning_recorded?(package_root)
-
-      add_warning(missing_package_root_warning(package_root, detection_target))
-    end
-
-    def missing_package_root_warning_recorded?(package_root)
-      messages.any? do |message|
-        message[:type] == :warning &&
-          message[:content].include?("node_modules_location points to #{package_root},")
-      end
-    end
-
     def get_package_manager_version(manager)
       begin
         stdout, _stderr, status = Open3.capture3(manager, "--version")
