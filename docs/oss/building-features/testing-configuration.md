@@ -119,14 +119,17 @@ require "socket"
 module RscNodeRenderer
   module_function
 
-  def wait_until_ready!(host:, port:, timeout_seconds: 30)
+  def wait_until_ready!(host:, port:, timeout_seconds: 30, log_path: nil)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
 
     loop do
-      TCPSocket.open(host, port).close
+      TCPSocket.open(host, port) {}
       break
-    rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ECONNRESET, Errno::ETIMEDOUT
-      raise "Node renderer did not boot on #{host}:#{port}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+    rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT
+      if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+        hint = log_path ? " Check #{log_path} for startup errors." : ""
+        raise "Node renderer did not boot on #{host}:#{port} within #{timeout_seconds}s.#{hint}"
+      end
 
       sleep 0.1
     end
@@ -168,13 +171,14 @@ RSpec.configure do |config|
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => expanded_cache_path
     }
 
+    renderer_log_path = Rails.root.join("log/node-renderer-test.log").to_s
     rsc_node_renderer_pid = Process.spawn(
       renderer_env,
       "pnpm", # replace with "npm", "yarn", or "bun" if that is your package manager
       "run",
       "node-renderer",
       chdir: Rails.root.to_s,
-      out: Rails.root.join("log/node-renderer-test.log").to_s,
+      out: renderer_log_path,
       err: [:child, :out]
     )
     rsc_node_renderer_waiter = Process.detach(rsc_node_renderer_pid)
@@ -183,7 +187,8 @@ RSpec.configure do |config|
     RscNodeRenderer.wait_until_ready!(
       host: "127.0.0.1",
       port: ENV.fetch("RENDERER_PORT").to_i,
-      timeout_seconds: renderer_timeout
+      timeout_seconds: renderer_timeout,
+      log_path: renderer_log_path
     )
   end
 
