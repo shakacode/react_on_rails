@@ -2932,7 +2932,7 @@ module ReactOnRails
       script = "console.log(require.resolve('react/package.json'))"
       package_root = resolved_package_root
       unless Dir.exist?(package_root)
-        warn_missing_package_root(package_root)
+        warn_missing_package_root(package_root, "installed React")
         return nil
       end
 
@@ -2948,11 +2948,17 @@ module ReactOnRails
       nil
     end
 
-    def warn_missing_package_root(package_root)
-      checker.add_warning(missing_package_root_warning(package_root, "installed React"))
+    def warn_missing_package_root(package_root, detection_target)
+      checker.add_warning(missing_package_root_warning(package_root, detection_target))
     end
 
     def declared_react_version
+      package_root = resolved_package_root
+      if package_root_missing?(package_root)
+        warn_missing_package_root(package_root, "declared React version")
+        return nil
+      end
+
       package_json_path = resolved_package_json_path
       return nil unless File.exist?(package_json_path)
 

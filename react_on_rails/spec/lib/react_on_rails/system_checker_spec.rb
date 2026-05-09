@@ -126,6 +126,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: rails_root.to_s)
         )
+        allow(Dir).to receive(:exist?).with(rails_root.to_s).and_return(true)
         allow(checker).to receive(:cli_exists?).with("npm").and_return(true)
         allow(checker).to receive(:cli_exists?).with("yarn").and_return(true)
         allow(checker).to receive(:cli_exists?).with("pnpm").and_return(false)
@@ -139,7 +140,11 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       it "adds a success message" do
+        rails_root = Pathname.new("/tmp/myapp")
+
         result = checker.check_package_manager
+
+        expect(File).to have_received(:exist?).with(rails_root.join("yarn.lock").to_s)
         expect(result).to be true
         expect(checker.messages.any? do |msg|
                  msg[:type] == :success && msg[:content].include?("Package managers available: npm, yarn")
