@@ -124,8 +124,7 @@ Install a fetch implementation only when your renderer runtime does not provide 
 | CommonJS launch file on an older runtime that does not expose fetch globals | Use `node-fetch` v2; `node-fetch` v3+ is ESM-only.                                                                                                |
 | Supported Node.js LTS, ESM or CommonJS, want a bundled HTTP client          | Use `undici` and choose a release compatible with your runtime; see [undici's compatibility notes](https://undici.nodejs.org/) for version pairs. |
 
-For older or unsupported Node.js installations that cannot use the built-in fetch API, use the `node-fetch` v2 CommonJS
-row or an `undici` release from the compatibility notes that still supports your runtime.
+For older or unsupported Node.js installations that cannot use the built-in fetch API, use `node-fetch` v2 (see the CommonJS example below) or an `undici` release from the compatibility notes that still supports your runtime.
 
 For example, with `node-fetch` v2 in a CommonJS launch file:
 
@@ -145,9 +144,14 @@ const {
   Response: ResponseImplementation,
 } = nodeFetch;
 
-if (!HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+if (
+  typeof nodeFetch !== 'function' ||
+  !HeadersImplementation ||
+  !RequestImplementation ||
+  !ResponseImplementation
+) {
   throw new Error(
-    'node-fetch v2 did not expose one or more required fetch classes (Headers, Request, Response). ' +
+    'node-fetch v2 did not expose the required fetch function or fetch classes (Headers, Request, Response). ' +
       'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
   );
 }
