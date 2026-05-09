@@ -136,6 +136,6 @@ exclude_path = [
 # Don't check fragments/anchors (can be flaky)
 include_fragments = false
 
-# Cache results to speed up repeated runs
-cache = true
-max_cache_age = "1d"
+# Do not cache link results in CI. Transient 5xx responses from GitHub can
+# otherwise be restored by actions/cache and keep otherwise valid PRs red.
+cache = false
