@@ -64,7 +64,7 @@ class StoryPagePreflight
       return Result.new(
         props: { notFound: true, story: nil },
         status: :not_found,
-        cache_control: "no-store"
+        cache_control: "no-store" # or "public, max-age=30" to absorb repeat 404s at the CDN
       )
     end
 
@@ -222,7 +222,8 @@ When the response varies by locale, device class, authentication state, or featu
 
 ```ruby
 existing_vary = response.headers["Vary"].presence
-response.headers["Vary"] = [existing_vary, "Accept-Language"].compact.join(", ")
+vary_tokens = [existing_vary, "Accept-Language"].compact.join(", ")
+response.headers["Vary"] = vary_tokens.split(",").map(&:strip).uniq.join(", ")
 ```
 
 Every `Vary` header expands the cache key; avoid high-cardinality headers for public caches unless that extra cache storage is intentional.
@@ -242,6 +243,8 @@ Pass decisions as data, not as hidden HTTP side effects:
   }
 }
 ```
+
+Keep viewer props minimal. They are embedded in the streamed response and visible to browser DevTools, logs, and any permitted cache, so include only fields the component actually reads rather than a full user representation.
 
 ```tsx
 type StoryData = { id: number; title: string };
