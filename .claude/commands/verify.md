@@ -17,8 +17,9 @@ command is designed to prevent.
 4. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 5. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
 6. After one or more edits for a failure, restart at the failed command and continue forward. Count each rerun of the
-   same command that produces the same first failing test name, RuboCop offense, or Prettier file as one loop cycle.
-   Stop and report after three cycles unless the user asks you to keep going.
+   same command that produces the same first failing test name, RuboCop offense, or Prettier file as one loop cycle. The
+   counter is per command, so reset it when you advance to a different step. Stop and report after three cycles unless
+   the user asks you to keep going.
    - If the first failing item changes, reset the counter and continue.
    - If a later step reintroduces a failure that already passed, stop immediately and report the regression.
    - Do not claim a failure is fixed until the command passes locally.
@@ -41,10 +42,12 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run lint`
    - `pnpm run type-check`
    - targeted `pnpm --filter react-on-rails run test` for react-on-rails package tests, or
-     `pnpm --filter react-on-rails exec jest <relative-test-file-path>` for targeted test file runs
+     `pnpm --filter react-on-rails exec jest <relative-test-file-path>` for targeted test file runs; the path is
+     relative to `packages/react-on-rails/`, for example `tests/ReactOnRailsClient.test.ts`
    - `pnpm run test` when broad package behavior changed or the touched files are not covered by a narrower package test
    - `cd react_on_rails/spec/dummy && pnpm test:e2e` when the branch changes SSR rendering, client hydration, or
-     browser-visible integration behavior
+     browser-visible integration behavior; run `pnpm exec playwright install` in that directory first if browsers are
+     not yet installed
 5. Docs:
    - `script/check-docs-sidebar` when docs under `docs/oss/` or `docs/pro/` changed
    - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless the
