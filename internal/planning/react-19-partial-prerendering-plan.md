@@ -24,7 +24,9 @@ verification, not necessarily a broad package-range change.
 
 Note: `react-on-rails-pro` currently pins `react-on-rails-rsc` as a peer dependency at `>= 19.0.2 <= 19.2.3`.
 Verification should confirm whether this ceiling is intentional or should be widened alongside any React 19.2.x range
-update. **Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
+update. Because this hard upper bound would reject a future `19.2.4` patch or `19.3.x` minor release, the decision must
+either widen the range for stable React 19.x, such as `< 20.0.0`, or document the specific API risk that requires a tight
+pin. **Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
 
 ## React 19.2.x Verification Checklist
 
@@ -32,11 +34,13 @@ Use a dedicated branch for the actual version verification work:
 
 - [ ] Review the React 19.2.x changelog and release notes for breaking changes, deprecations, and new APIs that could
       affect React on Rails SSR, streaming, RSC, or hydration integration.
-- [ ] Confirm the existing `renderToString` usages in `packages/react-on-rails/src/serverRenderReactComponent.ts` and
-      `packages/react-on-rails/src/handleError.ts` are intentionally exempt from migration to `renderToPipeableStream`;
-      React 19 soft-deprecates `renderToString`. Also grep `packages/react-on-rails-pro-node-renderer/` and related SSR
-      integration paths for additional call sites, then document either a migration ticket or why current usage is
-      acceptable.
+- [ ] Confirm that no React on Rails SSR path passes a Suspense-containing tree through `renderToString`; React 19 renders
+      Suspense fallbacks synchronously in that path instead of suspending, which can silently change output without an
+      error. Check the existing `renderToString` usages in
+      `packages/react-on-rails/src/serverRenderReactComponent.ts` and `packages/react-on-rails/src/handleError.ts`, plus
+      `renderToStaticMarkup` if any source or generated-bundle call site participates in SSR. Also grep
+      `packages/react-on-rails-pro-node-renderer/` and related SSR integration paths for additional call sites, then
+      document either a migration ticket or why current usage is acceptable.
 - [ ] Run `pnpm install` from a clean checkout and confirm React, React DOM, and `react-on-rails-rsc` resolve to
       compatible versions.
 - [ ] Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream`
@@ -162,5 +166,6 @@ validated independently from the rest of the implementation tree.
 - Should the minimum supported React version retain React 18.x compatibility or move to React 19.x only?
   **Owner**: @justin808 | **Target**: before any package-range change is merged
 - Should the `react-on-rails-pro` peer dependency ceiling for `react-on-rails-rsc` stay at `<= 19.2.3` or widen with the
-  React 19.2.x verification work?
+  React 19.2.x verification work? If it stays tight, what specific API risk justifies rejecting future React 19.x patch
+  or minor releases?
   **Owner**: @justin808 | **Target**: before any package-range change is merged
