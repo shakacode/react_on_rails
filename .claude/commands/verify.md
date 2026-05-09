@@ -17,7 +17,7 @@ reintroduces an earlier failure, stop and report the cycle instead of continuing
 4. Always include `bundle exec rubocop` before creating a commit, even when the changed surface is documentation-only, because `AGENTS.md` marks it mandatory before every commit.
 5. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 6. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
-7. After a fix, restart at the failed command and continue forward. Count each fix-and-restart as one loop cycle and stop after three cycles unless the user explicitly asks you to keep debugging. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, or a later fix reintroduces an earlier failure, stop and report the cycle instead of retrying.
+7. After one or more edits for a failure, restart at the failed command and continue forward. Count each command rerun after edits as one loop cycle, and stop after three cycles unless the user explicitly asks you to keep debugging. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, or a later fix reintroduces an earlier failure, stop and report the cycle instead of retrying.
 8. Finish with the exact commands run and their pass/fail status.
 
 ## Default Verification Order
