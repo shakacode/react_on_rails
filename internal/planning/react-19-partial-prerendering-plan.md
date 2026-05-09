@@ -17,7 +17,8 @@ This is a planning document. It does not change package versions, build configur
 The workspace package ranges already allow React 19.2.x through `^19.0.3` for `react` and `react-dom`, plus `^19.0.4`
 for `react-on-rails-rsc` (the React on Rails RSC integration package, not a React-team package), in the root, dummy app,
 and Pro dummy app package manifests. To see what versions are currently resolved, run
-`pnpm list -r --depth=0 react react-dom react-on-rails-rsc` from the repo root. Note:
+`pnpm list -r --depth=0 react react-dom` and
+`pnpm --filter react-on-rails-pro list --depth=0 react-on-rails-rsc` from the repo root. Note:
 `react_on_rails_pro/spec/execjs-compatible-dummy` is intentionally pinned to React 18 through pnpm overrides for `app>react`
 and `app>react-dom`; verification should
 confirm whether that workspace stays on React 18 during this work. That means the first implementation step is
@@ -41,11 +42,12 @@ Use a dedicated branch for the actual version verification work:
 - [ ] Review the React 19.2.x [changelog](https://github.com/facebook/react/blob/main/CHANGELOG.md) and
       [React 19 upgrade guide](https://react.dev/blog/2024/04/25/react-19-upgrade-guide) for breaking changes,
       deprecations, and new APIs that could affect React on Rails SSR, streaming, RSC, or hydration integration.
-- [ ] Audit `renderToString` and `renderToStaticMarkup` call sites in React on Rails SSR paths; React 19 renders Suspense
+- [ ] Audit `renderToString` and `renderToStaticMarkup` call sites in React on Rails SSR paths; React 18+ renders Suspense
       fallbacks synchronously in `renderToString` instead of suspending, which can silently change output without an error.
       For each call site in `packages/react-on-rails/src/serverRenderReactComponent.ts`,
       `packages/react-on-rails/src/handleError.ts`, and any generated bundles found by
-      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.mjs" --include="*.cjs" --include="*.ts" --include="*.tsx" --include="*.cts"`,
+      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.mjs" --include="*.cjs" --include="*.ts" --include="*.tsx" --include="*.cts"`
+      run from the repo root,
       document whether a Suspense-containing tree could plausibly be passed by a user render function today, then either
       open a follow-up migration ticket or record why the current usage is acceptable.
 - [ ] If the Issue 3255 minimum-React-version decision drops React 16/17 support, remove
@@ -53,8 +55,9 @@ Use a dedicated branch for the actual version verification work:
       accepted exit criterion and close this task.
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
       React, React DOM, and `react-on-rails-rsc` resolve to compatible versions. Capture the exact
-      `pnpm list -r --depth=0 react react-dom react-on-rails-rsc` output in the verification record, such as a comment on
-      Issue 3255, so the tested React 19.2.x patch version is auditable. Also verify that the resolved
+      `pnpm list -r --depth=0 react react-dom` and
+      `pnpm --filter react-on-rails-pro list --depth=0 react-on-rails-rsc` output in the verification record, such as a
+      comment on Issue 3255, so the tested React 19.2.x patch version is auditable. Also verify that the resolved
       `react-on-rails-rsc` version satisfies both the root `^19.0.4` range and the
       `packages/react-on-rails-pro/package.json` peer dependency ceiling `>= 19.0.2 <= 19.2.3`; a mismatch means the ceiling
       must be widened before workspace installs stay consistent across OSS and Pro.
@@ -112,12 +115,12 @@ Use a dedicated branch for the actual version verification work:
   git worktree remove /tmp/ror-verify
   ```
 
-  > **Warning**: `git clean -fdx` deletes all untracked files, including gitignored files, and cannot be undone. Move or
-  > back up gitignored files, such as `.env`, local credentials, or generated certs, before continuing.
-
   If neither a fresh clone nor a disposable worktree is practical, use the repo root only after stashing or committing tracked
   and non-ignored in-progress work. Note: `git stash -u` saves untracked non-ignored files, but does not save gitignored
   files.
+
+  > **Warning**: `git clean -fdx` deletes all untracked files, including gitignored files, and cannot be undone. Move or
+  > back up gitignored files, such as `.env`, local credentials, or generated certs, before using the fallback below.
 
   ```bash
   git stash -u
@@ -128,8 +131,7 @@ Use a dedicated branch for the actual version verification work:
   Then run the suite:
 
   ```bash
-  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_latest   # runs example apps without a pinned React version (resolves to workspace default, currently React 19)
-  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples           # full suite across all example apps (latest + all pinned React versions)
+  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples   # full suite across all example apps (latest + all pinned React versions)
   ```
 
   Note: `bundle exec rake shakapacker_examples:gen_all` only generates apps; a separate `run_rspec:*` task must run their
