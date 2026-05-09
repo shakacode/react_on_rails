@@ -43,7 +43,7 @@ React Server Components add one more moving part to the standard test setup: sys
 
 Use this recipe for Capybara, system, and end-to-end tests that exercise `stream_react_component`, `RSCRoute`, or the `rsc_payload_route`.
 
-This recipe uses the React on Rails TestHelper with `build_test_command`: Rails checks whether generated bundles are stale, runs your test build command when needed, and fails fast if compilation fails. The full lifecycle example is RSpec-focused because it uses `before(:suite)` and `after(:suite)` hooks; Minitest suites can reuse the ENV setup and `ReactOnRails::TestHelper.ensure_assets_compiled` call, but must start and stop the renderer from their own suite-level harness. See [Two Approaches to Test Asset Compilation](#two-approaches-to-test-asset-compilation) for the underlying compilation tradeoffs.
+This recipe uses the React on Rails TestHelper with `build_test_command`: Rails checks whether generated bundles are stale, runs your test build command when needed, and fails fast if compilation fails. The full lifecycle example is RSpec-focused because it uses `before(:suite)` and `after(:suite)` hooks; Minitest suites can reuse the ENV setup and `ReactOnRails::TestHelper.ensure_assets_compiled` call, but must start and stop the renderer from their own suite-level harness such as `Minitest.after_run { ... }` plus a suite-level startup helper. See [Two Approaches to Test Asset Compilation](#two-approaches-to-test-asset-compilation) for the underlying compilation tradeoffs.
 
 ### 1. Set Renderer ENV Before Rails Boots
 
@@ -209,6 +209,24 @@ RSpec.configure do |config|
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => expanded_cache_path
     }
 
+    renderer_port = begin
+      Integer(renderer_env["RENDERER_PORT"])
+    rescue ArgumentError
+      raise "RENDERER_PORT must be an integer port number " \
+            "(got: #{renderer_env['RENDERER_PORT'].inspect})"
+    end
+    begin
+      Socket.tcp("127.0.0.1", renderer_port, connect_timeout: 1).close
+      raise "RENDERER_PORT #{renderer_env['RENDERER_PORT']} is already in use. " \
+            "A previous test run may have left an orphaned node renderer. " \
+            "Kill it manually or restart the CI job."
+    rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT
+      # Port is free; safe to spawn.
+    rescue Errno::ECONNRESET
+      raise "RENDERER_PORT #{renderer_env['RENDERER_PORT']} accepted and reset a connection. " \
+            "Another service may already be using it."
+    end
+
     renderer_log_path = Rails.root.join("log/node-renderer-test-#{RscTestWorker::ID}.log").to_s
     rsc_node_renderer_pid = Process.spawn(
       renderer_env,
@@ -222,11 +240,17 @@ RSpec.configure do |config|
     )
     rsc_node_renderer_waiter = Process.detach(rsc_node_renderer_pid)
 
-    renderer_timeout = Integer(ENV.fetch("RSC_NODE_RENDERER_BOOT_TIMEOUT", "30"))
+    renderer_timeout_value = ENV.fetch("RSC_NODE_RENDERER_BOOT_TIMEOUT", "30")
+    renderer_timeout = begin
+      Integer(renderer_timeout_value)
+    rescue ArgumentError
+      raise "RSC_NODE_RENDERER_BOOT_TIMEOUT must be an integer number of seconds " \
+            "(got: #{ENV['RSC_NODE_RENDERER_BOOT_TIMEOUT'].inspect})"
+    end
     begin
       RscNodeRenderer.wait_until_ready!(
         host: "127.0.0.1",
-        port: Integer(renderer_env["RENDERER_PORT"]),
+        port: renderer_port,
         timeout_seconds: renderer_timeout,
         log_path: renderer_log_path,
         pid: rsc_node_renderer_pid
@@ -248,7 +272,8 @@ RSpec.configure do |config|
     pid = rsc_node_renderer_pid
     next unless pid
 
-    # Signal the process group so pnpm and the Node child both stop.
+    # Sends SIGTERM to the entire process group so pnpm and the Node child both stop.
+    # Raises Errno::ESRCH if the group is already gone; caught by rescue below.
     Process.kill("-TERM", pid)
     # Thread#join returns the waiter thread when the process exits, and nil on timeout.
     # Skip SIGKILL only when TERM worked and the waiter reaped the process.
@@ -269,7 +294,7 @@ RSpec.configure do |config|
 end
 ```
 
-Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. The TCP probe above is a fallback for renderers that do not expose a health endpoint; if your renderer has one, replace the probe with an HTTP health check. A successful TCP connection only proves the port is accepting connections, not that route handlers or bundle manifests are fully initialized. The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately; if you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout. The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to the one-second connect timeout. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
+Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. The TCP probe above is a fallback for renderers that do not expose a health endpoint; if your renderer has one, replace the probe with an HTTP health check. A successful TCP connection only proves the port is accepting connections, not that route handlers or bundle manifests are fully initialized. A reset during the pre-spawn probe usually means another service is already using the port and closing connections immediately. The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately; if you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout. The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to the one-second connect timeout. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
 
 The helper relies on the Step 2 `configure_rspec_to_compile_assets` setup so bundles are available before renderer-backed
 examples run. Load `support/rsc_node_renderer` after registering `configure_rspec_to_compile_assets` so modern RSpec can
