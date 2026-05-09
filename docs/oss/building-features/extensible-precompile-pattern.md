@@ -30,7 +30,8 @@ When moving custom build work out of `precompile_hook`, make the ownership chang
 1. Move custom one-time tasks into `run_precompile_tasks` in `bin/dev`.
 2. Remove matching shell fragments from `Procfile.dev`, any project-specific variants (for example, `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`), and CI/CD pipeline scripts (for example, `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json`).
 3. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
-4. Add all build steps you moved in step 1 to `build_test_command` and `build_production_command`.
+4. Ensure `build_test_command` and `build_production_command` each include every build step from step 1. `bin/dev` is
+   not invoked in CI or production, so these commands are the only mechanism those lifecycles have.
 5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
 
 The goal is one owner per lifecycle: `bin/dev` owns development startup, Procfile processes own long-running watchers, and React on Rails build commands own test and production compilation.
@@ -164,7 +165,9 @@ unless %w[test production].include?(mode)
   exit(1)
 end
 
-# Replace with your own pre-build step(s), for example: "yarn tsc --noEmit && yarn res:build".
+# Replace with your own pre-build step(s). For example, to run TypeScript then ReScript:
+#   system("yarn", "tsc", "--noEmit") || abort("tsc failed")
+#   system("yarn", "res:build")       || abort("res:build failed")
 system("yarn", "res:build") || abort("res:build failed")
 
 case mode
@@ -177,16 +180,17 @@ when "production"
 end
 ```
 
-Make the script executable before wiring it into the build commands:
-
-```bash
-chmod +x bin/build-react-on-rails
-```
-
-On Windows, set the executable bit through Git directly; `chmod` from Git Bash may or may not update the Git index depending on your Git for Windows version and configuration:
+Make the script executable and ensure Git tracks the executable bit:
 
 ```bash
 git update-index --chmod=+x bin/build-react-on-rails
+```
+
+`chmod +x bin/build-react-on-rails` works too on most Unix systems, but `git update-index` is reliable across all
+platforms including Windows and Docker volumes.
+
+```bash
+chmod +x bin/build-react-on-rails
 ```
 
 ```ruby
