@@ -92,7 +92,7 @@ module.exports = commonWebpackConfig;
 
 If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5 / Webpack 4, prefer upgrading to Shakapacker first when you can.
 
-These shims are not covered by React on Rails CI and are documented for the legacy React 16/17 `react-rails` / Webpacker migration profile described in the migration guide; the bundler is the compatibility constraint, so verify your full app locally before relying on them.
+These shims are not covered by React on Rails CI and are documented as a temporary bridge for apps still on Webpacker 5 / Webpack 4; the bundler is the compatibility constraint, so verify your full app locally before relying on them.
 
 Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims.
 
@@ -116,8 +116,9 @@ shim explicit and narrow:
 
    If you want to confirm whether your `@babel/preset-env` targets already include optional chaining and
    nullish coalescing, set `debug: true` on the `@babel/preset-env` options and check the build output for
-   `proposal-optional-chaining` and `proposal-nullish-coalescing-operator` in the "Using plugins" list. If they
-   appear there, you can skip the standalone packages; when in doubt, install them because they are no-ops if
+   `optional-chaining` and `nullish-coalescing-operator` in the "Using plugins" list. They may appear as
+   `proposal-optional-chaining` on Babel < 7.9 or `transform-optional-chaining` on Babel >= 7.9. If they appear
+   there, you can skip the standalone packages; when in doubt, install them because they are no-ops if
    `preset-env` already transforms the syntax.
 
    ```bash
@@ -209,7 +210,7 @@ shim explicit and narrow:
 
    ```js
    // jest.config.js
-   // Before: transformIgnorePatterns: ['node_modules/(?!.pnpm|other-esm-package)']
+   // Before: transformIgnorePatterns: ['node_modules/(?!\\.pnpm|other-esm-package)']
    // After (add react-on-rails to the existing lookahead group):
    module.exports = {
      // keep existing config
