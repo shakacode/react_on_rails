@@ -74,7 +74,7 @@ This is the recommended data fetching pattern for React on Rails because:
 - It supports streaming SSR — HTML streams to the browser as React renders
 - All data passes as props -- no client-side fetching or loading states needed
 
-> **Renderer runtime note:** Server Components rendered through the node renderer do not automatically receive host Node.js globals such as `fetch`, `Headers`, `Request`, or `Response`. Prefer passing Rails-owned data through props. For external HTTP APIs, either import a server-side HTTP client into the component bundle or inject fetch globals with `additionalContext`. See [Node Renderer Runtime Globals](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
+> **Note:** Server Components rendered through the node renderer do not automatically receive host Node.js globals such as `fetch`, `Headers`, `Request`, or `Response`. Prefer passing Rails-owned data through props. For external HTTP APIs, either import a server-side HTTP client into the component bundle or inject fetch globals with `additionalContext`. See [Node Renderer Runtime Globals](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
 
 ### How Streaming Works
 

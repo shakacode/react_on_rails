@@ -20,7 +20,7 @@ In a React Server Components project, there are three distinct types of bundles,
 - Used for traditional server-side rendering (SSR)
 - Enables HTML generation of any components
 - Does not transform client components into references
-- **Runtime: V8 VM sandbox** -- runs inside `vm.createContext()`, which has no `require()` and lacks many Node.js/browser globals (see [Bundle Architecture Reference](#bundle-architecture-reference) below)
+- **Runtime: Node renderer VM context** -- runs inside `vm.createContext()`, which has no `require()` and lacks many Node.js/browser globals (see [Bundle Architecture Reference](#bundle-architecture-reference) below)
 
 ### Client Bundle
 

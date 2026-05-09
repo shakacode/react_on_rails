@@ -8,21 +8,21 @@ This guide covers the most common problems you'll encounter when migrating to Re
 
 When something goes wrong during RSC migration, start here. This table maps symptoms to the most likely cause and the relevant section in this guide:
 
-| Symptom                                                          | Most Likely Cause                                                              | Section                                                                           |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| Build error: _"cannot be passed directly to Client Components"_  | Passing functions or class instances across the server-client boundary         | [Serialization Boundary Issues](#serialization-boundary-issues)                   |
-| Build error: _"needs useState/useEffect"_                        | Using hooks in a Server Component file                                         | [Error Message Catalog](#error-message-catalog)                                   |
-| RSC page downloads unexpectedly large JS chunks                  | Chunk contamination from shared `'use client'` modules                         | [Chunk Contamination](#chunk-contamination)                                       |
-| Component stays a Client Component after removing `'use client'` | Imported by another `'use client'` file, or RSC bundle not rebuilding          | [Accidental Client Components](#accidental-client-components)                     |
-| Hydration mismatch warnings in console                           | Server/client render output differs (timestamps, browser APIs, invalid HTML)   | [Hydration Mismatches](#hydration-mismatches)                                     |
-| `ReferenceError: performance is not defined`                     | Node renderer VM context missing globals                                       | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
-| `ReferenceError: fetch is not defined`                           | Node renderer VM context missing fetch globals                                 | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
-| `ReferenceError: require is not defined`                         | Server bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback) |
-| `ReferenceError: MessageChannel is not defined`                  | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox   | [MessageChannel Not Defined](#messagechannel-not-defined)                         |
-| SSR hangs or times out on large pages                            | Stream backpressure deadlock                                                   | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                     |
-| Rails boot error about version mismatch                          | Gem and npm package at different versions                                      | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)     |
-| 422 Unprocessable Entity on form submission                      | Missing CSRF token in fetch request                                            | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)  |
-| Page is blank until all data loads                               | Missing `stream_react_component` or Suspense boundaries                        | [Performance Pitfalls](#performance-pitfalls)                                     |
+| Symptom                                                               | Most Likely Cause                                                              | Section                                                                           |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| Build error: _"cannot be passed directly to Client Components"_       | Passing functions or class instances across the server-client boundary         | [Serialization Boundary Issues](#serialization-boundary-issues)                   |
+| Build error: _"needs useState/useEffect"_                             | Using hooks in a Server Component file                                         | [Error Message Catalog](#error-message-catalog)                                   |
+| RSC page downloads unexpectedly large JS chunks                       | Chunk contamination from shared `'use client'` modules                         | [Chunk Contamination](#chunk-contamination)                                       |
+| Component stays a Client Component after removing `'use client'`      | Imported by another `'use client'` file, or RSC bundle not rebuilding          | [Accidental Client Components](#accidental-client-components)                     |
+| Hydration mismatch warnings in console                                | Server/client render output differs (timestamps, browser APIs, invalid HTML)   | [Hydration Mismatches](#hydration-mismatches)                                     |
+| `ReferenceError: performance is not defined`                          | Node renderer VM context missing globals                                       | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
+| `ReferenceError: fetch / Headers / Request / Response is not defined` | Node renderer VM context missing fetch globals                                 | [Node Renderer VM Context](#node-renderer-vm-context----missing-globals)          |
+| `ReferenceError: require is not defined`                              | Server bundle uses `externals` for Node builtins instead of `resolve.fallback` | [Handling Node Builtins](#handling-node-builtins----externals-vs-resolvefallback) |
+| `ReferenceError: MessageChannel is not defined`                       | `react-dom/server.browser` needs `MessageChannel` at load time in VM sandbox   | [MessageChannel Not Defined](#messagechannel-not-defined)                         |
+| SSR hangs or times out on large pages                                 | Stream backpressure deadlock                                                   | [Stream Backpressure Deadlock](#stream-backpressure-deadlock)                     |
+| Rails boot error about version mismatch                               | Gem and npm package at different versions                                      | [Gem and npm Package Version Mismatch](#gem-and-npm-package-version-mismatch)     |
+| 422 Unprocessable Entity on form submission                           | Missing CSRF token in fetch request                                            | [Mutations](rsc-data-fetching.md#mutations-rails-controllers-not-server-actions)  |
+| Page is blank until all data loads                                    | Missing `stream_react_component` or Suspense boundaries                        | [Performance Pitfalls](#performance-pitfalls)                                     |
 
 ## Serialization Boundary Issues
 
@@ -837,17 +837,26 @@ RENDERER_SUPPORT_MODULES=true
 For globals not covered by `supportModules`, use `additionalContext`:
 
 ```js
+const fetchImplementation = globalThis.fetch;
+const HeadersImplementation = globalThis.Headers;
+const RequestImplementation = globalThis.Request;
+const ResponseImplementation = globalThis.Response;
+
+if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+  throw new Error(
+    'Your Node.js runtime does not expose fetch, Headers, Request, and Response. ' +
+      'Use Node.js 18+ or replace these globalThis.* values with a fetch polyfill before passing additionalContext.',
+  );
+}
+
 module.exports = {
   supportModules: true,
   additionalContext: {
     // Add any globals that aren't in the default supportModules set.
-    // These host globals require Node.js 18+. If any are undefined, import a
-    // polyfill and pass that implementation instead. The JavaScript
-    // configuration guide shows a guarded startup example.
-    fetch: globalThis.fetch,
-    Headers: globalThis.Headers,
-    Request: globalThis.Request,
-    Response: globalThis.Response,
+    fetch: fetchImplementation,
+    Headers: HeadersImplementation,
+    Request: RequestImplementation,
+    Response: ResponseImplementation,
     // Example: override `performance` with a deterministic stub if rendered
     // output embeds timing values and you need byte-stable SSR.
     performance: { now: () => 0 },

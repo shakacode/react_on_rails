@@ -101,6 +101,31 @@ reactOnRailsProNodeRenderer({
 
 If your Node.js runtime does not provide these globals, install a fetch implementation and pass that implementation through `additionalContext` instead. For CommonJS launch files, use a CJS-compatible implementation such as `node-fetch` v2 or `undici`; `node-fetch` v3+ is ESM-only.
 
+For example, with `node-fetch` v2 in a CommonJS launch file:
+
+```js
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+
+const fetchImplementation = require('node-fetch'); // node-fetch v2 (CJS)
+const {
+  Headers: HeadersImplementation,
+  Request: RequestImplementation,
+  Response: ResponseImplementation,
+} = fetchImplementation;
+
+reactOnRailsProNodeRenderer({
+  supportModules: true,
+  additionalContext: {
+    fetch: fetchImplementation,
+    Headers: HeadersImplementation,
+    Request: RequestImplementation,
+    Response: ResponseImplementation,
+  },
+});
+```
+
+Use the same `additionalContext` shape if you import a compatible client from `undici` instead.
+
 ## Example Launch Files
 
 ### Testing example:
