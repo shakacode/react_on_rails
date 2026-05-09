@@ -129,7 +129,8 @@ module RscNodeRenderer
     loop do
       Socket.tcp(host, port, connect_timeout: 1).close
       break
-    rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT, SocketError
+    rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT,
+           Errno::EHOSTUNREACH, SocketError
       if pid
         begin
           Process.kill(0, pid)
@@ -184,6 +185,9 @@ RSpec.configure do |config|
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => expanded_cache_path
     }
 
+    # These lines mirror the Step 1 preamble. This support file is required as a
+    # standalone file, so it cannot share locals with rails_helper.rb and must re-derive
+    # test_worker_id itself.
     test_worker = ENV.fetch("TEST_ENV_NUMBER", "0")
     test_worker = "0" if test_worker.empty?
     test_worker_id = test_worker.gsub(/[^0-9]/, "")
@@ -224,6 +228,9 @@ RSpec.configure do |config|
     rsc_node_renderer_waiter&.join(5)
   rescue Errno::ESRCH
     # Already stopped.
+  rescue Errno::EPERM
+    warn "No permission to stop node renderer process group #{pid}; " \
+         "it may need manual cleanup."
   ensure
     rsc_node_renderer_pid = nil
     rsc_node_renderer_waiter = nil
