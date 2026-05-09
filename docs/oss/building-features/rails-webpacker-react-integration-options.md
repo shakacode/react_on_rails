@@ -112,7 +112,7 @@ Keep each shim explicit and narrow:
    + import ReactOnRails from 'react-on-rails';
    ```
 
-   The root import uses the full build and may log a browser console warning about bundled server-rendering code. It also includes server-rendering code in the client bundle, which increases client bundle size. That trade-off is expected for this temporary shim; remove the shim and return to the current client entry point after upgrading to Shakapacker/Webpack 5 or newer.
+   The root import uses the full build and may log a browser console warning about bundled server-rendering code. It also includes server-rendering code in the client bundle, adding approximately 5 KB compared to the `react-on-rails/client` entry point. That trade-off is expected for this temporary shim; remove the shim and return to the current client entry point after upgrading to Shakapacker/Webpack 5 or newer.
 
 2. Ensure Babel can parse modern syntax used by current packages. Add these plugins to your existing Babel config without replacing existing presets or plugins:
 
@@ -198,7 +198,10 @@ Keep each shim explicit and narrow:
    ```
 
    `rootMode: 'upward'` tells Babel to walk up from `node_modules/react-on-rails` to the project root so it
-   can find your project-wide `babel.config.js` or `babel.config.json`.
+   can find your project-wide `babel.config.js` or `babel.config.json`. In a monorepo where the Rails app
+   lives in a subdirectory, confirm that Babel resolves the app config you expect. You can run
+   `babel --show-config-for <file>` to inspect the resolved config; if Babel picks up an ancestor config
+   unexpectedly, set `configFile` in the `babel-loader` options to point directly at your app's config.
 
    Webpacker 5's default JavaScript rule excludes `node_modules`, so files from `react-on-rails` will not reach
    `babel-loader` unless you add a separate package-scoped rule. Keep the new rule narrow instead of removing the
@@ -238,7 +241,7 @@ Keep each shim explicit and narrow:
 
    **When to apply:** Only add this Jest config if your project runs Jest directly.
 
-   If you do not have existing `transformIgnorePatterns`, npm and yarn projects can use the single package lookahead:
+   If you do not have existing `transformIgnorePatterns`, npm, yarn, and bun projects can use the single package lookahead:
 
    ```js
    // jest.config.js
