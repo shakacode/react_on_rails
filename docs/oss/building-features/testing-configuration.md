@@ -43,7 +43,7 @@ React Server Components add one more moving part to the standard test setup: sys
 
 Use this recipe for Capybara, system, and end-to-end tests that exercise `stream_react_component`, `RSCRoute`, or the `rsc_payload_route`.
 
-This recipe builds on the TestHelper and `build_test_command` approach described in [Two Approaches to Test Asset Compilation](#two-approaches-to-test-asset-compilation). The full lifecycle example is RSpec-focused because it uses `before(:suite)` and `after(:suite)` hooks; Minitest suites can reuse the ENV setup and `ReactOnRails::TestHelper.ensure_assets_compiled` call, but must start and stop the renderer from their own suite-level harness.
+This recipe uses the React on Rails TestHelper with `build_test_command`: Rails checks whether generated bundles are stale, runs your test build command when needed, and fails fast if compilation fails. The full lifecycle example is RSpec-focused because it uses `before(:suite)` and `after(:suite)` hooks; Minitest suites can reuse the ENV setup and `ReactOnRails::TestHelper.ensure_assets_compiled` call, but must start and stop the renderer from their own suite-level harness. See [Two Approaches to Test Asset Compilation](#two-approaches-to-test-asset-compilation) for the underlying compilation tradeoffs.
 
 ### 1. Set Renderer ENV Before Rails Boots
 
@@ -66,7 +66,7 @@ ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
 require_relative "../config/environment"
 ```
 
-`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID so every worker gets a unique port and cache path.
+`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on, so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID so every worker gets a unique port and cache path.
 
 If you run tests in parallel, each worker needs its own `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH`. Sharing a renderer cache across parallel workers can produce stale-bundle and missing-bundle failures that look like flaky RSC timeouts.
 
@@ -89,7 +89,13 @@ require "react_on_rails/test_helper"
 require_relative "support/rsc_node_renderer"
 
 RSpec.configure do |config|
-  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config, :rsc)
+  ReactOnRails::TestHelper.configure_rspec_to_compile_assets(
+    config,
+    :rsc,
+    :js,
+    :server_rendering,
+    :controller
+  )
 
   config.define_derived_metadata(file_path: %r{spec/(system|features)}) do |metadata|
     metadata[:rsc] = true
@@ -97,9 +103,9 @@ RSpec.configure do |config|
 end
 ```
 
-The optional `:rsc` argument is a TestHelper metatag filter. It tells `configure_rspec_to_compile_assets` to compile before `:rsc` examples instead of every example.
+Passing any metatags replaces the TestHelper defaults, so include the default `:js`, `:server_rendering`, and `:controller` tags alongside `:rsc` if your suite mixes RSC and non-RSC specs.
 
-Tag request specs that hit the RSC payload endpoint explicitly with `:rsc`. You can keep the default `:js`, `:server_rendering`, and `:controller` tags instead if that already matches your suite. The important part is that the build runs before the first request that can upload bundles to the node renderer.
+Tag request specs that hit the RSC payload endpoint explicitly with `:rsc`. If your suite uses a different tag scheme, pass the complete list of tags that should trigger compilation. The important part is that the build runs before the first request that can upload bundles to the node renderer.
 
 ### 3. Start One Test Renderer Per Worker
 
@@ -119,7 +125,7 @@ module RscNodeRenderer
     loop do
       TCPSocket.open(host, port).close
       break
-    rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ECONNRESET
+    rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ECONNRESET, Errno::ETIMEDOUT
       raise "Node renderer did not boot on #{host}:#{port}" if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
 
       sleep 0.1
@@ -164,7 +170,7 @@ RSpec.configure do |config|
 
     rsc_node_renderer_pid = Process.spawn(
       renderer_env,
-      "pnpm", # replace with "npm" or "yarn" if that is your package manager
+      "pnpm", # replace with "npm", "yarn", or "bun" if that is your package manager
       "run",
       "node-renderer",
       chdir: Rails.root.to_s,
