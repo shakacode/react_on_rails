@@ -90,9 +90,10 @@ Before running scans, record the exact baselines used:
 > **Do not run any scanner evaluation until every cell in this table is filled in and committed.** Undocumented
 > baselines produce results that cannot be reproduced or compared across evaluators.
 
-[Issue 3265](https://github.com/shakacode/react_on_rails/issues/3265) must be closed, with every dataset table cell
-filled and committed, before [Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018) moves from planning to
-execution.
+The follow-up issue,
+[#3265 Track baseline prerequisites for AI security scanner evaluation](https://github.com/shakacode/react_on_rails/issues/3265),
+must be closed, with every dataset table cell filled and committed, before
+[Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018) moves from planning to execution.
 
 The intentionally vulnerable fixture should be small and obvious, such as unsafe template evaluation in a test-only file.
 Do not commit intentionally vulnerable fixtures, secrets, real credentials, or exploit-ready application behavior to a
@@ -102,12 +103,13 @@ group unless Issue 2018 assigns a narrower group for the evaluation.
 
 ## Scoring Criteria
 
-Score each scanner against the same rubric (1 = poor, 3 = acceptable, 5 = excellent). Use weighted totals to make
-security signal and operational cost comparable across evaluators:
-`weighted score = score x weight`; `weighted total = sum(weighted scores) / sum(weights)`.
+Score each scanner against the same rubric (1 = poor, 3 = acceptable, 5 = excellent). Use a normalized weighted average
+to make security signal and operational cost comparable across evaluators while keeping the final total on the 1-5 scale:
+`weighted score = score x weight`; `normalized weighted average = sum(weighted scores) / sum(weights)`.
 
 Example: Actionability score = 4 with weight = 1.0 produces a weighted score of 4.0. If all eight criteria score 3,
-the weighted total is `(3 x 1.0 + 3 x 1.0 + 3 x 0.9 + 3 x 0.8 + 3 x 0.8 + 3 x 0.7 + 3 x 0.7 + 3 x 0.5) / 6.4 = 3.0`.
+the normalized weighted average is
+`(3 x 1.0 + 3 x 1.0 + 3 x 0.9 + 3 x 0.8 + 3 x 0.8 + 3 x 0.7 + 3 x 0.7 + 3 x 0.5) / 6.4 = 3.0`.
 
 | Criterion                 | Question                                                                           | Score (1-5) | Weight (0-1) | Weighted score |
 | ------------------------- | ---------------------------------------------------------------------------------- | ----------- | ------------ | -------------- |
@@ -167,9 +169,9 @@ before adoption, repository maintainers with write access own the next triage de
 Do not add a scanner to CI until all of these are true:
 
 - Finds at least one verified issue or a clearly valuable hardening opportunity.
-- Keeps the false-positive rate at or below 25% among high/critical findings on `main` after one triage pass. If the scan
-  reports fewer than five high/critical findings, manually review every finding and record why the sample is too small
-  for a stable rate.
+- Keeps the false-positive rate at or below 25% for that scanner's `main` scan after one triage pass, measured among
+  high/critical findings reviewed for that scanner run, not cumulatively across scanners. If the scan reports fewer than
+  five high/critical findings, manually review every finding and record why the sample is too small for a stable rate.
 - Supports advisory mode for pull requests.
 - Requires only read-only repository access plus permission to post advisory PR comments or create issues; no write,
   merge, or admin permissions.
