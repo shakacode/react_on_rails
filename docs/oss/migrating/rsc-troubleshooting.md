@@ -756,8 +756,10 @@ Server Components run on the server (in the node renderer), so they have access 
 async function DBComponent() {
   // WARNING: If INTERNAL_API_URL points back to the same Rails server,
   // this creates a circular request (Node renderer → Rails → Node renderer).
-  // Use a direct database call or internal service URL that bypasses Rails routing.
-  const data = await fetch(process.env.INTERNAL_API_URL); // Works if this env var holds an HTTP(S) URL
+  // Use a direct database call, internal service URL that bypasses Rails routing,
+  // or a bundled/injected HTTP client. The node renderer VM does not expose
+  // host fetch globals unless you pass them through additionalContext.
+  const apiUrl = process.env.INTERNAL_API_URL; // Works as a server-only value
   const dbUrl = process.env.DATABASE_URL; // Works
   const secret = process.env.API_SECRET; // Works
 }

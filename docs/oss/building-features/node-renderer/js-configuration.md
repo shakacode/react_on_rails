@@ -70,8 +70,8 @@ The node renderer executes uploaded JavaScript bundles inside isolated VM contex
 
 Prefer passing application data from Rails controllers through props when the data belongs to your Rails app. When a Server Component really needs to call an external HTTP API from the renderer, choose one of these approaches:
 
-1. Import a server-side HTTP client in the component code, such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici`, and let your bundler include it in the RSC/server bundle.
-2. Inject host globals through `additionalContext`:
+1. Inject host globals through `additionalContext`. On Node.js runtimes that already expose `globalThis.fetch`, start with the guarded example below so the renderer fails fast if any required fetch global is absent.
+2. Import a server-side HTTP client in the component code, such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici`, and let your bundler include it in the RSC/server bundle.
 
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
@@ -99,7 +99,7 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-If your Node.js runtime does not provide these globals, install a fetch implementation and pass that implementation through `additionalContext` instead. For CommonJS launch files, use a CJS-compatible implementation such as `node-fetch` v2 or a compatible `undici` version; `node-fetch` v3+ is ESM-only. Pin the `undici` major version to match your Node.js runtime: v5 for Node.js 14/16, v6 for Node.js 18.17+, or v7+ for Node.js 20.18.1+.
+Install a fetch implementation only when your renderer runtime does not provide these globals, or when you intentionally want a bundled HTTP client instead of the host runtime's implementation. For CommonJS launch files, use a CJS-compatible implementation such as `node-fetch` v2 or a compatible `undici` version; `node-fetch` v3+ is ESM-only. Pin the `undici` major version to match your Node.js runtime: v5 for Node.js 14/16, v6 for Node.js 18.17+, or v7+ for Node.js 20.18.1+.
 
 For example, with `node-fetch` v2 in a CommonJS launch file:
 
