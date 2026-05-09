@@ -40,7 +40,7 @@ class StoriesController < ApplicationController
         Rails.logger.error("Unknown redirect_reason: #{reason.inspect}")
         root_path
       end
-      return redirect_to(redirect_path, status: preflight.redirect_status || :see_other)
+      return redirect_to(redirect_path, status: preflight.redirect_status)
     end
 
     response.status = preflight.status if preflight.status
@@ -57,11 +57,22 @@ One possible preflight implementation is:
 ```ruby
 class StoryPagePreflight
   # redirect_reason is nil when no redirect is needed.
-  Result = Struct.new(:props, :status, :redirect_reason, :redirect_status, :cache_control, keyword_init: true)
+  Result = Struct.new(
+    :props,
+    :status,
+    :redirect_reason,
+    :redirect_status,
+    :cache_control,
+    keyword_init: true
+  ) do
+    def redirect_status
+      self[:redirect_status] || :see_other
+    end
+  end
 
   def self.call(story_id, current_user:)
     unless current_user
-      return Result.new(props: {}, redirect_reason: :unauthenticated, redirect_status: :see_other)
+      return Result.new(props: {}, redirect_reason: :unauthenticated)
     end
 
     story = Story.find_by(id: story_id)
@@ -172,23 +183,33 @@ def show
 end
 ```
 
-Create `app/views/errors/gone.html.erb` if your app does not already have a generic template for `410` responses. Cache a `410` only when the removal is durable enough for clients and CDNs to reuse that response.
+Create `app/views/errors/gone.html.erb` if your app does not already have a generic template for `410`
+responses. Cache a `410` only when the removal is durable enough for clients and CDNs to reuse that response.
+With `max-age=3600`, a shared cache may keep serving the `410` for up to one hour after the origin restores the
+resource unless you purge that cache explicitly. Choose the TTL based on how confident you are that the removal is
+permanent and whether your CDN supports on-demand purging; longer TTLs are appropriate only for irreversible removals.
 
 ## Redirects
 
-Use Rails redirects before streaming. Replace `can?` with your app's authorization helper:
+Use Rails redirects before streaming. Keep authentication redirects separate from authorization decisions so signed-in
+users are not sent back to sign-in and private resources do not reveal that a record exists. Replace `can?` with your
+app's authorization helper:
 
 ```ruby
 def show
+  return redirect_to(sign_in_path, status: :see_other) unless current_user
+
   story = Story.find_by(id: params[:id])
   return render(template: "errors/not_found", status: :not_found) unless story
-
-  return redirect_to(sign_in_path, status: :see_other) unless can?(:read, story)
+  return render(template: "errors/not_found", status: :not_found) unless can?(:read, story)
 
   @story_props = { story: StorySerializer.render_as_hash(story) }
   stream_view_containing_react_components(template: "stories/show")
 end
 ```
+
+Use `:forbidden` for unauthorized users only when the route is allowed to reveal that the resource exists. For private
+resources, returning the same `404` for missing and unauthorized records is usually safer.
 
 Do not model route redirects as Server Component return values. React on Rails render-functions may expose redirect metadata for client routers, but React on Rails does not turn that metadata into an actual HTTP redirect for the page response. See [Redirect Information](../core-concepts/render-functions.md#8-redirect-information-legacy).
 
@@ -227,6 +248,12 @@ end
 ```
 
 If `stale?` returns `false`, Rails has already prepared the `304 Not Modified` response; the early return keeps the controller from starting a streamed render after that response has been selected.
+
+`stale?` compares Rails' response validators, such as the generated `ETag` and `Last-Modified`, with request headers
+such as `If-None-Match` and `If-Modified-Since`. Before relying on this for public caching, make sure those validators
+change whenever any rendered input changes. For example, models for comments or join records that affect the page can
+declare `belongs_to :story, touch: true`, while author/profile data may need an explicit composite cache key or a manual
+touch when it changes. Otherwise Rails can return `304 Not Modified` for content that should be regenerated.
 
 When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy before streaming or keep the response private:
 
@@ -291,3 +318,8 @@ React can render metadata, route chrome, empty states, and branded error UI from
 - Pass route decisions into RSC as serializable props.
 - Keep Rails controllers, policies, and services responsible for authentication, authorization, and response policy.
 - Use Client Component navigation only for browser-side transitions after a valid HTTP response exists.
+
+## Next Steps
+
+- [Third-Party Library Compatibility](rsc-third-party-libs.md) -- dealing with incompatible libraries
+- [Troubleshooting and Common Pitfalls](rsc-troubleshooting.md) -- debugging and avoiding problems
