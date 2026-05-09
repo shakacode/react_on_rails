@@ -156,18 +156,18 @@ def show
 end
 ```
 
-Then keep the React component purely presentational. The happy path omits `notFound`, so `notFound?: false` models the absent key as the non-error branch while still narrowing `story` after the guard:
+Then keep the React component purely presentational. The happy path omits `notFound`, so `notFound?: false` models the absent key as the non-error branch. Keep `props` whole until after the guard so TypeScript narrows `story` correctly:
 
 ```tsx
 type StoryData = { id: number; title: string };
 type StoryPageProps = { notFound: true; story: null } | { notFound?: false; story: StoryData };
 
-export default function StoryPage({ notFound, story }: StoryPageProps) {
-  if (notFound) {
+export default function StoryPage(props: StoryPageProps) {
+  if (props.notFound) {
     return <NotFoundMessage />;
   }
 
-  return <Story story={story} />;
+  return <Story story={props.story} />;
 }
 ```
 
@@ -282,15 +282,8 @@ varies on, such as `Accept-Encoding`, `X-Device-Class`, or an application-specif
 existing_vary = response.headers["Vary"].presence
 
 unless existing_vary == "*"
-  vary_tokens = [existing_vary, "Accept-Language"].compact.join(", ")
-  seen_tokens = {}
-  response.headers["Vary"] = vary_tokens.split(",").map(&:strip).reject do |token|
-    normalized_token = token.downcase
-    next true if seen_tokens[normalized_token]
-
-    seen_tokens[normalized_token] = true
-    false
-  end.join(", ")
+  vary_tokens = [existing_vary, "Accept-Language"].compact.flat_map { |value| value.split(",") }.map(&:strip)
+  response.headers["Vary"] = vary_tokens.reject(&:empty?).uniq { |token| token.downcase }.join(", ")
 end
 ```
 
