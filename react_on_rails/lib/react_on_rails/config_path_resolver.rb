@@ -16,6 +16,13 @@ module ReactOnRails
     ].freeze
     ALL_DEFAULT_CONFIG_CANDIDATES = (WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES).freeze
 
+    def config_path_warning_registry
+      @config_path_warning_registry ||= {
+        package_roots: Set.new,
+        package_json_paths: Set.new
+      }
+    end
+
     private
 
     def resolved_package_json_path
@@ -30,7 +37,7 @@ module ReactOnRails
       # realpath is intentionally skipped to avoid filesystem I/O on every call.
       # Relative paths like "../client" remain valid diagnostics targets and are
       # not constrained to stay within Rails.root.
-      return Rails.root.to_s if resolved_location == Pathname.new(".") || resolved_location == Rails.root.cleanpath
+      return Rails.root.to_s if resolved_location == Pathname.new(".")
       return resolved_location.to_s if resolved_location.absolute?
 
       Rails.root.join(resolved_location).to_s
@@ -88,13 +95,6 @@ module ReactOnRails
 
     def warned_package_json_paths
       config_path_warning_registry[:package_json_paths]
-    end
-
-    def config_path_warning_registry
-      @config_path_warning_registry ||= {
-        package_roots: Set.new,
-        package_json_paths: Set.new
-      }
     end
 
     def resolved_webpack_config_path

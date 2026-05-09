@@ -2953,7 +2953,7 @@ module ReactOnRails
     end
 
     def config_path_warning_registry
-      checker.send(:config_path_warning_registry)
+      checker.config_path_warning_registry
     end
 
     def declared_react_version(package_root)
