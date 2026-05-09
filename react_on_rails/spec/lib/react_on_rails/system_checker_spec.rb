@@ -329,6 +329,9 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     context "when package.json does not exist" do
       before do
+        # The outer stub keeps this example focused on package parsing; this root
+        # stub lets the missing-package warning classify the current directory as
+        # an existing JS workspace instead of exercising path resolution again.
         allow(File).to receive(:exist?).with("package.json").and_return(false)
         allow(checker).to receive(:resolved_package_root).and_return(Dir.pwd)
       end
@@ -1078,6 +1081,23 @@ RSpec.describe ReactOnRails::SystemChecker do
             .to be true
           expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
         end
+      end
+    end
+
+    describe "#resolved_package_root" do
+      let(:rails_root) { Pathname.new("/tmp/myapp/rails") }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+      end
+
+      it "allows relative package paths that traverse above Rails.root" do
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "../client")
+        )
+
+        expect(checker.send(:resolved_package_root)).to eq("/tmp/myapp/client")
+        expect(checker.send(:resolved_package_json_path)).to eq("/tmp/myapp/client/package.json")
       end
     end
   end

@@ -16,14 +16,16 @@ module ReactOnRails
     ].freeze
     ALL_DEFAULT_CONFIG_CANDIDATES = (WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES).freeze
 
-    # Public so Doctor can delegate to the checker instance and share the same
-    # warning de-dupe registry. All other resolver methods are private.
+    # Protected so Doctor can delegate to the checker instance and share the same
+    # warning de-dupe registry without exposing this helper as public API.
     def config_path_warning_registry
       @config_path_warning_registry ||= {
         package_roots: Set.new,
         package_json_paths: Set.new
       }
     end
+
+    protected :config_path_warning_registry
 
     private
 
@@ -58,7 +60,7 @@ module ReactOnRails
       return package_json_path if File.exist?(package_json_path)
 
       if package_root_missing?(package_root)
-        warn_missing_package_root(package_root, detection_target)
+        warn_missing_package_root(package_root)
       else
         warn_missing_package_json(package_json_path, detection_target)
       end
@@ -70,15 +72,13 @@ module ReactOnRails
     # #config_path_warning_registry to share de-dupe state with that sink.
     # Overrides must return a Hash with :package_roots and :package_json_paths
     # keys whose values respond to #add?, such as Set instances.
-    def warn_missing_package_root(package_root, detection_target)
+    def warn_missing_package_root(package_root)
       return unless warned_package_roots.add?(package_root)
 
-      add_warning(missing_package_root_warning(package_root, detection_target))
+      add_warning(missing_package_root_warning(package_root))
     end
 
-    def missing_package_root_warning(package_root, _detection_target)
-      # Intentionally omit detection_target: one generic message covers all
-      # diagnostics skipped for the same missing package root.
+    def missing_package_root_warning(package_root)
       "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
         "all diagnostics that read from it are skipped. Check config/initializers/react_on_rails.rb."
     end
