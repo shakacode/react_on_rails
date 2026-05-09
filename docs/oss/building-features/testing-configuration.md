@@ -66,7 +66,7 @@ ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
 require_relative "../config/environment"
 ```
 
-`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on, so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID so every worker gets a unique port and cache path.
+`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on (skipping `"1"`), so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID so every worker gets a unique port and cache path.
 
 If you run tests in parallel, each worker needs its own `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH`. Sharing a renderer cache across parallel workers can produce stale-bundle and missing-bundle failures that look like flaky RSC timeouts.
 
@@ -123,7 +123,7 @@ module RscNodeRenderer
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
 
     loop do
-      TCPSocket.new(host, port).close
+      Socket.tcp(host, port, connect_timeout: 1).close
       break
     rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT
       if pid
@@ -190,7 +190,8 @@ RSpec.configure do |config|
       "node-renderer",
       chdir: Rails.root.to_s,
       out: renderer_log_path,
-      err: [:child, :out]
+      err: [:child, :out],
+      pgroup: true # place pnpm and its child Node process in a new process group
     )
     rsc_node_renderer_waiter = Process.detach(rsc_node_renderer_pid)
 
@@ -208,10 +209,11 @@ RSpec.configure do |config|
     pid = rsc_node_renderer_pid
     next unless pid
 
-    Process.kill("TERM", pid)
+    # Signal the process group so pnpm and the Node child both stop.
+    Process.kill("-TERM", pid)
     next if rsc_node_renderer_waiter&.join(5)
 
-    Process.kill("KILL", pid)
+    Process.kill("-KILL", pid)
     rsc_node_renderer_waiter&.join(5)
   rescue Errno::ESRCH
     # Already stopped.
