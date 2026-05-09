@@ -194,6 +194,14 @@ git_diff_base_resolve() {
     current_remote_branch=""
   fi
 
+  # Initial depth-limited fetches can complete very small shallow repositories,
+  # so refresh the flag before deciding whether more history can be fetched.
+  if git_diff_base_is_shallow_repository; then
+    is_shallow=true
+  else
+    is_shallow=false
+  fi
+
   if ! git_diff_base_verify_ref "$base_ref" &&
     [ -n "$remote_branch" ] &&
     [ "$is_shallow" = false ]; then
@@ -205,6 +213,8 @@ git_diff_base_resolve() {
     fi
   fi
 
+  # Fail early when the base ref is still missing and there is no history left
+  # to deepen: either this is already a full clone, or no remote branch is known.
   if ! git_diff_base_verify_ref "$base_ref" &&
     { [ "$is_shallow" = false ] || { [ -z "$remote_branch" ] && [ -z "$current_remote_branch" ]; }; }; then
     echo "Error: base ref '$base_ref' does not exist locally" >&2
