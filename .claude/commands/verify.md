@@ -15,12 +15,12 @@ reproduce CI job selection locally.
    every commit.
 4. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 5. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
-6. After one or more edits for a failure, restart at the failed command and continue forward. For a single failing
-   command, count each rerun after edits as one loop cycle and stop after three reruns for that same failure signature
-   (for example, the same failing spec, RuboCop offense, or Prettier file) unless the user explicitly asks you to keep
-   debugging. If the command fails with a different underlying issue, reset the counter for that new failure and report
-   the transition. Do not claim a failure is fixed until the failed command passes locally. If a later fix reintroduces
-   an earlier failure, stop and report the cycle instead of retrying.
+6. After one or more edits for a failure, restart at the failed command and continue forward. Count each rerun of the
+   same command with the same root cause (same failing spec, RuboCop offense, or Prettier file) as one loop cycle. Stop
+   and report after three cycles unless the user asks you to keep going.
+   - If the failure changes to a different root cause, reset the counter and continue.
+   - If a later step reintroduces a failure that already passed, stop immediately and report the regression.
+   - Do not claim a failure is fixed until the command passes locally.
 7. Finish with the exact commands run and their pass/fail status.
 
 ## Default Verification Order
@@ -40,7 +40,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run lint`
    - `pnpm run type-check`
    - targeted `pnpm --filter react-on-rails run test` for react-on-rails package tests, or
-     `pnpm --filter react-on-rails exec jest <path>` for targeted test file runs
+     `pnpm --filter react-on-rails exec jest <relative-test-file-path>` for targeted test file runs
    - `pnpm run test` when broad package behavior changed or the touched files are not covered by a narrower package test
    - `cd react_on_rails/spec/dummy && pnpm test:e2e` when the branch changes SSR rendering, client hydration, or
      browser-visible integration behavior
@@ -65,7 +65,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - Dummy app or integration changes: run `rake run_rspec:dummy` or a targeted dummy spec such as `cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb`. For changes that affect SSR rendering or client-side behavior, also run `cd react_on_rails/spec/dummy && pnpm test:e2e`.
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
-- Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`, but do not treat it as a Markdown validator.
+- Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`; it scans all Ruby files, not just staged files, but does not validate Markdown.
 - `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm start format.listDifferent`; in the Pro package, `pnpm start` delegates to that package's `nps` script, so this uses the package-local Prettier check.
 - `react_on_rails_pro/**/*.rb` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `bundle exec rubocop react_on_rails_pro/` and any targeted RSpec.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
