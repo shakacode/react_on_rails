@@ -123,6 +123,24 @@ git_diff_base_fetch_depth() {
   printf '50\n'
 }
 
+git_diff_base_max_attempts() {
+  local raw_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-8}"
+
+  if [[ "$raw_attempts" =~ ^[[:space:]]*([0-9]+)[[:space:]]*$ ]]; then
+    local max_attempts
+
+    max_attempts=$((10#${BASH_REMATCH[1]}))
+
+    if [ "$max_attempts" -gt 0 ]; then
+      printf '%s\n' "$max_attempts"
+      return 0
+    fi
+  fi
+
+  echo "Warning: invalid GIT_DIFF_BASE_MAX_ATTEMPTS '$raw_attempts'; using 8." >&2
+  printf '8\n'
+}
+
 git_diff_base_fetch_remote_branch() {
   local branch="$1"
   local mode="$2"
@@ -337,17 +355,18 @@ git_diff_base_resolve() {
   fi
 
   if [ -n "$remote_branch" ] || [ -n "$current_remote_branch" ]; then
-    local attempt=1
     local deepen_attempts=0
     local deepen_depth="$fetch_depth"
     local fetched=false
-    local max_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-8}"
+    local max_attempts
+
+    max_attempts="$(git_diff_base_max_attempts)"
 
     # Re-check shallow state each time so tiny repositories can leave the loop
     # as soon as a deepen fetch completes their history.
     # When base_ref is a raw event SHA and no base branch is known, deepening
     # the current branch can still reveal a push-event before SHA ancestor.
-    while [ "$attempt" -le "$max_attempts" ] && git_diff_base_is_shallow_repository; do
+    while [ "$deepen_attempts" -lt "$max_attempts" ] && git_diff_base_is_shallow_repository; do
       fetched=false
 
       # A successful deepen on either side can reveal the common ancestor, even
@@ -382,7 +401,6 @@ git_diff_base_resolve() {
 
       deepen_attempts=$((deepen_attempts + 1))
       deepen_depth=$((deepen_depth * 2))
-      attempt=$((attempt + 1))
     done
 
     if git_diff_base_is_shallow_repository; then
@@ -392,7 +410,7 @@ git_diff_base_resolve() {
     fi
 
     if [ "$is_shallow" = true ]; then
-      echo "Warning: deepening did not find merge base after $deepen_attempts successful attempt(s);" \
+      echo "Warning: deepening did not find merge base after $deepen_attempts deepen attempt(s) with fetch progress;" \
         "falling back to --unshallow (this may be slow for large repositories)" >&2
 
       # Extra history from either side can reveal the merge base, so warn on a
