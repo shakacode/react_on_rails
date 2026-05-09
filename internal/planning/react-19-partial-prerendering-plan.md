@@ -38,9 +38,8 @@ Use a dedicated branch for the actual version verification work:
 - [ ] Audit `renderToString` and `renderToStaticMarkup` call sites in React on Rails SSR paths; React 19 renders Suspense
       fallbacks synchronously in `renderToString` instead of suspending, which can silently change output without an error.
       For each call site in `packages/react-on-rails/src/serverRenderReactComponent.ts`,
-      `packages/react-on-rails/src/handleError.ts`, `packages/react-on-rails-pro-node-renderer/`, and any generated bundles
-      found by
-      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.ts" --include="*.tsx" --include="*.cts"`,
+      `packages/react-on-rails/src/handleError.ts`, and any generated bundles found by
+      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.mjs" --include="*.cjs" --include="*.ts" --include="*.tsx" --include="*.cts"`,
       document whether a Suspense-containing tree could plausibly be passed by a user render function today, then either
       open a follow-up migration ticket or record why the current usage is acceptable.
 - [ ] Decide the fate of `packages/react-on-rails/src/ReactDOMServer.cts`: either remove the compatibility re-export when
@@ -92,7 +91,8 @@ Use a dedicated branch for the actual version verification work:
       and cleaning:
 
   > **Warning**: `git clean -fdx` deletes all untracked files and cannot be undone. Stash or commit any in-progress work
-  > first.
+  > first. Note: `git stash` only saves tracked changes; untracked files must be committed or moved manually before running
+  > `git clean`.
 
   ```bash
   git stash
@@ -103,8 +103,8 @@ Use a dedicated branch for the actual version verification work:
   Then run the suite:
 
   ```bash
-  bundle exec rake run_rspec:shakapacker_examples_latest   # React 19 examples only
-  bundle exec rake run_rspec:shakapacker_examples           # full suite across pinned React versions when needed
+  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_latest   # React 19 examples only
+  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples           # full suite across pinned React versions when needed
   ```
 
   Note: `bundle exec rake shakapacker_examples:gen_all` only generates apps; a separate `run_rspec:*` task must run their
