@@ -45,7 +45,9 @@ Use a dedicated branch for the actual version verification work:
       and renderer artifacts, such as
       `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.ts" --include="*.tsx" --include="*.cts"`, plus
       `packages/react-on-rails-pro-node-renderer/` and related SSR integration paths for additional call sites, then
-      document either a migration ticket or why current usage is acceptable.
+      document either a migration ticket or why current usage is acceptable. Include
+      `packages/react-on-rails/src/ReactDOMServer.cts` in the audit, and either remove that compatibility re-export when
+      dropping React 16/17 support or open a dedicated follow-up ticket.
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
       React, React DOM, and `react-on-rails-rsc` resolve to compatible versions. Capture the exact
       `pnpm list -r react react-dom react-on-rails-rsc` output in the verification record, such as a comment on Issue 3255,
@@ -89,8 +91,9 @@ Use a dedicated branch for the actual version verification work:
   - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
   - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
   - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
-- [ ] Run the generated-app suite from the repo root after `git clean -fdx` and a fresh `pnpm install`, or from a fresh
-      clone:
+- [ ] Run the generated-app suite from a fresh clone (preferred) or from the repo root after `git stash` and
+      `git clean -fdx` if a fresh clone is not practical; `git clean -fdx` deletes all untracked files and cannot be undone.
+      Then run a fresh `pnpm install`:
       `bundle exec rake run_rspec:shakapacker_examples_latest` for the React 19 examples. Use
       `bundle exec rake run_rspec:shakapacker_examples` to run the full suite across pinned React versions when needed.
       `bundle exec rake shakapacker_examples:gen_all` only generates example apps; a separate `run_rspec:*` task must run
@@ -99,8 +102,13 @@ Use a dedicated branch for the actual version verification work:
       examples.
 - [ ] Fill the secondary reviewer placeholders in the Open Questions section before opening the first implementation PR.
 
-If any verification step fails, capture the exact command and failure, then decide whether to pin the resolved React
-version, open an upstream or compatibility issue, or block the package-range work until the regression has an owner.
+If any verification step fails, capture the exact command and failure, then use this default decision rule:
+
+- Public API regression, such as broken SSR output, hydration mismatch, or a missing export: block the package-range work
+  until resolved.
+- Behavior change without breakage, such as a Suspense and `renderToString` semantic shift: open a migration ticket,
+  document the change, and do not block the range work.
+- Pro-only test failure: block the Pro ceiling change; the OSS range update may proceed independently if OSS tests pass.
 
 ## Partial Pre-Rendering Definition
 
@@ -170,7 +178,7 @@ validated independently from the rest of the implementation tree.
   decision before any implementation PR is opened
 - How should failures in the dynamic portion affect status codes and error boundaries after part of the response has
   streamed?
-  **Owner**: @justin808 | **Target**: after the SSR-vs-RSC strategy decision, before public docs or examples
+  **Owner**: @justin808 | **Target**: concurrently with the SSR-vs-RSC strategy decision, before public docs or examples
 - What metrics matter most for acceptance: TTFB, LCP, response end, total bytes, or client JavaScript reduction, and how
   do Rails `ActionController::Live` and Node Renderer streaming paths affect those metrics differently?
   **Owner**: @justin808 | **Secondary reviewer**: React on Rails maintainer with Pro access | **Target**: after the
