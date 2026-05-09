@@ -52,9 +52,9 @@ The Pro initializer reads renderer settings while Rails boots. Set test renderer
 ```ruby
 # spec/support/rsc_test_worker.rb
 module RscTestWorker
-  TEST_ENV_NUMBER = ENV.fetch("TEST_ENV_NUMBER", "0")
-  NORMALIZED_ENV_NUMBER = TEST_ENV_NUMBER.empty? ? "0" : TEST_ENV_NUMBER
-  ID = NORMALIZED_ENV_NUMBER.gsub(/[^0-9]/, "").then { |worker_id| worker_id.empty? ? "0" : worker_id }
+  ID = ENV.fetch("TEST_ENV_NUMBER", "")
+          .gsub(/[^0-9]/, "")
+          .then { |worker_id| worker_id.empty? ? "0" : worker_id }
 end
 ```
 
@@ -172,6 +172,7 @@ RSpec.configure do |config|
             "gets a unique renderer bundle cache directory."
     end
     expanded_cache_path = File.expand_path(cache_path)
+    FileUtils.mkdir_p(Rails.root.join("tmp"))
     tmp_root = File.realpath(Rails.root.join("tmp").to_s)
     unless expanded_cache_path.start_with?("#{tmp_root}#{File::SEPARATOR}")
       raise "RENDERER_SERVER_BUNDLE_CACHE_PATH must be inside Rails.root/tmp " \
