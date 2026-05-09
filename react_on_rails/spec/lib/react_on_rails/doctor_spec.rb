@@ -3073,6 +3073,19 @@ RSpec.describe ReactOnRails::Doctor do
         success_msgs = checker.messages.select { |m| m[:type] == :success }
         expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
       end
+
+      it "warns when the configured package root does not exist" do
+        allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+
+        doctor.send(:check_rsc_react_version)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("does not exist") }).to be true
+      end
     end
 
     context "when React is not installed" do

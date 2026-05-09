@@ -2930,7 +2930,16 @@ module ReactOnRails
       # which handles hoisted dependencies in monorepos and pnpm workspaces.
       # Resolve from the configured package root so nested client/ layouts work.
       script = "console.log(require.resolve('react/package.json'))"
-      stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: resolved_package_root)
+      package_root = resolved_package_root
+      unless Dir.exist?(package_root)
+        checker.add_warning(
+          "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
+          "cannot detect installed React"
+        )
+        return nil
+      end
+
+      stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: package_root)
       return nil unless status.success?
 
       resolved_path = stdout.strip
