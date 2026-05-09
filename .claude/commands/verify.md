@@ -3,7 +3,8 @@
 Run a local verification loop for the current branch before creating or updating a PR.
 
 Use `/verify` for local pre-PR checks. Use `/run-ci` when you need the CI change detector or want to
-reproduce CI job selection locally.
+reproduce CI job selection locally. See also `.claude/docs/avoiding-ci-failure-cycles.md` for the failure patterns this
+command is designed to prevent.
 
 ## Instructions
 
@@ -16,9 +17,9 @@ reproduce CI job selection locally.
 4. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 5. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
 6. After one or more edits for a failure, restart at the failed command and continue forward. Count each rerun of the
-   same command with the same root cause (same failing spec, RuboCop offense, or Prettier file) as one loop cycle. Stop
-   and report after three cycles unless the user asks you to keep going.
-   - If the failure changes to a different root cause, reset the counter and continue.
+   same command that produces the same first failing test name, RuboCop offense, or Prettier file as one loop cycle.
+   Stop and report after three cycles unless the user asks you to keep going.
+   - If the first failing item changes, reset the counter and continue.
    - If a later step reintroduces a failure that already passed, stop immediately and report the regression.
    - Do not claim a failure is fixed until the command passes locally.
 7. Finish with the exact commands run and their pass/fail status.
