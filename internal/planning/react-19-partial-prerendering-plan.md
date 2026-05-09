@@ -26,10 +26,15 @@ Use a dedicated branch for the actual version verification work:
    versions.
 3. Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream` and
    `renderToReadableStream` through `@types/react-dom`, lint enforces package style, and tests exercise the runtime paths:
-   - `pnpm run type-check`
-   - `pnpm run lint`
-   - `pnpm run test`
+   - `pnpm run lint` from the repo root
+   - `pnpm --filter react-on-rails run type-check`
+   - `pnpm --filter react-on-rails run test`
+   - `pnpm --filter create-react-on-rails-app run type-check`
+   - `pnpm --filter create-react-on-rails-app run test`
+   - `pnpm --filter react-on-rails-pro run type-check` _(requires Pro access and `react_on_rails_pro/` checked out)_
    - `pnpm --filter react-on-rails-pro run test:rsc` _(requires Pro access and `react_on_rails_pro/` checked out)_
+   - `pnpm --filter react-on-rails-pro-node-renderer run type-check` _(requires Pro access)_
+   - `pnpm --filter react-on-rails-pro-node-renderer run test` _(requires Pro access)_
 4. Run Ruby checks that exercise SSR and generated apps:
    - `bundle exec rubocop`
    - `bundle exec rake rbs:validate`
