@@ -41,9 +41,11 @@ Recommended OSS first slice for [Issue 2169](https://github.com/shakacode/react_
 3. Cached SSR route with explicit hit and miss measurements
 
 Hash SSR is deferred to a follow-on PR after the initial OSS noise profile is understood. The cached SSR slice should
-define separate cache-hit and cache-miss benchmark paths before comparing results. The miss path should clear the
-benchmark cache namespace before measurement, and the hit path should clear that namespace, make one warm-up request to
-prime the fragment, then run k6 against the primed route. Avoid relying on a shared Redis instance or manual cache state.
+define separate cache-hit and cache-miss benchmark paths before comparing results. Use a dedicated cache adapter and
+namespace for benchmark routes, such as `ActiveSupport::Cache::FileStore.new("tmp/benchmark_cache")`, instead of the
+app's default store. The miss path should clear only that benchmark cache namespace before measurement, and the hit path
+should clear that namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. Avoid
+relying on a shared Redis instance, environment-default `:null_store`/`:memory_store` behavior, or manual cache state.
 
 Recommended Pro slice for [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169), implemented after the
 OSS first slice or in a dedicated follow-up PR:
@@ -78,10 +80,15 @@ Prerequisites for the first implementation PR:
 
 - Define alternating route order in `benchmarks/bench.rb` as two deterministic passes over the same route list: first in
   `rails routes` order, then in reverse order in the same job. Record the pass order with the per-route artifacts before
-  using route ordering as a noise-control signal. Budget this intentionally because it roughly doubles route runtime: each
-  route gets two k6 runs plus two warm-up phases, or about `2 * (DURATION + 5 seconds)` per route with the current warm-up.
+  using route ordering as a noise-control signal. This is large enough to land as its own prerequisite PR, and the first
+  benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally because it roughly
+  doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about `2 * (DURATION + 5 seconds)` per
+  route with the current warm-up, assuming the default `DURATION=30s`. Recalculate the estimate when overriding
+  `DURATION`.
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
-  `metadata.json` artifact and mirror the key fields in the `summary.txt` header.
+  `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
+  the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
+  `node --version` for `node_version`, and the installed React package metadata for `react_version`.
 
   Use these metadata keys as the minimum schema:
 
@@ -118,6 +125,10 @@ Every benchmark PR should include:
 
 If a benchmark requires generated assets, the command should build those assets explicitly so CI and local runs use the
 same mode.
+
+Until benchmark-specific contributor docs exist, put this checklist in each benchmark implementation PR description. The
+implementation work should then anchor it in `benchmarks/README.md` or a benchmark-specific pull request template so
+reviewers have one stable compliance checklist.
 
 ## Acceptance Criteria
 
