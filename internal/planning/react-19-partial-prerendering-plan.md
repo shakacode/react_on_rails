@@ -8,7 +8,7 @@ apps.
 
 This is a planning document. It does not change package versions, build configuration, or Pro package code.
 
-**Status**: Draft | **Created**: 2026-04 | **Last updated**: 2026-05-09 | **Tracks**:
+**Status**: Draft | **Created**: 2026-04-30 | **Last updated**: 2026-05-09 | **Tracks**:
 [Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) and
 [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255)
 
@@ -24,7 +24,7 @@ verification, not necessarily a broad package-range change.
 
 Note: `react-on-rails-pro` currently pins `react-on-rails-rsc` as a peer dependency at `>= 19.0.2 <= 19.2.3`.
 Verification should confirm whether this ceiling is intentional or should be widened alongside any React 19.2.x range
-update.
+update. **Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
 
 ## React 19.2.x Verification Checklist
 
@@ -55,6 +55,8 @@ Use a dedicated branch for the actual version verification work:
     setup)_
   - Confirm whether `react_on_rails_pro/spec/execjs-compatible-dummy` needs a dedicated React 18 test run as part of the
     acceptance criteria.
+  - Public contributors without Pro runtime prerequisites should rely on the PR's Pro CI checks as the proxy for these
+    Pro verification steps.
 - [ ] Run Ruby checks that exercise SSR and generated apps:
   - `bundle exec rubocop`
   - `bundle exec rake rbs:validate`
@@ -80,6 +82,7 @@ Use a dedicated branch for the actual version verification work:
       their tests.
 - [ ] Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
       examples.
+- [ ] Fill the secondary reviewer placeholders in the Open Questions section before opening the first implementation PR.
 
 If any verification step fails, capture the exact command and failure, then decide whether to pin the resolved React
 version, open an upstream or compatibility issue, or block the package-range work until the regression has an owner.
@@ -156,3 +159,8 @@ validated independently from the rest of the implementation tree.
   do Rails `ActionController::Live` and Node Renderer streaming paths affect those metrics differently?
   **Owner**: @justin808 | **Secondary reviewer**: React on Rails maintainer with Pro access | **Target**: after the
   SSR-vs-RSC strategy decision, before benchmark implementation
+- Should the minimum supported React version retain React 18.x compatibility or move to React 19.x only?
+  **Owner**: @justin808 | **Target**: before any package-range change is merged
+- Should the `react-on-rails-pro` peer dependency ceiling for `react-on-rails-rsc` stay at `<= 19.2.3` or widen with the
+  React 19.2.x verification work?
+  **Owner**: @justin808 | **Target**: before any package-range change is merged
