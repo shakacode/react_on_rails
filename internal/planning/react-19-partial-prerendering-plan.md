@@ -91,7 +91,7 @@ Use a dedicated branch for the actual version verification work:
       and cleaning:
 
   > **Warning**: `git clean -fdx` deletes all untracked files and cannot be undone. Stash or commit any in-progress work
-  > first. Note: `git stash` only saves tracked changes; untracked files must be committed or moved manually before running
+  > first. Note: the default `git stash` omits untracked files; use `git stash -u` to include them before running
   > `git clean`.
 
   ```bash
@@ -103,7 +103,7 @@ Use a dedicated branch for the actual version verification work:
   Then run the suite:
 
   ```bash
-  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_latest   # React 19 examples only
+  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_latest   # runs the latest-pinned React examples (currently React 19)
   cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples           # full suite across pinned React versions when needed
   ```
 
