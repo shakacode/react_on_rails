@@ -11,6 +11,8 @@ paths.
 | Latest released `react_on_rails` gem and `react-on-rails` package | Report and triage                                                     |
 | Older released versions                                           | Report; maintainers evaluate case-by-case and may recommend upgrading |
 
+Fixes are generally delivered for the most recent minor line; older releases may receive backports if severity warrants.
+
 ## Scope
 
 This policy covers security vulnerabilities in the `react_on_rails` gem and the `react-on-rails` npm package. It does
@@ -32,8 +34,9 @@ If the repository does not show **Report a vulnerability**, open a confidential
 draft, or contact a repository maintainer with write access directly and coordinate disclosure timing before sharing
 exposure details publicly.
 
-If a reporter cannot use GitHub, they may email [contact@shakacode.com](mailto:contact@shakacode.com) and ask to be
-routed to a React on Rails maintainer for coordinated disclosure. Do not include exploit details in that first contact.
+If a reporter cannot use GitHub, they may email [contact@shakacode.com](mailto:contact@shakacode.com) with the subject
+line `React on Rails security` and ask to be routed to a React on Rails maintainer for coordinated disclosure. Do not
+include exploit details in that first contact.
 
 Maintainers aim to provide an initial response within five business days. The default disclosure window is 90 days from
 the date of first report unless maintainers and the reporter agree to a shorter or longer timeline.

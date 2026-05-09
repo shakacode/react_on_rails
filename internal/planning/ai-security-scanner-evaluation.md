@@ -4,6 +4,10 @@
 Re-check product names, URLs, plans, and language coverage before running the evaluation, then refresh this snapshot
 annually or when a listed vendor is acquired, deprecated, or materially changes scope.
 
+- **Last reviewed:** 2026-05-09
+- **Review owner:** React on Rails maintainers
+- **Next review due:** 2027-05-09
+
 ## Purpose
 
 Evaluate whether AI-native security scanners can find actionable vulnerabilities or logic bugs in React on Rails beyond
@@ -11,6 +15,10 @@ the issues already covered by existing lint, test, dependency, and code review w
 
 This plan tracks [Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018). It is an evaluation plan, not a
 decision to adopt any vendor or CI integration.
+
+> **Public planning note:** This file lives in a public repository even though the path starts with `internal/planning/`.
+> Keep raw scanner findings, exploit details, private fork URLs, and intentionally vulnerable fixtures outside this repo;
+> commit only sanitized summaries here.
 
 ## Scope
 
@@ -81,8 +89,9 @@ Before running scans, record the exact baselines used:
 > **Do not run any scanner evaluation until every cell in this table is filled in and committed.** Undocumented
 > baselines produce results that cannot be reproduced or compared across evaluators.
 
-Track this prerequisite in [Issue 3265](https://github.com/shakacode/react_on_rails/issues/3265) before scheduling any
-evaluation run, so the placeholders cannot be missed when Issue 2018 moves from planning to execution.
+[Issue 3265](https://github.com/shakacode/react_on_rails/issues/3265) must be closed, with every dataset table cell
+filled and committed, before [Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018) moves from planning to
+execution.
 
 The intentionally vulnerable fixture should be small and obvious, such as unsafe template evaluation in a test-only file.
 Do not commit intentionally vulnerable fixtures, secrets, real credentials, or exploit-ready application behavior to a
@@ -95,6 +104,9 @@ group unless Issue 2018 assigns a narrower group for the evaluation.
 Score each scanner against the same rubric (1 = poor, 3 = acceptable, 5 = excellent). Use weighted totals to make
 security signal and operational cost comparable across evaluators:
 `weighted score = score x weight`; `weighted total = sum(weighted scores) / sum(weights)`.
+
+Example: Actionability score = 4 with weight = 1.0 produces a weighted score of 4.0. If all eight criteria score 3,
+the weighted total is `(3 x 1.0 + 3 x 1.0 + 3 x 0.9 + 3 x 0.8 + 3 x 0.8 + 3 x 0.7 + 3 x 0.7 + 3 x 0.5) / 6.4 = 3.0`.
 
 | Criterion                 | Question                                                                           | Score (1-5) | Weight (0-1) | Weighted score |
 | ------------------------- | ---------------------------------------------------------------------------------- | ----------- | ------------ | -------------- |
