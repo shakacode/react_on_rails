@@ -145,7 +145,7 @@ const {
   Response: ResponseImplementation,
 } = nodeFetch;
 
-if (!nodeFetch || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+if (!HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
     'node-fetch v2 did not expose one or more required fetch classes (Headers, Request, Response). ' +
       'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',

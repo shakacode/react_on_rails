@@ -753,6 +753,7 @@ Server Components run on the server (in the node renderer), so they have access 
 
 ```jsx
 // Server Component -- full access to Node.js process.env
+// node-fetch v2 is CJS-only; the bundler resolves this import to its default fetch function.
 import nodeFetch from 'node-fetch';
 
 async function InternalDataComponent() {
