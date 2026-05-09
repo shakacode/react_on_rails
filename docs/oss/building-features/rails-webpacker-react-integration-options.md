@@ -99,7 +99,7 @@ Webpack 4, and verify your full app locally before relying on them.
 
 :::
 
-Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field (`lib/ReactOnRails.full.js`). The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims. Additionally, the built files in `lib/` use modern JavaScript syntax, such as optional chaining and nullish coalescing, that Webpack 4's default parser does not support; you may need Babel to transpile those files after fixing the import path.
+Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist. As a deliberate shim, switch those imports to the package root so Webpack resolves the `main` field target (`lib/ReactOnRails.full.js`). The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims. Additionally, the built files in `lib/` use modern JavaScript syntax, such as optional chaining and nullish coalescing, that Webpack 4's default parser does not support; you may need Babel to transpile those files after fixing the import path.
 
 Keep each shim explicit and narrow:
 
