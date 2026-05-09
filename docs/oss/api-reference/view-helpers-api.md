@@ -197,7 +197,7 @@ See the [React on Rails Pro Configuration](../configuration/configuration-pro.md
 
 ### rsc_payload_react_component_with_async_props
 
-Async-props variant of `rsc_payload_react_component`. Use it when custom RSC payload rendering needs async props emitted from Rails.
+Async-props variant of `rsc_payload_react_component`. Use it only when custom RSC payload rendering needs Rails-emitted async props, such as an overridden payload route or template. For standard streamed ERB views, use [`stream_react_component_with_async_props`](#stream_react_component_with_async_props).
 
 It accepts the same options as `rsc_payload_react_component`, plus a block that receives an emitter:
 
@@ -207,6 +207,9 @@ It accepts the same options as `rsc_payload_react_component`, plus a block that 
   emit.call("reviews", @product.reviews.as_json(only: [:id, :text, :rating]))
 end %>
 ```
+
+> [!IMPORTANT]
+> `rsc_payload_react_component_with_async_props` always forces `prerender: true` — passing `prerender: false` has no effect. Use this helper only for custom RSC payload rendering; standard streamed ERB views should use `stream_react_component_with_async_props`.
 
 ---
 

@@ -949,7 +949,7 @@ For each component that fetches data:
 2. Remove `useState` for data, loading, and error
 3. Remove the `useEffect` data fetch
 4. Accept data as props from Rails (or use [`stream_react_component_with_async_props`](#data-fetching-in-react-on-rails-pro) for slow data)
-5. Use `stream_react_component` in the ERB view to enable streaming SSR
+5. Use `stream_react_component` in the ERB view, or `stream_react_component_with_async_props` when step 4 moved slow data to async props, to enable streaming SSR
 6. Remove the API route if it was only used by this component
 
 ### Step 3: Add Suspense Boundaries
