@@ -77,11 +77,10 @@ Use this concise summary:
 ```text
 Verification:
 - PASS git diff --check origin/main...HEAD
-- PASS pnpm start format.listDifferent
-- FAIL bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb
+- FAIL pnpm start format.listDifferent
 
 Next fix:
-- Remove trailing whitespace in `docs/oss/example.md` line 42, then rerun `pnpm start format.listDifferent`.
+- Run `rake autofix` to fix Prettier formatting, then rerun `pnpm start format.listDifferent`.
 ```
 
 If a command is intentionally skipped, explain why in one line. Prefer local verification over waiting for CI.
