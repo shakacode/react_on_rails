@@ -84,7 +84,7 @@ const ResponseImplementation = globalThis.Response;
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
     'Your Node.js runtime does not expose fetch, Headers, Request, and Response. ' +
-      'Use Node.js 18+ or replace the globalThis.* references above with a fetch polyfill import.',
+      'Use a supported Node.js release that exposes these globals or replace the globalThis.* references above with a fetch polyfill import.',
   );
 }
 
@@ -99,7 +99,7 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-Install a fetch implementation only when your renderer runtime does not provide these globals, or when you intentionally want a bundled HTTP client instead of the host runtime's implementation. For CommonJS launch files, use a CJS-compatible implementation such as `node-fetch` v2 or a compatible `undici` version; `node-fetch` v3+ is ESM-only. Pin the `undici` major version to match your Node.js runtime: v5 for Node.js 14/16, v6 for Node.js 18.17+, or v7+ for Node.js 20.18.1+.
+Install a fetch implementation only when your renderer runtime does not provide these globals, or when you intentionally want a bundled HTTP client instead of the host runtime's implementation. For CommonJS launch files, use a CJS-compatible implementation such as `node-fetch` v2 or a compatible `undici` version; `node-fetch` v3+ is ESM-only. On supported Node.js LTS releases, use `undici` v7+. If you are maintaining an older, EOL Node.js installation, pin the `undici` major version to match that runtime: v5 for Node.js 14/16, v6 for Node.js 18.17+, or v7+ for Node.js 20.18.1+.
 
 For example, with `node-fetch` v2 in a CommonJS launch file:
 
@@ -125,7 +125,7 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export. Pin `undici` to v5 for Node.js 14/16, v6 for Node.js 18.17+, or v7+ for Node.js 20.18.1+:
+Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export. Use `undici` v7+ on supported Node.js LTS releases; older, EOL Node.js installations may need v5 for Node.js 14/16 or v6 for Node.js 18.17+:
 
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');

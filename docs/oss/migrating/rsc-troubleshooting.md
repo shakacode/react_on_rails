@@ -759,7 +759,7 @@ async function DBComponent() {
   // Use a direct database call, internal service URL that bypasses Rails routing,
   // or a bundled/injected HTTP client. The node renderer VM does not expose
   // host fetch globals unless you pass them through additionalContext.
-  const apiUrl = process.env.INTERNAL_API_URL; // Works as a server-only value
+  const apiUrl = process.env.INTERNAL_API_URL; // Pass to a bundled/injected HTTP client
   const dbUrl = process.env.DATABASE_URL; // Works
   const secret = process.env.API_SECRET; // Works
 }
@@ -847,7 +847,7 @@ const ResponseImplementation = globalThis.Response;
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
     'Your Node.js runtime does not expose fetch, Headers, Request, and Response. ' +
-      'Use Node.js 18+ or replace these globalThis.* values with a fetch polyfill before passing additionalContext.',
+      'Use a supported Node.js release that exposes these globals or replace these globalThis.* values with a fetch polyfill before passing additionalContext.',
   );
 }
 
