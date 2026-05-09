@@ -105,7 +105,9 @@ Keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
 
-   **When to apply:** Only change imports that currently point to `react-on-rails/client`.
+   **When to apply:** Change imports that point to React on Rails subpath exports such as
+   `react-on-rails/client`, `react-on-rails/context`, `react-on-rails/pageLifecycle`, or
+   `react-on-rails/turbolinksUtils`.
 
    ```diff
    - import ReactOnRails from 'react-on-rails/client';
@@ -137,6 +139,9 @@ Keep each shim explicit and narrow:
    If a legacy stack reports peer dependency warnings for the `transform-*` package names, use the equivalent
    `@babel/plugin-proposal-optional-chaining` and `@babel/plugin-proposal-nullish-coalescing-operator` packages
    that match your pinned `@babel/core`.
+
+   Installing these plugins only prepares Babel to transform the syntax. Webpack 4 still needs the package-scoped
+   loader rule in Step 3 before files from `node_modules/react-on-rails` pass through Babel.
 
    Add the plugins to the top-level `plugins` array, not inside an `env`-conditional block. The diff below
    applies to `babel.config.js`; for `babel.config.json`, add the same plugin strings to the equivalent JSON
@@ -199,34 +204,40 @@ Keep each shim explicit and narrow:
    };
    ```
 
-   `rootMode: 'upward'` tells Babel to walk up from `node_modules/react-on-rails` to the project root so it
-   can find your project-wide `babel.config.js` or `babel.config.json`. In a monorepo where the Rails app
-   lives in a subdirectory, confirm that Babel resolves the app config you expect. You can run
-   `npx --package @babel/cli babel --show-config-for <file>` to inspect the resolved config; if Babel picks up an ancestor config
-   unexpectedly, set `configFile` in the `babel-loader` options to point directly at your app's config.
+   `rootMode: 'upward'` lets Babel load a project-wide `babel.config.js` or `babel.config.json` from the loader's
+   working root or one of its ancestors. It does not search upward from each file under
+   `node_modules/react-on-rails`. In a monorepo where the Rails app lives in a subdirectory, confirm that Babel
+   resolves the app config you expect:
+
+   ```bash
+   npx --package @babel/cli babel --show-config-for node_modules/react-on-rails/lib/ReactOnRails.full.js
+   ```
+
+   If Babel picks up an ancestor config unexpectedly, set `configFile` in the `babel-loader` options to point
+   directly at your app's config.
 
    Webpacker 5's default JavaScript rule excludes `node_modules`, so files from `react-on-rails` will not reach
    `babel-loader` unless you add a separate package-scoped rule. Keep the new rule narrow instead of removing the
    global `node_modules` exclusion from Webpacker's default loader.
 
-   ```diff
+   ```js
    // config/webpack/environment.js
    // Webpacker 5 uses '@rails/webpacker', not 'shakapacker'.
    const { environment } = require('@rails/webpacker');
 
-   + environment.loaders.append('react-on-rails-js', {
-   +   test: /\.[cm]?js$/,
-   +   include: /node_modules[\\/]react-on-rails[\\/]/,
-   +   use: [
-   +     {
-   +       loader: 'babel-loader',
-   +       options: {
-   +         cacheDirectory: true,
-   +         rootMode: 'upward',
-   +       },
-   +     },
-   +   ],
-   + });
+   environment.loaders.append('react-on-rails-js', {
+     test: /\.[cm]?js$/,
+     include: /node_modules[\\/]react-on-rails[\\/]/,
+     use: [
+       {
+         loader: 'babel-loader',
+         options: {
+           cacheDirectory: true,
+           rootMode: 'upward',
+         },
+       },
+     ],
+   });
 
    module.exports = environment;
    ```
