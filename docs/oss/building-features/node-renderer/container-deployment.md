@@ -184,6 +184,7 @@ class HealthController < ActionController::Base
     renderer_url = ReactOnRailsPro.configuration.renderer_url
     raise ArgumentError, "renderer_url not configured" if renderer_url.nil? || renderer_url.empty?
 
+    # Missing or malformed renderer_url raises and surfaces as a 500 so configuration mistakes stay visible.
     renderer_uri = URI.parse(renderer_url)
     renderer_port = renderer_url.match?(/:\d+(?:[\/?#]|$)/) ? renderer_uri.port : 3800
     Socket.tcp("localhost", renderer_port, connect_timeout: 1) {}
@@ -547,7 +548,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
 
    ```yaml
    livenessProbe:
-     # Omit initialDelaySeconds only if the startupProbe above is configured.
+     # Add initialDelaySeconds here if no startupProbe is configured.
+     # Kubernetes 1.20+ defers readiness/liveness until the startupProbe succeeds.
      tcpSocket:
        port: 3800
      # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
@@ -562,7 +564,8 @@ During container startup, you may see `ERR_STREAM_PREMATURE_CLOSE` errors from F
    >
    > ```yaml
    > livenessProbe:
-   >   # Omit initialDelaySeconds only if the startupProbe above is configured.
+   >   # Add initialDelaySeconds here if no startupProbe is configured.
+   >   # Kubernetes 1.20+ defers readiness/liveness until the startupProbe succeeds.
    >   # Requires curl with HTTP/2 support (verify: curl --version | grep -i http2).
    >   exec:
    >     command:
@@ -695,7 +698,8 @@ spec:
             failureThreshold: 6
             timeoutSeconds: 1
           readinessProbe:
-            # Omit initialDelaySeconds only if the startupProbe above is configured.
+            # Add initialDelaySeconds here if no startupProbe is configured.
+            # Kubernetes 1.20+ defers readiness/liveness until the startupProbe succeeds.
             exec:
               command:
                 - curl
@@ -708,7 +712,8 @@ spec:
             periodSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            # Omit initialDelaySeconds only if the startupProbe above is configured.
+            # Add initialDelaySeconds here if no startupProbe is configured.
+            # Kubernetes 1.20+ defers readiness/liveness until the startupProbe succeeds.
             tcpSocket:
               port: 3800
             # TCP handshakes should complete quickly; exec/H2 uses timeoutSeconds: 5.
