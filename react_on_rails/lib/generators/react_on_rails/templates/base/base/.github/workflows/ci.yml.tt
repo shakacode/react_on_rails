@@ -25,12 +25,11 @@ jobs:
 <%- unless config[:package_manager_declared] -%>
         with:
           # `pnpm/action-setup` requires a version unless package.json declares
-          # `packageManager` (Corepack). Verify this matches the pnpm version
-          # that generated your `pnpm-lock.yaml` — pnpm major bumps occasionally
-          # change defaults that affect dependency resolution. A major-only value
-          # like this resolves to the latest matching patch at install time, so two
-          # runs of the same commit may use different pnpm patch versions. For
-          # reproducible installs, add `"packageManager": "pnpm@<exact-version>"`
+          # `packageManager` (Corepack). This pins an exact pnpm version so CI is
+          # reproducible, but it will drift as pnpm releases new versions. Verify it
+          # still matches the pnpm version that generated your `pnpm-lock.yaml`
+          # (pnpm major bumps occasionally change resolution defaults). For fully
+          # automated version management, add `"packageManager": "pnpm@<exact-version>"`
           # to package.json, then delete `with:` and these comments.
           version: "<%= config[:pnpm_fallback_version] %>"
 <%- end -%>
