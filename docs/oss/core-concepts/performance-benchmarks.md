@@ -102,10 +102,11 @@ surface with the same reduced presenter data and outer layout across two routes:
 > iteration time, while **React Server Components** target runtime JavaScript reduction and server-side composition.
 > The benchmark below measures only the RSC dimension.
 
-The April 30, 2026 production-like local benchmark used eight alternating cycles between the Inertia and RSC routes,
-with one warmup request before each measured run. It used compiled Shakapacker/Rspack assets, compiled RSC demo bundles,
-Rails without the Shakapacker dev server, a dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`, and
-matching Chrome 147 and ChromeDriver 147. The median results showed this directional signal:
+The April 30, 2026 production-like local benchmark used eight alternating measured runs between the Inertia and RSC
+routes, four per route, with one warmup request before each measured run. It used compiled Shakapacker/Rspack assets,
+compiled RSC demo bundles, Rails without the Shakapacker dev server, a dedicated React on Rails Pro Node renderer on
+`RENDERER_PORT=3800`, and matching Chrome 147 and ChromeDriver 147. The median results, plus the observed max
+`responseEnd`, showed this directional signal:
 
 | Metric                        | Inertia demo | RSC demo |  Delta |
 | ----------------------------- | -----------: | -------: | -----: |
@@ -114,12 +115,15 @@ matching Chrome 147 and ChromeDriver 147. The median results showed this directi
 | `responseEnd`                 |     644.80ms | 588.80ms |  -8.7% |
 | Controller `action_total`     |     346.87ms | 339.20ms |  -2.2% |
 | Page-specific script requests |            6 |        1 | -83.3% |
-| Max `responseEnd` (n=4)       |     730.62ms | 768.25ms |  +5.2% |
+| Max `responseEnd`             |     730.62ms | 768.25ms |  +5.2% |
+
+_All rows use n=4 per route: eight alternating measured runs total, with one warmup request before each measured run._
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
 user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the worst-case
 timing still favored the Inertia control. A stable deployed repeat, renderer-internal timing, and hardware details for
 the local run are still required before making stronger production-performance claims.
+
 The script-request row counts browser-observed page-specific script resources only; combined transfer-size capture is
 tracked in [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
