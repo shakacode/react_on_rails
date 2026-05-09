@@ -24,7 +24,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `git diff --check origin/main...HEAD` for committed branch content before creating or updating a PR
    - `pnpm start format.listDifferent`
 2. Ruby:
-   - `bundle exec rubocop` before every commit as required by `AGENTS.md`; it lints Ruby, not Markdown or YAML
+   - `bundle exec rubocop` - **mandatory gate before every commit** (per `AGENTS.md`); it lints Ruby, not Markdown or YAML
    - `bundle exec rake rbs:validate` when Ruby signatures or public Ruby APIs changed
    - targeted `bundle exec rspec ...` for changed Ruby behavior
 3. JavaScript and TypeScript:
@@ -52,7 +52,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`, but do not treat it as a Markdown validator.
-- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved, then run `cd react_on_rails_pro && pnpm run prettier --check .`.
+- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved, then run `cd react_on_rails_pro && pnpm exec prettier --check .`.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
 
 ## Output Format
