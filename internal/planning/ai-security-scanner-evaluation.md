@@ -43,12 +43,12 @@ prioritization, explanation, or reachability analysis for a finding that existin
 Start with this point-in-time vendor shortlist from the issue if the products still offer an appropriate plan at
 evaluation time.
 
-| Vendor          | Reference                  | Initial status | Before scheduling                                       |
-| --------------- | -------------------------- | -------------- | ------------------------------------------------------- |
-| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
-| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
-| Almanax         | <https://almanax.ai/>      | Candidate      | Confirm Ruby/TypeScript coverage; examples skew Web3.   |
-| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
+| Vendor          | Reference                  | Initial status | Before scheduling                                                                                          |
+| --------------- | -------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------- |
+| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                    |
+| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                    |
+| Almanax         | <https://almanax.ai/>      | Lower priority | Evaluate only if ZeroPath, Corgea, and DryRun are unsuitable; confirm coverage beyond Web3-heavy examples. |
+| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                    |
 
 If the named vendors are unavailable or unsuitable, look for tools in these categories:
 
@@ -106,10 +106,20 @@ Anchor examples:
 - Correctness: 5 means locally reproduced or disproven with a clear command; 1 means the scanner cannot explain the
   finding.
 - False-positive rate: 5 means most surfaced findings survive local verification; 1 means the report is mostly noise.
+- Ruby/Rails coverage: 5 means it traces Rails generators, helpers, SSR, and ExecJS paths; 1 means generic Ruby syntax
+  only.
+- TypeScript/React coverage: 5 means it understands package exports, SSR utilities, and browser/server boundaries; 1 means
+  generic JavaScript syntax only.
+- Permission model: 5 means read-only repository access plus advisory comments or issues; 1 means organization-wide write,
+  merge, or admin permissions.
+- CI fit: 5 means advisory, opt-in, non-blocking pull request results; 1 means all pull requests are blocked by default
+  with no clear override.
+- Maintenance cost: 5 means near-zero configuration and triage overhead; 1 means weekly manual triage or frequent config
+  churn.
 
 ## First-Pass Workflow
 
-1. Pick one OSS branch and one scanner.
+1. Pick the current `main` branch of `react_on_rails` and one candidate scanner from the shortlist.
 2. Run the scan without enabling CI blocking.
 3. Export raw findings with sensitive details into a private, access-controlled location if needed; summarize only
    sanitized, verified results in the public issue after exposure details are fixed or disproven.
