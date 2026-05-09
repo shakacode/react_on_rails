@@ -182,6 +182,9 @@ validated independently from the rest of the implementation tree.
 These placeholders must be filled before the first implementation PR is opened. If no name is assigned by that point,
 @justin808 is the fallback owner for both roles.
 
+These will be filled in Issue 3255 before any implementation PR is opened; they are intentionally left blank in this planning
+document.
+
 **Secondary reviewer (SSR-vs-RSC)**: _[name to be filled before first implementation PR; fallback: @justin808]_
 
 **Backup reviewer (benchmarks)**: _[name to be filled before first implementation PR; fallback: @justin808]_
@@ -190,6 +193,10 @@ These placeholders must be filled before the first implementation PR is opened. 
   combination?
   **Owner**: @justin808 | **Target**: before any implementation PR is opened
 - Should the static-shell be rendered by the Node Renderer, cached as a Rails partial fragment, or selected per example?
+  **Owner**: @justin808 | **Target**: before any implementation PR is opened
+- How does the static-shell or streaming-SSR pattern interact with Turbo Drive navigation, Turbo Frames, and Turbo Streams?
+  Confirm whether Turbo page visits re-request the full response instead of reusing a cached shell, and whether
+  `stream_react_component` can flush into a Turbo Stream frame.
   **Owner**: @justin808 | **Target**: before any implementation PR is opened
 - Should the first example use traditional SSR with Suspense, RSC, or both?
   **Owner**: @justin808 | **Secondary reviewer**: React on Rails maintainer with Pro access | **Target**: prerequisite
