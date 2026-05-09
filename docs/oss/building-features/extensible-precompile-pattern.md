@@ -30,7 +30,7 @@ When moving custom build work out of `precompile_hook`, make the ownership chang
 1. Move custom one-time tasks into `run_precompile_tasks` in `bin/dev`.
 2. Remove matching shell fragments from `Procfile.dev`, any project-specific variants (for example, `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`), and CI/CD pipeline scripts (for example, `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json`).
 3. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
-4. Add the same required build steps to `build_test_command` and `build_production_command`.
+4. Add all build steps you moved in step 1 to `build_test_command` and `build_production_command`.
 5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
 
 The goal is one owner per lifecycle: `bin/dev` owns development startup, Procfile processes own long-running watchers, and React on Rails build commands own test and production compilation.
@@ -164,7 +164,8 @@ unless %w[test production].include?(mode)
   exit(1)
 end
 
-system("yarn", "res:build") || abort("res:build failed") # replace "yarn res:build" with your own pre-build step(s)
+# Replace with your own pre-build step(s), for example: "yarn tsc --noEmit && yarn res:build".
+system("yarn", "res:build") || abort("res:build failed")
 
 case mode
 when "test"
