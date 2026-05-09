@@ -139,6 +139,10 @@ Keep each shim explicit and narrow:
    default `ReactOnRails` object. If Webpack 4 cannot resolve one of these named subpaths, use the corresponding
    built-file path as a temporary compatibility import:
 
+   > **Warning:** These `lib/` paths are internal build artifacts, not stable public exports. They are not covered by
+   > the public API contract and may break without warning in any patch or minor release. Treat them as an absolute
+   > last resort, and pin `react_on_rails` tightly if you use them.
+
    For `react-on-rails/context`, switch only that import:
 
    ```diff
@@ -301,6 +305,10 @@ Keep each shim explicit and narrow:
 
 4. If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add
    `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails.
+
+   **Prerequisite:** Confirm that `babel-jest` is set up as the JavaScript transformer. Most Webpacker/Jest stacks
+   already include it, but if your `jest.config.js` has a custom `transform` map that does not cover `.js`, add a
+   `babel-jest` entry for JavaScript files before this step.
 
    **When to apply:** Only add this Jest config if your project runs Jest directly.
 
