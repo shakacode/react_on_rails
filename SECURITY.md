@@ -38,6 +38,8 @@ first email, include the affected package name (`react_on_rails` gem or `react-o
 and a one-line impact description, such as "potential XSS in SSR helper" or "information disclosure in generator output."
 Do not include exploit details in that first contact. Maintainers will respond with a secure alternative, such as a
 private GitHub Advisory thread or another mutually agreed private channel, before requesting reproduction details.
+If you prefer to encrypt your first message, ask for a PGP public key at the same address before sending sensitive
+reproduction details.
 
 Maintainers aim to provide an initial response within five business days. The default disclosure window is 90 days from
 the date of first report unless maintainers and the reporter agree to a shorter or longer timeline. If you do not
@@ -49,3 +51,6 @@ only after a fix, mitigation, or explicit non-impact determination means the dis
 help exploit supported releases.
 
 Reporters will be credited in the security advisory or release notes unless they request anonymity.
+
+Maintainers will request a CVE for confirmed vulnerabilities affecting released versions of the gem or npm package and
+will include the CVE identifier in the security advisory when one is assigned.
