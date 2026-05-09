@@ -99,15 +99,25 @@ Webpack 4, and verify your full app locally before relying on them.
 
 :::
 
-Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist. As a deliberate shim, switch those imports to the package root so Webpack resolves the `main` field target (`lib/ReactOnRails.full.js`). The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims. Additionally, the built files in `lib/` use modern JavaScript syntax, such as optional chaining and nullish coalescing, that Webpack 4's default parser does not support; you may need Babel to transpile those files after fixing the import path.
+Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as
+`react-on-rails/client` resolve to a literal file path that does not exist. As a deliberate shim, switch default
+imports from `react-on-rails/client` to the package root so Webpack resolves the `main` field target
+(`lib/ReactOnRails.full.js`).
+
+The `react-on-rails/client` subpath export has been present since
+[React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03),
+so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need this default-import shim.
+
+Additionally, the built files in `lib/` use modern JavaScript syntax, such as optional chaining and nullish
+coalescing, that Webpack 4's default parser does not support; you may need Babel to transpile those files after
+fixing the import path.
 
 Keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
 
-   **When to apply:** Change imports that point to React on Rails subpath exports such as
-   `react-on-rails/client`, `react-on-rails/context`, `react-on-rails/pageLifecycle`, or
-   `react-on-rails/turbolinksUtils`.
+   **When to apply:** Change default imports from `react-on-rails/client` that expect the default `ReactOnRails`
+   object.
 
    ```diff
    - import ReactOnRails from 'react-on-rails/client';
@@ -115,6 +125,21 @@ Keep each shim explicit and narrow:
    ```
 
    The root import uses the full build and may log a browser console warning about bundled server-rendering code. It also includes a small amount of extra server-rendering code (the SSR capability module) in the client bundle compared to the `react-on-rails/client` entry point. That trade-off is expected for this temporary shim; remove the shim and return to the current client entry point after upgrading to Shakapacker/Webpack 5 or newer.
+
+   Do not use the root default import as a replacement for named utility subpaths. Those modules do not export the
+   default `ReactOnRails` object. If Webpack 4 cannot resolve one of these named subpaths, use the corresponding
+   built-file path as a temporary compatibility import:
+
+   ```diff
+   - import { getRailsContext } from 'react-on-rails/context';
+   + import { getRailsContext } from 'react-on-rails/lib/context.js';
+
+   - import { onPageLoaded } from 'react-on-rails/pageLifecycle';
+   + import { onPageLoaded } from 'react-on-rails/lib/pageLifecycle.js';
+
+   - import { turbolinksSupported } from 'react-on-rails/turbolinksUtils';
+   + import { turbolinksSupported } from 'react-on-rails/lib/turbolinksUtils.js';
+   ```
 
 2. Ensure Babel can parse modern syntax used by current packages. Add these plugins to your existing Babel config without replacing existing presets or plugins:
 
@@ -124,10 +149,11 @@ Keep each shim explicit and narrow:
    If you want to confirm whether your `@babel/preset-env` targets already include optional chaining and
    nullish coalescing, set `debug: true` on the `@babel/preset-env` options and check the build output for
    `optional-chaining` and `nullish-coalescing-operator` in the "Using plugins" list. Use the `transform-*` package
-   names when your pinned Babel stack provides them; if a legacy Babel stack cannot resolve those packages, use the
-   equivalent `proposal-*` package names that match your installed `@babel/core`. If the transforms already appear in
-   the preset output, you can skip the standalone packages; when in doubt, install them because they are no-ops if
-   `preset-env` already transforms the syntax.
+   names first: `@babel/plugin-proposal-optional-chaining` is deprecated as of its 7.21.0 package metadata, and
+   `@babel/plugin-proposal-nullish-coalescing-operator` is deprecated in its 7.18.6 package metadata. Both notices
+   direct users to the corresponding `transform-*` package. If the transforms already appear in the preset output,
+   you can skip the standalone packages; when in doubt, install them because they are no-ops if `preset-env` already
+   transforms the syntax.
 
    ```bash
    yarn add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
@@ -136,9 +162,10 @@ Keep each shim explicit and narrow:
    # or: bun add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
    ```
 
-   If a legacy stack reports peer dependency warnings for the `transform-*` package names, use the equivalent
+   If a locked legacy Babel 7 stack cannot resolve the `transform-*` package names, use the equivalent
    `@babel/plugin-proposal-optional-chaining` and `@babel/plugin-proposal-nullish-coalescing-operator` packages
-   that match your pinned `@babel/core`.
+   that match your pinned `@babel/core`, then remove that fallback when the app can use the maintained transform
+   packages.
 
    Installing these plugins only prepares Babel to transform the syntax. Webpack 4 still needs the package-scoped
    loader rule in Step 3 before files from `node_modules/react-on-rails` pass through Babel.
