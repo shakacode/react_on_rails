@@ -1,8 +1,8 @@
 # AI Security Scanner Evaluation Plan
 
-**Last updated:** 2026-05-09. **Vendor snapshot:** Re-check product names, URLs, plans, and language coverage before
-running the evaluation, then refresh this snapshot annually or when a listed vendor is acquired, deprecated, or materially
-changes scope.
+**Revision history:** Use `git log -- internal/planning/ai-security-scanner-evaluation.md`. **Vendor snapshot:**
+Re-check product names, URLs, plans, and language coverage before running the evaluation, then refresh this snapshot
+annually or when a listed vendor is acquired, deprecated, or materially changes scope.
 
 ## Purpose
 
@@ -81,6 +81,9 @@ Before running scans, record the exact baselines used:
 > **Do not run any scanner evaluation until every cell in this table is filled in and committed.** Undocumented
 > baselines produce results that cannot be reproduced or compared across evaluators.
 
+Track this prerequisite in [Issue 3265](https://github.com/shakacode/react_on_rails/issues/3265) before scheduling any
+evaluation run, so the placeholders cannot be missed when Issue 2018 moves from planning to execution.
+
 The intentionally vulnerable fixture should be small and obvious, such as unsafe template evaluation in a test-only file.
 Do not commit intentionally vulnerable fixtures, secrets, real credentials, or exploit-ready application behavior to a
 public branch of this repository. Keep any private positive-control fixture non-indexable, clearly labeled test-only, and
@@ -110,6 +113,8 @@ Anchor examples:
 - Correctness: 5 means locally reproduced or disproven with a clear command; 1 means the scanner cannot explain the
   finding.
 - False-positive rate: 5 means most surfaced findings survive local verification; 1 means the report is mostly noise.
+  If fewer than three high/critical findings are reported, record the raw count and defer scoring until a larger sample is
+  available; do not extrapolate a rate from a single finding.
 - Ruby/Rails coverage: 5 means it traces Rails generators, helpers, SSR, and ExecJS paths; 1 means generic Ruby syntax
   only.
 - TypeScript/React coverage: 5 means it understands package exports, SSR utilities, and browser/server boundaries; 1 means
@@ -123,6 +128,8 @@ Anchor examples:
 
 ## First-Pass Workflow
 
+0. Verify the chosen scanner's current plan availability and Ruby/TypeScript coverage against the shortlist table.
+   Update the table's "Initial status" and "Before scheduling" columns if anything has changed.
 1. Pick the current `main` branch of `react_on_rails` and one candidate scanner from the shortlist.
 2. Run the scan without enabling CI blocking.
 3. Export raw findings with sensitive details into a private, access-controlled location if needed; summarize only
