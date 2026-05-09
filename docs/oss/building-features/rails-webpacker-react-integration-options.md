@@ -90,7 +90,8 @@ module.exports = commonWebpackConfig;
 
 ## Legacy Webpacker / Webpack 4 migration shims
 
-If you are on Webpacker 5 / Webpack 4, whether you are migrating from `react-rails` or upgrading an existing React on Rails app, prefer upgrading to Shakapacker first when you can.
+If you are on Webpacker 5 / Webpack 4, whether you are migrating from `react-rails` or upgrading an
+existing React on Rails app, prefer upgrading to Shakapacker first when you can.
 
 :::caution
 
@@ -99,6 +100,9 @@ Webpack 4, and verify your full app locally before relying on them.
 
 :::
 
+These shims target React 16 / 17 apps. React 18 apps have additional requirements, such as `react-dom/client`
+compatibility, that are not covered here.
+
 Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as
 `react-on-rails/client` resolve to a literal file path that does not exist. As a deliberate shim, switch default
 imports from `react-on-rails/client` to the package root so Webpack resolves the `main` field target
@@ -106,7 +110,8 @@ imports from `react-on-rails/client` to the package root so Webpack resolves the
 
 The `react-on-rails/client` subpath export has been present since
 [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03),
-so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need this default-import shim.
+so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need the Step 1 default-import shim. Steps 2-4 are
+only needed for versions that output ESM with modern syntax, such as React on Rails 16.0 and newer.
 
 Additionally, the built files in `lib/` use modern JavaScript syntax, such as optional chaining and nullish
 coalescing, that Webpack 4's default parser does not support. The package also declares `"type": "module"`, so
@@ -299,7 +304,7 @@ Keep each shim explicit and narrow:
    module.exports = {
      // keep existing config
      transformIgnorePatterns: [
-       '<rootDir>/node_modules/\\.pnpm/(?!(react-on-rails)@)',
+       '<rootDir>/node_modules/\\.pnpm/(?!react-on-rails@)',
        'node_modules/(?!\\.pnpm|react-on-rails)',
      ],
    };
