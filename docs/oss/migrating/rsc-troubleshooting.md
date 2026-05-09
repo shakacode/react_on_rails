@@ -760,6 +760,7 @@ async function DBComponent() {
   // or a bundled/injected HTTP client. The node renderer VM does not expose
   // host fetch globals unless you pass them through additionalContext.
   const apiUrl = process.env.INTERNAL_API_URL; // Pass to a bundled/injected HTTP client
+  // e.g. const data = await myHttpClient(apiUrl);
   const dbUrl = process.env.DATABASE_URL; // Works
   const secret = process.env.API_SECRET; // Works
 }

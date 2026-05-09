@@ -75,7 +75,13 @@ This is the recommended data fetching pattern for React on Rails because:
 - All data passes as props -- no client-side fetching or loading states needed
 
 > [!NOTE]
-> Server Components rendered through the node renderer do not automatically receive host Node.js globals such as `fetch`, `Headers`, `Request`, or `Response`. Prefer passing Rails-owned data through props. For external HTTP APIs, either import a server-side HTTP client into the component bundle or inject fetch globals with `additionalContext`. See [Node Renderer Runtime Globals](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
+> Server Components rendered through the node renderer do not automatically receive host Node.js globals such as `fetch`, `Headers`, `Request`, or `Response`. To make HTTP calls from a Server Component:
+>
+> - **Prefer props**: pass Rails-owned data from the controller and avoid HTTP entirely.
+> - **Bundle an HTTP client**: import `node-fetch` v2 (CJS) or a compatible `undici` version in component code so the bundler includes it.
+> - **Inject via `additionalContext`**: expose the host's fetch globals or a polyfill at renderer startup.
+>
+> See [Node Renderer Runtime Globals](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
 
 ### How Streaming Works
 
