@@ -2,6 +2,10 @@
 
 # Shared helpers for scripts that need a reliable merge-base in shallow clones.
 # Source this file from bash scripts; do not execute it directly.
+#
+# Tuning knobs:
+# - GIT_DIFF_BASE_FETCH_DEPTH: initial fetch size, and first deepen size before doubling.
+# - GIT_DIFF_BASE_MAX_ATTEMPTS: exponential deepen attempts before falling back to --unshallow.
 
 git_diff_base_remote_branch() {
   local ref="$1"
@@ -41,6 +45,8 @@ git_diff_base_base_remote_branch() {
     return 0
   fi
 
+  # Push events provide a raw before SHA without GITHUB_BASE_REF. In that case
+  # resolve may still deepen the current branch until the SHA appears locally.
   if git_diff_base_sha_ref "$base_ref" && [ -n "${GITHUB_BASE_REF:-}" ]; then
     printf '%s\n' "$GITHUB_BASE_REF"
     return 0
@@ -129,7 +135,11 @@ git_diff_base_merge_base() {
   local base_ref="$1"
   local current_ref="$2"
 
-  git merge-base "$base_ref" "$current_ref" 2>/dev/null
+  if [ -n "${GIT_DIFF_BASE_DEBUG:-}" ]; then
+    git merge-base "$base_ref" "$current_ref"
+  else
+    git merge-base "$base_ref" "$current_ref" 2>/dev/null
+  fi
 }
 
 git_diff_base_is_shallow_repository() {
