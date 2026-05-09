@@ -1,7 +1,8 @@
 # AI Security Scanner Evaluation Plan
 
 **Vendor snapshot:** 2026-05-09. Re-check product names, URLs, plans, and language coverage before running the
-evaluation.
+evaluation, then refresh this snapshot annually or when a listed vendor is acquired, deprecated, or materially changes
+scope.
 
 ## Purpose
 
@@ -23,17 +24,27 @@ Evaluate the open-source gem and npm package first:
 Evaluate React on Rails Pro separately after the OSS scan path is understood, because Pro contains separate package and
 licensing boundaries.
 
+## Existing Tooling Baseline
+
+Compare scanner output against the current baseline before counting a finding as net-new signal:
+
+- CodeQL configuration under `.github/codeql/codeql-config.yml`
+- Existing lint, test, dependency, and code review workflows
+
+Record whether each verified finding is missed by the existing baseline or whether the scanner mainly improves
+prioritization, explanation, or reachability analysis for a finding that existing tools already surface.
+
 ## Candidate Scanners
 
 Start with this point-in-time vendor shortlist from the issue if the products still offer an appropriate plan at
 evaluation time.
 
-| Vendor          | Reference                  | Before scheduling                                            |
-| --------------- | -------------------------- | ------------------------------------------------------------ |
-| ZeroPath        | <https://zeropath.com/>    | Confirm OSS or trial plan and Ruby/TypeScript coverage.      |
-| Corgea          | <https://corgea.com/>      | Confirm OSS or trial plan and Ruby/TypeScript coverage.      |
-| Almanax         | <https://almanax.ai/>      | Confirm current product scope beyond Web3-oriented examples. |
-| DryRun Security | <https://dryrun.security/> | Confirm OSS or trial plan and Ruby/TypeScript coverage.      |
+| Vendor          | Reference                  | Initial status    | Before scheduling                                            |
+| --------------- | -------------------------- | ----------------- | ------------------------------------------------------------ |
+| ZeroPath        | <https://zeropath.com/>    | Candidate         | Confirm OSS or trial plan and Ruby/TypeScript coverage.      |
+| Corgea          | <https://corgea.com/>      | Candidate         | Confirm OSS or trial plan and Ruby/TypeScript coverage.      |
+| Almanax         | <https://almanax.ai/>      | Needs scope check | Confirm current product scope beyond Web3-oriented examples. |
+| DryRun Security | <https://dryrun.security/> | Candidate         | Confirm OSS or trial plan and Ruby/TypeScript coverage.      |
 
 If the named vendors are unavailable or unsuitable, look for tools in these categories:
 
@@ -65,13 +76,14 @@ Before running scans, record the exact baselines used:
 The intentionally vulnerable fixture should be small and obvious, such as unsafe template evaluation in a test-only file.
 Do not commit intentionally vulnerable fixtures, secrets, real credentials, or exploit-ready application behavior to a
 public branch of this repository. Keep any private positive-control fixture non-indexable, clearly labeled test-only, and
-inert: no operational code paths, real network calls, or reusable exploit payloads.
+inert: no operational code paths, real network calls, or reusable exploit payloads. Limit access to the default triage
+group unless Issue 2018 assigns a narrower group for the evaluation.
 
 ## Scoring Criteria
 
 Score each scanner against the same rubric (1 = poor, 3 = acceptable, 5 = excellent). Use weighted totals to make
 security signal and operational cost comparable across evaluators:
-`weighted total = sum(score x weight) / sum(weights)`.
+`weighted score = score x weight`; `weighted total = sum(weighted scores) / sum(weights)`.
 
 | Criterion                 | Question                                                                           | Score (1-5) | Weight (0-1) | Weighted score |
 | ------------------------- | ---------------------------------------------------------------------------------- | ----------- | ------------ | -------------- |
@@ -103,23 +115,26 @@ Anchor examples:
 4. For each high or critical finding, reproduce locally or write down why it is not reachable.
    Batch-triage medium findings after the high/critical pass. Skip informational findings unless a pattern emerges.
 5. Fix only verified vulnerabilities or correctness bugs.
-   If a verified vulnerability affects released gem or npm package code, keep exposure details private until patched and
-   follow `SECURITY.md` if present; otherwise coordinate a maintainer-approved disclosure path before public disclosure.
+   If a verified vulnerability affects released gem or npm package code, keep exposure details private until patched. If
+   `SECURITY.md` exists, follow it; otherwise ask repository maintainers with write access to choose a private
+   coordination path and approve timing before public disclosure.
 6. Summarize scanner signal in the issue before trying the next scanner.
 
 ## Adoption Bar
 
 **Owner:** See [Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018) for tracking and assignment.
 **Default triage group:** repository maintainers with write access, unless the issue assigns a narrower group.
+**Default triage SLA:** first response within five business days for high or critical alerts.
 
 Do not add a scanner to CI until all of these are true:
 
 - Finds at least one verified issue or a clearly valuable hardening opportunity.
-- Produces five or fewer false-positive high/critical findings on `main` after one triage pass.
+- Keeps the false-positive rate at or below 25% among high/critical findings on `main` after one triage pass. If the scan
+  reports fewer than three high/critical findings, manually review every finding and record why the sample is too small
+  for a stable rate.
 - Supports advisory mode for pull requests.
 - Requires only read-only repository access plus permission to post advisory PR comments or create issues; no write,
   merge, or admin permissions.
-- Documents triage ownership in Issue 2018, including the owner or rotation and a target first response within five
-  business days.
+- Records the triage owner or rotation for the default SLA in Issue 2018.
 
 If no scanner clears this bar, keep the issue as a record of what was tested and revisit later.
