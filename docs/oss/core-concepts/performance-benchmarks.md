@@ -128,14 +128,15 @@ Conditions:
 > [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing environment metadata. Until
 > that is resolved, treat these numbers as directional signals rather than a stable baseline.
 
-The median results showed this directional signal:
+The median results showed this directional signal. The source artifact's navigation-duration metric comes from its
+Playwright harness and may differ from `PerformanceNavigationTiming.duration`.
 
 | Source  | Metric                                      | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ------- | ------------------------------------------- | -----------: | -------: | ------------------------------: |
 | Browser | Navigation duration                         |        775ms |    607ms |                          -21.7% |
 | Browser | Largest Contentful Paint                    |        794ms |    634ms |                          -20.2% |
 | Browser | `responseEnd`                               |        645ms |    589ms |                           -8.7% |
-| Rails   | Controller `action_total` (Rails wall time) |        347ms |    339ms |                -2.2% (variance) |
+| Rails   | Controller `action_total` (Rails wall time) |        347ms |    339ms |                -2.3% (variance) |
 
 `action_total` is the Rails wall-time field from the raw benchmark artifact, not a browser Performance API metric. The
 artifact does not yet publish enough logger or extraction-script context to confirm whether it is the full
@@ -158,7 +159,7 @@ combined transfer size or cache behavior. Fewer requests do not necessarily impl
 
 - _All timing values are medians from the raw benchmark artifact values (n=4 per route); sample size is too small to
   establish statistical significance._
-- _The `action_total` delta is shown with a variance qualifier because its -2.2% difference is likely within expected
+- _The `action_total` delta is shown with a variance qualifier because its -2.3% difference is likely within expected
   variance at n=4._
 - _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
