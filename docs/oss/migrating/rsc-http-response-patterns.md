@@ -46,9 +46,8 @@ class StoriesController < ApplicationController
 end
 ```
 
-The preflight object can expose a small, serializable result:
-
-These examples use placeholder serializer classes that return plain Ruby hashes; substitute your app's serializer or presenter as needed.
+The preflight object can expose a small, serializable result. These examples use placeholder serializer
+classes that return plain Ruby hashes; substitute your app's serializer or presenter as needed:
 
 ```ruby
 class StoryPagePreflight
@@ -172,7 +171,7 @@ Use Rails redirects before streaming. Replace `can?` with your app's authorizati
 ```ruby
 def show
   story = Story.find_by(id: params[:id])
-  return redirect_to(stories_path, alert: "Story not found", status: :see_other) unless story
+  return render(template: "errors/not_found", status: :not_found) unless story
 
   return redirect_to(sign_in_path, status: :see_other) unless can?(:read, story)
 
@@ -271,6 +270,7 @@ React can render metadata, route chrome, empty states, and branded error UI from
 - Decide redirects before rendering.
 - Decide `404`, `410`, and authorization statuses before rendering.
 - Set cache headers before the first streamed chunk.
+- Set cookies and mutate session state before the first streamed chunk.
 - Pass route decisions into RSC as serializable props.
 - Keep Rails controllers, policies, and services responsible for authentication, authorization, and response policy.
 - Use Client Component navigation only for browser-side transitions after a valid HTTP response exists.
