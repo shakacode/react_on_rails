@@ -113,8 +113,8 @@ to make security signal and operational cost comparable across evaluators while 
 
 Example: Actionability score = 4 with weight = 1.0 produces a weighted score of 4.0. If all eight criteria score 3,
 the normalized weighted average is
-`(3 x 1.0 + 3 x 1.0 + 3 x 0.9 + 3 x 0.8 + 3 x 0.8 + 3 x 0.7 + 3 x 0.7 + 3 x 0.5) / 6.4 = 3.0`,
-where 6.4 is the sum of all weights. If any criterion or weight changes, recompute this denominator in the example and
+`(3 x 1.0 + 3 x 1.0 + 3 x 0.9 + 3 x 0.8 + 3 x 0.8 + 3 x 0.7 + 3 x 0.7 + 3 x 1.0) / 6.9 = 3.0`,
+where 6.9 is the sum of all weights. If any criterion or weight changes, recompute this denominator in the example and
 in the final-score row before merging the change.
 
 | Criterion                 | Question                                                                                                                      | Score (1-5) | Weight (0-1) | Weighted score |
@@ -126,8 +126,8 @@ in the final-score row before merging the change.
 | TypeScript/React coverage | Does it understand package exports, SSR utilities, and browser/runtime boundaries?                                            |             | 0.8          |                |
 | Permission model          | Can it run with minimal GitHub permissions?                                                                                   |             | 0.7          |                |
 | CI fit                    | Can results be advisory first, without failing every PR?                                                                      |             | 0.7          |                |
-| Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                                                                 |             | 0.5          |                |
-| **Final score**           | Normalized weighted average: `sum(weighted scores) / sum(weights)`; current total weight = `6.4`; recompute if weights change |             | N/A          | `<fill>`       |
+| Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                                                                 |             | 1.0          |                |
+| **Final score**           | Normalized weighted average: `sum(weighted scores) / sum(weights)`; current total weight = `6.9`; recompute if weights change |             | N/A          | `<fill>`       |
 
 Anchor examples:
 
@@ -177,8 +177,10 @@ Do not add a scanner to CI until all of these are true:
 
 - Finds at least one verified issue or a clearly valuable hardening opportunity.
 - Keeps the false-positive rate at or below 15% for that scanner's `main` scan after one triage pass, measured among
-  high/critical findings reviewed for that scanner run, not cumulatively across scanners. If the scan reports fewer than
-  five high/critical findings, manually review every finding and record why the sample is too small for a stable rate.
+  high/critical findings reviewed for that scanner run, not cumulatively across scanners. A scan with fewer than five
+  high/critical findings cannot satisfy this false-positive-rate gate by itself; manually review every finding, record
+  the raw count and why the sample is too small for a stable rate, and gather a larger sample before using this rate to
+  justify CI adoption.
 - Supports advisory mode for pull requests.
 - Requires only read-only repository access plus permission to post advisory PR comments or create issues; no write,
   merge, or admin permissions.
