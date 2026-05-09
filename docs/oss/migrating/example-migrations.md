@@ -118,20 +118,20 @@ Use maintainability notes when that is the honest win. Do not force a weak bench
 
 Use this template in the migration PR description, linked issue, or a short `docs/` note in the example repository. Fill in the fields that match the claim, mark evidence fields that were not measured as `"not claimed"`, and mark "Known blockers or caveats" as `"none"` when checked and absent.
 
-| Field                     | What to record                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Baseline ref              | Commit SHA, branch, or tag before the migration                                                         |
-| Migration ref             | Commit SHA, branch, this PR if it is the migration PR, or another PR after the migration                |
-| Route or component        | The exact Rails route, controller action, or React mount point                                          |
-| Date captured             | YYYY-MM-DD, PR date, or release milestone when the evidence was collected                               |
-| React on Rails version    | Target gem/npm package version, branch, or "this PR"                                                    |
-| Starting integration      | `react-rails`, `vite_rails`, custom helper, or older React on Rails                                     |
-| Migration slice           | What changed and what intentionally stayed out of scope                                                 |
-| Performance evidence      | Response timing, HTML size, JS bytes, asset count, Lighthouse/WebPageTest/RUM metrics, or "not claimed" |
-| Maintainability evidence  | Removed custom bridge code, smaller mount boundary, standardized helper usage, or "not claimed"         |
-| Validation                | Test commands, build commands, browser smoke checks, screenshots, or CI links; **required**             |
-| Known blockers or caveats | Native services, old lockfiles, auth setup, browser-only flows, environment assumptions, or "none"      |
-| Honest summary sentence   | One sentence contributors can write and maintainers can quote without overstating the result            |
+| Field                     | What to record                                                                                                                                             |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline ref              | Commit SHA, branch, or tag before the migration                                                                                                            |
+| Migration ref             | Commit SHA, branch, this PR if it is the migration PR, or another PR after the migration                                                                   |
+| Route or component        | The exact Rails route, controller action, or React mount point                                                                                             |
+| Date captured             | YYYY-MM-DD or release milestone when the evidence was collected                                                                                            |
+| React on Rails version    | Target gem/npm package version, or a branch/PR link if targeting a pre-release                                                                             |
+| Starting integration      | `react-rails`, `vite_rails`, custom helper, or older React on Rails                                                                                        |
+| Migration slice           | What changed and what intentionally stayed out of scope                                                                                                    |
+| Performance evidence      | Response timing, HTML size, JS bytes, asset count, Lighthouse/WebPageTest/RUM metrics, or "not claimed"; see [What counts as proof](#what-counts-as-proof) |
+| Maintainability evidence  | Removed custom bridge code, smaller mount boundary, standardized helper usage, or "not claimed"; see [What counts as proof](#what-counts-as-proof)         |
+| Validation                | Test commands, build commands, browser smoke checks, screenshots, or CI links; **required**                                                                |
+| Known blockers or caveats | Native services, old lockfiles, auth setup, browser-only flows, environment assumptions, or "none"                                                         |
+| Honest summary sentence   | One sentence contributors can write and maintainers can quote without overstating the result                                                               |
 
 Copy this table when opening a migration PR:
 
