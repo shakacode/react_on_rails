@@ -47,28 +47,36 @@ This recipe uses the React on Rails TestHelper with `build_test_command`: Rails 
 
 ### 1. Set Renderer ENV Before Rails Boots
 
-The Pro initializer reads renderer settings while Rails boots. Set test renderer ENV values before requiring `config/environment` in `spec/rails_helper.rb`. Generated Pro apps read `REACT_RENDERER_URL`; some older or custom initializers read `RENDERER_URL`, so the example sets both names.
+The Pro initializer reads renderer settings while Rails boots. Set test renderer ENV values before requiring `config/environment` in `spec/rails_helper.rb`. Generated Pro apps read `REACT_RENDERER_URL`; some older or custom initializers read `RENDERER_URL`, so the example sets both names. Keep the worker ID normalization in a small support file so the Rails boot preamble and renderer lifecycle code cannot drift apart.
+
+```ruby
+# spec/support/rsc_test_worker.rb
+module RscTestWorker
+  TEST_ENV_NUMBER = ENV.fetch("TEST_ENV_NUMBER", "0")
+  NORMALIZED_ENV_NUMBER = TEST_ENV_NUMBER.empty? ? "0" : TEST_ENV_NUMBER
+  ID = begin
+    worker_id = NORMALIZED_ENV_NUMBER.gsub(/[^0-9]/, "")
+    worker_id.empty? ? "0" : worker_id
+  end
+end
+```
 
 ```ruby
 # spec/rails_helper.rb
 ENV["RAILS_ENV"] ||= "test"
+require_relative "support/rsc_test_worker"
 
-test_worker = ENV.fetch("TEST_ENV_NUMBER", "0")
-test_worker = "0" if test_worker.empty?
-test_worker_id = test_worker.gsub(/[^0-9]/, "")
-test_worker_id = "0" if test_worker_id.empty?
-
-ENV["RENDERER_PORT"] ||= (3900 + test_worker_id.to_i).to_s
+ENV["RENDERER_PORT"] ||= (3900 + RscTestWorker::ID.to_i).to_s
 renderer_url = "http://127.0.0.1:#{ENV["RENDERER_PORT"]}"
 ENV["REACT_RENDERER_URL"] ||= renderer_url # used by config.renderer_url = ENV["REACT_RENDERER_URL"]
 ENV["RENDERER_URL"] ||= renderer_url       # used by some older/custom initializers
 ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
-  File.expand_path("../tmp/node-renderer-bundles-test-#{test_worker_id}", __dir__)
+  File.expand_path("../tmp/node-renderer-bundles-test-#{RscTestWorker::ID}", __dir__)
 
 require_relative "../config/environment"
 ```
 
-`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on (skipping `"1"`), so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID and normalize it to a stable, path-safe `test_worker_id` so every worker gets a unique port and cache path.
+`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on (skipping `"1"`), so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, update `spec/support/rsc_test_worker.rb` to normalize that tool's worker ID to a stable, path-safe `RscTestWorker::ID` so every worker gets a unique port, cache path, and renderer log.
 
 If you run tests in parallel, each worker needs its own `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH`. Sharing a renderer cache across parallel workers can produce stale-bundle and missing-bundle failures that look like flaky RSC timeouts.
 
@@ -119,6 +127,7 @@ Start the renderer in `before(:suite)` after assets are compiled and stop it in 
 # spec/support/rsc_node_renderer.rb
 require "fileutils"
 require "socket"
+require_relative "rsc_test_worker"
 
 module RscNodeRenderer
   module_function
@@ -130,7 +139,7 @@ module RscNodeRenderer
       Socket.tcp(host, port, connect_timeout: 1).close
       break
     rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT,
-           Errno::EHOSTUNREACH, SocketError
+           Errno::EADDRNOTAVAIL, Errno::EHOSTUNREACH, SocketError
       if pid
         begin
           Process.kill(0, pid)
@@ -185,14 +194,7 @@ RSpec.configure do |config|
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => expanded_cache_path
     }
 
-    # These lines mirror the Step 1 preamble. This support file is required as a
-    # standalone file, so it cannot share locals with rails_helper.rb and must re-derive
-    # test_worker_id itself.
-    test_worker = ENV.fetch("TEST_ENV_NUMBER", "0")
-    test_worker = "0" if test_worker.empty?
-    test_worker_id = test_worker.gsub(/[^0-9]/, "")
-    test_worker_id = "0" if test_worker_id.empty?
-    renderer_log_path = Rails.root.join("log/node-renderer-test-#{test_worker_id}.log").to_s
+    renderer_log_path = Rails.root.join("log/node-renderer-test-#{RscTestWorker::ID}.log").to_s
     rsc_node_renderer_pid = Process.spawn(
       renderer_env,
       "pnpm", # replace with "npm", "yarn", or "bun" if that is your package manager
@@ -277,7 +279,7 @@ RSpec.describe "RSC payload endpoint", :rsc, type: :request do
 
     chunks = response.body.lines.map(&:chomp).reject(&:empty?).map { |line| JSON.parse(line) }
     # "html" is emitted by the default React on Rails RSC renderer; verify custom renderer output explicitly.
-    expect(chunks.any? { |chunk| chunk.key?("html") }).to be(true)
+    expect(chunks).to include(include("html" => anything))
   end
 end
 ```
