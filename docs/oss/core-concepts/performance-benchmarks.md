@@ -116,19 +116,20 @@ that is resolved, treat these numbers as directional signals rather than a stabl
 
 The median results showed this directional signal:
 
-| Metric                        | Inertia demo | RSC demo |  Delta |
-| ----------------------------- | -----------: | -------: | -----: |
-| Navigation duration           |     775.40ms | 607.15ms | -21.7% |
-| Largest Contentful Paint      |     794.00ms | 634.00ms | -20.2% |
-| `responseEnd`                 |     644.80ms | 588.80ms |  -8.7% |
-| Controller `action_total`     |      346.9ms |  339.2ms |  -2.2% |
-| Page-specific script requests |            6 |        1 | -83.3% |
+| Metric                                      | Inertia demo | RSC demo |  Delta |
+| ------------------------------------------- | -----------: | -------: | -----: |
+| Navigation duration                         |     775.40ms | 607.15ms | -21.7% |
+| Largest Contentful Paint                    |     794.00ms | 634.00ms | -20.2% |
+| `responseEnd`                               |     644.80ms | 588.80ms |  -8.7% |
+| Controller `action_total` (Rails wall time) |      346.9ms |  339.2ms |  -2.2% |
+| Page-specific script requests               |            6 |        1 | -83.3% |
 
-_Rows 1-5 are medians (n=4 per route); sample size is too small to establish statistical significance. Distribution and variance artifacts are tracked in
-[Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
+_Rows 1-5 are medians (n=4 per route); sample size is too small to establish statistical significance._
+_Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
 The observed **max `responseEnd`** across the four RSC runs was 768.25ms vs. 730.62ms for the Inertia control's max
-(+5.2% for RSC worst-case), indicating the Inertia control had a faster worst-case `responseEnd` than the RSC route.
+(+5.2% for RSC worst-case, max of n=4 - high variance expected at this sample size), indicating the Inertia control had
+a faster worst-case `responseEnd` than the RSC route.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
 user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the worst-case
