@@ -49,8 +49,10 @@ Use a dedicated branch for the actual version verification work:
    - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
    - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
 6. Run the generated-app suite from a clean checkout:
-   `bundle exec rake run_rspec:shakapacker_examples_basic`. Use `bundle exec rake shakapacker_examples:gen_all` for full
-   regenerated example coverage when needed.
+   `bundle exec rake run_rspec:shakapacker_examples_latest` for the React 19 examples. Use
+   `bundle exec rake run_rspec:shakapacker_examples` to run the full suite across pinned React versions when needed.
+   `bundle exec rake shakapacker_examples:gen_all` only generates example apps; a separate `run_rspec:*` task must run
+   their tests.
 7. Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
    examples.
 
@@ -90,7 +92,7 @@ Evaluate these in order:
 
 - React 19.2.x passes the same local verification suite as the currently supported React 19 line.
 - Existing SSR, streaming SSR, RSC payload rendering, and client hydration tests stay green.
-- The generated-app suite (`bundle exec rake run_rspec:shakapacker_examples_basic`) passes with React 19.2.x.
+- The generated-app suite (`bundle exec rake run_rspec:shakapacker_examples_latest`) passes with React 19.2.x.
 - Any public docs that cite an explicit React version are updated or explicitly annotated with a minimum-version note.
 - Any partial pre-rendering proposal includes a same-route benchmark against traditional SSR or streaming SSR.
 - The first public artifact is documentation or an example unless a missing library API is clearly demonstrated.
