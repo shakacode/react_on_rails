@@ -132,21 +132,10 @@ For example, with `node-fetch` v2 in a CommonJS launch file:
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
-// node-fetch v2: the default CJS export is the fetch function itself.
-// Headers, Request, and Response are attached as properties on that function.
-// Do NOT write: const { fetch } = require("node-fetch").
-// Require the whole module and use it directly as the fetch function instead.
-let nodeFetch;
-
-try {
-  nodeFetch = require('node-fetch');
-} catch (error) {
-  throw new Error(
-    'node-fetch v2 could not be loaded. ' +
-      'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
-    { cause: error },
-  );
-}
+// node-fetch v2: the CJS default export is the fetch function itself.
+// There is no named "fetch" export, so require("node-fetch").fetch is undefined.
+// Headers, Request, and Response are attached as properties on that default export.
+const nodeFetch = require('node-fetch');
 
 // A successful require returns the fetch function; the guard below verifies
 // the attached fetch classes that node-fetch v2 must provide.

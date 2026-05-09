@@ -752,11 +752,9 @@ end
 Server Components run on the server (in the node renderer), so they have access to **all** environment variables available to the Node.js process:
 
 ```jsx
-// Server Component -- full access to Node.js process.env
-// This code is bundled by webpack/esbuild, so use ESM imports here.
-// In a CommonJS launcher file such as node-renderer.js, use require() instead.
-// node-fetch v2 is a CJS module. Most bundlers used here (webpack/esbuild) treat
-// module.exports as the default import; node-fetch v2 exports the fetch function that way.
+// Server Component -- this file is bundled by webpack/esbuild into the server/RSC bundle.
+// node-fetch v2 is a CJS module. Webpack/esbuild treat module.exports as the default import,
+// and node-fetch v2 exports the fetch function that way.
 import nodeFetch from 'node-fetch';
 
 async function InternalDataComponent() {
