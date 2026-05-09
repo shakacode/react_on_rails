@@ -28,7 +28,10 @@ Consider this approach if you:
 When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice:
 
 1. Move custom one-time tasks into `run_precompile_tasks` in `bin/dev`.
-2. Remove matching shell fragments from `Procfile.dev`, any project-specific variants (for example, `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`), and CI/CD pipeline scripts (for example, `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json`).
+2. Remove only the duplicated build shell fragments from `Procfile.dev`, any project-specific variants (for example,
+   `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`), and CI/CD pipeline scripts. Do not delete entire
+   `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json` files unless they exist solely for the migrated
+   build step.
 3. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
 4. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
    need, such as ReScript builds, TypeScript checks or compilation, and locale generation. `bin/dev` is not invoked in
@@ -143,7 +146,9 @@ wp-server: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 
 Handle test and production builds in `config/initializers/react_on_rails.rb`. These commands must include every build step that production deploys and CI test runs require, because `bin/dev` is not part of those lifecycles:
 
-In CI, ReactOnRails::TestHelper or `ensure_assets_compiled` runs `build_test_command` when test assets need compilation. During `assets:precompile`, React on Rails runs `build_production_command`.
+In CI, ReactOnRails::TestHelper runs `build_test_command` when test assets need compilation. See
+[testing configuration](testing-configuration.md#quick-start) for the RSpec/Minitest wiring. During
+`assets:precompile`, React on Rails runs `build_production_command`.
 
 Choose one of the following configuration styles. Use only one: Option A sets the commands directly, while Option B
 points both commands at the helper script.
@@ -185,6 +190,8 @@ when "test"
 when "production"
   env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
   system(env, "bin/shakapacker") || abort("shakapacker (production) failed")
+else
+  abort "Unsupported build mode: #{mode.inspect}"
 end
 ```
 
@@ -213,6 +220,16 @@ metadata; it does not change the current working-tree file mode.
 ReactOnRails.configure do |config|
   config.build_test_command = "bin/build-react-on-rails test"
   config.build_production_command = "bin/build-react-on-rails production"
+end
+```
+
+If the filesystem cannot run `bin/build-react-on-rails` directly, use Ruby-prefixed commands in that local checkout:
+
+```ruby
+# config/initializers/react_on_rails.rb
+ReactOnRails.configure do |config|
+  config.build_test_command = "ruby bin/build-react-on-rails test"
+  config.build_production_command = "ruby bin/build-react-on-rails production"
 end
 ```
 
