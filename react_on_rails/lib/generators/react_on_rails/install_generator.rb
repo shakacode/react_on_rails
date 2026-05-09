@@ -136,15 +136,15 @@ module ReactOnRails
 
       # Floor used when the scaffolded CI workflow has to supply a pnpm version because
       # `pnpm/action-setup` requires one unless package.json declares `packageManager`.
-      # `pnpm/action-setup@v4` resolves this to the latest matching patch (e.g. `"11"`
-      # → latest `11.x.y`) at install time, so this is a major-or-minor floor — not a
-      # reproducible patch pin. Bump on each pnpm major so projects that generated a
-      # lockfile with a newer pnpm but never committed `packageManager` get a runtime
-      # that can still read the lockfile. Check https://github.com/pnpm/pnpm/releases
-      # for the current stable major when bumping. Last checked 2026-05-08: v11.0.8.
+      # `pnpm/action-setup@v4` resolves this to the latest matching patch (e.g. `"11.0"`
+      # → latest `11.0.x`) at install time, so this is a minor floor — not a reproducible
+      # patch pin. Bump on each pnpm major/minor so projects that generated a lockfile with
+      # a newer pnpm but never committed `packageManager` get a runtime that can still read
+      # the lockfile. Check https://github.com/pnpm/pnpm/releases for the current stable
+      # minor when bumping. Last checked 2026-05-08: v11.0.8.
       # Users who need exact reproducibility should commit `packageManager` to their
       # package.json instead.
-      CI_PNPM_FALLBACK_VERSION = "11"
+      CI_PNPM_FALLBACK_VERSION = "11.0"
       private_constant :CI_PNPM_FALLBACK_VERSION
 
       # Main generator entry point

@@ -375,22 +375,26 @@ describe GeneratorMessages do
 
     before { allow(File).to receive(:exist?).and_call_original }
 
-    it "returns true when package.json declares a supported packageManager" do
+    it "requires callers to specify which package manager they need declared" do
+      expect { described_class.package_manager_declared? }.to raise_error(ArgumentError, /manager/)
+    end
+
+    it "returns true when package.json declares the requested packageManager" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path)
                                    .and_return('{"packageManager":"pnpm@9.0.0"}')
-      expect(described_class.package_manager_declared?).to be(true)
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(true)
     end
 
     it "returns false when packageManager is absent" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path).and_return('{"name":"app"}')
-      expect(described_class.package_manager_declared?).to be(false)
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
     it "returns false when package.json is missing" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(false)
-      expect(described_class.package_manager_declared?).to be(false)
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
     it "returns false without reading package.json when package_json: nil is passed explicitly" do
@@ -403,7 +407,7 @@ describe GeneratorMessages do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path)
                                    .and_return('{"packageManager":"deno@1.0.0"}')
-      expect(described_class.package_manager_declared?).to be(false)
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
     # Corepack rejects a bare manager name with no @version, and `pnpm/action-setup`
@@ -423,11 +427,11 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
-    it "returns true when packageManager matches the requested manager" do
+    it "returns false when packageManager has text after the version" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path)
-                                   .and_return('{"packageManager":"pnpm@9.0.0"}')
-      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(true)
+                                   .and_return('{"packageManager":"pnpm@9.0.0 extra text"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
     it "uses a provided package_json without reading package.json again" do

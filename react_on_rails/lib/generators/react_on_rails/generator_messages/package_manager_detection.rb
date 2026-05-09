@@ -74,13 +74,13 @@ module GeneratorMessages
     end
 
     # Returns true when package.json declares a `packageManager` field (Corepack standard)
-    # for a supported manager. When `manager:` is passed (e.g. `"pnpm"`), the declared
-    # value must match that specific manager — declaring `yarn@...` returns false even
-    # though yarn is supported. Used by the CI scaffold to decide whether
+    # for a supported manager. The declared value must match `manager:` (e.g. `"pnpm"`);
+    # declaring `yarn@...` returns false even though yarn is supported. Used by the CI
+    # scaffold to decide whether
     # `pnpm/action-setup` needs an explicit `version:`; the action only reads the pin
     # from `packageManager` when that field actually declares pnpm.
     # Pass package_json: to reuse an already-parsed package.json and avoid a re-read.
-    def package_manager_declared?(app_root: Dir.pwd, manager: nil, package_json: PACKAGE_JSON_UNSET)
+    def package_manager_declared?(manager:, app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       content = if package_json.equal?(PACKAGE_JSON_UNSET)
                   read_package_json(app_root)
                 else
@@ -90,7 +90,6 @@ module GeneratorMessages
 
       declared = versioned_package_manager_from_content(content)
       return false if declared.nil?
-      return true if manager.nil?
 
       declared == manager.to_s.downcase
     end
@@ -154,7 +153,7 @@ module GeneratorMessages
       return nil unless raw_declared.is_a?(String)
 
       declared = raw_declared.strip
-      match = declared.match(/\A([^@\s]+)@\S+/)
+      match = declared.match(/\A([^@\s]+)@\S+\z/)
       return nil unless match
 
       name = match[1].downcase
