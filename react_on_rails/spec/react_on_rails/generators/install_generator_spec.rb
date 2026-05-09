@@ -2029,7 +2029,7 @@ describe InstallGenerator, type: :generator do
           %r{pnpm/action-setup@v4\n\s+with:\n(?:\s+\#[^\n]*\n)*\s+version:}
         )
         expect(content).to match(
-          %r{uses: pnpm/action-setup@v4\n\n\s+- name: Set up Node}
+          %r{uses: pnpm/action-setup@v4\n\s+- name: Set up Node}
         )
       end
     end
@@ -2061,7 +2061,7 @@ describe InstallGenerator, type: :generator do
           %r{pnpm/action-setup@v4\n\s+with:\n(?:\s+\#[^\n]*\n)*\s+version: "#{Regexp.escape(fallback_version)}"}
         )
         expect(content).to match(
-          /version: "#{Regexp.escape(fallback_version)}"\n\n\s+- name: Set up Node/
+          /version: "#{Regexp.escape(fallback_version)}"\n\s+- name: Set up Node/
         )
       end
     end
@@ -2076,6 +2076,9 @@ describe InstallGenerator, type: :generator do
     expect(fallback_version).to match(/\A\d+\.\d+\.\d+\z/)
     expect(generator_source).to include(
       "https://github.com/pnpm/pnpm/releases/tag/v#{fallback_version}"
+    )
+    expect(generator_source).to include(
+      "renovate: datasource=github-releases depName=pnpm/pnpm"
     )
   end
 

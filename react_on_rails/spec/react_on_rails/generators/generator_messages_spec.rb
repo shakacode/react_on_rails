@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "tmpdir"
+
 require_relative "../support/generator_spec_helper"
 
 describe GeneratorMessages do
@@ -93,6 +95,16 @@ describe GeneratorMessages do
     )
 
     expect(message).not_to include("React on Rails Pro")
+  end
+
+  it "does not re-read a missing package.json when building the CI section" do
+    Dir.mktmpdir do |app_root|
+      expect(described_class).to receive(:read_package_json).with(app_root).once.and_call_original
+
+      message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
+
+      expect(message).to include("CI / BUILD ORDERING")
+    end
   end
 
   describe ".detect_package_manager" do
@@ -453,6 +465,16 @@ describe GeneratorMessages do
           skip_package_json_detection: true
         )
       ).to be(false)
+    end
+
+    it "rejects skip_package_json_detection when a package_json hash is provided" do
+      expect do
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          package_json: { "packageManager" => "pnpm@9.0.0" },
+          skip_package_json_detection: true
+        )
+      end.to raise_error(ArgumentError, /explicit package_json hash/)
     end
 
     it "returns false when packageManager declares an unsupported tool" do

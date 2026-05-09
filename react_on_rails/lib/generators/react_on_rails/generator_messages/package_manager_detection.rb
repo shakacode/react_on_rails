@@ -81,11 +81,14 @@ module GeneratorMessages
 
     # Returns true when package.json declares a `packageManager` field with an
     # npm-style version/range/tag (e.g. `"pnpm@9.0.0"`, `"pnpm@10"`,
-    # `"pnpm@^10.0.0"`, or `"pnpm@latest"`) for the requested `manager`. A bare name
-    # without `@<version>` returns false because `pnpm/action-setup` has no version to
-    # resolve from it. Used by the CI scaffold to decide whether `pnpm/action-setup`
-    # needs an explicit `version:` key; exact SemVer validation belongs only where a
-    # caller needs to extract a reproducible version pin.
+    # `"pnpm@^10.0.0"`, or `"pnpm@latest"`) for the requested `manager`. These forms
+    # match what `pnpm/action-setup` can resolve from package.json; projects that need
+    # reproducible Corepack behavior should prefer an exact version, optionally with a
+    # hash (e.g. `"pnpm@9.0.0+sha256.abc"`). A bare name without `@<version>` returns
+    # false because `pnpm/action-setup` has no version to resolve from it. Used by the
+    # CI scaffold to decide whether `pnpm/action-setup` needs an explicit `version:`
+    # key; exact SemVer validation belongs only where a caller needs to extract a
+    # reproducible version pin.
     # Pass package_json: to reuse an already-parsed package.json and avoid a re-read.
     # Pass skip_package_json_detection: true only when the caller already attempted to
     # read package.json and wants an absent declaration result without re-reading.
@@ -136,7 +139,8 @@ module GeneratorMessages
     # package_manager_declared? to avoid repeated disk reads.
     # When this returns nil, pass skip_package_json_detection: true to those
     # helpers to preserve that cached missing/unreadable state; package_json: nil
-    # alone keeps the public "read from disk" behavior.
+    # alone keeps the public "read from disk" behavior and would read the file a
+    # second time.
     #
     # @api public
     def read_package_json(app_root)
@@ -160,7 +164,16 @@ module GeneratorMessages
     end
 
     def package_json_content(app_root:, package_json:, skip_package_json_detection:)
-      return nil if skip_package_json_detection
+      if skip_package_json_detection
+        if !package_json.equal?(PACKAGE_JSON_UNSET) && !package_json.nil?
+          raise ArgumentError, "Cannot use skip_package_json_detection: true with an explicit package_json hash"
+        end
+
+        return nil
+      end
+
+      # nil is treated as unset/read from disk, not cached absent. Callers that
+      # know package.json is missing should pass skip_package_json_detection: true.
       return read_package_json(app_root) if package_json.equal?(PACKAGE_JSON_UNSET) || package_json.nil?
 
       package_json

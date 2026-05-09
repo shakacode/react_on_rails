@@ -28,13 +28,12 @@ jobs:
           # `packageManager` (Corepack). This pins an exact pnpm version so CI is
           # reproducible, but it will drift as pnpm releases new versions. Verify it
           # still matches the pnpm version that generated your `pnpm-lock.yaml`
-          # (pnpm major mismatches can alter dependency resolution and lockfile
-          # compatibility). For fully automated version management, add
+          # because pnpm major mismatches can silently alter dependency resolution as
+          # lockfile formats change between majors. For fully automated version management, add
           # `"packageManager": "pnpm@<exact-version>"` to package.json, then delete
           # `with:` and these comments.
           version: "<%= config[:pnpm_fallback_version] %>"
 <%- end -%>
-
 <%- end -%>
 <%- if config[:package_manager] == 'bun' -%>
       - name: Set up Bun

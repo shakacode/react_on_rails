@@ -143,6 +143,7 @@ module ReactOnRails
       # constant when bumping. Last checked 2026-05-08.
       # Users who need exact reproducibility should commit `packageManager` to their
       # package.json instead.
+      # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$
       CI_PNPM_FALLBACK_VERSION = "11.0.8"
       private_constant :CI_PNPM_FALLBACK_VERSION
 
