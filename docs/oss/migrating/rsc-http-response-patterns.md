@@ -77,7 +77,7 @@ class StoryPagePreflight
 
   def self.call(story_id, current_user:)
     unless current_user
-      return Result.new(props: {}, redirect_reason: :unauthenticated)
+      return Result.new(redirect_reason: :unauthenticated)
     end
 
     story = Story.find_by(id: story_id)
@@ -273,7 +273,9 @@ change whenever any rendered input changes. For example, models for comments or 
 declare `belongs_to :story, touch: true`, while author/profile data may need an explicit composite cache key or a manual
 touch when it changes. Otherwise Rails can return `304 Not Modified` for content that should be regenerated.
 
-When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy before streaming or keep the response private:
+When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary`
+policy before streaming or keep the response private. Replace `Accept-Language` with the headers your app actually
+varies on, such as `Accept-Encoding`, `X-Device-Class`, or an application-specific header:
 
 ```ruby
 # Merge with any existing Vary tokens set upstream, then deduplicate.
