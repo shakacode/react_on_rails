@@ -26,6 +26,9 @@ Use a dedicated branch for the actual version verification work:
 
 - [ ] Review the React 19.2.x changelog and release notes for breaking changes, deprecations, and new APIs that could
       affect React on Rails SSR, streaming, RSC, or hydration integration.
+- [ ] Grep for `renderToString` usage across `packages/react-on-rails/`, `node_renderer/`, and related SSR integration
+      paths; React 19 soft-deprecates it in favor of `renderToPipeableStream`, so confirm whether migration is needed or
+      whether current usage is intentionally exempt.
 - [ ] Run `pnpm install` from a clean checkout and confirm React, React DOM, and `react-on-rails-rsc` resolve to
       compatible versions.
 - [ ] Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream`
@@ -107,6 +110,8 @@ Evaluate these in order:
 - Any partial pre-rendering proposal includes a same-route benchmark against traditional SSR or streaming SSR.
 - The first public artifact is documentation or an example unless a missing library API is clearly demonstrated.
 - The feature name and docs explain Rails ownership clearly so users do not expect Next.js-style file-system routing.
+- The decision on the minimum supported React version, including whether React 18.x remains supported, is documented
+  before any package-range change is merged.
 
 ## Open Questions
 
@@ -119,6 +124,10 @@ Suspense, RSC, or both; answer that before settling caching, benchmarks, or stre
 Before implementation starts, assign a secondary reviewer for the prerequisite SSR-vs-RSC decision so the plan does not
 stall if @justin808 is unavailable. Also assign a backup reviewer for benchmark metrics because that decision can be
 validated independently from the rest of the implementation tree.
+
+**Secondary reviewer (SSR-vs-RSC)**: _[name to be filled before first implementation PR]_
+
+**Backup reviewer (benchmarks)**: _[name to be filled before first implementation PR]_
 
 - Which Rails caching layer should be recommended for the static-shell: fragment cache, HTTP cache, CDN cache, or a
   combination?
