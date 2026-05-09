@@ -196,13 +196,17 @@ chmod +x bin/build-react-on-rails
 git add bin/build-react-on-rails
 ```
 
-On Windows or Docker volumes where the filesystem may not preserve Unix modes, skip the `chmod` command above and record
-the executable bit through Git instead:
+On Windows or Docker volumes where the filesystem may not preserve Unix modes, `chmod` may not make the current checkout
+runnable. Record the executable bit in Git for CI and other checkouts, and invoke the script through Ruby when running it
+from that local filesystem:
 
 ```bash
-git add bin/build-react-on-rails
-git update-index --chmod=+x bin/build-react-on-rails
+git update-index --add --chmod=+x bin/build-react-on-rails
+ruby bin/build-react-on-rails test
 ```
+
+Use `production` instead of `test` for the production build command. The `git update-index` command only updates Git
+metadata; it does not change the current working-tree file mode.
 
 ```ruby
 # config/initializers/react_on_rails.rb
