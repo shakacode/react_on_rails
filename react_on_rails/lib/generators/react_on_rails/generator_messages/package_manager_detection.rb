@@ -165,6 +165,9 @@ module GeneratorMessages
     # version spec, not just a manager name. It accepts numeric npm-style version specs
     # because `pnpm/action-setup` can read those from package.json; a bare `"pnpm"` or
     # symbolic tag such as `"pnpm@latest"` still needs the scaffolded fallback version.
+    # Corepack expects an exact version, so range specs such as `"pnpm@^10.0.0"` are
+    # non-standard even though this check treats them as declared to avoid injecting
+    # a conflicting fallback version.
     def versioned_package_manager_name_from_content(content)
       raw_declared = content["packageManager"]
       return nil unless raw_declared.is_a?(String)
