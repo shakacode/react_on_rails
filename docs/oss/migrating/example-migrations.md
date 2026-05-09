@@ -125,7 +125,7 @@ Use this template in the migration PR description, linked issue, or a short `doc
 | Route or component        | The exact Rails route, controller action, or React mount point                                                                                             |
 | Date captured             | YYYY-MM-DD or release milestone when the evidence was collected                                                                                            |
 | React on Rails version    | Target gem/npm package version, or a branch/PR link if targeting a pre-release                                                                             |
-| Starting integration      | `react-rails`, `vite_rails`, custom helper, or older React on Rails                                                                                        |
+| Starting integration      | `react-rails`, `vite_rails`, custom helper, older `react_on_rails` version, or other                                                                       |
 | Migration slice           | What changed and what intentionally stayed out of scope                                                                                                    |
 | Performance evidence      | Response timing, HTML size, JS bytes, asset count, Lighthouse/WebPageTest/RUM metrics, or "not claimed"; see [What counts as proof](#what-counts-as-proof) |
 | Maintainability evidence  | Removed custom bridge code, smaller mount boundary, standardized helper usage, or "not claimed"; see [What counts as proof](#what-counts-as-proof)         |
@@ -139,20 +139,20 @@ Copy this table when opening a migration PR:
 <!-- Use "not claimed" for evidence fields that do not apply. Use "none" for Known blockers when there are none. -->
 <!-- Validation is required; do not leave it blank. -->
 
-| Field                     | Value |
-| ------------------------- | ----- |
-| Baseline ref              |       |
-| Migration ref             |       |
-| Route or component        |       |
-| Date captured             |       |
-| React on Rails version    |       |
-| Starting integration      |       |
-| Migration slice           |       |
-| Performance evidence      |       |
-| Maintainability evidence  |       |
-| Validation                |       |
-| Known blockers or caveats |       |
-| Honest summary sentence   |       |
+| Field                     | Value             |
+| ------------------------- | ----------------- |
+| Baseline ref              |                   |
+| Migration ref             |                   |
+| Route or component        |                   |
+| Date captured             |                   |
+| React on Rails version    |                   |
+| Starting integration      |                   |
+| Migration slice           |                   |
+| Performance evidence      |                   |
+| Maintainability evidence  |                   |
+| Validation                | <!-- required --> |
+| Known blockers or caveats |                   |
+| Honest summary sentence   |                   |
 ```
 
 Example summary sentences:
