@@ -207,7 +207,7 @@ module ReactOnRailsPro
       value = ENV.fetch(name, "")
       raise ReactOnRailsPro::Error, "#{name} is whitespace-only; set or unset it." if value.match?(/\A\s+\z/)
 
-      warn "[ReactOnRailsPro] #{name} has surrounding whitespace; using verbatim." if value != value.strip
+      warn "[ReactOnRailsPro] #{name} has surrounding whitespace and will be used verbatim." if value != value.strip
       value.empty? ? nil : value
     end
     private_class_method :renderer_cache_env_value

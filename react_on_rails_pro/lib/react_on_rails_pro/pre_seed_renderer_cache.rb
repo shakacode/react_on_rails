@@ -40,6 +40,10 @@ module ReactOnRailsPro
         # The Node Renderer serves manifests from whichever bundle dir it loaded,
         # so both server and RSC dirs need the manifests present.
         stage_assets(assets, bundle_dir, rsc_required_paths, mode)
+      rescue StandardError => e
+        warn "[ReactOnRailsPro] Renderer cache staging failed for bundle #{bundle_hash}; " \
+             "cache may be partially staged: #{e.message}"
+        raise
       end
     end
 

@@ -2783,9 +2783,10 @@ module ReactOnRails
       # in a deploy script does not raise Encoding::InvalidByteSequenceError
       # and mask the file via the rescue below.
       #
-      # Skip leading-comment lines (`#` Procfile/shell, `//` Dockerfile-style)
-      # so files that mention the old task only inside a comment do not trip
-      # the migration nudge.
+      # Skip leading-comment lines (`#` is the comment prefix for all scanned
+      # file types: Procfile, Dockerfile, shell scripts, YAML, and Ruby) so
+      # files that mention the old task only inside a comment do not trip the
+      # migration nudge.
       # Per-file rescue so a transient failure on one path (e.g. Errno::EACCES)
       # does not abort the whole scan and silently skip the rest. The outer
       # rescue catches anything that escapes the per-file guard.

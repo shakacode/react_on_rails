@@ -56,7 +56,7 @@ module ReactOnRailsPro
       duplicates = basenames.tally.select { |_, count| count > 1 }.keys
       return if duplicates.empty?
 
-      warn "[ReactOnRailsPro] Duplicate asset basenames in assets_to_copy: " \
+      warn "[ReactOnRailsPro] Duplicate asset basenames in assets_to_copy / RSC manifests: " \
            "#{duplicates.join(', ')}. Only the last entry per basename will be staged."
     end
 

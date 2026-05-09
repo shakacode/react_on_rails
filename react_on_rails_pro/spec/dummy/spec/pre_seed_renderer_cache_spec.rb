@@ -271,7 +271,7 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
 
     it "warns about the basename collision so the silent overwrite is visible" do
       expect { pre_seed_cache }
-        .to output(/Duplicate asset basenames in assets_to_copy: manifest\.json/).to_stderr
+        .to output(%r{Duplicate asset basenames in assets_to_copy / RSC manifests: manifest\.json}).to_stderr
     end
   end
 
@@ -320,6 +320,14 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     it "leaves the previous bundle file in place" do
       expect { pre_seed_cache }.to raise_error(Errno::EIO)
       expect(File.read(dest_file)).to eq("// previous bundle content")
+    end
+
+    it "warns that the renderer cache may be partially staged" do
+      expected_warning = /Renderer cache staging failed for bundle #{bundle_hash}; cache may be partially staged/
+
+      expect do
+        expect { pre_seed_cache }.to raise_error(Errno::EIO)
+      end.to output(expected_warning).to_stderr
     end
   end
 
