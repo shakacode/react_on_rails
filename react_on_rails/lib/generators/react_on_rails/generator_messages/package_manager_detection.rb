@@ -165,6 +165,7 @@ module GeneratorMessages
 
     def package_json_content(app_root:, package_json:, skip_package_json_detection:)
       if skip_package_json_detection
+        # nil means the caller cached that package.json was absent; a stale hash is not allowed here.
         if !package_json.equal?(PACKAGE_JSON_UNSET) && !package_json.nil?
           raise ArgumentError, "Cannot use skip_package_json_detection: true with an explicit package_json hash"
         end
@@ -177,6 +178,10 @@ module GeneratorMessages
       return read_package_json(app_root) if package_json.equal?(PACKAGE_JSON_UNSET) || package_json.nil?
 
       package_json
+    end
+
+    def package_json_detection_options_for(package_json)
+      package_json.nil? ? { skip_package_json_detection: true } : { package_json: package_json }
     end
 
     # Sibling of `package_manager_from_content` for places that need a resolvable

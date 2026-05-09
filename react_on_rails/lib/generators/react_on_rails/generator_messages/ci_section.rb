@@ -12,11 +12,7 @@ module GeneratorMessages
       # Read package.json once and reuse for both package-manager detection and the
       # build:test script presence check to avoid a second I/O pass.
       package_json = read_package_json(app_root)
-      package_json_detection_options = if package_json.nil?
-                                         { skip_package_json_detection: true }
-                                       else
-                                         { package_json: package_json }
-                                       end
+      package_json_detection_options = package_json_detection_options_for(package_json)
       package_manager = detect_package_manager(app_root: app_root, **package_json_detection_options)
       ci_status = if ci_workflow_generated
                     "A GitHub Actions workflow has been generated at .github/workflows/ci.yml."

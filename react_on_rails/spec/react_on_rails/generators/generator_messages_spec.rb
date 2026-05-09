@@ -540,4 +540,20 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
   end
+
+  describe ".package_json_detection_options_for" do
+    it "preserves a cached missing package.json as explicit skipped detection" do
+      expect(described_class.send(:package_json_detection_options_for, nil)).to eq(
+        { skip_package_json_detection: true }
+      )
+    end
+
+    it "passes a parsed package.json hash through for reuse" do
+      package_json = { "packageManager" => "pnpm@11.0.8" }
+
+      expect(described_class.send(:package_json_detection_options_for, package_json)).to eq(
+        { package_json: package_json }
+      )
+    end
+  end
 end

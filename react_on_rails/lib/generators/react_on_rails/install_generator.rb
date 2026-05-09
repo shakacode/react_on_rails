@@ -275,11 +275,7 @@ module ReactOnRails
         # read_package_json returns nil for missing/unreadable files. Passing
         # package_json: nil alone means "read from disk," so use the explicit skip
         # flag to preserve the cached missing state and avoid a redundant re-read.
-        package_json_detection_options = if package_json.nil?
-                                           { skip_package_json_detection: true }
-                                         else
-                                           { package_json: package_json }
-                                         end
+        package_json_detection_options = GeneratorMessages.send(:package_json_detection_options_for, package_json)
         package_manager = GeneratorMessages.detect_package_manager(
           app_root: destination_root,
           **package_json_detection_options
