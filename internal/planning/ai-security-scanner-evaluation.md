@@ -53,12 +53,12 @@ prioritization, explanation, or reachability analysis for a finding that existin
 Start with this point-in-time vendor shortlist from the issue if the products still offer an appropriate plan at
 evaluation time.
 
-| Vendor          | Reference                  | Initial status | Before scheduling                                                                                          |
-| --------------- | -------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------- |
-| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                    |
-| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                    |
-| Almanax         | <https://almanax.ai/>      | Lower priority | Evaluate only if ZeroPath, Corgea, and DryRun are unsuitable; confirm coverage beyond Web3-heavy examples. |
-| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                    |
+| Vendor          | Reference                  | Initial status | Before scheduling                                                                                   |
+| --------------- | -------------------------- | -------------- | --------------------------------------------------------------------------------------------------- |
+| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                             |
+| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                             |
+| Almanax         | <https://almanax.ai/>      | Lower priority | Confirm OSS or trial access and Ruby/TypeScript coverage; public examples are currently Web3-heavy. |
+| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                             |
 
 If the named vendors are unavailable or unsuitable, look for tools in these categories:
 
@@ -109,13 +109,14 @@ to make security signal and operational cost comparable across evaluators while 
 
 Example: Actionability score = 4 with weight = 1.0 produces a weighted score of 4.0. If all eight criteria score 3,
 the normalized weighted average is
-`(3 x 1.0 + 3 x 1.0 + 3 x 0.9 + 3 x 0.8 + 3 x 0.8 + 3 x 0.7 + 3 x 0.7 + 3 x 0.5) / 6.4 = 3.0`.
+`(3 x 1.0 + 3 x 1.0 + 3 x 0.9 + 3 x 0.8 + 3 x 0.8 + 3 x 0.7 + 3 x 0.7 + 3 x 0.5) / 6.4 = 3.0`,
+where 6.4 is the sum of all weights.
 
 | Criterion                 | Question                                                                           | Score (1-5) | Weight (0-1) | Weighted score |
 | ------------------------- | ---------------------------------------------------------------------------------- | ----------- | ------------ | -------------- |
 | Actionability             | Does the finding name the concrete file, behavior, and reachable path?             |             | 1.0          |                |
 | Correctness               | Can we reproduce or disprove the finding locally?                                  |             | 1.0          |                |
-| False-positive rate       | How many findings are noise after local verification?                              |             | 0.9          |                |
+| False-positive rate       | What fraction of surfaced findings survive local verification as true positives?   |             | 0.9          |                |
 | Ruby/Rails coverage       | Does it understand Rails generators, helpers, and server rendering paths?          |             | 0.8          |                |
 | TypeScript/React coverage | Does it understand package exports, SSR utilities, and browser/runtime boundaries? |             | 0.8          |                |
 | Permission model          | Can it run with minimal GitHub permissions?                                        |             | 0.7          |                |
