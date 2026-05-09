@@ -107,19 +107,21 @@ with one warmup request before each measured run. It used compiled Shakapacker/R
 Rails without the Shakapacker dev server, a dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`, and
 matching Chrome 147 and ChromeDriver 147. The median results showed this directional signal:
 
-| Metric                    | Inertia demo | RSC demo |  Delta |
-| ------------------------- | -----------: | -------: | -----: |
-| Navigation duration       |     775.40ms | 607.15ms | -21.7% |
-| Largest Contentful Paint  |     794.00ms | 634.00ms | -20.2% |
-| Response end              |     644.80ms | 588.80ms |  -8.7% |
-| Controller `action_total` |     346.87ms | 339.20ms |  -2.2% |
-| Page-specific JS requests |            6 |        1 | -83.3% |
-| p95 `responseEnd`         |     730.62ms | 768.25ms |  +5.2% |
+| Metric                        | Inertia demo | RSC demo |  Delta |
+| ----------------------------- | -----------: | -------: | -----: |
+| Navigation duration           |     775.40ms | 607.15ms | -21.7% |
+| Largest Contentful Paint      |     794.00ms | 634.00ms | -20.2% |
+| `responseEnd`                 |     644.80ms | 588.80ms |  -8.7% |
+| Controller `action_total`     |     346.87ms | 339.20ms |  -2.2% |
+| Page-specific script requests |            6 |        1 | -83.3% |
+| Max `responseEnd` (n=4)       |     730.62ms | 768.25ms |  +5.2% |
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
-user-visible median navigation duration and LCP while sending much less page-specific JavaScript, but the p95 response
+user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the worst-case
 timing still favored the Inertia control. A stable deployed repeat, renderer-internal timing, and hardware details for
 the local run are still required before making stronger production-performance claims.
+The script-request row counts browser-observed page-specific script resources only; combined transfer-size capture is
+tracked in [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the current tracking discussion, and
