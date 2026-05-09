@@ -142,6 +142,8 @@ git_diff_base_fetch_remote_branch() {
 
     if [ "$unshallow_timeout" -gt 0 ]; then
       if command -v timeout >/dev/null 2>&1; then
+        # Timeout-guarded unshallow fetches return here. The plain fetch below
+        # handles disabled timeouts, missing timeout commands, and other modes.
         timeout "$unshallow_timeout" git fetch "${fetch_args[@]}" >&2
         return $?
       fi
@@ -226,7 +228,9 @@ git_diff_base_resolve() {
 
   # - strict: abort immediately when the initial fetch fails
   # - lenient: continue with cached local history after an initial fetch failure
-  git_diff_base_is_shallow_repository && is_shallow=true
+  if git_diff_base_is_shallow_repository; then
+    is_shallow=true
+  fi
 
   if remote_branch="$(git_diff_base_base_remote_branch "$base_ref")"; then
     if [ "$is_shallow" = true ] && ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
@@ -274,12 +278,19 @@ git_diff_base_resolve() {
     fi
   fi
 
-  # Fail early when the base ref is still missing and there is no history left
-  # to deepen: either this is already a full clone, or no remote branch is known.
-  if ! git_diff_base_verify_ref "$base_ref" &&
-    { [ "$is_shallow" = false ] || { [ -z "$remote_branch" ] && [ -z "$current_remote_branch" ]; }; }; then
-    echo "Error: base ref '$base_ref' does not exist locally" >&2
-    return 1
+  if ! git_diff_base_verify_ref "$base_ref"; then
+    # Fail early when the base ref is still missing from a full clone. There is
+    # no shallow history left to deepen, so another fetch mode cannot reveal it.
+    if [ "$is_shallow" = false ]; then
+      echo "Error: base ref '$base_ref' does not exist locally" >&2
+      return 1
+    fi
+
+    # Without either remote branch, the shallow loop has nothing it can fetch.
+    if [ -z "$remote_branch" ] && [ -z "$current_remote_branch" ]; then
+      echo "Error: base ref '$base_ref' does not exist locally" >&2
+      return 1
+    fi
   fi
 
   if ! git_diff_base_verify_ref "$current_ref"; then
@@ -319,22 +330,29 @@ git_diff_base_resolve() {
       # deepen fetch fails in the same iteration.
       if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" deepen "$deepen_depth"; then
         fetched=true
+
+        if git_diff_base_verify_ref "$base_ref" &&
+          merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+          printf '%s\n' "$merge_base"
+          return 0
+        fi
       fi
 
       if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
         if git_diff_base_fetch_remote_branch "$current_remote_branch" deepen "$deepen_depth"; then
           fetched=true
+
+          if git_diff_base_verify_ref "$base_ref" &&
+            merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+            printf '%s\n' "$merge_base"
+            return 0
+          fi
         fi
       fi
 
       if [ "$fetched" = false ]; then
         echo "Warning: all deepen fetches failed; stopping shallow history expansion. See git fetch output above." >&2
         break
-      fi
-
-      if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
-        printf '%s\n' "$merge_base"
-        return 0
       fi
 
       deepen_depth=$((deepen_depth * 2))
