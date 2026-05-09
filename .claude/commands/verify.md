@@ -5,8 +5,8 @@ Run a local verification loop for the current branch before creating or updating
 Use `/verify` for local pre-PR checks. Use `/run-ci` when you need the CI change detector or want to
 reproduce CI job selection locally.
 
-Limit the loop to three fix-and-restart cycles unless the user explicitly asks to keep debugging. If a later fix
-reintroduces an earlier failure, stop and report the cycle instead of continuing indefinitely.
+For each failing command, limit the loop to three reruns after edits unless the user explicitly asks to keep debugging. If a
+later fix reintroduces an earlier failure, stop and report the cycle instead of continuing indefinitely.
 
 ## Instructions
 
@@ -35,6 +35,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run build`
    - `pnpm run lint`
    - `pnpm run type-check`
+   - `pnpm run test` when broad package behavior changed or the touched files are not covered by a narrower package test
    - targeted `pnpm --filter react-on-rails run test` for react-on-rails package tests, or
      `pnpm --filter react-on-rails exec jest -- <path>` for targeted test file runs
    - `cd react_on_rails/spec/dummy && pnpm test:e2e` when the branch changes SSR rendering, client hydration, or
@@ -51,7 +52,8 @@ Use this order unless the changed files make a narrower or broader set clearly a
 6. Broad suite — pick the narrowest command that covers the change:
    - `rake all_but_examples` for broad coverage without the slow generated-examples suite
    - `rake` when shared runtime behavior, generators, cross-package contracts, or release-critical paths changed
-   - `rake lint` when the full lint surface is appropriate and a single lint command is clearer than separate steps
+   - `rake lint` when a branch intentionally needs the complete lint gate across Ruby, JavaScript/TypeScript, and
+     formatting; otherwise keep using the narrower lint commands above
 
 ## Scope Guide
 
