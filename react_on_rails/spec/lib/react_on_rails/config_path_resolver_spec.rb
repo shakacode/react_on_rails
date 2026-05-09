@@ -17,7 +17,7 @@ RSpec.describe ReactOnRails::ConfigPathResolver do
       resolver = resolver_class.new
 
       expect { resolver.warn_missing_package_root("/missing/client") }
-        .to raise_error(NoMethodError, /must implement #add_warning\(message\)/)
+        .to raise_error(NotImplementedError, /must implement #add_warning\(message\)/)
     end
   end
 end

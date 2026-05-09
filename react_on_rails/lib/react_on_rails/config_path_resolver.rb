@@ -32,17 +32,22 @@ module ReactOnRails
     end
 
     def resolved_package_root
-      node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
+      @resolved_package_root ||= begin
+        node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
 
-      resolved_location = Pathname.new(node_modules_location).cleanpath
-      # cleanpath normalizes redundant separators and ".." without resolving symlinks;
-      # realpath is intentionally skipped to avoid filesystem I/O on every call.
-      # Relative paths like "../client" remain valid diagnostics targets and are
-      # not constrained to stay within Rails.root.
-      return Rails.root.to_s if resolved_location == Pathname.new(".")
-      return resolved_location.to_s if resolved_location.absolute?
-
-      Rails.root.join(resolved_location).to_s
+        resolved_location = Pathname.new(node_modules_location).cleanpath
+        # cleanpath normalizes redundant separators and ".." without resolving symlinks;
+        # realpath is intentionally skipped to avoid filesystem I/O on every call.
+        # Relative paths like "../client" remain valid diagnostics targets and are
+        # not constrained to stay within Rails.root.
+        if resolved_location == Pathname.new(".")
+          Rails.root.to_s
+        elsif resolved_location.absolute?
+          resolved_location.to_s
+        else
+          Rails.root.join(resolved_location).to_s
+        end
+      end
     end
 
     def resolved_package_path(filename, package_root = resolved_package_root)
@@ -100,12 +105,12 @@ module ReactOnRails
       config_path_warning_registry[:package_json_paths]
     end
 
-    def add_config_path_warning(message)
-      unless respond_to?(:add_warning, true)
-        raise NoMethodError,
-              "#{self.class} must implement #add_warning(message) to include ReactOnRails::ConfigPathResolver"
-      end
+    def add_warning(_message)
+      raise NotImplementedError,
+            "#{self.class} must implement #add_warning(message) to include ReactOnRails::ConfigPathResolver"
+    end
 
+    def add_config_path_warning(message)
       add_warning(message)
     end
 

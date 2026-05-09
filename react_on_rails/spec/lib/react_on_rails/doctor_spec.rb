@@ -2177,6 +2177,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       it "resolves root package paths to Rails.root" do
         [nil, "", ".", rails_root.to_s, "#{rails_root}/"].each do |node_modules_location|
+          doctor = described_class.new(verbose: false, fix: false)
           stub_node_modules_location(node_modules_location)
 
           expect(doctor.send(:resolved_package_root)).to eq(rails_root.to_s)
