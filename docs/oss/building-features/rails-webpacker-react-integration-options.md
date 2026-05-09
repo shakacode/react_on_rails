@@ -92,6 +92,8 @@ module.exports = commonWebpackConfig;
 
 If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5 / Webpack 4, prefer upgrading to Shakapacker first when you can.
 
+These shims are not covered by React on Rails CI and are documented for the legacy React 16/17 `react-rails` / Webpacker migration profile described in the migration guide; the bundler is the compatibility constraint, so verify your full app locally before relying on them.
+
 Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims. Apply only the steps that match the errors you see, except that Step 3 requires Step 2's transforms to already be configured. Keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
@@ -155,7 +157,7 @@ Webpack 4 does not support the `exports` field in `package.json`, so subpath imp
 
 Keep this rule scoped to `node_modules/react-on-rails`; broad `node_modules` transpilation can slow legacy builds and introduce unrelated Babel differences. After you upgrade the app to Shakapacker/Webpack 5 or newer, remove the shim and use the package entry points documented for current installs.
 
-If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Update `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails, for example `transformIgnorePatterns: ['/node_modules/(?!react-on-rails/)']`.
+If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails. If you do not have existing `transformIgnorePatterns`, set it to `['/node_modules/(?!react-on-rails/)']`; if you already have entries, merge the `(?!react-on-rails/)` lookahead into your existing pattern rather than replacing the whole setting.
 
 ---
 
