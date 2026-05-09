@@ -2518,6 +2518,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("custom-bundle.js") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("dynamic imports") }).to be true
       end
     end
 
@@ -2556,6 +2557,25 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_base_package_references)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
+      end
+    end
+
+    context "when JS files dynamically import the base package after a Pro migration" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/lazy.js",
+                       "const ReactOnRails = await import('react-on-rails/client');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports warning" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("lazy.js") }).to be true
       end
     end
 
@@ -2861,6 +2881,27 @@ RSpec.describe ReactOnRails::Doctor do
       it "reports success" do
         doctor.send(:check_base_package_references)
         success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
+      end
+    end
+
+    context "when JS files correctly dynamically import from 'react-on-rails-pro'" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/lazy.js",
+                       "const ReactOnRails = await import('react-on-rails-pro/client');\n")
+            example.run
+          end
+        end
+      end
+
+      it "reports success" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(warning_msgs).to be_empty
         expect(success_msgs.any? { |m| m[:content].include?("Pro package used correctly") }).to be true
       end
     end

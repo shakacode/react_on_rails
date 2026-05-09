@@ -2752,9 +2752,11 @@ module ReactOnRails
     # RSC), and may cause "component not registered" errors at runtime.
     BASE_PACKAGE_IMPORT_PATTERN = %r{\bfrom\s+['"]react-on-rails(?:/[^'"]*)?['"]}
     BASE_PACKAGE_REQUIRE_PATTERN = %r{\brequire\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
+    BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN = %r{\bimport\s*\(\s*['"]react-on-rails(?:/[^'"]*)?['"]\s*\)}
     # Match known Jest/Vitest helpers. Aliased or nested receivers are intentionally
     # out of scope to avoid warning on arbitrary application methods named `mock`.
-    # Vitest's importActual/importMock may also be used as bare helpers.
+    # The bare importActual/importMock forms cover Vitest's destructured-import style:
+    #   import { importActual, importMock } from 'vitest'
     BASE_PACKAGE_MOCK_PATTERN = %r{
       \b(?:
         (?:jest|vi)\.
@@ -2769,6 +2771,7 @@ module ReactOnRails
     BASE_PACKAGE_REFERENCE_PATTERNS = [
       BASE_PACKAGE_IMPORT_PATTERN,
       BASE_PACKAGE_REQUIRE_PATTERN,
+      BASE_PACKAGE_DYNAMIC_IMPORT_PATTERN,
       BASE_PACKAGE_MOCK_PATTERN,
       BASE_PACKAGE_DECLARE_MODULE_PATTERN
     ].freeze
@@ -2783,6 +2786,9 @@ module ReactOnRails
           ⚠️  Found references to 'react-on-rails' instead of 'react-on-rails-pro':
           #{files_with_base_reference.map { |f| "  • #{f}" }.join("\n")}
 
+          Look for static imports, CommonJS requires, dynamic imports,
+          Jest/Vitest mock helpers, or TypeScript module augmentations.
+
           The base package is a transitive dependency of Pro, so these references resolve
           silently but load the base version without Pro features.
 
@@ -2790,6 +2796,7 @@ module ReactOnRails
             import ReactOnRails from 'react-on-rails-pro';         // ES import (server)
             import ReactOnRails from 'react-on-rails-pro/client';  // ES import (client)
             const ReactOnRails = require('react-on-rails-pro');    // CommonJS require
+            const ReactOnRails = await import('react-on-rails-pro'); // Dynamic import
             jest.mock('react-on-rails-pro', ...);                  // Jest mock helper
             vi.mock('react-on-rails-pro', ...);                    // Vitest mock helper
             declare module 'react-on-rails-pro' { ... }            // TypeScript augmentation
