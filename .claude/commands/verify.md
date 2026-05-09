@@ -17,7 +17,7 @@ reintroduces an earlier failure, stop and report the cycle instead of continuing
 4. Always include `bundle exec rubocop` before creating a commit, even when the changed surface is documentation-only, because `AGENTS.md` marks it mandatory before every commit.
 5. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 6. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
-7. After one or more edits for a failure, restart at the failed command and continue forward. Count each command rerun after edits as one loop cycle, and stop after three cycles unless the user explicitly asks you to keep debugging. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, or a later fix reintroduces an earlier failure, stop and report the cycle instead of retrying.
+7. After one or more edits for a failure, restart at the failed command and continue forward. For a single failing command, count each rerun after edits as one loop cycle and stop after three reruns for that same failure unless the user explicitly asks you to keep debugging. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, or a later fix reintroduces an earlier failure, stop and report the cycle instead of retrying.
 8. Finish with the exact commands run and their pass/fail status.
 
 ## Default Verification Order
@@ -60,7 +60,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`, but do not treat it as a Markdown validator.
-- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm start format.listDifferent` (the Pro package's own Prettier check, matching how the root uses `pnpm start format.listDifferent`).
+- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm start format.listDifferent`; in the Pro package, `pnpm start` delegates to that package's `nps` script, so this uses the package-local Prettier check.
 - `react_on_rails_pro/**/*.rb` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `bundle exec rubocop react_on_rails_pro/` and any targeted RSpec.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
 
