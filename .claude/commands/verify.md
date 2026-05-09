@@ -13,7 +13,7 @@ reproduce CI job selection locally.
 3. Decide the minimal sufficient verification set that covers the changed surface area.
 4. Always include `bundle exec rubocop` when you will create or amend a commit, even when the changed surface is documentation-only, because `AGENTS.md` marks it mandatory before every commit.
 5. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
-6. For formatting failures, run `rake autofix`; do not manually edit formatting-only changes.
+6. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
 7. After a fix, restart at the failed command and continue forward. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, stop and report the error instead of retrying.
 8. Finish with the exact commands run and their pass/fail status.
 
@@ -22,7 +22,7 @@ reproduce CI job selection locally.
 Use this order unless the changed files make a narrower or broader set clearly appropriate:
 
 1. Formatting and whitespace:
-   - `git diff --check origin/main...HEAD` for committed branch content before creating or updating a PR
+   - `git diff --check origin/main...HEAD` for committed branch content before creating or updating a PR; detects trailing whitespace and conflict markers, not Prettier formatting
    - `pnpm start format.listDifferent`
 2. Ruby:
    - `bundle exec rubocop` - **mandatory gate before every commit** (per `AGENTS.md`); it lints Ruby, not Markdown or YAML
@@ -35,7 +35,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - targeted `pnpm --filter react-on-rails run test` for react-on-rails package tests, or
      `pnpm --filter react-on-rails exec jest -- <path>` for targeted test file runs
 4. Docs:
-   - `script/check-docs-sidebar origin/main HEAD` when docs under `docs/` changed
+   - `script/check-docs-sidebar` when docs under `docs/` changed
    - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless this branch changes the canonical command
 5. CI workflows and YAML:
    - Confirm the workflow edit itself was approved because `AGENTS.md` marks changes to `.github/workflows/` as ask-first
@@ -54,7 +54,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`, but do not treat it as a Markdown validator.
-- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm exec prettier --check .` (equivalent to the root `pnpm start format.listDifferent` Prettier check, scoped to Pro).
+- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm start format.listDifferent` (the Pro package's own Prettier check, matching how the root uses `pnpm start format.listDifferent`).
 - `react_on_rails_pro/**/*.rb` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `bundle exec rubocop react_on_rails_pro/` and any targeted RSpec.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
 
