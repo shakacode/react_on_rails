@@ -57,7 +57,13 @@ class StoryPagePreflight
 
     story = Story.find_by(id: story_id)
 
-    return Result.new(props: { notFound: true, story: nil }, status: :not_found) unless story
+    unless story
+      return Result.new(
+        props: { notFound: true, story: nil },
+        status: :not_found,
+        cache_control: "no-store"
+      )
+    end
 
     Result.new(
       props: { story: StorySerializer.render_as_hash(story) },
@@ -98,6 +104,8 @@ def show
   stream_view_containing_react_components(template: "stories/show")
 end
 ```
+
+Create `app/views/errors/not_found.html.erb` or use another existing error template before copying this pattern. For quick local testing, `render(plain: "Not Found", status: :not_found)` is a minimal stand-in.
 
 If you want the not-found page itself to be rendered by RSC, set the status before streaming:
 
@@ -151,7 +159,7 @@ def show
 end
 ```
 
-Cache a `410` only when the removal is durable enough for clients and CDNs to reuse that response.
+Create `app/views/errors/gone.html.erb` if your app does not already have a generic template for `410` responses. Cache a `410` only when the removal is durable enough for clients and CDNs to reuse that response.
 
 ## Redirects
 
@@ -187,7 +195,7 @@ response.headers["Cache-Control"] = "private, no-cache"
 
 For public pages, let Rails decide freshness before rendering:
 
-> **Rails 7.1+:** The `cache_control:` keyword on `stale?` requires Rails 7.1 or later. On earlier Rails versions, set the full `Cache-Control` header directly with `response.headers["Cache-Control"] = "public, max-age=60"` and keep the explicit freshness guard before streaming. `stale_while_revalidate` only helps caches that support that extension; unsupported browsers, proxies, and CDNs fall back to normal `max-age` behavior.
+> **Rails 7.1+:** The `cache_control:` keyword on `stale?` requires Rails 7.1 or later. On earlier Rails versions, set the full `Cache-Control` header directly with `response.headers["Cache-Control"] = "public, max-age=300"` and keep the explicit freshness guard before streaming. `stale_while_revalidate` only helps caches that support that extension; unsupported browsers, proxies, and CDNs fall back to normal `max-age` behavior.
 
 ```ruby
 def show
@@ -197,7 +205,7 @@ def show
   return unless stale?(
     story,
     public: true,
-    cache_control: { max_age: 60, stale_while_revalidate: 300 }
+    cache_control: { max_age: 300, stale_while_revalidate: 300 }
   )
 
   @story_props = { story: PublicStorySerializer.render_as_hash(story) }
@@ -245,7 +253,7 @@ export default function StoryPage({ story, viewer, responsePolicy }: StoryPagePr
 }
 ```
 
-Use the same serialized key names that the TypeScript component consumes. React on Rails passes prop keys through by default, so choose one casing convention for the route props and keep both sides aligned.
+Use the same serialized key names that the TypeScript component consumes. React on Rails passes prop keys through by default, so these example props are already in camelCase for TypeScript. If your app uses `config.rendering_props_extension` or another custom serializer to change key casing, use the Ruby-side key names that your serializer expects and keep both sides aligned.
 
 Native `<link>` hoisting requires React 19. On React 18, use `react-helmet` or emit canonical URLs from the Rails layout instead. See [React 19 Native Metadata](../building-features/react-19-native-metadata.md).
 
