@@ -32,6 +32,8 @@ module ReactOnRails
     # Auto-registration requires nested_entries support which was added in 7.0.0
     # Note: The gemspec requires Shakapacker >= 6.0 for basic functionality
     MINIMUM_SHAKAPACKER_VERSION_FOR_AUTO_BUNDLING = "7.0.0"
+    # Longer than any realistic pack generation; LOCK_NB still gates the actual clear.
+    GENERATED_PACKS_LOCK_TTL_SECONDS = 120
 
     def self.instance
       @instance ||= PacksGenerator.new
@@ -48,25 +50,76 @@ module ReactOnRails
 
       verbose = ENV["REACT_ON_RAILS_VERBOSE"] == "true"
 
-      add_generated_pack_to_server_bundle
+      with_generated_packs_lock(verbose: verbose) do
+        add_generated_pack_to_server_bundle
 
-      # Clean any non-generated files from directories
-      clean_non_generated_files_with_feedback(verbose: verbose)
-
-      are_generated_files_present_and_up_to_date = Dir.exist?(generated_packs_directory_path) &&
-                                                   File.exist?(generated_server_bundle_file_path) &&
-                                                   !stale_or_missing_packs?
-
-      if are_generated_files_present_and_up_to_date
-        puts Rainbow("✅ Generated packs are up to date, no regeneration needed").green if verbose
-        return
+        if generated_files_present_and_up_to_date?
+          clean_non_generated_files_with_feedback(verbose: verbose)
+          puts Rainbow("✅ Generated packs are up to date, no regeneration needed").green if verbose
+        else
+          clean_generated_directories_with_feedback(verbose: verbose)
+          generate_packs(verbose: verbose)
+        end
       end
-
-      clean_generated_directories_with_feedback(verbose: verbose)
-      generate_packs(verbose: verbose)
     end
 
     private
+
+    def generated_files_present_and_up_to_date?
+      server_bundle_ready =
+        ReactOnRails.configuration.server_bundle_js_file.blank? ||
+        File.exist?(generated_server_bundle_file_path)
+
+      Dir.exist?(generated_packs_directory_path) &&
+        server_bundle_ready &&
+        !stale_or_missing_packs?
+    end
+
+    def with_generated_packs_lock(verbose: false)
+      lock_path = generated_packs_lock_path
+      FileUtils.mkdir_p(lock_path.dirname)
+      clear_stale_generated_packs_lock(lock_path, verbose: verbose)
+
+      File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |lock_file|
+        puts Rainbow("🔒 Acquiring generated packs lock at #{lock_path}").yellow if verbose
+        # flock waits until the holder releases; keep Rails tmp local so serialization is reliable.
+        lock_file.flock(File::LOCK_EX)
+        puts Rainbow("🔒 Generated packs lock acquired at #{lock_path}").yellow if verbose
+        lock_file.rewind
+        lock_file.truncate(0)
+        lock_file.write("pid=#{Process.pid}\nstarted_at=#{Time.now.utc}\n")
+        lock_file.flush
+
+        yield
+      ensure
+        # Release early so the next waiter can proceed even if the block raised.
+        lock_file.flock(File::LOCK_UN)
+      end
+    end
+
+    def clear_stale_generated_packs_lock(lock_path, verbose: false)
+      return unless File.exist?(lock_path)
+      return unless File.mtime(lock_path) < Time.now - GENERATED_PACKS_LOCK_TTL_SECONDS
+
+      # Kernel locks are released when the holder exits; this only clears stale metadata.
+      lock_acquired = false
+      File.open(lock_path, File::RDWR) do |lock_file|
+        lock_acquired = lock_file.flock(File::LOCK_EX | File::LOCK_NB) != false
+        next unless lock_acquired
+
+        lock_file.rewind
+        lock_file.truncate(0)
+        puts Rainbow("🧹 Cleared stale generated packs lock at #{lock_path}").yellow if verbose
+      ensure
+        lock_file.flock(File::LOCK_UN) if lock_acquired
+      end
+    rescue Errno::ENOENT, Errno::EACCES
+      nil
+    end
+
+    def generated_packs_lock_path
+      Rails.root.join("tmp", "react_on_rails_generate_packs.lock")
+    end
 
     def generate_packs(verbose: false)
       # Check for name conflicts between components and stores
