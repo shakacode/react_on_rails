@@ -2904,17 +2904,10 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     def stub_package_root(path)
-      # Set Rails.root and node_modules_location to the same absolute value so
-      # resolved_location == Rails.root.cleanpath short-circuits to Rails.root.
-      allow(Rails).to receive(:root).and_return(Pathname.new(path))
-      allow(ReactOnRails).to receive(:configuration).and_return(
-        instance_double(ReactOnRails::Configuration, node_modules_location: path)
-      )
+      allow(doctor).to receive(:resolved_package_root).and_return(path)
     end
 
     before do
-      # Pin resolved_package_root to the current Dir.pwd (no custom nesting).
-      # Nested-workspace contexts override this with a relative path like "client".
       stub_package_root(Dir.pwd)
     end
 
@@ -3036,10 +3029,7 @@ RSpec.describe ReactOnRails::Doctor do
         File.write("client/package.json", '{"dependencies":{"react":"^19.0.0"}}')
         FileUtils.mkdir_p("client/node_modules/react")
         File.write("client/node_modules/react/package.json", '{"version":"19.0.4"}')
-        allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
-        allow(ReactOnRails).to receive(:configuration).and_return(
-          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
-        )
+        stub_package_root(package_root)
         allow(Open3).to receive(:capture3)
           .with(
             "node",
@@ -3063,10 +3053,7 @@ RSpec.describe ReactOnRails::Doctor do
       it "falls back to the declared React version in the nested package.json when node is unavailable" do
         FileUtils.mkdir_p("client")
         File.write("client/package.json", '{"dependencies":{"react":"19.0.4"}}')
-        allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
-        allow(ReactOnRails).to receive(:configuration).and_return(
-          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
-        )
+        stub_package_root(File.join(Dir.pwd, "client"))
         allow(Open3).to receive(:capture3).and_return(
           ["", "", instance_double(Process::Status, success?: false)]
         )
@@ -3077,16 +3064,14 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "warns when the configured package root does not exist" do
-        allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
-        allow(ReactOnRails).to receive(:configuration).and_return(
-          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
-        )
+        stub_package_root(File.join(Dir.pwd, "client"))
 
         doctor.send(:check_rsc_react_version)
 
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("does not exist") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
       end
     end
 

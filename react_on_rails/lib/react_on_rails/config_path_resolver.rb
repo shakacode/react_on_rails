@@ -39,6 +39,15 @@ module ReactOnRails
       File.join(resolved_package_root, filename)
     end
 
+    def package_root_missing?(package_root)
+      !Dir.exist?(package_root)
+    end
+
+    def missing_package_root_warning(package_root, detection_target)
+      "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
+        "cannot detect #{detection_target}. Check config/initializers/react_on_rails.rb."
+    end
+
     def resolved_webpack_config_path
       webpack_config_candidates.find { |path| File.file?(path) }
     end

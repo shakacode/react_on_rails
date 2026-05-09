@@ -944,6 +944,8 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: node_modules_location)
         )
+        allow(Dir).to receive(:exist?).with(rails_root.to_s).and_return(true)
+        allow(Dir).to receive(:exist?).with(rails_root.join("client").to_s).and_return(true)
       end
 
       it "returns bun when bun.lock exists" do
@@ -974,6 +976,18 @@ RSpec.describe ReactOnRails::SystemChecker do
           allow(File).to receive(:exist?).with(rails_root.join("client", "package-lock.json").to_s).and_return(false)
 
           expect(checker.send(:detect_used_package_manager)).to eq("yarn")
+        end
+
+        it "warns when the configured package root does not exist" do
+          package_root = rails_root.join("client").to_s
+          allow(Dir).to receive(:exist?).with(package_root).and_return(false)
+          expect(File).not_to receive(:exist?)
+
+          expect(checker.send(:detect_used_package_manager)).to be_nil
+          warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+          expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location points to #{package_root}") })
+            .to be true
+          expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
         end
       end
     end

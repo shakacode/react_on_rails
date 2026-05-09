@@ -97,6 +97,7 @@ exec ./client/node_modules/.bin/shakapacker "$@"
 
 ```js
 // config/webpack/webpack.config.js
+// "../../" goes from config/webpack/ back to the Rails root, then into client/.
 module.exports = require('../../client/config/webpack/webpack.config.js');
 ```
 
