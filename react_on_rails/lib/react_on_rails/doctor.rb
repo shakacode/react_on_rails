@@ -2834,7 +2834,8 @@ module ReactOnRails
       # Runtime hooks (Procfile, bin/*, .kamal/deploy.yml, Capistrano config) run after the app is deployed,
       # where both the app and renderer share the same filesystem, so symlink mode is correct.
       if path.start_with?("Dockerfile")
-        "rake react_on_rails_pro:pre_seed_renderer_cache"
+        "RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles " \
+          "rake react_on_rails_pro:pre_seed_renderer_cache"
       elsif path.start_with?(".kamal/")
         "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink " \
           "(use copy mode if this runs during image build)"
