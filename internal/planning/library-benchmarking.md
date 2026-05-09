@@ -117,8 +117,10 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
      if Bencher supports that flag for the configured threshold type
    - require manual tracking in Issue 3169 to see the same `(benchmark, measure)` pair alert on at least 2 consecutive
      runs before filing or failing
-     If overlap remains below `0.40` after boundary widening, collect 5 more qualifying runs and re-evaluate from step 2
-     before escalating to step 4.
+
+   If overlap remains below `0.40` after boundary widening, collect 5 more qualifying runs and re-evaluate from step 2
+   before escalating to step 4.
+
 4. If shared-runner noise remains high, move benchmark jobs to larger GitHub-hosted runners or dedicated runners before
    restoring the hard gate.
 
