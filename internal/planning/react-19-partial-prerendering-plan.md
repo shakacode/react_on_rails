@@ -29,14 +29,14 @@ Use a dedicated branch for the actual version verification work:
    - `pnpm run type-check`
    - `pnpm run lint`
    - `pnpm run test`
-   - `pnpm --filter react-on-rails-pro run test:rsc` _(requires Pro access)_
+   - `pnpm --filter react-on-rails-pro run test:rsc` _(requires Pro access and `react_on_rails_pro/` checked out)_
 4. Run Ruby checks that exercise SSR and generated apps:
    - `bundle exec rubocop`
    - `bundle exec rake rbs:validate`
    - `bundle exec rspec react_on_rails/spec/react_on_rails/` for gem-side rendering, doctor, and generator coverage
    - `cd react_on_rails/spec/dummy && bundle exec rspec spec/requests spec/system spec/packs_generator_spec.rb` for dummy
      SSR and generator integration paths
-   - Pro RSC and renderer paths _(requires Pro access)_:
+   - Pro RSC and renderer paths _(requires Pro access and `react_on_rails_pro/` checked out)_:
      ```bash
      cd react_on_rails_pro/spec/dummy
      bundle exec rspec spec/requests/rsc_payload_spec.rb spec/requests/server_render_check_spec.rb spec/system/renderer_integration_spec.rb
@@ -64,8 +64,8 @@ too loosely:
 
 - The Rails route still owns routing, authentication, headers, caching, and status codes.
 - React on Rails owns React registration, SSR, streaming, and hydration boundaries.
-- Streaming SSR means the Node Renderer starts work during the request and flushes chunks as Suspense boundaries,
-  server data, and RSC payloads resolve.
+- Streaming SSR means the Node Renderer starts work during the request and flushes chunks as Suspense boundaries and RSC
+  payloads resolve, delivering content progressively without waiting for a full render.
 - True partial pre-rendering would require a reusable static-shell, rendered ahead of dynamic data at build time or at a
   cache layer such as Rails HTTP caching or a CDN, with dynamic holes filled by a later streaming pass.
 - The feature must not require moving a Rails app into a frontend-framework routing model.
