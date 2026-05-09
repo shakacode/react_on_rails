@@ -17,10 +17,7 @@ module ReactOnRails
     private
 
     def resolved_package_json_path
-      node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
-      return "package.json" if node_modules_location.empty? || node_modules_location == Rails.root.to_s
-
-      Rails.root.join(node_modules_location, "package.json").to_s
+      resolved_package_path("package.json")
     end
 
     def resolved_package_root

@@ -1881,6 +1881,7 @@ RSpec.describe ReactOnRails::Doctor do
 
     before do
       allow(File).to receive(:exist?).and_call_original
+      allow(doctor).to receive(:resolved_package_json_path).and_return("package.json")
       allow(File).to receive(:exist?).with("package.json").and_return(true)
     end
 
@@ -1954,6 +1955,7 @@ RSpec.describe ReactOnRails::Doctor do
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: "client")
         )
+        allow(doctor).to receive(:resolved_package_json_path).and_return(package_json_path)
         allow(File).to receive(:exist?).with(package_json_path).and_return(true)
         allow(File).to receive(:read).with(package_json_path).and_return(
           JSON.generate({ "dependencies" => { "react-on-rails-pro" => "16.4.0" } })
@@ -2092,6 +2094,38 @@ RSpec.describe ReactOnRails::Doctor do
   end
 
   describe "private path resolution helpers" do
+    describe "#resolved_package_root" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+      end
+
+      def stub_node_modules_location(path)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: path)
+        )
+      end
+
+      it "resolves root package paths to Rails.root" do
+        [nil, "", rails_root.to_s].each do |node_modules_location|
+          stub_node_modules_location(node_modules_location)
+
+          expect(doctor.send(:resolved_package_root)).to eq(rails_root.to_s)
+          expect(doctor.send(:resolved_package_json_path)).to eq(rails_root.join("package.json").to_s)
+          expect(doctor.send(:resolved_package_path, "package.json")).to eq(rails_root.join("package.json").to_s)
+        end
+      end
+
+      it "resolves nested package paths under Rails.root" do
+        stub_node_modules_location("client")
+
+        expect(doctor.send(:resolved_package_root)).to eq(rails_root.join("client").to_s)
+        expect(doctor.send(:resolved_package_json_path)).to eq(rails_root.join("client", "package.json").to_s)
+        expect(doctor.send(:resolved_package_path, "yarn.lock")).to eq(rails_root.join("client", "yarn.lock").to_s)
+      end
+    end
+
     describe "#resolved_webpack_config_path" do
       it "prioritizes shakapacker's exact assets_bundler_config_path" do
         allow(File).to receive(:file?).and_return(false)
@@ -3002,6 +3036,26 @@ RSpec.describe ReactOnRails::Doctor do
                   instance_double(Process::Status, success?: true)
                 ]
               )
+
+            doctor.send(:check_rsc_react_version)
+            success_msgs = checker.messages.select { |m| m[:type] == :success }
+            expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+          end
+        end
+      end
+
+      it "falls back to the declared React version in the nested package.json when node is unavailable" do
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("client")
+            File.write("client/package.json", '{"dependencies":{"react":"19.0.4"}}')
+            allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+            allow(ReactOnRails).to receive(:configuration).and_return(
+              instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+            )
+            allow(Open3).to receive(:capture3).and_return(
+              ["", "", instance_double(Process::Status, success?: false)]
+            )
 
             doctor.send(:check_rsc_react_version)
             success_msgs = checker.messages.select { |m| m[:type] == :success }

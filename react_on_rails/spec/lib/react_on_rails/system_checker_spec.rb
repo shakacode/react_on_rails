@@ -226,6 +226,10 @@ RSpec.describe ReactOnRails::SystemChecker do
   end
 
   describe "#check_react_on_rails_npm_package" do
+    before do
+      allow(checker).to receive(:resolved_package_json_path).and_return("package.json")
+    end
+
     context "when package.json exists with react-on-rails" do
       let(:package_json_content) do
         { "dependencies" => { "react-on-rails" => "^16.0.0" } }.to_json
@@ -321,6 +325,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: "client")
         )
+        allow(checker).to receive(:resolved_package_json_path).and_return(package_json_path)
         allow(File).to receive(:exist?).with(package_json_path).and_return(true)
         allow(File).to receive(:read).with(package_json_path).and_return(package_json_content)
       end
@@ -337,6 +342,7 @@ RSpec.describe ReactOnRails::SystemChecker do
   describe "#check_package_version_sync" do
     before do
       stub_const("ReactOnRails::VERSION", "16.2.0.beta.10")
+      allow(checker).to receive(:resolved_package_json_path).and_return("package.json")
     end
 
     context "when package.json does not exist" do
@@ -520,6 +526,7 @@ RSpec.describe ReactOnRails::SystemChecker do
 
     before do
       allow(File).to receive(:exist?).and_call_original
+      allow(checker).to receive(:resolved_package_json_path).and_return("package.json")
       allow(File).to receive(:exist?).with("package.json").and_return(true)
       allow(File).to receive(:read).with("package.json").and_return(base_package_json.to_json)
     end
@@ -927,12 +934,17 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
 
     describe "#detect_used_package_manager" do
-      it "returns bun when bun.lock exists" do
-        rails_root = Pathname.new("/tmp/myapp")
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:node_modules_location) { rails_root.to_s }
+
+      before do
         allow(Rails).to receive(:root).and_return(rails_root)
         allow(ReactOnRails).to receive(:configuration).and_return(
-          instance_double(ReactOnRails::Configuration, node_modules_location: rails_root.to_s)
+          instance_double(ReactOnRails::Configuration, node_modules_location: node_modules_location)
         )
+      end
+
+      it "returns bun when bun.lock exists" do
         allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
         allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
         allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(true)
@@ -941,11 +953,6 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       it "returns bun when bun.lockb exists" do
-        rails_root = Pathname.new("/tmp/myapp")
-        allow(Rails).to receive(:root).and_return(rails_root)
-        allow(ReactOnRails).to receive(:configuration).and_return(
-          instance_double(ReactOnRails::Configuration, node_modules_location: rails_root.to_s)
-        )
         allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
         allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
         allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(false)
@@ -954,19 +961,18 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.send(:detect_used_package_manager)).to eq("bun")
       end
 
-      it "checks lockfiles next to a configured nested package.json" do
-        rails_root = Pathname.new("/tmp/myapp")
-        allow(Rails).to receive(:root).and_return(rails_root)
-        allow(ReactOnRails).to receive(:configuration).and_return(
-          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
-        )
-        allow(File).to receive(:exist?).with(rails_root.join("client", "yarn.lock").to_s).and_return(true)
-        allow(File).to receive(:exist?).with(rails_root.join("client", "pnpm-lock.yaml").to_s).and_return(false)
-        allow(File).to receive(:exist?).with(rails_root.join("client", "bun.lock").to_s).and_return(false)
-        allow(File).to receive(:exist?).with(rails_root.join("client", "bun.lockb").to_s).and_return(false)
-        allow(File).to receive(:exist?).with(rails_root.join("client", "package-lock.json").to_s).and_return(false)
+      context "with a configured nested package.json" do
+        let(:node_modules_location) { "client" }
 
-        expect(checker.send(:detect_used_package_manager)).to eq("yarn")
+        it "checks lockfiles next to the configured package.json" do
+          allow(File).to receive(:exist?).with(rails_root.join("client", "yarn.lock").to_s).and_return(true)
+          allow(File).to receive(:exist?).with(rails_root.join("client", "pnpm-lock.yaml").to_s).and_return(false)
+          allow(File).to receive(:exist?).with(rails_root.join("client", "bun.lock").to_s).and_return(false)
+          allow(File).to receive(:exist?).with(rails_root.join("client", "bun.lockb").to_s).and_return(false)
+          allow(File).to receive(:exist?).with(rails_root.join("client", "package-lock.json").to_s).and_return(false)
+
+          expect(checker.send(:detect_used_package_manager)).to eq("yarn")
+        end
       end
     end
   end
