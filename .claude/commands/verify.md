@@ -31,7 +31,8 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run build`
    - `pnpm run lint`
    - `pnpm run type-check`
-   - targeted `pnpm --filter react-on-rails run test` or `pnpm run test -- <path>` for changed package behavior
+   - targeted `pnpm --filter react-on-rails run test` or `pnpm --filter react-on-rails run test -- <path>` for
+     changed package behavior
 4. Docs:
    - `script/check-docs-sidebar origin/main HEAD` when docs under `docs/` changed
    - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless this branch changes the canonical command
