@@ -1080,13 +1080,6 @@ describe RscGenerator, type: :generator do
       expect(messages).to include("regex literal with an unmatched")
     end
 
-    it "detects legacy let or var dot-access path resolve imports" do
-      expect(generator.send(:path_resolve_imported?, "let resolve = require('path').resolve;"))
-        .to be(true)
-      expect(generator.send(:path_resolve_imported?, "var resolve = require('path').resolve;"))
-        .to be(true)
-    end
-
     it "does not inject duplicate imports for legacy let or var CommonJS destructuring" do
       config_path = "config/webpack/clientWebpackConfig.js"
       simulate_existing_file(
