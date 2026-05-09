@@ -27,6 +27,12 @@ git_diff_base_remote_branch() {
   esac
 }
 
+git_diff_base_verify_ref() {
+  local ref="$1"
+
+  git rev-parse --verify "$ref^{commit}" >/dev/null 2>&1
+}
+
 git_diff_base_sha_ref() {
   local ref="$1"
   local length="${#ref}"
@@ -39,7 +45,6 @@ git_diff_base_sha_ref() {
 
   # Full GitHub event SHAs may be absent in shallow clones. Short hex strings
   # count only when they already resolve locally, avoiding hex branch-name hits.
-  # git_diff_base_verify_ref is defined below and only called after sourcing.
   if [ "$length" -ne 40 ] && [ "$length" -ne 64 ] && ! git_diff_base_verify_ref "$ref"; then
     return 1
   fi
@@ -77,6 +82,25 @@ git_diff_base_fetch_refspec() {
   printf '+refs/heads/%s:refs/remotes/origin/%s\n' "$branch" "$branch"
 }
 
+git_diff_base_unshallow_timeout_seconds() {
+  local raw_timeout="${GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS:-300}"
+
+  if [[ "$raw_timeout" =~ ^[[:space:]]*([0-9]+)[[:space:]]*$ ]]; then
+    local timeout_seconds="${BASH_REMATCH[1]}"
+
+    while [ "${#timeout_seconds}" -gt 1 ] && [ "${timeout_seconds#0}" != "$timeout_seconds" ]; do
+      timeout_seconds="${timeout_seconds#0}"
+    done
+
+    printf '%s\n' "$timeout_seconds"
+    return 0
+  fi
+
+  echo "Warning: invalid GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS '$raw_timeout';" \
+    "running unshallow fetch without timeout." >&2
+  printf '0\n'
+}
+
 git_diff_base_fetch_remote_branch() {
   local branch="$1"
   local mode="$2"
@@ -111,9 +135,11 @@ git_diff_base_fetch_remote_branch() {
   # Keep fetch diagnostics visible while ensuring callers that use command
   # substitution capture only the merge-base SHA on stdout.
   if [ "$mode" = "unshallow" ]; then
-    local unshallow_timeout="${GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS:-300}"
+    local unshallow_timeout
 
-    if [ "$unshallow_timeout" != "0" ]; then
+    unshallow_timeout="$(git_diff_base_unshallow_timeout_seconds)"
+
+    if [ "$unshallow_timeout" -gt 0 ] 2>/dev/null; then
       if command -v timeout >/dev/null 2>&1; then
         timeout "$unshallow_timeout" git fetch "${fetch_args[@]}" >&2
         return $?
@@ -155,12 +181,6 @@ git_diff_base_current_remote_branch() {
   fi
 
   return 1
-}
-
-git_diff_base_verify_ref() {
-  local ref="$1"
-
-  git rev-parse --verify "$ref^{commit}" >/dev/null 2>&1
 }
 
 git_diff_base_merge_base() {
@@ -289,6 +309,9 @@ git_diff_base_resolve() {
       fetched=false
       deepen_attempts=$((deepen_attempts + 1))
 
+      # A successful deepen on either side can reveal the common ancestor, even
+      # when the other branch fetch fails. Stop early only when every attempted
+      # deepen fetch fails in the same iteration.
       if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" deepen "$deepen_depth"; then
         fetched=true
       fi
