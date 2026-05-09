@@ -15,7 +15,12 @@ reproduce CI job selection locally.
    every commit.
 4. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 5. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
-6. After one or more edits for a failure, restart at the failed command and continue forward. For a single failing command, count each rerun after edits as one loop cycle and stop after three reruns for that same failure unless the user explicitly asks you to keep debugging. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, or a later fix reintroduces an earlier failure, stop and report the cycle instead of retrying.
+6. After one or more edits for a failure, restart at the failed command and continue forward. For a single failing
+   command, count each rerun after edits as one loop cycle and stop after three reruns for that same failure signature
+   (for example, the same failing spec, RuboCop offense, or Prettier file) unless the user explicitly asks you to keep
+   debugging. If the command fails with a different underlying issue, reset the counter for that new failure and report
+   the transition. Do not claim a failure is fixed until the failed command passes locally. If a later fix reintroduces
+   an earlier failure, stop and report the cycle instead of retrying.
 7. Finish with the exact commands run and their pass/fail status.
 
 ## Default Verification Order
@@ -76,7 +81,7 @@ Verification:
 - FAIL bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb
 
 Next fix:
-- ...
+- Remove trailing whitespace in `docs/oss/example.md` line 42, then rerun `pnpm start format.listDifferent`.
 ```
 
 If a command is intentionally skipped, explain why in one line. Prefer local verification over waiting for CI.
