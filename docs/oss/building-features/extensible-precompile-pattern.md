@@ -184,8 +184,9 @@ end
 
 # Add your app's pre-build step(s) here. They run for both test and production.
 # Leave this section empty if shakapacker is the only build step.
-# Define a local env hash here if a shared pre-build command needs one; the mode-specific env
-# values below are intentionally scoped to each shakapacker invocation.
+# If a pre-build command needs env vars, pass them via a hash:
+#   system({ "SOME_VAR" => "value" }, "yarn", "custom:build") || abort("custom:build failed")
+# The mode-specific env hashes below are intentionally scoped to each shakapacker call.
 # For example, to run TypeScript then ReScript:
 #   # --noEmit type-checks only; ts-loader/babel-loader handle transpilation during webpack bundling.
 #   system("yarn", "tsc", "--noEmit") || abort("tsc type-check failed")
@@ -200,6 +201,8 @@ when "test"
 when "production"
   env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
   system(env, RbConfig.ruby, "bin/shakapacker") || abort("shakapacker (production) failed")
+else
+  abort "BUG: unhandled mode #{mode.inspect}"
 end
 ```
 
