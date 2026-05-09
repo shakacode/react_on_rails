@@ -131,7 +131,7 @@ Apply only the steps that match the errors you see. Step 3 depends on Step 2: co
    };
    ```
 
-3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed. This rule inherits your project's `babel.config.js`, so first confirm that your config handles optional chaining and nullish coalescing by following Step 2 above or by using existing `@babel/preset-env` targets that already include those transforms:
+3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed. This rule inherits your project's `babel.config.js`, so first confirm that your config handles optional chaining and nullish coalescing by following Step 2 above or by using existing `@babel/preset-env` targets that already include those transforms. Use a project-wide `babel.config.js` or `babel.config.json`; package-scoped `.babelrc` files will not apply when Babel processes files inside `node_modules/react-on-rails`:
 
    ```js
    // config/webpack/environment.js
@@ -159,7 +159,7 @@ Apply only the steps that match the errors you see. Step 3 depends on Step 2: co
 
 Keep this rule scoped to `node_modules/react-on-rails`; broad `node_modules` transpilation can slow legacy builds and introduce unrelated Babel differences. After you upgrade the app to Shakapacker/Webpack 5 or newer, remove the shim and use the package entry points documented for current installs.
 
-If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails. If you do not have existing `transformIgnorePatterns`, set it to `['/node_modules/(?!react-on-rails/)']`; if you already have entries, merge the `(?!react-on-rails/)` lookahead into your existing pattern rather than replacing the whole setting.
+If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails. If you do not have existing `transformIgnorePatterns`, set it to `['/node_modules/(?!react-on-rails/)']`; if you already have entries, merge the package into your existing lookahead rather than replacing the whole setting, for example `'/node_modules/(?!(react-on-rails|other-esm-package)/)'`.
 
 ---
 
