@@ -37,7 +37,7 @@ class ActiveSupport::TestCase
 end
 ```
 
-## RSC And Node Renderer System Tests
+## RSC and Node Renderer System Tests
 
 React Server Components add one more moving part to the standard test setup: system tests need compiled client, server, and RSC bundles, and the Rails test process must be able to reach a node-renderer process that uses the test bundle cache.
 
@@ -66,7 +66,7 @@ ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
 require_relative "../config/environment"
 ```
 
-`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on, so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID so every worker gets a unique port and cache path.
+`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on, so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID so every worker gets a unique port and cache path.
 
 If you run tests in parallel, each worker needs its own `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH`. Sharing a renderer cache across parallel workers can produce stale-bundle and missing-bundle failures that look like flaky RSC timeouts.
 
@@ -119,13 +119,22 @@ require "socket"
 module RscNodeRenderer
   module_function
 
-  def wait_until_ready!(host:, port:, timeout_seconds: 30, log_path: nil)
+  def wait_until_ready!(host:, port:, timeout_seconds: 30, log_path: nil, pid: nil)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
 
     loop do
       TCPSocket.new(host, port).close
       break
     rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT
+      if pid
+        begin
+          Process.kill(0, pid)
+        rescue Errno::ESRCH
+          hint = log_path ? " Check #{log_path} for startup errors." : ""
+          raise "Node renderer process (pid #{pid}) exited before binding to #{host}:#{port}.#{hint}"
+        end
+      end
+
       if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
         hint = log_path ? " Check #{log_path} for startup errors." : ""
         raise "Node renderer did not boot on #{host}:#{port} within #{timeout_seconds}s.#{hint}"
@@ -190,7 +199,8 @@ RSpec.configure do |config|
       host: "127.0.0.1",
       port: ENV.fetch("RENDERER_PORT").to_i,
       timeout_seconds: renderer_timeout,
-      log_path: renderer_log_path
+      log_path: renderer_log_path,
+      pid: rsc_node_renderer_pid
     )
   end
 
