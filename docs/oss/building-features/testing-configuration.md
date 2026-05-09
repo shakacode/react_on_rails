@@ -73,7 +73,7 @@ ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
 require_relative "../config/environment"
 ```
 
-`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on (skipping `"1"`), so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, update `spec/support/rsc_test_worker.rb` to normalize that tool's worker ID to a stable, path-safe `RscTestWorker::ID` so every worker gets a unique port, cache path, and renderer log.
+`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on (skipping `"1"`), so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. That unused 3901 port is expected; keeping the normalized worker ID stable matters more than filling every port number. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, update `spec/support/rsc_test_worker.rb` to normalize that tool's worker ID to a stable, path-safe `RscTestWorker::ID` so every worker gets a unique port, cache path, and renderer log.
 
 If you run tests in parallel, each worker needs its own `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH`. Sharing a renderer cache across parallel workers can produce stale-bundle and missing-bundle failures that look like flaky RSC timeouts.
 
@@ -133,10 +133,16 @@ module RscNodeRenderer
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
 
     loop do
-      Socket.tcp(host, port, connect_timeout: 1).close
-      break
-    rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT,
-           Errno::EADDRNOTAVAIL, Errno::EHOSTUNREACH, SocketError
+      begin
+        Socket.tcp(host, port, connect_timeout: 1).close
+        break
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT
+        # The renderer is still booting or has not bound the port yet; keep retrying until the deadline.
+      rescue Errno::EADDRNOTAVAIL, Errno::EHOSTUNREACH, SocketError => e
+        raise "Cannot reach node renderer at #{host}:#{port}. " \
+              "Check the host configuration (#{e.class}: #{e.message})."
+      end
+
       if pid
         begin
           Process.kill(0, pid)
@@ -156,8 +162,10 @@ module RscNodeRenderer
   end
 end
 
-rsc_node_renderer_pid = nil # Closure shared by before(:suite) and after(:suite).
-rsc_node_renderer_waiter = nil # Process.detach thread for reaping abnormal exits.
+# Intentional suite-level closure state shared by before(:suite) and after(:suite).
+# This avoids relying on RSpec hook instance variables while keeping mutation local to this support file.
+rsc_node_renderer_pid = nil
+rsc_node_renderer_waiter = nil
 
 RSpec.configure do |config|
   config.before(:suite) do
@@ -221,8 +229,8 @@ RSpec.configure do |config|
 
     # Signal the process group so pnpm and the Node child both stop.
     Process.kill("-TERM", pid)
-    # join returns the Thread when TERM reaped the process; nil means the process is still alive.
-    # Skip KILL only when TERM already reaped the process.
+    # Thread#join returns the waiter thread when the process exits, and nil on timeout.
+    # Skip SIGKILL only when TERM worked and the waiter reaped the process.
     next if rsc_node_renderer_waiter&.join(5)
 
     Process.kill("-KILL", pid)
