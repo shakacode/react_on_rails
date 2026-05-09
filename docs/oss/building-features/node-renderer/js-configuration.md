@@ -66,7 +66,7 @@ The node renderer executes uploaded JavaScript bundles inside isolated VM contex
 | Server bundle (SSR)       | Node renderer VM context              | JavaScript built-ins are available. With the `supportModules` option enabled, common Node.js globals (`Buffer`, `TextDecoder`, `TextEncoder`, `URLSearchParams`, `ReadableStream`, `process`, `performance`, timer functions) are injected. |
 | RSC bundle payload render | Node renderer VM context for RSC code | Uses the same VM context rules as the server bundle. The bundle is built for RSC, but host Node.js globals still need to be bundled, polyfilled, or injected.                                                                               |
 
-`supportModules` does **not** inject `fetch`, `Headers`, `Request`, or `Response`. Even if the Node.js process that launches the renderer has those globals, code inside the renderer VM will not see them unless you provide them. That means Server Components should not assume that "modern Node" global `fetch` is available in the server or RSC bundle.
+`supportModules` injects a fixed set of common Node.js globals; it does **not** mirror the host global object into the VM. It does **not** inject `fetch`, `Headers`, `Request`, `Response`, `AbortController`, or `AbortSignal`. Even if the Node.js process that launches the renderer has those globals, code inside the renderer VM will not see them unless you provide them. That means Server Components should not assume that "modern Node" global `fetch` or fetch-related cancellation APIs are available in the server or RSC bundle.
 
 Prefer passing application data from Rails controllers through props when the data belongs to your Rails app. When a Server Component really needs to call an external HTTP API from the renderer, choose one of these approaches:
 
@@ -80,11 +80,20 @@ const fetchImplementation = globalThis.fetch;
 const HeadersImplementation = globalThis.Headers;
 const RequestImplementation = globalThis.Request;
 const ResponseImplementation = globalThis.Response;
+const AbortControllerImplementation = globalThis.AbortController;
+const AbortSignalImplementation = globalThis.AbortSignal;
 
-if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+if (
+  !fetchImplementation ||
+  !HeadersImplementation ||
+  !RequestImplementation ||
+  !ResponseImplementation ||
+  !AbortControllerImplementation ||
+  !AbortSignalImplementation
+) {
   throw new Error(
-    'Your Node.js runtime does not expose fetch, Headers, Request, and Response. ' +
-      'Use a supported Node.js release that exposes these globals or replace the globalThis.* references above with a fetch polyfill import.',
+    'Your Node.js runtime does not expose fetch, Headers, Request, Response, AbortController, and AbortSignal. ' +
+      'Use a supported Node.js release that exposes these globals or replace the globalThis.* references above with compatible fetch/abort polyfill imports.',
   );
 }
 
@@ -95,9 +104,13 @@ reactOnRailsProNodeRenderer({
     Headers: HeadersImplementation,
     Request: RequestImplementation,
     Response: ResponseImplementation,
+    AbortController: AbortControllerImplementation,
+    AbortSignal: AbortSignalImplementation,
   },
 });
 ```
+
+If your component code creates abort signals, pass `AbortController` and `AbortSignal` through `additionalContext` with the fetch implementation or provide a compatible polyfill. `supportModules` does not add those globals.
 
 Install a fetch implementation only when your renderer runtime does not provide these globals, or when you intentionally want a bundled HTTP client instead of the host runtime's implementation. Use this decision guide:
 
