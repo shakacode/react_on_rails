@@ -33,8 +33,10 @@ module GeneratorMessages
     # Pass package_json: <parsed_hash> to reuse an already-parsed package.json and
     # avoid a re-read (callers that also inspect scripts/deps should parse once and
     # pass the hash).
-    # Pass skip_package_json_detection: true only when the caller already attempted to
-    # read package.json and wants detection to fall through directly to lockfile heuristics.
+    # Pass package_json: nil when the caller already attempted to read package.json and
+    # wants detection to fall through directly to lockfile heuristics.
+    # Pass skip_package_json_detection: true only as a compatibility alias for
+    # package_json: nil in older call sites.
     def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET,
                                skip_package_json_detection: false)
       detect_package_manager_with_source(
@@ -56,7 +58,7 @@ module GeneratorMessages
         package_json: package_json,
         skip_package_json_detection: skip_package_json_detection
       )
-      pm_from_json = content ? package_manager_from_content(content) : nil
+      pm_from_json = content ? package_manager_name_from_content(content) : nil
       return [pm_from_json, :package_json] if pm_from_json
 
       pm_from_lockfile = detect_package_manager_from_lockfiles(app_root: app_root)
@@ -65,7 +67,7 @@ module GeneratorMessages
       ["npm", :default]
     end
 
-    def package_manager_from_content(content)
+    def package_manager_name_from_content(content)
       raw_declared = content["packageManager"]
       return nil unless raw_declared.is_a?(String)
 
@@ -79,19 +81,18 @@ module GeneratorMessages
       end
     end
 
-    # Returns true when package.json declares a `packageManager` field with an
+    # Returns true when package.json declares a top-level `packageManager` field with an
     # npm-style version/range/tag (e.g. `"pnpm@9.0.0"`, `"pnpm@10"`,
     # `"pnpm@^10.0.0"`, or `"pnpm@latest"`) for the requested `manager`. These forms
-    # match what `pnpm/action-setup` can resolve from package.json; projects that need
-    # reproducible Corepack behavior should prefer an exact version, optionally with a
-    # hash (e.g. `"pnpm@9.0.0+sha256.abc"`). A bare name without `@<version>` returns
-    # false because `pnpm/action-setup` has no version to resolve from it. Used by the
-    # CI scaffold to decide whether `pnpm/action-setup` needs an explicit `version:`
-    # key; exact SemVer validation belongs only where a caller needs to extract a
-    # reproducible version pin.
-    # Pass package_json: to reuse an already-parsed package.json and avoid a re-read.
-    # Pass skip_package_json_detection: true only when the caller already attempted to
-    # read package.json and wants an absent declaration result without re-reading.
+    # match what `pnpm/action-setup@v4` can resolve from package.json; projects that
+    # need reproducible Corepack behavior should prefer an exact version, optionally
+    # with a hash (e.g. `"pnpm@9.0.0+sha256.abc"`). A bare name without `@<version>`
+    # returns false because `pnpm/action-setup` has no version to resolve from it.
+    # Used by the CI scaffold to decide whether `pnpm/action-setup` needs an explicit
+    # `version:` key; exact SemVer validation belongs only where a caller needs to
+    # extract a reproducible version pin.
+    # Pass package_json: <parsed_hash> to reuse an already-parsed package.json and
+    # package_json: nil to preserve a cached missing/unreadable read.
     def package_manager_declared?(manager:, app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET,
                                   skip_package_json_detection: false)
       content = package_json_content(
@@ -101,7 +102,7 @@ module GeneratorMessages
       )
       return false unless content
 
-      declared = declared_package_manager_from_content(content)
+      declared = versioned_package_manager_name_from_content(content)
       return false if declared.nil?
 
       declared == manager.to_s.downcase
@@ -137,10 +138,8 @@ module GeneratorMessages
     # Intentionally public: install_generator and other generator callers read
     # package.json once and pass the result to detect_package_manager /
     # package_manager_declared? to avoid repeated disk reads.
-    # When this returns nil, pass skip_package_json_detection: true to those
-    # helpers to preserve that cached missing/unreadable state; package_json: nil
-    # alone keeps the public "read from disk" behavior and would read the file a
-    # second time.
+    # When this returns nil, pass package_json: nil to those helpers to preserve
+    # that cached missing/unreadable state.
     #
     # @api public
     def read_package_json(app_root)
@@ -152,6 +151,15 @@ module GeneratorMessages
       nil
     end
 
+    # Converts a cached package.json read into detection kwargs. A parsed hash is
+    # reused directly; nil preserves the cached missing/unreadable state without a
+    # second disk read.
+    #
+    # @api public
+    def package_json_detection_options_for(package_json)
+      { package_json: package_json }
+    end
+
     private
 
     # Pipeline internals — external callers should go through `detect_package_manager`
@@ -160,7 +168,7 @@ module GeneratorMessages
 
     def detect_package_manager_from_package_json(app_root: Dir.pwd)
       content = read_package_json(app_root)
-      content ? package_manager_from_content(content) : nil
+      content ? package_manager_name_from_content(content) : nil
     end
 
     def package_json_content(app_root:, package_json:, skip_package_json_detection:)
@@ -173,22 +181,17 @@ module GeneratorMessages
         return nil
       end
 
-      # nil is treated as unset/read from disk, not cached absent. Callers that
-      # know package.json is missing should pass skip_package_json_detection: true.
-      return read_package_json(app_root) if package_json.equal?(PACKAGE_JSON_UNSET) || package_json.nil?
+      return read_package_json(app_root) if package_json.equal?(PACKAGE_JSON_UNSET)
 
+      # nil means the caller cached that package.json was absent/unreadable.
       package_json
     end
 
-    def package_json_detection_options_for(package_json)
-      package_json.nil? ? { skip_package_json_detection: true } : { package_json: package_json }
-    end
-
-    # Sibling of `package_manager_from_content` for places that need a resolvable
+    # Sibling of `package_manager_name_from_content` for places that need a resolvable
     # version spec, not just a manager name. It accepts npm-style version specs because
     # `pnpm/action-setup` can read those from package.json; a bare `"pnpm"` still needs
     # the scaffolded fallback version.
-    def declared_package_manager_from_content(content)
+    def versioned_package_manager_name_from_content(content)
       raw_declared = content["packageManager"]
       return nil unless raw_declared.is_a?(String)
 

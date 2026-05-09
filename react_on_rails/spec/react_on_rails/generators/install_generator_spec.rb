@@ -2072,8 +2072,10 @@ describe InstallGenerator, type: :generator do
     generator_source = File.read(
       File.expand_path("../../../lib/generators/react_on_rails/install_generator.rb", __dir__)
     )
+    package_manager = JSON.parse(File.read(File.expand_path("../../../../package.json", __dir__)))["packageManager"]
 
     expect(fallback_version).to match(/\A\d+\.\d+\.\d+\z/)
+    expect(package_manager).to eq("pnpm@#{fallback_version}")
     expect(generator_source).to include(
       "https://github.com/pnpm/pnpm/releases/tag/v#{fallback_version}"
     )

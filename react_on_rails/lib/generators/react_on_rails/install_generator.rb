@@ -136,15 +136,13 @@ module ReactOnRails
 
       # Exact fallback used when the scaffolded CI workflow has to supply a pnpm
       # version because `pnpm/action-setup` requires one unless package.json declares
-      # `packageManager`. Bump on each pnpm major/minor so projects that generated a
-      # lockfile with a newer pnpm but never committed `packageManager` get a runtime
-      # that can still read the lockfile. Track the exact release used for this fallback
-      # at https://github.com/pnpm/pnpm/releases/tag/v11.0.8; update this URL with the
-      # constant when bumping. Last checked 2026-05-08.
-      # Users who need exact reproducibility should commit `packageManager` to their
-      # package.json instead.
+      # `packageManager`. Match the repo's own packageManager version so generated
+      # CI defaults to the pnpm major this codebase tests with. Track the exact release
+      # used for this fallback at https://github.com/pnpm/pnpm/releases/tag/v9.14.2;
+      # update this URL with the constant when bumping. Users who need exact
+      # reproducibility should commit `packageManager` to their package.json instead.
       # renovate: datasource=github-releases depName=pnpm/pnpm extractVersion=^v(?<version>.+)$
-      CI_PNPM_FALLBACK_VERSION = "11.0.8"
+      CI_PNPM_FALLBACK_VERSION = "9.14.2"
       private_constant :CI_PNPM_FALLBACK_VERSION
 
       # Main generator entry point
@@ -272,10 +270,7 @@ module ReactOnRails
         end
 
         package_json = GeneratorMessages.read_package_json(destination_root)
-        # read_package_json returns nil for missing/unreadable files. Passing
-        # package_json: nil alone means "read from disk," so use the explicit skip
-        # flag to preserve the cached missing state and avoid a redundant re-read.
-        package_json_detection_options = GeneratorMessages.send(:package_json_detection_options_for, package_json)
+        package_json_detection_options = GeneratorMessages.package_json_detection_options_for(package_json)
         package_manager = GeneratorMessages.detect_package_manager(
           app_root: destination_root,
           **package_json_detection_options

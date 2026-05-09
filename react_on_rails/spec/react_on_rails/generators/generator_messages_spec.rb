@@ -171,15 +171,13 @@ describe GeneratorMessages do
       expect(described_class.detect_package_manager).to eq("yarn")
     end
 
-    it "treats package_json: nil like the default and still reads package.json" do
+    it "treats package_json: nil as a cached missing package.json and falls through to lockfiles" do
+      expect(described_class).not_to receive(:read_package_json)
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
       allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(true)
-      allow(File).to receive(:read).and_call_original
-      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
-                                   .and_return('{"packageManager": "pnpm@8.0.0"}')
 
-      expect(described_class.detect_package_manager(package_json: nil)).to eq("pnpm")
+      expect(described_class.detect_package_manager(package_json: nil)).to eq("yarn")
     end
 
     it "skips package.json disk detection only when explicitly requested" do
@@ -436,12 +434,10 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
-    it "treats package_json: nil like the default and still reads package.json" do
-      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
-      allow(File).to receive(:read).with(package_json_path)
-                                   .and_return('{"packageManager":"pnpm@9.0.0"}')
+    it "treats package_json: nil as a cached missing package.json" do
+      expect(File).not_to receive(:read)
 
-      expect(described_class.package_manager_declared?(manager: "pnpm", package_json: nil)).to be(true)
+      expect(described_class.package_manager_declared?(manager: "pnpm", package_json: nil)).to be(false)
     end
 
     it "skips package.json disk detection only when explicitly requested" do
@@ -539,19 +535,32 @@ describe GeneratorMessages do
                                    .and_return('{"packageManager":"yarn@1.22.0"}')
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
+
+    it "does not treat devEngines.packageManager as declared for pnpm/action-setup v4" do
+      expect(
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          package_json: { "devEngines" => { "packageManager" => "pnpm@9.14.2" } }
+        )
+      ).to be(false)
+    end
   end
 
   describe ".package_json_detection_options_for" do
-    it "preserves a cached missing package.json as explicit skipped detection" do
-      expect(described_class.send(:package_json_detection_options_for, nil)).to eq(
-        { skip_package_json_detection: true }
+    it "is public for generator callers outside GeneratorMessages" do
+      expect(described_class).to respond_to(:package_json_detection_options_for)
+    end
+
+    it "preserves a cached missing package.json without a second read" do
+      expect(described_class.package_json_detection_options_for(nil)).to eq(
+        { package_json: nil }
       )
     end
 
     it "passes a parsed package.json hash through for reuse" do
       package_json = { "packageManager" => "pnpm@11.0.8" }
 
-      expect(described_class.send(:package_json_detection_options_for, package_json)).to eq(
+      expect(described_class.package_json_detection_options_for(package_json)).to eq(
         { package_json: package_json }
       )
     end
