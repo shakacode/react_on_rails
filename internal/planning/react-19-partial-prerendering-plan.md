@@ -22,12 +22,13 @@ is intentionally pinned to React 18 through pnpm overrides for `app>react` and `
 confirm whether that workspace stays on React 18 during this work. That means the first implementation step is
 verification, not necessarily a broad package-range change.
 
-Note: `react-on-rails-pro` currently pins `react-on-rails-rsc` as a peer dependency at `>= 19.0.2 <= 19.2.3`.
-Verification should confirm whether this ceiling is intentional or should be widened alongside any React 19.2.x range
-update. Because this hard upper bound would reject a future `19.2.4` patch or `19.3.x` minor release, the decision must
-either widen the range for stable React 19.x, such as `< 20.0.0`, or document the specific API risk that requires a tight
-pin. If verification finds no specific API risk, the default outcome is to widen the ceiling to `< 20.0.0`. **Owner**:
-@justin808 | **Target**: before any package-range change is merged (see Open Questions).
+Note: private Pro package verification should confirm whether any `react-on-rails-rsc` peer dependency ceiling, such as
+`>= 19.0.2 <= 19.2.3`, exists outside the public package manifests and whether it should be widened alongside any React
+19.2.x range update. Because a hard upper bound would reject a future `19.2.4` patch or `19.3.x` minor release, the
+decision must either widen the range for stable React 19.x, such as `< 20.0.0`, or document the specific API risk that
+requires a tight pin. If verification finds no specific API risk, the default outcome is to widen the ceiling to
+`< 20.0.0`. This check requires Pro access and cannot be completed by a public contributor without relying on Pro CI.
+**Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
 
 ## React 19.2.x Verification Checklist
 
@@ -35,17 +36,21 @@ Use a dedicated branch for the actual version verification work:
 
 - [ ] Review the React 19.2.x changelog and release notes for breaking changes, deprecations, and new APIs that could
       affect React on Rails SSR, streaming, RSC, or hydration integration.
-- [ ] Confirm that no React on Rails SSR path passes a Suspense-containing tree through `renderToString`; React 19 renders
-      Suspense fallbacks synchronously in that path instead of suspending, which can silently change output without an
-      error. Check the existing `renderToString` usages in
+- [ ] Audit what React trees currently reach `renderToString` in React on Rails SSR paths; React 19 renders Suspense
+      fallbacks synchronously in that path instead of suspending, which can silently change output without an error. For
+      each call site, document whether a Suspense-containing tree could plausibly be passed by a user render function
+      today, and either open a follow-up migration ticket or record why the current usage is acceptable. Check the existing
+      `renderToString` usages in
       `packages/react-on-rails/src/serverRenderReactComponent.ts` and `packages/react-on-rails/src/handleError.ts`, plus
       `renderToStaticMarkup` if any source or generated-bundle call site participates in SSR. Also grep generated bundles
       and renderer artifacts, such as
       `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.ts"`, plus
       `packages/react-on-rails-pro-node-renderer/` and related SSR integration paths for additional call sites, then
       document either a migration ticket or why current usage is acceptable.
-- [ ] Run `pnpm install` from a clean checkout and confirm React, React DOM, and `react-on-rails-rsc` resolve to
-      compatible versions.
+- [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
+      React, React DOM, and `react-on-rails-rsc` resolve to compatible versions. Capture the exact
+      `pnpm list -r react react-dom react-on-rails-rsc` output in the verification record, such as a comment on Issue 3255,
+      so the tested React 19.2.x patch version is auditable.
 - [ ] Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream`
       and `renderToReadableStream` through `@types/react-dom`, lint enforces package style, and tests exercise the
       runtime paths:
