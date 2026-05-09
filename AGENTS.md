@@ -37,6 +37,7 @@ bundle exec rubocop                  # Ruby — must pass with zero offenses
 pnpm run lint                        # JS/TS via ESLint
 pnpm start format.listDifferent      # Check Prettier formatting
 rake lint                            # All linting (Ruby + JS + formatting)
+bin/check-links                      # Markdown link checks
 
 # Auto-fix formatting
 rake autofix                         # Preferred for all formatting

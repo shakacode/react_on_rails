@@ -42,7 +42,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `actionlint` when any `.github/workflows/` file changed
    - `yamllint .github/` when any `.github/workflows/` file changed
    - Do not run RuboCop on `.yml` files
-6. Broad suite:
+6. Broad suite — pick the narrowest command that covers the change:
    - `rake all_but_examples` for broad coverage without the slow generated-examples suite
    - `rake` when shared runtime behavior, generators, cross-package contracts, or release-critical paths changed
    - `rake lint` when the full lint surface is appropriate and a single lint command is clearer than separate steps
