@@ -84,7 +84,7 @@ const ResponseImplementation = globalThis.Response;
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
     'Your Node.js runtime does not expose fetch, Headers, Request, and Response. ' +
-      'Use Node.js 18+ or replace the globalThis.* assignments above with a fetch polyfill import.',
+      'Use Node.js 18+ or replace the globalThis.* references above with a fetch polyfill import.',
   );
 }
 
@@ -124,7 +124,27 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-Use the same `additionalContext` shape if you import a compatible client from `undici` instead.
+Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export:
+
+```js
+const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
+const {
+  fetch: fetchImplementation,
+  Headers: HeadersImplementation,
+  Request: RequestImplementation,
+  Response: ResponseImplementation,
+} = require('undici');
+
+reactOnRailsProNodeRenderer({
+  supportModules: true,
+  additionalContext: {
+    fetch: fetchImplementation,
+    Headers: HeadersImplementation,
+    Request: RequestImplementation,
+    Response: ResponseImplementation,
+  },
+});
+```
 
 ## Example Launch Files
 
