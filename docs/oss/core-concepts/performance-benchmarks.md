@@ -141,8 +141,10 @@ Playwright harness and may differ from `PerformanceNavigationTiming.duration`.
 `action_total` is the Rails wall-time field from the raw benchmark artifact, not a browser Performance API metric. The
 artifact does not yet publish enough logger or extraction-script context to confirm whether it is the full
 `process_action` duration including rendering or a narrower controller-action field, so do not use it to infer the
-server-rendering split. [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing
-distribution and source artifacts.
+server-rendering split. Because the Pro Node renderer runs in a separate OS process, Rails wall time may also exclude
+RSC rendering cost that the Inertia control keeps in-process, so the two `action_total` values may not measure identical
+scopes of work. [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing distribution
+and source artifacts.
 
 Derived from the median table above, the RSC route's post-`responseEnd` browser processing time (`navigation duration -
 responseEnd`, including HTML parsing, sub-resource loading, layout, and paint) was about 18ms, compared with about 130ms
@@ -154,7 +156,9 @@ than the `responseEnd` gain (-8.7%).
 The page-specific script request count, recorded as Chrome DevTools Network panel `Script`-type requests after loading
 each route, changed from 6 requests for the Inertia demo to 1 request for the RSC demo. The artifact reports this as a
 fixed post-load request-count observation, not a per-run timing median or statistical sample, and it does not measure
-combined transfer size or cache behavior. Fewer requests do not necessarily imply a smaller browser payload. See
+combined transfer size or cache behavior. Fewer requests do not necessarily imply a smaller browser payload: the RSC
+route carries runtime, Flight payload, and RSC-specific bundle costs that the Inertia control does not, so total transfer
+size is the meaningful network-cost metric and is not reported here. See
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
 - _All timing values are medians from the raw benchmark artifact values (n=4 per route); sample size is too small to
