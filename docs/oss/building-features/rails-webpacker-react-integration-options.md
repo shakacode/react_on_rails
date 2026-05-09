@@ -169,6 +169,13 @@ Keep each shim explicit and narrow:
 
    For a `modules: false` setup, keep that setting for the rest of your app and add a narrow override:
 
+   ```bash
+   yarn add -D @babel/plugin-transform-modules-commonjs
+   # or: npm install -D @babel/plugin-transform-modules-commonjs
+   # or: pnpm add -D @babel/plugin-transform-modules-commonjs
+   # or: bun add -D @babel/plugin-transform-modules-commonjs
+   ```
+
    ```js
    // babel.config.js
    module.exports = {
