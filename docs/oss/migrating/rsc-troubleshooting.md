@@ -859,7 +859,7 @@ if (
   !AbortSignalImplementation
 ) {
   throw new Error(
-    'Your Node.js runtime does not expose fetch, Headers, Request, Response, AbortController, and AbortSignal. ' +
+    'Your Node.js runtime does not expose one or more required fetch globals (fetch, Headers, Request, Response, AbortController, AbortSignal). ' +
       'Use a supported Node.js release that exposes these globals or replace the globalThis.* references above with compatible fetch/abort polyfill imports.',
   );
 }

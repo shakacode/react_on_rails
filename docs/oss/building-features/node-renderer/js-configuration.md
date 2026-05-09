@@ -92,7 +92,7 @@ if (
   !AbortSignalImplementation
 ) {
   throw new Error(
-    'Your Node.js runtime does not expose fetch, Headers, Request, Response, AbortController, and AbortSignal. ' +
+    'Your Node.js runtime does not expose one or more required fetch globals (fetch, Headers, Request, Response, AbortController, AbortSignal). ' +
       'Use a supported Node.js release that exposes these globals or replace the globalThis.* references above with compatible fetch/abort polyfill imports.',
   );
 }
@@ -130,15 +130,23 @@ const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-rendere
 // Headers, Request, and Response are properties attached to that function, not named exports.
 // Do not destructure `fetch` from require("node-fetch"); require it as the whole module instead.
 const nodeFetch = require('node-fetch');
+
+if (!nodeFetch) {
+  throw new Error(
+    'node-fetch v2 did not export a fetch function. ' +
+      'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
+  );
+}
+
 const {
   Headers: HeadersImplementation,
   Request: RequestImplementation,
   Response: ResponseImplementation,
 } = nodeFetch;
 
-if (!nodeFetch || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+if (!HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
-    'node-fetch v2 did not export the expected fetch, Headers, Request, or Response. ' +
+    'node-fetch v2 did not expose one or more required fetch classes (Headers, Request, Response). ' +
       'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
   );
 }
@@ -179,7 +187,7 @@ if (
   !AbortSignalImplementation
 ) {
   throw new Error(
-    'The selected undici version does not expose fetch, Headers, Request, Response, AbortController, and AbortSignal. ' +
+    'The selected undici version does not expose one or more required fetch globals (fetch, Headers, Request, Response, AbortController, AbortSignal). ' +
       'Choose an undici release compatible with your renderer Node.js runtime.',
   );
 }

@@ -12,7 +12,7 @@ In a React Server Components project, there are three distinct types of bundles,
 - Generated using the RSC Webpack Loader which transforms client components into references
 - Used specifically for generating RSC payloads
 - Configured with `react-server` condition to enable RSC-specific code paths that tell the runtime that this bundle is used for RSC payload generation.
-- **Runtime: Node renderer VM context** -- when the node renderer generates an RSC payload, it executes the uploaded RSC bundle in an isolated VM context. Use `supportModules`, `additionalContext`, or bundled imports for Node.js globals.
+- **Runtime: Node renderer VM context** -- when the node renderer generates an RSC payload, it executes the uploaded RSC bundle in an isolated VM context. The webpack `target: 'node'` in `rscWebpackConfig.js` is a build-time setting only; it does not grant the runtime VM access to host Node.js globals. Use `supportModules`, `additionalContext`, or bundled imports for any globals your RSC code needs.
 
 ### Server Bundle (server-bundle.js)
 
