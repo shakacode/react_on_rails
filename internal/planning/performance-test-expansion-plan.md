@@ -18,14 +18,14 @@ existing Vegeta HTTP/2 Cleartext benchmark rather than duplicating that transpor
 
 Start with a small, representative matrix before adding more routes:
 
-| Area                  | Operation                                 | Primary metric          | Notes                                                                                               |
-| --------------------- | ----------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
-| Client rendering      | `react_component` with `prerender: false` | RPS, p50, p90, p99, max | Uses existing HTTP benchmark output; browser mount timing is follow-up instrumentation              |
-| Traditional SSR       | `react_component` with `prerender: true`  | RPS, p50, p90, p99, max | OSS first slice uses ExecJS; Pro Node Renderer follow-up uses `benchmarks/bench-node-renderer.rb`   |
-| Hash SSR              | `react_component_hash`                    | RPS, p50, p90, p99, max | Deferred; see First PR Scope. Payload-size capture requires tooling extension                       |
-| Streaming SSR         | `stream_react_component`                  | RPS, p50, p90, p99, max | Pro-only Rails HTTP path; TTFB/response-end reporting is a required extension before new thresholds |
-| RSC payload rendering | `rsc_payload_react_component`             | RPS, p50, p90, p99, max | Use a static/default route because route discovery skips required params                            |
-| Fragment caching      | `react_component` with `cache: true`      | RPS, p50, p90, p99, max | Requires separate primed-hit and busted-miss paths or setup steps; k6 cannot infer cache state      |
+| Area                  | Operation                                 | Primary metric          | Notes                                                                                                                                             |
+| --------------------- | ----------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client rendering      | `react_component` with `prerender: false` | RPS, p50, p90, p99, max | Uses existing HTTP benchmark output; browser mount timing is follow-up instrumentation                                                            |
+| Traditional SSR       | `react_component` with `prerender: true`  | RPS, p50, p90, p99, max | OSS first slice uses ExecJS; Pro Node Renderer follow-up uses `benchmarks/bench-node-renderer.rb`                                                 |
+| Hash SSR              | `react_component_hash`                    | RPS, p50, p90, p99, max | Deferred; see First PR Scope. Payload-size capture requires tooling extension                                                                     |
+| Streaming SSR         | `stream_react_component`                  | RPS, p50, p90, p99, max | Pro-only Rails HTTP path; TTFB (`http_req_waiting`) and response-end (`http_req_duration`) capture in k6 artifacts required before new thresholds |
+| RSC payload rendering | `rsc_payload_react_component`             | RPS, p50, p90, p99, max | Use a static/default route because route discovery skips required params                                                                          |
+| Fragment caching      | `react_component` with `cache: true`      | RPS, p50, p90, p99, max | Requires separate primed-hit and busted-miss paths or setup steps; k6 cannot infer cache state                                                    |
 
 Here `p50` maps to k6's `med` stat and the `p50_latency` Bencher Metric Format measure.
 
@@ -48,7 +48,9 @@ should clear that namespace, make one warm-up request to prime the fragment, the
 the dedicated `FileStore`, clear the namespace with `FileUtils.rm_rf("tmp/benchmark_cache")`; avoid `Rails.cache.clear`
 on the application cache. Avoid relying on a shared Redis instance, environment-default `:null_store`/`:memory_store`
 behavior, or manual cache state. This explicit cache-prime request is an additional step before the existing per-route
-k6 warm-up in [Noise Controls](#noise-controls); it does not replace that 10-request warm-up phase.
+k6 warm-up in [Noise Controls](#noise-controls); it does not replace that 10-request warm-up phase for cache-hit runs.
+The cache-miss path must either skip the generic per-route warm-up or clear the dedicated benchmark cache again after
+warm-up and immediately before k6 measurement, so measurement starts from a cold cache state.
 
 Recommended Pro slice for [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169), implemented after the
 OSS first slice or in a dedicated follow-up PR:
@@ -57,9 +59,11 @@ OSS first slice or in a dedicated follow-up PR:
    TTFB/response-end capture in the k6 artifacts, CI summary, and Bencher output before defining streaming-specific
    thresholds. LCP remains separate browser instrumentation such as Playwright or Lighthouse.
 2. RSC payload route with representative payload size measurements. Treat this as endpoint throughput and payload-size
-   coverage rather than streaming TTFB measurement. Use a static benchmark route with no required URL params, teach
-   `benchmarks/bench.rb` how to provide a default component name, or run `benchmarks/k6.ts` with an explicit `TARGET_URL`;
-   automatic route discovery currently skips required-parameter routes such as `/rsc_payload/:component_name`.
+   coverage rather than streaming TTFB measurement. Use a static benchmark route with no required URL params. If the
+   dummy app has no parameter-free RSC route, run `benchmarks/k6.ts` with an explicit `TARGET_URL`; alternatively,
+   introduce an `RSC_BENCHMARK_COMPONENT` environment variable defaulting to a known component name so
+   `benchmarks/bench.rb` can construct the URL without relying on route discovery. Automatic route discovery currently
+   skips required-parameter routes such as `/rsc_payload/:component_name`.
 
 Use `benchmarks/bench.rb`/`benchmarks/k6.ts` for Rails HTTP routes such as streaming SSR and static RSC payload endpoint
 checks. Use `benchmarks/bench-node-renderer.rb` for direct Pro Node Renderer transport coverage unless that script is
@@ -87,10 +91,10 @@ Prerequisites for the first implementation PR:
   artifacts before using route ordering as a noise-control signal. This is large enough to land as its own prerequisite
   PR, and the first benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally
   because it roughly
-  doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about `2 * (DURATION + 5 seconds)` per
-  route with the current warm-up, assuming the default `DURATION=30s`. This estimate does not include the per-job
-  `bundle exec rails routes` discovery call, server startup, or server warmdown time. Recalculate the estimate when
-  overriding `DURATION`.
+  doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about
+  `2 * (DURATION + WARMUP_REQUESTS * WARMUP_SLEEP_S)` per route (currently `2 * (30s + 10 * 0.5s)` = 70 seconds with
+  defaults). This estimate does not include the per-job `bundle exec rails routes` discovery call, server startup, or
+  server warmdown time. Recalculate the estimate when overriding `DURATION`, `WARMUP_REQUESTS`, or `WARMUP_SLEEP_S`.
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
@@ -103,9 +107,9 @@ Prerequisites for the first implementation PR:
 
   ```json
   {
-    "ruby_version": "ruby 3.3.0 (2023-12-25 revision ...) [x86_64-linux]",
-    "node_version": "v20.11.0",
-    "react_version": "18.3.1",
+    "ruby_version": "<output of: ruby --version>",
+    "node_version": "<output of: node --version>",
+    "react_version": "<installed react package version>",
     "renderer": "execjs",
     "runner_type": "ubuntu-latest",
     "bundle_mode": "production",
