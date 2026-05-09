@@ -145,6 +145,7 @@ module RscNodeRenderer
 
       if pid
         begin
+          # This process was spawned above, so EPERM is not expected here; ESRCH means it exited early.
           Process.kill(0, pid)
         rescue Errno::ESRCH
           hint = log_path ? " Check #{log_path} for startup errors." : ""
@@ -181,7 +182,7 @@ RSpec.configure do |config|
     end
     expanded_cache_path = File.expand_path(cache_path)
     FileUtils.mkdir_p(Rails.root.join("tmp"))
-    tmp_root = File.expand_path(Rails.root.join("tmp").to_s)
+    tmp_root = Rails.root.join("tmp").to_s
     unless expanded_cache_path.start_with?("#{tmp_root}#{File::SEPARATOR}")
       raise "RENDERER_SERVER_BUNDLE_CACHE_PATH must be inside Rails.root/tmp " \
             "(got: #{expanded_cache_path})"
@@ -231,6 +232,7 @@ RSpec.configure do |config|
     Process.kill("-TERM", pid)
     # Thread#join returns the waiter thread when the process exits, and nil on timeout.
     # Skip SIGKILL only when TERM worked and the waiter reaped the process.
+    # Ruby still runs the block-level ensure below when next exits the hook early.
     next if rsc_node_renderer_waiter&.join(5)
 
     Process.kill("-KILL", pid)
@@ -247,7 +249,7 @@ RSpec.configure do |config|
 end
 ```
 
-Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately; if you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
+Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately; if you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout. The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to the one-second connect timeout. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
 
 The explicit `ensure_assets_compiled` call above is intentional: the renderer needs bundles before it boots. Step 2 still wires compilation to `:rsc` examples for suites that do not start the renderer.
 
