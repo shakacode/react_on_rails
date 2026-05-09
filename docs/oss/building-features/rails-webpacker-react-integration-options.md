@@ -94,7 +94,7 @@ If you are on Webpacker 5 / Webpack 4, whether you are migrating from `react-rai
 
 These shims are not covered by React on Rails CI and are documented as a temporary bridge for apps still on Webpacker 5 / Webpack 4; the bundler is the compatibility constraint, so verify your full app locally before relying on them.
 
-Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims.
+Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims. Because the package also declares `"type": "module"`, Webpack 4 stacks that reach the package's `.js` files may still need Babel to transpile ESM syntax after the import path is fixed.
 
 Keep each shim explicit and narrow:
 
@@ -150,12 +150,39 @@ Keep each shim explicit and narrow:
    };
    ```
 
-3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed. Before touching `config/webpack/environment.js`, confirm these prerequisites:
+3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed.
+
+   **When to apply:** Add this loader only if Webpack 4 still reports parse errors from `node_modules/react-on-rails` after Step 1 and Step 2.
+
+   Before touching `config/webpack/environment.js`, confirm these prerequisites:
    - Use a project-wide `babel.config.js` or `babel.config.json`. Package-scoped `.babelrc` files and `package.json#babel` settings will not apply when Babel processes files inside `node_modules/react-on-rails`.
    - If your app only has `.babelrc`, move that config into `babel.config.js` before adding this rule.
    - Confirm Step 2 is in place, either through the standalone optional chaining and nullish coalescing plugins or through existing `@babel/preset-env` targets that already include those transforms.
    - If your `@babel/preset-env` config uses `modules: false`, add a `babel.config.js` `overrides` entry that applies `@babel/plugin-transform-modules-commonjs` to `node_modules/react-on-rails`; otherwise Webpack 4 can still fail on the package's ESM files.
    - If your Webpacker stack pins Babel dependencies, choose plugin versions compatible with your installed `@babel/core`.
+
+   For a `modules: false` setup, keep that setting for the rest of your app and add a narrow override:
+
+   ```js
+   // babel.config.js
+   module.exports = {
+     presets: [
+       [
+         '@babel/preset-env',
+         {
+           // keep existing options
+           modules: false,
+         },
+       ],
+     ],
+     overrides: [
+       {
+         test: './node_modules/react-on-rails',
+         plugins: ['@babel/plugin-transform-modules-commonjs'],
+       },
+     ],
+   };
+   ```
 
    `rootMode: 'upward'` tells Babel to walk up from `node_modules/react-on-rails` to the project root so it
    can find your project-wide `babel.config.js` or `babel.config.json`.
