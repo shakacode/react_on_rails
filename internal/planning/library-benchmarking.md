@@ -86,8 +86,8 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 - `MAX_SAMPLE=64`
 - `--err` causes Bencher regression alerts to return a non-zero exit code
 - each threshold uses `--threshold-test t_test` and `--threshold-max-sample-size $MAX_SAMPLE`
-- `rps` uses `--threshold-lower-boundary $BOUNDARY` because higher RPS is better; a regression is a drop below the
-  lower bound
+- `rps` uses `--threshold-lower-boundary $BOUNDARY` and `--threshold-upper-boundary _` (which disables the upper bound)
+  because higher RPS is better; a regression is a drop below the lower bound
 - `p50_latency`, `p90_latency`, `p99_latency`, and `failed_pct` use `--threshold-upper-boundary $BOUNDARY` because lower
   latency and failure rate are better; a regression is a rise above the upper bound
 - on main, `run_bencher` captures Bencher's non-zero exit as `BENCHER_EXIT_CODE`; the
