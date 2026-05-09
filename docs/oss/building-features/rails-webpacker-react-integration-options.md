@@ -94,7 +94,9 @@ If you are moving an older `react-rails` app to React on Rails while it is still
 
 These shims are not covered by React on Rails CI and are documented for the legacy React 16/17 `react-rails` / Webpacker migration profile described in the migration guide; the bundler is the compatibility constraint, so verify your full app locally before relying on them.
 
-Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims. Apply only the steps that match the errors you see, except that Step 3 requires Step 2's transforms to already be configured. Keep each shim explicit and narrow:
+Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims.
+
+Apply only the steps that match the errors you see. Step 3 depends on Step 2: configure the Babel transforms before adding the loader rule. Keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
 
