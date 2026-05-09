@@ -17,7 +17,9 @@ This is a planning document. It does not change package versions, build configur
 The workspace package ranges already allow React 19.2.x through `^19.0.3` for `react` and `react-dom`, plus `^19.0.4`
 for `react-on-rails-rsc` (the React on Rails RSC integration package, not a React-team package), in the root, dummy app,
 and Pro dummy app package manifests. To see what versions are currently resolved, run
-`pnpm list react react-dom react-on-rails-rsc` from the repo root. That means the first implementation step is
+`pnpm list react react-dom react-on-rails-rsc` from the repo root. Note: `react_on_rails_pro/spec/execjs-compatible-dummy`
+is intentionally pinned to React 18 through pnpm overrides for `app>react` and `app>react-dom`; verification should
+confirm whether that workspace stays on React 18 during this work. That means the first implementation step is
 verification, not necessarily a broad package-range change.
 
 Note: `react-on-rails-pro` currently pins `react-on-rails-rsc` as a peer dependency at `>= 19.0.2 <= 19.2.3`.
@@ -45,10 +47,14 @@ Use a dedicated branch for the actual version verification work:
   - `pnpm --filter react-on-rails run test`
   - `pnpm --filter create-react-on-rails-app run type-check`
   - `pnpm --filter create-react-on-rails-app run test`
-  - `pnpm --filter react-on-rails-pro run type-check` _(requires Pro access and `react_on_rails_pro/` checked out)_
-  - `pnpm --filter react-on-rails-pro run test:rsc` _(requires Pro access and `react_on_rails_pro/` checked out)_
-  - `pnpm --filter react-on-rails-pro-node-renderer run type-check` _(requires Pro access)_
-  - `pnpm --filter react-on-rails-pro-node-renderer run test` _(requires Pro access)_
+  - `pnpm --filter react-on-rails-pro run type-check` _(requires Pro runtime prerequisites such as license or env setup)_
+  - `pnpm --filter react-on-rails-pro run test` _(requires Pro runtime prerequisites such as license or env setup)_
+  - `pnpm --filter react-on-rails-pro-node-renderer run type-check` _(requires Pro runtime prerequisites such as license
+    or env setup)_
+  - `pnpm --filter react-on-rails-pro-node-renderer run test` _(requires Pro runtime prerequisites such as license or env
+    setup)_
+  - Confirm whether `react_on_rails_pro/spec/execjs-compatible-dummy` needs a dedicated React 18 test run as part of the
+    acceptance criteria.
 - [ ] Run Ruby checks that exercise SSR and generated apps:
   - `bundle exec rubocop`
   - `bundle exec rake rbs:validate`
