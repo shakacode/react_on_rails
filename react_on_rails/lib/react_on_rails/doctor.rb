@@ -74,6 +74,8 @@ module ReactOnRails
       "Dockerfile.production",
       "Dockerfile.staging",
       "Dockerfile.review",
+      "docker-compose.yml",
+      "compose.yml",
       "bin/deploy",
       "bin/release",
       "bin/docker-entrypoint",

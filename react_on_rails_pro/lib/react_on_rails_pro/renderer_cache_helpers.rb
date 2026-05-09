@@ -20,12 +20,11 @@ module ReactOnRailsPro
       # are required, so resolve them separately and fail loudly if either
       # resolves to nil rather than letting `.compact` swallow the gap.
       assets = Array(config.assets_to_copy).compact
+      rsc_manifests = []
 
       if config.enable_rsc_support
         rsc_manifests = rsc_manifest_paths
         assets.concat(rsc_manifests)
-      else
-        rsc_manifests = []
       end
 
       unique = assets.uniq(&:to_s)
@@ -140,10 +139,10 @@ module ReactOnRailsPro
     end
 
     def validate_bundle_exists!(path, action_description)
-      return if File.exist?(path)
+      return if File.file?(path)
 
       raise ReactOnRailsPro::Error,
-            "Bundle not found at #{path}. " \
+            "Bundle not found or not a file at #{path}. " \
             "Please build your bundles before #{action_description} the renderer cache."
     end
 

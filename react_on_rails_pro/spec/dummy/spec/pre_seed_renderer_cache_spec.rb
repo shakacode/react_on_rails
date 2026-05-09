@@ -366,6 +366,21 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
   end
 
+  context "when server bundle path is a directory" do
+    let(:directory_bundle_path) { path_in_webpack_folder("server-bundle-directory.js") }
+
+    before do
+      FileUtils.mkdir_p(directory_bundle_path)
+      allow(ReactOnRails::Utils).to receive(:server_bundle_js_file_path).and_return(directory_bundle_path)
+    end
+
+    after { FileUtils.rm_rf(directory_bundle_path) }
+
+    it "raises the friendly bundle error before hashing or staging" do
+      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /Bundle not found/)
+    end
+  end
+
   context "when the pool returns a blank server_bundle_hash" do
     before do
       pool = ReactOnRailsPro::ServerRenderingPool::NodeRenderingPool
