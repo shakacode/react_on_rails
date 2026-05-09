@@ -386,6 +386,13 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(true)
     end
 
+    it "returns true when packageManager includes a Corepack hash annotation" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm@9.0.0+sha256.abc123"}')
+      expect(described_class.package_manager_declared?(manager: "pnpm")).to be(true)
+    end
+
     it "returns false when packageManager is absent" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path).and_return('{"name":"app"}')

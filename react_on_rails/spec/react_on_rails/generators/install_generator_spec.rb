@@ -2068,11 +2068,10 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when env selects pnpm but packageManager declares yarn" do
-    original_react_on_rails_package_manager = nil
+    before do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("REACT_ON_RAILS_PACKAGE_MANAGER", nil).and_return("pnpm")
 
-    before(:all) do
-      original_react_on_rails_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
-      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "pnpm"
       run_generator_test_with_args(%w[], package_json: true) do
         simulate_existing_file("pnpm-lock.yaml", "")
         simulate_existing_file("bin/shakapacker", "")
@@ -2083,14 +2082,6 @@ describe InstallGenerator, type: :generator do
           "package.json",
           "#{JSON.pretty_generate('name' => 'app', 'packageManager' => 'yarn@1.22.0')}\n"
         )
-      end
-    end
-
-    after(:all) do
-      if original_react_on_rails_package_manager
-        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_react_on_rails_package_manager
-      else
-        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
       end
     end
 

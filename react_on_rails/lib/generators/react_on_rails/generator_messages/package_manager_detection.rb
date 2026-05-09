@@ -36,6 +36,8 @@ module GeneratorMessages
     # Pass package_json: nil to skip JSON detection (e.g. when read_package_json already
     # returned nil because package.json is absent or unreadable); detection falls through
     # directly to lockfile heuristics.
+    # Compatibility note: nil is not the default behavior for this keyword. Omit the
+    # keyword when callers want detect_package_manager to perform its own disk read.
     def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       detect_package_manager_with_source(app_root: app_root, package_json: package_json).first
     end
