@@ -28,7 +28,7 @@ Consider this approach if you:
 When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice:
 
 1. Move custom one-time tasks into `run_precompile_tasks` in `bin/dev`.
-2. Remove matching shell fragments from `Procfile.dev` and any project-specific variants (for example, `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`).
+2. Remove matching shell fragments from `Procfile.dev`, any project-specific variants (for example, `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`), and CI/CD pipeline scripts (for example, `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json`).
 3. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
 4. Add the same required build steps to `build_test_command` and `build_production_command`.
 5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
@@ -162,13 +162,15 @@ unless %w[test production].include?(mode)
   exit(1)
 end
 
-system("yarn", "res:build", exception: true) # replace with your own pre-build step(s)
+system("yarn", "res:build") || abort("res:build failed") # replace with your own pre-build step(s)
 
 case mode
 when "test"
-  system({ "RAILS_ENV" => "test", "NODE_ENV" => "test" }, "bin/shakapacker", exception: true)
+  env = { "RAILS_ENV" => "test", "NODE_ENV" => "test" }
+  system(env, "bin/shakapacker") || abort("shakapacker (test) failed")
 when "production"
-  system({ "RAILS_ENV" => "production", "NODE_ENV" => "production" }, "bin/shakapacker", exception: true)
+  env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
+  system(env, "bin/shakapacker") || abort("shakapacker (production) failed")
 end
 ```
 
