@@ -123,7 +123,7 @@ module RscNodeRenderer
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
 
     loop do
-      TCPSocket.open(host, port) {}
+      TCPSocket.new(host, port).close
       break
     rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT
       if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
@@ -171,7 +171,9 @@ RSpec.configure do |config|
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => expanded_cache_path
     }
 
-    renderer_log_path = Rails.root.join("log/node-renderer-test.log").to_s
+    test_worker = ENV.fetch("TEST_ENV_NUMBER", "0")
+    test_worker = "0" if test_worker.empty?
+    renderer_log_path = Rails.root.join("log/node-renderer-test-#{test_worker}.log").to_s
     rsc_node_renderer_pid = Process.spawn(
       renderer_env,
       "pnpm", # replace with "npm", "yarn", or "bun" if that is your package manager
