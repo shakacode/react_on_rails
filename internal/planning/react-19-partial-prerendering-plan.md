@@ -24,11 +24,11 @@ confirm whether that workspace stays on React 18 during this work. That means th
 verification, not necessarily a broad package-range change.
 
 Note: `packages/react-on-rails-pro/package.json` already sets the `react-on-rails-rsc` peer dependency ceiling to
-`>= 19.0.2 <= 19.2.3`. Verification should decide whether this ceiling should be widened alongside any React 19.2.x range
-update. Because a hard upper bound would reject a future `19.2.4` patch or `19.3.x` minor release, the decision must either
-widen the range for stable React 19.x, such as `< 20.0.0`, or document the specific API risk that requires a tight pin. If
-verification finds no specific API risk, the default outcome is to widen the ceiling to `< 20.0.0`. **Owner**: @justin808 |
-**Target**: before any package-range change is merged (see Open Questions).
+`>= 19.0.2 <= 19.2.3` (space means AND; both comparators must be satisfied). Verification should decide whether this ceiling
+should be widened alongside any React 19.2.x range update. Because a hard upper bound would reject a future `19.2.4` patch or
+`19.3.x` minor release, the decision must either widen the range for stable React 19.x, such as `< 20.0.0`, or document the
+specific API risk that requires a tight pin. If verification finds no specific API risk, the default outcome is to widen the
+ceiling to `< 20.0.0`. **Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
 
 ## React 19.2.x Verification Checklist
 
@@ -88,13 +88,13 @@ Use a dedicated branch for the actual version verification work:
   - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
   - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
   - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
-- [ ] Run the generated-app suite. Prefer a fresh clone. If a fresh clone is not practical, use the repo root after stashing
-      and cleaning:
+- [ ] Run the generated-app suite. Prefer a fresh clone.
 
   > **Warning**: `git clean -fdx` deletes all untracked files, including gitignored files, and cannot be undone. Move or
-  > back up gitignored files, such as `.env`, local credentials, or generated certs, before continuing. For tracked or
-  > non-ignored in-progress work, stash or commit first. Note: `git stash -u` saves untracked non-ignored files, but does
-  > not save gitignored files.
+  > back up gitignored files, such as `.env`, local credentials, or generated certs, before continuing.
+
+  If a fresh clone is not practical, use the repo root after stashing or committing tracked and non-ignored in-progress work.
+  Note: `git stash -u` saves untracked non-ignored files, but does not save gitignored files.
 
   ```bash
   git stash -u
