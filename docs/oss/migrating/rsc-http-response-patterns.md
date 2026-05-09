@@ -21,8 +21,9 @@ With streaming, this boundary matters even more. Once Rails writes the first res
 ## Preflight Pattern
 
 Use a controller or service object to gather data and choose the response policy before rendering the RSC tree.
-The preflight object exposes a small, serializable result. `StorySerializer`, `PublicStorySerializer`, and
-`ViewerSerializer` are placeholder names in these examples; substitute your app's serializer or presenter as needed.
+The preflight object exposes a small, serializable result. `StorySerializer`, `PublicStorySerializer`,
+`ViewerSerializer`, and `StoryPolicy` are placeholder names in these examples; substitute your app's serializer,
+presenter, or authorization helper as needed.
 
 ```ruby
 class StoriesController < ApplicationController
@@ -52,6 +53,9 @@ class StoriesController < ApplicationController
 end
 ```
 
+`stream_view_containing_react_components` commits the response status that was set before streaming begins. For example,
+a pre-set `:not_found` status remains a real `404` in the HTTP response line.
+
 One possible preflight implementation is:
 
 ```ruby
@@ -78,6 +82,14 @@ class StoryPagePreflight
     story = Story.find_by(id: story_id)
 
     unless story
+      return Result.new(
+        props: { notFound: true, story: nil },
+        status: :not_found,
+        cache_control: "no-store"
+      )
+    end
+
+    unless StoryPolicy.new(current_user, story).read?
       return Result.new(
         props: { notFound: true, story: nil },
         status: :not_found,
@@ -171,12 +183,12 @@ Use `410 Gone` when the route identifies a permanently removed resource and you 
 def show
   story = Story.find_by(slug: params[:slug])
 
-  if story&.removed?
+  return render(template: "errors/not_found", status: :not_found) unless story
+
+  if story.removed?
     response.headers["Cache-Control"] = "public, max-age=3600" # Cache only for truly permanent removals.
     return render(template: "errors/gone", status: :gone)
   end
-
-  return render(template: "errors/not_found", status: :not_found) unless story
 
   @story_props = { story: StorySerializer.render_as_hash(story) }
   stream_view_containing_react_components(template: "stories/show")
@@ -239,7 +251,7 @@ def show
   return unless stale?(
     story,
     public: true,
-    cache_control: { max_age: 300, stale_while_revalidate: 300 }
+    cache_control: { max_age: 60, stale_while_revalidate: 300 }
   )
 
   @story_props = { story: PublicStorySerializer.render_as_hash(story) }
