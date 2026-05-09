@@ -89,11 +89,12 @@ Server components produce HTML that does not need hydration — they have no cli
 
 ## Real-World Results
 
-### Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
+### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo, not an official Gumroad integration. It measures a bounded creator-dashboard
-surface with the same reduced presenter data and outer layout across two routes:
+surface with the same reduced presenter data and outer layout across two routes. The comparison changes three axes at
+once (RSC, the Pro Node renderer, and SSR), so the deltas cannot be attributed to any single factor. The routes are:
 
 - Inertia-style control: `/dashboard/inertia_demo` (uses the actual `inertia_rails` gem; no Pro renderer or SSR)
 - React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
@@ -114,24 +115,25 @@ Conditions:
 - Dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`
 - Chrome 147 with matching ChromeDriver 147
 
-The original artifact does not yet publish `RAILS_ENV`, hardware/OS, Ruby/Node/Rails versions, or cache-state details.
-[Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing environment metadata; until
-that is resolved, treat these numbers as directional signals rather than a stable baseline.
+The original artifact does not yet publish `RAILS_ENV`, browser cache behavior between measured runs, hardware/OS, or
+Ruby/Node/Rails versions. [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing
+environment metadata; until that is resolved, treat these numbers as directional signals rather than a stable baseline.
 
 The browser timing medians showed this directional signal:
 
 | Metric                                      | Inertia demo | RSC demo |  Delta |
 | ------------------------------------------- | -----------: | -------: | -----: |
-| Navigation duration                         |     775.40ms | 607.15ms | -21.7% |
-| Largest Contentful Paint                    |     794.00ms | 634.00ms | -20.2% |
-| `responseEnd`                               |     644.80ms | 588.80ms |  -8.7% |
-| Controller `action_total` (Rails wall time) |     346.90ms | 339.20ms |  noise |
+| Navigation duration                         |        775ms |    607ms | -21.7% |
+| Largest Contentful Paint                    |        794ms |    634ms | -20.2% |
+| `responseEnd`                               |        645ms |    589ms |  -8.7% |
+| Controller `action_total` (Rails wall time) |        347ms |    339ms |  noise |
 
 The page-specific script request count changed from 6 requests for the Inertia demo to 1 request for the RSC demo. That
 is a fixed request count, not a timing median or statistical sample, and it does not measure combined transfer-size. See
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
-- _All timing values are medians (n=4 per route); sample size is too small to establish statistical significance._
+- _All timing values are medians rounded to the nearest millisecond (n=4 per route); sample size is too small to
+  establish statistical significance._
 - _The `action_total` difference was -2.2%, which is likely within expected variance at n=4._
 - _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
@@ -139,7 +141,7 @@ Worst-case counter-signal:
 
 | Metric                              | Inertia demo | RSC demo | Delta |
 | ----------------------------------- | -----------: | -------: | ----: |
-| Max `responseEnd` (worst-case, n=4) |     730.62ms | 768.25ms | +5.2% |
+| Max `responseEnd` (worst-case, n=4) |        731ms |    768ms | +5.2% |
 
 The max row is a max-vs-max comparison, not a stable tail-latency estimate. It shows a +5.2% RSC regression on
 worst-case `responseEnd` (high variance is expected at n=4), indicating the Inertia control had a faster worst-case
