@@ -92,13 +92,15 @@ Prerequisites for the first implementation PR:
   PR, and the first benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally
   because it roughly
   doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about
-  `2 * (DURATION + WARMUP_REQUESTS * WARMUP_SLEEP_S)` per route (currently `2 * (30s + 10 * 0.5s)` = 70 seconds with
-  defaults). This estimate does not include the per-job `bundle exec rails routes` discovery call, server startup, or
-  server warmdown time. Recalculate the estimate when overriding `DURATION`, `WARMUP_REQUESTS`, or `WARMUP_SLEEP_S`.
+  `2 * (DURATION + warm-up requests * warm-up sleep)` per route. With today's defaults and the hard-coded warm-up loop in
+  `benchmarks/bench.rb`, that is `2 * (30s + 10 * 0.5s)` = 70 seconds. This estimate does not include the per-job
+  `bundle exec rails routes` discovery call, server startup, or server warmdown time. Recalculate the estimate if
+  `DURATION` changes or if the `benchmarks/bench.rb` warm-up loop changes.
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
-  `node --version` for `node_version`, and the installed React package metadata for `react_version`.
+  `node --version` for `node_version`, and run `node -e "console.log(require('react/package.json').version)"` from the
+  active `APP_DIR` for `react_version` so OSS and Pro dummy apps report their own installed React package.
   Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary; the
   first slice should start at one run per route, and alternating route order increases it to two when both passes are
   merged into one route summary.
@@ -109,9 +111,9 @@ Prerequisites for the first implementation PR:
   {
     "ruby_version": "<output of: ruby --version>",
     "node_version": "<output of: node --version>",
-    "react_version": "<installed react package version>",
-    "renderer": "execjs",
-    "runner_type": "ubuntu-latest",
+    "react_version": "<output of: node -e \"console.log(require('react/package.json').version)\" from APP_DIR>",
+    "renderer": "<node_renderer when PRO=true, otherwise execjs>",
+    "runner_type": "<RUNNER_OS/RUNNER_ARCH when available, otherwise local platform>",
     "bundle_mode": "production",
     "sample_count": 1
   }
@@ -120,8 +122,8 @@ Prerequisites for the first implementation PR:
 - Preserve the existing `benchmarks/bench.rb` summary metrics (`RPS`, `p50`, `p90`, `p99`, and `max`) and extend Bencher
   BMF reporting to include `max_latency` alongside the existing `rps`, `p50_latency`, `p90_latency`, `p99_latency`, and
   `failed_pct` measures. Today `max` appears in `summary.txt` but not in the BMF output. Add a `max:` keyword parameter
-  to `BmfCollector#add` in `benchmarks/lib/bmf_helpers.rb`, then pass `max_latency:` from the `bmf_collector.add` call
-  in `benchmarks/bench.rb`.
+  to `BmfCollector#add` in `benchmarks/lib/bmf_helpers.rb`, then pass `max: max_latency` from the `bmf_collector.add`
+  call in `benchmarks/bench.rb`.
 
 Follow-on enhancements:
 
