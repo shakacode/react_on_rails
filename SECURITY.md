@@ -21,8 +21,10 @@ Use GitHub's private vulnerability reporting for this repository:
 2. Select **Report a vulnerability**.
 3. Include affected package versions, impact, and the smallest safe reproduction details you can share privately.
 
-If the repository does not show **Report a vulnerability**, contact a repository maintainer with write access through a
-private channel and coordinate disclosure timing before sharing exposure details publicly.
+If the repository does not show **Report a vulnerability**, open a confidential
+[GitHub Security Advisory](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/creating-a-repository-security-advisory)
+draft, or contact a repository maintainer with write access directly and coordinate disclosure timing before sharing
+exposure details publicly.
 
 Maintainers aim to provide an initial response within five business days. The default disclosure window is 90 days from
 the date of first report unless maintainers and the reporter agree to a shorter or longer timeline.

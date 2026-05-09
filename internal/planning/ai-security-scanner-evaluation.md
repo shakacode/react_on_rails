@@ -1,8 +1,8 @@
 # AI Security Scanner Evaluation Plan
 
-**Vendor snapshot:** See git history for last revision date. Re-check product names, URLs, plans, and language coverage before running the
-evaluation, then refresh this snapshot annually or when a listed vendor is acquired, deprecated, or materially changes
-scope.
+**Last updated:** 2026-05-09. **Vendor snapshot:** Re-check product names, URLs, plans, and language coverage before
+running the evaluation, then refresh this snapshot annually or when a listed vendor is acquired, deprecated, or materially
+changes scope.
 
 ## Purpose
 
@@ -32,8 +32,9 @@ Compare scanner output against the current baseline before counting a finding as
 - Dependabot security updates for npm, Bundler, and GitHub Actions under `.github/dependabot.yml`
 - Existing lint, test, and code review workflows
 
-No dedicated `bundler-audit`, `bundle-audit`, `npm audit`, or `pnpm audit` CI workflow is configured at this snapshot.
-If one is added before an evaluation run, include it in this baseline before counting dependency CVEs as net-new signal.
+No dedicated `bundler-audit` (CLI: `bundle-audit`), `npm audit`, or `pnpm audit` CI workflow is configured at this
+snapshot. If one is added before an evaluation run, include it in this baseline before counting dependency CVEs as
+net-new signal.
 
 Record whether each verified finding is missed by the existing baseline or whether the scanner mainly improves
 prioritization, explanation, or reachability analysis for a finding that existing tools already surface.
@@ -76,6 +77,9 @@ Before running scans, record the exact baselines used:
 | `main`              | `react_on_rails`                 | `main`                 | `<fill full SHA>`     | `<fill date>` |
 | Known-issue fixture | Private fork or training project | `<fill branch or URL>` | `<fill SHA/version>`  | `<fill date>` |
 | Safe refactor       | `react_on_rails`                 | `<fill branch>`        | `<fill full SHA>`     | `<fill date>` |
+
+> **Do not run any scanner evaluation until every cell in this table is filled in and committed.** Undocumented
+> baselines produce results that cannot be reproduced or compared across evaluators.
 
 The intentionally vulnerable fixture should be small and obvious, such as unsafe template evaluation in a test-only file.
 Do not commit intentionally vulnerable fixtures, secrets, real credentials, or exploit-ready application behavior to a
