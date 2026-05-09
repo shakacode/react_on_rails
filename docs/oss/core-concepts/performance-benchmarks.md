@@ -111,6 +111,7 @@ route. Before each of the eight measured runs, the harness sent one warmup reque
 warmup may not be enough for the Pro Node renderer worker pool to reach JIT and RSC-payload-compilation steady state.
 That limitation is more likely to make the RSC route look slower than its steady-state performance than to inflate its
 advantage, so treat the RSC median wins as directional rather than fully warmed production estimates.
+
 Conditions:
 
 - Compiled page assets from the same Shakapacker/Rspack configuration for both routes
