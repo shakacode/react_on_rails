@@ -201,9 +201,9 @@ chmod +x bin/build-react-on-rails
 git add bin/build-react-on-rails
 ```
 
-On Windows or Docker volumes where the filesystem may not preserve Unix modes, `chmod` may not make the current checkout
-runnable. Record the executable bit in Git for CI and other checkouts, and invoke the script through Ruby when running it
-from that local filesystem:
+On Windows or Docker bind mounts backed by a Windows filesystem, the filesystem may not preserve Unix modes, so `chmod`
+may not make the current checkout runnable. Record the executable bit in Git for CI and other checkouts, and invoke the
+script through Ruby when running it from that local filesystem:
 
 ```bash
 git update-index --add --chmod=+x bin/build-react-on-rails
@@ -214,13 +214,14 @@ Use `production` instead of `test` for the production build command. The `git up
 metadata; it does not change the current working-tree file mode.
 
 Configure `react_on_rails.rb` once. Use direct script commands on Unix-like filesystems and CI where the executable bit is
-set; use the Ruby-prefixed variant for local Windows or Docker-volume checkouts that cannot execute the file directly:
+set; use the Ruby-prefixed variant for local Windows or Windows-backed Docker bind-mount checkouts that cannot execute the
+file directly:
 
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
   # Unix/CI (executable bit set): "bin/build-react-on-rails test"
-  # Windows/Docker (no exec bit): "ruby bin/build-react-on-rails test"
+  # Windows/Windows-backed Docker bind mount: "ruby bin/build-react-on-rails test"
   config.build_test_command = "bin/build-react-on-rails test"
   config.build_production_command = "bin/build-react-on-rails production"
 end
