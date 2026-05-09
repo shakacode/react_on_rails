@@ -111,12 +111,14 @@ If your component code creates abort signals, keep the `...abortContext` spread 
 
 Install a fetch implementation only when your renderer runtime does not provide these globals, or when you intentionally want a bundled HTTP client instead of the host runtime's implementation. Use this decision guide:
 
-| Situation                                                                        | Recommendation                                                                                                                                    |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Supported Node.js LTS host, want to use the runtime's built-in fetch             | Use the guarded `globalThis.fetch` / `additionalContext` example above.                                                                           |
-| CommonJS launch file on an older runtime that does not expose fetch globals      | Use `node-fetch` v2; `node-fetch` v3+ is ESM-only.                                                                                                |
-| Supported Node.js LTS, ESM or CommonJS, want a bundled HTTP client               | Use `undici` and choose a release compatible with your runtime; see [undici's compatibility notes](https://undici.nodejs.org/) for version pairs. |
-| Older or unsupported Node.js installation that cannot use the built-in fetch API | Pin the HTTP client to a version that still supports that runtime.                                                                                |
+| Situation                                                                   | Recommendation                                                                                                                                    |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Supported Node.js LTS host, want to use the runtime's built-in fetch        | Use the guarded `globalThis.fetch` / `additionalContext` example above.                                                                           |
+| CommonJS launch file on an older runtime that does not expose fetch globals | Use `node-fetch` v2; `node-fetch` v3+ is ESM-only.                                                                                                |
+| Supported Node.js LTS, ESM or CommonJS, want a bundled HTTP client          | Use `undici` and choose a release compatible with your runtime; see [undici's compatibility notes](https://undici.nodejs.org/) for version pairs. |
+
+For older or unsupported Node.js installations that cannot use the built-in fetch API, use the `node-fetch` v2 CommonJS
+row or an `undici` release from the compatibility notes that still supports your runtime.
 
 For example, with `node-fetch` v2 in a CommonJS launch file:
 
