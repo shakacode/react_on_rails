@@ -144,9 +144,10 @@ worst-case `responseEnd` (high variance is expected at n=4), indicating the Iner
 `responseEnd` than the RSC route.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
-user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the max
-`responseEnd` counter-signal was faster for the Inertia control. A stable deployed repeat, renderer-internal timing,
-environment metadata, and distribution artifacts are still required before making stronger production-performance claims.
+user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the route also
+benefits from both RSC and the Pro Node renderer with SSR, while the Inertia control has neither. The max `responseEnd`
+counter-signal was faster for the Inertia control. A stable deployed repeat, renderer-internal timing, environment
+metadata, and distribution artifacts are still required before making stronger production-performance claims.
 
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
