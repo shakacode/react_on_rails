@@ -24,13 +24,15 @@ confirm whether that workspace stays on React 18 during this work. That means th
 verification, not necessarily a broad package-range change.
 
 Note: `packages/react-on-rails-pro/package.json` already sets the `react-on-rails-rsc` peer dependency ceiling to
-`>= 19.0.2 <= 19.2.3` (space means AND; both comparators must be satisfied). Verification should decide whether this ceiling
-should be widened alongside any React 19.2.x range update. Because a hard upper bound would reject a future `19.2.4` patch or
-`19.3.x` minor release, the decision must either widen the range for stable React 19.x, such as `< 20.0.0`, or document the
-specific API risk that requires a tight pin. If verification finds no specific API risk, the default outcome is to widen the
-ceiling to `< 20.0.0`. The same decision must also audit the Pro package `react` and `react-dom` peer dependency ranges,
-currently `>= 16`, so all three peer ranges stay aligned with the minimum React version decision. **Owner**: @justin808 |
-**Target**: before any package-range change is merged (see Open Questions).
+`>= 19.0.2 <= 19.2.3` (space means AND; both comparators must be satisfied). The `<= 19.2.3` upper bound is a precautionary
+verified-patch ceiling from the current planning pass, not a recorded React API incompatibility. Verification should decide
+whether this ceiling should be widened alongside any React 19.2.x range update. Because a hard upper bound would reject a
+future `19.2.4` patch or `19.3.x` minor release, the decision must either widen the stable React 19 range to
+`>= 19.0.2 < 20.0.0` or document the specific API risk that requires a tight pin. Pre-release React versions should remain
+outside the recommended range unless the verification record explicitly tests them. If verification finds no specific API
+risk, the default outcome is to widen the range to `>= 19.0.2 < 20.0.0`. The same decision must also audit the Pro package
+`react` and `react-dom` peer dependency ranges, currently `>= 16`, so all three peer ranges stay aligned with the minimum
+React version decision. **Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
 
 ## React 19.2.x Verification Checklist
 
@@ -46,8 +48,9 @@ Use a dedicated branch for the actual version verification work:
       `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.mjs" --include="*.cjs" --include="*.ts" --include="*.tsx" --include="*.cts"`,
       document whether a Suspense-containing tree could plausibly be passed by a user render function today, then either
       open a follow-up migration ticket or record why the current usage is acceptable.
-- [ ] If React 16/17 support is being dropped in this work cycle, remove `packages/react-on-rails/src/ReactDOMServer.cts`.
-      Otherwise, confirm the file's existing removal comment remains the accepted exit criterion and close this task.
+- [ ] If the Issue 3255 minimum-React-version decision drops React 16/17 support, remove
+      `packages/react-on-rails/src/ReactDOMServer.cts`. Otherwise, confirm the file's existing removal comment remains the
+      accepted exit criterion and close this task.
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
       React, React DOM, and `react-on-rails-rsc` resolve to compatible versions. Capture the exact
       `pnpm list -r --depth=0 react react-dom react-on-rails-rsc` output in the verification record, such as a comment on
@@ -71,6 +74,10 @@ Use a dedicated branch for the actual version verification work:
     setup)_
   - Confirm whether `react_on_rails_pro/spec/execjs-compatible-dummy` needs a dedicated React 18 test run as part of the
     acceptance criteria.
+  - Confirm the resolved `@tanstack/react-router` version used by the Pro package still satisfies its React 19 compatibility
+    matrix, and make the Pro `./tanstack-router` export part of the RSC boundary verification. If local Pro prerequisites
+    are unavailable, record the PR's Pro CI result as the proxy and open a follow-up only if that CI does not cover the
+    export.
   - Public contributors without Pro runtime prerequisites should rely on the PR's Pro CI checks as the proxy for these
     Pro verification steps.
 - [ ] Run Ruby checks that exercise SSR and generated apps:
@@ -96,8 +103,7 @@ Use a dedicated branch for the actual version verification work:
 
   ```bash
   git worktree add /tmp/ror-verify HEAD
-  cd /tmp/ror-verify
-  pnpm install
+  (cd /tmp/ror-verify && pnpm install)
   ```
 
   After the suite runs, remove the worktree from the original checkout:
@@ -190,7 +196,8 @@ Track these in [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3
 each decision has an owner, acceptance criteria, and a closure path.
 
 The prerequisite decision is whether the first implementation should prove the pattern through traditional SSR with
-Suspense, RSC, or both; answer that before settling caching, benchmarks, or streamed-error semantics.
+Suspense, RSC, or both. Record that answer in Issue 3255 before opening the first implementation PR; until then, caching,
+benchmarks, and streamed-error semantics stay provisional rather than settled.
 
 Before implementation starts, assign a secondary reviewer for the prerequisite SSR-vs-RSC decision so the plan does not
 stall if @justin808 is unavailable. Also assign a backup reviewer for benchmark metrics because that decision can be
