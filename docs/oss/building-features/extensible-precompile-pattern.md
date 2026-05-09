@@ -30,8 +30,9 @@ When moving custom build work out of `precompile_hook`, make the ownership chang
 1. Move custom one-time tasks into `run_precompile_tasks` in `bin/dev`.
 2. Remove matching shell fragments from `Procfile.dev`, any project-specific variants (for example, `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`), and CI/CD pipeline scripts (for example, `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json`).
 3. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
-4. Ensure `build_test_command` and `build_production_command` each include every build step from step 1. `bin/dev` is
-   not invoked in CI or production, so these commands are the only mechanism those lifecycles have.
+4. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
+   need, such as ReScript builds, TypeScript checks or compilation, and locale generation. `bin/dev` is not invoked in
+   CI or production, so these commands are the only mechanism those lifecycles have.
 5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
 
 The goal is one owner per lifecycle: `bin/dev` owns development startup, Procfile processes own long-running watchers, and React on Rails build commands own test and production compilation.
@@ -173,7 +174,8 @@ end
 
 # Add your app's pre-build step(s) here. Leave this section empty if shakapacker is the only build step.
 # For example, to run TypeScript then ReScript:
-#   system("yarn", "tsc", "--noEmit") || abort("tsc failed")
+#   # --noEmit produces no JS; ts-loader/babel-loader must transpile TypeScript during webpack.
+#   system("yarn", "tsc", "--noEmit") || abort("tsc type-check failed")
 #   system("yarn", "res:build")       || abort("res:build failed")
 
 case mode
