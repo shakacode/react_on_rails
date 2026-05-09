@@ -101,7 +101,7 @@ single factor. The routes are:
 - React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
 
 > [!NOTE]
-> Both routes use the same Shakapacker/Rspack page-asset build, so this is a route-level comparison rather than a
+> Both routes use the same Shakapacker with Rspack page-asset build, so this is a route-level comparison rather than a
 > bundler comparison. It also does not isolate a renderer-only baseline: the Inertia route has no React on Rails Pro
 > renderer or SSR, while the RSC route uses the Pro Node renderer. Treat the deltas as the combined route-level effect;
 > see the [SSR Performance table](#ssr-performance-execjs-vs-node-renderer) for the renderer baseline.
@@ -112,7 +112,7 @@ warmup request to the route being measured.
 
 Conditions:
 
-- Compiled page assets from the same Shakapacker/Rspack configuration for both routes
+- Compiled page assets from the same Shakapacker with Rspack configuration for both routes
 - Compiled RSC demo bundles
 - Rails server without the Shakapacker dev server running
 - Dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`
@@ -130,12 +130,12 @@ Conditions:
 
 The median results showed this directional signal:
 
-| Source  | Metric                                      | Inertia demo | RSC demo | Delta (negative = RSC faster) |
-| ------- | ------------------------------------------- | -----------: | -------: | ----------------------------: |
-| Browser | Navigation duration                         |     775.40ms | 607.15ms |                        -21.7% |
-| Browser | Largest Contentful Paint                    |     794.00ms | 634.00ms |                        -20.2% |
-| Browser | `responseEnd`                               |     644.80ms | 588.80ms |                         -8.7% |
-| Rails   | Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |              -2.2% (variance) |
+| Source  | Metric                                      | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
+| ------- | ------------------------------------------- | -----------: | -------: | ------------------------------: |
+| Browser | Navigation duration                         |     775.40ms | 607.15ms |                          -21.7% |
+| Browser | Largest Contentful Paint                    |     794.00ms | 634.00ms |                          -20.2% |
+| Browser | `responseEnd`                               |     644.80ms | 588.80ms |                           -8.7% |
+| Rails   | Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |                -2.2% (variance) |
 
 `action_total` is the Rails wall-time field from the raw benchmark artifact, not a browser Performance API metric. The
 artifact does not yet publish enough logger or extraction-script context to confirm whether it is the full
@@ -160,11 +160,11 @@ combined transfer size or cache behavior. Fewer requests do not necessarily impl
   variance at n=4._
 - _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
-#### Worst-case `responseEnd` counter-signal
+#### Worst-case `responseEnd` counter-signal {#gumroad-rsc-worst-case-responsend}
 
-| Metric                             | Inertia demo | RSC demo | Delta (negative = RSC faster) |
-| ---------------------------------- | -----------: | -------: | ----------------------------: |
-| Worst-case `responseEnd` (max n=4) |     730.62ms | 768.25ms |                         +5.2% |
+| Metric                             | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
+| ---------------------------------- | -----------: | -------: | ------------------------------: |
+| Worst-case `responseEnd` (max n=4) |     730.62ms | 768.25ms |                           +5.2% |
 
 The source artifact labels this as p95, but with four samples it is effectively the maximum observed value, not a
 stable tail-latency estimate. It shows a +5.2% RSC regression on worst-case `responseEnd` (high variance is expected at
