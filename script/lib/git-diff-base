@@ -273,7 +273,7 @@ git_diff_base_resolve() {
     is_shallow=true
   fi
 
-  fetch_depth="$(git_diff_base_fetch_depth "${GIT_DIFF_BASE_FETCH_DEPTH:-50}")"
+  fetch_depth="$(git_diff_base_fetch_depth)"
 
   if remote_branch="$(git_diff_base_base_remote_branch "$base_ref")"; then
     if [ "$is_shallow" = true ] && ! git_diff_base_fetch_remote_branch "$remote_branch" initial "$fetch_depth"; then
@@ -282,8 +282,6 @@ git_diff_base_resolve() {
         return 1
       fi
     fi
-  else
-    remote_branch=""
   fi
 
   if current_remote_branch="$(git_diff_base_current_remote_branch "$current_ref")"; then
@@ -431,7 +429,8 @@ git_diff_base_resolve() {
         if ! git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow; then
           echo "Warning: failed to unshallow origin/$current_remote_branch; continuing." >&2
         fi
-        if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+        if git_diff_base_verify_ref "$base_ref" &&
+          merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"
           return 0
         fi
