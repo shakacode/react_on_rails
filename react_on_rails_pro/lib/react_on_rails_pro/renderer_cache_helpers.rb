@@ -125,11 +125,7 @@ module ReactOnRailsPro
       File.rename(tmp_file, dest)
       puts "[ReactOnRailsPro] #{log_prefix}: #{src} -> #{dest}"
     ensure
-      # Ruby pre-initializes `tmp_file` to nil at parse time, so the local exists even
-      # when an exception (e.g. from FileUtils.mkdir_p) fires before the assignment on
-      # line 104 runs — the `if tmp_file` guard turns that case into a no-op without
-      # raising NameError. On success, File.rename has already moved the temp file
-      # away; on a failure after assignment, rm_f cleans up the orphaned temp file.
+      # Clean up the temp file on failure; rm_f is harmless after a successful rename.
       FileUtils.rm_f(tmp_file) if tmp_file
     end
 
