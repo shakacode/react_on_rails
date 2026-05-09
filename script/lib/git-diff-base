@@ -257,11 +257,9 @@ git_diff_base_resolve() {
   # fetch failure aborts immediately. Missing refs, current-branch fetches, and
   # merge-base failures remain fatal under both policies.
   case "$initial_fetch_policy" in
-    strict|required)
-      initial_fetch_policy="strict"
+    strict)
       ;;
-    lenient|optional)
-      initial_fetch_policy="lenient"
+    lenient)
       ;;
     *)
       echo "Error: unknown initial fetch policy '$initial_fetch_policy' (expected strict or lenient)" >&2
