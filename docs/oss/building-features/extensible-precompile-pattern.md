@@ -181,6 +181,8 @@ end
 
 # Add your app's pre-build step(s) here. They run for both test and production.
 # Leave this section empty if shakapacker is the only build step.
+# Define a local env hash here if a shared pre-build command needs one; the mode-specific env
+# values below are intentionally scoped to each shakapacker invocation.
 # For example, to run TypeScript then ReScript:
 #   # --noEmit produces no JS; ts-loader/babel-loader must transpile TypeScript during webpack.
 #   system("yarn", "tsc", "--noEmit") || abort("tsc type-check failed")
