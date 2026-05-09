@@ -2757,7 +2757,7 @@ module ReactOnRails
     # Vitest's importActual/importMock may also be used as bare helpers.
     BASE_PACKAGE_MOCK_PATTERN = %r{
       \b(?:
-        (?:jest|vi|vitest)\.
+        (?:jest|vi)\.
         (?:mock|unmock|doMock|doUnmock|dontMock|requireActual|requireMock|importActual|importMock)
         |
         (?:importActual|importMock)
@@ -2790,7 +2790,8 @@ module ReactOnRails
             import ReactOnRails from 'react-on-rails-pro';         // ES import (server)
             import ReactOnRails from 'react-on-rails-pro/client';  // ES import (client)
             const ReactOnRails = require('react-on-rails-pro');    // CommonJS require
-            jest.mock('react-on-rails-pro', ...);                  // Jest/Vitest mock helper
+            jest.mock('react-on-rails-pro', ...);                  // Jest mock helper
+            vi.mock('react-on-rails-pro', ...);                    // Vitest mock helper
             declare module 'react-on-rails-pro' { ... }            // TypeScript augmentation
         MSG
       end
@@ -2800,12 +2801,12 @@ module ReactOnRails
 
     def files_with_base_package_references(source_path)
       js_extensions = %w[js jsx ts tsx mjs cjs]
-      # The **/*.ts glob also includes .d.ts declaration files.
+      # **/*.ts naturally matches *.d.ts declaration files because they end in .ts.
       js_patterns = js_extensions.map { |ext| "#{source_path}/**/*.#{ext}" }
 
       js_patterns.flat_map do |pattern|
         Dir.glob(pattern).select { |file| base_package_reference_file?(file) }
-      end.sort.uniq
+      end.sort
     end
 
     def base_package_reference_file?(file)
@@ -2813,6 +2814,8 @@ module ReactOnRails
       return false unless content.valid_encoding?
 
       base_package_reference?(content)
+    rescue SystemCallError
+      false
     end
 
     def base_package_reference?(content)

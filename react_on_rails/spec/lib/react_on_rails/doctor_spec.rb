@@ -2727,6 +2727,25 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when JS tests use a nonstandard vitest namespace object" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            File.write("app/javascript/packs/vitest-namespace.test.ts",
+                       "vitest.mock('react-on-rails', () => ({}));\n")
+            example.run
+          end
+        end
+      end
+
+      it "does not report a warning for the nonstandard helper form" do
+        doctor.send(:check_base_package_references)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("vitest-namespace.test.ts") }).to be false
+      end
+    end
+
     context "when TypeScript declaration files augment the base package after a Pro migration" do
       around do |example|
         Dir.mktmpdir do |tmpdir|
@@ -2967,6 +2986,31 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("react-on-rails") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("client/app/packs/app.js") }).to be true
+      end
+    end
+
+    context "when a file disappears during the base package scan" do
+      around do |example|
+        Dir.mktmpdir do |tmpdir|
+          Dir.chdir(tmpdir) do
+            FileUtils.mkdir_p("app/javascript/packs")
+            example.run
+          end
+        end
+      end
+
+      it "skips the unreadable file and keeps scanning the rest" do
+        missing_file = "app/javascript/packs/deleted.js"
+        stale_file = "app/javascript/packs/stale.js"
+        File.write(stale_file, "import ReactOnRails from 'react-on-rails';\n")
+
+        allow(Dir).to receive(:glob).and_call_original
+        allow(Dir).to receive(:glob).with("app/javascript/**/*.js").and_return([missing_file, stale_file])
+
+        doctor.send(:check_base_package_references)
+        warning_content = checker.messages.select { |m| m[:type] == :warning }.map { |m| m[:content] }.join("\n")
+        expect(warning_content).to include(stale_file)
+        expect(warning_content).not_to include("Could not scan for base package references")
       end
     end
   end
