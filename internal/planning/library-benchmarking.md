@@ -86,8 +86,10 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 - `MAX_SAMPLE=64`
 - `--err` causes Bencher regression alerts to return a non-zero exit code
 - each threshold uses `--threshold-test t_test` and `--threshold-max-sample-size $MAX_SAMPLE`
-- `rps` uses `--threshold-lower-boundary $BOUNDARY`
-- `p50_latency`, `p90_latency`, `p99_latency`, and `failed_pct` use `--threshold-upper-boundary $BOUNDARY`
+- `rps` uses `--threshold-lower-boundary $BOUNDARY` because higher RPS is better; a regression is a drop below the
+  lower bound
+- `p50_latency`, `p90_latency`, `p99_latency`, and `failed_pct` use `--threshold-upper-boundary $BOUNDARY` because lower
+  latency and failure rate are better; a regression is a rise above the upper bound
 - on main, `run_bencher` captures Bencher's non-zero exit as `BENCHER_EXIT_CODE`; the
   `Warn if Bencher detected regression on main` step emits `::warning::` for regression alerts instead of exiting
 - operational Bencher failures already hard-fail via `Fail on non-regression Bencher error on main`, so only regression
@@ -119,16 +121,16 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 
 ### Acceptance Criteria
 
-- At least 5 consecutive qualifying main `Benchmark Workflow` runs complete with no Bencher regression alert; that means
-  `BENCHER_EXIT_CODE` stays `0` or `BENCHER_HAS_ALERT` stays `0` with the current code. A run qualifies when the
-  triggering push modifies at least one file that
+- Before restoring the hard gate, verify it can detect real regressions: add a temporary controller delay to a benchmarked
+  route, confirm an alert fires under the tuned settings, then revert the delay. If no alert fires, re-tune before
+  proceeding.
+- At least 5 consecutive qualifying main `Benchmark Workflow` runs complete with no Bencher regression alert after the
+  deliberate-regression check above passes; that means `BENCHER_HAS_ALERT` stays `0` with the current code. A run
+  qualifies when the triggering push modifies at least one file that
   [`script/ci-changes-detector`](../../script/ci-changes-detector) does not classify as docs-only. Track the running
   count in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
 - External tracking requires the same `(benchmark, measure)` pair to alert on at least 2 consecutive runs before filing or
   failing; a single noisy run does not trigger the gate.
-- A deliberately introduced local regression still triggers an alert under the tuned settings. The developer re-enabling
-  the gate should add a temporary controller delay to a benchmarked route, verify an alert fires, and then revert the
-  delay.
 - The hard gate is restored only after the tuned settings meet the project false-positive target: no more than 1 noisy
   failure in 20 successful main `Benchmark Workflow` runs whose triggering commits do not intentionally change benchmark
   performance. Treat an alert as noisy when it does not recur for the same `(benchmark, measure)` pair in the next
