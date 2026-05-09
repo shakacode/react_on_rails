@@ -101,29 +101,22 @@ end %>
 
 > **See also:** [React on Rails Pro streaming SSR](../../pro/streaming-ssr.md) for setup instructions and configuration options.
 
-**React component (Server Component):**
+**React component for synchronous props (Server Component):**
+
+Use this version with the `stream_react_component` ERB helper above. Rails resolves every prop before rendering begins, including `reviews`.
 
 ```tsx
-import { Suspense } from 'react';
-import type { WithAsyncProps } from 'react-on-rails-pro';
-
 type Review = {
   id: number;
   text: string;
   rating: number;
 };
 
-type SyncProps = {
+type ProductPageProps = {
   name: string;
   price: number;
-};
-
-type AsyncProps = {
   reviews: Review[];
 };
-
-type ProductPageProps = SyncProps & AsyncProps;
-type ProductPageWithAsyncProps = WithAsyncProps<AsyncProps, SyncProps>;
 
 export default function ProductPage({ name, price, reviews }: ProductPageProps) {
   return (
@@ -146,13 +139,50 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
     </ul>
   );
 }
+```
+
+**React component for async props (Server Component):**
+
+Use this version with the `stream_react_component_with_async_props` ERB helper above. Keep the registered component name as `ProductPage`; the props shape changes so `reviews` comes from `getReactOnRailsAsyncProp`.
+
+```tsx
+import { Suspense } from 'react';
+import type { WithAsyncProps } from 'react-on-rails-pro';
+
+type Review = {
+  id: number;
+  text: string;
+  rating: number;
+};
+
+type SyncProps = {
+  name: string;
+  price: number;
+};
+
+type AsyncProps = {
+  reviews: Review[];
+};
+
+type ProductPageProps = WithAsyncProps<AsyncProps, SyncProps>;
+
+function ReviewList({ reviews }: { reviews: Review[] }) {
+  return (
+    <ul>
+      {reviews.map((review) => (
+        <li key={review.id}>
+          {review.text} ({review.rating}/5)
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 async function AsyncReviewList({ reviewsPromise }: { reviewsPromise: Promise<Review[]> }) {
   return <ReviewList reviews={await reviewsPromise} />;
 }
 
-// With async props, the helper injects getReactOnRailsAsyncProp.
-export function ProductPageAsync({ name, price, getReactOnRailsAsyncProp }: ProductPageWithAsyncProps) {
+export default function ProductPage({ name, price, getReactOnRailsAsyncProp }: ProductPageProps) {
   const reviewsPromise = getReactOnRailsAsyncProp('reviews');
 
   return (

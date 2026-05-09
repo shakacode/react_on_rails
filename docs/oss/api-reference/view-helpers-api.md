@@ -180,6 +180,9 @@ end %>
 
 Components rendered this way receive `getReactOnRailsAsyncProp`, which returns a Promise for each emitted prop.
 
+> [!IMPORTANT]
+> `stream_react_component_with_async_props` always forces `prerender: true` — passing `prerender: false` has no effect. It requires the same controller setup as `stream_react_component`: the controller must call `stream_view_containing_react_components`.
+
 ### rsc_payload_react_component
 
 Renders React Server Component (RSC) payloads in NDJSON format for client-side consumption. Used in conjunction with RSC support to enable:

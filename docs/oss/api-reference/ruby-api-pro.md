@@ -59,6 +59,8 @@ Requires the controller to use `stream_view_containing_react_components`.
 
 Async-props variant of `stream_react_component`. Use this when the view has immediately available props plus slower values that should stream to React behind Suspense boundaries.
 
+Requires the controller to use `stream_view_containing_react_components`, same as `stream_react_component`.
+
 This helper accepts the same options as `stream_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop as it becomes available. Components read emitted values through the injected `getReactOnRailsAsyncProp` prop.
 
 ```ruby
