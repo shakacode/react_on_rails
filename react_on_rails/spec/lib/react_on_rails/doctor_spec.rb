@@ -2515,7 +2515,9 @@ RSpec.describe ReactOnRails::Doctor do
                           .find { |line| line.include?("Dockerfile.production →") }
         expect(suggestion_line).not_to be_nil
         expect(suggestion_line).to include("pre_seed_renderer_cache")
-        expect(suggestion_line).to include("RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles")
+        expect(suggestion_line).to include(
+          "RENDERER_SERVER_BUNDLE_CACHE_PATH=#{File.join(tmpdir, '.node-renderer-bundles')}"
+        )
         expect(suggestion_line).not_to include("MODE=symlink")
       end
     end

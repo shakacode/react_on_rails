@@ -34,17 +34,18 @@ module ReactOnRailsPro
     end
 
     def rsc_manifest_paths
-      manifests = [
-        ReactOnRailsPro::Utils.react_client_manifest_file_path,
-        ReactOnRailsPro::Utils.react_server_client_manifest_file_path
-      ]
-      if manifests.any?(&:nil?)
+      manifests = {
+        react_client_manifest_file_path: ReactOnRailsPro::Utils.react_client_manifest_file_path,
+        react_server_client_manifest_file_path: ReactOnRailsPro::Utils.react_server_client_manifest_file_path
+      }
+      nil_manifest_names = manifests.select { |_name, path| path.nil? }.keys
+      unless nil_manifest_names.empty?
         raise ReactOnRailsPro::Error,
-              "RSC manifest path resolved to nil. " \
+              "RSC manifest path resolved to nil for #{nil_manifest_names.join(', ')}. " \
               "Check react_client_manifest_file and react_server_client_manifest_file configuration."
       end
 
-      manifests
+      manifests.values
     end
 
     # `stage_assets` writes each asset into `bundle_dir` using only its basename,
@@ -106,15 +107,7 @@ module ReactOnRailsPro
       File.rename(tmp_file, dest)
       puts "[ReactOnRailsPro] #{log_prefix}: #{src} -> #{dest}"
     ensure
-      # `tmp_file` is nil if execution never reached the assignment — Ruby's
-      # parser pre-allocates a nil slot for every local variable it sees as an
-      # assignment target, so the `if tmp_file` guard catches the case where
-      # `mkdir_p` raises before the assignment runs.
-      #
-      # On the success path `tmp_file` is a truthy string but the file no
-      # longer exists on disk after the rename, and `rm_f` is a no-op for
-      # missing files — so this `ensure` is harmless on success and cleans up
-      # the partial copy on failure.
+      # Clean up the temp file on failure; rm_f is harmless after a successful rename.
       FileUtils.rm_f(tmp_file) if tmp_file
     end
 

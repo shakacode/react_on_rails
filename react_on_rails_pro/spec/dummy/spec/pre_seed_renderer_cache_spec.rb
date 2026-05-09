@@ -396,18 +396,21 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
     end
   end
 
-  context "when an RSC manifest path resolves to nil and RSC support is enabled" do
+  context "when RSC manifest paths resolve to nil and RSC support is enabled" do
     before do
       allow(ReactOnRailsPro.configuration).to receive_messages(enable_rsc_support: true, assets_to_copy: nil)
       allow(ReactOnRailsPro::Utils).to receive_messages(
         rsc_bundle_js_file_path: server_bundle_path,
         react_client_manifest_file_path: nil,
-        react_server_client_manifest_file_path: "/some/path/react-server-client-manifest.json"
+        react_server_client_manifest_file_path: nil
       )
     end
 
-    it "raises a clear error rather than silently dropping the nil path" do
-      expect { pre_seed_cache }.to raise_error(ReactOnRailsPro::Error, /RSC manifest path resolved to nil/)
+    it "raises a clear error naming the missing manifest helpers" do
+      expect { pre_seed_cache }.to raise_error(
+        ReactOnRailsPro::Error,
+        /RSC manifest path resolved to nil for react_client_manifest_file_path, react_server_client_manifest_file_path/
+      )
     end
   end
 
