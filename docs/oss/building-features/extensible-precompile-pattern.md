@@ -28,16 +28,17 @@ Consider this approach if you:
 When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice:
 
 1. Uncomment and add custom one-time tasks to the `run_precompile_tasks` method in `bin/dev`.
-2. Remove one-time build commands from Procfile process entries and CI/CD pipeline scripts. Development should own them in
-   `run_precompile_tasks`, while CI/production should own them in `build_test_command` or `build_production_command`.
-   Examples include `bundle exec rake react_on_rails:locale` or `yarn res:build`. Do not delete entire
-   `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json` files unless they exist solely for the migrated build
-   step.
-3. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
-4. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
+2. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
    need, such as ReScript builds, TypeScript checks or compilation, and locale generation. `bin/dev` is not invoked in
    CI or production, so these commands are the only mechanism those lifecycles have.
-5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
+3. Verify the updated commands work locally before removing duplicate invocations from Procfiles or CI/CD scripts.
+4. Remove one-time build commands from individual Procfile process entries. If those same commands appear as standalone
+   steps in CI/CD pipeline scripts, remove those duplicate invocations too. For example, remove a bare `yarn res:build`
+   GitHub Actions step only after `build_test_command` or `build_production_command` includes it. Do not delete entire
+   `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json` files unless they exist solely for the migrated build
+   step.
+5. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
+6. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
 
 The goal is one owner per lifecycle: `bin/dev` owns development startup, Procfile processes own long-running watchers, and React on Rails build commands own test and production compilation.
 
@@ -186,11 +187,12 @@ end
 # Define a local env hash here if a shared pre-build command needs one; the mode-specific env
 # values below are intentionally scoped to each shakapacker invocation.
 # For example, to run TypeScript then ReScript:
-#   # --noEmit produces no JS; ts-loader/babel-loader must transpile TypeScript during webpack.
+#   # --noEmit type-checks only; ts-loader/babel-loader handle transpilation during webpack bundling.
 #   system("yarn", "tsc", "--noEmit") || abort("tsc type-check failed")
 #   system("yarn", "res:build")       || abort("res:build failed")
 
-# Mode-specific invocation below. Add shared steps above, not inside the case blocks.
+# Mode-specific invocation below. RbConfig.ruby runs shakapacker with the same Ruby interpreter that launched this wrapper.
+# Add shared steps above, not inside the case blocks.
 case mode
 when "test"
   env = { "RAILS_ENV" => "test", "NODE_ENV" => "test" }
@@ -214,12 +216,13 @@ may not make the current checkout runnable. Record the executable bit in Git for
 script through Ruby when running it from that local filesystem:
 
 ```bash
-git update-index --add --chmod=+x bin/build-react-on-rails
+git update-index --chmod=+x bin/build-react-on-rails
 ruby bin/build-react-on-rails test
 ```
 
-Use `production` instead of `test` for the production build command. The `git update-index` command only updates Git
-metadata; it does not change the current working-tree file mode.
+If the file has not been staged yet, use `git update-index --add --chmod=+x bin/build-react-on-rails` instead. Use
+`production` instead of `test` for the production build command. The `git update-index` command only updates Git metadata;
+it does not change the current working-tree file mode.
 
 Configure `react_on_rails.rb` once. Prefix the helper with `ruby` so the same commands work on Unix, macOS, CI, and
 Windows or Windows-backed Docker bind-mount checkouts without relying on the current filesystem's executable bit:
