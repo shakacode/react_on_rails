@@ -31,7 +31,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run build`
    - `pnpm run lint`
    - `pnpm run type-check`
-   - targeted `pnpm --filter react-on-rails run test` for all package tests, or
+   - targeted `pnpm --filter react-on-rails run test` for react-on-rails package tests, or
      `pnpm --filter react-on-rails exec jest -- <path>` for targeted test file runs
 4. Docs:
    - `script/check-docs-sidebar origin/main HEAD` when docs under `docs/` changed
@@ -54,6 +54,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`, but do not treat it as a Markdown validator.
 - `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm exec prettier --check .`.
+- `react_on_rails_pro/**/*.rb` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `bundle exec rubocop react_on_rails_pro/` and any targeted RSpec.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
 
 ## Output Format
