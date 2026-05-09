@@ -31,6 +31,10 @@ git_diff_base_remote_branch() {
 git_diff_base_verify_ref() {
   local ref="$1"
 
+  if [ -z "$ref" ]; then
+    return 1
+  fi
+
   git rev-parse --verify "$ref^{commit}" >/dev/null 2>&1
 }
 
@@ -101,9 +105,8 @@ git_diff_base_unshallow_timeout_seconds() {
     return 0
   fi
 
-  echo "Warning: invalid GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS '$raw_timeout';" \
-    "running unshallow fetch without timeout." >&2
-  printf '0\n'
+  echo "Warning: invalid GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS '$raw_timeout'; using 300." >&2
+  printf '300\n'
 }
 
 git_diff_base_fetch_depth() {
