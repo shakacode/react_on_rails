@@ -30,8 +30,10 @@ class StoriesController < ApplicationController
     preflight = StoryPagePreflight.call(params[:id], current_user: current_user)
 
     if preflight.redirect_reason
-      # .fetch raises KeyError if a new redirect_reason is added without a matching path here.
-      redirect_path = { unauthenticated: sign_in_path }.fetch(preflight.redirect_reason)
+      redirect_path = { unauthenticated: sign_in_path }.fetch(preflight.redirect_reason) do |reason|
+        Rails.logger.error("Unknown redirect_reason: #{reason.inspect}")
+        root_path
+      end
       return redirect_to(redirect_path, status: preflight.redirect_status || :see_other)
     end
 
@@ -45,6 +47,8 @@ end
 ```
 
 The preflight object can expose a small, serializable result:
+
+These examples use placeholder serializer classes that return plain Ruby hashes; substitute your app's serializer or presenter as needed.
 
 ```ruby
 class StoryPagePreflight
@@ -218,7 +222,8 @@ If `stale?` returns `false`, Rails has already prepared the `304 Not Modified` r
 When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy before streaming or keep the response private:
 
 ```ruby
-response.headers["Vary"] = "Accept-Language"
+existing_vary = response.headers["Vary"].presence
+response.headers["Vary"] = [existing_vary, "Accept-Language"].compact.join(", ")
 ```
 
 Every `Vary` header expands the cache key; avoid high-cardinality headers for public caches unless that extra cache storage is intentional.
@@ -240,8 +245,10 @@ Pass decisions as data, not as hidden HTTP side effects:
 ```
 
 ```tsx
+type StoryData = { id: number; title: string };
+type ViewerData = { id: number; name: string };
 type ResponsePolicy = { canonicalUrl: string };
-type StoryPageProps = { story: Story; viewer: Viewer; responsePolicy: ResponsePolicy };
+type StoryPageProps = { story: StoryData; viewer: ViewerData; responsePolicy: ResponsePolicy };
 
 export default function StoryPage({ story, viewer, responsePolicy }: StoryPageProps) {
   return (
