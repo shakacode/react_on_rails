@@ -126,12 +126,12 @@ Conditions:
 
 The browser timing medians showed this directional signal:
 
-| Metric                                      | Inertia demo | RSC demo |  Delta |
-| ------------------------------------------- | -----------: | -------: | -----: |
-| Navigation duration                         |     775.40ms | 607.15ms | -21.7% |
-| Largest Contentful Paint                    |     794.00ms | 634.00ms | -20.2% |
-| `responseEnd`                               |     644.80ms | 588.80ms |  -8.7% |
-| Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |  noise |
+| Metric                                      | Inertia demo | RSC demo | Delta (negative = RSC faster) |
+| ------------------------------------------- | -----------: | -------: | ----------------------------: |
+| Navigation duration                         |     775.40ms | 607.15ms |                        -21.7% |
+| Largest Contentful Paint                    |     794.00ms | 634.00ms |                        -20.2% |
+| `responseEnd`                               |     644.80ms | 588.80ms |                         -8.7% |
+| Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |                             — |
 
 The page-specific script request count, measured as Chrome DevTools Network panel `Script`-type requests after loading
 each route, changed from 6 requests for the Inertia demo to 1 request for the RSC demo. That is a fixed request count,
@@ -140,14 +140,15 @@ not a timing median or statistical sample, and it does not measure combined tran
 
 - _All timing values are medians from the raw benchmark artifact values (n=4 per route); sample size is too small to
   establish statistical significance._
-- _The `action_total` difference was -2.2%, which is likely within expected variance at n=4._
+- _The `action_total` delta is shown as an em dash because its computed -2.2% difference is likely within expected
+  variance at n=4._
 - _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
-p95 counter-signal:
+#### p95 counter-signal
 
-| Metric                  | Inertia demo | RSC demo | Delta |
-| ----------------------- | -----------: | -------: | ----: |
-| p95 `responseEnd` (n=4) |     730.62ms | 768.25ms | +5.2% |
+| Metric                  | Inertia demo | RSC demo | Delta (negative = RSC faster) |
+| ----------------------- | -----------: | -------: | ----------------------------: |
+| p95 `responseEnd` (n=4) |     730.62ms | 768.25ms |                         +5.2% |
 
 The p95 row is a percentile comparison over four samples, not a stable tail-latency estimate. It shows a +5.2% RSC
 regression on p95 `responseEnd` (high variance is expected at n=4), indicating the Inertia control had a faster p95
