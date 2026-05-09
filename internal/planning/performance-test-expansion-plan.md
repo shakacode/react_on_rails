@@ -48,11 +48,11 @@ should clear that namespace, make one warm-up request to prime the fragment, the
 the dedicated `FileStore`, clear the exact store root, for example
 `FileUtils.rm_rf(Rails.root.join("tmp/benchmark_cache"))`; do not clear `tmp/cache/assets` or the app's default cache
 store. Avoid `Rails.cache.clear` on the application cache. Avoid relying on a shared Redis instance, environment-default
-`:null_store`/`:memory_store` behavior, or manual cache state. This explicit cache-prime request is an additional step
-before the existing per-route k6 warm-up in [Noise Controls](#noise-controls); it does not replace that 10-request
-warm-up phase for cache-hit runs. The cache-miss path must either skip the generic per-route warm-up or clear the
-dedicated benchmark cache again after warm-up and immediately before k6 measurement, so measurement starts from a cold
-cache state.
+`:null_store`/`:memory_store` behavior, or manual cache state. To avoid mixing cold Rails-process noise into cache-miss
+measurements, warm the Rails process with a route that does not populate the benchmark cache, then clear the dedicated
+benchmark cache immediately before the cache-miss k6 measurement. For cache-hit measurements, clear the dedicated
+benchmark cache, send one explicit cache-prime request to the measured route, then run the existing per-route k6 warm-up
+and measurement against the primed route.
 
 Recommended Pro slice for [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169), implemented after the
 OSS first slice or in a dedicated follow-up PR:
@@ -64,15 +64,18 @@ OSS first slice or in a dedicated follow-up PR:
    coverage rather than streaming TTFB measurement. Use a static benchmark route with no required URL params. If the
    dummy app has no parameter-free RSC route, run `benchmarks/k6.ts` with an explicit `TARGET_URL`; alternatively,
    introduce an `RSC_BENCHMARK_COMPONENT` environment variable defaulting to a known component name so
-   `benchmarks/bench.rb` can construct the URL without relying on route discovery. Automatic route discovery currently
-   skips required-parameter routes such as `/rsc_payload/:component_name`.
+   `benchmarks/bench.rb` can construct the URL without relying on route discovery. If neither `TARGET_URL` nor
+   `RSC_BENCHMARK_COMPONENT` is provided and no parameter-free RSC route exists, fail setup with an actionable error
+   instead of silently skipping RSC coverage. Automatic route discovery currently skips required-parameter routes such as
+   `/rsc_payload/:component_name`.
 
 Use `benchmarks/bench.rb`/`benchmarks/k6.ts` for Rails HTTP routes such as streaming SSR and static RSC payload endpoint
 checks. Use `benchmarks/bench-node-renderer.rb` for direct Pro Node Renderer transport coverage unless that script is
 extended to cover full Rails streaming behavior.
 
-Run Pro routes with `PRO=true`; `benchmarks/bench.rb` switches `APP_DIR` to `react_on_rails_pro/spec/dummy` and appends
-`: Pro` to Bencher benchmark names.
+Run Pro routes with `PRO=true`; `benchmarks/bench.rb` switches `APP_DIR` to `react_on_rails_pro/spec/dummy`. The current
+Bencher suffix is `: Core` for OSS routes and `: Pro` for Pro routes, so cache-hit/cache-miss benchmark names should
+preserve that suffix while adding the new cache-state distinction.
 
 ## Noise Controls
 
@@ -103,9 +106,10 @@ Prerequisites for the first implementation PR:
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
   `node --version` for `node_version`, and run `node -e "console.log(require('react/package.json').version)"` from the
   active `APP_DIR` for `react_version` so OSS and Pro dummy apps report their own installed React package.
-  Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary; the
-  first slice should start at one run per route, and alternating route order increases it to two when both passes are
-  merged into one route summary.
+  Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary. The
+  first slice should start at one run per route. If a later implementation aggregates forward and reverse passes into a
+  single route summary, record `sample_count: 2`; if it writes one summary per pass, keep each summary at
+  `sample_count: 1`.
 
   Use these metadata keys as the minimum schema:
 
