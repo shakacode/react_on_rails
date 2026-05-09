@@ -129,11 +129,13 @@ const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-rendere
 // node-fetch v2: the default CJS export is the fetch function itself.
 // Headers, Request, and Response are properties attached to that function, not named exports.
 // Do not destructure `fetch` from require("node-fetch"); require it as the whole module instead.
-const nodeFetch = require('node-fetch');
+let nodeFetch;
 
-if (!nodeFetch) {
+try {
+  nodeFetch = require('node-fetch');
+} catch {
   throw new Error(
-    'node-fetch v2 did not export a fetch function. ' +
+    'node-fetch v2 could not be loaded. ' +
       'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
   );
 }
@@ -158,9 +160,11 @@ reactOnRailsProNodeRenderer({
     Headers: HeadersImplementation,
     Request: RequestImplementation,
     Response: ResponseImplementation,
-    // node-fetch v2 does not include AbortController or AbortSignal.
-    // If component code uses abort signals, add a compatible polyfill here,
-    // for example from the `abort-controller` npm package.
+    // node-fetch v2 does not include AbortController or AbortSignal. On Node.js 15+,
+    // pass the native globals here if component code uses abort signals:
+    // AbortController: globalThis.AbortController,
+    // AbortSignal: globalThis.AbortSignal,
+    // On older EOL runtimes, use a compatible polyfill.
   },
 });
 ```
