@@ -43,7 +43,7 @@ Use a dedicated branch for the actual version verification work:
       `packages/react-on-rails/src/serverRenderReactComponent.ts` and `packages/react-on-rails/src/handleError.ts`, plus
       `renderToStaticMarkup` if any source or generated-bundle call site participates in SSR. Also grep generated bundles
       and renderer artifacts, such as
-      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.ts"`, plus
+      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.ts" --include="*.tsx" --include="*.cts"`, plus
       `packages/react-on-rails-pro-node-renderer/` and related SSR integration paths for additional call sites, then
       document either a migration ticket or why current usage is acceptable.
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
