@@ -27,6 +27,8 @@ Start with a small, representative matrix before adding more routes:
 | RSC payload rendering | `rsc_payload_react_component`             | RPS, p50, p90, p99, max | Pro-only endpoint throughput and payload-size path; not a streaming TTFB target                     |
 | Fragment caching      | `react_component` with `cache: true`      | RPS, p50, p90, p99, max | Requires separate primed-hit and busted-miss paths or setup steps; k6 cannot infer cache state      |
 
+Here `p50` maps to k6's `med` stat and the `p50_latency` Bencher Metric Format measure.
+
 ## First PR Scope
 
 The first implementation PR should add only one or two routes per category and should reuse existing dummy app examples
@@ -56,6 +58,8 @@ OSS first slice or in a dedicated follow-up PR:
 Use `benchmarks/bench.rb`/`benchmarks/k6.ts` for Rails HTTP routes such as streaming SSR and static RSC payload endpoint
 checks. Use `benchmarks/bench-node-renderer.rb` for direct Pro Node Renderer transport coverage unless that script is
 extended to cover full Rails streaming behavior.
+Run Pro routes with `PRO=true`; `benchmarks/bench.rb` switches `APP_DIR` to `react_on_rails_pro/spec/dummy` and appends
+`: Pro` to Bencher benchmark names.
 
 ## Noise Controls
 
@@ -82,7 +86,8 @@ Prerequisites for the first implementation PR:
 
 Follow-on enhancements:
 
-- Add `p95` only when the k6 trend stats, summary table, artifacts, and Bencher reporting can be updated together.
+- Add `p95` only when the k6 `--summary-trend-stats` flag, currently `med,max,p(90),p(99)` in `benchmarks/bench.rb`, the
+  summary table, artifacts, and Bencher reporting can be updated together.
 - Require repeated or overlapping alerts before opening an issue or failing CI.
 
 ## Local Verification Before CI
