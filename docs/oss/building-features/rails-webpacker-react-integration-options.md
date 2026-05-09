@@ -147,6 +147,9 @@ Keep each shim explicit and narrow:
    + import { turbolinksSupported } from 'react-on-rails/lib/turbolinksUtils.js';
    ```
 
+   For React on Rails 16.0 and newer, these `lib/` path imports carry the same ESM and modern-syntax
+   requirements as the `/client` import; steps 2 and 3 must also be in place before switching to them.
+
 2. Ensure Babel can parse modern syntax used by current packages. Add these plugins to your existing Babel config without replacing existing presets or plugins:
 
    **When to apply:** Only add these plugins if Webpack 4 fails to parse modern syntax; first check whether your
