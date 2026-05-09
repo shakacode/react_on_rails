@@ -119,11 +119,12 @@ Conditions:
 - Chrome 147 with matching ChromeDriver 147
 
 > [!WARNING]
-> The original artifact does not yet publish `RAILS_ENV`, browser cache behavior between measured runs, hardware/OS, or
-> Ruby/Node/Rails versions. Unknown `RAILS_ENV` can account for large timing differences; unknown browser cache state
-> between measured runs affects repeatability. The single warmup request before each measured run may also be insufficient
-> for the Pro Node renderer worker pool to reach JIT and RSC-payload-compilation steady state, which is more likely to
-> make the RSC route look slower than its steady-state performance than to inflate its advantage.
+> The original artifact does not yet publish `RAILS_ENV`, so the absolute timing values may include development-mode or
+> other non-production Rails overhead. It also does not publish browser cache behavior between measured runs, hardware/OS,
+> or Ruby/Node/Rails versions. Unknown browser cache state between measured runs affects repeatability. The single warmup
+> request before each measured run may also be insufficient for the Pro Node renderer worker pool to reach JIT and
+> RSC-payload-compilation steady state, which is more likely to make the RSC route look slower than its steady-state
+> performance than to inflate its advantage.
 > [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing environment metadata. Until
 > that is resolved, treat these numbers as directional signals rather than a stable baseline.
 
@@ -136,18 +137,20 @@ The median results showed this directional signal:
 | Browser | `responseEnd`                               |     644.80ms | 588.80ms |                         -8.7% |
 | Rails   | Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |              -2.2% (variance) |
 
-`action_total` is the Rails controller wall-time field from the raw benchmark artifact, not a browser Performance API
-metric. The artifact does not yet publish enough logger or extraction-script context to make that field independently
-reproducible; [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing distribution and
-source artifacts.
+`action_total` is the Rails wall-time field from the raw benchmark artifact, not a browser Performance API metric. The
+artifact does not yet publish enough logger or extraction-script context to confirm whether it is the full
+`process_action` duration including rendering or a narrower controller-action field, so do not use it to infer the
+server-rendering split. [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing
+distribution and source artifacts.
 
-The RSC route's post-`responseEnd` client processing time was about 18ms, compared with about 130ms for the Inertia
-control. That gap helps explain why the navigation-duration gain (-21.7%) was larger than the server-response
-`responseEnd` gain (-8.7%).
+Derived from the median table above, the RSC route's post-`responseEnd` client processing time (`navigation duration -
+responseEnd`) was about 18ms, compared with about 130ms for the Inertia control. That gap helps explain why the
+navigation-duration gain (-21.7%) was larger than the `responseEnd` gain (-8.7%).
 
 The page-specific script request count, measured as Chrome DevTools Network panel `Script`-type requests after loading
 each route, changed from 6 requests for the Inertia demo to 1 request for the RSC demo. That is a fixed request count,
-not a timing median or statistical sample, and it does not measure combined transfer-size. See
+not a timing median or statistical sample, and it does not measure combined transfer size or cache behavior. Fewer
+requests do not necessarily imply a smaller browser payload. See
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
 - _All timing values are medians from the raw benchmark artifact values (n=4 per route); sample size is too small to
