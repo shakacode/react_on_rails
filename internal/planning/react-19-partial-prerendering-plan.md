@@ -24,8 +24,8 @@ Use a dedicated branch for the actual version verification work:
    React on Rails SSR, streaming, RSC, or hydration integration.
 2. Run `pnpm install` from a clean checkout and confirm React, React DOM, and `react-on-rails-rsc` resolve to compatible
    versions.
-3. Run package checks. These cover the `react-dom/server` streaming APIs most likely to break across React 19 minors,
-   including `renderToPipeableStream` and `renderToReadableStream`:
+3. Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream` and
+   `renderToReadableStream` through `@types/react-dom`, lint enforces package style, and tests exercise the runtime paths:
    - `pnpm run type-check`
    - `pnpm run lint`
    - `pnpm run test`
@@ -48,7 +48,9 @@ Use a dedicated branch for the actual version verification work:
    - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
    - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
    - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
-6. Run at least one generated-app path that installs dependencies from scratch.
+6. Run the generated-app suite from a clean checkout:
+   `bundle exec rake run_rspec:shakapacker_examples_basic`. Use `bundle exec rake shakapacker_examples:gen_all` for full
+   regenerated example coverage when needed.
 7. Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
    examples.
 
@@ -85,6 +87,8 @@ Evaluate these in order:
 
 - React 19.2.x passes the same local verification suite as the currently supported React 19 line.
 - Existing SSR, streaming SSR, RSC payload rendering, and client hydration tests stay green.
+- The generated-app suite passes with React 19.2.x.
+- Public docs that cite an explicit React version are updated or explicitly annotated with a minimum-version note.
 - Any partial pre-rendering proposal includes a same-route benchmark against traditional SSR or streaming SSR.
 - The first public artifact is documentation or an example unless a missing library API is clearly demonstrated.
 - The feature name and docs explain Rails ownership clearly so users do not expect Next.js-style file-system routing.
