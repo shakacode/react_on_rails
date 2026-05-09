@@ -65,8 +65,8 @@ module ReactOnRails
     # common deploy-script locations so users on older Procfile/Dockerfile entries
     # get a migration nudge before the task is removed.
     DEPRECATED_RENDERER_CACHE_TASK = "pre_stage_bundle_for_node_renderer"
-    # Intentionally a fixed list, not a glob (for example, config/deploy/*.rb).
-    # CI manifests and directory globs need a separate bounded scan to avoid surprising IO.
+    # Intentionally limited to single-file app deploy hooks. CI manifests and
+    # directory globs need a separate bounded scan to avoid surprising IO.
     RENDERER_CACHE_DEPLOY_SCRIPT_PATHS = [
       "Procfile",
       "Procfile.dev",
