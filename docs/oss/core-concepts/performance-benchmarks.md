@@ -92,9 +92,10 @@ Server components produce HTML that does not need hydration — they have no cli
 ### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
-is a public ShakaCode comparison repo, not an official Gumroad integration. It measures a bounded creator-dashboard
-surface with the same reduced presenter data and outer layout across two routes. The comparison changes three axes at
-once (RSC, the Pro Node renderer, and SSR), so the deltas cannot be attributed to any single factor. The routes are:
+is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
+not an official Gumroad integration. It measures the same reduced presenter data and outer layout across two routes. The
+comparison changes three axes at once (RSC, the Pro Node renderer, and SSR), so the deltas cannot be attributed to any
+single factor. The routes are:
 
 - Inertia-style control: `/dashboard/inertia_demo` (uses the actual `inertia_rails` gem; no Pro renderer or SSR)
 - React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
@@ -106,7 +107,8 @@ once (RSC, the Pro Node renderer, and SSR), so the deltas cannot be attributed t
 > route-level effect; see the [SSR Performance table](#ssr-performance-execjs-vs-node-renderer) for the renderer baseline.
 
 The April 30, 2026 local benchmark used eight alternating measured runs between the Inertia and RSC routes, four per
-route. Before each of the eight measured runs, the harness sent one warmup request to the route being measured.
+route. Before each of the eight measured runs, the harness sent one warmup request to the route being measured; one
+warmup may not be enough for the Pro Node renderer worker pool to reach JIT and RSC-payload-compilation steady state.
 Conditions:
 
 - Compiled page assets from the same Shakapacker/Rspack configuration for both routes
@@ -115,9 +117,12 @@ Conditions:
 - Dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`
 - Chrome 147 with matching ChromeDriver 147
 
-The original artifact does not yet publish `RAILS_ENV`, browser cache behavior between measured runs, hardware/OS, or
-Ruby/Node/Rails versions. [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing
-environment metadata; until that is resolved, treat these numbers as directional signals rather than a stable baseline.
+> [!WARNING]
+> The original artifact does not yet publish `RAILS_ENV`, browser cache behavior between measured runs, hardware/OS, or
+> Ruby/Node/Rails versions. Unknown `RAILS_ENV` can account for large timing differences; unknown browser cache state
+> between measured runs affects repeatability. [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253)
+> tracks the missing environment metadata. Until that is resolved, treat these numbers as directional signals rather than
+> a stable baseline.
 
 The browser timing medians showed this directional signal:
 
@@ -128,8 +133,9 @@ The browser timing medians showed this directional signal:
 | `responseEnd`                               |        645ms |    589ms |  -8.7% |
 | Controller `action_total` (Rails wall time) |        347ms |    339ms |  noise |
 
-The page-specific script request count changed from 6 requests for the Inertia demo to 1 request for the RSC demo. That
-is a fixed request count, not a timing median or statistical sample, and it does not measure combined transfer-size. See
+The page-specific script request count, measured as Chrome DevTools Network panel `Script`-type requests after loading
+each route, changed from 6 requests for the Inertia demo to 1 request for the RSC demo. That is a fixed request count,
+not a timing median or statistical sample, and it does not measure combined transfer-size. See
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
 - _All timing values are medians rounded to the nearest millisecond (n=4 per route); sample size is too small to
