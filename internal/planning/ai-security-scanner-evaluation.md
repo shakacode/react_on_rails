@@ -113,17 +113,17 @@ the normalized weighted average is
 `(3 x 1.0 + 3 x 1.0 + 3 x 0.9 + 3 x 0.8 + 3 x 0.8 + 3 x 0.7 + 3 x 0.7 + 3 x 0.5) / 6.4 = 3.0`,
 where 6.4 is the sum of all weights.
 
-| Criterion                 | Question                                                                           | Score (1-5) | Weight (0-1) | Weighted score |
-| ------------------------- | ---------------------------------------------------------------------------------- | ----------- | ------------ | -------------- |
-| Actionability             | Does the finding name the concrete file, behavior, and reachable path?             |             | 1.0          |                |
-| Correctness               | Can we reproduce or disprove the finding locally?                                  |             | 1.0          |                |
-| False-positive rate       | What fraction of surfaced findings survive local verification as true positives?   |             | 0.9          |                |
-| Ruby/Rails coverage       | Does it understand Rails generators, helpers, and server rendering paths?          |             | 0.8          |                |
-| TypeScript/React coverage | Does it understand package exports, SSR utilities, and browser/runtime boundaries? |             | 0.8          |                |
-| Permission model          | Can it run with minimal GitHub permissions?                                        |             | 0.7          |                |
-| CI fit                    | Can results be advisory first, without failing every PR?                           |             | 0.7          |                |
-| Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                      |             | 0.5          |                |
-| **Final score**           | Normalized weighted average: `sum(weighted scores) / 6.4`; total weight = `6.4`    |             | N/A          | `<fill>`       |
+| Criterion                 | Question                                                                                         | Score (1-5) | Weight (0-1) | Weighted score |
+| ------------------------- | ------------------------------------------------------------------------------------------------ | ----------- | ------------ | -------------- |
+| Actionability             | Does the finding name the concrete file, behavior, and reachable path?                           |             | 1.0          |                |
+| Correctness               | Can we reproduce or disprove the finding locally?                                                |             | 1.0          |                |
+| False-positive rate       | What fraction of surfaced findings survive local verification as true positives?                 |             | 0.9          |                |
+| Ruby/Rails coverage       | Does it understand Rails generators, helpers, and server rendering paths?                        |             | 0.8          |                |
+| TypeScript/React coverage | Does it understand package exports, SSR utilities, and browser/runtime boundaries?               |             | 0.8          |                |
+| Permission model          | Can it run with minimal GitHub permissions?                                                      |             | 0.7          |                |
+| CI fit                    | Can results be advisory first, without failing every PR?                                         |             | 0.7          |                |
+| Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                                    |             | 0.5          |                |
+| **Final score**           | Normalized weighted average: `sum(weighted scores) / sum(weights)`; current total weight = `6.4` |             | N/A          | `<fill>`       |
 
 Anchor examples:
 

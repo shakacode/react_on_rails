@@ -37,9 +37,11 @@ draft directly, but external reporters cannot use the GitHub Security Advisory d
 Advisory requires repository write access.
 
 If a reporter cannot use GitHub, they may email [contact@shakacode.com](mailto:contact@shakacode.com) with the subject
-line `React on Rails security` and ask to be routed to a React on Rails maintainer for coordinated disclosure. Do not
-include exploit details in that first contact. This fallback remains in place until maintainers publish the dedicated
-security alias tracked in
+line `React on Rails security` and ask to be routed to a React on Rails maintainer for coordinated disclosure. In that
+first email, include the affected package name (`react_on_rails` gem or `react-on-rails` npm package), the version range,
+and a one-line impact description, such as "potential XSS in SSR helper" or "information disclosure in generator output."
+Do not include exploit details in that first contact. This fallback remains in place until maintainers publish the
+dedicated security alias tracked in
 [Issue 3266](https://github.com/shakacode/react_on_rails/issues/3266). Maintainers will respond with a secure
 alternative, such as a private GitHub Advisory thread or another mutually agreed private channel, before requesting
 reproduction details.
