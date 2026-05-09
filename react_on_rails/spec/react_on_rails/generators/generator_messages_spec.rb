@@ -461,8 +461,8 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
-    it "returns true when packageManager uses numeric npm-style version specs" do
-      %w[pnpm@10 pnpm@10.x pnpm@^10.0.0].each do |package_manager|
+    it "returns true when packageManager uses npm-style version specs" do
+      %w[pnpm@10 pnpm@10.x pnpm@^10.0.0 pnpm@latest pnpm@*].each do |package_manager|
         expect(
           described_class.package_manager_declared?(
             manager: "pnpm",
@@ -470,15 +470,6 @@ describe GeneratorMessages do
           )
         ).to be(true), "expected #{package_manager.inspect} to count as an explicit packageManager declaration"
       end
-    end
-
-    it "returns false when packageManager uses a symbolic version tag" do
-      expect(
-        described_class.package_manager_declared?(
-          manager: "pnpm",
-          package_json: { "packageManager" => "pnpm@latest" }
-        )
-      ).to be(false)
     end
 
     it "uses a provided package_json without reading package.json again" do

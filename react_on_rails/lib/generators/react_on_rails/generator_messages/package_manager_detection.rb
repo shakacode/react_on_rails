@@ -75,13 +75,13 @@ module GeneratorMessages
       end
     end
 
-    # Returns true when package.json declares a top-level `packageManager` field with a
-    # numeric version/range (e.g. `"pnpm@9.0.0"`, `"pnpm@10"`, or `"pnpm@^10.0.0"`)
-    # for the requested `manager`. Symbolic tags such as `"pnpm@latest"` return false
-    # so the CI scaffold keeps its reproducible fallback pin. Projects that need
-    # reproducible Corepack behavior should prefer an exact version, optionally with a
-    # hash (e.g. `"pnpm@9.0.0+sha256.abc"`). A bare name without `@<version>` returns
-    # false because `pnpm/action-setup` has no version to resolve from it.
+    # Returns true when package.json declares a top-level `packageManager` field with an
+    # npm-style version/range/tag (e.g. `"pnpm@9.0.0"`, `"pnpm@^10.0.0"`, or
+    # `"pnpm@latest"`) for the requested `manager`. The CI scaffold treats these as
+    # declared so it does not inject a conflicting fallback `version:`. Projects that
+    # need reproducible Corepack behavior should prefer an exact version, optionally
+    # with a hash (e.g. `"pnpm@9.0.0+sha256.abc"`). A bare name without `@<version>`
+    # returns false because `pnpm/action-setup` has no version to resolve from it.
     # Used by the CI scaffold to decide whether `pnpm/action-setup` needs an explicit
     # `version:` key; exact SemVer validation belongs only where a caller needs to
     # extract a reproducible version pin.
@@ -162,18 +162,15 @@ module GeneratorMessages
     end
 
     # Sibling of `package_manager_name_from_content` for places that need a resolvable
-    # version spec, not just a manager name. It accepts numeric npm-style version specs
-    # because `pnpm/action-setup` can read those from package.json; a bare `"pnpm"` or
-    # symbolic tag such as `"pnpm@latest"` still needs the scaffolded fallback version.
-    # Corepack expects an exact version, so range specs such as `"pnpm@^10.0.0"` are
-    # non-standard even though this check treats them as declared to avoid injecting
-    # a conflicting fallback version.
+    # spec, not just a manager name. Range or tag specs such as `"pnpm@^10.0.0"` and
+    # `"pnpm@latest"` are non-standard for reproducible Corepack usage, but this check
+    # treats them as declared to avoid injecting a conflicting fallback version.
     def versioned_package_manager_name_from_content(content)
       raw_declared = content["packageManager"]
       return nil unless raw_declared.is_a?(String)
 
       declared = raw_declared.strip
-      match = declared.match(/\A([^@\s]+)@(?=\S*\d)(\S+)\z/)
+      match = declared.match(/\A([^@\s]+)@(\S+)\z/)
       return nil unless match
 
       name = match[1].downcase
