@@ -160,7 +160,7 @@ combined transfer size or cache behavior. Fewer requests do not necessarily impl
   variance at n=4._
 - _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
-#### Worst-case `responseEnd` counter-signal {#gumroad-rsc-worst-case-responsend}
+#### Worst-case `responseEnd` counter-signal {#gumroad-rsc-worst-case-responseend}
 
 | Metric                             | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ---------------------------------- | -----------: | -------: | ------------------------------: |
