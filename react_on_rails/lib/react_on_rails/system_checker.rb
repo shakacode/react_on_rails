@@ -18,6 +18,7 @@ module ReactOnRails
 
     def initialize
       @messages = []
+      @package_manager_lockfile_scan_blocked = nil
     end
 
     def add_error(message)

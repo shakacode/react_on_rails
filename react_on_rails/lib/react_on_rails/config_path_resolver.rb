@@ -25,8 +25,8 @@ module ReactOnRails
 
     private
 
-    def resolved_package_json_path
-      resolved_package_path("package.json")
+    def resolved_package_json_path(package_root = resolved_package_root)
+      resolved_package_path("package.json", package_root)
     end
 
     def resolved_package_root
@@ -43,8 +43,8 @@ module ReactOnRails
       Rails.root.join(resolved_location).to_s
     end
 
-    def resolved_package_path(filename)
-      File.join(resolved_package_root, filename)
+    def resolved_package_path(filename, package_root = resolved_package_root)
+      File.join(package_root, filename)
     end
 
     def package_root_missing?(package_root)
@@ -53,7 +53,7 @@ module ReactOnRails
 
     def package_json_path_for(detection_target)
       package_root = resolved_package_root
-      package_json_path = resolved_package_json_path
+      package_json_path = resolved_package_json_path(package_root)
       return package_json_path if File.exist?(package_json_path)
 
       if package_root_missing?(package_root)
