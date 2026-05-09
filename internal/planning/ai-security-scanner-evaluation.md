@@ -53,12 +53,12 @@ prioritization, explanation, or reachability analysis for a finding that existin
 Start with this point-in-time vendor shortlist from the issue if the products still offer an appropriate plan at
 evaluation time.
 
-| Vendor          | Reference                  | Initial status | Before scheduling                                                                                                                       |
-| --------------- | -------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                 |
-| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                 |
-| Almanax         | <https://almanax.ai/>      | Lower priority | Confirm OSS or trial access and Ruby/TypeScript coverage; public examples were Web3-heavy as of 2026-05-09. Re-evaluate at next review. |
-| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                 |
+| Vendor          | Reference                  | Initial status | Before scheduling                                                                                                                              |
+| --------------- | -------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                        |
+| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                        |
+| Almanax         | <https://almanax.ai/>      | Lower priority | Confirm OSS or trial access and Ruby/TypeScript coverage; public examples were Web3-heavy as of the document date. Re-evaluate at next review. |
+| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                        |
 
 If the named vendors are unavailable or unsuitable, look for tools in these categories:
 
@@ -89,6 +89,9 @@ Before running scans, record the exact baselines used:
 
 > **Do not run any scanner evaluation until every cell in this table is filled in and committed.** Undocumented
 > baselines produce results that cannot be reproduced or compared across evaluators.
+> For the known-issue fixture, fill the table with a concrete private repository/branch or public training-project URL,
+> commit or version, fixture owner, and access request path before scheduling any scanner. Until Issue 2018 names a
+> narrower owner, repository maintainers with write access own fixture selection and access approval.
 
 The follow-up issue,
 [#3265 Track baseline prerequisites for AI security scanner evaluation](https://github.com/shakacode/react_on_rails/issues/3265),
@@ -111,19 +114,20 @@ to make security signal and operational cost comparable across evaluators while 
 Example: Actionability score = 4 with weight = 1.0 produces a weighted score of 4.0. If all eight criteria score 3,
 the normalized weighted average is
 `(3 x 1.0 + 3 x 1.0 + 3 x 0.9 + 3 x 0.8 + 3 x 0.8 + 3 x 0.7 + 3 x 0.7 + 3 x 0.5) / 6.4 = 3.0`,
-where 6.4 is the sum of all weights.
+where 6.4 is the sum of all weights. If any criterion or weight changes, recompute this denominator in the example and
+in the final-score row before merging the change.
 
-| Criterion                 | Question                                                                                         | Score (1-5) | Weight (0-1) | Weighted score |
-| ------------------------- | ------------------------------------------------------------------------------------------------ | ----------- | ------------ | -------------- |
-| Actionability             | Does the finding name the concrete file, behavior, and reachable path?                           |             | 1.0          |                |
-| Correctness               | Can we reproduce or disprove the finding locally?                                                |             | 1.0          |                |
-| False-positive rate       | What fraction of surfaced findings survive local verification as true positives?                 |             | 0.9          |                |
-| Ruby/Rails coverage       | Does it understand Rails generators, helpers, and server rendering paths?                        |             | 0.8          |                |
-| TypeScript/React coverage | Does it understand package exports, SSR utilities, and browser/runtime boundaries?               |             | 0.8          |                |
-| Permission model          | Can it run with minimal GitHub permissions?                                                      |             | 0.7          |                |
-| CI fit                    | Can results be advisory first, without failing every PR?                                         |             | 0.7          |                |
-| Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                                    |             | 0.5          |                |
-| **Final score**           | Normalized weighted average: `sum(weighted scores) / sum(weights)`; current total weight = `6.4` |             | N/A          | `<fill>`       |
+| Criterion                 | Question                                                                                                                      | Score (1-5) | Weight (0-1) | Weighted score |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------ | -------------- |
+| Actionability             | Does the finding name the concrete file, behavior, and reachable path?                                                        |             | 1.0          |                |
+| Correctness               | Can we reproduce or disprove the finding locally?                                                                             |             | 1.0          |                |
+| False-positive rate       | What fraction of surfaced findings survive local verification as true positives?                                              |             | 0.9          |                |
+| Ruby/Rails coverage       | Does it understand Rails generators, helpers, and server rendering paths?                                                     |             | 0.8          |                |
+| TypeScript/React coverage | Does it understand package exports, SSR utilities, and browser/runtime boundaries?                                            |             | 0.8          |                |
+| Permission model          | Can it run with minimal GitHub permissions?                                                                                   |             | 0.7          |                |
+| CI fit                    | Can results be advisory first, without failing every PR?                                                                      |             | 0.7          |                |
+| Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                                                                 |             | 0.5          |                |
+| **Final score**           | Normalized weighted average: `sum(weighted scores) / sum(weights)`; current total weight = `6.4`; recompute if weights change |             | N/A          | `<fill>`       |
 
 Anchor examples:
 
@@ -172,7 +176,7 @@ before adoption, repository maintainers with write access own the next triage de
 Do not add a scanner to CI until all of these are true:
 
 - Finds at least one verified issue or a clearly valuable hardening opportunity.
-- Keeps the false-positive rate at or below 25% for that scanner's `main` scan after one triage pass, measured among
+- Keeps the false-positive rate at or below 15% for that scanner's `main` scan after one triage pass, measured among
   high/critical findings reviewed for that scanner run, not cumulatively across scanners. If the scan reports fewer than
   five high/critical findings, manually review every finding and record why the sample is too small for a stable rate.
 - Supports advisory mode for pull requests.

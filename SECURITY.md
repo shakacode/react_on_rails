@@ -39,9 +39,12 @@ Do not include exploit details in that first contact. Maintainers will respond w
 private GitHub Advisory thread or another mutually agreed private channel, before requesting reproduction details.
 
 Maintainers aim to provide an initial response within five business days. The default disclosure window is 90 days from
-the date of first report unless maintainers and the reporter agree to a shorter or longer timeline.
+the date of first report unless maintainers and the reporter agree to a shorter or longer timeline. If you do not
+receive an initial response within ten business days, send a follow-up to the same email address or private GitHub
+report thread.
 
 Maintainers must keep reports private until the issue is patched or disproven, then publish an advisory or release note
-only after sensitive reproduction details are no longer useful for exploiting supported releases.
+only after a fix, mitigation, or explicit non-impact determination means the disclosed reproduction details no longer
+help exploit supported releases.
 
 Reporters will be credited in the security advisory or release notes unless they request anonymity.
