@@ -189,10 +189,10 @@ end
 case mode
 when "test"
   env = { "RAILS_ENV" => "test", "NODE_ENV" => "test" }
-  system(env, "bin/shakapacker") || abort("shakapacker (test) failed")
+  system(env, "ruby", "bin/shakapacker") || abort("shakapacker (test) failed")
 when "production"
   env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
-  system(env, "bin/shakapacker") || abort("shakapacker (production) failed")
+  system(env, "ruby", "bin/shakapacker") || abort("shakapacker (production) failed")
 end
 ```
 
