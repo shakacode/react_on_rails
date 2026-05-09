@@ -47,7 +47,8 @@ app's default store. The miss path should clear only that benchmark cache namesp
 should clear that namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. For
 the dedicated `FileStore`, clear the namespace with `FileUtils.rm_rf("tmp/benchmark_cache")`; avoid `Rails.cache.clear`
 on the application cache. Avoid relying on a shared Redis instance, environment-default `:null_store`/`:memory_store`
-behavior, or manual cache state.
+behavior, or manual cache state. This explicit cache-prime request is an additional step before the existing per-route
+k6 warm-up in [Noise Controls](#noise-controls); it does not replace that 10-request warm-up phase.
 
 Recommended Pro slice for [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169), implemented after the
 OSS first slice or in a dedicated follow-up PR:
@@ -63,6 +64,7 @@ OSS first slice or in a dedicated follow-up PR:
 Use `benchmarks/bench.rb`/`benchmarks/k6.ts` for Rails HTTP routes such as streaming SSR and static RSC payload endpoint
 checks. Use `benchmarks/bench-node-renderer.rb` for direct Pro Node Renderer transport coverage unless that script is
 extended to cover full Rails streaming behavior.
+
 Run Pro routes with `PRO=true`; `benchmarks/bench.rb` switches `APP_DIR` to `react_on_rails_pro/spec/dummy` and appends
 `: Pro` to Bencher benchmark names.
 
@@ -80,10 +82,11 @@ Already in place:
 
 Prerequisites for the first implementation PR:
 
-- Define alternating route order in `benchmarks/bench.rb` as two deterministic passes over the same route list: first in
-  `rails routes` order, then in reverse order in the same job. Record the pass order with the per-route artifacts before
-  using route ordering as a noise-control signal. This is large enough to land as its own prerequisite PR, and the first
-  benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally because it roughly
+- Define forward-then-reverse route passes in `benchmarks/bench.rb` as two deterministic passes over the same route list:
+  first in `rails routes` order, then in reverse order in the same job. Record the pass order with the per-route
+  artifacts before using route ordering as a noise-control signal. This is large enough to land as its own prerequisite
+  PR, and the first benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally
+  because it roughly
   doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about `2 * (DURATION + 5 seconds)` per
   route with the current warm-up, assuming the default `DURATION=30s`. This estimate does not include the per-job
   `bundle exec rails routes` discovery call, server startup, or server warmdown time. Recalculate the estimate when
@@ -100,11 +103,11 @@ Prerequisites for the first implementation PR:
 
   ```json
   {
-    "ruby_version": "<ruby --version>",
-    "node_version": "<node --version>",
-    "react_version": "<installed react package version>",
-    "renderer": "<execjs|node_renderer>",
-    "runner_type": "<github runner label>",
+    "ruby_version": "ruby 3.3.0 (2023-12-25 revision ...) [x86_64-linux]",
+    "node_version": "v20.11.0",
+    "react_version": "18.3.1",
+    "renderer": "execjs",
+    "runner_type": "ubuntu-latest",
     "bundle_mode": "production",
     "sample_count": 1
   }
@@ -112,7 +115,9 @@ Prerequisites for the first implementation PR:
 
 - Preserve the existing `benchmarks/bench.rb` summary metrics (`RPS`, `p50`, `p90`, `p99`, and `max`) and extend Bencher
   BMF reporting to include `max_latency` alongside the existing `rps`, `p50_latency`, `p90_latency`, `p99_latency`, and
-  `failed_pct` measures. Today `max` appears in `summary.txt` but not in the BMF output.
+  `failed_pct` measures. Today `max` appears in `summary.txt` but not in the BMF output. Add a `max:` keyword parameter
+  to `BmfCollector#add` in `benchmarks/lib/bmf_helpers.rb`, then pass `max_latency:` from the `bmf_collector.add` call
+  in `benchmarks/bench.rb`.
 
 Follow-on enhancements:
 
