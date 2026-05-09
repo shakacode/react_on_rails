@@ -74,7 +74,8 @@ thresholds before the full 30-run window exists because sparse history trains on
 The Bencher reporting baseline fix from [PR 3148](https://github.com/shakacode/react_on_rails/pull/3148) landed on
 2026-04-23. Do not re-enable the hard gate until at least 30 successful `Benchmark Workflow` runs on `main` have built
 fresh history. Count only completed `benchmark` jobs triggered after that merge; exclude pre-merge runs, branch runs,
-reruns, and docs-only pushes skipped by `script/ci-changes-detector`. Record each counted run ID and timestamp in
+reruns, and docs-only pushes skipped by
+[`script/ci-changes-detector`](../../script/ci-changes-detector). Record each counted run ID and timestamp in
 [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
 
 ### Current Bencher Configuration
@@ -94,6 +95,9 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 - restoring the hard gate means changing the warning step to exit with `$BENCHER_EXIT_CODE` after the false-positive
   target is met, not removing `--err`
 
+> **Note:** The values above are a snapshot of the workflow at the time of writing. Verify against
+> `.github/workflows/benchmark.yml` (`run_bencher` function) before tuning because the workflow is the source of truth.
+
 ### Tuning Sequence
 
 1. Keep the gate in warning mode while gathering the new baseline.
@@ -101,8 +105,9 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
    overlap-comparison method tracked in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). For two
    adjacent alert sets `A` and `B`, use Jaccard overlap: `|A intersect B| / |A union B|`. For example, two shared pairs
    across 10 total unique alert pairs gives `2 / 10 = 20%`. Overlap below `0.20` means runner noise is still dominating;
-   proceed to step 3 only after overlap is at least `0.40` for 3 consecutive adjacent-run pairs. If a comparison has
-   fewer than 5 unique alert pairs, record the small-sample caveat in Issue 3169 and keep collecting runs.
+   proceed to step 3 only after overlap is at least `0.40` for 3 consecutive adjacent-run pairs. The gap between `0.20`
+   and `0.40` avoids flip-flopping between noise and signal states. If a comparison has fewer than 5 unique alert pairs,
+   record the small-sample caveat in Issue 3169 and keep collecting runs.
 3. Prefer threshold changes that require stronger evidence before failure:
    - widen the Bencher boundary from `0.95` toward `0.99`
    - keep `--threshold-max-sample-size $MAX_SAMPLE` aligned with the available history; add a minimum-sample rule only
@@ -114,9 +119,11 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 
 ### Acceptance Criteria
 
-- At least 5 consecutive qualifying main `Benchmark Workflow` runs pass the warning-mode check with the current code.
-  A run qualifies when the triggering push modifies at least one file that `script/ci-changes-detector` does not classify
-  as docs-only. Track the running count in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
+- At least 5 consecutive qualifying main `Benchmark Workflow` runs complete with no Bencher regression alert; that means
+  `BENCHER_EXIT_CODE` stays `0` or `BENCHER_HAS_ALERT` stays `0` with the current code. A run qualifies when the
+  triggering push modifies at least one file that
+  [`script/ci-changes-detector`](../../script/ci-changes-detector) does not classify as docs-only. Track the running
+  count in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
 - External tracking requires the same `(benchmark, measure)` pair to alert on at least 2 consecutive runs before filing or
   failing; a single noisy run does not trigger the gate.
 - A deliberately introduced local regression still triggers an alert under the tuned settings. The developer re-enabling
