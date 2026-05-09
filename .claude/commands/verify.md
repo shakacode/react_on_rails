@@ -10,7 +10,7 @@ reproduce CI job selection locally.
 1. Read `AGENTS.md` first. It is the canonical source for required commands, formatting, boundaries, and ask-first areas.
 2. Inspect the current branch diff with `git status --short` and `git diff --stat origin/main...HEAD`.
 3. Decide the smallest verification set that covers the changed surface area.
-4. Keep repo-wide commit gates from `AGENTS.md` in the set when you will create a commit, even if the changed surface is narrow.
+4. Always include `bundle exec rubocop` when you will create or amend a commit, even when the changed surface is documentation-only, because `AGENTS.md` marks it mandatory before every commit.
 5. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 6. For formatting failures, run `rake autofix`; do not manually edit formatting-only changes.
 7. After a fix, restart at the failed command and continue forward. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, stop and report the error instead of retrying.
@@ -31,7 +31,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run build`
    - `pnpm run lint`
    - `pnpm run type-check`
-   - targeted `pnpm --filter <package> run test` or `pnpm run test -- <path>` for changed package behavior
+   - targeted `pnpm --filter react-on-rails run test` or `pnpm run test -- <path>` for changed package behavior
 4. Docs:
    - `script/check-docs-sidebar origin/main HEAD` when docs under `docs/` changed
    - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless this branch changes the canonical command
