@@ -21,8 +21,8 @@ Start with a small, representative matrix before adding more routes:
 | Area                  | Operation                                 | Primary metric          | Notes                                                                                               |
 | --------------------- | ----------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------- |
 | Client rendering      | `react_component` with `prerender: false` | RPS, p50, p90, p99, max | Uses existing HTTP benchmark output; browser mount timing is follow-up instrumentation              |
-| Traditional SSR       | `react_component` with `prerender: true`  | RPS, p50, p90, p99, max | Covers ExecJS and Node Renderer paths; server render duration requires separate instrumentation     |
-| Hash SSR              | `react_component_hash`                    | RPS, p50, p90, p99, max | Covers render-functions returning objects; payload-size capture requires tooling extension          |
+| Traditional SSR       | `react_component` with `prerender: true`  | RPS, p50, p90, p99, max | OSS first slice uses ExecJS; Pro Node Renderer follow-up uses `benchmarks/bench-node-renderer.rb`   |
+| Hash SSR              | `react_component_hash`                    | RPS, p50, p90, p99, max | Deferred; see First PR Scope. Payload-size capture requires tooling extension                       |
 | Streaming SSR         | `stream_react_component`                  | RPS, p50, p90, p99, max | Pro-only Rails HTTP path; TTFB/response-end reporting is a required extension before new thresholds |
 | RSC payload rendering | `rsc_payload_react_component`             | RPS, p50, p90, p99, max | Pro-only endpoint throughput and payload-size path; not a streaming TTFB target                     |
 | Fragment caching      | `react_component` with `cache: true`      | RPS, p50, p90, p99, max | Requires separate primed-hit and busted-miss paths or setup steps; k6 cannot infer cache state      |
@@ -41,8 +41,9 @@ Recommended OSS first slice for [Issue 2169](https://github.com/shakacode/react_
 3. Cached SSR route with explicit hit and miss measurements
 
 Hash SSR is deferred to a follow-on PR after the initial OSS noise profile is understood. The cached SSR slice should
-define separate cache-hit and cache-miss benchmark paths, or a deterministic priming and busting step, before comparing
-results.
+define separate cache-hit and cache-miss benchmark paths before comparing results. The miss path should clear the
+benchmark cache namespace before measurement, and the hit path should clear that namespace, make one warm-up request to
+prime the fragment, then run k6 against the primed route. Avoid relying on a shared Redis instance or manual cache state.
 
 Recommended Pro slice for [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169), implemented after the
 OSS first slice or in a dedicated follow-up PR:
@@ -77,9 +78,25 @@ Prerequisites for the first implementation PR:
 
 - Define alternating route order in `benchmarks/bench.rb` as two deterministic passes over the same route list: first in
   `rails routes` order, then in reverse order in the same job. Record the pass order with the per-route artifacts before
-  using route ordering as a noise-control signal.
-- Record sample count, runner type, Ruby version, Node version, React version, and bundle mode in a `metadata.json`
-  artifact and mirror the key fields in the `summary.txt` header.
+  using route ordering as a noise-control signal. Budget this intentionally because it roughly doubles route runtime: each
+  route gets two k6 runs plus two warm-up phases, or about `2 * (DURATION + 5 seconds)` per route with the current warm-up.
+- Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
+  `metadata.json` artifact and mirror the key fields in the `summary.txt` header.
+
+  Use these metadata keys as the minimum schema:
+
+  ```json
+  {
+    "ruby_version": "3.3.0",
+    "node_version": "22.0.0",
+    "react_version": "18.3.0",
+    "renderer": "execjs",
+    "runner_type": "ubuntu-22.04-8-core",
+    "bundle_mode": "production",
+    "sample_count": 1
+  }
+  ```
+
 - Preserve the existing `benchmarks/bench.rb` summary metrics (`RPS`, `p50`, `p90`, `p99`, and `max`) and extend Bencher
   BMF reporting to include `max_latency` alongside the existing `rps`, `p50_latency`, `p90_latency`, `p99_latency`, and
   `failed_pct` measures. Today `max` appears in `summary.txt` but not in the BMF output.
