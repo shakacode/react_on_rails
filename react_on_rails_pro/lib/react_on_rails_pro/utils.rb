@@ -120,10 +120,8 @@ module ReactOnRailsPro
     def self.server_bundle_file_name
       return @server_bundle_hash if @server_bundle_hash && !Rails.env.development?
 
-      @server_bundle_hash = begin
-        server_bundle_name = ReactOnRails.configuration.server_bundle_js_file
-        bundle_file_name(server_bundle_name)
-      end
+      server_bundle_name = ReactOnRails.configuration.server_bundle_js_file
+      @server_bundle_hash = bundle_file_name(server_bundle_name)
     end
 
     def self.calc_bundle_hash(server_bundle_js_file_path)
@@ -207,7 +205,10 @@ module ReactOnRailsPro
       value = ENV.fetch(name, "")
       raise ReactOnRailsPro::Error, "#{name} is whitespace-only; set or unset it." if value.match?(/\A\s+\z/)
 
-      warn "[ReactOnRailsPro] #{name} has surrounding whitespace and will be used verbatim." if value != value.strip
+      if value != value.strip
+        warn "[ReactOnRailsPro] #{name} has surrounding whitespace " \
+             "and will be used verbatim: #{value.inspect}"
+      end
       value.empty? ? nil : value
     end
     private_class_method :renderer_cache_env_value

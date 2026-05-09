@@ -215,6 +215,15 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       expect(File.exist?(File.join(bundle_dir, asset_filename))).to be(true)
       expect(File.exist?(File.join(bundle_dir, asset_filename2))).to be(true)
     end
+
+    it "logs copy operations with source and destination paths" do
+      copy_logs = satisfy("shows copy source and destination") do |out|
+        out.include?("Pre-seeded renderer cache: #{server_bundle_path} -> ") &&
+          out.include?("Copied asset: #{path_in_webpack_folder(asset_filename)} -> ")
+      end
+
+      expect { pre_seed_cache }.to output(copy_logs).to_stdout
+    end
   end
 
   context "when assets don't exist" do
@@ -231,6 +240,15 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
 
     it "keeps the invalid entry visible and warns instead of dropping it silently" do
       expect { pre_seed_cache }.to output(/Asset not found <blank> \(missing or not a file\)/).to_stderr
+    end
+  end
+
+  context "when assets include an invalid user-home path" do
+    before { allow(ReactOnRailsPro.configuration).to receive(:assets_to_copy).and_return(["~missing_user/asset.json"]) }
+
+    it "warns and skips the malformed optional asset path" do
+      expect { pre_seed_cache }
+        .to output(%r{Asset not found ~missing_user/asset\.json \(invalid path:}).to_stderr
     end
   end
 

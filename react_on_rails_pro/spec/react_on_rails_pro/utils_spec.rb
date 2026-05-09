@@ -515,10 +515,12 @@ module ReactOnRailsPro
         # Whitespace is preserved so the Rails pre-seed lands in the same path
         # the Node renderer reads (it consumes the env var verbatim in
         # configBuilder.ts).
+        expected_warning = Regexp.escape(
+          "RENDERER_SERVER_BUNDLE_CACHE_PATH has surrounding whitespace and will be used verbatim: " \
+          '"  /tmp/renderer-cache  "'
+        )
         expect { @result = described_class.resolve_renderer_cache_dir }
-          .to output(
-            /RENDERER_SERVER_BUNDLE_CACHE_PATH has surrounding whitespace and will be used verbatim/
-          ).to_stderr
+          .to output(/#{expected_warning}/).to_stderr
         expect(@result).to eq("  /tmp/renderer-cache  ")
       end
 
@@ -535,9 +537,12 @@ module ReactOnRailsPro
         # Lookahead-based match so the assertion is order-independent: both the
         # deprecation notice and the whitespace warning must appear, but either
         # may print first since they come from different code paths.
+        whitespace_warning = Regexp.escape(
+          'RENDERER_BUNDLE_PATH has surrounding whitespace and will be used verbatim: " /tmp/legacy-cache "'
+        )
         expected_warning = Regexp.new(
           "(?=.*RENDERER_BUNDLE_PATH is deprecated)" \
-          "(?=.*RENDERER_BUNDLE_PATH has surrounding whitespace and will be used verbatim)",
+          "(?=.*#{whitespace_warning})",
           Regexp::MULTILINE
         )
         expect { @result = described_class.resolve_renderer_cache_dir }

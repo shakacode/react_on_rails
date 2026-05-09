@@ -78,7 +78,14 @@ module ReactOnRailsPro
           next
         end
 
-        expanded = File.expand_path(asset_path.to_s, Rails.root)
+        expanded =
+          begin
+            File.expand_path(asset_path.to_s, Rails.root)
+          rescue ArgumentError => e
+            warn "[ReactOnRailsPro] Asset not found #{asset_label(asset_path)} (invalid path: #{e.message})"
+            next
+          end
+
         unless File.file?(expanded)
           if rsc_required_paths.include?(expanded)
             raise ReactOnRailsPro::Error, "Required RSC asset not found or not a file: #{asset_path}. " \
@@ -97,7 +104,7 @@ module ReactOnRailsPro
       tmp_file = "#{dest}.tmp-#{Process.pid}-#{SecureRandom.hex(6)}"
       FileUtils.cp(src, tmp_file)
       File.rename(tmp_file, dest)
-      puts "[ReactOnRailsPro] #{log_prefix}: #{dest}"
+      puts "[ReactOnRailsPro] #{log_prefix}: #{src} -> #{dest}"
     ensure
       # `tmp_file` is nil if execution never reached the assignment — Ruby's
       # parser pre-allocates a nil slot for every local variable it sees as an
