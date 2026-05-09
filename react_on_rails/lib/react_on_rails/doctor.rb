@@ -2757,6 +2757,8 @@ module ReactOnRails
     # out of scope to avoid warning on arbitrary application methods named `mock`.
     # The bare importActual/importMock forms cover Vitest's destructured-import style:
     #   import { importActual, importMock } from 'vitest'
+    # Accepted false-positive risk: user-defined importActual/importMock helpers
+    # that take a 'react-on-rails' string also match.
     BASE_PACKAGE_MOCK_PATTERN = %r{
       \b(?:
         (?:jest|vi)\.
@@ -2788,6 +2790,7 @@ module ReactOnRails
 
           Look for static imports, CommonJS requires, dynamic imports,
           Jest/Vitest mock helpers, or TypeScript module augmentations.
+          Note: this includes commented-out references; review each file before updating.
 
           The base package is a transitive dependency of Pro, so these references resolve
           silently but load the base version without Pro features.
