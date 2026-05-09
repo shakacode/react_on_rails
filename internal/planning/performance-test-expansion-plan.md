@@ -45,12 +45,14 @@ define separate cache-hit and cache-miss benchmark paths before comparing result
 namespace for benchmark routes, such as `ActiveSupport::Cache::FileStore.new("tmp/benchmark_cache")`, instead of the
 app's default store. The miss path should clear only that benchmark cache namespace before measurement, and the hit path
 should clear that namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. For
-the dedicated `FileStore`, clear the namespace with `FileUtils.rm_rf("tmp/benchmark_cache")`; avoid `Rails.cache.clear`
-on the application cache. Avoid relying on a shared Redis instance, environment-default `:null_store`/`:memory_store`
-behavior, or manual cache state. This explicit cache-prime request is an additional step before the existing per-route
-k6 warm-up in [Noise Controls](#noise-controls); it does not replace that 10-request warm-up phase for cache-hit runs.
-The cache-miss path must either skip the generic per-route warm-up or clear the dedicated benchmark cache again after
-warm-up and immediately before k6 measurement, so measurement starts from a cold cache state.
+the dedicated `FileStore`, clear the exact store root, for example
+`FileUtils.rm_rf(Rails.root.join("tmp/benchmark_cache"))`; do not clear `tmp/cache/assets` or the app's default cache
+store. Avoid `Rails.cache.clear` on the application cache. Avoid relying on a shared Redis instance, environment-default
+`:null_store`/`:memory_store` behavior, or manual cache state. This explicit cache-prime request is an additional step
+before the existing per-route k6 warm-up in [Noise Controls](#noise-controls); it does not replace that 10-request
+warm-up phase for cache-hit runs. The cache-miss path must either skip the generic per-route warm-up or clear the
+dedicated benchmark cache again after warm-up and immediately before k6 measurement, so measurement starts from a cold
+cache state.
 
 Recommended Pro slice for [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169), implemented after the
 OSS first slice or in a dedicated follow-up PR:
@@ -115,7 +117,7 @@ Prerequisites for the first implementation PR:
     "renderer": "<node_renderer when PRO=true, otherwise execjs>",
     "runner_type": "<RUNNER_OS/RUNNER_ARCH when available, otherwise local platform>",
     "bundle_mode": "production",
-    "sample_count": 1
+    "sample_count": "<number of completed k6 measurement samples included in this summary>"
   }
   ```
 
