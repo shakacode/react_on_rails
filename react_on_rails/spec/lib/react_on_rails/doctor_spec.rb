@@ -1991,7 +1991,8 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location points to #{package_root}") })
           .to be true
-        expect(warning_msgs.any? { |m| m[:content].include?("Pro package consistency") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("all diagnostics that read from it are skipped") })
+          .to be true
       end
 
       it "warns once when checker and doctor see the same missing package root" do
@@ -3140,7 +3141,8 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warning_msgs.any? { |m| m[:content].include?("does not exist") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
         expect(warning_msgs.count { |m| m[:content].include?("node_modules_location") }).to eq(1)
-        expect(warning_msgs.any? { |m| m[:content].include?("React version") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("all diagnostics that read from it are skipped") })
+          .to be true
       end
 
       it "warns when the configured package root exists without package.json" do

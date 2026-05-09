@@ -457,6 +457,9 @@ module ReactOnRails
       # Check for lock files next to the configured package.json to support
       # legacy apps that keep their JS package tree under client/.
       package_json_path = package_json_path_for("package manager lockfiles")
+      # If package.json cannot be read, the configured package root is broken
+      # enough that detecting a stray lockfile would be misleading. Block the
+      # scan so check_package_manager does not suggest installing lockfiles.
       return PackageManagerDetection.new(manager: nil, lockfile_scan_blocked: true) unless package_json_path
 
       package_root = File.dirname(package_json_path)

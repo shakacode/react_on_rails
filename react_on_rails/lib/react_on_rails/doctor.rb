@@ -2919,6 +2919,8 @@ module ReactOnRails
       # (stripped to "19.0.0" even though 19.0.4+ may be installed).
       package_root = resolved_package_root
       if package_root_missing?(package_root)
+        # This check only needs the directory before Node chdirs into it; an
+        # installed React version can be resolved without package.json.
         warn_missing_package_root(package_root, "React version")
         return nil
       end

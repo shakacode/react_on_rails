@@ -77,9 +77,9 @@ module ReactOnRails
       add_warning(missing_package_root_warning(package_root, detection_target))
     end
 
-    def missing_package_root_warning(package_root, detection_target)
+    def missing_package_root_warning(package_root, _detection_target)
       "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
-        "cannot detect #{detection_target}. Check config/initializers/react_on_rails.rb."
+        "all diagnostics that read from it are skipped. Check config/initializers/react_on_rails.rb."
     end
 
     def warn_missing_package_json(package_json_path, detection_target)
