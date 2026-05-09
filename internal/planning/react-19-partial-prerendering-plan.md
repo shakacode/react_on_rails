@@ -33,7 +33,7 @@ Use a dedicated branch for the actual version verification work:
 4. Run Ruby checks that exercise SSR and generated apps:
    - `bundle exec rubocop`
    - `bundle exec rake rbs:validate`
-   - `bundle exec rspec react_on_rails/spec/react_on_rails/` for gem-side rendering, doctor, and generator coverage
+   - `cd react_on_rails && bundle exec rspec spec/react_on_rails/` for gem-side rendering, doctor, and generator coverage
    - `cd react_on_rails/spec/dummy && bundle exec rspec spec/requests spec/system spec/packs_generator_spec.rb` for dummy
      SSR and generator integration paths
    - Pro RSC and renderer paths _(requires Pro access and `react_on_rails_pro/` checked out)_:
@@ -103,11 +103,19 @@ Evaluate these in order:
 Track these in [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255) before implementation begins so
 each decision has an owner, acceptance criteria, and a closure path.
 
+The prerequisite decision is whether the first implementation should prove the pattern through traditional SSR with
+Suspense, RSC, or both; answer that before settling caching, benchmarks, or streamed-error semantics.
+
 - Which Rails caching layer should be recommended for the static-shell: fragment cache, HTTP cache, CDN cache, or a
   combination?
+  **Owner**: @justin808 | **Target**: before any implementation PR is opened
 - Should the static-shell be rendered by the Node Renderer, cached as a Rails partial fragment, or selected per example?
+  **Owner**: @justin808 | **Target**: before any implementation PR is opened
 - Should the first example use traditional SSR with Suspense, RSC, or both?
+  **Owner**: @justin808 | **Target**: prerequisite decision before any implementation PR is opened
 - How should failures in the dynamic portion affect status codes and error boundaries after part of the response has
   streamed?
+  **Owner**: @justin808 | **Target**: after the SSR-vs-RSC strategy decision, before public docs or examples
 - What metrics matter most for acceptance: TTFB, LCP, response end, total bytes, or client JavaScript reduction, and how
   do Rails `ActionController::Live` and Node Renderer streaming paths affect those metrics differently?
+  **Owner**: @justin808 | **Target**: after the SSR-vs-RSC strategy decision, before benchmark implementation
