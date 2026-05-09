@@ -160,11 +160,16 @@ reactOnRailsProNodeRenderer({
     Headers: HeadersImplementation,
     Request: RequestImplementation,
     Response: ResponseImplementation,
-    // node-fetch v2 does not include AbortController or AbortSignal. On Node.js 15+,
-    // pass the native globals here if component code uses abort signals:
-    // AbortController: globalThis.AbortController,
-    // AbortSignal: globalThis.AbortSignal,
-    // On older EOL runtimes, use a compatible polyfill.
+    // node-fetch v2 does not include AbortController or AbortSignal.
+    // On Node.js 15+, pass the native globals if component code uses abort signals.
+    // Guard against older runtimes where these may be undefined:
+    // ...(globalThis.AbortController && globalThis.AbortSignal
+    //   ? {
+    //       AbortController: globalThis.AbortController,
+    //       AbortSignal: globalThis.AbortSignal,
+    //     }
+    //   : {}),
+    // On older EOL runtimes, use a compatible polyfill instead.
   },
 });
 ```
@@ -178,21 +183,21 @@ const {
   Headers: HeadersImplementation,
   Request: RequestImplementation,
   Response: ResponseImplementation,
-  AbortController: AbortControllerImplementation,
-  AbortSignal: AbortSignalImplementation,
 } = require('undici');
+const AbortControllerImplementation = globalThis.AbortController;
+const AbortSignalImplementation = globalThis.AbortSignal;
 
-if (
-  !fetchImplementation ||
-  !HeadersImplementation ||
-  !RequestImplementation ||
-  !ResponseImplementation ||
-  !AbortControllerImplementation ||
-  !AbortSignalImplementation
-) {
+if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
-    'The selected undici version does not expose one or more required fetch globals (fetch, Headers, Request, Response, AbortController, AbortSignal). ' +
+    'The selected undici version does not expose one or more required fetch globals (fetch, Headers, Request, Response). ' +
       'Choose an undici release compatible with your renderer Node.js runtime.',
+  );
+}
+
+if (!AbortControllerImplementation || !AbortSignalImplementation) {
+  throw new Error(
+    'Your Node.js runtime does not expose one or both required abort globals (AbortController, AbortSignal). ' +
+      'Use a supported Node.js release or replace the globalThis.* references above with compatible abort polyfill imports.',
   );
 }
 

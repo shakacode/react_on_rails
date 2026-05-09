@@ -759,6 +759,9 @@ async function DBComponent() {
   // Use a direct database call, internal service URL that bypasses Rails routing,
   // or a bundled/injected HTTP client. The node renderer VM does not expose
   // host fetch globals unless you pass them through additionalContext.
+  // Correct approach: import a bundled HTTP client (for example, node-fetch v2
+  // or undici) or inject fetch via additionalContext at renderer startup.
+  // See: ../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc
   // Do not call `fetch(process.env.INTERNAL_API_URL)` directly; `fetch` is
   // not available in the VM by default. Bundle an HTTP client or inject fetch
   // via additionalContext before calling this URL.
@@ -838,50 +841,7 @@ Or set the environment variable:
 RENDERER_SUPPORT_MODULES=true
 ```
 
-For globals not covered by `supportModules`, use `additionalContext`:
-
-The example below uses the standalone config-object style for launchers that `require()` a renderer config file. If your launch file calls `reactOnRailsProNodeRenderer({ ... })` directly, pass the same `supportModules` and `additionalContext` options to that call.
-
-```js
-const fetchImplementation = globalThis.fetch;
-const HeadersImplementation = globalThis.Headers;
-const RequestImplementation = globalThis.Request;
-const ResponseImplementation = globalThis.Response;
-const AbortControllerImplementation = globalThis.AbortController;
-const AbortSignalImplementation = globalThis.AbortSignal;
-
-if (
-  !fetchImplementation ||
-  !HeadersImplementation ||
-  !RequestImplementation ||
-  !ResponseImplementation ||
-  !AbortControllerImplementation ||
-  !AbortSignalImplementation
-) {
-  throw new Error(
-    'Your Node.js runtime does not expose one or more required fetch globals (fetch, Headers, Request, Response, AbortController, AbortSignal). ' +
-      'Use a supported Node.js release that exposes these globals or replace the globalThis.* references above with compatible fetch/abort polyfill imports.',
-  );
-}
-
-module.exports = {
-  supportModules: true,
-  additionalContext: {
-    // Add any globals that aren't in the default supportModules set.
-    fetch: fetchImplementation,
-    Headers: HeadersImplementation,
-    Request: RequestImplementation,
-    Response: ResponseImplementation,
-    AbortController: AbortControllerImplementation,
-    AbortSignal: AbortSignalImplementation,
-    // Example: override `performance` with a deterministic stub if rendered
-    // output embeds timing values and you need byte-stable SSR.
-    performance: { now: () => 0 },
-  },
-};
-```
-
-If your Node.js runtime does not provide the fetch globals, use a bundled HTTP client such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici` from the component code, or pass a fetch implementation through `additionalContext`. If component code uses abort signals, pass `AbortController` and `AbortSignal` too. See [Node Renderer JavaScript Configuration](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc) for a guarded startup example that fails fast when a required global is missing.
+For globals not covered by `supportModules`, use `additionalContext`. For `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal`, see [Node Renderer JavaScript Configuration](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc) for guarded startup examples that fail fast when a required global is missing. If your Node.js runtime does not provide the fetch globals, use a bundled HTTP client such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici` from the component code, or pass a fetch implementation through `additionalContext`.
 
 #### Handling Node Builtins -- `externals` vs `resolve.fallback`
 
