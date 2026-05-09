@@ -5,6 +5,9 @@ Run a local verification loop for the current branch before creating or updating
 Use `/verify` for local pre-PR checks. Use `/run-ci` when you need the CI change detector or want to
 reproduce CI job selection locally.
 
+Limit the loop to three fix-and-restart cycles unless the user explicitly asks to keep debugging. If a later fix
+reintroduces an earlier failure, stop and report the cycle instead of continuing indefinitely.
+
 ## Instructions
 
 1. Read `AGENTS.md` first. It is the canonical source for required commands, formatting, boundaries, and ask-first areas.
@@ -34,9 +37,12 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run type-check`
    - targeted `pnpm --filter react-on-rails run test` for react-on-rails package tests, or
      `pnpm --filter react-on-rails exec jest -- <path>` for targeted test file runs
+   - `cd react_on_rails/spec/dummy && pnpm test:e2e` when the branch changes SSR rendering, client hydration, or
+     browser-visible integration behavior
 4. Docs:
    - `script/check-docs-sidebar` when docs under `docs/` changed
-   - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless this branch changes the canonical command
+   - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless the
+     branch changes `bin/check-links`, `.lychee.toml`, or the documented link-check workflow itself
 5. CI workflows and YAML:
    - Confirm the workflow edit itself was approved because `AGENTS.md` marks changes to `.github/workflows/` as ask-first
    - `actionlint` when any `.github/workflows/` file changed
