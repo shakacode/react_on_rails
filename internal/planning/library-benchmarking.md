@@ -121,7 +121,8 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
      runs before filing or failing
 
    If overlap remains below `0.40` after boundary widening, collect 5 more qualifying runs and re-evaluate from step 2
-   before escalating to step 4.
+   before escalating to step 4. Escalate to step 4 unconditionally after 2 such re-evaluation cycles, which means at
+   least 10 extra qualifying runs beyond the initial 30-run window, if overlap has not reached `0.40`.
 
 4. If shared-runner noise remains high, move benchmark jobs to larger GitHub-hosted runners or dedicated runners before
    restoring the hard gate.
@@ -129,15 +130,15 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 ### Acceptance Criteria
 
 1. Before restoring the hard gate, verify it can detect real regressions: add a temporary controller delay to a benchmarked
-   route, confirm an alert fires under the tuned settings, then revert the delay. If no alert fires, re-tune before
-   proceeding.
-2. Only after step 1 passes, at least 5 consecutive qualifying main `Benchmark Workflow` runs complete with no Bencher
-   regression alert; that means `BENCHER_HAS_ALERT` stays `0` with the current code. A run qualifies when the triggering
-   push modifies at least one file that [`script/ci-changes-detector`](../../script/ci-changes-detector) does not classify
-   as docs-only. Track the running count in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
-3. As a pre-condition for restoration, the tuned settings must require manual tracking in Issue 3169 to show the same
-   `(benchmark, measure)` pair alerting on at least 2 consecutive runs before filing or failing; a single noisy run does
-   not trigger the gate.
+   SSR route large enough to cause at least 10% degradation versus the current baseline median for that route, confirm an
+   alert fires under the tuned settings, then revert the delay. If no alert fires, re-tune before proceeding.
+2. As a pre-condition for starting the 5-run clean-run count below, the tuned settings must require manual tracking in
+   Issue 3169 to show the same `(benchmark, measure)` pair alerting on at least 2 consecutive runs before filing or
+   failing; a single noisy run does not trigger the gate.
+3. Only after steps 1 and 2 pass, at least 5 consecutive qualifying main `Benchmark Workflow` runs complete with no
+   Bencher regression alert; that means `BENCHER_HAS_ALERT` stays `0` with the current code. A run qualifies when the
+   triggering push modifies at least one file that [`script/ci-changes-detector`](../../script/ci-changes-detector) does
+   not classify as docs-only. Track the running count in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
 4. The hard gate is restored only after the tuned settings meet the project false-positive target: no more than 1 noisy
    failure in 20 successful main `Benchmark Workflow` runs whose triggering commits do not intentionally change benchmark
    performance. Treat an alert as noisy when it does not recur for the same `(benchmark, measure)` pair in the next
