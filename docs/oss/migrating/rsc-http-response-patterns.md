@@ -27,10 +27,11 @@ class StoriesController < ApplicationController
   include ReactOnRailsPro::Stream # Requires React on Rails Pro
 
   def show
-    preflight = StoryPagePreflight.call(params[:id], current_user: current_user, sign_in_path: sign_in_path)
+    preflight = StoryPagePreflight.call(params[:id], current_user: current_user)
 
-    if preflight.redirect_path
-      return redirect_to(preflight.redirect_path, status: preflight.redirect_status || :see_other)
+    if preflight.redirect_reason
+      redirect_path = { unauthenticated: sign_in_path }.fetch(preflight.redirect_reason)
+      return redirect_to(redirect_path, status: preflight.redirect_status || :see_other)
     end
 
     response.status = preflight.status unless preflight.status.nil?
@@ -46,11 +47,11 @@ The preflight object can expose a small, serializable result:
 
 ```ruby
 class StoryPagePreflight
-  Result = Struct.new(:props, :status, :redirect_path, :redirect_status, :cache_control, keyword_init: true)
+  Result = Struct.new(:props, :status, :redirect_reason, :redirect_status, :cache_control, keyword_init: true)
 
-  def self.call(story_id, current_user:, sign_in_path:)
+  def self.call(story_id, current_user:)
     unless current_user
-      return Result.new(props: {}, redirect_path: sign_in_path, redirect_status: :see_other)
+      return Result.new(props: {}, redirect_reason: :unauthenticated, redirect_status: :see_other)
     end
 
     story = Story.find_by(id: story_id)
@@ -73,11 +74,13 @@ Keep the props serializable and intentional. A good preflight result usually con
 
 - The data the RSC tree needs to render
 - The selected HTTP status
-- Any redirect target
+- Any redirect reason and status
 - Cache policy metadata
 - Small route-level flags such as `notFound: true`
 
 Avoid making React responsible for route outcomes. React can render a "not found" UI, but Rails should decide whether the response is actually a `404`.
+
+Set cookies and mutate session state before calling `stream_view_containing_react_components`, for the same reason you set status and cache headers first. Once streaming commits the headers, `Set-Cookie` changes and session writes can no longer be added reliably to the HTTP response.
 
 ## 404 and Not-Found Routes
 
@@ -115,7 +118,8 @@ end
 Then keep the React component purely presentational. The happy path omits `notFound`, so `notFound?: false` models the absent key as the non-error branch while still narrowing `story` after the guard:
 
 ```tsx
-type StoryPageProps = { notFound: true; story: null } | { notFound?: false; story: Story };
+type StoryData = { id: number; title: string };
+type StoryPageProps = { notFound: true; story: null } | { notFound?: false; story: StoryData };
 
 export default function StoryPage({ notFound, story }: StoryPageProps) {
   if (notFound) {
@@ -127,6 +131,27 @@ export default function StoryPage({ notFound, story }: StoryPageProps) {
 ```
 
 Use this pattern when the branded not-found UI benefits from the same RSC layout as the rest of the route. Use a plain Rails error template when you need the smallest, most reliable failure path.
+
+Use `410 Gone` when the route identifies a permanently removed resource and you want caches to treat that response differently from a temporary `404`:
+
+```ruby
+def show
+  story = Story.find_by(slug: params[:slug])
+
+  if story&.removed?
+    response.status = :gone
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return render(template: "errors/gone", status: :gone)
+  end
+
+  return render(template: "errors/not_found", status: :not_found) unless story
+
+  @story_props = { story: StorySerializer.render_as_hash(story) }
+  stream_view_containing_react_components(template: "stories/show")
+end
+```
+
+Cache a `410` only when the removal is durable enough for clients and CDNs to reuse that response.
 
 ## Redirects
 
