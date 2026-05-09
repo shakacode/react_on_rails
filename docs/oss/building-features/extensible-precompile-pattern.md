@@ -144,7 +144,7 @@ Handle test and production builds in `config/initializers/react_on_rails.rb`. Th
 ```ruby
 ReactOnRails.configure do |config|
   # Build commands should include all necessary steps
-  config.build_test_command = "yarn res:build && RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "yarn res:build && RAILS_ENV=test NODE_ENV=test bin/shakapacker"
   config.build_production_command = "yarn res:build && RAILS_ENV=production NODE_ENV=production bin/shakapacker"
 end
 ```
@@ -160,14 +160,14 @@ mode = ARGV.first
 
 unless %w[test production].include?(mode)
   warn "Usage: bin/build-react-on-rails test|production"
-  exit 1
+  exit(1)
 end
 
 system("yarn res:build", exception: true) # replace with your own pre-build step(s)
 
 case mode
 when "test"
-  system({ "RAILS_ENV" => "test" }, "bin/shakapacker", exception: true)
+  system({ "RAILS_ENV" => "test", "NODE_ENV" => "test" }, "bin/shakapacker", exception: true)
 when "production"
   system({ "RAILS_ENV" => "production", "NODE_ENV" => "production" }, "bin/shakapacker", exception: true)
 end
@@ -178,6 +178,8 @@ Make the script executable before wiring it into the build commands:
 ```bash
 chmod +x bin/build-react-on-rails
 ```
+
+On Windows, run `chmod` from Git Bash or WSL, or use your project's Git file-mode workflow to mark the script executable.
 
 ```ruby
 # config/initializers/react_on_rails.rb
