@@ -165,6 +165,21 @@ See the [Streaming Server Rendering guide](../building-features/streaming-server
 > [!IMPORTANT]
 > `stream_react_component` always forces `prerender: true` — passing `prerender: false` has no effect. It only supports React components and render functions that return React components; render functions returning a `{ renderedHtml }` hash are incompatible (see [compatibility matrix](../core-concepts/render-functions.md#compatibility-matrix-component-types-and-ruby-helpers)).
 
+### stream_react_component_with_async_props
+
+Async-props variant of `stream_react_component`. Use it when Rails has some props immediately available and other props should stream later through Suspense boundaries.
+
+It accepts the same options as `stream_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop:
+
+```erb
+<%= stream_react_component_with_async_props("ProductPage",
+      props: { name: @product.name, price: @product.price }) do |emit|
+  emit.call("reviews", @product.reviews.as_json(only: [:id, :text, :rating]))
+end %>
+```
+
+Components rendered this way receive `getReactOnRailsAsyncProp`, which returns a Promise for each emitted prop.
+
 ### rsc_payload_react_component
 
 Renders React Server Component (RSC) payloads in NDJSON format for client-side consumption. Used in conjunction with RSC support to enable:
@@ -173,7 +188,22 @@ Renders React Server Component (RSC) payloads in NDJSON format for client-side c
 - Server-side data fetching
 - Selective client-side hydration
 
+The mounted `rsc_payload_route` normally calls this helper for you. Call it directly only for custom RSC payload rendering.
+
 See the [React on Rails Pro Configuration](../configuration/configuration-pro.md) for RSC setup.
+
+### rsc_payload_react_component_with_async_props
+
+Async-props variant of `rsc_payload_react_component`. Use it when custom RSC payload rendering needs async props emitted from Rails.
+
+It accepts the same options as `rsc_payload_react_component`, plus a block that receives an emitter:
+
+```erb
+<%= rsc_payload_react_component_with_async_props("ProductPage",
+      props: { name: @product.name, price: @product.price }) do |emit|
+  emit.call("reviews", @product.reviews.as_json(only: [:id, :text, :rating]))
+end %>
+```
 
 ---
 

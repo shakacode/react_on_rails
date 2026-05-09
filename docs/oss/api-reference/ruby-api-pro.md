@@ -47,12 +47,25 @@ Streams a server-rendered React component using React 18's `renderToPipeableStre
 
 Requires the controller to use `stream_view_containing_react_components`.
 
-Options: same as `react_component`.
+`stream_react_component` forces `prerender: true`; passing `prerender: false` has no effect. Common options mirror `react_component`, including `props`, `id`, `html_options`, `trace`, and `raise_on_prerender_error`.
 
 > **Note (Pro):** React on Rails Pro hydrates streamed components early (before `DOMContentLoaded`) automatically — no per-component toggle is exposed.
 
 ```ruby
 <%= stream_react_component("App", props: { data: @data }) %>
+```
+
+### `stream_react_component_with_async_props(component_name, options = {}, &block)`
+
+Async-props variant of `stream_react_component`. Use this when the view has immediately available props plus slower values that should stream to React behind Suspense boundaries.
+
+This helper accepts the same options as `stream_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop as it becomes available. Components read emitted values through the injected `getReactOnRailsAsyncProp` prop.
+
+```ruby
+<%= stream_react_component_with_async_props("ProductPage",
+      props: { name: @product.name, price: @product.price }) do |emit|
+  emit.call("reviews", @product.reviews.as_json(only: [:id, :text, :rating]))
+end %>
 ```
 
 ### `cached_stream_react_component(component_name, options = {}, &block)`
@@ -70,10 +83,25 @@ Renders the React Server Component payload as NDJSON. Each line contains:
 - `hasErrors` — boolean
 - `isShellReady` — boolean
 
-Requires `enable_rsc_support = true` in configuration.
+Requires `enable_rsc_support = true` in configuration. This helper is normally used by `rsc_payload_route`; call it directly only when you need custom RSC payload rendering.
+
+Common options include `props`, `trace`, and `id`. The helper forces `prerender: true`; passing `prerender: false` has no effect.
 
 ```ruby
 <%= rsc_payload_react_component("RSCPage", props: { id: @post.id }) %>
+```
+
+### `rsc_payload_react_component_with_async_props(component_name, options = {}, &block)`
+
+Async-props variant of `rsc_payload_react_component`. Use this when custom RSC payload rendering needs the same emitted-prop behavior as `stream_react_component_with_async_props`.
+
+This helper accepts the same options as `rsc_payload_react_component`, plus a block that receives an emitter. Call `emit.call(prop_name, value)` for each async prop.
+
+```ruby
+<%= rsc_payload_react_component_with_async_props("ProductPage",
+      props: { name: @product.name, price: @product.price }) do |emit|
+  emit.call("reviews", @product.reviews.as_json(only: [:id, :text, :rating]))
+end %>
 ```
 
 ### `async_react_component(component_name, options = {})`
