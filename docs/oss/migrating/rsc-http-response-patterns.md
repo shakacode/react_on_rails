@@ -27,14 +27,14 @@ class StoriesController < ApplicationController
   include ReactOnRailsPro::Stream # Requires React on Rails Pro
 
   def show
-    preflight = StoryPagePreflight.call(params[:id], current_user: current_user)
+    preflight = StoryPagePreflight.call(params[:id], current_user: current_user, sign_in_path: sign_in_path)
 
     if preflight.redirect_path
       return redirect_to(preflight.redirect_path, status: preflight.redirect_status || :see_other)
     end
 
     response.status = preflight.status unless preflight.status.nil?
-    response.set_header("Cache-Control", preflight.cache_control) if preflight.cache_control
+    response.headers["Cache-Control"] = preflight.cache_control if preflight.cache_control
 
     @story_props = preflight.props
     stream_view_containing_react_components(template: "stories/show")
@@ -48,9 +48,9 @@ The preflight object can expose a small, serializable result:
 class StoryPagePreflight
   Result = Struct.new(:props, :status, :redirect_path, :redirect_status, :cache_control, keyword_init: true)
 
-  def self.call(story_id, current_user:)
+  def self.call(story_id, current_user:, sign_in_path:)
     unless current_user
-      return Result.new(props: {}, redirect_path: "/sign_in", redirect_status: :see_other)
+      return Result.new(props: {}, redirect_path: sign_in_path, redirect_status: :see_other)
     end
 
     story = Story.find_by(id: story_id)
@@ -112,7 +112,7 @@ def show
 end
 ```
 
-Then keep the React component purely presentational:
+Then keep the React component purely presentational. The happy path omits `notFound`, so `notFound?: false` models the absent key as the non-error branch while still narrowing `story` after the guard:
 
 ```tsx
 type StoryPageProps = { notFound: true; story: null } | { notFound?: false; story: Story };
@@ -130,7 +130,7 @@ Use this pattern when the branded not-found UI benefits from the same RSC layout
 
 ## Redirects
 
-Use Rails redirects before streaming:
+Use Rails redirects before streaming. Replace `can?` with your app's authorization helper:
 
 ```ruby
 def show
@@ -155,12 +155,14 @@ Set cache headers in Rails before streaming. The streamed HTML can include seria
 For personalized pages, prefer private HTTP caching with revalidation:
 
 ```ruby
-response.set_header("Cache-Control", "private, no-cache")
+response.headers["Cache-Control"] = "private, no-cache"
 ```
 
-`private` prevents CDNs and shared proxies from storing the response; `no-cache` allows the browser to store it but requires revalidation with the origin before each reuse. Use `no-store` instead when sensitive responses must never be cached by anyone.
+`private` prevents CDNs and shared proxies from storing the response; `no-cache` allows permitted HTTP caches to store it but requires revalidation with the origin before each reuse. For a private response, that permitted cache is usually the browser. Use `no-store` instead when sensitive responses must never be cached by anyone.
 
 For public pages, let Rails decide freshness before rendering:
+
+> **Rails 7.1+:** The `cache_control:` keyword on `stale?` requires Rails 7.1 or later. On earlier Rails versions, set the full `Cache-Control` header directly with `response.headers["Cache-Control"] = "public, max-age=60"` and keep the explicit freshness guard before streaming. `stale_while_revalidate` only helps caches that support that extension; unsupported browsers, proxies, and CDNs fall back to normal `max-age` behavior.
 
 ```ruby
 def show
@@ -178,13 +180,15 @@ def show
 end
 ```
 
-If `stale?` returns `false`, Rails has already prepared the `304 Not Modified` response; the early return keeps the controller from starting a streamed render after that response has been selected. Rails 7.1+ supports `cache_control:` on `stale?`. On older Rails versions, set the full `Cache-Control` header directly and keep the explicit freshness guard before streaming. `stale_while_revalidate` only helps caches that support that extension; unsupported browsers, proxies, and CDNs fall back to the normal `max-age` behavior.
+If `stale?` returns `false`, Rails has already prepared the `304 Not Modified` response; the early return keeps the controller from starting a streamed render after that response has been selected.
 
 When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy or keep the response private:
 
 ```ruby
-response.set_header("Vary", "Accept-Language")
+response.headers["Vary"] = "Accept-Language"
 ```
+
+Every `Vary` header expands the cache key; avoid high-cardinality headers for public caches unless that extra cache storage is intentional.
 
 Do not bury cache decisions inside Server Components. By the time React is rendering, the controller should already know whether the response is public, private, stale, or not cacheable.
 
