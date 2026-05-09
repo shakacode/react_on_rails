@@ -97,9 +97,11 @@ These shims are not covered by React on Rails CI and are documented for the lega
 Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims.
 
 Step 1 is conditional: only needed if your packs currently import `react-on-rails/client`. Step 2 is also
-conditional: only needed if Webpack 4 fails to parse modern syntax, but confirm Step 2 is satisfied before
-adding Step 3 because Step 3 always depends on those Babel transforms. Step 4 is conditional: only needed if
-your project uses Jest. Keep each shim explicit and narrow:
+conditional: only needed if Webpack 4 fails to parse modern syntax; check whether your existing
+`@babel/preset-env` targets already cover optional chaining and nullish coalescing before installing new plugins.
+Step 3 requires those Babel transforms to be in place, either through Step 2 or existing `@babel/preset-env`
+targets, before adding the webpack rule. Step 4 is conditional: only needed if your project uses Jest. Keep each
+shim explicit and narrow:
 
 1. Import the package root from application packs:
 
@@ -122,6 +124,7 @@ your project uses Jest. Keep each shim explicit and narrow:
    yarn add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
    # or: npm install -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
    # or: pnpm add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
+   # or: bun add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
    ```
 
    If a legacy stack reports peer dependency warnings for the `transform-*` package names, use the equivalent
@@ -195,8 +198,8 @@ your project uses Jest. Keep each shim explicit and narrow:
    module.exports = {
      // keep existing config
      transformIgnorePatterns: [
-       '<rootDir>/node_modules/.pnpm/(?!(react-on-rails)@)',
-       'node_modules/(?!.pnpm|react-on-rails)',
+       '<rootDir>/node_modules/\\.pnpm/(?!(react-on-rails)@)',
+       'node_modules/(?!\\.pnpm|react-on-rails)',
      ],
    };
    ```
@@ -211,8 +214,8 @@ your project uses Jest. Keep each shim explicit and narrow:
    module.exports = {
      // keep existing config
      transformIgnorePatterns: [
-       '<rootDir>/node_modules/.pnpm/(?!(react-on-rails|other-esm-package)@)',
-       'node_modules/(?!.pnpm|react-on-rails|other-esm-package)',
+       '<rootDir>/node_modules/\\.pnpm/(?!(react-on-rails|other-esm-package)@)',
+       'node_modules/(?!\\.pnpm|react-on-rails|other-esm-package)',
      ],
    };
    ```
