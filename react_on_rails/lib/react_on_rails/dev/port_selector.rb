@@ -121,8 +121,14 @@ module ReactOnRails
           return nil unless bp
 
           ports = derive_ports_from_base(bp)
-          puts "Base port #{bp} detected via #{source}. Using Rails :#{ports[:rails]}, " \
-               "webpack :#{ports[:webpack]}, renderer :#{ports[:renderer]}"
+          source_note = if source == "CONDUCTOR_PORT"
+                          " (unofficial contract; set REACT_ON_RAILS_BASE_PORT to override)"
+                        else
+                          ""
+                        end
+          renderer_segment = pro_renderer ? ", renderer :#{ports[:renderer]}" : ""
+          puts "Base port #{bp} detected via #{source}#{source_note}. Using Rails :#{ports[:rails]}, " \
+               "webpack :#{ports[:webpack]}#{renderer_segment}"
           warn_if_derived_ports_in_use(bp, ports, pro_renderer: pro_renderer)
           ports
         end

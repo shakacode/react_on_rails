@@ -193,12 +193,14 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       allow(ENV).to receive(:fetch).with("SHAKAPACKER_DEV_SERVER_PORT", nil).and_return("3036")
       allow(ENV).to receive(:fetch).with("RENDERER_PORT", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("REACT_RENDERER_URL", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil).and_return(nil)
 
       expect(described_class).to receive(:with_unbundled_context).and_yield
       expect(described_class).to receive(:system)
         .with(
           { "PORT" => "3001", "SHAKAPACKER_DEV_SERVER_PORT" => "3036",
-            "RENDERER_PORT" => nil, "REACT_RENDERER_URL" => nil },
+            "RENDERER_PORT" => nil, "REACT_RENDERER_URL" => nil,
+            "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => nil },
           "foreman", "start", "-f", "Procfile.dev"
         )
 
@@ -211,12 +213,14 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
       allow(ENV).to receive(:fetch).with("SHAKAPACKER_DEV_SERVER_PORT", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("RENDERER_PORT", nil).and_return(nil)
       allow(ENV).to receive(:fetch).with("REACT_RENDERER_URL", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("SHAKAPACKER_SKIP_PRECOMPILE_HOOK", nil).and_return(nil)
 
       expect(described_class).to receive(:with_unbundled_context).and_yield
       expect(described_class).to receive(:system)
         .with(
           { "PORT" => "3001", "SHAKAPACKER_DEV_SERVER_PORT" => nil,
-            "RENDERER_PORT" => nil, "REACT_RENDERER_URL" => nil },
+            "RENDERER_PORT" => nil, "REACT_RENDERER_URL" => nil,
+            "SHAKAPACKER_SKIP_PRECOMPILE_HOOK" => nil },
           "foreman", "start", "-f", "Procfile.dev"
         )
 
@@ -350,9 +354,11 @@ RSpec.describe ReactOnRails::Dev::ProcessManager do
     it "forwards set keys to the child" do
       ENV["PORT"] = "4200"
       ENV["RENDERER_PORT"] = "3800"
+      ENV["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"] = "true"
       result = described_class.send(:preserve_runtime_env_vars)
       expect(result["PORT"]).to eq("4200")
       expect(result["RENDERER_PORT"]).to eq("3800")
+      expect(result["SHAKAPACKER_SKIP_PRECOMPILE_HOOK"]).to eq("true")
     end
   end
 end

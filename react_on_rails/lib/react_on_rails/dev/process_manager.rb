@@ -20,11 +20,14 @@ module ReactOnRails
       # concrete values into PORT / SHAKAPACKER_DEV_SERVER_PORT / RENDERER_PORT /
       # REACT_RENDERER_URL. Sub-processes should use those fixed ports rather
       # than re-deriving from the base.
+      # SHAKAPACKER_SKIP_PRECOMPILE_HOOK is also runtime-only and must survive
+      # Bundler's env reset so nested shakapacker commands don't rerun the hook.
       ENV_KEYS_TO_PRESERVE = %w[
         PORT
         SHAKAPACKER_DEV_SERVER_PORT
         RENDERER_PORT
         REACT_RENDERER_URL
+        SHAKAPACKER_SKIP_PRECOMPILE_HOOK
       ].freeze
 
       class << self

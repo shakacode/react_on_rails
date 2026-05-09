@@ -103,6 +103,11 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "names CONDUCTOR_PORT as the source in the base port log line" do
         expect { described_class.select_ports }.to output(/via CONDUCTOR_PORT/).to_stdout
       end
+
+      it "calls out that REACT_ON_RAILS_BASE_PORT is the stable override" do
+        expect { described_class.select_ports }
+          .to output(/CONDUCTOR_PORT .*set REACT_ON_RAILS_BASE_PORT to override/).to_stdout
+      end
     end
 
     context "when both REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT are set" do
@@ -556,6 +561,13 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       expect(described_class.base_port_ports).to include(
         rails: 4000, webpack: 4001, renderer: 4002, base_port_mode: true
       )
+    end
+
+    it "omits the renderer banner segment when Pro renderer support is inactive" do
+      ENV["REACT_ON_RAILS_BASE_PORT"] = "4000"
+      expect { described_class.base_port_ports(pro_renderer: false) }
+        .to output("Base port 4000 detected via REACT_ON_RAILS_BASE_PORT. " \
+                   "Using Rails :4000, webpack :4001\n").to_stdout
     end
 
     it "returns nil for an invalid base port so callers can fall through" do

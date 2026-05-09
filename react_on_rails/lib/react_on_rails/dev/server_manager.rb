@@ -1220,7 +1220,7 @@ module ReactOnRails
         #       * `[^@/:]+` for a regular hostname/IPv4 whose charset excludes
         #         `/` and `:` so the `:\d+` port anchor lands on the authority
         #         separator without backtracking into the host.
-        URL_WITH_EXPLICIT_PORT_RE = %r{://(?:[^@/]*@)?(?:\[[^\]]+\]|[^@/:]+):\d+}
+        URL_WITH_EXPLICIT_PORT_RE = %r{://(?:[^@/]*@)?(?:\[[^\]]+\]|[^@/:]+):\d+(?=[/?#]|$)}
         private_constant :URL_WITH_EXPLICIT_PORT_RE
 
         # Uses URI.parse so a short port isn't matched as a substring of a
