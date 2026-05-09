@@ -34,12 +34,10 @@ class StoriesController < ApplicationController
 
     if preflight.redirect_reason
       # Map every possible redirect_reason StoryPagePreflight can return.
-      # Unknown reasons fall back to root_path and log an error.
       redirect_path = {
         unauthenticated: sign_in_path,
       }.fetch(preflight.redirect_reason) do |reason|
-        Rails.logger.error("Unknown redirect_reason: #{reason.inspect}")
-        root_path
+        raise ArgumentError, "Unknown redirect_reason: #{reason.inspect}"
       end
       return redirect_to(redirect_path, status: preflight.redirect_status)
     end
@@ -107,6 +105,7 @@ end
 ```
 
 ```erb
+<%# app/views/stories/show.html.erb %>
 <%= stream_react_component("StoryPage", props: @story_props) %>
 ```
 
@@ -190,7 +189,8 @@ def show
   return render(template: "errors/not_found", status: :not_found) unless story
 
   if story.removed?
-    response.headers["Cache-Control"] = "public, max-age=3600" # Cache only for truly permanent removals.
+    # Use this branch only when removed stories are truly permanent in your app.
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return render(template: "errors/gone", status: :gone)
   end
 
@@ -278,12 +278,19 @@ policy before streaming or keep the response private. Replace `Accept-Language` 
 varies on, such as `Accept-Encoding`, `X-Device-Class`, or an application-specific header:
 
 ```ruby
-# Merge with any existing Vary tokens set upstream, then deduplicate.
+# Merge with any existing Vary tokens set upstream, then deduplicate case-insensitively.
 existing_vary = response.headers["Vary"].presence
 
 unless existing_vary == "*"
   vary_tokens = [existing_vary, "Accept-Language"].compact.join(", ")
-  response.headers["Vary"] = vary_tokens.split(",").map(&:strip).uniq.join(", ")
+  seen_tokens = {}
+  response.headers["Vary"] = vary_tokens.split(",").map(&:strip).reject do |token|
+    normalized_token = token.downcase
+    next true if seen_tokens[normalized_token]
+
+    seen_tokens[normalized_token] = true
+    false
+  end.join(", ")
 end
 ```
 
