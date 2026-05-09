@@ -148,13 +148,8 @@ try {
   );
 }
 
-if (!nodeFetch) {
-  throw new Error(
-    'node-fetch v2 did not expose the required fetch function. ' +
-      'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
-  );
-}
-
+// A successful require returns the fetch function; the guard below verifies
+// the attached fetch classes that node-fetch v2 must provide.
 const {
   Headers: HeadersImplementation,
   Request: RequestImplementation,
@@ -193,7 +188,7 @@ const {
 } = require('undici');
 
 // undici does not export AbortController or AbortSignal; use host Node.js globals when present.
-const componentsUseAbortSignals = true;
+const componentsUseAbortSignals = false; // Set to true if component code uses AbortSignal.
 
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
