@@ -109,8 +109,9 @@ The `react-on-rails/client` subpath export has been present since
 so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need this default-import shim.
 
 Additionally, the built files in `lib/` use modern JavaScript syntax, such as optional chaining and nullish
-coalescing, that Webpack 4's default parser does not support; you may need Babel to transpile those files after
-fixing the import path.
+coalescing, that Webpack 4's default parser does not support. The package also declares `"type": "module"`, so
+`.js` files in `lib/` are treated as ES modules. You may need Babel to transpile those files after fixing the import
+path.
 
 Keep each shim explicit and narrow:
 
