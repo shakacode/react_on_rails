@@ -144,6 +144,11 @@ Handle test and production builds in `config/initializers/react_on_rails.rb`. Th
 
 In CI, ReactOnRails::TestHelper or `ensure_assets_compiled` runs `build_test_command` when test assets need compilation. During `assets:precompile`, React on Rails runs `build_production_command`.
 
+Choose one of the following configuration styles. Use only one: Option A sets the commands directly, while Option B
+points both commands at the helper script.
+
+#### Option A - Inline commands
+
 ```ruby
 ReactOnRails.configure do |config|
   # Build commands should include all necessary steps
@@ -151,6 +156,8 @@ ReactOnRails.configure do |config|
   config.build_production_command = "yarn res:build && RAILS_ENV=production NODE_ENV=production bin/shakapacker"
 end
 ```
+
+#### Option B - Script wrapper (recommended for larger apps)
 
 For larger apps, prefer a small Ruby script over a very long command string. Create `bin/build-react-on-rails`:
 
@@ -164,10 +171,10 @@ unless %w[test production].include?(mode)
   abort "Usage: bin/build-react-on-rails test|production"
 end
 
-# Replace with your own pre-build step(s). For example, to run TypeScript then ReScript:
+# Add your app's pre-build step(s) here. Leave this section empty if shakapacker is the only build step.
+# For example, to run TypeScript then ReScript:
 #   system("yarn", "tsc", "--noEmit") || abort("tsc failed")
 #   system("yarn", "res:build")       || abort("res:build failed")
-system("yarn", "res:build") || abort("res:build failed")
 
 case mode
 when "test"
@@ -179,18 +186,19 @@ when "production"
 end
 ```
 
-Make the script executable so it can run locally, then stage the file so Git records the executable bit for CI and other
-checkouts:
+On Unix-like filesystems, make the script executable so it can run locally, then stage the file so Git records the
+executable bit for CI and other checkouts:
 
 ```bash
 chmod +x bin/build-react-on-rails
 git add bin/build-react-on-rails
 ```
 
-On Windows or Docker volumes where the filesystem may not preserve Unix modes, use `git update-index` instead of relying
-on the filesystem mode:
+On Windows or Docker volumes where the filesystem may not preserve Unix modes, skip the `chmod` command above and record
+the executable bit through Git instead:
 
 ```bash
+git add bin/build-react-on-rails
 git update-index --chmod=+x bin/build-react-on-rails
 ```
 
