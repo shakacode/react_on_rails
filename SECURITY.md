@@ -2,9 +2,9 @@
 
 ## Supported Versions
 
-React on Rails does not yet publish a fixed security-support matrix. Report suspected vulnerabilities for any released
-React on Rails gem or npm package version. Maintainers will triage impact and prioritize fixes for supported upgrade
-paths.
+React on Rails does not yet publish fixed version numbers for security support. Report suspected vulnerabilities for any
+released React on Rails gem or npm package version. Maintainers will triage impact and prioritize fixes for supported
+upgrade paths.
 
 | Version line                                                      | Security support                                                      |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------- |
