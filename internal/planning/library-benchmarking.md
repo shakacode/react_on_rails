@@ -93,6 +93,8 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
   is a rise above the upper bound
 - on main, `run_bencher` captures Bencher's non-zero exit as `BENCHER_EXIT_CODE`; the
   `Warn if Bencher detected regression on main` step emits `::warning::` for regression alerts instead of exiting
+- a separate main-branch step creates or updates a GitHub issue labeled `performance-regression` and links to the
+  regression run
 - operational Bencher failures already hard-fail via `Fail on non-regression Bencher error on main`, so only regression
   alerts are soft while the gate is in warning mode
 - restoring the hard gate means changing the warning step to exit with `$BENCHER_EXIT_CODE` after the false-positive
@@ -135,7 +137,8 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
    alert fires under the tuned settings, then revert the delay. If no alert fires, re-tune before proceeding.
 2. As a pre-condition for starting the 5-run clean-run count below, the tuned settings must require manual tracking in
    Issue 3169 to show the same `(benchmark, measure)` pair alerting on at least 2 consecutive runs before filing or
-   failing; a single noisy run does not trigger the gate.
+   failing; a single noisy run does not trigger the gate. This is a manual gate: Bencher still alerts on the first run,
+   and the requirement is that a reviewer confirms recurrence in Issue 3169 before acting on it.
 3. Only after steps 1 and 2 pass, at least 5 consecutive qualifying main `Benchmark Workflow` runs complete with no
    Bencher regression alert; that means `BENCHER_HAS_ALERT` stays `0` with the current code. A run qualifies when the
    triggering push modifies at least one file that [`script/ci-changes-detector`](../../script/ci-changes-detector) does
