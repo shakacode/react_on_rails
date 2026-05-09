@@ -20,15 +20,21 @@ and Pro dummy app package manifests. To see what versions are currently resolved
 `pnpm list react react-dom react-on-rails-rsc` from the repo root. That means the first implementation step is
 verification, not necessarily a broad package-range change.
 
+Note: `react-on-rails-pro` currently pins `react-on-rails-rsc` as a peer dependency at `>= 19.0.2 <= 19.2.3`.
+Verification should confirm whether this ceiling is intentional or should be widened alongside any React 19.2.x range
+update.
+
 ## React 19.2.x Verification Checklist
 
 Use a dedicated branch for the actual version verification work:
 
 - [ ] Review the React 19.2.x changelog and release notes for breaking changes, deprecations, and new APIs that could
       affect React on Rails SSR, streaming, RSC, or hydration integration.
-- [ ] Grep for `renderToString` usage across `packages/react-on-rails/`, `node_renderer/`, and related SSR integration
-      paths; React 19 soft-deprecates it in favor of `renderToPipeableStream`, so confirm whether migration is needed or
-      whether current usage is intentionally exempt.
+- [ ] Confirm the existing `renderToString` usages in `packages/react-on-rails/src/serverRenderReactComponent.ts` and
+      `packages/react-on-rails/src/handleError.ts` are intentionally exempt from migration to `renderToPipeableStream`;
+      React 19 soft-deprecates `renderToString`. Also grep `packages/react-on-rails-pro-node-renderer/` and related SSR
+      integration paths for additional call sites, then document either a migration ticket or why current usage is
+      acceptable.
 - [ ] Run `pnpm install` from a clean checkout and confirm React, React DOM, and `react-on-rails-rsc` resolve to
       compatible versions.
 - [ ] Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream`
