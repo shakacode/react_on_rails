@@ -5,8 +5,6 @@ Run a local verification loop for the current branch before creating or updating
 Use `/verify` for local pre-PR checks. Use `/run-ci` when you need the CI change detector or want to
 reproduce CI job selection locally.
 
-Step 6 defines the retry cap and what to do if a later fix reintroduces an earlier failure.
-
 ## Instructions
 
 1. Read `AGENTS.md` first. It is the canonical source for required commands, formatting, boundaries, and ask-first areas.
@@ -27,11 +25,12 @@ Use this order unless the changed files make a narrower or broader set clearly a
 1. Formatting and whitespace:
    - `git diff --check origin/main...HEAD` for committed branch content before creating or updating a PR; detects trailing whitespace and conflict markers, not Prettier formatting
    - `pnpm start format.listDifferent`
-2. Ruby:
+2. Mandatory pre-commit gate:
    - `bundle exec rubocop` - **mandatory gate before every commit, including documentation-only commits** (per `AGENTS.md`); it lints Ruby, not Markdown or YAML
+3. Ruby:
    - `bundle exec rake rbs:validate` when Ruby signatures or public Ruby APIs changed
    - targeted `bundle exec rspec ...` for changed Ruby behavior
-3. JavaScript and TypeScript:
+4. JavaScript and TypeScript:
    - `pnpm run build`
    - `pnpm run lint`
    - `pnpm run type-check`
@@ -40,16 +39,16 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run test` when broad package behavior changed or the touched files are not covered by a narrower package test
    - `cd react_on_rails/spec/dummy && pnpm test:e2e` when the branch changes SSR rendering, client hydration, or
      browser-visible integration behavior
-4. Docs:
+5. Docs:
    - `script/check-docs-sidebar` when docs under `docs/` changed
    - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless the
      branch changes `bin/check-links`, `.lychee.toml`, or the documented link-check workflow itself
-5. CI workflows and YAML:
+6. CI workflows and YAML:
    - Confirm the workflow edit itself was approved because `AGENTS.md` marks changes to `.github/workflows/` as ask-first
    - `actionlint` when any `.github/workflows/` file changed
    - `yamllint .github/` when any `.github/workflows/` file changed
    - Do not run RuboCop on `.yml` files
-6. Broad suite — pick the narrowest command that covers the change:
+7. Broad suite — pick the narrowest command that covers the change:
    - `rake all_but_examples` for broad coverage without the slow generated-examples suite
    - `rake` when shared runtime behavior, generators, cross-package contracts, or release-critical paths changed
    - `rake lint` when a branch intentionally needs the complete lint gate across Ruby, JavaScript/TypeScript, and
