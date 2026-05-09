@@ -27,7 +27,7 @@ Consider this approach if you:
 
 When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice:
 
-1. Move custom one-time tasks into `run_precompile_tasks` in `bin/dev`.
+1. Uncomment and add custom one-time tasks to the `run_precompile_tasks` method in `bin/dev`.
 2. Remove only the duplicated build shell fragments from `Procfile.dev`, any project-specific variants (for example,
    `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`), and CI/CD pipeline scripts. Do not delete entire
    `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json` files unless they exist solely for the migrated
@@ -177,12 +177,14 @@ unless %w[test production].include?(mode)
   abort "Usage: bin/build-react-on-rails test|production"
 end
 
-# Add your app's pre-build step(s) here. Leave this section empty if shakapacker is the only build step.
+# Add your app's pre-build step(s) here. They run for both test and production.
+# Leave this section empty if shakapacker is the only build step.
 # For example, to run TypeScript then ReScript:
 #   # --noEmit produces no JS; ts-loader/babel-loader must transpile TypeScript during webpack.
 #   system("yarn", "tsc", "--noEmit") || abort("tsc type-check failed")
 #   system("yarn", "res:build")       || abort("res:build failed")
 
+# Mode-specific invocation below. Add shared steps above, not inside the case blocks.
 case mode
 when "test"
   env = { "RAILS_ENV" => "test", "NODE_ENV" => "test" }
@@ -213,17 +215,14 @@ ruby bin/build-react-on-rails test
 Use `production` instead of `test` for the production build command. The `git update-index` command only updates Git
 metadata; it does not change the current working-tree file mode.
 
-Configure `react_on_rails.rb` once. Use direct script commands on Unix-like filesystems and CI where the executable bit is
-set; use the Ruby-prefixed variant for local Windows or Windows-backed Docker bind-mount checkouts that cannot execute the
-file directly:
+Configure `react_on_rails.rb` once. Prefix the helper with `ruby` so the same commands work on Unix, macOS, CI, and
+Windows or Windows-backed Docker bind-mount checkouts without relying on the current filesystem's executable bit:
 
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  # Unix/CI (executable bit set): "bin/build-react-on-rails test"
-  # Windows/Windows-backed Docker bind mount: "ruby bin/build-react-on-rails test"
-  config.build_test_command = "bin/build-react-on-rails test"
-  config.build_production_command = "bin/build-react-on-rails production"
+  config.build_test_command = "ruby bin/build-react-on-rails test"
+  config.build_production_command = "ruby bin/build-react-on-rails production"
 end
 ```
 
