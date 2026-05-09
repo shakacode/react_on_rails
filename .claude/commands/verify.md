@@ -10,9 +10,9 @@ reproduce CI job selection locally.
 1. Read `AGENTS.md` first. It is the canonical source for required commands, formatting, boundaries, and ask-first areas.
 2. Inspect the current branch diff with `git status --short`, `git diff --name-only origin/main...HEAD`, and
    `git diff --stat origin/main...HEAD`.
-3. Decide the required verification set that covers the changed surface area. Always include `bundle exec rubocop` before
-   creating a commit, even when the changed surface is documentation-only, because `AGENTS.md` marks it mandatory before
-   every commit.
+3. Decide the required verification set that covers the changed surface area using the **Scope Guide** below. Always
+   include `bundle exec rubocop` before creating a commit, even when the changed surface is documentation-only, because
+   `AGENTS.md` marks it mandatory before every commit.
 4. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 5. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
 6. After one or more edits for a failure, restart at the failed command and continue forward. Count each rerun of the
