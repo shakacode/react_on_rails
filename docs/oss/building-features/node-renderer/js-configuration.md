@@ -136,6 +136,13 @@ const {
   Response: ResponseImplementation,
 } = nodeFetch;
 
+if (!nodeFetch || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+  throw new Error(
+    'node-fetch v2 did not export the expected fetch, Headers, Request, or Response. ' +
+      'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
+  );
+}
+
 reactOnRailsProNodeRenderer({
   supportModules: true,
   additionalContext: {
@@ -143,11 +150,12 @@ reactOnRailsProNodeRenderer({
     Headers: HeadersImplementation,
     Request: RequestImplementation,
     Response: ResponseImplementation,
+    // node-fetch v2 does not include AbortController or AbortSignal.
+    // If component code uses abort signals, add a compatible polyfill here,
+    // for example from the `abort-controller` npm package.
   },
 });
 ```
-
-If your components use abort signals with `node-fetch` v2, also pass `AbortController` and `AbortSignal` from a compatible polyfill through `additionalContext`.
 
 Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export; choose a version compatible with your renderer Node.js runtime. Add the same startup guard so incompatible versions fail before the renderer starts:
 

@@ -760,8 +760,8 @@ async function DBComponent() {
   // or a bundled/injected HTTP client. The node renderer VM does not expose
   // host fetch globals unless you pass them through additionalContext.
   const apiUrl = process.env.INTERNAL_API_URL;
-  // To call this URL from a Server Component, use a bundled or injected HTTP client.
-  // See: ../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc
+  // Do not call `fetch(apiUrl)` directly; `fetch` is not available in the VM by default.
+  // Bundle an HTTP client or inject fetch via additionalContext before calling this URL.
   const dbUrl = process.env.DATABASE_URL; // Works
   const secret = process.env.API_SECRET; // Works
 }
