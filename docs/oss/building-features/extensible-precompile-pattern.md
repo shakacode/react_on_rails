@@ -141,6 +141,8 @@ wp-server: SERVER_BUNDLE_ONLY=true bin/shakapacker --watch
 
 Handle test and production builds in `config/initializers/react_on_rails.rb`. These commands must include every build step that production deploys and CI test runs require, because `bin/dev` is not part of those lifecycles:
 
+In CI, ReactOnRails::TestHelper or `ensure_assets_compiled` runs `build_test_command` when test assets need compilation. During `assets:precompile`, React on Rails runs `build_production_command`.
+
 ```ruby
 ReactOnRails.configure do |config|
   # Build commands should include all necessary steps
@@ -162,7 +164,7 @@ unless %w[test production].include?(mode)
   exit(1)
 end
 
-system("yarn", "res:build") || abort("res:build failed") # replace with your own pre-build step(s)
+system("yarn", "res:build") || abort("res:build failed") # replace "yarn res:build" with your own pre-build step(s)
 
 case mode
 when "test"
@@ -180,7 +182,7 @@ Make the script executable before wiring it into the build commands:
 chmod +x bin/build-react-on-rails
 ```
 
-On Windows, prefer tracking the executable bit through Git directly; `chmod` from Git Bash is also fine if that is your project workflow:
+On Windows, set the executable bit through Git directly; `chmod` from Git Bash may or may not update the Git index depending on your Git for Windows version and configuration:
 
 ```bash
 git update-index --chmod=+x bin/build-react-on-rails
