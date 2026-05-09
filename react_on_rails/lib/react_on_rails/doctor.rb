@@ -491,8 +491,8 @@ module ReactOnRails
     end
 
     def check_npm_package_version
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("react-on-rails npm package version")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
@@ -607,8 +607,8 @@ module ReactOnRails
     end
 
     def check_npm_wildcards
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("npm package version constraints")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
@@ -721,8 +721,8 @@ module ReactOnRails
     end
 
     def auto_fix_versions
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("package version auto-sync")
+      return unless package_json_path
 
       synchronizer = ReactOnRails::VersionSynchronizer.new(package_json_path: package_json_path, io: StringIO.new)
       result = synchronizer.sync(write: true)
@@ -766,8 +766,8 @@ module ReactOnRails
     end
 
     def check_pro_package_consistency
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("Pro package consistency")
+      return unless package_json_path
 
       package_json = JSON.parse(File.read(package_json_path))
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
@@ -2948,8 +2948,26 @@ module ReactOnRails
       nil
     end
 
+    def package_json_path_for(detection_target)
+      package_json_path = resolved_package_json_path
+      return package_json_path if File.exist?(package_json_path)
+
+      package_root = resolved_package_root
+      warn_missing_package_root(package_root, detection_target) if package_root_missing?(package_root)
+      nil
+    end
+
     def warn_missing_package_root(package_root, detection_target)
+      return if missing_package_root_warning_recorded?(package_root)
+
       checker.add_warning(missing_package_root_warning(package_root, detection_target))
+    end
+
+    def missing_package_root_warning_recorded?(package_root)
+      checker.messages.any? do |message|
+        message[:type] == :warning &&
+          message[:content].include?("node_modules_location points to #{package_root},")
+      end
     end
 
     def declared_react_version(package_root)

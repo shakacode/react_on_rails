@@ -192,8 +192,8 @@ module ReactOnRails
     end
 
     def check_react_on_rails_npm_package
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("react-on-rails npm package")
+      return unless package_json_path
 
       package_json = JSON.parse(File.read(package_json_path))
       package_name, npm_version = react_on_rails_npm_package_details(package_json)
@@ -213,8 +213,8 @@ module ReactOnRails
     end
 
     def check_package_version_sync
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("React on Rails package version sync")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))
@@ -282,9 +282,10 @@ module ReactOnRails
 
     # React dependencies validation
     def check_react_dependencies
-      return unless File.exist?(resolved_package_json_path)
+      package_json_path = package_json_path_for("React dependencies")
+      return unless package_json_path
 
-      package_json = parse_package_json
+      package_json = parse_package_json(package_json_path)
       return unless package_json
 
       # Check core React dependencies
@@ -449,7 +450,7 @@ module ReactOnRails
       # legacy apps that keep their JS package tree under client/.
       package_root = resolved_package_root
       if package_root_missing?(package_root)
-        add_warning(missing_package_root_warning(package_root, "package manager lockfiles"))
+        warn_missing_package_root(package_root, "package manager lockfiles")
         return nil
       end
 
@@ -461,6 +462,28 @@ module ReactOnRails
         "bun"
       elsif File.exist?(File.join(package_root, "package-lock.json"))
         "npm"
+      end
+    end
+
+    def package_json_path_for(detection_target)
+      package_json_path = resolved_package_json_path
+      return package_json_path if File.exist?(package_json_path)
+
+      package_root = resolved_package_root
+      warn_missing_package_root(package_root, detection_target) if package_root_missing?(package_root)
+      nil
+    end
+
+    def warn_missing_package_root(package_root, detection_target)
+      return if missing_package_root_warning_recorded?(package_root)
+
+      add_warning(missing_package_root_warning(package_root, detection_target))
+    end
+
+    def missing_package_root_warning_recorded?(package_root)
+      messages.any? do |message|
+        message[:type] == :warning &&
+          message[:content].include?("node_modules_location points to #{package_root},")
       end
     end
 
@@ -724,8 +747,8 @@ module ReactOnRails
     end
     # rubocop:enable Metrics/CyclomaticComplexity
 
-    def parse_package_json
-      JSON.parse(File.read(resolved_package_json_path))
+    def parse_package_json(package_json_path)
+      JSON.parse(File.read(package_json_path))
     rescue Errno::ENOENT, JSON::ParserError
       add_warning("⚠️  Could not parse package.json to check React dependencies")
       nil
@@ -821,8 +844,8 @@ module ReactOnRails
     end
 
     def report_webpack_version
-      package_json_path = resolved_package_json_path
-      return unless File.exist?(package_json_path)
+      package_json_path = package_json_path_for("Webpack version")
+      return unless package_json_path
 
       begin
         package_json = JSON.parse(File.read(package_json_path))

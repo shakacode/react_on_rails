@@ -311,12 +311,41 @@ RSpec.describe ReactOnRails::SystemChecker do
     context "when package.json does not exist" do
       before do
         allow(File).to receive(:exist?).with("package.json").and_return(false)
+        allow(checker).to receive(:resolved_package_root).and_return(Dir.pwd)
       end
 
       it "does not add any messages" do
         messages_count_before = checker.messages.count
         checker.check_react_on_rails_npm_package
         expect(checker.messages.count).to eq(messages_count_before)
+      end
+    end
+
+    context "when node_modules_location points to a missing JS workspace" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:package_root) { rails_root.join("client") }
+      let(:package_json_path) { package_root.join("package.json").to_s }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(checker).to receive(:resolved_package_json_path).and_call_original
+        allow(File).to receive(:exist?).and_call_original
+        allow(File).to receive(:exist?).with(package_json_path).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(false)
+      end
+
+      it "warns once across package.json-based checks" do
+        checker.check_react_on_rails_npm_package
+        checker.send(:check_package_version_sync)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        root_warnings = warning_msgs.select { |m| m[:content].include?("node_modules_location points to") }
+        expect(root_warnings.length).to eq(1)
+        expect(root_warnings.first[:content]).to include(package_root.to_s)
+        expect(root_warnings.first[:content]).to include("config/initializers/react_on_rails.rb")
       end
     end
 
@@ -355,6 +384,7 @@ RSpec.describe ReactOnRails::SystemChecker do
     context "when package.json does not exist" do
       before do
         allow(File).to receive(:exist?).with("package.json").and_return(false)
+        allow(checker).to receive(:resolved_package_root).and_return(Dir.pwd)
       end
 
       it "does not add any messages" do

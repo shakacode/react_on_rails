@@ -1969,6 +1969,31 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_pro_package_consistency)
       end
     end
+
+    context "when node_modules_location points to a missing JS workspace" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+      let(:package_root) { rails_root.join("client") }
+      let(:workspace_package_json_path) { package_root.join("package.json").to_s }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(doctor).to receive(:resolved_package_json_path).and_call_original
+        allow(File).to receive(:exist?).with(workspace_package_json_path).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(false)
+      end
+
+      it "warns instead of silently skipping the Pro package check" do
+        doctor.send(:check_pro_package_consistency)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location points to #{package_root}") })
+          .to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("Pro package consistency") }).to be true
+      end
+    end
   end
 
   describe "#check_gem_wildcard_for" do

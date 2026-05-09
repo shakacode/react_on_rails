@@ -89,11 +89,12 @@ expect:
 #!/usr/bin/env bash
 # bin/shakapacker - create this file, then make it executable:
 #   chmod +x bin/shakapacker
-# set -eu fails fast before exec, e.g. when client/ is missing.
+# set -eu fails fast before exec, e.g. when the package root is missing.
 # exec then propagates shakapacker's exit code directly to the caller.
 set -eu
 cd "$(dirname "$0")/.."
-exec ./client/node_modules/.bin/shakapacker "$@"
+JS_PACKAGE_ROOT=client # Match config.node_modules_location; change this if you use frontend/, app/javascript/, etc.
+exec "./${JS_PACKAGE_ROOT}/node_modules/.bin/shakapacker" "$@"
 ```
 
 ```js
@@ -109,8 +110,8 @@ js: bin/shakapacker --watch --mode development
 ```
 
 Use the same pattern for any static-assets Procfile or custom `bin/dev` launcher: keep the Rails-facing command at the
-repo root, but delegate the actual JavaScript executable to `client/node_modules/.bin`. Once the migration is stable, you
-can decide separately whether moving the package root to the Rails root is worth the churn.
+repo root, but delegate the actual JavaScript executable to the configured package root's `node_modules/.bin`. Once the
+migration is stable, you can decide separately whether moving the package root to the Rails root is worth the churn.
 
 ## 2. Replace Vite layout tags
 
