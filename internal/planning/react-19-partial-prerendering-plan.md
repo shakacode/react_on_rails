@@ -12,9 +12,9 @@ This is a planning document. It does not change package versions, build configur
 
 The workspace package ranges already allow React 19.2.x through `^19.0.3` for `react` and `react-dom`, plus `^19.0.4`
 for `react-on-rails-rsc` (the React on Rails RSC integration package, not a React-team package), in the root, dummy app,
-and Pro dummy app package manifests. The current `pnpm-lock.yaml` resolves React and React DOM entries in the 19.2.x
-line for the main workspace. That means the first implementation step is verification, not necessarily a broad
-package-range change.
+and Pro dummy app package manifests. To see what versions are currently resolved, run
+`pnpm list react react-dom react-on-rails-rsc` from the repo root. That means the first implementation step is
+verification, not necessarily a broad package-range change.
 
 ## React 19.2.x Verification Checklist
 
@@ -29,14 +29,14 @@ Use a dedicated branch for the actual version verification work:
    - `pnpm run type-check`
    - `pnpm run lint`
    - `pnpm run test`
-   - `pnpm --filter react-on-rails-pro run test:rsc`
+   - `pnpm --filter react-on-rails-pro run test:rsc` _(requires Pro access)_
 4. Run Ruby checks that exercise SSR and generated apps:
    - `bundle exec rubocop`
    - `bundle exec rake rbs:validate`
    - `bundle exec rspec react_on_rails/spec/react_on_rails/` for gem-side rendering, doctor, and generator coverage
    - `cd react_on_rails/spec/dummy && bundle exec rspec spec/requests spec/system spec/packs_generator_spec.rb` for dummy
      SSR and generator integration paths
-   - Pro RSC and renderer paths:
+   - Pro RSC and renderer paths _(requires Pro access)_:
      ```bash
      cd react_on_rails_pro/spec/dummy
      bundle exec rspec spec/requests/rsc_payload_spec.rb spec/requests/server_render_check_spec.rb spec/system/renderer_integration_spec.rb
@@ -70,6 +70,9 @@ too loosely:
   cache layer such as Rails HTTP caching or a CDN, with dynamic holes filled by a later streaming pass.
 - The feature must not require moving a Rails app into a frontend-framework routing model.
 
+Note: React's official experimental PPR API in canary releases is not required for the patterns described here. This plan
+targets approaches achievable with stable React 19.x unless a specific implementation step states otherwise.
+
 ## Candidate Implementation Shapes
 
 Evaluate these in order:
@@ -87,8 +90,8 @@ Evaluate these in order:
 
 - React 19.2.x passes the same local verification suite as the currently supported React 19 line.
 - Existing SSR, streaming SSR, RSC payload rendering, and client hydration tests stay green.
-- The generated-app suite passes with React 19.2.x.
-- Public docs that cite an explicit React version are updated or explicitly annotated with a minimum-version note.
+- The generated-app suite (`bundle exec rake run_rspec:shakapacker_examples_basic`) passes with React 19.2.x.
+- Any public docs that cite an explicit React version are updated or explicitly annotated with a minimum-version note.
 - Any partial pre-rendering proposal includes a same-route benchmark against traditional SSR or streaming SSR.
 - The first public artifact is documentation or an example unless a missing library API is clearly demonstrated.
 - The feature name and docs explain Rails ownership clearly so users do not expect Next.js-style file-system routing.
