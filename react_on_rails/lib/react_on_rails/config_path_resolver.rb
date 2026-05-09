@@ -23,6 +23,7 @@ module ReactOnRails
     def resolved_package_root
       node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
       return Rails.root.to_s if node_modules_location.empty? || node_modules_location == Rails.root.to_s
+      return node_modules_location if Pathname.new(node_modules_location).absolute?
 
       Rails.root.join(node_modules_location).to_s
     end

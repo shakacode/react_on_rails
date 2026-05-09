@@ -2124,6 +2124,14 @@ RSpec.describe ReactOnRails::Doctor do
         expect(doctor.send(:resolved_package_json_path)).to eq(rails_root.join("client", "package.json").to_s)
         expect(doctor.send(:resolved_package_path, "yarn.lock")).to eq(rails_root.join("client", "yarn.lock").to_s)
       end
+
+      it "passes through absolute package paths" do
+        stub_node_modules_location("/opt/app/client")
+
+        expect(doctor.send(:resolved_package_root)).to eq("/opt/app/client")
+        expect(doctor.send(:resolved_package_json_path)).to eq("/opt/app/client/package.json")
+        expect(doctor.send(:resolved_package_path, "yarn.lock")).to eq("/opt/app/client/yarn.lock")
+      end
     end
 
     describe "#resolved_webpack_config_path" do
@@ -2902,6 +2910,8 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     before do
+      # Pin resolved_package_root to the current Dir.pwd (no custom nesting).
+      # Nested-workspace contexts override this with a relative path like "client".
       stub_package_root(Dir.pwd)
     end
 
