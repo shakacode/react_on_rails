@@ -26,7 +26,7 @@ Use a dedicated branch for the actual version verification work:
    versions.
 3. Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream` and
    `renderToReadableStream` through `@types/react-dom`, lint enforces package style, and tests exercise the runtime paths:
-   - `pnpm run lint` from the repo root
+   - `pnpm run lint` from the repo root (ESLint only; per-package type-check and tests follow)
    - `pnpm --filter react-on-rails run type-check`
    - `pnpm --filter react-on-rails run test`
    - `pnpm --filter create-react-on-rails-app run type-check`
@@ -53,7 +53,7 @@ Use a dedicated branch for the actual version verification work:
    - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
    - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
    - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
-6. Run the generated-app suite from a clean checkout:
+6. Run the generated-app suite from the repo root in a clean checkout:
    `bundle exec rake run_rspec:shakapacker_examples_latest` for the React 19 examples. Use
    `bundle exec rake run_rspec:shakapacker_examples` to run the full suite across pinned React versions when needed.
    `bundle exec rake shakapacker_examples:gen_all` only generates example apps; a separate `run_rspec:*` task must run
