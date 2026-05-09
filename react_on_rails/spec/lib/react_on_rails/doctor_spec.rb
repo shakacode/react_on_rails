@@ -2974,6 +2974,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     before do
+      # RSpec runs before hooks inside the chdir around hooks below, so Dir.pwd is the per-example tmpdir.
       stub_package_root(Dir.pwd)
     end
 
@@ -3140,6 +3141,23 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
         expect(warning_msgs.count { |m| m[:content].include?("node_modules_location") }).to eq(1)
         expect(warning_msgs.any? { |m| m[:content].include?("React version") }).to be true
+      end
+
+      it "warns when the configured package root exists without package.json" do
+        package_root = File.join(Dir.pwd, "client")
+        package_json_path = File.join(package_root, "package.json")
+        FileUtils.mkdir_p(package_root)
+        stub_package_root(package_root)
+        allow(Open3).to receive(:capture3).and_return(
+          ["", "", instance_double(Process::Status, success?: false)]
+        )
+
+        doctor.send(:check_rsc_react_version)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? { |m| m[:content].include?("#{package_json_path} not found") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("declared React version") }).to be true
+        expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
       end
     end
 

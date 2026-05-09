@@ -52,10 +52,10 @@ module ReactOnRails
     end
 
     def package_json_path_for(detection_target)
+      package_root = resolved_package_root
       package_json_path = resolved_package_json_path
       return package_json_path if File.exist?(package_json_path)
 
-      package_root = File.dirname(package_json_path)
       if package_root_missing?(package_root)
         warn_missing_package_root(package_root, detection_target)
       else

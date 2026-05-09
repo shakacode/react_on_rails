@@ -131,7 +131,8 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(checker).to receive(:cli_exists?).with("yarn").and_return(true)
         allow(checker).to receive(:cli_exists?).with("pnpm").and_return(false)
         allow(checker).to receive(:cli_exists?).with("bun").and_return(false)
-        # Mock file existence checks for lock files so detect_used_package_manager returns nil
+        # Mock file existence checks so detect_used_package_manager scans lockfiles but returns nil.
+        allow(File).to receive(:exist?).with(rails_root.join("package.json").to_s).and_return(true)
         allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
         allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
         allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(false)
@@ -149,6 +150,24 @@ RSpec.describe ReactOnRails::SystemChecker do
         expect(checker.messages.any? do |msg|
                  msg[:type] == :success && msg[:content].include?("Package managers available: npm, yarn")
                end).to be true
+      end
+
+      it "does not suggest installing lockfiles when the configured package root is missing" do
+        rails_root = Pathname.new("/tmp/myapp")
+        package_root = rails_root.join("client")
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(File).to receive(:exist?).with(package_root.join("package.json").to_s).and_return(false)
+        allow(Dir).to receive(:exist?).with(package_root.to_s).and_return(false)
+
+        result = checker.check_package_manager
+
+        expect(result).to be true
+        expect(checker.messages.any? do |msg|
+                 msg[:type] == :warning && msg[:content].include?("node_modules_location points to #{package_root}")
+               end).to be true
+        expect(checker.messages.none? { |msg| msg[:content].include?("No lock file detected") }).to be true
       end
     end
   end
@@ -1011,6 +1030,8 @@ RSpec.describe ReactOnRails::SystemChecker do
         )
         allow(Dir).to receive(:exist?).with(rails_root.to_s).and_return(true)
         allow(Dir).to receive(:exist?).with(rails_root.join("client").to_s).and_return(true)
+        allow(File).to receive(:exist?).with(rails_root.join("package.json").to_s).and_return(true)
+        allow(File).to receive(:exist?).with(rails_root.join("client", "package.json").to_s).and_return(true)
       end
 
       it "returns bun when bun.lock exists" do
@@ -1045,8 +1066,8 @@ RSpec.describe ReactOnRails::SystemChecker do
 
         it "warns when the configured package root does not exist" do
           package_root = rails_root.join("client").to_s
+          allow(File).to receive(:exist?).with(rails_root.join("client", "package.json").to_s).and_return(false)
           allow(Dir).to receive(:exist?).with(package_root).and_return(false)
-          expect(File).not_to receive(:exist?)
 
           expect(checker.send(:detect_used_package_manager)).to be_nil
           warning_msgs = checker.messages.select { |m| m[:type] == :warning }

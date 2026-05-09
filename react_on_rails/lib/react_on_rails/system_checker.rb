@@ -124,7 +124,9 @@ module ReactOnRails
         add_success(message)
       else
         add_success("✅ Package managers available: #{available_managers.join(', ')}")
-        add_info("ℹ️  No lock file detected - run npm/yarn/pnpm install to establish which manager is used")
+        unless package_manager_lockfile_scan_blocked?
+          add_info("ℹ️  No lock file detected - run npm/yarn/pnpm install to establish which manager is used")
+        end
       end
       true
     end
@@ -448,12 +450,14 @@ module ReactOnRails
     def detect_used_package_manager
       # Check for lock files next to the configured package.json to support
       # legacy apps that keep their JS package tree under client/.
-      package_root = resolved_package_root
-      if package_root_missing?(package_root)
-        warn_missing_package_root(package_root, "package manager lockfiles")
+      @package_manager_lockfile_scan_blocked = false
+      package_json_path = package_json_path_for("package manager lockfiles")
+      unless package_json_path
+        @package_manager_lockfile_scan_blocked = true
         return nil
       end
 
+      package_root = File.dirname(package_json_path)
       if File.exist?(File.join(package_root, "yarn.lock"))
         "yarn"
       elsif File.exist?(File.join(package_root, "pnpm-lock.yaml"))
@@ -463,6 +467,10 @@ module ReactOnRails
       elsif File.exist?(File.join(package_root, "package-lock.json"))
         "npm"
       end
+    end
+
+    def package_manager_lockfile_scan_blocked?
+      @package_manager_lockfile_scan_blocked == true
     end
 
     def get_package_manager_version(manager)

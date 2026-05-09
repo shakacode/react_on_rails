@@ -2926,7 +2926,7 @@ module ReactOnRails
       installed = installed_react_version(package_root)
       return installed if installed
 
-      declared_react_version(package_root)
+      declared_react_version
     rescue StandardError
       nil
     end
@@ -2956,9 +2956,9 @@ module ReactOnRails
       checker.config_path_warning_registry
     end
 
-    def declared_react_version(package_root)
-      package_json_path = File.join(package_root, "package.json")
-      return nil unless File.exist?(package_json_path)
+    def declared_react_version
+      package_json_path = package_json_path_for("declared React version")
+      return nil unless package_json_path
 
       package_json = JSON.parse(File.read(package_json_path))
       all_deps = (package_json["dependencies"] || {}).merge(package_json["devDependencies"] || {})
