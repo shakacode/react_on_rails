@@ -8,6 +8,10 @@ apps.
 
 This is a planning document. It does not change package versions, build configuration, or Pro package code.
 
+**Status**: Draft | **Created**: 2026-04 | **Last updated**: 2026-05-09 | **Tracks**:
+[Issue 2182](https://github.com/shakacode/react_on_rails/issues/2182) and
+[Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255)
+
 ## Current Repository Signal
 
 The workspace package ranges already allow React 19.2.x through `^19.0.3` for `react` and `react-dom`, plus `^19.0.4`
@@ -20,46 +24,47 @@ verification, not necessarily a broad package-range change.
 
 Use a dedicated branch for the actual version verification work:
 
-1. Review the React 19.2.x changelog and release notes for breaking changes, deprecations, and new APIs that could affect
-   React on Rails SSR, streaming, RSC, or hydration integration.
-2. Run `pnpm install` from a clean checkout and confirm React, React DOM, and `react-on-rails-rsc` resolve to compatible
-   versions.
-3. Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream` and
-   `renderToReadableStream` through `@types/react-dom`, lint enforces package style, and tests exercise the runtime paths:
-   - `pnpm run lint` from the repo root (ESLint only; per-package type-check and tests follow)
-   - `pnpm --filter react-on-rails run type-check`
-   - `pnpm --filter react-on-rails run test`
-   - `pnpm --filter create-react-on-rails-app run type-check`
-   - `pnpm --filter create-react-on-rails-app run test`
-   - `pnpm --filter react-on-rails-pro run type-check` _(requires Pro access and `react_on_rails_pro/` checked out)_
-   - `pnpm --filter react-on-rails-pro run test:rsc` _(requires Pro access and `react_on_rails_pro/` checked out)_
-   - `pnpm --filter react-on-rails-pro-node-renderer run type-check` _(requires Pro access)_
-   - `pnpm --filter react-on-rails-pro-node-renderer run test` _(requires Pro access)_
-4. Run Ruby checks that exercise SSR and generated apps:
-   - `bundle exec rubocop`
-   - `bundle exec rake rbs:validate`
-   - `cd react_on_rails && bundle exec rspec spec/react_on_rails/` for gem-side rendering, doctor, and generator coverage
-   - `cd react_on_rails/spec/dummy && bundle exec rspec spec/requests spec/system spec/packs_generator_spec.rb` for dummy
-     SSR and generator integration paths
-   - Pro RSC and renderer paths _(requires Pro access and `react_on_rails_pro/` checked out)_:
-     ```bash
-     cd react_on_rails_pro/spec/dummy
-     bundle exec rspec spec/requests/rsc_payload_spec.rb spec/requests/server_render_check_spec.rb spec/system/renderer_integration_spec.rb
-     ```
-   - See `.claude/docs/replicating-ci-failures.md` when mapping a failed CI job back to a narrower local command.
-5. Ensure Playwright browsers are installed, then run E2E coverage:
-   - `cd react_on_rails/spec/dummy && pnpm playwright install --with-deps`
-   - `cd react_on_rails/spec/dummy && pnpm test:e2e` for OSS dummy SSR and hydration paths
-   - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
-   - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
-   - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
-6. Run the generated-app suite from the repo root in a clean checkout:
-   `bundle exec rake run_rspec:shakapacker_examples_latest` for the React 19 examples. Use
-   `bundle exec rake run_rspec:shakapacker_examples` to run the full suite across pinned React versions when needed.
-   `bundle exec rake shakapacker_examples:gen_all` only generates example apps; a separate `run_rspec:*` task must run
-   their tests.
-7. Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
-   examples.
+- [ ] Review the React 19.2.x changelog and release notes for breaking changes, deprecations, and new APIs that could
+      affect React on Rails SSR, streaming, RSC, or hydration integration.
+- [ ] Run `pnpm install` from a clean checkout and confirm React, React DOM, and `react-on-rails-rsc` resolve to
+      compatible versions.
+- [ ] Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream`
+      and `renderToReadableStream` through `@types/react-dom`, lint enforces package style, and tests exercise the
+      runtime paths:
+  - `pnpm run lint` from the repo root (ESLint only; per-package type-check and tests follow)
+  - `pnpm --filter react-on-rails run type-check`
+  - `pnpm --filter react-on-rails run test`
+  - `pnpm --filter create-react-on-rails-app run type-check`
+  - `pnpm --filter create-react-on-rails-app run test`
+  - `pnpm --filter react-on-rails-pro run type-check` _(requires Pro access and `react_on_rails_pro/` checked out)_
+  - `pnpm --filter react-on-rails-pro run test:rsc` _(requires Pro access and `react_on_rails_pro/` checked out)_
+  - `pnpm --filter react-on-rails-pro-node-renderer run type-check` _(requires Pro access)_
+  - `pnpm --filter react-on-rails-pro-node-renderer run test` _(requires Pro access)_
+- [ ] Run Ruby checks that exercise SSR and generated apps:
+  - `bundle exec rubocop`
+  - `bundle exec rake rbs:validate`
+  - `cd react_on_rails && bundle exec rspec spec/react_on_rails/` for gem-side rendering, doctor, and generator coverage
+  - `cd react_on_rails/spec/dummy && bundle exec rspec spec/requests spec/system spec/packs_generator_spec.rb` for dummy
+    SSR and generator integration paths
+  - Pro RSC and renderer paths _(requires Pro access and `react_on_rails_pro/` checked out)_:
+    ```bash
+    cd react_on_rails_pro/spec/dummy
+    bundle exec rspec spec/requests/rsc_payload_spec.rb spec/requests/server_render_check_spec.rb spec/system/renderer_integration_spec.rb
+    ```
+  - See `.claude/docs/replicating-ci-failures.md` when mapping a failed CI job back to a narrower local command.
+- [ ] Ensure Playwright browsers are installed, then run E2E coverage:
+  - `cd react_on_rails/spec/dummy && pnpm playwright install --with-deps`
+  - `cd react_on_rails/spec/dummy && pnpm test:e2e` for OSS dummy SSR and hydration paths
+  - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
+  - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
+  - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
+- [ ] Run the generated-app suite from the repo root in a clean checkout:
+      `bundle exec rake run_rspec:shakapacker_examples_latest` for the React 19 examples. Use
+      `bundle exec rake run_rspec:shakapacker_examples` to run the full suite across pinned React versions when needed.
+      `bundle exec rake shakapacker_examples:gen_all` only generates example apps; a separate `run_rspec:*` task must run
+      their tests.
+- [ ] Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
+      examples.
 
 If any verification step fails, capture the exact command and failure, then decide whether to pin the resolved React
 version, open an upstream or compatibility issue, or block the package-range work until the regression has an owner.
@@ -111,16 +116,22 @@ each decision has an owner, acceptance criteria, and a closure path.
 The prerequisite decision is whether the first implementation should prove the pattern through traditional SSR with
 Suspense, RSC, or both; answer that before settling caching, benchmarks, or streamed-error semantics.
 
+Before implementation starts, assign a secondary reviewer for the prerequisite SSR-vs-RSC decision so the plan does not
+stall if @justin808 is unavailable. Also assign a backup reviewer for benchmark metrics because that decision can be
+validated independently from the rest of the implementation tree.
+
 - Which Rails caching layer should be recommended for the static-shell: fragment cache, HTTP cache, CDN cache, or a
   combination?
   **Owner**: @justin808 | **Target**: before any implementation PR is opened
 - Should the static-shell be rendered by the Node Renderer, cached as a Rails partial fragment, or selected per example?
   **Owner**: @justin808 | **Target**: before any implementation PR is opened
 - Should the first example use traditional SSR with Suspense, RSC, or both?
-  **Owner**: @justin808 | **Target**: prerequisite decision before any implementation PR is opened
+  **Owner**: @justin808 | **Secondary reviewer**: React on Rails maintainer with Pro access | **Target**: prerequisite
+  decision before any implementation PR is opened
 - How should failures in the dynamic portion affect status codes and error boundaries after part of the response has
   streamed?
   **Owner**: @justin808 | **Target**: after the SSR-vs-RSC strategy decision, before public docs or examples
 - What metrics matter most for acceptance: TTFB, LCP, response end, total bytes, or client JavaScript reduction, and how
   do Rails `ActionController::Live` and Node Renderer streaming paths affect those metrics differently?
-  **Owner**: @justin808 | **Target**: after the SSR-vs-RSC strategy decision, before benchmark implementation
+  **Owner**: @justin808 | **Secondary reviewer**: React on Rails maintainer with Pro access | **Target**: after the
+  SSR-vs-RSC strategy decision, before benchmark implementation
