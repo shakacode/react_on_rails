@@ -161,8 +161,7 @@ For larger apps, prefer a small Ruby script over a very long command string. Cre
 mode = ARGV.first
 
 unless %w[test production].include?(mode)
-  warn "Usage: bin/build-react-on-rails test|production"
-  exit(1)
+  abort "Usage: bin/build-react-on-rails test|production"
 end
 
 # Replace with your own pre-build step(s). For example, to run TypeScript then ReScript:
@@ -180,17 +179,19 @@ when "production"
 end
 ```
 
-Make the script executable and ensure Git tracks the executable bit:
-
-```bash
-git update-index --chmod=+x bin/build-react-on-rails
-```
-
-`chmod +x bin/build-react-on-rails` works too on most Unix systems, but `git update-index` is reliable across all
-platforms including Windows and Docker volumes.
+Make the script executable so it can run locally, then stage the file so Git records the executable bit for CI and other
+checkouts:
 
 ```bash
 chmod +x bin/build-react-on-rails
+git add bin/build-react-on-rails
+```
+
+On Windows or Docker volumes where the filesystem may not preserve Unix modes, use `git update-index` instead of relying
+on the filesystem mode:
+
+```bash
+git update-index --chmod=+x bin/build-react-on-rails
 ```
 
 ```ruby
