@@ -143,7 +143,7 @@ function ReviewList({ reviews }: { reviews: Review[] }) {
 
 **React component for async props (Server Component):**
 
-Use this version with the `stream_react_component_with_async_props` ERB helper above. Keep the registered component name as `ProductPage`; the props shape changes so `reviews` comes from `getReactOnRailsAsyncProp`.
+Use this version with the `stream_react_component_with_async_props` ERB helper above. Keep the registered component name as `ProductPage`; the props shape changes so `reviews` comes from `getReactOnRailsAsyncProp`. `WithAsyncProps<AsyncProps, SyncProps>` combines the props passed directly through `props:` with a typed accessor for the keys emitted from Rails.
 
 ```tsx
 import { Suspense } from 'react';
@@ -199,8 +199,8 @@ export default function ProductPage({ name, price, getReactOnRailsAsyncProp }: P
 
 **How it works:**
 
-1. Rails loads synchronous data and passes it as props to `stream_react_component`
-2. `stream_react_component` uses React's `renderToPipeableStream` for streaming SSR
+1. Rails loads synchronous data and passes it as props to `stream_react_component`, or as immediate `props:` to `stream_react_component_with_async_props` when slower props are emitted from the block
+2. The streaming helper uses React's `renderToPipeableStream` for streaming SSR
 3. HTML streams to the browser as React renders the component tree
 4. No client-side fetching or client-side effect-based loading state needed
 5. The component renders with zero JavaScript cost as a Server Component
