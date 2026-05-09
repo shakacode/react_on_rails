@@ -153,12 +153,12 @@ minimal client-side hydration work after `responseEnd`, while the Inertia contro
 on the client. That difference in client-side work helps explain why the navigation-duration gain (-21.7%) was larger
 than the `responseEnd` gain (-8.7%).
 
-The page-specific script request count, recorded as Chrome DevTools Network panel `Script`-type requests after loading
-each route, changed from 6 requests for the Inertia demo to 1 request for the RSC demo. The artifact reports this as a
-fixed post-load request-count observation, not a per-run timing median or statistical sample, and it does not measure
-combined transfer size or cache behavior. Fewer requests do not necessarily imply a smaller browser payload: the RSC
-route carries runtime, Flight payload, and RSC-specific bundle costs that the Inertia control does not, so total transfer
-size is the meaningful network-cost metric and is not reported here. See
+The page-specific script request count was 6 for the Inertia demo and 1 for the RSC demo, recorded as Chrome DevTools
+Network panel `Script`-type requests after loading each route. This is a fixed post-load observation, not a per-run
+timing median or statistical sample. Fewer requests do not necessarily imply a smaller browser payload: the RSC route
+carries runtime, Flight payload, and RSC-specific bundle costs that the Inertia control does not, so total transfer size
+is the meaningful network-cost metric and is not reported here. The raw request-count difference is noted for
+completeness only. See
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
 - _All timing values are medians from the raw benchmark artifact values (n=4 per route); sample size is too small to
@@ -173,15 +173,16 @@ size is the meaningful network-cost metric and is not reported here. See
 | ---------------------------------- | -----------: | -------: | ------------------------------: |
 | Worst-case `responseEnd` (max n=4) |        731ms |    768ms |                           +5.1% |
 
-The source artifact labels this as p95, but with four samples it is effectively the maximum observed value, not a
-stable tail-latency estimate. It shows a +5.1% RSC regression on worst-case `responseEnd` (high variance is expected at
-n=4), indicating the Inertia control had a faster worst-case `responseEnd` than the RSC route.
+The source artifact mislabels this metric as p95. With only four samples, p95 is the maximum observed value by
+definition, not an independently estimated tail percentile. It shows a +5.1% RSC regression on worst-case `responseEnd`
+(high variance is expected at n=4), indicating the Inertia control had a faster worst-case `responseEnd` than the RSC
+route.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route combines RSC, the Pro Node
-renderer, and SSR, while the Inertia control has none of those three factors. With that caveat, the RSC route was faster
-on user-visible median navigation duration and LCP while sending fewer page-specific script requests. The p95
-`responseEnd` counter-signal was faster for the Inertia control. A stable deployed repeat, renderer-internal timing,
-environment metadata, and distribution artifacts are still required before making stronger production-performance claims.
+renderer, and SSR, while the Inertia control has none of those three factors. With that caveat, the RSC route showed
+faster median navigation duration and LCP on the measured routes. The worst-case `responseEnd` counter-signal favored
+the Inertia control. A stable deployed repeat, renderer-internal timing, environment metadata, and distribution artifacts
+are still required before making stronger production-performance claims.
 
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
