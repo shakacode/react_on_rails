@@ -30,6 +30,7 @@ class StoriesController < ApplicationController
     preflight = StoryPagePreflight.call(params[:id], current_user: current_user)
 
     if preflight.redirect_reason
+      # .fetch raises KeyError if a new redirect_reason is added without a matching path here.
       redirect_path = { unauthenticated: sign_in_path }.fetch(preflight.redirect_reason)
       return redirect_to(redirect_path, status: preflight.redirect_status || :see_other)
     end
@@ -80,7 +81,7 @@ Keep the props serializable and intentional. A good preflight result usually con
 
 Avoid making React responsible for route outcomes. React can render a "not found" UI, but Rails should decide whether the response is actually a `404`.
 
-Set cookies and mutate session state before calling `stream_view_containing_react_components`, for the same reason you set status and cache headers first. Once streaming commits the headers, `Set-Cookie` changes and session writes can no longer be added reliably to the HTTP response.
+> **Important:** Set cookies and mutate session state before calling `stream_view_containing_react_components`, for the same reason you set status and cache headers first. Once streaming commits the headers, `Set-Cookie` changes and session writes can no longer be added reliably to the HTTP response.
 
 ## 404 and Not-Found Routes
 
@@ -139,7 +140,6 @@ def show
   story = Story.find_by(slug: params[:slug])
 
   if story&.removed?
-    response.status = :gone
     response.headers["Cache-Control"] = "public, max-age=86400"
     return render(template: "errors/gone", status: :gone)
   end
@@ -207,7 +207,7 @@ end
 
 If `stale?` returns `false`, Rails has already prepared the `304 Not Modified` response; the early return keeps the controller from starting a streamed render after that response has been selected.
 
-When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy or keep the response private:
+When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy before streaming or keep the response private:
 
 ```ruby
 response.headers["Vary"] = "Accept-Language"
