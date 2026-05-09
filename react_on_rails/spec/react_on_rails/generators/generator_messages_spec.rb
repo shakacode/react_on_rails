@@ -393,6 +393,12 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?).to be(false)
     end
 
+    it "returns false without reading package.json when package_json: nil is passed explicitly" do
+      expect(File).not_to receive(:read)
+
+      expect(described_class.package_manager_declared?(manager: "pnpm", package_json: nil)).to be(false)
+    end
+
     it "returns false when packageManager declares an unsupported tool" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path)
