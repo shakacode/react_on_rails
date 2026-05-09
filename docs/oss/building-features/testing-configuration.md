@@ -54,10 +54,7 @@ The Pro initializer reads renderer settings while Rails boots. Set test renderer
 module RscTestWorker
   TEST_ENV_NUMBER = ENV.fetch("TEST_ENV_NUMBER", "0")
   NORMALIZED_ENV_NUMBER = TEST_ENV_NUMBER.empty? ? "0" : TEST_ENV_NUMBER
-  ID = begin
-    worker_id = NORMALIZED_ENV_NUMBER.gsub(/[^0-9]/, "")
-    worker_id.empty? ? "0" : worker_id
-  end
+  ID = NORMALIZED_ENV_NUMBER.gsub(/[^0-9]/, "").then { |worker_id| worker_id.empty? ? "0" : worker_id }
 end
 ```
 
@@ -175,7 +172,7 @@ RSpec.configure do |config|
             "gets a unique renderer bundle cache directory."
     end
     expanded_cache_path = File.expand_path(cache_path)
-    tmp_root = File.expand_path(Rails.root.join("tmp").to_s)
+    tmp_root = File.realpath(Rails.root.join("tmp").to_s)
     unless expanded_cache_path.start_with?("#{tmp_root}#{File::SEPARATOR}")
       raise "RENDERER_SERVER_BUNDLE_CACHE_PATH must be inside Rails.root/tmp " \
             "(got: #{expanded_cache_path})"
@@ -210,7 +207,7 @@ RSpec.configure do |config|
     renderer_timeout = ENV.fetch("RSC_NODE_RENDERER_BOOT_TIMEOUT", "30").to_i
     RscNodeRenderer.wait_until_ready!(
       host: "127.0.0.1",
-      port: ENV.fetch("RENDERER_PORT").to_i,
+      port: renderer_env["RENDERER_PORT"].to_i,
       timeout_seconds: renderer_timeout,
       log_path: renderer_log_path,
       pid: rsc_node_renderer_pid
@@ -240,7 +237,7 @@ RSpec.configure do |config|
 end
 ```
 
-Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
+Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately; if you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
 
 The explicit `ensure_assets_compiled` call above is intentional: the renderer needs bundles before it boots. Step 2 still wires compilation to `:rsc` examples for suites that do not start the renderer.
 
