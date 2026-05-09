@@ -15,7 +15,9 @@ module ReactOnRails
     attr_reader :messages
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
-    PackageManagerDetection = Struct.new(:manager, :lockfile_scan_blocked, keyword_init: true)
+    unless const_defined?(:PackageManagerDetection, false)
+      PackageManagerDetection = Struct.new(:manager, :lockfile_scan_blocked, keyword_init: true)
+    end
 
     def initialize
       @messages = []

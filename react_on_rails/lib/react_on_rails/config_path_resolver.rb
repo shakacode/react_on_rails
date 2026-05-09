@@ -16,8 +16,10 @@ module ReactOnRails
     ].freeze
     ALL_DEFAULT_CONFIG_CANDIDATES = (WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES).freeze
 
-    # Public so Doctor can delegate to a SystemChecker instance and share the
-    # same warning de-dupe registry across resolver callers.
+    protected
+
+    # Protected so including classes and overrides can share the same warning
+    # de-dupe registry across resolver callers without exposing it as API.
     def config_path_warning_registry
       @config_path_warning_registry ||= {
         package_roots: Set.new,
