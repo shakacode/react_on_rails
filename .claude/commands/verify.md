@@ -2,6 +2,9 @@
 
 Run a local verification loop for the current branch before creating or updating a PR.
 
+Use `/verify` for local pre-PR checks. Use `/run-ci` when you need the CI change detector or want to
+reproduce CI job selection locally.
+
 ## Instructions
 
 1. Read `AGENTS.md` first. It is the canonical source for required commands, formatting, boundaries, and ask-first areas.
@@ -9,8 +12,8 @@ Run a local verification loop for the current branch before creating or updating
 3. Decide the smallest verification set that covers the changed surface area.
 4. Keep repo-wide commit gates from `AGENTS.md` in the set when you will create a commit, even if the changed surface is narrow.
 5. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
-6. For formatting failures, run `rake autofix` instead of manually editing formatting-only changes.
-7. After a fix, restart at the failed command and continue forward. Do not claim a failure is fixed until the failed command passes locally.
+6. For formatting failures, run `rake autofix`; do not manually edit formatting-only changes.
+7. After a fix, restart at the failed command and continue forward. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, stop and report the error instead of retrying.
 8. Finish with the exact commands run and their pass/fail status.
 
 ## Default Verification Order
@@ -28,7 +31,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run build`
    - `pnpm run lint`
    - `pnpm run type-check`
-   - targeted `pnpm run test -- ...` for changed package behavior
+   - targeted `pnpm --filter <package> run test` or `pnpm run test -- <path>` for changed package behavior
 4. Docs:
    - `script/check-docs-sidebar origin/main HEAD` when docs under `docs/` changed
    - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless this branch changes the canonical command
@@ -38,7 +41,9 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `yamllint .github/` when any `.github/workflows/` file changed
    - Do not run RuboCop on `.yml` files
 6. Broad suite:
+   - `rake all_but_examples` for broad coverage without the slow generated-examples suite
    - `rake` when shared runtime behavior, generators, cross-package contracts, or release-critical paths changed
+   - `rake lint` when the full lint surface is appropriate and a single lint command is clearer than separate steps
 
 ## Scope Guide
 
@@ -47,6 +52,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`, but do not treat it as a Markdown validator.
+- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved, then run `cd react_on_rails_pro && pnpm run prettier --check .`.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
 
 ## Output Format
@@ -57,7 +63,7 @@ Use this concise summary:
 Verification:
 - PASS git diff --check origin/main...HEAD
 - PASS pnpm start format.listDifferent
-- FAIL bundle exec rspec path/to/spec.rb
+- FAIL bundle exec rspec react_on_rails/spec/react_on_rails/path/to/spec.rb
 
 Next fix:
 - ...
