@@ -18,7 +18,8 @@ Fixes are generally delivered for the most recent minor line; older releases may
 
 This policy covers security vulnerabilities in the `react_on_rails` gem and the `react-on-rails` npm package. It does
 not cover vulnerabilities in end-user Rails applications that happen to use React on Rails, vulnerabilities in
-third-party dependencies, or non-technical attacks such as phishing or social engineering.
+third-party dependencies, or non-technical attacks such as phishing or social engineering. Vulnerabilities in
+`react_on_rails_pro` follow the same reporting process; use the same GitHub advisory path or email fallback below.
 
 ## Reporting a Vulnerability
 
@@ -38,8 +39,8 @@ first email, include the affected package name (`react_on_rails` gem or `react-o
 and a one-line impact description, such as "potential XSS in SSR helper" or "information disclosure in generator output."
 Do not include exploit details in that first contact. Maintainers will respond with a secure alternative, such as a
 private GitHub Advisory thread or another mutually agreed private channel, before requesting reproduction details.
-If you prefer to encrypt your first message, ask for a PGP public key at the same address before sending sensitive
-reproduction details.
+If you prefer to encrypt your first message and a PGP key is available for this address, request it before sending
+sensitive reproduction details.
 
 Maintainers aim to provide an initial response within five business days. The default disclosure window is 90 days from
 the date of first report unless maintainers and the reporter agree to a shorter or longer timeline. If you do not

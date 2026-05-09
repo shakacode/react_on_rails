@@ -179,10 +179,11 @@ Do not add a scanner to CI until all of these are true:
 
 - Finds at least one verified issue or a clearly valuable hardening opportunity.
 - Keeps the false-positive rate at or below 15% for that scanner's `main` scan after one triage pass, measured among
-  high/critical findings reviewed for that scanner run, not cumulatively across scanners. A scan with fewer than five
-  high/critical findings cannot satisfy this false-positive-rate gate by itself; manually review every finding, record
-  the raw count and why the sample is too small for a stable rate, and gather a larger sample before using this rate to
-  justify CI adoption.
+  high/critical findings reviewed for that scanner run, not cumulatively across scanners. This initial bar is
+  intentionally lenient to support first-pass data collection; tighten it to 10% or lower before moving findings from
+  advisory to blocking. A scan with fewer than five high/critical findings cannot satisfy this false-positive-rate gate
+  by itself; manually review every finding, record the raw count and why the sample is too small for a stable rate, and
+  gather a larger sample before using this rate to justify CI adoption.
 - Supports advisory mode for pull requests.
 - Requires only read-only repository access plus permission to post advisory PR comments or create issues; no write,
   merge, or admin permissions.
