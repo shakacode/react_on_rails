@@ -137,6 +137,8 @@ exclude_path = [
 # Don't check fragments/anchors (can be flaky)
 include_fragments = false
 
-# Do not cache link results. In CI, transient 5xx responses from GitHub can
-# otherwise be restored by actions/cache and keep otherwise valid PRs red.
-cache = false
+# Keep CI cache entries short-lived so transient external failures do not
+# linger across otherwise valid PRs.
+cache = true
+max_cache_age = "6h"
+cache_exclude_status = ["429", "500..=599"]

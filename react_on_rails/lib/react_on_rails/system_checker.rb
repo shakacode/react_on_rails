@@ -454,7 +454,7 @@ module ReactOnRails
       # legacy apps that keep their JS package tree under client/.
       package_root = resolved_package_root
       package_json_path = package_json_path_for(
-        "package manager (package.json must exist alongside lockfiles)",
+        "package manager lockfile",
         package_root
       )
       # If package.json cannot be read, the configured package root is broken
