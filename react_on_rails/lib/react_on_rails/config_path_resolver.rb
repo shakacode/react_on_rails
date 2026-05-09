@@ -53,8 +53,7 @@ module ReactOnRails
       !Dir.exist?(package_root)
     end
 
-    def package_json_path_for(detection_target)
-      package_root = resolved_package_root
+    def package_json_path_for(detection_target, package_root = resolved_package_root)
       package_json_path = resolved_package_json_path(package_root)
       return package_json_path if File.exist?(package_json_path)
 
@@ -78,6 +77,8 @@ module ReactOnRails
     end
 
     def missing_package_root_warning(package_root, _detection_target)
+      # Intentionally omit detection_target: one generic message covers all
+      # diagnostics skipped for the same missing package root.
       "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
         "all diagnostics that read from it are skipped. Check config/initializers/react_on_rails.rb."
     end

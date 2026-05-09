@@ -449,20 +449,16 @@ module ReactOnRails
       status.success?
     end
 
-    def detect_used_package_manager
-      detect_package_manager_from_lockfile.manager
-    end
-
     def detect_package_manager_from_lockfile
       # Check for lock files next to the configured package.json to support
       # legacy apps that keep their JS package tree under client/.
-      package_json_path = package_json_path_for("package manager lockfiles")
+      package_root = resolved_package_root
+      package_json_path = package_json_path_for("package manager lockfiles", package_root)
       # If package.json cannot be read, the configured package root is broken
       # enough that detecting a stray lockfile would be misleading. Block the
       # scan so check_package_manager does not suggest installing lockfiles.
       return PackageManagerDetection.new(manager: nil, lockfile_scan_blocked: true) unless package_json_path
 
-      package_root = File.dirname(package_json_path)
       manager = if File.exist?(File.join(package_root, "yarn.lock"))
                   "yarn"
                 elsif File.exist?(File.join(package_root, "pnpm-lock.yaml"))

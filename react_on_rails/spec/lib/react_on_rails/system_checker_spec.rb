@@ -131,7 +131,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(checker).to receive(:cli_exists?).with("yarn").and_return(true)
         allow(checker).to receive(:cli_exists?).with("pnpm").and_return(false)
         allow(checker).to receive(:cli_exists?).with("bun").and_return(false)
-        # Mock file existence checks so detect_used_package_manager scans lockfiles but returns nil.
+        # Mock file existence checks so detect_package_manager_from_lockfile scans lockfiles but returns nil.
         allow(File).to receive(:exist?).with(rails_root.join("package.json").to_s).and_return(true)
         allow(File).to receive(:exist?).with(rails_root.join("yarn.lock").to_s).and_return(false)
         allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
@@ -1019,7 +1019,7 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
     end
 
-    describe "#detect_used_package_manager" do
+    describe "#detect_package_manager_from_lockfile" do
       let(:rails_root) { Pathname.new("/tmp/myapp") }
       let(:node_modules_location) { rails_root.to_s }
 
@@ -1039,7 +1039,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:exist?).with(rails_root.join("pnpm-lock.yaml").to_s).and_return(false)
         allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(true)
 
-        expect(checker.send(:detect_used_package_manager)).to eq("bun")
+        expect(checker.send(:detect_package_manager_from_lockfile).manager).to eq("bun")
       end
 
       it "returns bun when bun.lockb exists" do
@@ -1048,7 +1048,7 @@ RSpec.describe ReactOnRails::SystemChecker do
         allow(File).to receive(:exist?).with(rails_root.join("bun.lock").to_s).and_return(false)
         allow(File).to receive(:exist?).with(rails_root.join("bun.lockb").to_s).and_return(true)
 
-        expect(checker.send(:detect_used_package_manager)).to eq("bun")
+        expect(checker.send(:detect_package_manager_from_lockfile).manager).to eq("bun")
       end
 
       context "with a configured nested package.json" do
@@ -1061,7 +1061,7 @@ RSpec.describe ReactOnRails::SystemChecker do
           allow(File).to receive(:exist?).with(rails_root.join("client", "bun.lockb").to_s).and_return(false)
           allow(File).to receive(:exist?).with(rails_root.join("client", "package-lock.json").to_s).and_return(false)
 
-          expect(checker.send(:detect_used_package_manager)).to eq("yarn")
+          expect(checker.send(:detect_package_manager_from_lockfile).manager).to eq("yarn")
         end
 
         it "warns when the configured package root does not exist" do
@@ -1069,7 +1069,10 @@ RSpec.describe ReactOnRails::SystemChecker do
           allow(File).to receive(:exist?).with(rails_root.join("client", "package.json").to_s).and_return(false)
           allow(Dir).to receive(:exist?).with(package_root).and_return(false)
 
-          expect(checker.send(:detect_used_package_manager)).to be_nil
+          detection = checker.send(:detect_package_manager_from_lockfile)
+
+          expect(detection.manager).to be_nil
+          expect(detection.lockfile_scan_blocked).to be true
           warning_msgs = checker.messages.select { |m| m[:type] == :warning }
           expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location points to #{package_root}") })
             .to be true
