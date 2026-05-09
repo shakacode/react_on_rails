@@ -92,7 +92,12 @@ module.exports = commonWebpackConfig;
 
 If you are on Webpacker 5 / Webpack 4, whether you are migrating from `react-rails` or upgrading an existing React on Rails app, prefer upgrading to Shakapacker first when you can.
 
-These shims are not covered by React on Rails CI and are documented as a temporary bridge for apps still on Webpacker 5 / Webpack 4; the bundler is the compatibility constraint, so verify your full app locally before relying on them.
+:::caution
+
+These shims are not covered by React on Rails CI. Treat them as a temporary bridge for apps still on Webpacker 5 /
+Webpack 4, and verify your full app locally before relying on them.
+
+:::
 
 Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims. Because the package also declares `"type": "module"`, Webpack 4 stacks that reach the package's `.js` files may still need Babel to transpile ESM syntax after the import path is fixed.
 
@@ -177,7 +182,7 @@ Keep each shim explicit and narrow:
      ],
      overrides: [
        {
-         test: './node_modules/react-on-rails',
+         test: /node_modules[\\/]react-on-rails[\\/]/,
          plugins: ['@babel/plugin-transform-modules-commonjs'],
        },
      ],
