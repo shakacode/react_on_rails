@@ -28,7 +28,9 @@ Note: `packages/react-on-rails-pro/package.json` already sets the `react-on-rail
 should be widened alongside any React 19.2.x range update. Because a hard upper bound would reject a future `19.2.4` patch or
 `19.3.x` minor release, the decision must either widen the range for stable React 19.x, such as `< 20.0.0`, or document the
 specific API risk that requires a tight pin. If verification finds no specific API risk, the default outcome is to widen the
-ceiling to `< 20.0.0`. **Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
+ceiling to `< 20.0.0`. The same decision must also audit the Pro package `react` and `react-dom` peer dependency ranges,
+currently `>= 16`, so all three peer ranges stay aligned with the minimum React version decision. **Owner**: @justin808 |
+**Target**: before any package-range change is merged (see Open Questions).
 
 ## React 19.2.x Verification Checklist
 
@@ -44,9 +46,8 @@ Use a dedicated branch for the actual version verification work:
       `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.mjs" --include="*.cjs" --include="*.ts" --include="*.tsx" --include="*.cts"`,
       document whether a Suspense-containing tree could plausibly be passed by a user render function today, then either
       open a follow-up migration ticket or record why the current usage is acceptable.
-- [ ] Open a tracking issue titled "Drop React 16/17 support" if one does not already exist, then link it here. The
-      `packages/react-on-rails/src/ReactDOMServer.cts` compatibility re-export is already marked for deletion when that
-      support is dropped.
+- [ ] If React 16/17 support is being dropped in this work cycle, remove `packages/react-on-rails/src/ReactDOMServer.cts`.
+      Otherwise, confirm the file's existing removal comment remains the accepted exit criterion and close this task.
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
       React, React DOM, and `react-on-rails-rsc` resolve to compatible versions. Capture the exact
       `pnpm list -r --depth=0 react react-dom react-on-rails-rsc` output in the verification record, such as a comment on
