@@ -128,34 +128,34 @@ The browser timing medians showed this directional signal:
 
 | Metric                                      | Inertia demo | RSC demo |  Delta |
 | ------------------------------------------- | -----------: | -------: | -----: |
-| Navigation duration                         |        775ms |    607ms | -21.7% |
-| Largest Contentful Paint                    |        794ms |    634ms | -20.2% |
-| `responseEnd`                               |        645ms |    589ms |  -8.7% |
-| Controller `action_total` (Rails wall time) |        347ms |    339ms |  noise |
+| Navigation duration                         |     775.40ms | 607.15ms | -21.7% |
+| Largest Contentful Paint                    |     794.00ms | 634.00ms | -20.2% |
+| `responseEnd`                               |     644.80ms | 588.80ms |  -8.7% |
+| Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |  noise |
 
 The page-specific script request count, measured as Chrome DevTools Network panel `Script`-type requests after loading
 each route, changed from 6 requests for the Inertia demo to 1 request for the RSC demo. That is a fixed request count,
 not a timing median or statistical sample, and it does not measure combined transfer-size. See
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
-- _All timing values are medians rounded to the nearest millisecond (n=4 per route); sample size is too small to
+- _All timing values are medians from the raw benchmark artifact values (n=4 per route); sample size is too small to
   establish statistical significance._
 - _The `action_total` difference was -2.2%, which is likely within expected variance at n=4._
 - _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
-Worst-case counter-signal:
+p95 counter-signal:
 
-| Metric                              | Inertia demo | RSC demo | Delta |
-| ----------------------------------- | -----------: | -------: | ----: |
-| Max `responseEnd` (worst-case, n=4) |        731ms |    768ms | +5.2% |
+| Metric                  | Inertia demo | RSC demo | Delta |
+| ----------------------- | -----------: | -------: | ----: |
+| p95 `responseEnd` (n=4) |     730.62ms | 768.25ms | +5.2% |
 
-The max row is a max-vs-max comparison, not a stable tail-latency estimate. It shows a +5.2% RSC regression on
-worst-case `responseEnd` (high variance is expected at n=4), indicating the Inertia control had a faster worst-case
+The p95 row is a percentile comparison over four samples, not a stable tail-latency estimate. It shows a +5.2% RSC
+regression on p95 `responseEnd` (high variance is expected at n=4), indicating the Inertia control had a faster p95
 `responseEnd` than the RSC route.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route combines RSC, the Pro Node
 renderer, and SSR, while the Inertia control has none of those three factors. With that caveat, the RSC route was faster
-on user-visible median navigation duration and LCP while sending fewer page-specific script requests. The max
+on user-visible median navigation duration and LCP while sending fewer page-specific script requests. The p95
 `responseEnd` counter-signal was faster for the Inertia control. A stable deployed repeat, renderer-internal timing,
 environment metadata, and distribution artifacts are still required before making stronger production-performance claims.
 
