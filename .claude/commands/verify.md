@@ -13,16 +13,18 @@ command is designed to prevent.
    `git diff --stat origin/main...HEAD`.
 3. Decide the required verification set that covers the changed surface area using the **Scope Guide** below. Always
    include `bundle exec rubocop` before creating a commit, even when the changed surface is documentation-only, because
-   `AGENTS.md` marks it mandatory before every commit.
+   RuboCop scans all Ruby files, not just changed or staged ones, so docs-only commits can still expose pre-existing
+   Ruby offenses that CI will catch.
 4. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 5. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
-6. After one or more edits for a failure, restart at the failed command and continue forward. Count each rerun of the
-   same command that produces the same first failing test name, RuboCop offense, or Prettier file as one loop cycle. The
-   counter is per command, so reset it when you advance to a different step. Stop and report after three cycles unless
-   the user asks you to keep going.
-   - If the first failing item changes, reset the counter and continue.
-   - If a later step reintroduces a failure that already passed, stop immediately and report the regression.
-   - Do not claim a failure is fixed until the command passes locally.
+6. After one or more edits for a failure, restart at the failed command and continue forward. Track a loop counter per
+   command:
+   1. Increment the counter when the same command fails on the same first item (test name, RuboCop offense, or Prettier
+      file) as the previous run.
+   2. Reset the counter when the first failing item changes or when you advance to a different command.
+   3. Stop and report after three consecutive cycles on the same item, unless the user asks you to keep going.
+   4. Stop immediately and report a regression if a command that previously passed now fails again.
+   5. Do not claim a failure is fixed until the command passes locally.
 7. Finish with the exact commands run and their pass/fail status.
 
 ## Default Verification Order
