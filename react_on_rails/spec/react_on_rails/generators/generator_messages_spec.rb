@@ -474,14 +474,14 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
-    it "returns false when packageManager has a non-SemVer version label" do
-      %w[pnpm@alpha pnpm@next pnpm@9 pnpm@01.0.0].each do |package_manager|
+    it "returns true when packageManager uses npm-style version specs" do
+      %w[pnpm@10 pnpm@10.x pnpm@^10.0.0 pnpm@latest].each do |package_manager|
         expect(
           described_class.package_manager_declared?(
             manager: "pnpm",
             package_json: { "packageManager" => package_manager }
           )
-        ).to be(false), "expected #{package_manager.inspect} not to count as a Corepack SemVer pin"
+        ).to be(true), "expected #{package_manager.inspect} to count as an explicit packageManager declaration"
       end
     end
 

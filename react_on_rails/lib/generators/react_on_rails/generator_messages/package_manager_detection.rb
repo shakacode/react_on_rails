@@ -10,17 +10,7 @@ module GeneratorMessages
   module PackageManagerDetection
     SUPPORTED_PACKAGE_MANAGERS = %w[npm pnpm yarn bun].freeze
     PACKAGE_JSON_UNSET = Object.new.freeze
-    SEMVER_NUMBER_PATTERN = "(?:0|[1-9]\\d*)"
-    SEMVER_IDENTIFIER_PATTERN = "[0-9A-Za-z-]+"
-    PACKAGE_MANAGER_VERSION_PATTERN = /
-      \A
-      #{SEMVER_NUMBER_PATTERN}\.#{SEMVER_NUMBER_PATTERN}\.#{SEMVER_NUMBER_PATTERN}
-      (?:-#{SEMVER_IDENTIFIER_PATTERN}(?:\.#{SEMVER_IDENTIFIER_PATTERN})*)?
-      (?:\+#{SEMVER_IDENTIFIER_PATTERN}(?:\.#{SEMVER_IDENTIFIER_PATTERN})*)?
-      \z
-    /x
     private_constant :PACKAGE_JSON_UNSET
-    private_constant :SEMVER_NUMBER_PATTERN, :SEMVER_IDENTIFIER_PATTERN, :PACKAGE_MANAGER_VERSION_PATTERN
 
     # Hash insertion order is the detection priority used by
     # detect_package_manager_from_lockfiles (yarn -> pnpm -> bun -> npm).
@@ -89,11 +79,13 @@ module GeneratorMessages
       end
     end
 
-    # Returns true when package.json declares a `packageManager` field (Corepack standard)
-    # with a versioned pin (e.g. `"pnpm@9.0.0"`) for the requested `manager`. A bare name
-    # without `@<version>` returns false because Corepack rejects it and `pnpm/action-setup`
-    # has no version to resolve from it. Used by the CI scaffold to decide whether
-    # `pnpm/action-setup` needs an explicit `version:` key.
+    # Returns true when package.json declares a `packageManager` field with an
+    # npm-style version/range/tag (e.g. `"pnpm@9.0.0"`, `"pnpm@10"`,
+    # `"pnpm@^10.0.0"`, or `"pnpm@latest"`) for the requested `manager`. A bare name
+    # without `@<version>` returns false because `pnpm/action-setup` has no version to
+    # resolve from it. Used by the CI scaffold to decide whether `pnpm/action-setup`
+    # needs an explicit `version:` key; exact SemVer validation belongs only where a
+    # caller needs to extract a reproducible version pin.
     # Pass package_json: to reuse an already-parsed package.json and avoid a re-read.
     # Pass skip_package_json_detection: true only when the caller already attempted to
     # read package.json and wants an absent declaration result without re-reading.
@@ -106,7 +98,7 @@ module GeneratorMessages
       )
       return false unless content
 
-      declared = versioned_package_manager_from_content(content)
+      declared = declared_package_manager_from_content(content)
       return false if declared.nil?
 
       declared == manager.to_s.downcase
@@ -171,12 +163,11 @@ module GeneratorMessages
       package_json
     end
 
-    # Stricter sibling of `package_manager_from_content`: requires the full
-    # `<name>@<semver>` Corepack form. A bare `"pnpm"` or `"pnpm@next"` still expresses
-    # package-manager intent for generator command selection, but `pnpm/action-setup`
-    # has no numeric SemVer pin to resolve from it, so the CI scaffold must still pin
-    # a fallback.
-    def versioned_package_manager_from_content(content)
+    # Sibling of `package_manager_from_content` for places that need a resolvable
+    # version spec, not just a manager name. It accepts npm-style version specs because
+    # `pnpm/action-setup` can read those from package.json; a bare `"pnpm"` still needs
+    # the scaffolded fallback version.
+    def declared_package_manager_from_content(content)
       raw_declared = content["packageManager"]
       return nil unless raw_declared.is_a?(String)
 
@@ -185,8 +176,7 @@ module GeneratorMessages
       return nil unless match
 
       name = match[1].downcase
-      version = match[2]
-      supported_package_manager?(name) && version.match?(PACKAGE_MANAGER_VERSION_PATTERN) ? name : nil
+      supported_package_manager?(name) ? name : nil
     end
   end
 end
