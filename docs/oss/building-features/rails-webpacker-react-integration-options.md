@@ -117,7 +117,9 @@ Steps 1 and 2 are independent: apply each only if you hit the corresponding erro
    # or: pnpm add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
    ```
 
-   Add the plugins to the top-level `plugins` array, not inside an `env`-conditional block:
+   Add the plugins to the top-level `plugins` array, not inside an `env`-conditional block. The diff below
+   applies to `babel.config.js`; for `babel.config.json`, add the same plugin strings to the equivalent JSON
+   object instead.
 
    ```diff
    // babel.config.js
@@ -139,25 +141,27 @@ Steps 1 and 2 are independent: apply each only if you hit the corresponding erro
    - Confirm Step 2 is in place, either through the standalone optional chaining and nullish coalescing plugins or through existing `@babel/preset-env` targets that already include those transforms.
    - If your Webpacker stack pins Babel dependencies, choose plugin versions compatible with your installed `@babel/core`.
 
-   ```js
+   `rootMode: 'upward'` tells Babel to walk up from `node_modules/react-on-rails` to the project root so it
+   can find your project-wide `babel.config.js` or `babel.config.json`.
+
+   ```diff
    // config/webpack/environment.js
    // Webpacker 5 uses '@rails/webpacker', not 'shakapacker'.
    const { environment } = require('@rails/webpacker');
 
-   environment.loaders.append('react-on-rails-js', {
-     test: /\.[cm]?js$/,
-     include: /node_modules[\\/]react-on-rails[\\/]/,
-     use: [
-       {
-         loader: 'babel-loader',
-         options: {
-           cacheDirectory: true,
-           // Walk up to the project root to find babel.config.js instead of looking inside node_modules.
-           rootMode: 'upward',
-         },
-       },
-     ],
-   });
+   + environment.loaders.append('react-on-rails-js', {
+   +   test: /\.[cm]?js$/,
+   +   include: /node_modules[\\/]react-on-rails[\\/]/,
+   +   use: [
+   +     {
+   +       loader: 'babel-loader',
+   +       options: {
+   +         cacheDirectory: true,
+   +         rootMode: 'upward',
+   +       },
+   +     },
+   +   ],
+   + });
 
    module.exports = environment;
    ```
@@ -166,7 +170,28 @@ Steps 1 and 2 are independent: apply each only if you hit the corresponding erro
 
    Keep this rule scoped to `node_modules/react-on-rails`; broad `node_modules` transpilation can slow legacy builds and introduce unrelated Babel differences. After you upgrade the app to Shakapacker/Webpack 5 or newer, remove the shim and use the package entry points documented for current installs.
 
-4. If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails. If you do not have existing `transformIgnorePatterns`, set it to `['<rootDir>/node_modules/(?!react-on-rails/)']`; if you already have entries, merge the package into your existing lookahead rather than replacing the whole setting, for example `'<rootDir>/node_modules/(?!(react-on-rails|other-esm-package)/)'`.
+4. If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add
+   `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails.
+
+   If you do not have existing `transformIgnorePatterns`, add one:
+
+   ```js
+   // jest.config.js
+   module.exports = {
+     // keep existing config
+     transformIgnorePatterns: ['<rootDir>/node_modules/(?!react-on-rails/)'],
+   };
+   ```
+
+   If you already have `transformIgnorePatterns` entries, merge `react-on-rails` into the existing lookahead
+   rather than replacing the whole setting:
+
+   ```js
+   // jest.config.js
+   // Before: ['<rootDir>/node_modules/(?!(other-esm-package)/)']
+   // After:
+   transformIgnorePatterns: ['<rootDir>/node_modules/(?!(react-on-rails|other-esm-package)/)'],
+   ```
 
 ---
 
