@@ -2921,7 +2921,7 @@ module ReactOnRails
       if package_root_missing?(package_root)
         # This check only needs the directory before Node chdirs into it; an
         # installed React version can be resolved without package.json.
-        warn_missing_package_root(package_root, "React version")
+        warn_missing_package_root(package_root)
         return nil
       end
 

@@ -16,16 +16,14 @@ module ReactOnRails
     ].freeze
     ALL_DEFAULT_CONFIG_CANDIDATES = (WEBPACK_DEFAULT_CONFIG_CANDIDATES + RSPACK_DEFAULT_CONFIG_CANDIDATES).freeze
 
-    # Protected so Doctor can delegate to the checker instance and share the same
-    # warning de-dupe registry without exposing this helper as public API.
+    # Public so Doctor can delegate to a SystemChecker instance and share the
+    # same warning de-dupe registry across resolver callers.
     def config_path_warning_registry
       @config_path_warning_registry ||= {
         package_roots: Set.new,
         package_json_paths: Set.new
       }
     end
-
-    protected :config_path_warning_registry
 
     private
 
@@ -75,7 +73,7 @@ module ReactOnRails
     def warn_missing_package_root(package_root)
       return unless warned_package_roots.add?(package_root)
 
-      add_warning(missing_package_root_warning(package_root))
+      add_config_path_warning(missing_package_root_warning(package_root))
     end
 
     def missing_package_root_warning(package_root)
@@ -86,7 +84,7 @@ module ReactOnRails
     def warn_missing_package_json(package_json_path, detection_target)
       return unless warned_package_json_paths.add?(package_json_path)
 
-      add_warning(missing_package_json_warning(package_json_path, detection_target))
+      add_config_path_warning(missing_package_json_warning(package_json_path, detection_target))
     end
 
     def missing_package_json_warning(package_json_path, detection_target)
@@ -100,6 +98,15 @@ module ReactOnRails
 
     def warned_package_json_paths
       config_path_warning_registry[:package_json_paths]
+    end
+
+    def add_config_path_warning(message)
+      unless respond_to?(:add_warning, true)
+        raise NoMethodError,
+              "#{self.class} must implement #add_warning(message) to include ReactOnRails::ConfigPathResolver"
+      end
+
+      add_warning(message)
     end
 
     def resolved_webpack_config_path
