@@ -190,8 +190,6 @@ when "test"
 when "production"
   env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
   system(env, "bin/shakapacker") || abort("shakapacker (production) failed")
-else
-  abort "Unsupported build mode: #{mode.inspect}"
 end
 ```
 
@@ -215,21 +213,16 @@ ruby bin/build-react-on-rails test
 Use `production` instead of `test` for the production build command. The `git update-index` command only updates Git
 metadata; it does not change the current working-tree file mode.
 
+Configure `react_on_rails.rb` once. Use direct script commands on Unix-like filesystems and CI where the executable bit is
+set; use the Ruby-prefixed variant for local Windows or Docker-volume checkouts that cannot execute the file directly:
+
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
+  # Unix/CI (executable bit set): "bin/build-react-on-rails test"
+  # Windows/Docker (no exec bit): "ruby bin/build-react-on-rails test"
   config.build_test_command = "bin/build-react-on-rails test"
   config.build_production_command = "bin/build-react-on-rails production"
-end
-```
-
-If the filesystem cannot run `bin/build-react-on-rails` directly, use Ruby-prefixed commands in that local checkout:
-
-```ruby
-# config/initializers/react_on_rails.rb
-ReactOnRails.configure do |config|
-  config.build_test_command = "ruby bin/build-react-on-rails test"
-  config.build_production_command = "ruby bin/build-react-on-rails production"
 end
 ```
 
