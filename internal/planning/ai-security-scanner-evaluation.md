@@ -1,6 +1,6 @@
 # AI Security Scanner Evaluation Plan
 
-**Vendor snapshot:** 2026-05-09. Re-check product names, URLs, plans, and language coverage before running the
+**Vendor snapshot:** See git history for last revision date. Re-check product names, URLs, plans, and language coverage before running the
 evaluation, then refresh this snapshot annually or when a listed vendor is acquired, deprecated, or materially changes
 scope.
 
@@ -43,12 +43,12 @@ prioritization, explanation, or reachability analysis for a finding that existin
 Start with this point-in-time vendor shortlist from the issue if the products still offer an appropriate plan at
 evaluation time.
 
-| Vendor          | Reference                  | Initial status    | Before scheduling                                            |
-| --------------- | -------------------------- | ----------------- | ------------------------------------------------------------ |
-| ZeroPath        | <https://zeropath.com/>    | Candidate         | Confirm OSS or trial plan and Ruby/TypeScript coverage.      |
-| Corgea          | <https://corgea.com/>      | Candidate         | Confirm OSS or trial plan and Ruby/TypeScript coverage.      |
-| Almanax         | <https://almanax.ai/>      | Needs scope check | Confirm current product scope beyond Web3-oriented examples. |
-| DryRun Security | <https://dryrun.security/> | Candidate         | Confirm OSS or trial plan and Ruby/TypeScript coverage.      |
+| Vendor          | Reference                  | Initial status | Before scheduling                                       |
+| --------------- | -------------------------- | -------------- | ------------------------------------------------------- |
+| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
+| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
+| Almanax         | <https://almanax.ai/>      | Candidate      | Confirm Ruby/TypeScript coverage; examples skew Web3.   |
+| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
 
 If the named vendors are unavailable or unsuitable, look for tools in these categories:
 
@@ -125,7 +125,8 @@ Anchor examples:
 
 ## Adoption Bar
 
-**Owner:** See [Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018) for tracking and assignment.
+**Owner:** Tracked in [Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018). If that issue is closed
+before adoption, repository maintainers with write access own the next triage decision.
 **Default triage group:** repository maintainers with write access, unless the issue assigns a narrower group.
 **Default triage SLA:** first response within five business days for high or critical alerts.
 
@@ -138,6 +139,6 @@ Do not add a scanner to CI until all of these are true:
 - Supports advisory mode for pull requests.
 - Requires only read-only repository access plus permission to post advisory PR comments or create issues; no write,
   merge, or admin permissions.
-- Records the triage owner or rotation for the default SLA in Issue 2018.
+- Records the triage owner or rotation for the default SLA in this file or Issue 2018.
 
 If no scanner clears this bar, keep the issue as a record of what was tested and revisit later.
