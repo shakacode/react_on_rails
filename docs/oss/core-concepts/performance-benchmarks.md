@@ -100,13 +100,13 @@ surface with the same reduced presenter data and outer layout across two routes:
 
 > **Note:** These results reflect two distinct value propositions: **Rspack** addresses build speed and development
 > iteration time, while **React Server Components** target runtime JavaScript reduction and server-side composition.
-> The benchmark below measures only the RSC dimension.
+> Both routes use the same Shakapacker/Rspack page-asset build; the comparison measures the route-level RSC dimension,
+> not a bundler swap.
 
 The April 30, 2026 production-like local benchmark used eight alternating measured runs between the Inertia and RSC
-routes, four per route, with one warmup request before each measured run. It used compiled Shakapacker/Rspack assets,
-compiled RSC demo bundles, Rails without the Shakapacker dev server, a dedicated React on Rails Pro Node renderer on
-`RENDERER_PORT=3800`, and matching Chrome 147 and ChromeDriver 147. The median results, plus the observed max
-`responseEnd`, showed this directional signal:
+routes, four per route, with one warmup request before each measured run. It used compiled page assets from the same
+Shakapacker configuration with Rspack for both routes, compiled RSC demo bundles, Rails without the Shakapacker dev
+server, a dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`, and matching Chrome 147 and ChromeDriver 147. The median results, plus the observed max `responseEnd`, showed this directional signal:
 
 | Metric                        | Inertia demo | RSC demo |  Delta |
 | ----------------------------- | -----------: | -------: | -----: |
@@ -117,7 +117,8 @@ compiled RSC demo bundles, Rails without the Shakapacker dev server, a dedicated
 | Page-specific script requests |            6 |        1 | -83.3% |
 | Max `responseEnd`             |     730.62ms | 768.25ms |  +5.2% |
 
-_All rows use n=4 per route: eight alternating measured runs total, with one warmup request before each measured run._
+_Rows 1-5 are medians (n=4 per route); `Max responseEnd` is the observed maximum across those same four runs. The
+benchmark used eight alternating measured runs total, with one warmup request before each measured run._
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
 user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the worst-case
@@ -128,7 +129,7 @@ The script-request row counts browser-observed page-specific script resources on
 tracked in [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
-[Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the current tracking discussion, and
+[Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion, and
 [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) for the environment-metadata follow-up.
 
 ### Popmenu
