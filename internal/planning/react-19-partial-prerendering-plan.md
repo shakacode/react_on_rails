@@ -26,7 +26,8 @@ Note: `react-on-rails-pro` currently pins `react-on-rails-rsc` as a peer depende
 Verification should confirm whether this ceiling is intentional or should be widened alongside any React 19.2.x range
 update. Because this hard upper bound would reject a future `19.2.4` patch or `19.3.x` minor release, the decision must
 either widen the range for stable React 19.x, such as `< 20.0.0`, or document the specific API risk that requires a tight
-pin. **Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
+pin. If verification finds no specific API risk, the default outcome is to widen the ceiling to `< 20.0.0`. **Owner**:
+@justin808 | **Target**: before any package-range change is merged (see Open Questions).
 
 ## React 19.2.x Verification Checklist
 
@@ -38,7 +39,8 @@ Use a dedicated branch for the actual version verification work:
       Suspense fallbacks synchronously in that path instead of suspending, which can silently change output without an
       error. Check the existing `renderToString` usages in
       `packages/react-on-rails/src/serverRenderReactComponent.ts` and `packages/react-on-rails/src/handleError.ts`, plus
-      `renderToStaticMarkup` if any source or generated-bundle call site participates in SSR. Also grep
+      `renderToStaticMarkup` if any source or generated-bundle call site participates in SSR. Also grep generated bundles
+      and renderer artifacts, such as `grep -R "renderToString\\|renderToStaticMarkup" dist/ node_package/`, plus
       `packages/react-on-rails-pro-node-renderer/` and related SSR integration paths for additional call sites, then
       document either a migration ticket or why current usage is acceptable.
 - [ ] Run `pnpm install` from a clean checkout and confirm React, React DOM, and `react-on-rails-rsc` resolve to
@@ -100,8 +102,9 @@ too loosely:
 - React on Rails owns React registration, SSR, streaming, and hydration boundaries.
 - Streaming SSR means the Node Renderer starts work during the request and flushes chunks as Suspense boundaries and RSC
   payloads resolve, delivering content progressively without waiting for a full render.
-- True partial pre-rendering would require a reusable static-shell, rendered ahead of dynamic data at build time or at a
-  cache layer such as Rails HTTP caching or a CDN, with dynamic holes filled by a later streaming pass.
+- True partial pre-rendering would require a reusable static-shell, rendered ahead of dynamic data through an explicit
+  cache warm-up request, an asset-pipeline precompile hook, or a cache layer such as Rails HTTP caching or a CDN, with
+  dynamic holes filled by a later streaming pass.
 - The feature must not require moving a Rails app into a frontend-framework routing model.
 
 Note: React's official experimental PPR API in canary releases is not required for the patterns described here. This plan
@@ -167,5 +170,5 @@ validated independently from the rest of the implementation tree.
   **Owner**: @justin808 | **Target**: before any package-range change is merged
 - Should the `react-on-rails-pro` peer dependency ceiling for `react-on-rails-rsc` stay at `<= 19.2.3` or widen with the
   React 19.2.x verification work? If it stays tight, what specific API risk justifies rejecting future React 19.x patch
-  or minor releases?
+  or minor releases? Default to widening to `< 20.0.0` when verification finds no specific API risk.
   **Owner**: @justin808 | **Target**: before any package-range change is merged
