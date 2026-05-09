@@ -33,9 +33,9 @@ module GeneratorMessages
     # Pass package_json: <parsed_hash> to reuse an already-parsed package.json and
     # avoid a re-read (callers that also inspect scripts/deps should parse once and
     # pass the hash).
-    # Pass package_json: nil to skip JSON detection entirely when the caller has
-    # already determined the file is absent; detection falls through directly to
-    # lockfile heuristics.
+    # Pass package_json: nil to skip JSON detection (e.g. when read_package_json already
+    # returned nil because package.json is absent or unreadable); detection falls through
+    # directly to lockfile heuristics.
     def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       detect_package_manager_with_source(app_root: app_root, package_json: package_json).first
     end
@@ -121,6 +121,10 @@ module GeneratorMessages
     # Parses package.json once and returns the hash, or nil if the file is missing
     # or unreadable. Generator code can reuse the same parsed hash across setup,
     # template, and message paths.
+    #
+    # Intentionally public: install_generator and other generator callers read
+    # package.json once and pass the result to detect_package_manager /
+    # package_manager_declared? to avoid repeated disk reads.
     def read_package_json(app_root)
       package_json_path = File.join(app_root, "package.json")
       return nil unless File.exist?(package_json_path)
