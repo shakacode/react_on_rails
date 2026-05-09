@@ -125,7 +125,7 @@ module RscNodeRenderer
     loop do
       Socket.tcp(host, port, connect_timeout: 1).close
       break
-    rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT
+    rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT, SocketError
       if pid
         begin
           Process.kill(0, pid)
@@ -157,7 +157,7 @@ RSpec.configure do |config|
 
     cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH") do
       raise "RENDERER_SERVER_BUNDLE_CACHE_PATH is not set. " \
-            "Set it before requiring config/environment so every parallel worker " \
+            "Follow Step 1 of this guide to set it before Rails boots so every parallel worker " \
             "gets a unique renderer bundle cache directory."
     end
     expanded_cache_path = File.expand_path(cache_path)
@@ -174,7 +174,7 @@ RSpec.configure do |config|
       "RAILS_ENV" => "test",
       "RENDERER_PORT" => ENV.fetch("RENDERER_PORT") do
         raise "RENDERER_PORT is not set. " \
-              "Set it before requiring config/environment so every parallel worker " \
+              "Follow Step 1 of this guide to set it before Rails boots so every parallel worker " \
               "gets a unique renderer port."
       end,
       "RENDERER_SERVER_BUNDLE_CACHE_PATH" => expanded_cache_path
@@ -211,6 +211,7 @@ RSpec.configure do |config|
 
     # Signal the process group so pnpm and the Node child both stop.
     Process.kill("-TERM", pid)
+    # Thread#join(timeout) returns nil on timeout; skip KILL if TERM already reaped the process.
     next if rsc_node_renderer_waiter&.join(5)
 
     Process.kill("-KILL", pid)
@@ -260,6 +261,7 @@ RSpec.describe "RSC payload endpoint", :rsc, type: :request do
     expect(response.media_type).to eq("application/x-ndjson")
 
     chunks = response.body.lines.map(&:chomp).reject(&:empty?).map { |line| JSON.parse(line) }
+    # "html" is emitted by the default React on Rails RSC renderer; verify custom renderer output explicitly.
     expect(chunks.any? { |chunk| chunk.key?("html") }).to be(true)
   end
 end
