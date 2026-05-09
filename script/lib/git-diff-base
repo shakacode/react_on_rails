@@ -25,17 +25,20 @@ git_diff_base_remote_branch() {
 
 git_diff_base_sha_ref() {
   local ref="$1"
+  local length="${#ref}"
 
   case "$ref" in
     ""|*[!0-9a-fA-F]*)
       return 1
       ;;
-    *)
-      [ "${#ref}" -ge 7 ] &&
-        [ "${#ref}" -le 40 ] &&
-        ! git rev-parse --verify "refs/heads/$ref" >/dev/null 2>&1
-      ;;
   esac
+
+  # Full GitHub event SHAs may be absent in shallow clones. Short hex strings
+  # count only when they already resolve locally, avoiding hex branch-name hits.
+  # git_diff_base_verify_ref is defined below and only called after sourcing.
+  { [ "$length" -eq 40 ] || [ "$length" -eq 64 ] || git_diff_base_verify_ref "$ref"; } &&
+    ! git rev-parse --verify "refs/heads/$ref" >/dev/null 2>&1 &&
+    ! git rev-parse --verify "refs/remotes/origin/$ref" >/dev/null 2>&1
 }
 
 git_diff_base_base_remote_branch() {
@@ -63,7 +66,7 @@ git_diff_base_fetch_refspec() {
 git_diff_base_fetch_remote_branch() {
   local branch="$1"
   local mode="$2"
-  local depth="${GIT_DIFF_BASE_FETCH_DEPTH:-50}"
+  local depth="${3:-${GIT_DIFF_BASE_FETCH_DEPTH:-50}}"
   local fetch_args=()
   local refspec
 
@@ -77,6 +80,8 @@ git_diff_base_fetch_remote_branch() {
       fetch_args=(--deepen="$depth" origin "$refspec")
       ;;
     unshallow)
+      # In full clones this becomes a plain branch fetch, used for missing refs
+      # in CI checkouts that have history but not the base branch ref.
       if git_diff_base_is_shallow_repository; then
         fetch_args=(--unshallow origin "$refspec")
       else
@@ -89,8 +94,8 @@ git_diff_base_fetch_remote_branch() {
       ;;
   esac
 
-  # Redirect to stderr so the caller's $(...) captures only the merge-base SHA,
-  # not fetch noise.
+  # Keep fetch diagnostics visible while ensuring callers that use command
+  # substitution capture only the merge-base SHA on stdout.
   git fetch "${fetch_args[@]}" >&2
 }
 
@@ -153,18 +158,25 @@ git_diff_base_resolve() {
   local remote_branch=""
   local current_remote_branch=""
   local merge_base
+  local is_shallow=false
 
   case "$fetch_policy" in
     required|optional)
       ;;
     *)
-      echo "Error: unknown fetch policy '$fetch_policy' (expected required or optional)" >&2
+      echo "Error: unknown fetch_policy '$fetch_policy' (expected required or optional)" >&2
       return 1
       ;;
   esac
 
+  # fetch_policy only controls the first shallow fetch failure:
+  # - required: abort immediately
+  # - optional: continue with cached local history
+  # Missing refs and merge-base failures are fatal in both modes.
+  git_diff_base_is_shallow_repository && is_shallow=true
+
   if remote_branch="$(git_diff_base_base_remote_branch "$base_ref")"; then
-    if git_diff_base_is_shallow_repository && ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
+    if [ "$is_shallow" = true ] && ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
       if [ "$fetch_policy" = "required" ]; then
         echo "Error: failed to fetch $base_ref from origin" >&2
         return 1
@@ -175,7 +187,7 @@ git_diff_base_resolve() {
   fi
 
   if current_remote_branch="$(git_diff_base_current_remote_branch "$current_ref")"; then
-    if [ "$current_remote_branch" != "$remote_branch" ] && git_diff_base_is_shallow_repository; then
+    if [ "$current_remote_branch" != "$remote_branch" ] && [ "$is_shallow" = true ]; then
       git_diff_base_fetch_remote_branch "$current_remote_branch" initial || true
     fi
   else
@@ -184,7 +196,7 @@ git_diff_base_resolve() {
 
   if ! git_diff_base_verify_ref "$base_ref" &&
     [ -n "$remote_branch" ] &&
-    ! git_diff_base_is_shallow_repository; then
+    [ "$is_shallow" = false ]; then
     if ! git_diff_base_fetch_remote_branch "$remote_branch" unshallow && [ "$fetch_policy" = "required" ]; then
       echo "Error: failed to fetch $base_ref from origin" >&2
       return 1
@@ -192,7 +204,7 @@ git_diff_base_resolve() {
   fi
 
   if ! git_diff_base_verify_ref "$base_ref" &&
-    { ! git_diff_base_is_shallow_repository || { [ -z "$remote_branch" ] && [ -z "$current_remote_branch" ]; }; }; then
+    { [ "$is_shallow" = false ] || { [ -z "$remote_branch" ] && [ -z "$current_remote_branch" ]; }; }; then
     echo "Error: base ref '$base_ref' does not exist locally" >&2
     return 1
   fi
@@ -209,24 +221,25 @@ git_diff_base_resolve() {
 
   if [ -n "$remote_branch" ] || [ -n "$current_remote_branch" ]; then
     local attempt=1
-    local fetched
-    local max_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-20}"
-    while [ "$attempt" -le "$max_attempts" ]; do
-      git_diff_base_is_shallow_repository || break
+    local deepen_depth="${GIT_DIFF_BASE_FETCH_DEPTH:-50}"
+    local fetched=false
+    local max_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-8}"
+
+    while [ "$attempt" -le "$max_attempts" ] && [ "$is_shallow" = true ]; do
       fetched=false
 
-      if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" deepen; then
+      if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" deepen "$deepen_depth"; then
         fetched=true
       fi
 
       if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
-        if git_diff_base_fetch_remote_branch "$current_remote_branch" deepen; then
+        if git_diff_base_fetch_remote_branch "$current_remote_branch" deepen "$deepen_depth"; then
           fetched=true
         fi
       fi
 
       if [ "$fetched" = false ]; then
-        echo "Warning: all deepen fetches failed; stopping shallow history expansion" >&2
+        echo "Warning: all deepen fetches failed; stopping shallow history expansion. See git fetch output above." >&2
         break
       fi
 
@@ -235,10 +248,11 @@ git_diff_base_resolve() {
         return 0
       fi
 
+      deepen_depth=$((deepen_depth * 2))
       attempt=$((attempt + 1))
     done
 
-    if git_diff_base_is_shallow_repository; then
+    if [ "$is_shallow" = true ]; then
       if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" unshallow; then
         if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"
