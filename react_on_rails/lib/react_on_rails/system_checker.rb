@@ -15,10 +15,10 @@ module ReactOnRails
     attr_reader :messages
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
+    PackageManagerDetection = Struct.new(:manager, :lockfile_scan_blocked, keyword_init: true)
 
     def initialize
       @messages = []
-      @package_manager_lockfile_scan_blocked = nil
     end
 
     def add_error(message)
@@ -116,7 +116,8 @@ module ReactOnRails
       end
 
       # Detect which package manager is actually being used
-      used_manager = detect_used_package_manager
+      package_manager_detection = detect_package_manager_from_lockfile
+      used_manager = package_manager_detection.manager
       if used_manager
         version_info = get_package_manager_version(used_manager)
         deprecation_note = get_deprecation_note(used_manager, version_info)
@@ -125,7 +126,7 @@ module ReactOnRails
         add_success(message)
       else
         add_success("✅ Package managers available: #{available_managers.join(', ')}")
-        unless package_manager_lockfile_scan_blocked?
+        unless package_manager_detection.lockfile_scan_blocked
           add_info("ℹ️  No lock file detected - run npm/yarn/pnpm install to establish which manager is used")
         end
       end
@@ -449,29 +450,28 @@ module ReactOnRails
     end
 
     def detect_used_package_manager
-      # Check for lock files next to the configured package.json to support
-      # legacy apps that keep their JS package tree under client/.
-      @package_manager_lockfile_scan_blocked = false
-      package_json_path = package_json_path_for("package manager lockfiles")
-      unless package_json_path
-        @package_manager_lockfile_scan_blocked = true
-        return nil
-      end
-
-      package_root = File.dirname(package_json_path)
-      if File.exist?(File.join(package_root, "yarn.lock"))
-        "yarn"
-      elsif File.exist?(File.join(package_root, "pnpm-lock.yaml"))
-        "pnpm"
-      elsif File.exist?(File.join(package_root, "bun.lock")) || File.exist?(File.join(package_root, "bun.lockb"))
-        "bun"
-      elsif File.exist?(File.join(package_root, "package-lock.json"))
-        "npm"
-      end
+      detect_package_manager_from_lockfile.manager
     end
 
-    def package_manager_lockfile_scan_blocked?
-      @package_manager_lockfile_scan_blocked == true
+    def detect_package_manager_from_lockfile
+      # Check for lock files next to the configured package.json to support
+      # legacy apps that keep their JS package tree under client/.
+      package_json_path = package_json_path_for("package manager lockfiles")
+      return PackageManagerDetection.new(manager: nil, lockfile_scan_blocked: true) unless package_json_path
+
+      package_root = File.dirname(package_json_path)
+      manager = if File.exist?(File.join(package_root, "yarn.lock"))
+                  "yarn"
+                elsif File.exist?(File.join(package_root, "pnpm-lock.yaml"))
+                  "pnpm"
+                elsif File.exist?(File.join(package_root, "bun.lock")) ||
+                      File.exist?(File.join(package_root, "bun.lockb"))
+                  "bun"
+                elsif File.exist?(File.join(package_root, "package-lock.json"))
+                  "npm"
+                end
+
+      PackageManagerDetection.new(manager: manager, lockfile_scan_blocked: false)
     end
 
     def get_package_manager_version(manager)
