@@ -95,11 +95,14 @@ The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rai
 is a public ShakaCode comparison repo, not an official Gumroad integration. It measures a bounded creator-dashboard
 surface with the same reduced presenter data and outer layout across two routes:
 
-- Inertia-style control: `/dashboard/inertia_demo` (uses the actual `inertia_rails` gem; no Pro renderer)
+- Inertia-style control: `/dashboard/inertia_demo` (uses the actual `inertia_rails` gem; no Pro renderer or SSR)
 - React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
 
 > **Note:** Both routes use the same Shakapacker/Rspack page-asset build; this comparison measures the route-level RSC
-> dimension only. It is not a bundler comparison.
+> dimension only. It is not a bundler comparison. It also does not isolate a renderer-only baseline: the Inertia route
+> has no React on Rails Pro renderer or SSR, while the RSC route uses the Pro Node renderer. Treat the deltas as the
+> combined route-level effect; see the [SSR Performance table](#ssr-performance-execjs-vs-node-renderer) for the
+> renderer baseline.
 
 The April 30, 2026 production-like local benchmark used eight alternating measured runs between the Inertia and RSC
 routes, four per route, with one warmup request before each measured run. Conditions:
@@ -147,7 +150,9 @@ environment metadata, and distribution artifacts are still required before makin
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
 
-### Popmenu
+### Production Case Studies
+
+#### Popmenu
 
 Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on Rails Pro and reported:
 
