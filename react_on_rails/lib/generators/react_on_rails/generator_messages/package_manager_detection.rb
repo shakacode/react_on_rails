@@ -125,6 +125,8 @@ module GeneratorMessages
     # Intentionally public: install_generator and other generator callers read
     # package.json once and pass the result to detect_package_manager /
     # package_manager_declared? to avoid repeated disk reads.
+    #
+    # @api public
     def read_package_json(app_root)
       package_json_path = File.join(app_root, "package.json")
       return nil unless File.exist?(package_json_path)
