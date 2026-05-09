@@ -105,8 +105,8 @@ Use a dedicated branch for the actual version verification work:
   Then run the suite:
 
   ```bash
-  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_latest   # runs the latest-pinned React examples (currently React 19)
-  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples           # full suite across pinned React versions when needed
+  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples_latest   # runs example apps without a pinned React version (resolves to workspace default, currently React 19)
+  cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples           # full suite across all example apps (latest + all pinned React versions)
   ```
 
   Note: `bundle exec rake shakapacker_examples:gen_all` only generates apps; a separate `run_rspec:*` task must run their
