@@ -29,7 +29,8 @@ if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" strict); then
   exit 1
 fi
 
-# Get list of changed files (committed + uncommitted)
+# Get list of changed files (committed + uncommitted). A failed git diff is now
+# fatal so CI does not silently skip every job when diff detection breaks.
 CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF") || {
   echo -e "${RED}Error: git diff failed for $MERGE_BASE..$CURRENT_REF${NC}" >&2
   exit 1

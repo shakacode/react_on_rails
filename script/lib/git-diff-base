@@ -48,10 +48,11 @@ git_diff_base_sha_ref() {
       ;;
   esac
 
-  # Full GitHub event SHAs may be absent in shallow clones, so 40/64-char SHAs
-  # intentionally do not require local verification here. That means a typo or
-  # SHA copied from another repository fails later when fetch/merge-base cannot
-  # find usable history, instead of failing here as an unknown local ref.
+  # Full GitHub event SHAs may be absent in shallow clones, so full-length SHAs
+  # (40 chars for SHA-1, 64 chars for SHA-256) intentionally do not require
+  # local verification here. That means a typo or SHA copied from another
+  # repository fails later when fetch/merge-base cannot find usable history,
+  # instead of failing here as an unknown local ref.
   # Short hex strings count only when they already resolve locally, avoiding
   # hex branch-name hits.
   if [ "$length" -ne 40 ] && [ "$length" -ne 64 ] && ! git_diff_base_verify_ref "$ref"; then
@@ -243,6 +244,8 @@ git_diff_base_merge_base() {
 }
 
 git_diff_base_is_shallow_repository() {
+  # Git before 2.15 lacks --is-shallow-repository; treat that as a full clone so
+  # older clients skip the shallow-clone repair path instead of failing here.
   [ "$(git rev-parse --is-shallow-repository 2>/dev/null || echo false)" = "true" ]
 }
 
@@ -364,8 +367,9 @@ git_diff_base_resolve() {
 
     # Re-check shallow state each time so tiny repositories can leave the loop
     # as soon as a deepen fetch completes their history.
-    # When base_ref is a raw event SHA and no base branch is known, deepening
-    # the current branch can still reveal a push-event before SHA ancestor.
+    # When base_ref is a raw event SHA and no base branch is known, remote_branch
+    # is empty and deepening only the current branch can still reveal a
+    # push-event before-SHA ancestor.
     while [ "$deepen_attempts" -lt "$max_attempts" ] && git_diff_base_is_shallow_repository; do
       deepen_attempts=$((deepen_attempts + 1))
       fetched=false
