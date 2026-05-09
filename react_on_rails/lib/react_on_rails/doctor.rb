@@ -2917,25 +2917,25 @@ module ReactOnRails
       # Prefer the actually installed version from node_modules over the declared
       # range in package.json. Declared ranges like "^19.0.0" would be misleading
       # (stripped to "19.0.0" even though 19.0.4+ may be installed).
-      installed = installed_react_version
+      package_root = resolved_package_root
+      if package_root_missing?(package_root)
+        warn_missing_package_root(package_root, "React version")
+        return nil
+      end
+
+      installed = installed_react_version(package_root)
       return installed if installed
 
-      declared_react_version
+      declared_react_version(package_root)
     rescue StandardError
       nil
     end
 
-    def installed_react_version
+    def installed_react_version(package_root)
       # Use Node's own module resolution to find the actually installed React,
       # which handles hoisted dependencies in monorepos and pnpm workspaces.
       # Resolve from the configured package root so nested client/ layouts work.
       script = "console.log(require.resolve('react/package.json'))"
-      package_root = resolved_package_root
-      unless Dir.exist?(package_root)
-        warn_missing_package_root(package_root, "installed React")
-        return nil
-      end
-
       stdout, _stderr, status = Open3.capture3("node", "-e", script, chdir: package_root)
       return nil unless status.success?
 
@@ -2952,14 +2952,8 @@ module ReactOnRails
       checker.add_warning(missing_package_root_warning(package_root, detection_target))
     end
 
-    def declared_react_version
-      package_root = resolved_package_root
-      if package_root_missing?(package_root)
-        warn_missing_package_root(package_root, "declared React version")
-        return nil
-      end
-
-      package_json_path = resolved_package_json_path
+    def declared_react_version(package_root)
+      package_json_path = File.join(package_root, "package.json")
       return nil unless File.exist?(package_json_path)
 
       package_json = JSON.parse(File.read(package_json_path))

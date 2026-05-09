@@ -3072,7 +3072,8 @@ RSpec.describe ReactOnRails::Doctor do
         expect(warning_msgs.any? { |m| m[:content].include?("node_modules_location") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("does not exist") }).to be true
         expect(warning_msgs.any? { |m| m[:content].include?("config/initializers/react_on_rails.rb") }).to be true
-        expect(warning_msgs.any? { |m| m[:content].include?("declared React version") }).to be true
+        expect(warning_msgs.count { |m| m[:content].include?("node_modules_location") }).to eq(1)
+        expect(warning_msgs.any? { |m| m[:content].include?("React version") }).to be true
       end
     end
 

@@ -89,9 +89,9 @@ expect:
 #!/usr/bin/env bash
 # bin/shakapacker - create this file, then make it executable:
 #   chmod +x bin/shakapacker
-# set -euo pipefail fails fast before exec, e.g. when client/ is missing.
+# set -eu fails fast before exec, e.g. when client/ is missing.
 # exec then propagates shakapacker's exit code directly to the caller.
-set -euo pipefail
+set -eu
 cd "$(dirname "$0")/.."
 exec ./client/node_modules/.bin/shakapacker "$@"
 ```

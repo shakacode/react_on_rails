@@ -22,7 +22,6 @@ module ReactOnRails
 
     def resolved_package_root
       node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
-      return Rails.root.to_s if node_modules_location.empty?
 
       resolved_location = Pathname.new(node_modules_location).cleanpath
       # cleanpath normalizes redundant separators and ".." without resolving symlinks;
