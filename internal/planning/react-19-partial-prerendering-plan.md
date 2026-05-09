@@ -17,7 +17,7 @@ This is a planning document. It does not change package versions, build configur
 The workspace package ranges already allow React 19.2.x through `^19.0.3` for `react` and `react-dom`, plus `^19.0.4`
 for `react-on-rails-rsc` (the React on Rails RSC integration package, not a React-team package), in the root, dummy app,
 and Pro dummy app package manifests. To see what versions are currently resolved, run
-`pnpm list react react-dom react-on-rails-rsc` from the repo root. Note: `react_on_rails_pro/spec/execjs-compatible-dummy`
+`pnpm list -r react react-dom react-on-rails-rsc` from the repo root. Note: `react_on_rails_pro/spec/execjs-compatible-dummy`
 is intentionally pinned to React 18 through pnpm overrides for `app>react` and `app>react-dom`; verification should
 confirm whether that workspace stays on React 18 during this work. That means the first implementation step is
 verification, not necessarily a broad package-range change.
@@ -40,7 +40,8 @@ Use a dedicated branch for the actual version verification work:
       error. Check the existing `renderToString` usages in
       `packages/react-on-rails/src/serverRenderReactComponent.ts` and `packages/react-on-rails/src/handleError.ts`, plus
       `renderToStaticMarkup` if any source or generated-bundle call site participates in SSR. Also grep generated bundles
-      and renderer artifacts, such as `grep -R "renderToString\\|renderToStaticMarkup" dist/ node_package/`, plus
+      and renderer artifacts, such as
+      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.ts"`, plus
       `packages/react-on-rails-pro-node-renderer/` and related SSR integration paths for additional call sites, then
       document either a migration ticket or why current usage is acceptable.
 - [ ] Run `pnpm install` from a clean checkout and confirm React, React DOM, and `react-on-rails-rsc` resolve to
