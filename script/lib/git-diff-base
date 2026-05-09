@@ -45,8 +45,9 @@ git_diff_base_sha_ref() {
   esac
 
   # Full GitHub event SHAs may be absent in shallow clones, so 40/64-char SHAs
-  # intentionally do not require local verification here. Later fetch,
-  # verification, and merge-base steps decide whether enough history exists.
+  # intentionally do not require local verification here. That means a typo or
+  # SHA copied from another repository fails later when fetch/merge-base cannot
+  # find usable history, instead of failing here as an unknown local ref.
   # Short hex strings count only when they already resolve locally, avoiding
   # hex branch-name hits.
   if [ "$length" -ne 40 ] && [ "$length" -ne 64 ] && ! git_diff_base_verify_ref "$ref"; then
@@ -367,6 +368,7 @@ git_diff_base_resolve() {
     # When base_ref is a raw event SHA and no base branch is known, deepening
     # the current branch can still reveal a push-event before SHA ancestor.
     while [ "$deepen_attempts" -lt "$max_attempts" ] && git_diff_base_is_shallow_repository; do
+      deepen_attempts=$((deepen_attempts + 1))
       fetched=false
 
       # A successful deepen on either side can reveal the common ancestor, even
@@ -395,11 +397,11 @@ git_diff_base_resolve() {
       fi
 
       if [ "$fetched" = false ]; then
-        echo "Warning: all deepen fetches failed; stopping shallow history expansion. See git fetch output above." >&2
+        echo "Warning: all deepen fetches failed during attempt $deepen_attempts;" \
+          "stopping shallow history expansion. See git fetch output above." >&2
         break
       fi
 
-      deepen_attempts=$((deepen_attempts + 1))
       deepen_depth=$((deepen_depth * 2))
     done
 
@@ -410,7 +412,7 @@ git_diff_base_resolve() {
     fi
 
     if [ "$is_shallow" = true ]; then
-      echo "Warning: deepening did not find merge base after $deepen_attempts deepen attempt(s) with fetch progress;" \
+      echo "Warning: deepening did not find merge base after $deepen_attempts deepen attempt(s);" \
         "falling back to --unshallow (this may be slow for large repositories)" >&2
 
       # Extra history from either side can reveal the merge base, so warn on a
