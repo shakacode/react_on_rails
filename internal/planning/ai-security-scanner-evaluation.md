@@ -92,8 +92,9 @@ Before running scans, record the exact baselines used:
 
 The follow-up issue,
 [#3265 Track baseline prerequisites for AI security scanner evaluation](https://github.com/shakacode/react_on_rails/issues/3265),
-must be closed, with every dataset table cell filled and committed, before
-[Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018) moves from planning to execution.
+tracks this prerequisite, but closing that issue is not sufficient by itself. Before
+[Issue 2018](https://github.com/shakacode/react_on_rails/issues/2018) moves from planning to execution, verify that this
+dataset table has no placeholder cells and that the completed table is committed on the evaluation branch.
 
 The intentionally vulnerable fixture should be small and obvious, such as unsafe template evaluation in a test-only file.
 Do not commit intentionally vulnerable fixtures, secrets, real credentials, or exploit-ready application behavior to a
