@@ -104,21 +104,28 @@ surface with the same reduced presenter data and outer layout across two routes:
 > not a bundler swap.
 
 The April 30, 2026 production-like local benchmark used eight alternating measured runs between the Inertia and RSC
-routes, four per route, with one warmup request before each measured run. It used compiled page assets from the same
-Shakapacker configuration with Rspack for both routes, compiled RSC demo bundles, Rails without the Shakapacker dev
-server, a dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`, and matching Chrome 147 and ChromeDriver 147. The median results, plus the observed max `responseEnd`, showed this directional signal:
+routes, four per route, with one warmup request before each measured run. Conditions:
+
+- Compiled page assets from the same Shakapacker/Rspack configuration for both routes
+- Compiled RSC demo bundles
+- Rails server without the Shakapacker dev server running
+- Dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`
+- Chrome 147 with matching ChromeDriver 147
+
+The median results showed this directional signal:
 
 | Metric                        | Inertia demo | RSC demo |  Delta |
 | ----------------------------- | -----------: | -------: | -----: |
 | Navigation duration           |     775.40ms | 607.15ms | -21.7% |
 | Largest Contentful Paint      |     794.00ms | 634.00ms | -20.2% |
 | `responseEnd`                 |     644.80ms | 588.80ms |  -8.7% |
-| Controller `action_total`     |     346.87ms | 339.20ms |  -2.2% |
+| Controller `action_total`     |      346.9ms |  339.2ms |  -2.2% |
 | Page-specific script requests |            6 |        1 | -83.3% |
-| Max `responseEnd`             |     730.62ms | 768.25ms |  +5.2% |
 
-_Rows 1-5 are medians (n=4 per route); `Max responseEnd` is the observed maximum across those same four runs. The
-benchmark used eight alternating measured runs total, with one warmup request before each measured run._
+_Rows 1-5 are medians (n=4 per route)._
+
+The observed **max `responseEnd`** across the same four RSC runs was 768.25ms vs. 730.62ms for the Inertia control
+(+5.2%), indicating worst-case timing still favored the control.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
 user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the worst-case
