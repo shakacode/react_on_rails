@@ -8,6 +8,8 @@
 # - GIT_DIFF_BASE_MAX_ATTEMPTS: exponential deepen attempts before falling back to --unshallow
 #   (default 8). With default depth, the deepen loop can fetch up to 12,750 commits total
 #   before unshallowing.
+# - GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS: maximum seconds for the --unshallow fallback when the
+#   system timeout command is available (default 300; set 0 to disable the guard).
 
 git_diff_base_remote_branch() {
   local ref="$1"
@@ -38,11 +40,19 @@ git_diff_base_sha_ref() {
   # Full GitHub event SHAs may be absent in shallow clones. Short hex strings
   # count only when they already resolve locally, avoiding hex branch-name hits.
   # git_diff_base_verify_ref is defined below and only called after sourcing.
-  { [ "$length" -eq 40 ] || [ "$length" -eq 64 ] || git_diff_base_verify_ref "$ref"; } &&
-    ! git rev-parse --verify "refs/heads/$ref" >/dev/null 2>&1 &&
-    ! git rev-parse --verify "refs/remotes/origin/$ref" >/dev/null 2>&1 &&
-    return 0
-  return 1
+  if [ "$length" -ne 40 ] && [ "$length" -ne 64 ] && ! git_diff_base_verify_ref "$ref"; then
+    return 1
+  fi
+
+  if git rev-parse --verify "refs/heads/$ref" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  if git rev-parse --verify "refs/remotes/origin/$ref" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  return 0
 }
 
 git_diff_base_base_remote_branch() {
@@ -100,6 +110,19 @@ git_diff_base_fetch_remote_branch() {
 
   # Keep fetch diagnostics visible while ensuring callers that use command
   # substitution capture only the merge-base SHA on stdout.
+  if [ "$mode" = "unshallow" ]; then
+    local unshallow_timeout="${GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS:-300}"
+
+    if [ "$unshallow_timeout" != "0" ]; then
+      if command -v timeout >/dev/null 2>&1; then
+        timeout "$unshallow_timeout" git fetch "${fetch_args[@]}" >&2
+        return $?
+      fi
+
+      echo "Warning: timeout command unavailable; running unshallow fetch without timeout." >&2
+    fi
+  fi
+
   git fetch "${fetch_args[@]}" >&2
 }
 
@@ -158,33 +181,35 @@ git_diff_base_is_shallow_repository() {
 git_diff_base_resolve() {
   local base_ref="$1"
   local current_ref="$2"
-  local fetch_policy="${3:-required}"
+  local initial_fetch_policy="${3:-strict}"
   local remote_branch=""
   local current_remote_branch=""
   local merge_base
   local is_shallow=false
 
-  # fetch_policy names are historical. They only describe whether the initial
-  # shallow base-branch fetch is mandatory; merge-base resolution is still fatal
-  # under both policies.
-  case "$fetch_policy" in
-    required|optional)
+  # The initial fetch policy only controls whether the first shallow base-branch
+  # fetch failure aborts immediately. Missing refs, current-branch fetches, and
+  # merge-base failures remain fatal under both policies.
+  case "$initial_fetch_policy" in
+    strict|required)
+      initial_fetch_policy="strict"
+      ;;
+    lenient|optional)
+      initial_fetch_policy="lenient"
       ;;
     *)
-      echo "Error: unknown fetch_policy '$fetch_policy' (expected required or optional initial fetch handling)" >&2
+      echo "Error: unknown initial fetch policy '$initial_fetch_policy' (expected strict or lenient)" >&2
       return 1
       ;;
   esac
 
-  # fetch_policy only controls the first shallow base-branch fetch failure:
-  # - required: abort immediately when the initial fetch fails
-  # - optional: continue with cached local history after an initial fetch failure
-  # Missing refs, current-branch fetches, and merge-base failures remain fatal.
+  # - strict: abort immediately when the initial fetch fails
+  # - lenient: continue with cached local history after an initial fetch failure
   git_diff_base_is_shallow_repository && is_shallow=true
 
   if remote_branch="$(git_diff_base_base_remote_branch "$base_ref")"; then
     if [ "$is_shallow" = true ] && ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
-      if [ "$fetch_policy" = "required" ]; then
+      if [ "$initial_fetch_policy" = "strict" ]; then
         echo "Error: failed to fetch $base_ref from origin" >&2
         return 1
       fi
@@ -217,7 +242,7 @@ git_diff_base_resolve() {
     [ -n "$remote_branch" ] &&
     [ "$is_shallow" = false ]; then
     if ! git_diff_base_fetch_remote_branch "$remote_branch" unshallow; then
-      if [ "$fetch_policy" = "required" ]; then
+      if [ "$initial_fetch_policy" = "strict" ]; then
         echo "Error: failed to fetch $base_ref from origin" >&2
         return 1
       fi
@@ -262,7 +287,7 @@ git_diff_base_resolve() {
     # the current branch can still reveal a push-event before SHA ancestor.
     while [ "$attempt" -le "$max_attempts" ] && git_diff_base_is_shallow_repository; do
       fetched=false
-      deepen_attempts="$attempt"
+      deepen_attempts=$((deepen_attempts + 1))
 
       if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" deepen "$deepen_depth"; then
         fetched=true
