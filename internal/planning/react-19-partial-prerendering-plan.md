@@ -35,19 +35,16 @@ Use a dedicated branch for the actual version verification work:
 
 - [ ] Review the React 19.2.x changelog and release notes for breaking changes, deprecations, and new APIs that could
       affect React on Rails SSR, streaming, RSC, or hydration integration.
-- [ ] Audit what React trees currently reach `renderToString` in React on Rails SSR paths; React 19 renders Suspense
-      fallbacks synchronously in that path instead of suspending, which can silently change output without an error. For
-      each call site, document whether a Suspense-containing tree could plausibly be passed by a user render function
-      today, and either open a follow-up migration ticket or record why the current usage is acceptable. Check the existing
-      `renderToString` usages in
-      `packages/react-on-rails/src/serverRenderReactComponent.ts` and `packages/react-on-rails/src/handleError.ts`, plus
-      `renderToStaticMarkup` if any source or generated-bundle call site participates in SSR. Also grep generated bundles
-      and renderer artifacts, such as
-      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.ts" --include="*.tsx" --include="*.cts"`, plus
-      `packages/react-on-rails-pro-node-renderer/` and related SSR integration paths for additional call sites, then
-      document either a migration ticket or why current usage is acceptable. Include
-      `packages/react-on-rails/src/ReactDOMServer.cts` in the audit, and either remove that compatibility re-export when
-      dropping React 16/17 support or open a dedicated follow-up ticket.
+- [ ] Audit `renderToString` and `renderToStaticMarkup` call sites in React on Rails SSR paths; React 19 renders Suspense
+      fallbacks synchronously in `renderToString` instead of suspending, which can silently change output without an error.
+      For each call site in `packages/react-on-rails/src/serverRenderReactComponent.ts`,
+      `packages/react-on-rails/src/handleError.ts`, `packages/react-on-rails-pro-node-renderer/`, and any generated bundles
+      found by
+      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.ts" --include="*.tsx" --include="*.cts"`,
+      document whether a Suspense-containing tree could plausibly be passed by a user render function today, then either
+      open a follow-up migration ticket or record why the current usage is acceptable.
+- [ ] Decide the fate of `packages/react-on-rails/src/ReactDOMServer.cts`: either remove the compatibility re-export when
+      dropping React 16/17 support or open a dedicated follow-up ticket recording the reason for keeping it.
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
       React, React DOM, and `react-on-rails-rsc` resolve to compatible versions. Capture the exact
       `pnpm list -r react react-dom react-on-rails-rsc` output in the verification record, such as a comment on Issue 3255,
@@ -91,13 +88,28 @@ Use a dedicated branch for the actual version verification work:
   - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
   - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
   - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
-- [ ] Run the generated-app suite from a fresh clone (preferred) or from the repo root after `git stash` and
-      `git clean -fdx` if a fresh clone is not practical; `git clean -fdx` deletes all untracked files and cannot be undone.
-      Then run a fresh `pnpm install`:
-      `bundle exec rake run_rspec:shakapacker_examples_latest` for the React 19 examples. Use
-      `bundle exec rake run_rspec:shakapacker_examples` to run the full suite across pinned React versions when needed.
-      `bundle exec rake shakapacker_examples:gen_all` only generates example apps; a separate `run_rspec:*` task must run
-      their tests.
+- [ ] Run the generated-app suite. Prefer a fresh clone. If a fresh clone is not practical, use the repo root after stashing
+      and cleaning:
+
+  > **Warning**: `git clean -fdx` deletes all untracked files and cannot be undone. Stash or commit any in-progress work
+  > first.
+
+  ```bash
+  git stash
+  git clean -fdx
+  pnpm install
+  ```
+
+  Then run the suite:
+
+  ```bash
+  bundle exec rake run_rspec:shakapacker_examples_latest   # React 19 examples only
+  bundle exec rake run_rspec:shakapacker_examples           # full suite across pinned React versions when needed
+  ```
+
+  Note: `bundle exec rake shakapacker_examples:gen_all` only generates apps; a separate `run_rspec:*` task must run their
+  tests.
+
 - [ ] Confirm docs that mention explicit React versions are either updated or intentionally left on older minimum-version
       examples.
 - [ ] Fill the secondary reviewer placeholders in the Open Questions section before opening the first implementation PR.
@@ -164,9 +176,12 @@ Before implementation starts, assign a secondary reviewer for the prerequisite S
 stall if @justin808 is unavailable. Also assign a backup reviewer for benchmark metrics because that decision can be
 validated independently from the rest of the implementation tree.
 
-**Secondary reviewer (SSR-vs-RSC)**: _[name to be filled before first implementation PR]_
+These placeholders must be filled before the first implementation PR is opened. If no name is assigned by that point,
+@justin808 is the fallback owner for both roles.
 
-**Backup reviewer (benchmarks)**: _[name to be filled before first implementation PR]_
+**Secondary reviewer (SSR-vs-RSC)**: _[name to be filled before first implementation PR; fallback: @justin808]_
+
+**Backup reviewer (benchmarks)**: _[name to be filled before first implementation PR; fallback: @justin808]_
 
 - Which Rails caching layer should be recommended for the static-shell: fragment cache, HTTP cache, CDN cache, or a
   combination?
