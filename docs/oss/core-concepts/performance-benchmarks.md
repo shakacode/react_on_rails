@@ -98,10 +98,8 @@ surface with the same reduced presenter data and outer layout across two routes:
 - Inertia-style control: `/dashboard/inertia_demo`
 - React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
 
-> **Note:** These results reflect two distinct value propositions: **Rspack** addresses build speed and development
-> iteration time, while **React Server Components** target runtime JavaScript reduction and server-side composition.
-> Both routes use the same Shakapacker/Rspack page-asset build; the comparison measures the route-level RSC dimension,
-> not a bundler swap.
+> **Note:** Both routes use the same Shakapacker/Rspack page-asset build; this comparison measures the route-level RSC
+> dimension only. It is not a bundler comparison.
 
 The April 30, 2026 production-like local benchmark used eight alternating measured runs between the Inertia and RSC
 routes, four per route, with one warmup request before each measured run. Conditions:
@@ -113,8 +111,8 @@ routes, four per route, with one warmup request before each measured run. Condit
 - Chrome 147 with matching ChromeDriver 147
 
 The original artifact does not yet publish `RAILS_ENV`, hardware/OS, Ruby/Node/Rails versions, or cache-state details.
-[Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks that environment metadata before these
-numbers should be treated as a stable baseline.
+[Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing environment metadata; until
+that is resolved, treat these numbers as directional signals rather than a stable baseline.
 
 The median results showed this directional signal:
 
@@ -126,11 +124,11 @@ The median results showed this directional signal:
 | Controller `action_total`     |      346.9ms |  339.2ms |  -2.2% |
 | Page-specific script requests |            6 |        1 | -83.3% |
 
-_Rows 1-5 are medians (n=4 per route). Distribution and variance artifacts are tracked in
+_Rows 1-5 are medians (n=4 per route); sample size is too small to establish statistical significance. Distribution and variance artifacts are tracked in
 [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
 The observed **max `responseEnd`** across the four RSC runs was 768.25ms vs. 730.62ms for the Inertia control's max
-(+5.2% for RSC worst-case), indicating worst-case timing still favored the control.
+(+5.2% for RSC worst-case), indicating the Inertia control had a faster worst-case `responseEnd` than the RSC route.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
 user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the worst-case
