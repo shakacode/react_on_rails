@@ -166,10 +166,10 @@ combined transfer size or cache behavior. Fewer requests do not necessarily impl
 
 | Metric                             | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ---------------------------------- | -----------: | -------: | ------------------------------: |
-| Worst-case `responseEnd` (max n=4) |        731ms |    768ms |                           +5.2% |
+| Worst-case `responseEnd` (max n=4) |        731ms |    768ms |                           +5.1% |
 
 The source artifact labels this as p95, but with four samples it is effectively the maximum observed value, not a
-stable tail-latency estimate. It shows a +5.2% RSC regression on worst-case `responseEnd` (high variance is expected at
+stable tail-latency estimate. It shows a +5.1% RSC regression on worst-case `responseEnd` (high variance is expected at
 n=4), indicating the Inertia control had a faster worst-case `responseEnd` than the RSC route.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route combines RSC, the Pro Node
