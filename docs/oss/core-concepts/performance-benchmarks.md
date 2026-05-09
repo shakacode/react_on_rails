@@ -125,11 +125,11 @@ The median results showed this directional signal:
 | Largest Contentful Paint                    |     794.00ms | 634.00ms | -20.2% |
 | `responseEnd`                               |     644.80ms | 588.80ms |  -8.7% |
 | Controller `action_total` (Rails wall time) |      346.9ms |  339.2ms |  -2.2% |
-| Page-specific script requests               |            6 |        1 | -83.3% |
+| Page-specific script requests (count only)  |            6 |        1 | -83.3% |
 
+_The script-count row does not measure combined transfer-size. See [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259)._
 _All values are medians (n=4 per route); sample size is too small to establish statistical significance._
 _The `action_total` delta (-2.2%) is likely within expected variance at n=4._
-_Script count only; combined transfer-size is not yet captured. See [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259)._
 _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
 Worst-case counter-signal:
