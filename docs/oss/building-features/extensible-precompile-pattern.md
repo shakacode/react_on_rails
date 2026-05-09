@@ -29,7 +29,7 @@ When moving custom build work out of `precompile_hook`, make the ownership chang
 
 1. Move custom one-time tasks into `run_precompile_tasks` in `bin/dev`.
 2. Remove matching shell fragments from `Procfile.dev` and any project-specific variants (for example, `Procfile.dev-static-assets` or `Procfile.dev-prod-assets`).
-3. Remove or comment out `precompile_hook` in `config/shakapacker.yml` unless you still need Shakapacker to run a separate hook.
+3. Comment out `precompile_hook` in `config/shakapacker.yml` as shown in Section 2 unless you still need Shakapacker to run a separate hook.
 4. Add the same required build steps to `build_test_command` and `build_production_command`.
 5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
 
@@ -149,7 +149,7 @@ ReactOnRails.configure do |config|
 end
 ```
 
-For larger apps, prefer a small Ruby or shell script over a very long command string:
+For larger apps, prefer a small Ruby or shell script over a very long command string. Create `bin/build-react-on-rails`:
 
 ```ruby
 #!/usr/bin/env ruby
@@ -179,7 +179,11 @@ Make the script executable before wiring it into the build commands:
 chmod +x bin/build-react-on-rails
 ```
 
-On Windows, run `chmod` from Git Bash or WSL, or use your project's Git file-mode workflow to mark the script executable.
+On Windows, run `chmod` from Git Bash or WSL, or track the executable bit via Git directly:
+
+```bash
+git update-index --chmod=+x bin/build-react-on-rails
+```
 
 ```ruby
 # config/initializers/react_on_rails.rb
