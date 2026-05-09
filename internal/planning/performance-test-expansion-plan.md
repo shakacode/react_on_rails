@@ -24,7 +24,7 @@ Start with a small, representative matrix before adding more routes:
 | Traditional SSR       | `react_component` with `prerender: true`  | RPS, p50, p90, p99, max | OSS first slice uses ExecJS; Pro Node Renderer follow-up uses `benchmarks/bench-node-renderer.rb`   |
 | Hash SSR              | `react_component_hash`                    | RPS, p50, p90, p99, max | Deferred; see First PR Scope. Payload-size capture requires tooling extension                       |
 | Streaming SSR         | `stream_react_component`                  | RPS, p50, p90, p99, max | Pro-only Rails HTTP path; TTFB/response-end reporting is a required extension before new thresholds |
-| RSC payload rendering | `rsc_payload_react_component`             | RPS, p50, p90, p99, max | Pro-only endpoint throughput and payload-size path; not a streaming TTFB target                     |
+| RSC payload rendering | `rsc_payload_react_component`             | RPS, p50, p90, p99, max | Use a static/default route because route discovery skips required params                            |
 | Fragment caching      | `react_component` with `cache: true`      | RPS, p50, p90, p99, max | Requires separate primed-hit and busted-miss paths or setup steps; k6 cannot infer cache state      |
 
 Here `p50` maps to k6's `med` stat and the `p50_latency` Bencher Metric Format measure.
@@ -44,8 +44,10 @@ Hash SSR is deferred to a follow-on PR after the initial OSS noise profile is un
 define separate cache-hit and cache-miss benchmark paths before comparing results. Use a dedicated cache adapter and
 namespace for benchmark routes, such as `ActiveSupport::Cache::FileStore.new("tmp/benchmark_cache")`, instead of the
 app's default store. The miss path should clear only that benchmark cache namespace before measurement, and the hit path
-should clear that namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. Avoid
-relying on a shared Redis instance, environment-default `:null_store`/`:memory_store` behavior, or manual cache state.
+should clear that namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. For
+the dedicated `FileStore`, clear the namespace with `FileUtils.rm_rf("tmp/benchmark_cache")`; avoid `Rails.cache.clear`
+on the application cache. Avoid relying on a shared Redis instance, environment-default `:null_store`/`:memory_store`
+behavior, or manual cache state.
 
 Recommended Pro slice for [Issue 2169](https://github.com/shakacode/react_on_rails/issues/2169), implemented after the
 OSS first slice or in a dedicated follow-up PR:
@@ -83,22 +85,26 @@ Prerequisites for the first implementation PR:
   using route ordering as a noise-control signal. This is large enough to land as its own prerequisite PR, and the first
   benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally because it roughly
   doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about `2 * (DURATION + 5 seconds)` per
-  route with the current warm-up, assuming the default `DURATION=30s`. Recalculate the estimate when overriding
-  `DURATION`.
+  route with the current warm-up, assuming the default `DURATION=30s`. This estimate does not include the per-job
+  `bundle exec rails routes` discovery call, server startup, or server warmdown time. Recalculate the estimate when
+  overriding `DURATION`.
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
   `node --version` for `node_version`, and the installed React package metadata for `react_version`.
+  Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary; the
+  first slice should start at one run per route, and alternating route order increases it to two when both passes are
+  merged into one route summary.
 
   Use these metadata keys as the minimum schema:
 
   ```json
   {
-    "ruby_version": "3.3.0",
-    "node_version": "22.0.0",
-    "react_version": "18.3.0",
-    "renderer": "execjs",
-    "runner_type": "ubuntu-22.04-8-core",
+    "ruby_version": "<ruby --version>",
+    "node_version": "<node --version>",
+    "react_version": "<installed react package version>",
+    "renderer": "<execjs|node_renderer>",
+    "runner_type": "<github runner label>",
     "bundle_mode": "production",
     "sample_count": 1
   }
@@ -127,7 +133,7 @@ If a benchmark requires generated assets, the command should build those assets 
 same mode.
 
 Until benchmark-specific contributor docs exist, put this checklist in each benchmark implementation PR description. The
-implementation work should then anchor it in `benchmarks/README.md` or a benchmark-specific pull request template so
+implementation work should then create `benchmarks/README.md` or a benchmark-specific pull request template so
 reviewers have one stable compliance checklist.
 
 ## Acceptance Criteria
