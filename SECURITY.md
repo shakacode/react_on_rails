@@ -23,17 +23,17 @@ third-party dependencies, or non-technical attacks such as phishing or social en
 
 Please do not open a public issue for suspected vulnerabilities.
 
-If GitHub shows private vulnerability reporting for this repository, use that path:
+This repository has GitHub private vulnerability reporting enabled. Use that path when possible:
 
 1. Open the repository's **Security** tab on GitHub.
 2. Select **Report a vulnerability**.
 3. Include affected package versions, impact, and the smallest safe reproduction details you can share privately.
 
-If the repository does not show **Report a vulnerability**, private vulnerability reporting may not be enabled or may not
-be visible to your account. In that case, open a confidential
+If the repository does not show **Report a vulnerability** for your account, use the email fallback below and ask to be
+routed to a React on Rails maintainer before sharing exposure details. Repository maintainers with write access may open
+a confidential
 [GitHub Security Advisory](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/creating-a-repository-security-advisory)
-draft if your GitHub permissions allow it. If neither GitHub path is available, use the email fallback below and ask to
-be routed to a React on Rails maintainer before sharing exposure details.
+draft directly, but external reporters should not rely on that path because it requires repository write access.
 
 If a reporter cannot use GitHub, they may email [contact@shakacode.com](mailto:contact@shakacode.com) with the subject
 line `React on Rails security` and ask to be routed to a React on Rails maintainer for coordinated disclosure. Do not

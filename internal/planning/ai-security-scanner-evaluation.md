@@ -123,6 +123,7 @@ where 6.4 is the sum of all weights.
 | Permission model          | Can it run with minimal GitHub permissions?                                        |             | 0.7          |                |
 | CI fit                    | Can results be advisory first, without failing every PR?                           |             | 0.7          |                |
 | Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                      |             | 0.5          |                |
+| **Final score**           | Normalized weighted average: `sum(weighted scores) / 6.4`                          |             | **6.4**      | `<fill>`       |
 
 Anchor examples:
 
@@ -145,21 +146,21 @@ Anchor examples:
 
 ## First-Pass Workflow
 
-0. Verify the chosen scanner's current plan availability and Ruby/TypeScript coverage against the shortlist table.
+1. Verify the chosen scanner's current plan availability and Ruby/TypeScript coverage against the shortlist table.
    Update the table's "Initial status" and "Before scheduling" columns if anything has changed.
-1. Pick the current `main` branch of `react_on_rails` and one candidate scanner from the shortlist.
-2. Run the scan without enabling CI blocking.
-3. Export raw findings with sensitive details into a private, access-controlled location if needed; summarize only
+2. Pick the current `main` branch of `react_on_rails` and one candidate scanner from the shortlist.
+3. Run the scan without enabling CI blocking.
+4. Export raw findings with sensitive details into a private, access-controlled location if needed; summarize only
    sanitized, verified results in the public issue after exposure details are fixed or disproven.
    - Limit access to repository maintainers with write access, unless Issue 2018 names a narrower security triage group.
    - Omit secrets and credentials; redact reproduction snippets.
    - Delete or archive raw notes after the finding is resolved.
-4. For each high or critical finding, reproduce locally or write down why it is not reachable.
+5. For each high or critical finding, reproduce locally or write down why it is not reachable.
    Batch-triage medium findings after the high/critical pass. Skip informational findings unless a pattern emerges.
-5. Fix only verified vulnerabilities or correctness bugs.
+6. Fix only verified vulnerabilities or correctness bugs.
    If a verified vulnerability affects released gem or npm package code, keep exposure details private until patched.
    Follow `SECURITY.md` for the disclosure process and approve timing with maintainers before public disclosure.
-6. Summarize scanner signal in the issue before trying the next scanner.
+7. Summarize scanner signal in the issue before trying the next scanner.
 
 ## Adoption Bar
 
