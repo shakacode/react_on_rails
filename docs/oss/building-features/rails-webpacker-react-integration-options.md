@@ -96,7 +96,7 @@ These shims are not covered by React on Rails CI and are documented for the lega
 
 Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims.
 
-Apply only the steps that match the errors you see. Step 3 depends on Step 2: configure the Babel transforms before adding the loader rule. Keep each shim explicit and narrow:
+Steps 1 and 2 are independent: apply each only if you hit the corresponding error. Step 3 always requires Step 2: configure the Babel transforms before adding the loader rule. Keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
 
@@ -133,7 +133,11 @@ Apply only the steps that match the errors you see. Step 3 depends on Step 2: co
    };
    ```
 
-3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed. This rule inherits your project's `babel.config.js`, so first confirm that your config handles optional chaining and nullish coalescing by following Step 2 above or by using existing `@babel/preset-env` targets that already include those transforms. Use a project-wide `babel.config.js` or `babel.config.json`; package-scoped `.babelrc` files and `package.json#babel` settings will not apply when Babel processes files inside `node_modules/react-on-rails`. If your app only has `.babelrc`, move that config into `babel.config.js` before adding this rule:
+3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed. Before touching `config/webpack/environment.js`, confirm these prerequisites:
+   - Use a project-wide `babel.config.js` or `babel.config.json`. Package-scoped `.babelrc` files and `package.json#babel` settings will not apply when Babel processes files inside `node_modules/react-on-rails`.
+   - If your app only has `.babelrc`, move that config into `babel.config.js` before adding this rule.
+   - Confirm Step 2 is in place, either through the standalone optional chaining and nullish coalescing plugins or through existing `@babel/preset-env` targets that already include those transforms.
+   - If your Webpacker stack pins Babel dependencies, choose plugin versions compatible with your installed `@babel/core`.
 
    ```js
    // config/webpack/environment.js
@@ -155,14 +159,14 @@ Apply only the steps that match the errors you see. Step 3 depends on Step 2: co
      ],
    });
 
-   // If your environment.js already has other configuration, add the
-   // loaders.append block before the existing module.exports line.
    module.exports = environment;
    ```
 
-Keep this rule scoped to `node_modules/react-on-rails`; broad `node_modules` transpilation can slow legacy builds and introduce unrelated Babel differences. After you upgrade the app to Shakapacker/Webpack 5 or newer, remove the shim and use the package entry points documented for current installs.
+   If your `environment.js` already has other configuration, add the `loaders.append` block before the existing `module.exports` line.
 
-If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails. If you do not have existing `transformIgnorePatterns`, set it to `['<rootDir>/node_modules/(?!react-on-rails/)']`; if you already have entries, merge the package into your existing lookahead rather than replacing the whole setting, for example `'<rootDir>/node_modules/(?!(react-on-rails|other-esm-package)/)'`.
+   Keep this rule scoped to `node_modules/react-on-rails`; broad `node_modules` transpilation can slow legacy builds and introduce unrelated Babel differences. After you upgrade the app to Shakapacker/Webpack 5 or newer, remove the shim and use the package entry points documented for current installs.
+
+4. If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails. If you do not have existing `transformIgnorePatterns`, set it to `['<rootDir>/node_modules/(?!react-on-rails/)']`; if you already have entries, merge the package into your existing lookahead rather than replacing the whole setting, for example `'<rootDir>/node_modules/(?!(react-on-rails|other-esm-package)/)'`.
 
 ---
 
