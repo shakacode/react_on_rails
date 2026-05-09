@@ -108,8 +108,9 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
    overlap-comparison method tracked in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). For two
    adjacent alert sets `A` and `B`, use Jaccard overlap: `|A intersect B| / |A union B|`. For example, two shared pairs
    across 10 total unique alert pairs gives `2 / 10 = 20%`. Overlap below `0.20` means runner noise is still dominating;
-   proceed to step 3 only after overlap is at least `0.40` for 3 consecutive adjacent-run pairs. The gap between `0.20`
-   and `0.40` avoids flip-flopping between noise and signal states; the thresholds were chosen empirically from the
+   begin overlap analysis once at least 5 adjacent-run pairs exist, but proceed to step 3 only after the full 30-run
+   baseline window exists and overlap is at least `0.40` for 3 consecutive adjacent-run pairs. The gap between `0.20` and
+   `0.40` avoids flip-flopping between noise and signal states; the thresholds were chosen empirically from the
    alert-overlap evidence in Issue 3169 and should be revisited if the alert distribution changes significantly. If a
    comparison has fewer than 5 unique alert pairs, record the small-sample caveat in Issue 3169 and keep collecting runs.
 3. Prefer threshold changes that require stronger evidence before failure:
@@ -134,8 +135,9 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
    regression alert; that means `BENCHER_HAS_ALERT` stays `0` with the current code. A run qualifies when the triggering
    push modifies at least one file that [`script/ci-changes-detector`](../../script/ci-changes-detector) does not classify
    as docs-only. Track the running count in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
-3. Manual tracking in Issue 3169 must show the same `(benchmark, measure)` pair alerting on at least 2 consecutive runs
-   before filing or failing; a single noisy run does not trigger the gate.
+3. As a pre-condition for restoration, the tuned settings must require manual tracking in Issue 3169 to show the same
+   `(benchmark, measure)` pair alerting on at least 2 consecutive runs before filing or failing; a single noisy run does
+   not trigger the gate.
 4. The hard gate is restored only after the tuned settings meet the project false-positive target: no more than 1 noisy
    failure in 20 successful main `Benchmark Workflow` runs whose triggering commits do not intentionally change benchmark
    performance. Treat an alert as noisy when it does not recur for the same `(benchmark, measure)` pair in the next
