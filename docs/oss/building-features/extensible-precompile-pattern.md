@@ -173,6 +173,8 @@ Ruby script over a very long command string. Create `bin/build-react-on-rails`:
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "rbconfig"
+
 mode = ARGV.first
 
 unless %w[test production].include?(mode)
@@ -192,10 +194,10 @@ end
 case mode
 when "test"
   env = { "RAILS_ENV" => "test", "NODE_ENV" => "test" }
-  system(env, "ruby", "bin/shakapacker") || abort("shakapacker (test) failed")
+  system(env, RbConfig.ruby, "bin/shakapacker") || abort("shakapacker (test) failed")
 when "production"
   env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
-  system(env, "ruby", "bin/shakapacker") || abort("shakapacker (production) failed")
+  system(env, RbConfig.ruby, "bin/shakapacker") || abort("shakapacker (production) failed")
 end
 ```
 
