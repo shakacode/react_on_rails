@@ -17,7 +17,8 @@ This plan tracks [Issue 2018](https://github.com/shakacode/react_on_rails/issues
 decision to adopt any vendor or CI integration.
 
 > **Public planning note:** This file lives in a public repository even though the path starts with `internal/planning/`.
-> Keep raw scanner findings, exploit details, private fork URLs, and intentionally vulnerable fixtures outside this repo;
+> Here, `internal` means "not end-user documentation," not restricted access; GitHub search indexes this directory. Keep
+> raw scanner findings, exploit details, private fork URLs, and intentionally vulnerable fixtures outside this repo;
 > commit only sanitized summaries here.
 
 ## Scope
@@ -125,8 +126,8 @@ Anchor examples:
 - Correctness: 5 means locally reproduced or disproven with a clear command; 1 means the scanner cannot explain the
   finding.
 - False-positive rate: 5 means most surfaced findings survive local verification; 1 means the report is mostly noise.
-  If fewer than three high/critical findings are reported, record the raw count and defer scoring until a larger sample is
-  available; do not extrapolate a rate from a single finding.
+  If fewer than five high/critical findings are reported, record the raw count and defer scoring until a larger sample is
+  available; do not extrapolate a rate from a tiny sample.
 - Ruby/Rails coverage: 5 means it traces Rails generators, helpers, SSR, and ExecJS paths; 1 means generic Ruby syntax
   only.
 - TypeScript/React coverage: 5 means it understands package exports, SSR utilities, and browser/server boundaries; 1 means
@@ -167,7 +168,7 @@ Do not add a scanner to CI until all of these are true:
 
 - Finds at least one verified issue or a clearly valuable hardening opportunity.
 - Keeps the false-positive rate at or below 25% among high/critical findings on `main` after one triage pass. If the scan
-  reports fewer than three high/critical findings, manually review every finding and record why the sample is too small
+  reports fewer than five high/critical findings, manually review every finding and record why the sample is too small
   for a stable rate.
 - Supports advisory mode for pull requests.
 - Requires only read-only repository access plus permission to post advisory PR comments or create issues; no write,
