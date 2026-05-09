@@ -2028,6 +2028,9 @@ describe InstallGenerator, type: :generator do
         expect(content).not_to match(
           %r{pnpm/action-setup@v4\n\s+with:\n(?:\s+\#[^\n]*\n)*\s+version:}
         )
+        expect(content).to match(
+          %r{uses: pnpm/action-setup@v4\n\n\s+- name: Set up Node}
+        )
       end
     end
   end
@@ -2057,6 +2060,9 @@ describe InstallGenerator, type: :generator do
         expect(content).to include("uses: pnpm/action-setup@v4")
         expect(content).to match(
           %r{pnpm/action-setup@v4\n\s+with:\n(?:\s+\#[^\n]*\n)*\s+version: "#{Regexp.escape(fallback_version)}"}
+        )
+        expect(content).to match(
+          /version: "#{Regexp.escape(fallback_version)}"\n\n\s+- name: Set up Node/
         )
       end
     end
