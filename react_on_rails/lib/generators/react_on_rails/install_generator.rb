@@ -271,11 +271,17 @@ module ReactOnRails
         end
 
         package_json = GeneratorMessages.read_package_json(destination_root)
-        skip_package_json_detection = package_json.nil?
+        # read_package_json returns nil for missing/unreadable files. Passing
+        # package_json: nil alone means "read from disk," so use the explicit skip
+        # flag to preserve the cached missing state and avoid a redundant re-read.
+        package_json_detection_options = if package_json.nil?
+                                           { skip_package_json_detection: true }
+                                         else
+                                           { package_json: package_json }
+                                         end
         package_manager = GeneratorMessages.detect_package_manager(
           app_root: destination_root,
-          package_json: package_json,
-          skip_package_json_detection: skip_package_json_detection
+          **package_json_detection_options
         )
         # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
         # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
@@ -288,8 +294,7 @@ module ReactOnRails
                                    GeneratorMessages.package_manager_declared?(
                                      app_root: destination_root,
                                      manager: "pnpm",
-                                     package_json: package_json,
-                                     skip_package_json_detection: skip_package_json_detection
+                                     **package_json_detection_options
                                    )
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||

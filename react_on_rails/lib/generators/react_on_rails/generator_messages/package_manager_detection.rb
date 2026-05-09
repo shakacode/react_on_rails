@@ -134,6 +134,9 @@ module GeneratorMessages
     # Intentionally public: install_generator and other generator callers read
     # package.json once and pass the result to detect_package_manager /
     # package_manager_declared? to avoid repeated disk reads.
+    # When this returns nil, pass skip_package_json_detection: true to those
+    # helpers to preserve that cached missing/unreadable state; package_json: nil
+    # alone keeps the public "read from disk" behavior.
     #
     # @api public
     def read_package_json(app_root)

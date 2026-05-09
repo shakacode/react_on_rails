@@ -443,6 +443,18 @@ describe GeneratorMessages do
       ).to be(false)
     end
 
+    it "preserves a cached missing package.json when skip_package_json_detection is set" do
+      expect(File).not_to receive(:read)
+
+      expect(
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          package_json: nil,
+          skip_package_json_detection: true
+        )
+      ).to be(false)
+    end
+
     it "returns false when packageManager declares an unsupported tool" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path)
