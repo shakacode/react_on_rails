@@ -29,7 +29,11 @@ licensing boundaries.
 Compare scanner output against the current baseline before counting a finding as net-new signal:
 
 - CodeQL configuration under `.github/codeql/codeql-config.yml`
-- Existing lint, test, dependency, and code review workflows
+- Dependabot security updates for npm, Bundler, and GitHub Actions under `.github/dependabot.yml`
+- Existing lint, test, and code review workflows
+
+No dedicated `bundler-audit`, `bundle-audit`, `npm audit`, or `pnpm audit` CI workflow is configured at this snapshot.
+If one is added before an evaluation run, include it in this baseline before counting dependency CVEs as net-new signal.
 
 Record whether each verified finding is missed by the existing baseline or whether the scanner mainly improves
 prioritization, explanation, or reachability analysis for a finding that existing tools already surface.
@@ -115,9 +119,8 @@ Anchor examples:
 4. For each high or critical finding, reproduce locally or write down why it is not reachable.
    Batch-triage medium findings after the high/critical pass. Skip informational findings unless a pattern emerges.
 5. Fix only verified vulnerabilities or correctness bugs.
-   If a verified vulnerability affects released gem or npm package code, keep exposure details private until patched. If
-   `SECURITY.md` exists, follow it; otherwise ask repository maintainers with write access to choose a private
-   coordination path and approve timing before public disclosure.
+   If a verified vulnerability affects released gem or npm package code, keep exposure details private until patched.
+   Follow `SECURITY.md` for the disclosure process and approve timing with maintainers before public disclosure.
 6. Summarize scanner signal in the issue before trying the next scanner.
 
 ## Adoption Bar
