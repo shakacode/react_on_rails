@@ -10,6 +10,7 @@
 #   before unshallowing.
 # - GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS: maximum seconds for the --unshallow fallback when the
 #   system timeout command is available (default 300; set 0 to disable the guard).
+# - GIT_DIFF_BASE_DEBUG: set to any non-empty value to show git merge-base stderr output.
 
 git_diff_base_remote_branch() {
   local ref="$1"
@@ -86,11 +87,11 @@ git_diff_base_unshallow_timeout_seconds() {
   local raw_timeout="${GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS:-300}"
 
   if [[ "$raw_timeout" =~ ^[[:space:]]*([0-9]+)[[:space:]]*$ ]]; then
-    local timeout_seconds="${BASH_REMATCH[1]}"
+    local timeout_seconds
 
-    while [ "${#timeout_seconds}" -gt 1 ] && [ "${timeout_seconds#0}" != "$timeout_seconds" ]; do
-      timeout_seconds="${timeout_seconds#0}"
-    done
+    # Force base 10 so values like 08 or 09 are not treated as invalid octal by
+    # shell arithmetic.
+    timeout_seconds=$((10#${BASH_REMATCH[1]}))
 
     printf '%s\n' "$timeout_seconds"
     return 0
@@ -139,7 +140,7 @@ git_diff_base_fetch_remote_branch() {
 
     unshallow_timeout="$(git_diff_base_unshallow_timeout_seconds)"
 
-    if [ "$unshallow_timeout" -gt 0 ] 2>/dev/null; then
+    if [ "$unshallow_timeout" -gt 0 ]; then
       if command -v timeout >/dev/null 2>&1; then
         timeout "$unshallow_timeout" git fetch "${fetch_args[@]}" >&2
         return $?
@@ -258,6 +259,10 @@ git_diff_base_resolve() {
     is_shallow=false
   fi
 
+  # Non-shallow clone, or a clone that just became full after the initial
+  # fetches, where the base ref is absent. This is common in GitHub Actions
+  # checkouts that fetch only the PR branch; unshallow mode becomes a plain
+  # branch fetch in full repositories.
   if ! git_diff_base_verify_ref "$base_ref" &&
     [ -n "$remote_branch" ] &&
     [ "$is_shallow" = false ]; then
@@ -346,15 +351,24 @@ git_diff_base_resolve() {
       echo "Warning: deepening did not find merge base after $deepen_attempts attempt(s);" \
         "falling back to --unshallow (this may be slow for large repositories)" >&2
 
-      if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" unshallow; then
-        if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
-          printf '%s\n' "$merge_base"
-          return 0
+      # Extra history from either side can reveal the merge base, so warn on a
+      # failed unshallow fetch and keep trying the other side before failing.
+      if [ -n "$remote_branch" ]; then
+        if git_diff_base_fetch_remote_branch "$remote_branch" unshallow; then
+          if git_diff_base_verify_ref "$base_ref" &&
+            merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
+            printf '%s\n' "$merge_base"
+            return 0
+          fi
+        else
+          echo "Warning: failed to unshallow origin/$remote_branch; continuing." >&2
         fi
       fi
 
       if [ -n "$current_remote_branch" ] && [ "$current_remote_branch" != "$remote_branch" ]; then
-        git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow || true
+        if ! git_diff_base_fetch_remote_branch "$current_remote_branch" unshallow; then
+          echo "Warning: failed to unshallow origin/$current_remote_branch; continuing." >&2
+        fi
         if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"
           return 0
