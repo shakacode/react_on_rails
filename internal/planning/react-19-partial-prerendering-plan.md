@@ -183,7 +183,7 @@ Evaluate these in order:
 
 - React 19.2.x passes the same local verification suite as the currently supported React 19 line.
 - Existing SSR, streaming SSR, RSC payload rendering, and client hydration tests stay green.
-- The generated-app suite (`bundle exec rake run_rspec:shakapacker_examples_latest`) passes with React 19.2.x.
+- The full generated-app suite (`bundle exec rake run_rspec:shakapacker_examples`) passes with React 19.2.x.
 - Any public docs that cite an explicit React version are updated or explicitly annotated with a minimum-version note.
 - Any partial pre-rendering proposal includes a same-route benchmark against traditional SSR or streaming SSR (see
   `internal/planning/library-benchmarking.md` for tooling guidance).
