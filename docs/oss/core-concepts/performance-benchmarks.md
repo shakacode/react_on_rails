@@ -124,11 +124,11 @@ The median results showed this directional signal:
 | Controller `action_total` (Rails wall time) |      346.9ms |  339.2ms |  -2.2% |
 | Page-specific script requests               |            6 |        1 | -83.3% |
 
-_Rows 1-5 are medians (n=4 per route); sample size is too small to establish statistical significance._
+_All values are medians (n=4 per route); sample size is too small to establish statistical significance._
 _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
-The observed **max `responseEnd`** across the four RSC runs was 768.25ms vs. 730.62ms for the Inertia control's max
-(+5.2% for RSC worst-case, max of n=4 - high variance expected at this sample size), indicating the Inertia control had
+The observed **max `responseEnd`** across the four RSC runs was 768.25ms vs. 730.62ms for the Inertia control's max - a
++5.2% RSC regression on worst-case `responseEnd` (high variance is expected at n=4), indicating the Inertia control had
 a faster worst-case `responseEnd` than the RSC route.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
