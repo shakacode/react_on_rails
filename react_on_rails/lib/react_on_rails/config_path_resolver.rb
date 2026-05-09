@@ -67,6 +67,8 @@ module ReactOnRails
     # Including classes must provide #add_warning(message). Classes that route
     # warnings into another object's message list can override
     # #config_path_warning_registry to share de-dupe state with that sink.
+    # Overrides must return a Hash with :package_roots and :package_json_paths
+    # keys whose values respond to #add?, such as Set instances.
     def warn_missing_package_root(package_root, detection_target)
       return unless warned_package_roots.add?(package_root)
 
