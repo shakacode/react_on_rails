@@ -50,7 +50,7 @@ module GeneratorMessages
 
       pm_from_json = if package_json.equal?(PACKAGE_JSON_UNSET)
                        detect_package_manager_from_package_json(app_root: app_root)
-                     elsif package_json
+                     elsif !package_json.nil?
                        package_manager_from_content(package_json)
                      end
       return [pm_from_json, :package_json] if pm_from_json
