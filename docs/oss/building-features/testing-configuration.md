@@ -150,6 +150,9 @@ module RscNodeRenderer
         rescue Errno::ESRCH
           hint = log_path ? " Check #{log_path} for startup errors." : ""
           raise "Node renderer process (pid #{pid}) exited before binding to #{host}:#{port}.#{hint}"
+        rescue Errno::EPERM
+          hint = log_path ? " Check #{log_path} for startup errors." : ""
+          raise "Cannot inspect node renderer process (pid #{pid}) while waiting for #{host}:#{port}.#{hint}"
         end
       end
 
@@ -171,9 +174,6 @@ rsc_node_renderer_waiter = nil
 RSpec.configure do |config|
   config.before(:suite) do
     next unless ENV["RSC_NODE_RENDERER_TESTS"] == "1"
-
-    # Compile before spawning the renderer; tagged examples would compile too late.
-    ReactOnRails::TestHelper.ensure_assets_compiled
 
     cache_path = ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH") do
       raise "RENDERER_SERVER_BUNDLE_CACHE_PATH is not set. " \
