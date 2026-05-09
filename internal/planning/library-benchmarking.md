@@ -66,7 +66,8 @@ The benchmark workflow currently treats main-regression alerts as warnings becau
 GitHub-hosted runners have been dominated by environmental noise. The goal is to make a fired alert much more likely
 to represent a real regression before restoring a hard gate, where CI fails the job instead of posting a warning.
 If the hard gate has to return to warning mode, re-tune from the existing baseline window and overlap data first; start a
-fresh 30-run baseline window only after benchmark workflow or runner changes invalidate the old history.
+fresh 30-run baseline window only after benchmark workflow or runner changes invalidate the old history. Do not tune
+thresholds before the full 30-run window exists because sparse history trains on noise rather than signal.
 
 ### Baseline Dependency
 
@@ -74,8 +75,7 @@ The Bencher reporting baseline fix from [PR 3148](https://github.com/shakacode/r
 2026-04-23. Do not re-enable the hard gate until at least 30 successful `Benchmark Workflow` runs on `main` have built
 fresh history. Count only completed `benchmark` jobs triggered after that merge; exclude pre-merge runs, branch runs,
 reruns, and docs-only pushes skipped by `script/ci-changes-detector`. Record each counted run ID and timestamp in
-[Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). Threshold tuning against missing or sparse
-baseline history will mostly tune the noise.
+[Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
 
 ### Current Bencher Configuration
 
@@ -87,7 +87,12 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 - each threshold uses `--threshold-test t_test` and `--threshold-max-sample-size $MAX_SAMPLE`
 - `rps` uses `--threshold-lower-boundary $BOUNDARY`
 - `p50_latency`, `p90_latency`, `p99_latency`, and `failed_pct` use `--threshold-upper-boundary $BOUNDARY`
-- regression alerts currently warn on main in the `Warn if Bencher detected regression on main` step
+- on main, `run_bencher` captures Bencher's non-zero exit as `BENCHER_EXIT_CODE`; the
+  `Warn if Bencher detected regression on main` step emits `::warning::` for regression alerts instead of exiting
+- operational Bencher failures already hard-fail via `Fail on non-regression Bencher error on main`, so only regression
+  alerts are soft while the gate is in warning mode
+- restoring the hard gate means changing the warning step to exit with `$BENCHER_EXIT_CODE` after the false-positive
+  target is met, not removing `--err`
 
 ### Tuning Sequence
 
@@ -95,7 +100,9 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 2. Compare adjacent main runs by shared `(benchmark, measure)` alert pairs using the Bencher dashboard or the
    overlap-comparison method tracked in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). For two
    adjacent alert sets `A` and `B`, use Jaccard overlap: `|A intersect B| / |A union B|`. For example, two shared pairs
-   across 10 total unique alert pairs gives `2 / 10 = 20%`. Overlap below `0.20` means runner noise is still dominating.
+   across 10 total unique alert pairs gives `2 / 10 = 20%`. Overlap below `0.20` means runner noise is still dominating;
+   proceed to step 3 only after overlap is at least `0.40` for 3 consecutive adjacent-run pairs. If a comparison has
+   fewer than 5 unique alert pairs, record the small-sample caveat in Issue 3169 and keep collecting runs.
 3. Prefer threshold changes that require stronger evidence before failure:
    - widen the Bencher boundary from `0.95` toward `0.99`
    - keep `--threshold-max-sample-size $MAX_SAMPLE` aligned with the available history; add a minimum-sample rule only
@@ -119,7 +126,8 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
   failure in 20 successful main `Benchmark Workflow` runs whose triggering commits do not intentionally change benchmark
   performance. Treat an alert as noisy when it does not recur for the same `(benchmark, measure)` pair in the next
   qualifying run and has no matching performance-sensitive code change. If the gate later exceeds this rate on main,
-  revert it to warning mode and re-tune thresholds before trying to re-enable it again.
+  revert it to warning mode and re-tune thresholds from the existing baseline window and overlap data before trying to
+  re-enable it again.
 
 See [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) for the tracking discussion and historical
 alert-overlap evidence.
