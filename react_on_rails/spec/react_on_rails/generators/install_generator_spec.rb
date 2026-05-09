@@ -2053,10 +2053,7 @@ describe InstallGenerator, type: :generator do
     # Existing Shakapacker apps skip the seeding path, so the CI scaffold has to pin the
     # version itself or the workflow fails before dependency install.
     it "pins a pnpm version in the setup step" do
-      # Anchor to the constant so silent drift between `CI_PNPM_FALLBACK_VERSION`
-      # and the rendered template would fail this test.
       fallback_version = described_class.const_get(:CI_PNPM_FALLBACK_VERSION)
-      expect(fallback_version).to eq("11.0")
 
       assert_file ".github/workflows/ci.yml" do |content|
         expect(content).to include("uses: pnpm/action-setup@v4")
@@ -2065,6 +2062,45 @@ describe InstallGenerator, type: :generator do
         )
         expect(content).to match(
           /version: "#{Regexp.escape(fallback_version)}"\n\n\s+- name: Set up Node/
+        )
+      end
+    end
+  end
+
+  context "when env selects pnpm but packageManager declares yarn" do
+    original_react_on_rails_package_manager = nil
+
+    before(:all) do
+      original_react_on_rails_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
+      ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "pnpm"
+      run_generator_test_with_args(%w[], package_json: true) do
+        simulate_existing_file("pnpm-lock.yaml", "")
+        simulate_existing_file("bin/shakapacker", "")
+        simulate_existing_file("bin/shakapacker-dev-server", "")
+        simulate_existing_file("config/shakapacker.yml", "default: &default\n")
+        simulate_existing_file("config/webpack/webpack.config.js", "")
+        simulate_existing_file(
+          "package.json",
+          "#{JSON.pretty_generate('name' => 'app', 'packageManager' => 'yarn@1.22.0')}\n"
+        )
+      end
+    end
+
+    after(:all) do
+      if original_react_on_rails_package_manager
+        ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = original_react_on_rails_package_manager
+      else
+        ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
+      end
+    end
+
+    it "pins the pnpm fallback version in the setup step" do
+      fallback_version = described_class.const_get(:CI_PNPM_FALLBACK_VERSION)
+
+      assert_file ".github/workflows/ci.yml" do |content|
+        expect(content).to include("uses: pnpm/action-setup@v4")
+        expect(content).to match(
+          %r{pnpm/action-setup@v4\n\s+with:\n(?:\s+\#[^\n]*\n)*\s+version: "#{Regexp.escape(fallback_version)}"}
         )
       end
     end

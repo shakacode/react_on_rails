@@ -74,11 +74,10 @@ module GeneratorMessages
     end
 
     # Returns true when package.json declares a `packageManager` field (Corepack standard)
-    # for a supported manager. The declared value must match `manager:` (e.g. `"pnpm"`);
-    # declaring `yarn@...` returns false even though yarn is supported. Used by the CI
-    # scaffold to decide whether
-    # `pnpm/action-setup` needs an explicit `version:`; the action only reads the pin
-    # from `packageManager` when that field actually declares pnpm.
+    # with a versioned pin (e.g. `"pnpm@9.0.0"`) for the requested `manager`. A bare name
+    # without `@<version>` returns false because Corepack rejects it and `pnpm/action-setup`
+    # has no version to resolve from it. Used by the CI scaffold to decide whether
+    # `pnpm/action-setup` needs an explicit `version:` key.
     # Pass package_json: to reuse an already-parsed package.json and avoid a re-read.
     def package_manager_declared?(manager:, app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       content = if package_json.equal?(PACKAGE_JSON_UNSET)

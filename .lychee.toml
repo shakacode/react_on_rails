@@ -112,6 +112,7 @@ exclude = [
   '^https://github\.com/shakacode/react_on_rails/compare/',
   '^https://github\.com/shakacode/react_on_rails/pull/[0-9]+$',  # Intermittent 5xx from GitHub PR pages in CI
   '^https://github\.com/shakacode/react_on_rails/issues/2766$',  # Intermittent 502 from GitHub issue pages in CI
+  '^https://github\.com/pulkitkkr$',  # Intermittent 502 from GitHub profile pages in CI
   '^https://github\.com/rack/rack/blob/main/SPEC\.rdoc$',  # Intermittent 502 from GitHub blob pages in CI
   '^https://github\.com/shakacode/shakapacker/blob/cdf32835d3e0949952b8b4b53063807f714f9b24/package/environments/base\.js(#.*)?$',  # Intermittent 502 from GitHub blob view in CI
 
