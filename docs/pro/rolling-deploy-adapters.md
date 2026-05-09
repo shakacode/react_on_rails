@@ -63,7 +63,8 @@ module MyRollingDeployAdapter
   #   if the bundle is unavailable — pre-seeding logs a warning and continues.
   #
   # Fetch is wrapped in Timeout.timeout(30s) to protect pre-seeding
-  # from hanging on slow external stores.
+  # from hanging on slow external stores. The hard budget is
+  # ReactOnRailsPro::RollingDeployCacheStager::FETCH_TIMEOUT_SECONDS.
   def self.fetch(bundle_hash)
     # ...
   end
@@ -75,7 +76,8 @@ module MyRollingDeployAdapter
   # once with server_bundle_hash, once with rsc_bundle_hash.
   # Errors are warned per-hash, not raised. Each upload is wrapped in
   # Timeout.timeout(120s), so keep adapter network work comfortably
-  # inside that per-hash budget.
+  # inside that per-hash budget. The hard budget is
+  # ReactOnRailsPro::AssetsPrecompile::UPLOAD_TIMEOUT_SECONDS.
   def self.upload(bundle_hash, bundle:, assets:)
     # ...
   end

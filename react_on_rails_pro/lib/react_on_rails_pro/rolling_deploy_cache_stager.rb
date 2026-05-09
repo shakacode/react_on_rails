@@ -207,6 +207,9 @@ module ReactOnRailsPro
     private_class_method :valid_bundle_payload?
 
     def self.valid_asset_payload?(asset_paths, hash)
+      # Stricter than upload-side filtering: a partial payload in the store means
+      # every subsequent seed for this hash would produce a broken hydration
+      # chain, so reject the whole hash rather than staging an incomplete set.
       invalid_assets = asset_paths.reject { |asset_path| File.file?(asset_path) }
       return true if invalid_assets.empty?
 
