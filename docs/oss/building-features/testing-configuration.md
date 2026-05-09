@@ -136,7 +136,7 @@ module RscNodeRenderer
       begin
         Socket.tcp(host, port, connect_timeout: 1).close
         break
-      rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT, Errno::ECONNABORTED
+      rescue Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::ETIMEDOUT
         # The renderer is still booting or has not bound the port yet; keep retrying until the deadline.
       rescue Errno::EADDRNOTAVAIL, Errno::EHOSTUNREACH, SocketError => e
         raise "Cannot reach node renderer at #{host}:#{port}. " \
@@ -183,7 +183,7 @@ RSpec.configure do |config|
     end
     raise "RENDERER_SERVER_BUNDLE_CACHE_PATH is empty." if cache_path.strip.empty?
 
-    expanded_cache_path = File.expand_path(cache_path)
+    expanded_cache_path = File.expand_path(cache_path, Rails.root.to_s)
     FileUtils.mkdir_p(Rails.root.join("tmp"))
     tmp_root = Rails.root.join("tmp").to_s
     unless expanded_cache_path.start_with?("#{tmp_root}#{File::SEPARATOR}")
@@ -220,7 +220,7 @@ RSpec.configure do |config|
     renderer_timeout = Integer(ENV.fetch("RSC_NODE_RENDERER_BOOT_TIMEOUT", "30"))
     RscNodeRenderer.wait_until_ready!(
       host: "127.0.0.1",
-      port: renderer_env["RENDERER_PORT"].to_i,
+      port: Integer(renderer_env["RENDERER_PORT"]),
       timeout_seconds: renderer_timeout,
       log_path: renderer_log_path,
       pid: rsc_node_renderer_pid
