@@ -839,6 +839,8 @@ RENDERER_SUPPORT_MODULES=true
 
 For globals not covered by `supportModules`, use `additionalContext`:
 
+The example below uses the standalone config-object style for launchers that `require()` a renderer config file. If your launch file calls `reactOnRailsProNodeRenderer({ ... })` directly, pass the same `supportModules` and `additionalContext` options to that call.
+
 ```js
 const fetchImplementation = globalThis.fetch;
 const HeadersImplementation = globalThis.Headers;
@@ -848,7 +850,7 @@ const ResponseImplementation = globalThis.Response;
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
     'Your Node.js runtime does not expose fetch, Headers, Request, and Response. ' +
-      'Use a supported Node.js release that exposes these globals or replace these globalThis.* values with a fetch polyfill before passing additionalContext.',
+      'Use a supported Node.js release that exposes these globals or replace the globalThis.* references above with a fetch polyfill import.',
   );
 }
 
