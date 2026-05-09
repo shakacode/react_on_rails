@@ -2519,6 +2519,33 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when a Kamal deploy config references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        FileUtils.mkdir_p(File.join(tmpdir, ".kamal"))
+        File.write(
+          File.join(tmpdir, ".kamal", "deploy.yml"),
+          "hooks:\n  post-deploy: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "keeps the symlink-mode suggestion while noting image-build context may differ" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs).not_to be_empty
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?(".kamal/deploy.yml →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("MODE=symlink")
+        expect(suggestion_line).to include("image build")
+      end
+    end
+
     context "when no deploy scripts reference the deprecated task" do
       let(:tmpdir) { Dir.mktmpdir }
 
@@ -2551,7 +2578,7 @@ RSpec.describe ReactOnRails::Doctor do
 
         expect(warning_msgs.any? { |m| m[:content].include?("Procfile") }).to be(true)
         expect(warning_msgs.none? do |m|
-                 m[:content].include?("Could not scan for deprecated renderer-cache task")
+                 m[:content].include?("Could not scan bin/deploy for deprecated renderer-cache task")
                end).to be(true)
       end
     end
@@ -2632,6 +2659,42 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    context "when probing a deploy-script file size raises an unexpected error" do
+      let(:tmpdir) { Dir.mktmpdir }
+      let(:deploy_path) { File.join(tmpdir, "bin", "deploy") }
+
+      before do
+        FileUtils.mkdir_p(File.dirname(deploy_path))
+        File.write(
+          deploy_path,
+          "bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+
+        root_path = Pathname.new(tmpdir)
+        allow(Rails).to receive(:root).and_return(root_path)
+
+        failing_procfile = instance_double(Pathname)
+        allow(failing_procfile).to receive(:file?).and_return(true)
+        allow(failing_procfile).to receive(:size).and_raise(Errno::EACCES, "simulated size failure")
+        allow(root_path).to receive(:join).and_call_original
+        allow(root_path).to receive(:join).with("Procfile").and_return(failing_procfile)
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "captures the error for that file and continues scanning the rest" do
+        expect { doctor.send(:check_deprecated_renderer_cache_task) }.not_to raise_error
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs.any? do |m|
+                 m[:content].include?("Could not scan Procfile for deprecated renderer-cache task")
+               end).to be(true)
+        expect(warning_msgs.any? { |m| m[:content].include?("bin/deploy") }).to be(true)
+        expect(warning_msgs.none? do |m|
+                 m[:content].include?("Could not complete scan for deprecated renderer-cache task")
+               end).to be(true)
+      end
+    end
+
     context "when the deprecated task name appears only inside a comment" do
       let(:tmpdir) { Dir.mktmpdir }
 
@@ -2680,7 +2743,7 @@ RSpec.describe ReactOnRails::Doctor do
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs.any? { |m| m[:content].include?("pre_stage_bundle_for_node_renderer") }).to be(true)
         expect(warning_msgs.none? do |m|
-                 m[:content].include?("Could not scan for deprecated renderer-cache task")
+                 m[:content].include?("Could not scan Procfile for deprecated renderer-cache task")
                end).to be(true)
       end
     end

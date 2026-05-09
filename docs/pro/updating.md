@@ -52,6 +52,15 @@ To reduce upgrade risk, React on Rails Pro follows this policy:
 3. **Remove in a later release** with a short migration note in this guide.
 4. **Exception:** security/legal fixes may be removed immediately, but must include an explicit upgrade note.
 
+## Node Renderer Cache Layout
+
+Starting with the release that adds `react_on_rails_pro:pre_seed_renderer_cache`, both the new task and the
+deprecated `pre_stage_bundle_for_node_renderer` shim stage the renderer cache as `<cache>/<bundleHash>/<bundleHash>.js`.
+
+Older `pre_stage_bundle_for_node_renderer` versions wrote a flat `<cache>/<renderer_bundle_file_name>` file. That
+layout did not match the Node Renderer's runtime lookup, so most apps should not depend on it. Update any custom
+scripts that read the old flat file directly.
+
 ### Your Current Setup (GitHub Packages)
 
 If you're upgrading, you currently have:

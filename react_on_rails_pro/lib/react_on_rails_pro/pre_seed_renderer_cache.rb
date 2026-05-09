@@ -160,6 +160,8 @@ module ReactOnRailsPro
       File.rename(tmp, destination)
       puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
     ensure
+      # `tmp` is nil if assignment never ran. On success it has been renamed away, so rm_f is a no-op;
+      # on failure it removes the temp symlink.
       FileUtils.rm_f(tmp) if tmp
     end
     private_class_method :make_relative_symlink
