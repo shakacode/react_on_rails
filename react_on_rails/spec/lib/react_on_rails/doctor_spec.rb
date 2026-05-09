@@ -2108,7 +2108,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "resolves root package paths to Rails.root" do
-        [nil, "", rails_root.to_s].each do |node_modules_location|
+        [nil, "", ".", rails_root.to_s, "#{rails_root}/"].each do |node_modules_location|
           stub_node_modules_location(node_modules_location)
 
           expect(doctor.send(:resolved_package_root)).to eq(rails_root.to_s)
@@ -2126,7 +2126,7 @@ RSpec.describe ReactOnRails::Doctor do
       end
 
       it "passes through absolute package paths" do
-        stub_node_modules_location("/opt/app/client")
+        stub_node_modules_location("/opt/app/client/")
 
         expect(doctor.send(:resolved_package_root)).to eq("/opt/app/client")
         expect(doctor.send(:resolved_package_json_path)).to eq("/opt/app/client/package.json")
@@ -2903,6 +2903,7 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     def stub_package_root(path)
+      # Pass the same value for both so resolved_package_root short-circuits to Rails.root.
       allow(Rails).to receive(:root).and_return(Pathname.new(path))
       allow(ReactOnRails).to receive(:configuration).and_return(
         instance_double(ReactOnRails::Configuration, node_modules_location: path)
@@ -3021,57 +3022,56 @@ RSpec.describe ReactOnRails::Doctor do
     end
 
     context "when React is installed in a configured nested JS workspace" do
-      it "uses the configured package root for node module resolution" do
+      around do |example|
         Dir.mktmpdir do |tmpdir|
-          Dir.chdir(tmpdir) do
-            FileUtils.mkdir_p("client")
-            File.write("client/package.json", '{"dependencies":{"react":"^19.0.0"}}')
-            FileUtils.mkdir_p("client/node_modules/react")
-            File.write("client/node_modules/react/package.json", '{"version":"19.0.4"}')
-            allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
-            allow(ReactOnRails).to receive(:configuration).and_return(
-              instance_double(ReactOnRails::Configuration, node_modules_location: "client")
-            )
-            allow(Open3).to receive(:capture3)
-              .with(
-                "node",
-                "-e",
-                "console.log(require.resolve('react/package.json'))",
-                chdir: File.join(tmpdir, "client")
-              )
-              .and_return(
-                [
-                  "#{File.join(tmpdir, 'client/node_modules/react/package.json')}\n",
-                  "",
-                  instance_double(Process::Status, success?: true)
-                ]
-              )
-
-            doctor.send(:check_rsc_react_version)
-            success_msgs = checker.messages.select { |m| m[:type] == :success }
-            expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
-          end
+          Dir.chdir(tmpdir) { example.run }
         end
       end
 
-      it "falls back to the declared React version in the nested package.json when node is unavailable" do
-        Dir.mktmpdir do |tmpdir|
-          Dir.chdir(tmpdir) do
-            FileUtils.mkdir_p("client")
-            File.write("client/package.json", '{"dependencies":{"react":"19.0.4"}}')
-            allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
-            allow(ReactOnRails).to receive(:configuration).and_return(
-              instance_double(ReactOnRails::Configuration, node_modules_location: "client")
-            )
-            allow(Open3).to receive(:capture3).and_return(
-              ["", "", instance_double(Process::Status, success?: false)]
-            )
+      it "uses the configured package root for node module resolution" do
+        package_root = File.join(Dir.pwd, "client")
+        FileUtils.mkdir_p("client")
+        File.write("client/package.json", '{"dependencies":{"react":"^19.0.0"}}')
+        FileUtils.mkdir_p("client/node_modules/react")
+        File.write("client/node_modules/react/package.json", '{"version":"19.0.4"}')
+        allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(Open3).to receive(:capture3)
+          .with(
+            "node",
+            "-e",
+            "console.log(require.resolve('react/package.json'))",
+            chdir: package_root
+          )
+          .and_return(
+            [
+              "#{File.join(package_root, 'node_modules/react/package.json')}\n",
+              "",
+              instance_double(Process::Status, success?: true)
+            ]
+          )
 
-            doctor.send(:check_rsc_react_version)
-            success_msgs = checker.messages.select { |m| m[:type] == :success }
-            expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
-          end
-        end
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
+      end
+
+      it "falls back to the declared React version in the nested package.json when node is unavailable" do
+        FileUtils.mkdir_p("client")
+        File.write("client/package.json", '{"dependencies":{"react":"19.0.4"}}')
+        allow(Rails).to receive(:root).and_return(Pathname.new(Dir.pwd))
+        allow(ReactOnRails).to receive(:configuration).and_return(
+          instance_double(ReactOnRails::Configuration, node_modules_location: "client")
+        )
+        allow(Open3).to receive(:capture3).and_return(
+          ["", "", instance_double(Process::Status, success?: false)]
+        )
+
+        doctor.send(:check_rsc_react_version)
+        success_msgs = checker.messages.select { |m| m[:type] == :success }
+        expect(success_msgs.any? { |m| m[:content].include?("19.0.4") }).to be true
       end
     end
 

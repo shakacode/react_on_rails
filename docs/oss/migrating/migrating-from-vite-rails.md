@@ -83,11 +83,12 @@ config.node_modules_location = "client"
 ```
 
 Then keep root-level binstubs and config files as thin wrappers so Rails, Shakapacker, and CI still have the paths they
-expect. After creating each binstub, run `chmod +x` on it so process managers can execute it:
+expect:
 
 ```bash
 #!/usr/bin/env bash
-# bin/shakapacker
+# bin/shakapacker - create this file, then make it executable:
+#   chmod +x bin/shakapacker
 set -euo pipefail
 cd "$(dirname "$0")/.."
 exec ./client/node_modules/.bin/shakapacker "$@"

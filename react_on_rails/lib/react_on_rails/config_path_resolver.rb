@@ -22,10 +22,13 @@ module ReactOnRails
 
     def resolved_package_root
       node_modules_location = ReactOnRails.configuration.node_modules_location.to_s
-      return Rails.root.to_s if node_modules_location.empty? || node_modules_location == Rails.root.to_s
-      return node_modules_location if Pathname.new(node_modules_location).absolute?
+      return Rails.root.to_s if node_modules_location.empty?
 
-      Rails.root.join(node_modules_location).to_s
+      resolved_location = Pathname.new(node_modules_location).cleanpath
+      return Rails.root.to_s if resolved_location.to_s == "." || resolved_location == Rails.root.cleanpath
+      return resolved_location.to_s if resolved_location.absolute?
+
+      Rails.root.join(resolved_location).to_s
     end
 
     def resolved_package_path(filename)
