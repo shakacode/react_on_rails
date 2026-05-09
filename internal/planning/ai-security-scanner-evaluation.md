@@ -53,12 +53,14 @@ prioritization, explanation, or reachability analysis for a finding that existin
 Start with this point-in-time vendor shortlist from the issue if the products still offer an appropriate plan at
 evaluation time.
 
-| Vendor          | Reference                  | Initial status | Before scheduling                                                                                                                              |
-| --------------- | -------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                        |
-| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                        |
-| Almanax         | <https://almanax.ai/>      | Lower priority | Confirm OSS or trial access and Ruby/TypeScript coverage; public examples were Web3-heavy as of the document date. Re-evaluate at next review. |
-| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                        |
+| Vendor          | Reference                  | Initial status | Before scheduling                                       |
+| --------------- | -------------------------- | -------------- | ------------------------------------------------------- |
+| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
+| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
+| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
+
+**Deferred:** [Almanax](https://almanax.ai/) was Web3-heavy as of 2026-05-09 with no clear Ruby/TypeScript coverage
+signal. Re-add it to the shortlist only if the next annual review finds evidence of Rails/Node support.
 
 If the named vendors are unavailable or unsuitable, look for tools in these categories:
 
@@ -181,7 +183,8 @@ Do not add a scanner to CI until all of these are true:
 - Keeps the false-positive rate at or below 15% for that scanner's `main` scan after one triage pass, measured among
   high/critical findings reviewed for that scanner run, not cumulatively across scanners. This initial bar is
   intentionally lenient to support first-pass data collection; tighten it to 10% or lower before moving findings from
-  advisory to blocking. A scan with fewer than five high/critical findings cannot satisfy this false-positive-rate gate
+  advisory to blocking. Revisit this threshold after the second full triage cycle or after 90 days of CI advisory data,
+  whichever comes first. A scan with fewer than five high/critical findings cannot satisfy this false-positive-rate gate
   by itself; manually review every finding, record the raw count and why the sample is too small for a stable rate, and
   gather a larger sample before using this rate to justify CI adoption.
 - Supports advisory mode for pull requests.
