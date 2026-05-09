@@ -143,14 +143,15 @@ artifact does not yet publish enough logger or extraction-script context to conf
 server-rendering split. [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing
 distribution and source artifacts.
 
-Derived from the median table above, the RSC route's post-`responseEnd` client processing time (`navigation duration -
-responseEnd`) was about 18ms, compared with about 130ms for the Inertia control. That gap helps explain why the
-navigation-duration gain (-21.7%) was larger than the `responseEnd` gain (-8.7%).
+Derived from the median table above, the RSC route's post-`responseEnd` browser processing time (`navigation duration -
+responseEnd`, including HTML parsing, sub-resource loading, layout, and paint) was about 18ms, compared with about 130ms
+for the Inertia control. That gap helps explain why the navigation-duration gain (-21.7%) was larger than the
+`responseEnd` gain (-8.7%).
 
-The page-specific script request count, measured as Chrome DevTools Network panel `Script`-type requests after loading
-each route, changed from 6 requests for the Inertia demo to 1 request for the RSC demo. That is a fixed request count,
-not a timing median or statistical sample, and it does not measure combined transfer size or cache behavior. Fewer
-requests do not necessarily imply a smaller browser payload. See
+The page-specific script request count, recorded as Chrome DevTools Network panel `Script`-type requests after loading
+each route, changed from 6 requests for the Inertia demo to 1 request for the RSC demo. The artifact reports this as a
+fixed post-load request-count observation, not a per-run timing median or statistical sample, and it does not measure
+combined transfer size or cache behavior. Fewer requests do not necessarily imply a smaller browser payload. See
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
 - _All timing values are medians from the raw benchmark artifact values (n=4 per route); sample size is too small to
