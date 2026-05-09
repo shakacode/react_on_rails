@@ -96,7 +96,9 @@ each decision has an owner, acceptance criteria, and a closure path.
 
 - Which Rails caching layer should be recommended for the static-shell: fragment cache, HTTP cache, CDN cache, or a
   combination?
+- Should the static-shell be rendered by the Node Renderer, cached as a Rails partial fragment, or selected per example?
 - Should the first example use traditional SSR with Suspense, RSC, or both?
 - How should failures in the dynamic portion affect status codes and error boundaries after part of the response has
   streamed?
-- What metrics matter most for acceptance: TTFB, LCP, response end, total bytes, or client JavaScript reduction?
+- What metrics matter most for acceptance: TTFB, LCP, response end, total bytes, or client JavaScript reduction, and how
+  do Rails `ActionController::Live` and Node Renderer streaming paths affect those metrics differently?
