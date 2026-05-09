@@ -150,9 +150,7 @@ environment metadata, and distribution artifacts are still required before makin
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
 
-<a id="popmenu"></a>
-
-### Production Case Study: Popmenu
+### Production Case Study: Popmenu {#popmenu}
 
 Popmenu, a restaurant platform serving tens of millions of SSR requests daily, adopted React on Rails Pro and reported:
 
