@@ -8,8 +8,9 @@ reproduce CI job selection locally.
 ## Instructions
 
 1. Read `AGENTS.md` first. It is the canonical source for required commands, formatting, boundaries, and ask-first areas.
-2. Inspect the current branch diff with `git status --short` and `git diff --stat origin/main...HEAD`.
-3. Decide the smallest verification set that covers the changed surface area.
+2. Inspect the current branch diff with `git status --short`, `git diff --name-only origin/main...HEAD`, and
+   `git diff --stat origin/main...HEAD`.
+3. Decide the minimal sufficient verification set that covers the changed surface area.
 4. Always include `bundle exec rubocop` when you will create or amend a commit, even when the changed surface is documentation-only, because `AGENTS.md` marks it mandatory before every commit.
 5. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 6. For formatting failures, run `rake autofix`; do not manually edit formatting-only changes.
@@ -53,7 +54,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`, but do not treat it as a Markdown validator.
-- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm exec prettier --check .`.
+- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm exec prettier --check .` (equivalent to the root `pnpm start format.listDifferent` Prettier check, scoped to Pro).
 - `react_on_rails_pro/**/*.rb` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `bundle exec rubocop react_on_rails_pro/` and any targeted RSpec.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
 
