@@ -164,6 +164,9 @@ git_diff_base_resolve() {
   local merge_base
   local is_shallow=false
 
+  # fetch_policy names are historical. They only describe whether the initial
+  # shallow base-branch fetch is mandatory; merge-base resolution is still fatal
+  # under both policies.
   case "$fetch_policy" in
     required|optional)
       ;;
@@ -192,7 +195,11 @@ git_diff_base_resolve() {
 
   if current_remote_branch="$(git_diff_base_current_remote_branch "$current_ref")"; then
     if [ "$current_remote_branch" != "$remote_branch" ] && [ "$is_shallow" = true ]; then
-      git_diff_base_fetch_remote_branch "$current_remote_branch" initial || true
+      # The current ref already exists locally; this fetch only expands shallow
+      # history for better merge-base discovery, so keep it best-effort.
+      if ! git_diff_base_fetch_remote_branch "$current_remote_branch" initial; then
+        echo "Warning: failed to fetch origin/$current_remote_branch; continuing with local current ref." >&2
+      fi
     fi
   else
     current_remote_branch=""
@@ -235,6 +242,13 @@ git_diff_base_resolve() {
     return 0
   fi
 
+  if ! git_diff_base_verify_ref "$base_ref" &&
+    [ -z "$remote_branch" ] &&
+    ! git_diff_base_sha_ref "$base_ref"; then
+    echo "Error: base ref '$base_ref' does not exist locally and no remote branch is known to fetch it from" >&2
+    return 1
+  fi
+
   if [ -n "$remote_branch" ] || [ -n "$current_remote_branch" ]; then
     local attempt=1
     local deepen_attempts=0
@@ -244,6 +258,8 @@ git_diff_base_resolve() {
 
     # Re-check shallow state each time so tiny repositories can leave the loop
     # as soon as a deepen fetch completes their history.
+    # When base_ref is a raw event SHA and no base branch is known, deepening
+    # the current branch can still reveal a push-event before SHA ancestor.
     while [ "$attempt" -le "$max_attempts" ] && git_diff_base_is_shallow_repository; do
       fetched=false
       deepen_attempts="$attempt"
@@ -299,7 +315,12 @@ git_diff_base_resolve() {
     fi
   fi
 
-  echo "Error: unable to find a merge base between $base_ref and $current_ref" >&2
+  if ! git_diff_base_verify_ref "$base_ref"; then
+    echo "Error: base ref '$base_ref' still does not exist after fetching; unable to compute a merge base" >&2
+  else
+    echo "Error: unable to find a merge base between $base_ref and $current_ref" >&2
+  fi
+
   if [ -n "$remote_branch" ]; then
     echo "Fetch more history for origin/$remote_branch or run git fetch --unshallow origin." >&2
   fi
