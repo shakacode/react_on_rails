@@ -5,8 +5,7 @@ Run a local verification loop for the current branch before creating or updating
 Use `/verify` for local pre-PR checks. Use `/run-ci` when you need the CI change detector or want to
 reproduce CI job selection locally.
 
-Step 6 defines the retry cap. If a later fix reintroduces an earlier failure, stop and report the cycle instead of
-continuing indefinitely.
+Step 6 defines the retry cap and what to do if a later fix reintroduces an earlier failure.
 
 ## Instructions
 
@@ -36,9 +35,9 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run build`
    - `pnpm run lint`
    - `pnpm run type-check`
-   - `pnpm run test` when broad package behavior changed or the touched files are not covered by a narrower package test
    - targeted `pnpm --filter react-on-rails run test` for react-on-rails package tests, or
      `pnpm --filter react-on-rails exec jest -- <path>` for targeted test file runs
+   - `pnpm run test` when broad package behavior changed or the touched files are not covered by a narrower package test
    - `cd react_on_rails/spec/dummy && pnpm test:e2e` when the branch changes SSR rendering, client hydration, or
      browser-visible integration behavior
 4. Docs:
