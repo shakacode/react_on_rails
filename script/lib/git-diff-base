@@ -6,8 +6,8 @@
 # Tuning knobs:
 # - GIT_DIFF_BASE_FETCH_DEPTH: initial fetch size, and first deepen size before doubling (default 50).
 # - GIT_DIFF_BASE_MAX_ATTEMPTS: exponential deepen attempts before falling back to --unshallow
-#   (default 8). With default depth, the deepen loop can fetch up to 12,750 commits total
-#   before unshallowing.
+#   (default 8). With default depth, the deepen loop can fetch up to 12,750 commits per branch,
+#   or roughly 25,500 commits total when both base and current branches are deepened.
 # - GIT_DIFF_BASE_UNSHALLOW_TIMEOUT_SECONDS: maximum seconds for the --unshallow fallback when the
 #   system timeout command is available (default 300; set 0 to disable the guard).
 # - GIT_DIFF_BASE_DEBUG: set to any non-empty value to show git merge-base stderr output.
@@ -44,8 +44,11 @@ git_diff_base_sha_ref() {
       ;;
   esac
 
-  # Full GitHub event SHAs may be absent in shallow clones. Short hex strings
-  # count only when they already resolve locally, avoiding hex branch-name hits.
+  # Full GitHub event SHAs may be absent in shallow clones, so 40/64-char SHAs
+  # intentionally do not require local verification here. Later fetch,
+  # verification, and merge-base steps decide whether enough history exists.
+  # Short hex strings count only when they already resolve locally, avoiding
+  # hex branch-name hits.
   if [ "$length" -ne 40 ] && [ "$length" -ne 64 ] && ! git_diff_base_verify_ref "$ref"; then
     return 1
   fi
@@ -102,6 +105,24 @@ git_diff_base_unshallow_timeout_seconds() {
   printf '0\n'
 }
 
+git_diff_base_fetch_depth() {
+  local raw_depth="${1:-${GIT_DIFF_BASE_FETCH_DEPTH:-50}}"
+
+  if [[ "$raw_depth" =~ ^[[:space:]]*([0-9]+)[[:space:]]*$ ]]; then
+    local fetch_depth
+
+    fetch_depth=$((10#${BASH_REMATCH[1]}))
+
+    if [ "$fetch_depth" -gt 0 ]; then
+      printf '%s\n' "$fetch_depth"
+      return 0
+    fi
+  fi
+
+  echo "Warning: invalid fetch depth '$raw_depth'; using 50." >&2
+  printf '50\n'
+}
+
 git_diff_base_fetch_remote_branch() {
   local branch="$1"
   local mode="$2"
@@ -113,9 +134,11 @@ git_diff_base_fetch_remote_branch() {
 
   case "$mode" in
     initial)
+      depth="$(git_diff_base_fetch_depth "$depth")"
       fetch_args=(--depth="$depth" origin "$refspec")
       ;;
     deepen)
+      depth="$(git_diff_base_fetch_depth "$depth")"
       fetch_args=(--deepen="$depth" origin "$refspec")
       ;;
     unshallow)
@@ -209,6 +232,7 @@ git_diff_base_resolve() {
   local current_remote_branch=""
   local merge_base
   local is_shallow=false
+  local fetch_depth
 
   # The initial fetch policy only controls whether the first shallow base-branch
   # fetch failure aborts immediately. Missing refs, current-branch fetches, and
@@ -232,8 +256,10 @@ git_diff_base_resolve() {
     is_shallow=true
   fi
 
+  fetch_depth="$(git_diff_base_fetch_depth "${GIT_DIFF_BASE_FETCH_DEPTH:-50}")"
+
   if remote_branch="$(git_diff_base_base_remote_branch "$base_ref")"; then
-    if [ "$is_shallow" = true ] && ! git_diff_base_fetch_remote_branch "$remote_branch" initial; then
+    if [ "$is_shallow" = true ] && ! git_diff_base_fetch_remote_branch "$remote_branch" initial "$fetch_depth"; then
       if [ "$initial_fetch_policy" = "strict" ]; then
         echo "Error: failed to fetch $base_ref from origin" >&2
         return 1
@@ -247,7 +273,7 @@ git_diff_base_resolve() {
     if [ "$current_remote_branch" != "$remote_branch" ] && [ "$is_shallow" = true ]; then
       # The current ref already exists locally; this fetch only expands shallow
       # history for better merge-base discovery, so keep it best-effort.
-      if ! git_diff_base_fetch_remote_branch "$current_remote_branch" initial; then
+      if ! git_diff_base_fetch_remote_branch "$current_remote_branch" initial "$fetch_depth"; then
         echo "Warning: failed to fetch origin/$current_remote_branch; continuing with local current ref." >&2
       fi
     fi
@@ -313,7 +339,7 @@ git_diff_base_resolve() {
   if [ -n "$remote_branch" ] || [ -n "$current_remote_branch" ]; then
     local attempt=1
     local deepen_attempts=0
-    local deepen_depth="${GIT_DIFF_BASE_FETCH_DEPTH:-50}"
+    local deepen_depth="$fetch_depth"
     local fetched=false
     local max_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-8}"
 
@@ -323,7 +349,6 @@ git_diff_base_resolve() {
     # the current branch can still reveal a push-event before SHA ancestor.
     while [ "$attempt" -le "$max_attempts" ] && git_diff_base_is_shallow_repository; do
       fetched=false
-      deepen_attempts=$((deepen_attempts + 1))
 
       # A successful deepen on either side can reveal the common ancestor, even
       # when the other branch fetch fails. Stop early only when every attempted
@@ -355,6 +380,7 @@ git_diff_base_resolve() {
         break
       fi
 
+      deepen_attempts=$((deepen_attempts + 1))
       deepen_depth=$((deepen_depth * 2))
       attempt=$((attempt + 1))
     done
@@ -366,7 +392,7 @@ git_diff_base_resolve() {
     fi
 
     if [ "$is_shallow" = true ]; then
-      echo "Warning: deepening did not find merge base after $deepen_attempts attempt(s);" \
+      echo "Warning: deepening did not find merge base after $deepen_attempts successful attempt(s);" \
         "falling back to --unshallow (this may be slow for large repositories)" >&2
 
       # Extra history from either side can reveal the merge base, so warn on a
