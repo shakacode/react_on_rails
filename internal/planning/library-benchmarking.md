@@ -104,15 +104,16 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 ### Tuning Sequence
 
 1. Keep the gate in warning mode while gathering the new baseline.
-2. Compare adjacent main runs by shared `(benchmark, measure)` alert pairs using the Bencher dashboard or the
-   overlap-comparison method tracked in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). For two
-   adjacent alert sets `A` and `B`, use Jaccard overlap: `|A intersect B| / |A union B|`. For example, two shared pairs
-   across 10 total unique alert pairs gives `2 / 10 = 20%`. Overlap below `0.20` means runner noise is still dominating;
-   begin overlap analysis once at least 5 adjacent-run pairs exist, but proceed to step 3 only after the full 30-run
-   baseline window exists and overlap is at least `0.40` for 3 consecutive adjacent-run pairs. The gap between `0.20` and
-   `0.40` avoids flip-flopping between noise and signal states; the thresholds were chosen empirically from the
-   alert-overlap evidence in Issue 3169 and should be revisited if the alert distribution changes significantly. If a
-   comparison has fewer than 5 unique alert pairs, record the small-sample caveat in Issue 3169 and keep collecting runs.
+2. Compare adjacent main runs by shared `(benchmark, measure)` alert pairs using the
+   [Bencher dashboard](https://bencher.dev/console/projects/react-on-rails-t8a9ncxo/) or the overlap-comparison method
+   tracked in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). For two adjacent alert sets `A` and
+   `B`, use Jaccard overlap: `|A intersect B| / |A union B|`. For example, two shared pairs across 10 total unique alert
+   pairs gives `2 / 10 = 20%`. Overlap below `0.20` means runner noise is still dominating; begin overlap analysis once
+   at least 5 adjacent-run pairs exist, but proceed to step 3 only after the full 30-run baseline window exists and overlap
+   is at least `0.40` for 3 consecutive adjacent-run pairs. The gap between `0.20` and `0.40` avoids flip-flopping between
+   noise and signal states; the thresholds were chosen empirically from the alert-overlap evidence in Issue 3169 and
+   should be revisited if the alert distribution changes significantly. If a comparison has fewer than 5 unique alert
+   pairs, record the small-sample caveat in Issue 3169 and keep collecting runs.
 3. Prefer threshold changes that require stronger evidence before failure:
    - widen the Bencher boundary from `0.95` toward `0.99`
    - keep `--threshold-max-sample-size $MAX_SAMPLE` aligned with the available history; add a minimum-sample rule only
@@ -139,13 +140,14 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
    Bencher regression alert; that means `BENCHER_HAS_ALERT` stays `0` with the current code. A run qualifies when the
    triggering push modifies at least one file that [`script/ci-changes-detector`](../../script/ci-changes-detector) does
    not classify as docs-only. Track the running count in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
-4. The hard gate is restored only after the tuned settings meet the project false-positive target: no more than 1 noisy
-   failure in 20 successful main `Benchmark Workflow` runs whose triggering commits do not intentionally change benchmark
-   performance. Treat an alert as noisy when it does not recur for the same `(benchmark, measure)` pair in the next
-   qualifying run and has no matching performance-sensitive code change. After re-enabling, record each main gate failure
-   in Issue 3169 with a noisy/real classification. Review the running rate after every 5 gate-triggering runs or at least
-   monthly, whichever comes first. If the gate later exceeds this rate on main, revert it to warning mode and re-tune
-   thresholds from the existing baseline window and overlap data before trying to re-enable it again.
+4. Restore the hard gate once criteria 1-3 pass; those checks establish the project false-positive target of no more than
+   1 noisy failure in 20 successful main `Benchmark Workflow` runs whose triggering commits do not intentionally change
+   benchmark performance.
+5. After re-enabling, record each main gate failure in Issue 3169 with a noisy/real classification. Treat an alert as noisy
+   when it does not recur for the same `(benchmark, measure)` pair in the next qualifying run and has no matching
+   performance-sensitive code change. Review the running rate after every 5 gate-triggering runs or at least monthly,
+   whichever comes first. If the gate later exceeds the 1-in-20 noisy-failure rate on main, revert it to warning mode and
+   re-tune thresholds from the existing baseline window and overlap data before trying to re-enable it again.
 
 See [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) for the tracking discussion and historical
 alert-overlap evidence.
