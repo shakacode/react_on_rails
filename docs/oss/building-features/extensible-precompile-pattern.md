@@ -28,10 +28,10 @@ Consider this approach if you:
 When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice:
 
 1. Uncomment and add custom one-time tasks to the `run_precompile_tasks` method in `bin/dev`.
-2. Remove one-time build commands from Procfile process entries and CI/CD pipeline scripts once they are owned by
-   `run_precompile_tasks` in `bin/dev`, such as `bundle exec rake react_on_rails:locale` or `yarn res:build`. Do not
-   delete entire `.github/workflows`, `.circleci/config.yml`, or Heroku `app.json` files unless they exist solely for the
-   migrated build step.
+2. Remove one-time build commands from Procfile process entries and CI/CD pipeline scripts once development owns them in
+   `run_precompile_tasks` and CI/production own them in `build_test_command` or `build_production_command`, such as
+   `bundle exec rake react_on_rails:locale` or `yarn res:build`. Do not delete entire `.github/workflows`,
+   `.circleci/config.yml`, or Heroku `app.json` files unless they exist solely for the migrated build step.
 3. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
 4. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
    need, such as ReScript builds, TypeScript checks or compilation, and locale generation. `bin/dev` is not invoked in
@@ -175,7 +175,7 @@ Ruby script over a very long command string. Create `bin/build-react-on-rails`:
 mode = ARGV.first
 
 unless %w[test production].include?(mode)
-  abort "Usage: bin/build-react-on-rails test|production"
+  abort "Usage: bin/build-react-on-rails test|production\nGot: #{mode.inspect}"
 end
 
 # Add your app's pre-build step(s) here. They run for both test and production.
