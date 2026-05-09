@@ -173,7 +173,7 @@ RSpec.configure do |config|
     end
     expanded_cache_path = File.expand_path(cache_path)
     FileUtils.mkdir_p(Rails.root.join("tmp"))
-    tmp_root = File.realpath(Rails.root.join("tmp").to_s)
+    tmp_root = File.expand_path(Rails.root.join("tmp").to_s)
     unless expanded_cache_path.start_with?("#{tmp_root}#{File::SEPARATOR}")
       raise "RENDERER_SERVER_BUNDLE_CACHE_PATH must be inside Rails.root/tmp " \
             "(got: #{expanded_cache_path})"
@@ -221,7 +221,8 @@ RSpec.configure do |config|
 
     # Signal the process group so pnpm and the Node child both stop.
     Process.kill("-TERM", pid)
-    # Thread#join(timeout) returns nil on timeout; skip KILL if TERM already reaped the process.
+    # join returns the Thread when TERM reaped the process; nil means the process is still alive.
+    # Skip KILL only when TERM already reaped the process.
     next if rsc_node_renderer_waiter&.join(5)
 
     Process.kill("-KILL", pid)
