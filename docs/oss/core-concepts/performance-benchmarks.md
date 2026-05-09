@@ -89,7 +89,7 @@ Server components produce HTML that does not need hydration — they have no cli
 
 ## Real-World Results
 
-### Local Directional Benchmark: Gumroad-Style RSC Demo
+### Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026)
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo, not an official Gumroad integration. It measures a bounded creator-dashboard
@@ -124,7 +124,7 @@ The median results showed this directional signal:
 | Navigation duration                         |     775.40ms | 607.15ms | -21.7% |
 | Largest Contentful Paint                    |     794.00ms | 634.00ms | -20.2% |
 | `responseEnd`                               |     644.80ms | 588.80ms |  -8.7% |
-| Controller `action_total` (Rails wall time) |      346.9ms |  339.2ms |  -2.2% |
+| Controller `action_total` (Rails wall time) |     346.90ms | 339.20ms |  -2.2% |
 | Page-specific script requests (count only)  |            6 |        1 | -83.3% |
 
 _The script-count row does not measure combined transfer-size. See [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259)._
