@@ -9,7 +9,7 @@ For most applications, the recommended approach is React on Rails TestHelper wit
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
 end
 ```
 
@@ -50,7 +50,7 @@ React on Rails supports two mutually exclusive approaches for compiling webpack 
 ```ruby
 # config/initializers/react_on_rails.rb
 ReactOnRails.configure do |config|
-  config.build_test_command = "NODE_ENV=test RAILS_ENV=test bin/shakapacker"
+  config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
 
   # Or use your project's package manager with a custom script:
   # config.build_test_command = "pnpm run build:test"  # or: npm run build:test, yarn run build:test
@@ -214,7 +214,7 @@ test:
 
 ```ruby
 # config/initializers/react_on_rails.rb
-config.build_test_command = "RAILS_ENV=test bin/shakapacker"  # ← ...with this
+config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"  # ← ...with this
 
 # spec/rails_helper.rb
 ReactOnRails::TestHelper.configure_rspec_to_compile_assets(config)  # ← ...and this
@@ -245,7 +245,7 @@ This will cause assets to be compiled multiple times unnecessarily.
 3. Remove or comment out `build_test_command` in React on Rails config:
    ```ruby
    # config/initializers/react_on_rails.rb
-   # config.build_test_command = "RAILS_ENV=test bin/shakapacker"  # ← Comment out
+   # config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"  # ← Comment out
    ```
 
 ### From Shakapacker Auto-Compilation → React on Rails Test Helper
@@ -262,7 +262,7 @@ This will cause assets to be compiled multiple times unnecessarily.
 
    ```ruby
    # config/initializers/react_on_rails.rb
-   config.build_test_command = "RAILS_ENV=test bin/shakapacker"
+   config.build_test_command = "RAILS_ENV=test NODE_ENV=test bin/shakapacker"
    ```
 
 3. Add test helper configuration:
@@ -361,7 +361,7 @@ rm -rf public/webpack/test
 2. Can you run the command manually?
 
    ```bash
-   RAILS_ENV=test bin/shakapacker
+   RAILS_ENV=test NODE_ENV=test bin/shakapacker
    ```
 
 3. Are your webpack configs valid for test environment?
@@ -403,7 +403,7 @@ end
 If you're using the React on Rails test helper and want to avoid waiting for compilation on each test run, run your build command with the `--watch` flag in a separate terminal:
 
 ```bash
-RAILS_ENV=test bin/shakapacker --watch
+RAILS_ENV=test NODE_ENV=test bin/shakapacker --watch
 
 # Or with your package manager:
 # pnpm run build:test --watch
@@ -539,7 +539,7 @@ When running tests in parallel (with `parallel_tests` gem):
 - Each process compiles independently (may be slow)
 - Consider precompiling assets before running parallel tests:
   ```bash
-  RAILS_ENV=test bin/shakapacker
+  RAILS_ENV=test NODE_ENV=test bin/shakapacker
   bundle exec rake parallel:spec
   ```
 
