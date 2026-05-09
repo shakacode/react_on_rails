@@ -95,7 +95,7 @@ The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rai
 is a public ShakaCode comparison repo, not an official Gumroad integration. It measures a bounded creator-dashboard
 surface with the same reduced presenter data and outer layout across two routes:
 
-- Inertia-style control: `/dashboard/inertia_demo`
+- Inertia-style control: `/dashboard/inertia_demo` (uses the actual `inertia_rails` gem; no Pro renderer)
 - React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
 
 > **Note:** Both routes use the same Shakapacker/Rspack page-asset build; this comparison measures the route-level RSC
@@ -125,23 +125,27 @@ The median results showed this directional signal:
 | Page-specific script requests               |            6 |        1 | -83.3% |
 
 _All values are medians (n=4 per route); sample size is too small to establish statistical significance._
+_The `action_total` delta (-2.2%) is likely within expected variance at n=4._
+_Script count only; combined transfer-size is not yet captured. See [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259)._
 _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
-The observed **max `responseEnd`** across the four RSC runs was 768.25ms vs. 730.62ms for the Inertia control's max - a
-+5.2% RSC regression on worst-case `responseEnd` (high variance is expected at n=4), indicating the Inertia control had
-a faster worst-case `responseEnd` than the RSC route.
+Worst-case counter-signal:
+
+| Metric                              | Inertia demo | RSC demo | Delta |
+| ----------------------------------- | -----------: | -------: | ----: |
+| Max `responseEnd` (worst-case, n=4) |     730.62ms | 768.25ms | +5.2% |
+
+The max row is a max-vs-max comparison, not a stable tail-latency estimate. It shows a +5.2% RSC regression on
+worst-case `responseEnd` (high variance is expected at n=4), indicating the Inertia control had a faster worst-case
+`responseEnd` than the RSC route.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
-user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the worst-case
-timing still favored the Inertia control. A stable deployed repeat, renderer-internal timing, environment metadata, and
-distribution artifacts are still required before making stronger production-performance claims.
-
-The script-request row counts browser-observed page-specific script resources only; combined transfer-size capture is
-tracked in [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
+user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the max
+`responseEnd` counter-signal was faster for the Inertia control. A stable deployed repeat, renderer-internal timing,
+environment metadata, and distribution artifacts are still required before making stronger production-performance claims.
 
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
-[Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion, and
-[Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) for the environment-metadata follow-up.
+[Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
 
 ### Popmenu
 
