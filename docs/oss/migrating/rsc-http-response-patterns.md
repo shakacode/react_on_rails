@@ -67,8 +67,10 @@ class StoryPagePreflight
     :cache_control,
     keyword_init: true
   ) do
-    # Override the Struct-generated accessor to supply a default when the field is nil.
+    # Supply a default only for redirect results.
     def redirect_status
+      return unless redirect_reason
+
       self[:redirect_status] || :see_other
     end
   end
@@ -190,7 +192,7 @@ def show
 
   if story.removed?
     # Use this branch only when removed stories are truly permanent in your app.
-    response.headers["Cache-Control"] = "public, max-age=3600"
+    response.headers["Cache-Control"] = "public, max-age=0, s-maxage=3600"
     return render(template: "errors/gone", status: :gone)
   end
 
