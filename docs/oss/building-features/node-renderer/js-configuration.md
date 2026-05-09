@@ -99,19 +99,20 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-If your Node.js runtime does not provide these globals, install a fetch implementation and pass that implementation through `additionalContext` instead. For CommonJS launch files, use a CJS-compatible implementation such as `node-fetch` v2 or `undici`; `node-fetch` v3+ is ESM-only.
+If your Node.js runtime does not provide these globals, install a fetch implementation and pass that implementation through `additionalContext` instead. For CommonJS launch files, use a CJS-compatible implementation such as `node-fetch` v2 or a compatible `undici` version; `node-fetch` v3+ is ESM-only. Pin the `undici` major version to match your Node.js runtime: v5 for Node.js 14/16, v6 for Node.js 18.17+, or v7+ for Node.js 20.18.1+.
 
 For example, with `node-fetch` v2 in a CommonJS launch file:
 
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
-const fetchImplementation = require('node-fetch'); // node-fetch v2 (CJS)
+const nodeFetch = require('node-fetch'); // node-fetch v2 (CJS)
+const fetchImplementation = nodeFetch;
 const {
   Headers: HeadersImplementation,
   Request: RequestImplementation,
   Response: ResponseImplementation,
-} = fetchImplementation;
+} = nodeFetch;
 
 reactOnRailsProNodeRenderer({
   supportModules: true,
@@ -124,7 +125,7 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export:
+Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export. Pin `undici` to v5 for Node.js 14/16, v6 for Node.js 18.17+, or v7+ for Node.js 20.18.1+:
 
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
