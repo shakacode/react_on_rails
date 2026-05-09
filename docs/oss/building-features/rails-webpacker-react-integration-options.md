@@ -90,7 +90,7 @@ module.exports = commonWebpackConfig;
 
 ## Legacy Webpacker / Webpack 4 migration shims
 
-If you are moving an older `react-rails` app to React on Rails while it is still on Webpacker 5 / Webpack 4, prefer upgrading to Shakapacker first when you can.
+If you are on Webpacker 5 / Webpack 4, whether you are migrating from `react-rails` or upgrading an existing React on Rails app, prefer upgrading to Shakapacker first when you can.
 
 These shims are not covered by React on Rails CI and are documented as a temporary bridge for apps still on Webpacker 5 / Webpack 4; the bundler is the compatibility constraint, so verify your full app locally before relying on them.
 
@@ -154,6 +154,7 @@ Keep each shim explicit and narrow:
    - Use a project-wide `babel.config.js` or `babel.config.json`. Package-scoped `.babelrc` files and `package.json#babel` settings will not apply when Babel processes files inside `node_modules/react-on-rails`.
    - If your app only has `.babelrc`, move that config into `babel.config.js` before adding this rule.
    - Confirm Step 2 is in place, either through the standalone optional chaining and nullish coalescing plugins or through existing `@babel/preset-env` targets that already include those transforms.
+   - If your `@babel/preset-env` config uses `modules: false`, add a `babel.config.js` `overrides` entry that applies `@babel/plugin-transform-modules-commonjs` to `node_modules/react-on-rails`; otherwise Webpack 4 can still fail on the package's ESM files.
    - If your Webpacker stack pins Babel dependencies, choose plugin versions compatible with your installed `@babel/core`.
 
    `rootMode: 'upward'` tells Babel to walk up from `node_modules/react-on-rails` to the project root so it
@@ -186,7 +187,7 @@ Keep each shim explicit and narrow:
    ```
 
    If you see parse errors from `react-on-rails` files after changing the Babel config, clear the `babel-loader`
-   cache (typically `.cache/babel-loader/` in the project root) and re-run the build.
+   cache (typically `node_modules/.cache/babel-loader/` in the project root) and re-run the build.
 
    If your `environment.js` already has other configuration, add the `loaders.append` block before the existing `module.exports` line.
 
@@ -197,8 +198,17 @@ Keep each shim explicit and narrow:
 
    **When to apply:** Only add this Jest config if your project runs Jest directly.
 
-   If you do not have existing `transformIgnorePatterns`, add the two-pattern form so Jest also handles pnpm's
-   `.pnpm` store path:
+   If you do not have existing `transformIgnorePatterns`, npm and yarn projects can use the single package lookahead:
+
+   ```js
+   // jest.config.js
+   module.exports = {
+     // keep existing config
+     transformIgnorePatterns: ['node_modules/(?!react-on-rails)'],
+   };
+   ```
+
+   For pnpm projects, use the two-pattern form so Jest also handles pnpm's `.pnpm` store path:
 
    ```js
    // jest.config.js
