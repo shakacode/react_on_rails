@@ -45,6 +45,7 @@ module ReactOnRails
     after do
       ReactOnRails.configuration.server_bundle_js_file = old_server_bundle
       ReactOnRails.configuration.components_subdirectory = old_subdirectory
+      ReactOnRails.configuration.auto_load_bundle = old_auto_load_bundle
 
       FileUtils.rm_rf "#{packer_source_entry_path}/generated"
       FileUtils.rm_rf generated_server_bundle_file_path
@@ -399,6 +400,21 @@ module ReactOnRails
         end.not_to output(GENERATED_PACKS_CONSOLE_OUTPUT_REGEX).to_stdout
       end
 
+      it "does not require a generated server bundle when server bundle output is not configured" do
+        generator = described_class.new
+        server_bundle_path = generated_server_bundle_file_path
+        old_server_bundle = ReactOnRails.configuration.server_bundle_js_file
+        ReactOnRails.configuration.server_bundle_js_file = nil
+        FileUtils.mkdir_p(generated_directory)
+        FileUtils.rm_f(server_bundle_path)
+        allow(generator).to receive(:stale_or_missing_packs?).and_return(false)
+
+        expect(generator.send(:generated_files_present_and_up_to_date?)).to be(true)
+      ensure
+        ReactOnRails.configuration.server_bundle_js_file = old_server_bundle
+        FileUtils.touch(server_bundle_path) if server_bundle_path
+      end
+
       it "adds a single import statement to the server bundle" do
         test_string = "// import statement added by react_on_rails:generate_packs"
         same_instance = described_class.instance
@@ -408,6 +424,92 @@ module ReactOnRails
         # the following expectation checks that an additional import statement is not added if one already exists
         same_instance.generate_packs_if_stale
         expect(File.read(server_bundle_js_file_path).scan(/(?=#{test_string})/).count).to equal(1)
+      end
+
+      it "serializes concurrent generation and rechecks staleness after waiting" do
+        generator = nil
+        first_thread = nil
+        second_thread = nil
+        old_auto = old_auto_load_bundle
+
+        generator = described_class.new
+        generation_started = Queue.new
+        release_generation = Queue.new
+        second_about_to_lock = Queue.new
+        second_completed = Queue.new
+        generation_count = 0
+
+        allow(generator).to receive(:with_generated_packs_lock).and_wrap_original do |original, *args, **kwargs, &block|
+          second_about_to_lock << true if Thread.current[:packs_generator_spec_thread] == :second
+          original.call(*args, **kwargs, &block)
+        end
+        allow(generator).to receive(:add_generated_pack_to_server_bundle)
+        allow(generator).to receive(:clean_non_generated_files_with_feedback)
+        allow(generator).to receive(:clean_generated_directories_with_feedback)
+        allow(generator).to receive(:generated_files_present_and_up_to_date?).and_return(false, true)
+        allow(generator).to receive(:generate_packs) do
+          generation_count += 1
+          generation_started << true
+          release_generation.pop
+        end
+
+        ReactOnRails.configuration.auto_load_bundle = true
+        first_thread = Thread.new { generator.generate_packs_if_stale }
+        expect(generation_started.pop(timeout: 5)).to be(true)
+
+        second_thread = Thread.new do
+          Thread.current[:packs_generator_spec_thread] = :second
+          generator.generate_packs_if_stale
+          second_completed << true
+        end
+
+        expect(second_about_to_lock.pop(timeout: 5)).to be(true)
+        expect { second_completed.pop(true) }.to raise_error(ThreadError)
+
+        release_generation << true
+        expect(first_thread.join(5)).to eq(first_thread)
+        expect(second_thread.join(5)).to eq(second_thread)
+
+        expect(generation_count).to eq(1)
+      ensure
+        first_thread&.kill if first_thread&.alive?
+        second_thread&.kill if second_thread&.alive?
+        if generator
+          lock_path = generator.send(:generated_packs_lock_path)
+          FileUtils.rm_f(lock_path) if lock_path
+        end
+        ReactOnRails.configuration.auto_load_bundle = old_auto
+      end
+
+      it "clears stale lock contents without unlinking the lock file" do
+        generator = described_class.new
+        lock_path = generator.send(:generated_packs_lock_path)
+        FileUtils.mkdir_p(lock_path.dirname)
+        File.write(lock_path, "pid=stale\n")
+        FileUtils.touch(lock_path, mtime: Time.now - described_class::GENERATED_PACKS_LOCK_TTL_SECONDS - 1)
+
+        original_inode = File.stat(lock_path).ino
+
+        generator.send(:clear_stale_generated_packs_lock, lock_path)
+
+        expect(File.exist?(lock_path)).to be(true)
+        expect(File.stat(lock_path).ino).to eq(original_inode)
+        expect(File.read(lock_path)).to eq("")
+      ensure
+        FileUtils.rm_f(lock_path) if lock_path
+      end
+
+      it "ignores inaccessible stale lock files" do
+        generator = described_class.new
+        lock_path = generator.send(:generated_packs_lock_path)
+        FileUtils.mkdir_p(lock_path.dirname)
+        File.write(lock_path, "pid=stale\n")
+        FileUtils.touch(lock_path, mtime: Time.now - described_class::GENERATED_PACKS_LOCK_TTL_SECONDS - 1)
+        allow(File).to receive(:open).with(lock_path, File::RDWR).and_raise(Errno::EACCES)
+
+        expect { generator.send(:clear_stale_generated_packs_lock, lock_path) }.not_to raise_error
+      ensure
+        FileUtils.rm_f(lock_path) if lock_path
       end
 
       it "generate packs if a new component is added" do
