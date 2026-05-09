@@ -139,20 +139,20 @@ Copy this table when opening a migration PR:
 <!-- Use "not claimed" for evidence fields that do not apply. Use "none" for Known blockers when there are none. -->
 <!-- Validation is required; do not leave it blank. -->
 
-| Field                     | Value                                                             |
-| ------------------------- | ----------------------------------------------------------------- |
-| Baseline ref              |                                                                   |
-| Migration ref             |                                                                   |
-| Route or component        |                                                                   |
-| Date captured             |                                                                   |
-| React on Rails version    |                                                                   |
-| Starting integration      |                                                                   |
-| Migration slice           |                                                                   |
-| Performance evidence      |                                                                   |
-| Maintainability evidence  |                                                                   |
-| Validation                | Required: test/build command, smoke check, screenshot, or CI link |
-| Known blockers or caveats |                                                                   |
-| Honest summary sentence   |                                                                   |
+| Field                     | Value |
+| ------------------------- | ----- |
+| Baseline ref              |       |
+| Migration ref             |       |
+| Route or component        |       |
+| Date captured             |       |
+| React on Rails version    |       |
+| Starting integration      |       |
+| Migration slice           |       |
+| Performance evidence      |       |
+| Maintainability evidence  |       |
+| Validation                |       |
+| Known blockers or caveats |       |
+| Honest summary sentence   |       |
 ```
 
 Example summary sentences:
