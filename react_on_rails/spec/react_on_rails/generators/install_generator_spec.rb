@@ -2067,6 +2067,18 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  it "keeps the fallback pin tied to a version-specific pnpm release note" do
+    fallback_version = described_class.const_get(:CI_PNPM_FALLBACK_VERSION)
+    generator_source = File.read(
+      File.expand_path("../../../lib/generators/react_on_rails/install_generator.rb", __dir__)
+    )
+
+    expect(fallback_version).to match(/\A\d+\.\d+\.\d+\z/)
+    expect(generator_source).to include(
+      "https://github.com/pnpm/pnpm/releases/tag/v#{fallback_version}"
+    )
+  end
+
   context "when env selects pnpm but packageManager declares yarn" do
     previous_package_manager = nil
 

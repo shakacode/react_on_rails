@@ -138,8 +138,9 @@ module ReactOnRails
       # version because `pnpm/action-setup` requires one unless package.json declares
       # `packageManager`. Bump on each pnpm major/minor so projects that generated a
       # lockfile with a newer pnpm but never committed `packageManager` get a runtime
-      # that can still read the lockfile. Check https://github.com/pnpm/pnpm/releases
-      # for the current stable version when bumping. Last checked 2026-05-08: v11.0.8.
+      # that can still read the lockfile. Track the exact release used for this fallback
+      # at https://github.com/pnpm/pnpm/releases/tag/v11.0.8; update this URL with the
+      # constant when bumping. Last checked 2026-05-08.
       # Users who need exact reproducibility should commit `packageManager` to their
       # package.json instead.
       CI_PNPM_FALLBACK_VERSION = "11.0.8"
@@ -270,8 +271,11 @@ module ReactOnRails
         end
 
         package_json = GeneratorMessages.read_package_json(destination_root)
+        skip_package_json_detection = package_json.nil?
         package_manager = GeneratorMessages.detect_package_manager(
-          app_root: destination_root, package_json: package_json
+          app_root: destination_root,
+          package_json: package_json,
+          skip_package_json_detection: skip_package_json_detection
         )
         # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
         # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
@@ -282,7 +286,10 @@ module ReactOnRails
         # pnpm while package.json declares a different manager still gets the version pin.
         package_manager_declared = package_manager == "pnpm" &&
                                    GeneratorMessages.package_manager_declared?(
-                                     app_root: destination_root, manager: "pnpm", package_json: package_json
+                                     app_root: destination_root,
+                                     manager: "pnpm",
+                                     package_json: package_json,
+                                     skip_package_json_detection: skip_package_json_detection
                                    )
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||

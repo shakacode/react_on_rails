@@ -10,7 +10,17 @@ module GeneratorMessages
   module PackageManagerDetection
     SUPPORTED_PACKAGE_MANAGERS = %w[npm pnpm yarn bun].freeze
     PACKAGE_JSON_UNSET = Object.new.freeze
+    SEMVER_NUMBER_PATTERN = "(?:0|[1-9]\\d*)"
+    SEMVER_IDENTIFIER_PATTERN = "[0-9A-Za-z-]+"
+    PACKAGE_MANAGER_VERSION_PATTERN = /
+      \A
+      #{SEMVER_NUMBER_PATTERN}\.#{SEMVER_NUMBER_PATTERN}\.#{SEMVER_NUMBER_PATTERN}
+      (?:-#{SEMVER_IDENTIFIER_PATTERN}(?:\.#{SEMVER_IDENTIFIER_PATTERN})*)?
+      (?:\+#{SEMVER_IDENTIFIER_PATTERN}(?:\.#{SEMVER_IDENTIFIER_PATTERN})*)?
+      \z
+    /x
     private_constant :PACKAGE_JSON_UNSET
+    private_constant :SEMVER_NUMBER_PATTERN, :SEMVER_IDENTIFIER_PATTERN, :PACKAGE_MANAGER_VERSION_PATTERN
 
     # Hash insertion order is the detection priority used by
     # detect_package_manager_from_lockfiles (yarn -> pnpm -> bun -> npm).
@@ -33,26 +43,30 @@ module GeneratorMessages
     # Pass package_json: <parsed_hash> to reuse an already-parsed package.json and
     # avoid a re-read (callers that also inspect scripts/deps should parse once and
     # pass the hash).
-    # Pass package_json: nil to skip JSON detection (e.g. when read_package_json already
-    # returned nil because package.json is absent or unreadable); detection falls through
-    # directly to lockfile heuristics.
-    # Compatibility note: nil is not the default behavior for this keyword. Omit the
-    # keyword when callers want detect_package_manager to perform its own disk read.
-    def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
-      detect_package_manager_with_source(app_root: app_root, package_json: package_json).first
+    # Pass skip_package_json_detection: true only when the caller already attempted to
+    # read package.json and wants detection to fall through directly to lockfile heuristics.
+    def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET,
+                               skip_package_json_detection: false)
+      detect_package_manager_with_source(
+        app_root: app_root,
+        package_json: package_json,
+        skip_package_json_detection: skip_package_json_detection
+      ).first
     end
 
     # source is one of :env, :package_json, :lockfile, :default — used to
     # name the originating source when surfacing detection errors.
-    def detect_package_manager_with_source(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
+    def detect_package_manager_with_source(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET,
+                                           skip_package_json_detection: false)
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
       return [env_package_manager, :env] if supported_package_manager?(env_package_manager)
 
-      pm_from_json = if package_json.equal?(PACKAGE_JSON_UNSET)
-                       detect_package_manager_from_package_json(app_root: app_root)
-                     elsif !package_json.nil?
-                       package_manager_from_content(package_json)
-                     end
+      content = package_json_content(
+        app_root: app_root,
+        package_json: package_json,
+        skip_package_json_detection: skip_package_json_detection
+      )
+      pm_from_json = content ? package_manager_from_content(content) : nil
       return [pm_from_json, :package_json] if pm_from_json
 
       pm_from_lockfile = detect_package_manager_from_lockfiles(app_root: app_root)
@@ -81,12 +95,15 @@ module GeneratorMessages
     # has no version to resolve from it. Used by the CI scaffold to decide whether
     # `pnpm/action-setup` needs an explicit `version:` key.
     # Pass package_json: to reuse an already-parsed package.json and avoid a re-read.
-    def package_manager_declared?(manager:, app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
-      content = if package_json.equal?(PACKAGE_JSON_UNSET)
-                  read_package_json(app_root)
-                else
-                  package_json
-                end
+    # Pass skip_package_json_detection: true only when the caller already attempted to
+    # read package.json and wants an absent declaration result without re-reading.
+    def package_manager_declared?(manager:, app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET,
+                                  skip_package_json_detection: false)
+      content = package_json_content(
+        app_root: app_root,
+        package_json: package_json,
+        skip_package_json_detection: skip_package_json_detection
+      )
       return false unless content
 
       declared = versioned_package_manager_from_content(content)
@@ -147,20 +164,29 @@ module GeneratorMessages
       content ? package_manager_from_content(content) : nil
     end
 
+    def package_json_content(app_root:, package_json:, skip_package_json_detection:)
+      return nil if skip_package_json_detection
+      return read_package_json(app_root) if package_json.equal?(PACKAGE_JSON_UNSET) || package_json.nil?
+
+      package_json
+    end
+
     # Stricter sibling of `package_manager_from_content`: requires the full
-    # `<name>@<version>` Corepack form. A bare `"pnpm"` still expresses package-manager
-    # intent for generator command selection, but `pnpm/action-setup` has no version to
-    # resolve from it, so the CI scaffold must still pin a fallback.
+    # `<name>@<semver>` Corepack form. A bare `"pnpm"` or `"pnpm@next"` still expresses
+    # package-manager intent for generator command selection, but `pnpm/action-setup`
+    # has no numeric SemVer pin to resolve from it, so the CI scaffold must still pin
+    # a fallback.
     def versioned_package_manager_from_content(content)
       raw_declared = content["packageManager"]
       return nil unless raw_declared.is_a?(String)
 
       declared = raw_declared.strip
-      match = declared.match(/\A([^@\s]+)@\S+\z/)
+      match = declared.match(/\A([^@\s]+)@(\S+)\z/)
       return nil unless match
 
       name = match[1].downcase
-      supported_package_manager?(name) ? name : nil
+      version = match[2]
+      supported_package_manager?(name) && version.match?(PACKAGE_MANAGER_VERSION_PATTERN) ? name : nil
     end
   end
 end

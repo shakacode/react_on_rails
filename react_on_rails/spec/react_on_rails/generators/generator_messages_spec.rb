@@ -159,14 +159,25 @@ describe GeneratorMessages do
       expect(described_class.detect_package_manager).to eq("yarn")
     end
 
-    it "skips package.json disk detection when package_json: nil is passed explicitly" do
+    it "treats package_json: nil like the default and still reads package.json" do
+      allow(File).to receive(:exist?).and_call_original
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
+      allow(File).to receive(:exist?).with(File.join(Dir.pwd, "yarn.lock")).and_return(true)
+      allow(File).to receive(:read).and_call_original
+      allow(File).to receive(:read).with(File.join(Dir.pwd, "package.json"))
+                                   .and_return('{"packageManager": "pnpm@8.0.0"}')
+
+      expect(described_class.detect_package_manager(package_json: nil)).to eq("pnpm")
+    end
+
+    it "skips package.json disk detection only when explicitly requested" do
       expect(described_class).not_to receive(:read_package_json)
       allow(File).to receive(:exist?).and_call_original
       %w[yarn.lock pnpm-lock.yaml bun.lock bun.lockb package-lock.json].each do |lockfile|
         allow(File).to receive(:exist?).with(File.join(Dir.pwd, lockfile)).and_return(false)
       end
 
-      expect(described_class.detect_package_manager(package_json: nil)).to eq("npm")
+      expect(described_class.detect_package_manager(skip_package_json_detection: true)).to eq("npm")
     end
 
     it "returns nil from detect_package_manager_from_package_json for malformed JSON" do
@@ -393,6 +404,15 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(true)
     end
 
+    it "returns true when packageManager includes a SemVer prerelease" do
+      expect(
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          package_json: { "packageManager" => "pnpm@11.0.0-alpha.1" }
+        )
+      ).to be(true)
+    end
+
     it "returns false when packageManager is absent" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path).and_return('{"name":"app"}')
@@ -404,10 +424,23 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
-    it "returns false without reading package.json when package_json: nil is passed explicitly" do
+    it "treats package_json: nil like the default and still reads package.json" do
+      allow(File).to receive(:exist?).with(package_json_path).and_return(true)
+      allow(File).to receive(:read).with(package_json_path)
+                                   .and_return('{"packageManager":"pnpm@9.0.0"}')
+
+      expect(described_class.package_manager_declared?(manager: "pnpm", package_json: nil)).to be(true)
+    end
+
+    it "skips package.json disk detection only when explicitly requested" do
       expect(File).not_to receive(:read)
 
-      expect(described_class.package_manager_declared?(manager: "pnpm", package_json: nil)).to be(false)
+      expect(
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          skip_package_json_detection: true
+        )
+      ).to be(false)
     end
 
     it "returns false when packageManager declares an unsupported tool" do
@@ -439,6 +472,17 @@ describe GeneratorMessages do
       allow(File).to receive(:read).with(package_json_path)
                                    .and_return('{"packageManager":"pnpm@9.0.0 extra text"}')
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
+    end
+
+    it "returns false when packageManager has a non-SemVer version label" do
+      %w[pnpm@alpha pnpm@next pnpm@9 pnpm@01.0.0].each do |package_manager|
+        expect(
+          described_class.package_manager_declared?(
+            manager: "pnpm",
+            package_json: { "packageManager" => package_manager }
+          )
+        ).to be(false), "expected #{package_manager.inspect} not to count as a Corepack SemVer pin"
+      end
     end
 
     it "uses a provided package_json without reading package.json again" do
