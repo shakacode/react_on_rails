@@ -98,7 +98,8 @@ Webpack 4 does not support the `exports` field in `package.json`, so subpath imp
 
 Step 1 is conditional: only needed if your packs currently import `react-on-rails/client`. Step 2 is also
 conditional: only needed if Webpack 4 fails to parse modern syntax, but confirm Step 2 is satisfied before
-adding Step 3 because Step 3 always depends on those Babel transforms. Keep each shim explicit and narrow:
+adding Step 3 because Step 3 always depends on those Babel transforms. Step 4 is conditional: only needed if
+your project uses Jest. Keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
 
@@ -111,7 +112,11 @@ adding Step 3 because Step 3 always depends on those Babel transforms. Keep each
 
 2. Ensure Babel can parse modern syntax used by current packages. Add these plugins to your existing Babel config without replacing existing presets or plugins:
 
-   If your existing `@babel/preset-env` targets already include optional chaining and nullish coalescing transforms, you can skip installing the standalone plugins. Run `npx browserslist` to confirm the targets used by your app.
+   If you want to confirm whether your `@babel/preset-env` targets already include optional chaining and
+   nullish coalescing, set `debug: true` on the `@babel/preset-env` options and check the build output for
+   `proposal-optional-chaining` and `proposal-nullish-coalescing-operator` in the "Using plugins" list. If they
+   appear there, you can skip the standalone packages; when in doubt, install them because they are no-ops if
+   `preset-env` already transforms the syntax.
 
    ```bash
    yarn add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
@@ -171,6 +176,9 @@ adding Step 3 because Step 3 always depends on those Babel transforms. Keep each
 
    module.exports = environment;
    ```
+
+   If you see parse errors from `react-on-rails` files after changing the Babel config, clear the `babel-loader`
+   cache (typically `.cache/babel-loader/` in the project root) and re-run the build.
 
    If your `environment.js` already has other configuration, add the `loaders.append` block before the existing `module.exports` line.
 
