@@ -80,6 +80,13 @@ const fetchImplementation = globalThis.fetch;
 const HeadersImplementation = globalThis.Headers;
 const RequestImplementation = globalThis.Request;
 const ResponseImplementation = globalThis.Response;
+const abortContext =
+  globalThis.AbortController && globalThis.AbortSignal
+    ? {
+        AbortController: globalThis.AbortController,
+        AbortSignal: globalThis.AbortSignal,
+      }
+    : {};
 
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
@@ -95,23 +102,12 @@ reactOnRailsProNodeRenderer({
     Headers: HeadersImplementation,
     Request: RequestImplementation,
     Response: ResponseImplementation,
+    ...abortContext,
   },
 });
 ```
 
-If your component code creates abort signals, pass `AbortController` and `AbortSignal` through `additionalContext` with the fetch implementation or provide a compatible polyfill. `supportModules` does not add those globals. Keep them optional unless your component code requires them:
-
-```js
-const abortContext =
-  globalThis.AbortController && globalThis.AbortSignal
-    ? {
-        AbortController: globalThis.AbortController,
-        AbortSignal: globalThis.AbortSignal,
-      }
-    : {};
-
-// Merge into additionalContext above only when component code uses abort signals.
-```
+If your component code creates abort signals, keep the `...abortContext` spread above or replace it with compatible polyfill imports on runtimes without native abort globals. If your components do not create abort signals, omit `abortContext`. `supportModules` does not add those globals.
 
 Install a fetch implementation only when your renderer runtime does not provide these globals, or when you intentionally want a bundled HTTP client instead of the host runtime's implementation. Use this decision guide:
 
@@ -128,8 +124,9 @@ For example, with `node-fetch` v2 in a CommonJS launch file:
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
 // node-fetch v2: the default CJS export is the fetch function itself.
-// Headers, Request, and Response are properties attached to that function, not named exports.
-// Do not destructure `fetch` from require("node-fetch"); require it as the whole module instead.
+// Headers, Request, and Response are attached as properties on that function.
+// Do NOT write: const { fetch } = require("node-fetch").
+// Require the whole module and use it directly as the fetch function instead.
 let nodeFetch;
 
 try {
@@ -148,7 +145,7 @@ const {
   Response: ResponseImplementation,
 } = nodeFetch;
 
-if (!HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+if (!nodeFetch || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
     'node-fetch v2 did not expose one or more required fetch classes (Headers, Request, Response). ' +
       'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
@@ -168,7 +165,7 @@ reactOnRailsProNodeRenderer({
 
 `node-fetch` v2 does not include `AbortController` or `AbortSignal`. If component code uses abort signals, merge the optional `abortContext` shown above into `additionalContext`, or use a compatible polyfill on older EOL runtimes.
 
-Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export; choose a version compatible with your renderer Node.js runtime. Add the same startup guard so incompatible versions fail before the renderer starts:
+Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export; choose a version compatible with your renderer Node.js runtime. Add the same startup guard so incompatible versions fail before the renderer starts. The example below uses CommonJS; ESM launchers can import the same names from `undici` and alias them to the `*Implementation` constants used here.
 
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
