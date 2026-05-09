@@ -121,10 +121,11 @@ Keep each shim explicit and narrow:
 
    If you want to confirm whether your `@babel/preset-env` targets already include optional chaining and
    nullish coalescing, set `debug: true` on the `@babel/preset-env` options and check the build output for
-   `optional-chaining` and `nullish-coalescing-operator` in the "Using plugins" list. Babel < 7.8 uses only the
-   `proposal-*` package names; starting with Babel 7.8, the `transform-*` package names are available. If the
-   transforms already appear in the preset output, you can skip the standalone packages; when in doubt, install them
-   because they are no-ops if `preset-env` already transforms the syntax.
+   `optional-chaining` and `nullish-coalescing-operator` in the "Using plugins" list. Use the `transform-*` package
+   names when your pinned Babel stack provides them; if a legacy Babel stack cannot resolve those packages, use the
+   equivalent `proposal-*` package names that match your installed `@babel/core`. If the transforms already appear in
+   the preset output, you can skip the standalone packages; when in doubt, install them because they are no-ops if
+   `preset-env` already transforms the syntax.
 
    ```bash
    yarn add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
