@@ -89,7 +89,7 @@ Server components produce HTML that does not need hydration — they have no cli
 
 ## Real-World Results
 
-### Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026)
+### Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo, not an official Gumroad integration. It measures a bounded creator-dashboard
@@ -118,20 +118,22 @@ The original artifact does not yet publish `RAILS_ENV`, hardware/OS, Ruby/Node/R
 [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing environment metadata; until
 that is resolved, treat these numbers as directional signals rather than a stable baseline.
 
-The browser timing medians and deterministic script request counts showed this directional signal:
+The browser timing medians showed this directional signal:
 
 | Metric                                      | Inertia demo | RSC demo |  Delta |
 | ------------------------------------------- | -----------: | -------: | -----: |
 | Navigation duration                         |     775.40ms | 607.15ms | -21.7% |
 | Largest Contentful Paint                    |     794.00ms | 634.00ms | -20.2% |
 | `responseEnd`                               |     644.80ms | 588.80ms |  -8.7% |
-| Controller `action_total` (Rails wall time) |     346.90ms | 339.20ms |  -2.2% |
-| Page-specific script requests (count only)  |            6 |        1 | -83.3% |
+| Controller `action_total` (Rails wall time) |     346.90ms | 339.20ms |  noise |
 
-_The script-count row is a fixed request count, not a median, and does not measure combined transfer-size. See [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259)._
-_All values are medians (n=4 per route); sample size is too small to establish statistical significance._
-_The `action_total` delta (-2.2%) is likely within expected variance at n=4._
-_Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
+The page-specific script request count changed from 6 requests for the Inertia demo to 1 request for the RSC demo. That
+is a fixed request count, not a timing median or statistical sample, and it does not measure combined transfer-size. See
+[Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
+
+- _All timing values are medians (n=4 per route); sample size is too small to establish statistical significance._
+- _The `action_total` difference was -2.2%, which is likely within expected variance at n=4._
+- _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
 Worst-case counter-signal:
 
@@ -143,11 +145,11 @@ The max row is a max-vs-max comparison, not a stable tail-latency estimate. It s
 worst-case `responseEnd` (high variance is expected at n=4), indicating the Inertia control had a faster worst-case
 `responseEnd` than the RSC route.
 
-Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
-user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the route also
-benefits from both RSC and the Pro Node renderer with SSR, while the Inertia control has neither. The max `responseEnd`
-counter-signal was faster for the Inertia control. A stable deployed repeat, renderer-internal timing, environment
-metadata, and distribution artifacts are still required before making stronger production-performance claims.
+Use these numbers as a case-study signal, not a universal performance claim. The RSC route combines RSC, the Pro Node
+renderer, and SSR, while the Inertia control has none of those three factors. With that caveat, the RSC route was faster
+on user-visible median navigation duration and LCP while sending fewer page-specific script requests. The max
+`responseEnd` counter-signal was faster for the Inertia control. A stable deployed repeat, renderer-internal timing,
+environment metadata, and distribution artifacts are still required before making stronger production-performance claims.
 
 See [Issue 3128](https://github.com/shakacode/react_on_rails/issues/3128) and
 [Issue 3144](https://github.com/shakacode/react_on_rails/issues/3144) for the ongoing tracking discussion.
