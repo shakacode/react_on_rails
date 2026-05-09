@@ -70,7 +70,7 @@ The node renderer executes uploaded JavaScript bundles inside isolated VM contex
 
 Prefer passing application data from Rails controllers through props when the data belongs to your Rails app. When a Server Component really needs to call an external HTTP API from the renderer, choose one of these approaches:
 
-1. Inject host globals through `additionalContext`. On Node.js runtimes that already expose `globalThis.fetch`, start with the guarded example below so the renderer fails fast if any required fetch global is absent.
+1. Inject host globals through `additionalContext`. On Node.js 18+ runtimes that already expose `globalThis.fetch`, start with the guarded example below so the renderer fails fast if any required fetch global is absent. On Node.js versions before 18, use a bundled HTTP client instead (see option 2).
 2. Import a server-side HTTP client in the component code, such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici`, and let your bundler include it in the RSC/server bundle.
 
 ```js
@@ -99,14 +99,22 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-Install a fetch implementation only when your renderer runtime does not provide these globals, or when you intentionally want a bundled HTTP client instead of the host runtime's implementation. For CommonJS launch files, use a CJS-compatible implementation such as `node-fetch` v2 or an `undici` release compatible with your Node.js runtime; `node-fetch` v3+ is ESM-only. On supported Node.js LTS releases, use the latest `undici` release supported by your runtime; see [undici's compatibility notes](https://undici.nodejs.org/) for version pairing. If you maintain an older Node.js installation, pin the HTTP client to a version that still supports that runtime.
+Install a fetch implementation only when your renderer runtime does not provide these globals, or when you intentionally want a bundled HTTP client instead of the host runtime's implementation. Use this decision guide:
+
+| Situation                                                  | Recommendation                                                                                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js 18+ host, want to use the runtime's built-in fetch | Use the guarded `globalThis.fetch` / `additionalContext` example above.                                                                           |
+| CommonJS launch file, any Node.js version                  | Use `node-fetch` v2; `node-fetch` v3+ is ESM-only.                                                                                                |
+| Modern Node.js LTS, ESM or CommonJS                        | Use `undici` and choose a release compatible with your runtime; see [undici's compatibility notes](https://undici.nodejs.org/) for version pairs. |
+| Older Node.js installation                                 | Pin the HTTP client to a version that still supports that runtime.                                                                                |
 
 For example, with `node-fetch` v2 in a CommonJS launch file:
 
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
-const nodeFetch = require('node-fetch'); // node-fetch v2 (CJS)
+// node-fetch v2's CommonJS export is the fetch function, with Headers/Request/Response attached.
+const nodeFetch = require('node-fetch');
 const {
   Headers: HeadersImplementation,
   Request: RequestImplementation,

@@ -899,7 +899,7 @@ resolve: {
 }
 ```
 
-`resolve.fallback: false` tells webpack not to provide a polyfill for the module — the import resolves to an empty module at build time and no fallback shim is bundled. Apply the same rule to the RSC bundle when the node renderer executes it: the RSC bundle also runs in a VM context without host `require()` by default, so unresolved externals can crash there too.
+`resolve.fallback: false` tells webpack not to provide a polyfill for the module — the import resolves to an empty module at build time and no fallback shim is bundled. Apply the same rule to the RSC bundle when the node renderer executes it: the RSC bundle also runs in a VM context without host `require()` by default, so unresolved externals can crash at render time as well.
 
 ### MessageChannel Not Defined
 
