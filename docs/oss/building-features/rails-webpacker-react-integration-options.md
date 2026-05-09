@@ -130,19 +130,32 @@ Keep each shim explicit and narrow:
    + import ReactOnRails from 'react-on-rails';
    ```
 
-   The root import uses the full build and may log a browser console warning about bundled server-rendering code. It also includes a small amount of extra server-rendering code (the SSR capability module) in the client bundle compared to the `react-on-rails/client` entry point. That trade-off is expected for this temporary shim; remove the shim and return to the current client entry point after upgrading to Shakapacker/Webpack 5 or newer.
+   The root import uses the full build and may log a browser console warning about bundled server-rendering code. It
+   also includes a small amount of extra server-rendering code (the SSR capability module) in the client bundle compared
+   to the `react-on-rails/client` entry point. That trade-off is expected for this temporary shim; remove the shim and
+   return to the current client entry point after upgrading to Shakapacker/Webpack 5 or newer.
 
    Do not use the root default import as a replacement for named utility subpaths. Those modules do not export the
    default `ReactOnRails` object. If Webpack 4 cannot resolve one of these named subpaths, use the corresponding
    built-file path as a temporary compatibility import:
 
+   For `react-on-rails/context`, switch only that import:
+
    ```diff
    - import { getRailsContext } from 'react-on-rails/context';
    + import { getRailsContext } from 'react-on-rails/lib/context.js';
+   ```
 
+   For `react-on-rails/pageLifecycle`, switch only that import:
+
+   ```diff
    - import { onPageLoaded } from 'react-on-rails/pageLifecycle';
    + import { onPageLoaded } from 'react-on-rails/lib/pageLifecycle.js';
+   ```
 
+   For `react-on-rails/turbolinksUtils`, switch only that import:
+
+   ```diff
    - import { turbolinksSupported } from 'react-on-rails/turbolinksUtils';
    + import { turbolinksSupported } from 'react-on-rails/lib/turbolinksUtils.js';
    ```
@@ -234,6 +247,7 @@ Keep each shim explicit and narrow:
      overrides: [
        {
          test: /node_modules[\\/]react-on-rails[\\/]/,
+         // Adds CJS module transform on top of the global plugins from Step 2.
          plugins: ['@babel/plugin-transform-modules-commonjs'],
        },
      ],
