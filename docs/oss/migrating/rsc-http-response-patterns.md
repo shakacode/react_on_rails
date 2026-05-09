@@ -161,7 +161,7 @@ def show
   story = Story.find_by(slug: params[:slug])
 
   if story&.removed?
-    response.headers["Cache-Control"] = "public, max-age=3600" # Raise only for truly permanent removals.
+    response.headers["Cache-Control"] = "public, max-age=3600" # Cache only for truly permanent removals.
     return render(template: "errors/gone", status: :gone)
   end
 
