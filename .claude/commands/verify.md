@@ -46,7 +46,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `cd react_on_rails/spec/dummy && pnpm test:e2e` when the branch changes SSR rendering, client hydration, or
      browser-visible integration behavior
 5. Docs:
-   - `script/check-docs-sidebar` when docs under `docs/` changed
+   - `script/check-docs-sidebar` when docs under `docs/oss/` or `docs/pro/` changed
    - `bin/check-links` when Markdown URLs were added or edited; do not substitute an ad hoc link checker unless the
      branch changes `bin/check-links`, `.lychee.toml`, or the documented link-check workflow itself
 6. CI workflows and YAML:
@@ -66,7 +66,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - Dummy app or integration changes: run `rake run_rspec:dummy` or a targeted dummy spec such as `cd react_on_rails/spec/dummy && bundle exec rspec spec/path/to/spec.rb`. For changes that affect SSR rendering or client-side behavior, also run `cd react_on_rails/spec/dummy && pnpm test:e2e`.
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
-- Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`; it scans all Ruby files, not just staged files, but does not validate Markdown.
+- Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/oss/` or `docs/pro/`, and `bin/check-links` for new or changed URLs. If committing, still run the repo-wide `bundle exec rubocop` gate from `AGENTS.md`; it scans all Ruby files, not just staged files, but does not validate Markdown.
 - `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm start format.listDifferent`; in the Pro package, `pnpm start` delegates to that package's `nps` script, so this uses the package-local Prettier check.
 - `react_on_rails_pro/**/*.rb` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `bundle exec rubocop react_on_rails_pro/` and any targeted RSpec.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
