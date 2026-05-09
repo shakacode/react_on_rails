@@ -96,7 +96,9 @@ These shims are not covered by React on Rails CI and are documented for the lega
 
 Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims.
 
-Steps 1 and 2 are independent: apply each only if you hit the corresponding error. Step 3 always requires Step 2: configure the Babel transforms before adding the loader rule. Keep each shim explicit and narrow:
+Step 1 is conditional: only needed if your packs currently import `react-on-rails/client`. Step 2 is also
+conditional: only needed if Webpack 4 fails to parse modern syntax, but confirm Step 2 is satisfied before
+adding Step 3 because Step 3 always depends on those Babel transforms. Keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
 
@@ -116,6 +118,10 @@ Steps 1 and 2 are independent: apply each only if you hit the corresponding erro
    # or: npm install -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
    # or: pnpm add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
    ```
+
+   If a legacy stack reports peer dependency warnings for the `transform-*` package names, use the equivalent
+   `@babel/plugin-proposal-optional-chaining` and `@babel/plugin-proposal-nullish-coalescing-operator` packages
+   that match your pinned `@babel/core`.
 
    Add the plugins to the top-level `plugins` array, not inside an `env`-conditional block. The diff below
    applies to `babel.config.js`; for `babel.config.json`, add the same plugin strings to the equivalent JSON
@@ -188,9 +194,12 @@ Steps 1 and 2 are independent: apply each only if you hit the corresponding erro
 
    ```js
    // jest.config.js
-   // Before: ['<rootDir>/node_modules/(?!(other-esm-package)/)']
-   // After:
-   transformIgnorePatterns: ['<rootDir>/node_modules/(?!(react-on-rails|other-esm-package)/)'],
+   // Before: transformIgnorePatterns: ['<rootDir>/node_modules/(?!(other-esm-package)/)']
+   // After (add react-on-rails to the existing lookahead group):
+   module.exports = {
+     // keep existing config
+     transformIgnorePatterns: ['<rootDir>/node_modules/(?!(react-on-rails|other-esm-package)/)'],
+   };
    ```
 
 ---
