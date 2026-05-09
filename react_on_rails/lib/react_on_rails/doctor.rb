@@ -2952,6 +2952,10 @@ module ReactOnRails
       checker.add_warning(message)
     end
 
+    def config_path_warning_registry
+      checker.send(:config_path_warning_registry)
+    end
+
     def declared_react_version(package_root)
       package_json_path = File.join(package_root, "package.json")
       return nil unless File.exist?(package_json_path)

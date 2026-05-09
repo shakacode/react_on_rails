@@ -1993,6 +1993,22 @@ RSpec.describe ReactOnRails::Doctor do
           .to be true
         expect(warning_msgs.any? { |m| m[:content].include?("Pro package consistency") }).to be true
       end
+
+      it "warns once when checker and doctor see the same missing package root" do
+        allow(checker).to receive(:cli_exists?).with("npm").and_return(true)
+        allow(checker).to receive(:cli_exists?).with("pnpm").and_return(false)
+        allow(checker).to receive(:cli_exists?).with("yarn").and_return(false)
+        allow(checker).to receive(:cli_exists?).with("bun").and_return(false)
+
+        checker.check_package_manager
+        doctor.send(:check_pro_package_consistency)
+
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        root_warnings = warning_msgs.select do |message|
+          message[:content].include?("node_modules_location points to #{package_root}")
+        end
+        expect(root_warnings.length).to eq(1)
+      end
     end
 
     context "when the configured JS workspace exists without package.json" do

@@ -48,7 +48,7 @@ module ReactOnRails
       package_json_path = resolved_package_json_path
       return package_json_path if File.exist?(package_json_path)
 
-      package_root = resolved_package_root
+      package_root = File.dirname(package_json_path)
       if package_root_missing?(package_root)
         warn_missing_package_root(package_root, detection_target)
       else
@@ -57,6 +57,9 @@ module ReactOnRails
       nil
     end
 
+    # Including classes must provide #add_warning(message). Classes that route
+    # warnings into another object's message list can override
+    # #config_path_warning_registry to share de-dupe state with that sink.
     def warn_missing_package_root(package_root, detection_target)
       return unless warned_package_roots.add?(package_root)
 
@@ -80,11 +83,18 @@ module ReactOnRails
     end
 
     def warned_package_roots
-      @warned_package_roots ||= Set.new
+      config_path_warning_registry[:package_roots]
     end
 
     def warned_package_json_paths
-      @warned_package_json_paths ||= Set.new
+      config_path_warning_registry[:package_json_paths]
+    end
+
+    def config_path_warning_registry
+      @config_path_warning_registry ||= {
+        package_roots: Set.new,
+        package_json_paths: Set.new
+      }
     end
 
     def resolved_webpack_config_path
