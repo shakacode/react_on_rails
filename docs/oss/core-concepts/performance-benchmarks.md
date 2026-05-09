@@ -104,8 +104,9 @@ surface with the same reduced presenter data and outer layout across two routes:
 > on Rails Pro renderer or SSR, while the RSC route uses the Pro Node renderer. Treat the deltas as the combined
 > route-level effect; see the [SSR Performance table](#ssr-performance-execjs-vs-node-renderer) for the renderer baseline.
 
-The April 30, 2026 production-like local benchmark used eight alternating measured runs between the Inertia and RSC
-routes, four per route, with one warmup request before each measured run. Conditions:
+The April 30, 2026 local benchmark used eight alternating measured runs between the Inertia and RSC routes, four per
+route. Before each of the eight measured runs, the harness sent one warmup request to the route being measured.
+Conditions:
 
 - Compiled page assets from the same Shakapacker/Rspack configuration for both routes
 - Compiled RSC demo bundles
@@ -117,7 +118,7 @@ The original artifact does not yet publish `RAILS_ENV`, hardware/OS, Ruby/Node/R
 [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing environment metadata; until
 that is resolved, treat these numbers as directional signals rather than a stable baseline.
 
-The median results showed this directional signal:
+The browser timing medians and deterministic script request counts showed this directional signal:
 
 | Metric                                      | Inertia demo | RSC demo |  Delta |
 | ------------------------------------------- | -----------: | -------: | -----: |
@@ -127,7 +128,7 @@ The median results showed this directional signal:
 | Controller `action_total` (Rails wall time) |     346.90ms | 339.20ms |  -2.2% |
 | Page-specific script requests (count only)  |            6 |        1 | -83.3% |
 
-_The script-count row does not measure combined transfer-size. See [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259)._
+_The script-count row is a fixed request count, not a median, and does not measure combined transfer-size. See [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259)._
 _All values are medians (n=4 per route); sample size is too small to establish statistical significance._
 _The `action_total` delta (-2.2%) is likely within expected variance at n=4._
 _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
