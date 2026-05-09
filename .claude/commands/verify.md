@@ -14,10 +14,10 @@ reintroduces an earlier failure, stop and report the cycle instead of continuing
 2. Inspect the current branch diff with `git status --short`, `git diff --name-only origin/main...HEAD`, and
    `git diff --stat origin/main...HEAD`.
 3. Decide the minimal sufficient verification set that covers the changed surface area.
-4. Always include `bundle exec rubocop` when you will create or amend a commit, even when the changed surface is documentation-only, because `AGENTS.md` marks it mandatory before every commit.
+4. Always include `bundle exec rubocop` before creating a commit, even when the changed surface is documentation-only, because `AGENTS.md` marks it mandatory before every commit.
 5. Run each command in order and stop on the first failure. Report the failing command, the relevant error output, and the next fix to attempt.
 6. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
-7. After a fix, restart at the failed command and continue forward. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, stop and report the error instead of retrying.
+7. After a fix, restart at the failed command and continue forward. Count each fix-and-restart as one loop cycle and stop after three cycles unless the user explicitly asks you to keep debugging. Do not claim a failure is fixed until the failed command passes locally. If the same command fails again after a fix attempt, or a later fix reintroduces an earlier failure, stop and report the cycle instead of retrying.
 8. Finish with the exact commands run and their pass/fail status.
 
 ## Default Verification Order
@@ -28,7 +28,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `git diff --check origin/main...HEAD` for committed branch content before creating or updating a PR; detects trailing whitespace and conflict markers, not Prettier formatting
    - `pnpm start format.listDifferent`
 2. Ruby:
-   - `bundle exec rubocop` - **mandatory gate before every commit** (per `AGENTS.md`); it lints Ruby, not Markdown or YAML
+   - `bundle exec rubocop` - **mandatory gate before every commit, including documentation-only commits** (per `AGENTS.md`); it lints Ruby, not Markdown or YAML
    - `bundle exec rake rbs:validate` when Ruby signatures or public Ruby APIs changed
    - targeted `bundle exec rspec ...` for changed Ruby behavior
 3. JavaScript and TypeScript:
