@@ -132,10 +132,10 @@ The median results showed this directional signal:
 
 | Source  | Metric                                      | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ------- | ------------------------------------------- | -----------: | -------: | ------------------------------: |
-| Browser | Navigation duration                         |     775.40ms | 607.15ms |                          -21.7% |
-| Browser | Largest Contentful Paint                    |     794.00ms | 634.00ms |                          -20.2% |
-| Browser | `responseEnd`                               |     644.80ms | 588.80ms |                           -8.7% |
-| Rails   | Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |                -2.2% (variance) |
+| Browser | Navigation duration                         |        775ms |    607ms |                          -21.7% |
+| Browser | Largest Contentful Paint                    |        794ms |    634ms |                          -20.2% |
+| Browser | `responseEnd`                               |        645ms |    589ms |                           -8.7% |
+| Rails   | Controller `action_total` (Rails wall time) |        347ms |    339ms |                -2.2% (variance) |
 
 `action_total` is the Rails wall-time field from the raw benchmark artifact, not a browser Performance API metric. The
 artifact does not yet publish enough logger or extraction-script context to confirm whether it is the full
@@ -145,8 +145,10 @@ distribution and source artifacts.
 
 Derived from the median table above, the RSC route's post-`responseEnd` browser processing time (`navigation duration -
 responseEnd`, including HTML parsing, sub-resource loading, layout, and paint) was about 18ms, compared with about 130ms
-for the Inertia control. That gap helps explain why the navigation-duration gain (-21.7%) was larger than the
-`responseEnd` gain (-8.7%).
+for the Inertia control. This gap is expected: the RSC route delivers fully server-rendered HTML, so the browser has
+minimal client-side hydration work after `responseEnd`, while the Inertia control must hydrate the React component tree
+on the client. That difference in client-side work helps explain why the navigation-duration gain (-21.7%) was larger
+than the `responseEnd` gain (-8.7%).
 
 The page-specific script request count, recorded as Chrome DevTools Network panel `Script`-type requests after loading
 each route, changed from 6 requests for the Inertia demo to 1 request for the RSC demo. The artifact reports this as a
@@ -164,7 +166,7 @@ combined transfer size or cache behavior. Fewer requests do not necessarily impl
 
 | Metric                             | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
 | ---------------------------------- | -----------: | -------: | ------------------------------: |
-| Worst-case `responseEnd` (max n=4) |     730.62ms | 768.25ms |                           +5.2% |
+| Worst-case `responseEnd` (max n=4) |        731ms |    768ms |                           +5.2% |
 
 The source artifact labels this as p95, but with four samples it is effectively the maximum observed value, not a
 stable tail-latency estimate. It shows a +5.2% RSC regression on worst-case `responseEnd` (high variance is expected at
