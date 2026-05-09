@@ -106,11 +106,9 @@ single factor. The routes are:
 > renderer or SSR, while the RSC route uses the Pro Node renderer. Treat the deltas as the combined route-level effect;
 > see the [SSR Performance table](#ssr-performance-execjs-vs-node-renderer) for the renderer baseline.
 
-The April 30, 2026 local benchmark used eight alternating measured runs between the Inertia and RSC routes, four per
-route. Before each of the eight measured runs, the harness sent one warmup request to the route being measured; one
-warmup may not be enough for the Pro Node renderer worker pool to reach JIT and RSC-payload-compilation steady state.
-That limitation is more likely to make the RSC route look slower than its steady-state performance than to inflate its
-advantage, so treat the RSC median wins as directional rather than fully warmed production estimates.
+The April 30, 2026 local benchmark used eight strictly alternating measured runs between the Inertia and RSC routes
+(Inertia, RSC, Inertia, RSC, and so on), four per route. Before each of the eight measured runs, the harness sent one
+warmup request to the route being measured.
 
 Conditions:
 
@@ -123,18 +121,20 @@ Conditions:
 > [!WARNING]
 > The original artifact does not yet publish `RAILS_ENV`, browser cache behavior between measured runs, hardware/OS, or
 > Ruby/Node/Rails versions. Unknown `RAILS_ENV` can account for large timing differences; unknown browser cache state
-> between measured runs affects repeatability. [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253)
-> tracks the missing environment metadata. Until that is resolved, treat these numbers as directional signals rather than
-> a stable baseline.
+> between measured runs affects repeatability. The single warmup request before each measured run may also be insufficient
+> for the Pro Node renderer worker pool to reach JIT and RSC-payload-compilation steady state, which is more likely to
+> make the RSC route look slower than its steady-state performance than to inflate its advantage.
+> [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing environment metadata. Until
+> that is resolved, treat these numbers as directional signals rather than a stable baseline.
 
-The browser timing medians showed this directional signal:
+The median results showed this directional signal:
 
-| Metric                                      | Inertia demo | RSC demo | Delta (negative = RSC faster) |
-| ------------------------------------------- | -----------: | -------: | ----------------------------: |
-| Navigation duration                         |     775.40ms | 607.15ms |                        -21.7% |
-| Largest Contentful Paint                    |     794.00ms | 634.00ms |                        -20.2% |
-| `responseEnd`                               |     644.80ms | 588.80ms |                         -8.7% |
-| Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |              -2.2% (variance) |
+| Source  | Metric                                      | Inertia demo | RSC demo | Delta (negative = RSC faster) |
+| ------- | ------------------------------------------- | -----------: | -------: | ----------------------------: |
+| Browser | Navigation duration                         |     775.40ms | 607.15ms |                        -21.7% |
+| Browser | Largest Contentful Paint                    |     794.00ms | 634.00ms |                        -20.2% |
+| Browser | `responseEnd`                               |     644.80ms | 588.80ms |                         -8.7% |
+| Rails   | Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |              -2.2% (variance) |
 
 `action_total` is the Rails controller wall-time field from the raw benchmark artifact, not a browser Performance API
 metric. The artifact does not yet publish enough logger or extraction-script context to make that field independently
