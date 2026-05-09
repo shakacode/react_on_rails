@@ -40,7 +40,7 @@ Use this order unless the changed files make a narrower or broader set clearly a
    - `pnpm run lint`
    - `pnpm run type-check`
    - targeted `pnpm --filter react-on-rails run test` for react-on-rails package tests, or
-     `pnpm --filter react-on-rails exec jest -- <path>` for targeted test file runs
+     `pnpm --filter react-on-rails exec jest <path>` for targeted test file runs
    - `pnpm run test` when broad package behavior changed or the touched files are not covered by a narrower package test
    - `cd react_on_rails/spec/dummy && pnpm test:e2e` when the branch changes SSR rendering, client hydration, or
      browser-visible integration behavior
