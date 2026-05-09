@@ -70,7 +70,7 @@ The node renderer executes uploaded JavaScript bundles inside isolated VM contex
 
 Prefer passing application data from Rails controllers through props when the data belongs to your Rails app. When a Server Component really needs to call an external HTTP API from the renderer, choose one of these approaches:
 
-1. Inject host globals through `additionalContext`. On currently supported Node.js LTS runtimes that already expose `globalThis.fetch`, start with the guarded example below so the renderer fails fast if any required fetch global is absent. On older or unsupported Node.js versions without these globals, use a bundled HTTP client instead (see option 2).
+1. Inject host globals through `additionalContext`. Node.js 18+ exposes `globalThis.fetch`, `Headers`, `Request`, and `Response` by default (Node.js 18 and 20 list the fetch API as experimental; Node.js 21+ lists it as stable). Start with the guarded example below so the renderer fails fast if any required fetch global is absent. On older or unsupported Node.js versions without these globals, use a bundled HTTP client instead (see option 2).
 2. Import a server-side HTTP client in the component code, such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici`, and let your bundler include it in the RSC/server bundle.
 
 ```js
@@ -80,18 +80,19 @@ const fetchImplementation = globalThis.fetch;
 const HeadersImplementation = globalThis.Headers;
 const RequestImplementation = globalThis.Request;
 const ResponseImplementation = globalThis.Response;
-const abortContext =
-  globalThis.AbortController && globalThis.AbortSignal
-    ? {
-        AbortController: globalThis.AbortController,
-        AbortSignal: globalThis.AbortSignal,
-      }
-    : {};
+const componentsUseAbortSignals = true;
 
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
     'Your Node.js runtime does not expose one or more required fetch globals (fetch, Headers, Request, Response). ' +
       'Use a supported Node.js release that exposes these globals or replace the globalThis.* references above with compatible fetch polyfill imports.',
+  );
+}
+
+if (componentsUseAbortSignals && (!globalThis.AbortController || !globalThis.AbortSignal)) {
+  throw new Error(
+    'Your component code uses abort signals, but this Node.js runtime does not expose AbortController and AbortSignal. ' +
+      'Use a runtime that exposes them or replace the globalThis.* references below with compatible abort polyfill imports.',
   );
 }
 
@@ -102,12 +103,17 @@ reactOnRailsProNodeRenderer({
     Headers: HeadersImplementation,
     Request: RequestImplementation,
     Response: ResponseImplementation,
-    ...abortContext,
+    ...(componentsUseAbortSignals
+      ? {
+          AbortController: globalThis.AbortController,
+          AbortSignal: globalThis.AbortSignal,
+        }
+      : {}),
   },
 });
 ```
 
-If your component code creates abort signals, keep the `...abortContext` spread above or replace it with compatible polyfill imports on runtimes without native abort globals. If your components do not create abort signals, omit `abortContext`. `supportModules` does not add those globals.
+Set `componentsUseAbortSignals` to `true` when component code creates or accepts `AbortSignal` values. That guard turns a missing `AbortController` or `AbortSignal` into a startup error; without it, the renderer would start and the first component that touches those globals would fail later with `ReferenceError`. If your components do not use abort signals, set it to `false` or omit those `additionalContext` entries. `supportModules` does not add abort globals.
 
 Install a fetch implementation only when your renderer runtime does not provide these globals, or when you intentionally want a bundled HTTP client instead of the host runtime's implementation. Use this decision guide:
 
@@ -165,7 +171,7 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
-`node-fetch` v2 does not include `AbortController` or `AbortSignal`. If component code uses abort signals, merge the optional `abortContext` shown above into `additionalContext`, or use a compatible polyfill on older EOL runtimes.
+`node-fetch` v2 does not ship its own `AbortController` or `AbortSignal` implementation, but `node-fetch` v2.6+ accepts spec-compatible signals when you provide them. If component code uses abort signals, merge the optional abort globals shown in the first example into `additionalContext`; on Node.js 18+, the native `globalThis.AbortController` and `globalThis.AbortSignal` work with `node-fetch` v2.6+. On older EOL runtimes, use a compatible polyfill such as `node-abort-controller`.
 
 Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export; choose a version compatible with your renderer Node.js runtime. Add the same startup guard so incompatible versions fail before the renderer starts. The example below uses CommonJS; ESM launchers can import the same names from `undici` and alias them to the `*Implementation` constants used here.
 
@@ -179,18 +185,19 @@ const {
 } = require('undici');
 
 // undici does not export AbortController or AbortSignal; use host Node.js globals when present.
-const abortContext =
-  globalThis.AbortController && globalThis.AbortSignal
-    ? {
-        AbortController: globalThis.AbortController,
-        AbortSignal: globalThis.AbortSignal,
-      }
-    : {};
+const componentsUseAbortSignals = true;
 
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
     'The selected undici version does not expose one or more required fetch globals (fetch, Headers, Request, Response). ' +
       'Choose an undici release compatible with your renderer Node.js runtime.',
+  );
+}
+
+if (componentsUseAbortSignals && (!globalThis.AbortController || !globalThis.AbortSignal)) {
+  throw new Error(
+    'Your component code uses abort signals, but this Node.js runtime does not expose AbortController and AbortSignal. ' +
+      'Use a runtime that exposes them or replace the globalThis.* references below with compatible abort polyfill imports.',
   );
 }
 
@@ -201,7 +208,12 @@ reactOnRailsProNodeRenderer({
     Headers: HeadersImplementation,
     Request: RequestImplementation,
     Response: ResponseImplementation,
-    ...abortContext,
+    ...(componentsUseAbortSignals
+      ? {
+          AbortController: globalThis.AbortController,
+          AbortSignal: globalThis.AbortSignal,
+        }
+      : {}),
   },
 });
 ```

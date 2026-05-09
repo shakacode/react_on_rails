@@ -753,6 +753,8 @@ Server Components run on the server (in the node renderer), so they have access 
 
 ```jsx
 // Server Component -- full access to Node.js process.env
+// This code is bundled by webpack/esbuild, so use ESM imports here.
+// In a CommonJS launcher file such as node-renderer.js, use require() instead.
 // node-fetch v2 is a CJS module. The bundler (webpack/esbuild) handles CJS-to-ESM interop,
 // so this ESM default import resolves to the fetch function at build time.
 import nodeFetch from 'node-fetch';
