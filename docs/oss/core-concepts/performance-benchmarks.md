@@ -101,14 +101,16 @@ single factor. The routes are:
 - React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
 
 > [!NOTE]
-> Both routes use the same Shakapacker/Rspack page-asset build; this comparison measures the route-level RSC dimension
-> only. It is not a bundler comparison. It also does not isolate a renderer-only baseline: the Inertia route has no React
-> on Rails Pro renderer or SSR, while the RSC route uses the Pro Node renderer. Treat the deltas as the combined
-> route-level effect; see the [SSR Performance table](#ssr-performance-execjs-vs-node-renderer) for the renderer baseline.
+> Both routes use the same Shakapacker/Rspack page-asset build, so this is a route-level comparison rather than a
+> bundler comparison. It also does not isolate a renderer-only baseline: the Inertia route has no React on Rails Pro
+> renderer or SSR, while the RSC route uses the Pro Node renderer. Treat the deltas as the combined route-level effect;
+> see the [SSR Performance table](#ssr-performance-execjs-vs-node-renderer) for the renderer baseline.
 
 The April 30, 2026 local benchmark used eight alternating measured runs between the Inertia and RSC routes, four per
 route. Before each of the eight measured runs, the harness sent one warmup request to the route being measured; one
 warmup may not be enough for the Pro Node renderer worker pool to reach JIT and RSC-payload-compilation steady state.
+That limitation is more likely to make the RSC route look slower than its steady-state performance than to inflate its
+advantage, so treat the RSC median wins as directional rather than fully warmed production estimates.
 Conditions:
 
 - Compiled page assets from the same Shakapacker/Rspack configuration for both routes
@@ -132,6 +134,11 @@ The browser timing medians showed this directional signal:
 | Largest Contentful Paint                    |     794.00ms | 634.00ms |                        -20.2% |
 | `responseEnd`                               |     644.80ms | 588.80ms |                         -8.7% |
 | Controller `action_total` (Rails wall time) |     346.87ms | 339.20ms |              -2.2% (variance) |
+
+`action_total` is the Rails controller wall-time field from the raw benchmark artifact, not a browser Performance API
+metric. The artifact does not yet publish enough logger or extraction-script context to make that field independently
+reproducible; [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing distribution and
+source artifacts.
 
 The RSC route's post-`responseEnd` client processing time was about 18ms, compared with about 130ms for the Inertia
 control. That gap helps explain why the navigation-duration gain (-21.7%) was larger than the server-response
