@@ -179,13 +179,17 @@ adding Step 3 because Step 3 always depends on those Babel transforms. Keep each
 4. If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add
    `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails.
 
-   If you do not have existing `transformIgnorePatterns`, add one:
+   If you do not have existing `transformIgnorePatterns`, add the two-pattern form so Jest also handles pnpm's
+   `.pnpm` store path:
 
    ```js
    // jest.config.js
    module.exports = {
      // keep existing config
-     transformIgnorePatterns: ['<rootDir>/node_modules/(?!react-on-rails/)'],
+     transformIgnorePatterns: [
+       '<rootDir>/node_modules/.pnpm/(?!(react-on-rails)@)',
+       'node_modules/(?!.pnpm|react-on-rails)',
+     ],
    };
    ```
 
@@ -194,11 +198,14 @@ adding Step 3 because Step 3 always depends on those Babel transforms. Keep each
 
    ```js
    // jest.config.js
-   // Before: transformIgnorePatterns: ['<rootDir>/node_modules/(?!(other-esm-package)/)']
+   // Before: transformIgnorePatterns: ['node_modules/(?!.pnpm|other-esm-package)']
    // After (add react-on-rails to the existing lookahead group):
    module.exports = {
      // keep existing config
-     transformIgnorePatterns: ['<rootDir>/node_modules/(?!(react-on-rails|other-esm-package)/)'],
+     transformIgnorePatterns: [
+       '<rootDir>/node_modules/.pnpm/(?!(react-on-rails|other-esm-package)@)',
+       'node_modules/(?!.pnpm|react-on-rails|other-esm-package)',
+     ],
    };
    ```
 
