@@ -80,7 +80,8 @@ const fetchImplementation = globalThis.fetch;
 const HeadersImplementation = globalThis.Headers;
 const RequestImplementation = globalThis.Request;
 const ResponseImplementation = globalThis.Response;
-const componentsUseAbortSignals = true;
+// Set to true only if your Server Components use AbortSignal; requires Node.js 15+.
+const componentsUseAbortSignals = false;
 
 if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
   throw new Error(
@@ -144,6 +145,13 @@ try {
     'node-fetch v2 could not be loaded. ' +
       'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
     { cause: error },
+  );
+}
+
+if (!nodeFetch) {
+  throw new Error(
+    'node-fetch v2 did not expose the required fetch function. ' +
+      'Ensure node-fetch v2 is installed; v3+ is ESM-only and will not work in this CommonJS launcher.',
   );
 }
 
