@@ -184,6 +184,8 @@ const {
   Request: RequestImplementation,
   Response: ResponseImplementation,
 } = require('undici');
+
+// undici does not export AbortController or AbortSignal; use the host Node.js globals.
 const AbortControllerImplementation = globalThis.AbortController;
 const AbortSignalImplementation = globalThis.AbortSignal;
 

@@ -753,20 +753,26 @@ Server Components run on the server (in the node renderer), so they have access 
 
 ```jsx
 // Server Component -- full access to Node.js process.env
-async function DBComponent() {
-  // WARNING: If INTERNAL_API_URL points back to the same Rails server,
-  // this creates a circular request (Node renderer → Rails → Node renderer).
-  // Use a direct database call, internal service URL that bypasses Rails routing,
-  // or a bundled/injected HTTP client. The node renderer VM does not expose
-  // host fetch globals unless you pass them through additionalContext.
-  // Correct approach: import a bundled HTTP client (for example, node-fetch v2
-  // or undici) or inject fetch via additionalContext at renderer startup.
-  // See: ../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc
-  // Do not call `fetch(process.env.INTERNAL_API_URL)` directly; `fetch` is
-  // not available in the VM by default. Bundle an HTTP client or inject fetch
-  // via additionalContext before calling this URL.
-  const dbUrl = process.env.DATABASE_URL; // Works
+import nodeFetch from 'node-fetch';
+
+async function InternalDataComponent() {
+  const serviceUrl = process.env.INTERNAL_SERVICE_URL; // Works
   const secret = process.env.API_SECRET; // Works
+
+  if (!serviceUrl || !secret) {
+    throw new Error('INTERNAL_SERVICE_URL and API_SECRET must be set.');
+  }
+
+  // Use env vars with server-only data access, a bundled HTTP client, or fetch
+  // injected via additionalContext. Avoid URLs that route back through the same
+  // Rails app, which can create a Node renderer -> Rails -> Node renderer loop.
+  // This example uses node-fetch v2 bundled in the server/RSC bundle.
+  const response = await nodeFetch(serviceUrl, {
+    headers: { Authorization: `Bearer ${secret}` },
+  });
+  const data = await response.json();
+
+  return <pre>{JSON.stringify(data)}</pre>;
 }
 ```
 
@@ -842,6 +848,17 @@ RENDERER_SUPPORT_MODULES=true
 ```
 
 For globals not covered by `supportModules`, use `additionalContext`. For `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal`, see [Node Renderer JavaScript Configuration](../building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc) for guarded startup examples that fail fast when a required global is missing. If your Node.js runtime does not provide the fetch globals, use a bundled HTTP client such as `node-fetch` v2 (CJS-compatible; v3+ is ESM-only) or `undici` from the component code, or pass a fetch implementation through `additionalContext`.
+
+For other globals, inject them directly. For example, to provide a deterministic `performance` stub for byte-stable SSR:
+
+```js
+module.exports = {
+  supportModules: true,
+  additionalContext: {
+    performance: { now: () => 0 },
+  },
+};
+```
 
 #### Handling Node Builtins -- `externals` vs `resolve.fallback`
 
