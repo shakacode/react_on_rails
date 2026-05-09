@@ -26,8 +26,6 @@ NC='\033[0m' # No Color
 # Resolve the merge base before diffing. Three-dot diffs fail in shallow clones
 # when the common ancestor is outside the fixed fetch depth.
 if ! MERGE_BASE=$(git_diff_base_resolve "$BASE_REF" "$CURRENT_REF" required); then
-  echo "Available branches:" >&2
-  git branch -a | head -10 >&2
   exit 1
 fi
 

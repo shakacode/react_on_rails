@@ -4,8 +4,10 @@
 # Source this file from bash scripts; do not execute it directly.
 #
 # Tuning knobs:
-# - GIT_DIFF_BASE_FETCH_DEPTH: initial fetch size, and first deepen size before doubling.
-# - GIT_DIFF_BASE_MAX_ATTEMPTS: exponential deepen attempts before falling back to --unshallow.
+# - GIT_DIFF_BASE_FETCH_DEPTH: initial fetch size, and first deepen size before doubling (default 50).
+# - GIT_DIFF_BASE_MAX_ATTEMPTS: exponential deepen attempts before falling back to --unshallow
+#   (default 8). With default depth, the deepen loop can fetch up to 12,750 commits total
+#   before unshallowing.
 
 git_diff_base_remote_branch() {
   local ref="$1"
@@ -38,7 +40,9 @@ git_diff_base_sha_ref() {
   # git_diff_base_verify_ref is defined below and only called after sourcing.
   { [ "$length" -eq 40 ] || [ "$length" -eq 64 ] || git_diff_base_verify_ref "$ref"; } &&
     ! git rev-parse --verify "refs/heads/$ref" >/dev/null 2>&1 &&
-    ! git rev-parse --verify "refs/remotes/origin/$ref" >/dev/null 2>&1
+    ! git rev-parse --verify "refs/remotes/origin/$ref" >/dev/null 2>&1 &&
+    return 0
+  return 1
 }
 
 git_diff_base_base_remote_branch() {
@@ -233,14 +237,16 @@ git_diff_base_resolve() {
 
   if [ -n "$remote_branch" ] || [ -n "$current_remote_branch" ]; then
     local attempt=1
+    local deepen_attempts=0
     local deepen_depth="${GIT_DIFF_BASE_FETCH_DEPTH:-50}"
     local fetched=false
     local max_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-8}"
 
-    # Keep the original shallow state for this expansion pass. Each successful
-    # deepen/unshallow attempt is followed by a merge-base check before retrying.
-    while [ "$attempt" -le "$max_attempts" ] && [ "$is_shallow" = true ]; do
+    # Re-check shallow state each time so tiny repositories can leave the loop
+    # as soon as a deepen fetch completes their history.
+    while [ "$attempt" -le "$max_attempts" ] && git_diff_base_is_shallow_repository; do
       fetched=false
+      deepen_attempts="$attempt"
 
       if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" deepen "$deepen_depth"; then
         fetched=true
@@ -266,7 +272,16 @@ git_diff_base_resolve() {
       attempt=$((attempt + 1))
     done
 
+    if git_diff_base_is_shallow_repository; then
+      is_shallow=true
+    else
+      is_shallow=false
+    fi
+
     if [ "$is_shallow" = true ]; then
+      echo "Warning: deepening did not find merge base after $deepen_attempts attempt(s);" \
+        "falling back to --unshallow (this may be slow for large repositories)" >&2
+
       if [ -n "$remote_branch" ] && git_diff_base_fetch_remote_branch "$remote_branch" unshallow; then
         if git_diff_base_verify_ref "$base_ref" && merge_base="$(git_diff_base_merge_base "$base_ref" "$current_ref")"; then
           printf '%s\n' "$merge_base"
