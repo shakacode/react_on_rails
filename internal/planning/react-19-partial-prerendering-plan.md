@@ -22,13 +22,12 @@ is intentionally pinned to React 18 through pnpm overrides for `app>react` and `
 confirm whether that workspace stays on React 18 during this work. That means the first implementation step is
 verification, not necessarily a broad package-range change.
 
-Note: private Pro package verification should confirm whether any `react-on-rails-rsc` peer dependency ceiling, such as
-`>= 19.0.2 <= 19.2.3`, exists outside the public package manifests and whether it should be widened alongside any React
-19.2.x range update. Because a hard upper bound would reject a future `19.2.4` patch or `19.3.x` minor release, the
-decision must either widen the range for stable React 19.x, such as `< 20.0.0`, or document the specific API risk that
-requires a tight pin. If verification finds no specific API risk, the default outcome is to widen the ceiling to
-`< 20.0.0`. This check requires Pro access and cannot be completed by a public contributor without relying on Pro CI.
-**Owner**: @justin808 | **Target**: before any package-range change is merged (see Open Questions).
+Note: `packages/react-on-rails-pro/package.json` already sets the `react-on-rails-rsc` peer dependency ceiling to
+`>= 19.0.2 <= 19.2.3`. Verification should decide whether this ceiling should be widened alongside any React 19.2.x range
+update. Because a hard upper bound would reject a future `19.2.4` patch or `19.3.x` minor release, the decision must either
+widen the range for stable React 19.x, such as `< 20.0.0`, or document the specific API risk that requires a tight pin. If
+verification finds no specific API risk, the default outcome is to widen the ceiling to `< 20.0.0`. **Owner**: @justin808 |
+**Target**: before any package-range change is merged (see Open Questions).
 
 ## React 19.2.x Verification Checklist
 
@@ -50,7 +49,10 @@ Use a dedicated branch for the actual version verification work:
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
       React, React DOM, and `react-on-rails-rsc` resolve to compatible versions. Capture the exact
       `pnpm list -r react react-dom react-on-rails-rsc` output in the verification record, such as a comment on Issue 3255,
-      so the tested React 19.2.x patch version is auditable.
+      so the tested React 19.2.x patch version is auditable. Also verify that the resolved `react-on-rails-rsc` version
+      satisfies both the root `^19.0.4` range and the `packages/react-on-rails-pro/package.json` peer dependency ceiling
+      `>= 19.0.2 <= 19.2.3`; a mismatch means the ceiling must be widened before workspace installs stay consistent across
+      OSS and Pro.
 - [ ] Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream`
       and `renderToReadableStream` through `@types/react-dom`, lint enforces package style, and tests exercise the
       runtime paths:
@@ -87,7 +89,8 @@ Use a dedicated branch for the actual version verification work:
   - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
   - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
   - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
-- [ ] Run the generated-app suite from the repo root in a clean checkout:
+- [ ] Run the generated-app suite from the repo root after `git clean -fdx` and a fresh `pnpm install`, or from a fresh
+      clone:
       `bundle exec rake run_rspec:shakapacker_examples_latest` for the React 19 examples. Use
       `bundle exec rake run_rspec:shakapacker_examples` to run the full suite across pinned React versions when needed.
       `bundle exec rake shakapacker_examples:gen_all` only generates example apps; a separate `run_rspec:*` task must run
