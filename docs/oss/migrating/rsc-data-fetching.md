@@ -65,9 +65,9 @@ For pages with multiple data sources, use [`stream_react_component`](#data-fetch
 
 ## Data Fetching in React on Rails Pro
 
-In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree. This approach is sometimes called **async props** because Rails owns the data and React streams Suspense boundaries to the browser as the tree resolves.
+In React on Rails applications, Ruby on Rails is the backend. Rather than bypassing Rails to access the database directly from Server Components, React on Rails Pro provides **`stream_react_component`** -- a streaming view helper that uses React's `renderToPipeableStream` to stream rendered HTML to the browser as React processes the component tree. This approach is sometimes called **async props** because Rails fetches and assembles data, passes it as `props`, and streaming SSR progressively flushes the component tree to the browser.
 
-The RSC streaming helper is `stream_react_component`. Existing Pro helpers named `async_react_component` and `cached_async_react_component` are for concurrently rendering separate legacy React roots; RSC payload generation uses `rsc_payload_react_component` without a separate `_with_async_props` suffix.
+The RSC streaming helper is `stream_react_component`. Existing Pro helpers named `async_react_component` and `cached_async_react_component` are for concurrently rendering separate legacy React roots; RSC payload generation uses `rsc_payload_react_component` (there is no `_with_async_props` variant).
 
 This is the recommended data fetching pattern for React on Rails because:
 
@@ -309,7 +309,7 @@ export default function DashboardStats({ fallbackData }) {
 
 ## Avoiding Server-Side Waterfalls
 
-> **React on Rails note:** In React on Rails, the primary way to handle parallel data loading is [async props](#data-fetching-in-react-on-rails-pro) -- Rails owns the data and React streams Suspense boundaries to the browser as the component tree resolves. The patterns below apply when you have async Server Components that fetch data directly (outside the async props flow).
+> **React on Rails note:** In React on Rails, the primary way to handle parallel data loading is [async props](#data-fetching-in-react-on-rails-pro) -- Rails fetches and assembles data, passes it as `props`, and streaming SSR progressively flushes the component tree to the browser. The patterns below apply when you have async Server Components that fetch data directly (outside the async props flow).
 
 The most critical performance pitfall with Server Components is sequential data fetching. When one `await` blocks the next, you create a waterfall on the server:
 
