@@ -37,7 +37,6 @@ bundle exec rubocop                  # Ruby — must pass with zero offenses
 pnpm run lint                        # JS/TS via ESLint
 pnpm start format.listDifferent      # Check Prettier formatting
 rake lint                            # All linting (Ruby + JS + formatting)
-bin/check-links                      # Markdown link checks
 
 # Auto-fix formatting
 rake autofix                         # Preferred for all formatting
@@ -56,6 +55,9 @@ bundle exec rake rbs:validate        # RBS signatures
 rake run_rspec                       # All Ruby tests
 rake all_but_examples                # All tests except generated examples
 rake run_rspec:shakapacker_examples_basic  # Single example test
+
+# Link checking (requires lychee)
+bin/check-links                      # Markdown link checks
 
 # Full initial setup
 bundle && pnpm install && rake shakapacker_examples:gen_all && rake node_package && rake
