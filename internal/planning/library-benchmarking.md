@@ -106,16 +106,17 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 ### Tuning Sequence
 
 1. Keep the gate in warning mode while gathering the new baseline.
-2. Compare adjacent main runs by shared `(benchmark, measure)` alert pairs using the
+2. Compare adjacent qualifying main runs by shared `(benchmark, measure)` alert pairs using the
    [Bencher dashboard](https://bencher.dev/console/projects/react-on-rails-t8a9ncxo/) or the overlap-comparison method
    tracked in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). For two adjacent alert sets `A` and
    `B`, use Jaccard overlap: `|A intersect B| / |A union B|`. For example, two shared pairs across 10 total unique alert
    pairs gives `2 / 10 = 20%`. Overlap below `0.20` means runner noise is still dominating; begin overlap analysis once
-   at least 5 adjacent-run pairs exist, but proceed to step 3 only after the full 30-run baseline window exists and overlap
-   is at least `0.40` for 3 consecutive adjacent-run pairs. The gap between `0.20` and `0.40` avoids flip-flopping between
-   noise and signal states; the thresholds were chosen empirically from the alert-overlap evidence in Issue 3169 and
-   should be revisited if the alert distribution changes significantly. If a comparison has fewer than 5 unique alert
-   pairs, record the small-sample caveat in Issue 3169 and keep collecting runs.
+   at least 5 adjacent qualifying-run pairs exist, but proceed to step 3 only after the full 30-run baseline window exists
+   and overlap is at least `0.40` for 3 consecutive adjacent qualifying-run pairs. The gap between `0.20` and `0.40` avoids
+   flip-flopping between noise and signal states; the thresholds were chosen empirically from the alert-overlap evidence in
+   Issue 3169 and should be revisited if the alert distribution changes significantly. Use the qualifying-run definition
+   from acceptance criterion 3. If a comparison has fewer than 5 unique alert pairs, record the small-sample caveat in
+   Issue 3169 and keep collecting runs.
 3. Prefer threshold changes that require stronger evidence before failure:
    - widen the Bencher boundary from `0.95` toward `0.99`
    - keep `--threshold-max-sample-size $MAX_SAMPLE` aligned with the available history; add a minimum-sample rule only
@@ -133,7 +134,7 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 ### Acceptance Criteria
 
 1. Before restoring the hard gate, verify it can detect real regressions: add a temporary controller delay to a benchmarked
-   SSR route large enough to cause at least 10% degradation versus the current baseline median for that route, confirm an
+   SSR route large enough to cause at least 20% degradation versus the current baseline median for that route, confirm an
    alert fires under the tuned settings, then revert the delay. If no alert fires, re-tune before proceeding.
 2. As a pre-condition for starting the 5-run clean-run count below, the tuned settings must require manual tracking in
    Issue 3169 to show the same `(benchmark, measure)` pair alerting on at least 2 consecutive runs before filing or
