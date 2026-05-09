@@ -37,7 +37,7 @@ class StoriesController < ApplicationController
       return redirect_to(redirect_path, status: preflight.redirect_status || :see_other)
     end
 
-    response.status = preflight.status unless preflight.status.nil?
+    response.status = preflight.status if preflight.status
     response.headers["Cache-Control"] = preflight.cache_control if preflight.cache_control
 
     @story_props = preflight.props
@@ -51,6 +51,7 @@ classes that return plain Ruby hashes; substitute your app's serializer or prese
 
 ```ruby
 class StoryPagePreflight
+  # redirect_reason is nil when no redirect is needed.
   Result = Struct.new(:props, :status, :redirect_reason, :redirect_status, :cache_control, keyword_init: true)
 
   def self.call(story_id, current_user:)
