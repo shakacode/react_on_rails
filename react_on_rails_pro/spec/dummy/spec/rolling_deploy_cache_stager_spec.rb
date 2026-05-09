@@ -477,7 +477,10 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       # recreates bundle_dir before the promotion mv runs.
       allow(FileUtils).to receive(:mv).and_wrap_original do |original, source, destination, *args|
         result = original.call(source, destination, *args)
-        FileUtils.mkdir_p(bundle_dir) if destination.to_s.include?("abc123.previous-")
+        if destination.to_s.include?("abc123.previous-")
+          FileUtils.mkdir_p(bundle_dir)
+          File.write(existing_bundle, "// concurrent bundle")
+        end
         result
       end
     end
@@ -485,14 +488,50 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     # Regression: without the existence guard, FileUtils.mv would have nested
     # the staging dir inside the racing bundle_dir, hiding the seeded payload
     # from renderer lookups (404 → 410-retry storm). The guard now raises and
-    # the rescue path restores the backup so the previous good copy is kept.
-    it "aborts the promotion and restores the backup so the previous bundle stays servable" do
+    # the rescue path leaves the concurrent writer's directory intact rather
+    # than evicting it while trying to restore our backup.
+    it "aborts the promotion and keeps the concurrent writer's bundle in place" do
       expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
-        .to output(/Failed to seed previous bundle hash abc123.*Concurrent writer recreated/m).to_stderr
+        .to output(/Failed to seed previous bundle hash abc123: ReactOnRailsPro::Error: Concurrent writer recreated/m)
+        .to_stderr
 
       expect(File.exist?(existing_bundle)).to be(true)
-      expect(File.read(existing_bundle)).to eq("// existing bundle")
+      expect(File.read(existing_bundle)).to eq("// concurrent bundle")
+      expect(Dir.children(cache_dir).grep(/abc123\.previous/)).not_to be_empty
       expect(Dir.children(cache_dir).grep(/abc123\.staging/)).to be_empty
+      expect(Dir.glob(File.join(bundle_dir, "*.staging-*"))).to be_empty
+    end
+  end
+
+  context "when a concurrent writer recreates bundle_dir after the promote guard" do
+    let(:src_bundle) { source_file("bundle-new.js", contents: "// new bundle") }
+    let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
+    let(:bundle_dir) { File.join(cache_dir, "abc123") }
+    let(:existing_bundle) { File.join(bundle_dir, "abc123.js") }
+
+    before do
+      FileUtils.mkdir_p(bundle_dir)
+      File.write(existing_bundle, "// existing bundle")
+      allow(adapter).to receive_messages(previous_bundle_hashes: ["abc123"])
+      allow(adapter).to receive(:fetch).with("abc123").and_return(bundle: src_bundle, assets: [src_asset])
+      allow(FileUtils).to receive(:mv).and_wrap_original do |original, source, destination, *args|
+        if source.to_s.include?("abc123.staging-")
+          FileUtils.mkdir_p(bundle_dir)
+          File.write(existing_bundle, "// concurrent bundle")
+        end
+
+        original.call(source, destination, *args)
+      end
+    end
+
+    it "detects the nested staging directory and removes only this attempt's staging files" do
+      expect { described_class.call(cache_dir: cache_dir, current_hashes: [], mode: :copy) }
+        .to output(/Failed to seed previous bundle hash abc123: ReactOnRailsPro::Error: Concurrent writer recreated/m)
+        .to_stderr
+
+      expect(File.read(existing_bundle)).to eq("// concurrent bundle")
+      expect(Dir.children(cache_dir).grep(/abc123\.staging/)).to be_empty
+      expect(Dir.glob(File.join(bundle_dir, "*.staging-*"))).to be_empty
     end
   end
 

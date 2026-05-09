@@ -325,7 +325,7 @@ module ReactOnRailsPro
       # rejects the `bundle:` / `assets:` call shape used by assets precompile.
       # `**nil` (the `:nokey` parameter kind) explicitly forbids keywords too,
       # so reject it for the same reason.
-      return false if explicitly_forbids_upload_keywords?(params)
+      return false if uses_explicit_upload_keywords?(params)
       return true if params.any? { |type, _name| type == :rest }
 
       required_positionals = params.count { |type, _name| type == :req }
@@ -333,7 +333,7 @@ module ReactOnRailsPro
       required_positionals == 1 && optional_positionals.positive?
     end
 
-    def explicitly_forbids_upload_keywords?(params)
+    def uses_explicit_upload_keywords?(params)
       params.any? do |type, _name|
         type == :nokey || ROLLING_DEPLOY_UPLOAD_KEYWORD_PARAMS.include?(type)
       end

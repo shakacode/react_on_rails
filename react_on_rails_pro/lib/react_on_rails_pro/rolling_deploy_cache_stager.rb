@@ -36,6 +36,8 @@ module ReactOnRailsPro
     # change here fails that spec instead of silently drifting past the doctor
     # probe.
     DISCOVERY_TIMEOUT_SECONDS = 10
+    # Per-hash fetch budget during pre-seeding. Large cross-region stores may
+    # need adapters to keep fetches comfortably under this limit.
     FETCH_TIMEOUT_SECONDS = 30
     STALE_TEMP_DIR_TTL_SECONDS = 3600
     # Match temp dirs created by `temporary_bundle_directory` (and the analogous
@@ -225,7 +227,7 @@ module ReactOnRailsPro
       else
         warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-required asset " \
              "path(s) that do not exist: #{missing_assets.inspect}. Adapter contract requires only " \
-             "existing file paths. Skipping this hash."
+             "existing file paths. Skipping this hash to avoid staging an incomplete bundle directory."
       end
     end
     private_class_method :warn_missing_asset_payload
@@ -240,7 +242,7 @@ module ReactOnRailsPro
       else
         warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) returned non-required asset " \
              "path(s) that are not files: #{non_file_assets.inspect}. Adapter contract requires only " \
-             "existing file paths. Skipping this hash."
+             "existing file paths. Skipping this hash to avoid staging an incomplete bundle directory."
       end
     end
     private_class_method :warn_non_file_asset_payload
@@ -268,16 +270,13 @@ module ReactOnRailsPro
       # consistent — warning would just be noise on every rolling deploy.
       return unless ReactOnRailsPro::RendererCacheHelpers.loadable_stats_asset_path
 
-      warn "[ReactOnRailsPro] rolling_deploy_adapter#fetch(#{hash.inspect}) is missing loadable-stats.json. " \
+      warn "[ReactOnRailsPro] WARNING: rolling_deploy_adapter#fetch(#{hash.inspect}) is missing loadable-stats.json. " \
            "Client hydration may break for requests served by this previous bundle hash."
     end
     private_class_method :warn_if_missing_loadable_stats
 
     def self.required_rsc_asset_basenames
-      return [] unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      rsc_manifest_paths = RendererCacheHelpers.rsc_manifest_paths
-      RendererCacheHelpers.required_rsc_asset_paths(rsc_manifest_paths).map { |path| File.basename(path) }
+      RendererCacheHelpers.required_rsc_asset_basenames
     end
     private_class_method :required_rsc_asset_basenames
 
@@ -376,7 +375,7 @@ module ReactOnRailsPro
       # keeps staging safe even if sanitization ever regressed (a bundle landing
       # directly at `<cache>/<hash>.js` instead of `<cache>/<hash>/<hash>.js`
       # would break the renderer's lookup layout silently).
-      return normalized_candidate if normalized_candidate.start_with?("#{normalized_cache_dir}/")
+      return normalized_candidate if normalized_candidate.start_with?("#{normalized_cache_dir}#{File::SEPARATOR}")
 
       raise ReactOnRailsPro::Error,
             "Refusing to stage rolling-deploy bundle hash #{hash.inspect} outside renderer cache dir " \
@@ -406,10 +405,17 @@ module ReactOnRailsPro
       # and renderer lookups would miss the cache. The rescue below restores
       # the backup so the previous good copy remains servable.
       if File.exist?(bundle_dir)
-        raise "Concurrent writer recreated #{bundle_dir} between backup and promote; aborting promotion"
+        raise ReactOnRailsPro::Error,
+              "Concurrent writer recreated #{bundle_dir} between backup and promote; aborting promotion"
       end
 
       FileUtils.mv(staging_dir, bundle_dir)
+      nested_staging_dir = File.join(bundle_dir, File.basename(staging_dir))
+      if File.directory?(nested_staging_dir)
+        FileUtils.rm_rf(nested_staging_dir)
+        raise ReactOnRailsPro::Error,
+              "Concurrent writer recreated #{bundle_dir} before promotion completed; aborting promotion"
+      end
       puts "[ReactOnRailsPro] Staged previous bundle hash into #{bundle_dir}"
       remove_previous_bundle_backup(backup_dir)
     rescue StandardError
@@ -430,6 +436,12 @@ module ReactOnRailsPro
 
     def self.restore_previous_bundle_directory(backup_dir, bundle_dir)
       return unless backup_dir && File.exist?(backup_dir)
+
+      if File.exist?(bundle_dir)
+        warn "[ReactOnRailsPro] Cannot restore previous rolling-deploy bundle directory because #{bundle_dir} " \
+             "already exists. Leaving that concurrent writer's directory intact; #{backup_dir} will be swept later."
+        return
+      end
 
       FileUtils.rm_rf(bundle_dir)
       # Catch the narrow TOCTOU window where another writer recreates

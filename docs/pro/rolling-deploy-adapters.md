@@ -73,7 +73,9 @@ module MyRollingDeployAdapter
   # Uploads one bundle + its companion assets keyed by that bundle's
   # hash. When RSC is enabled, upload is called twice per deploy:
   # once with server_bundle_hash, once with rsc_bundle_hash.
-  # Errors are warned per-hash, not raised.
+  # Errors are warned per-hash, not raised. Each upload is wrapped in
+  # Timeout.timeout(120s), so keep adapter network work comfortably
+  # inside that per-hash budget.
   def self.upload(bundle_hash, bundle:, assets:)
     # ...
   end

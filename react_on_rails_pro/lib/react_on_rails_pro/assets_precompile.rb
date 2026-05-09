@@ -6,6 +6,8 @@ module ReactOnRailsPro
   class AssetsPrecompile # rubocop:disable Metrics/ClassLength
     include Singleton
 
+    # Per-hash upload budget during assets:precompile. With RSC enabled this can
+    # be spent twice per deploy (server bundle + RSC bundle).
     UPLOAD_TIMEOUT_SECONDS = 120
 
     def remote_bundle_cache_adapter
@@ -159,11 +161,7 @@ module ReactOnRailsPro
     end
 
     def self.required_rsc_asset_basenames
-      return [] unless ReactOnRailsPro.configuration.enable_rsc_support
-
-      rsc_manifest_paths = ReactOnRailsPro::RendererCacheHelpers.rsc_manifest_paths
-      required_asset_paths = ReactOnRailsPro::RendererCacheHelpers.required_rsc_asset_paths(rsc_manifest_paths)
-      required_asset_paths.map { |path| File.basename(path) }
+      ReactOnRailsPro::RendererCacheHelpers.required_rsc_asset_basenames
     end
 
     def self.publish_bundle(adapter, hash, bundle, assets, bundle_label)
@@ -188,6 +186,13 @@ module ReactOnRailsPro
       warn "[ReactOnRailsPro] rolling_deploy_adapter#upload for #{hash} raised #{e.class}: " \
            "#{e.message}. Next deploy's rolling-deploy seeding for this hash may degrade."
     end
+    private_class_method :publish_bundles,
+                         :filter_existing_assets,
+                         :warn_skipped_invalid_assets,
+                         :warn_if_unavailable_required_rsc_assets,
+                         :required_rsc_asset_basenames,
+                         :publish_bundle,
+                         :upload_bundle
 
     def self.pre_seed_renderer_cache_mode
       raw = ENV.fetch("ASSETS_PRECOMPILE_RENDERER_CACHE_MODE", "symlink").to_s.downcase

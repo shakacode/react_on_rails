@@ -592,15 +592,12 @@ describe ReactOnRailsPro::AssetsPrecompile do
 
       before do
         allow(config).to receive(:enable_rsc_support).and_return(true)
-        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:rsc_manifest_paths)
-          .and_return([missing_manifest])
-        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_paths)
-          .with([missing_manifest])
-          .and_return(Set.new([missing_manifest]))
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:required_rsc_asset_basenames)
+          .and_return([File.basename(missing_manifest)])
       end
 
       it "warns that the next deploy will fall back instead of treating it as purely optional" do
-        expect { described_class.filter_existing_assets([missing_manifest]) }
+        expect { described_class.send(:filter_existing_assets, [missing_manifest]) }
           .to output(/required RSC companion file/).to_stderr
       end
     end

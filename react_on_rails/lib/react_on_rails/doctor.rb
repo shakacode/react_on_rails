@@ -2943,7 +2943,7 @@ module ReactOnRails
     rescue Timeout::Error
       checker.add_warning(
         "⚠️  rolling_deploy_adapter#previous_bundle_hashes timed out after " \
-        "#{rolling_deploy_discovery_timeout_seconds}s"
+        "#{timeout_seconds}s"
       )
     rescue StandardError => e
       checker.add_warning("⚠️  rolling_deploy_adapter#previous_bundle_hashes raised #{e.class}: #{e.message}")

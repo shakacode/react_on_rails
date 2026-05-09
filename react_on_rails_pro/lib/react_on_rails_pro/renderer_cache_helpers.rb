@@ -22,7 +22,7 @@ module ReactOnRailsPro
       # those are silently dropped by `.compact`. RSC manifests, by contrast,
       # are required, so resolve them separately and fail loudly if either
       # resolves to nil rather than letting `.compact` swallow the gap.
-      assets = Array(config.assets_to_copy).dup.compact
+      assets = Array(config.assets_to_copy).compact
       loadable_stats_path = loadable_stats_asset_path
       assets << loadable_stats_path if loadable_stats_path
 
@@ -40,6 +40,10 @@ module ReactOnRailsPro
 
     def collect_assets
       collect_assets_with_required_paths.first
+    end
+
+    def required_rsc_asset_basenames
+      required_rsc_asset_paths.map { |path| File.basename(path) }
     end
 
     def rsc_manifest_paths
@@ -199,29 +203,6 @@ module ReactOnRailsPro
       puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination}"
     ensure
       FileUtils.rm_f(tmp_link) if tmp_link
-    end
-
-    def replace_existing_symlink(destination, relative_source_path, log_prefix)
-      if matching_symlink?(destination, relative_source_path)
-        puts "[ReactOnRailsPro] Symlink already present at #{destination} " \
-             "(concurrent creator won the race); leaving existing link."
-        return
-      end
-
-      FileUtils.rm_f(destination)
-      begin
-        File.symlink(relative_source_path, destination)
-      rescue Errno::EEXIST
-        return if matching_symlink?(destination, relative_source_path)
-
-        raise
-      end
-      puts "[ReactOnRailsPro] #{log_prefix}: #{relative_source_path} -> #{destination} " \
-           "(replaced stale symlink)"
-    end
-
-    def matching_symlink?(destination, relative_source_path)
-      File.symlink?(destination) && File.readlink(destination) == relative_source_path.to_s
     end
 
     def stage_file(src, dest, mode, log_prefix:)
