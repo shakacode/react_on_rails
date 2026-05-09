@@ -93,7 +93,6 @@ The Quick Start command only sets `RAILS_ENV` for the minimal browser-bundle cas
 ```ruby
 # spec/rails_helper.rb
 require "react_on_rails/test_helper"
-require_relative "support/rsc_node_renderer"
 
 RSpec.configure do |config|
   ReactOnRails::TestHelper.configure_rspec_to_compile_assets(
@@ -108,6 +107,8 @@ RSpec.configure do |config|
     metadata[:rsc] = true
   end
 end
+
+require_relative "support/rsc_node_renderer"
 ```
 
 Passing any metatags replaces the TestHelper defaults, so include the default `:js`, `:server_rendering`, and `:controller` tags alongside `:rsc` if your suite mixes RSC and non-RSC specs.
@@ -222,13 +223,25 @@ RSpec.configure do |config|
     rsc_node_renderer_waiter = Process.detach(rsc_node_renderer_pid)
 
     renderer_timeout = Integer(ENV.fetch("RSC_NODE_RENDERER_BOOT_TIMEOUT", "30"))
-    RscNodeRenderer.wait_until_ready!(
-      host: "127.0.0.1",
-      port: Integer(renderer_env["RENDERER_PORT"]),
-      timeout_seconds: renderer_timeout,
-      log_path: renderer_log_path,
-      pid: rsc_node_renderer_pid
-    )
+    begin
+      RscNodeRenderer.wait_until_ready!(
+        host: "127.0.0.1",
+        port: Integer(renderer_env["RENDERER_PORT"]),
+        timeout_seconds: renderer_timeout,
+        log_path: renderer_log_path,
+        pid: rsc_node_renderer_pid
+      )
+    rescue StandardError
+      begin
+        Process.kill("-TERM", rsc_node_renderer_pid)
+      rescue Errno::ESRCH
+        # Already stopped.
+      end
+      rsc_node_renderer_waiter&.join(2)
+      rsc_node_renderer_pid = nil
+      rsc_node_renderer_waiter = nil
+      raise
+    end
   end
 
   config.after(:suite) do
@@ -256,14 +269,13 @@ RSpec.configure do |config|
 end
 ```
 
-Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately; if you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout. The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to the one-second connect timeout. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
+Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. The TCP probe above is a fallback for renderers that do not expose a health endpoint; if your renderer has one, replace the probe with an HTTP health check. A successful TCP connection only proves the port is accepting connections, not that route handlers or bundle manifests are fully initialized. The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately; if you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout. The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to the one-second connect timeout. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
 
 The helper relies on the Step 2 `configure_rspec_to_compile_assets` setup so bundles are available before renderer-backed
-examples run. On RSpec 3.5 and newer, `configure_rspec_to_compile_assets` uses
-`when_first_matching_example_defined`, so compilation is triggered as soon as RSpec defines a matching example; older RSpec
-falls back to `before(:example, metatag)`. The renderer may already be running, but it does not need to serve an RSC request
-until a matching example executes. If your launcher validates bundles at boot, or your suite starts renderer-backed requests
-outside examples tagged for compilation, compile assets in your CI job before running the spec process.
+examples run. Load `support/rsc_node_renderer` after registering `configure_rspec_to_compile_assets` so modern RSpec can
+trigger compilation with `when_first_matching_example_defined` before suite hooks start the renderer. Older RSpec falls back
+to `before(:example, metatag)`, so compile assets in your CI job before running the spec process if your launcher validates
+bundles at boot or your suite starts renderer-backed requests outside examples tagged for compilation.
 
 In CI, set `RSC_NODE_RENDERER_TESTS=1` for jobs that need the renderer. For local development, leaving it unset lets you run non-RSC specs without starting another process.
 
