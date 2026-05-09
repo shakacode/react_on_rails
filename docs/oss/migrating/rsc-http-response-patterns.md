@@ -33,10 +33,10 @@ class StoriesController < ApplicationController
     preflight = StoryPagePreflight.call(params[:id], current_user: current_user)
 
     if preflight.redirect_reason
+      # Map every possible redirect_reason StoryPagePreflight can return.
+      # Unknown reasons fall back to root_path and log an error.
       redirect_path = {
         unauthenticated: sign_in_path,
-        # Add a key here for every redirect_reason StoryPagePreflight can return.
-        # Unknown reasons fall back to root_path and log an error.
       }.fetch(preflight.redirect_reason) do |reason|
         Rails.logger.error("Unknown redirect_reason: #{reason.inspect}")
         root_path
@@ -69,6 +69,7 @@ class StoryPagePreflight
     :cache_control,
     keyword_init: true
   ) do
+    # Override the Struct-generated accessor to supply a default when the field is nil.
     def redirect_status
       self[:redirect_status] || :see_other
     end
@@ -173,6 +174,9 @@ export default function StoryPage({ notFound, story }: StoryPageProps) {
 
 Use this pattern when the branded not-found UI benefits from the same RSC layout as the rest of the route. Use a plain Rails error template when you need the smallest, most reliable failure path.
 
+Rails normalizes `response.status` values through Rack, so both integer codes such as `404` and Rails symbols such as
+`:not_found` are valid.
+
 Cache `404` responses publicly only when the route is truly missing, such as typo-driven URLs that repeat often. Prefer
 `no-store` for user-specific or permission-sensitive misses, and use `410 Gone` for durable removals where caches should
 reuse the response as a permanent absence.
@@ -248,6 +252,8 @@ def show
   story = Story.published.find_by(slug: params[:slug])
   return render(template: "errors/not_found", status: :not_found) unless story
 
+  # If request validators still match, stale? sends 304 Not Modified and returns false.
+  # The explicit return avoids opening a stream for that already-selected response.
   return unless stale?(
     story,
     public: true,
