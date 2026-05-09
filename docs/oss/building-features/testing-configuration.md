@@ -55,18 +55,20 @@ ENV["RAILS_ENV"] ||= "test"
 
 test_worker = ENV.fetch("TEST_ENV_NUMBER", "0")
 test_worker = "0" if test_worker.empty?
+test_worker_id = test_worker.gsub(/[^0-9]/, "")
+test_worker_id = "0" if test_worker_id.empty?
 
-ENV["RENDERER_PORT"] ||= (3900 + test_worker.to_i).to_s
-renderer_url = "http://127.0.0.1:#{ENV.fetch('RENDERER_PORT')}"
+ENV["RENDERER_PORT"] ||= (3900 + test_worker_id.to_i).to_s
+renderer_url = "http://127.0.0.1:#{ENV["RENDERER_PORT"]}"
 ENV["REACT_RENDERER_URL"] ||= renderer_url # used by config.renderer_url = ENV["REACT_RENDERER_URL"]
 ENV["RENDERER_URL"] ||= renderer_url       # used by some older/custom initializers
 ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] ||=
-  File.expand_path("../tmp/node-renderer-bundles-test-#{test_worker}", __dir__)
+  File.expand_path("../tmp/node-renderer-bundles-test-#{test_worker_id}", __dir__)
 
 require_relative "../config/environment"
 ```
 
-`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on (skipping `"1"`), so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID so every worker gets a unique port and cache path.
+`TEST_ENV_NUMBER` is set by the `parallel_tests` gem. It uses `""` for the first worker, then `"2"`, `"3"`, and so on (skipping `"1"`), so the example uses ports 3900, 3902, 3903, and leaves a harmless gap at 3901. If another service already uses ports in the 3900 range, set `RENDERER_PORT` before this snippet or change the base port in the example. If you use a different parallelization tool, replace `test_worker` with that tool's worker ID and normalize it to a stable, path-safe `test_worker_id` so every worker gets a unique port and cache path.
 
 If you run tests in parallel, each worker needs its own `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH`. Sharing a renderer cache across parallel workers can produce stale-bundle and missing-bundle failures that look like flaky RSC timeouts.
 
@@ -105,11 +107,13 @@ end
 
 Passing any metatags replaces the TestHelper defaults, so include the default `:js`, `:server_rendering`, and `:controller` tags alongside `:rsc` if your suite mixes RSC and non-RSC specs.
 
+The derived metadata block intentionally tags every system and feature spec so the first browser request cannot race ahead of RSC bundle compilation. If only some directories exercise RSC, narrow the regex (for example, `spec/(system/rsc|features/rsc)`) or tag those examples manually to avoid compiling for unrelated system tests.
+
 Tag request specs that hit the RSC payload endpoint explicitly with `:rsc`. If your suite uses a different tag scheme, pass the complete list of tags that should trigger compilation. The important part is that the build runs before the first request that can upload bundles to the node renderer.
 
 ### 3. Start One Test Renderer Per Worker
 
-Start the renderer in `before(:suite)` after assets are compiled and stop it in `after(:suite)`. The example below assumes your app has a `node-renderer` package script; replace the package-manager command with the one your project uses.
+Start the renderer in `before(:suite)` after assets are compiled and stop it in `after(:suite)`. The example below assumes your app has a `node-renderer` package script that launches the node-renderer server, reads `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH` from ENV, and serves the RSC test bundle cache. See [Node Renderer JavaScript Configuration](node-renderer/js-configuration.md#example-launch-files) for launch-file and `package.json` script examples. Replace the package-manager command with the one your project uses.
 
 ```ruby
 # spec/support/rsc_node_renderer.rb
@@ -182,7 +186,9 @@ RSpec.configure do |config|
 
     test_worker = ENV.fetch("TEST_ENV_NUMBER", "0")
     test_worker = "0" if test_worker.empty?
-    renderer_log_path = Rails.root.join("log/node-renderer-test-#{test_worker}.log").to_s
+    test_worker_id = test_worker.gsub(/[^0-9]/, "")
+    test_worker_id = "0" if test_worker_id.empty?
+    renderer_log_path = Rails.root.join("log/node-renderer-test-#{test_worker_id}.log").to_s
     rsc_node_renderer_pid = Process.spawn(
       renderer_env,
       "pnpm", # replace with "npm", "yarn", or "bun" if that is your package manager
@@ -255,6 +261,8 @@ Request specs are still useful for the payload endpoint:
 ```ruby
 RSpec.describe "RSC payload endpoint", :rsc, type: :request do
   it "returns an RSC payload stream" do
+    # Replace this path if your app customizes config.rsc_payload_generation_url_path
+    # or rsc_payload_route.
     get "/rsc_payload/StoryPage", params: { props: { slug: "ruby-rails-react" }.to_json }
 
     expect(response).to have_http_status(:ok)
