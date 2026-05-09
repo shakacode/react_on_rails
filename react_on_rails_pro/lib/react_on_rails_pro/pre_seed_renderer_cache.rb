@@ -3,7 +3,6 @@
 require "fileutils"
 require "pathname"
 require "react_on_rails_pro/renderer_cache_helpers"
-require "securerandom"
 
 module ReactOnRailsPro
   # Stages the Node Renderer bundle cache in the renderer's expected directory
@@ -72,11 +71,10 @@ module ReactOnRailsPro
       # mis-staging.
       # RENDERER_BUNDLE_PATH remains accepted for compatibility, but new deploys
       # should migrate to RENDERER_SERVER_BUNDLE_CACHE_PATH. Whitespace-only
-      # values are treated as unset here so the user gets the actionable Docker
-      # guidance instead of the lower-level "whitespace-only" error from
-      # renderer_cache_env_value.
-      return if !ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").strip.empty? ||
-                !ENV.fetch("RENDERER_BUNDLE_PATH", "").strip.empty?
+      # values intentionally pass this guard so renderer_cache_env_value can
+      # raise the specific validation error instead of the missing-env guidance.
+      return if !ENV.fetch("RENDERER_SERVER_BUNDLE_CACHE_PATH", "").empty? ||
+                !ENV.fetch("RENDERER_BUNDLE_PATH", "").empty?
 
       raise ReactOnRailsPro::Error, <<~MSG.strip
         Pre-seeding the renderer cache in copy mode (#{Rails.env}) requires an explicit

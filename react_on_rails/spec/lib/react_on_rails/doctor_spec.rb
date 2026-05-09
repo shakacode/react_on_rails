@@ -2543,7 +2543,8 @@ RSpec.describe ReactOnRails::Doctor do
                           .find { |line| line.include?(".kamal/deploy.yml →") }
         expect(suggestion_line).not_to be_nil
         expect(suggestion_line).to include("MODE=symlink")
-        expect(suggestion_line).to include("image build")
+        expect(suggestion_line).to include("# use copy mode for image builds")
+        expect(suggestion_line).not_to include("(use copy mode")
       end
     end
 

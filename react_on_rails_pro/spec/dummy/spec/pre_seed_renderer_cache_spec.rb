@@ -179,13 +179,22 @@ describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePa
       ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
     end
 
-    it "raises the actionable Docker guidance when the preferred env var is whitespace-only" do
+    it "raises the whitespace-only error when the preferred env var is whitespace-only" do
       ENV["RENDERER_SERVER_BUNDLE_CACHE_PATH"] = "  "
 
       expect { described_class.call(mode: :copy) }
-        .to raise_error(ReactOnRailsPro::Error, /RENDERER_SERVER_BUNDLE_CACHE_PATH/)
+        .to raise_error(ReactOnRailsPro::Error, /RENDERER_SERVER_BUNDLE_CACHE_PATH is whitespace-only/)
     ensure
       ENV.delete("RENDERER_SERVER_BUNDLE_CACHE_PATH")
+    end
+
+    it "raises the whitespace-only error when the deprecated env var is whitespace-only" do
+      ENV["RENDERER_BUNDLE_PATH"] = "  "
+
+      expect { described_class.call(mode: :copy) }
+        .to raise_error(ReactOnRailsPro::Error, /RENDERER_BUNDLE_PATH is whitespace-only/)
+    ensure
+      ENV.delete("RENDERER_BUNDLE_PATH")
     end
 
     it "does not raise in :symlink mode even without an env var" do
