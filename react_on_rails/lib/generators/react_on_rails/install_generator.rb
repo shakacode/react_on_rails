@@ -270,10 +270,9 @@ module ReactOnRails
         end
 
         package_json = GeneratorMessages.read_package_json(destination_root)
-        package_json_detection_options = GeneratorMessages.package_json_detection_options_for(package_json)
         package_manager = GeneratorMessages.detect_package_manager(
           app_root: destination_root,
-          **package_json_detection_options
+          package_json: package_json
         )
         # Scope the lockfile check to the detected manager: a generic "any lockfile exists" check
         # would emit `cache: "pnpm"` in CI when only `yarn.lock` is on disk, breaking setup-node.
@@ -286,7 +285,7 @@ module ReactOnRails
                                    GeneratorMessages.package_manager_declared?(
                                      app_root: destination_root,
                                      manager: "pnpm",
-                                     **package_json_detection_options
+                                     package_json: package_json
                                    )
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||

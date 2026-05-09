@@ -35,28 +35,22 @@ module GeneratorMessages
     # pass the hash).
     # Pass package_json: nil when the caller already attempted to read package.json and
     # wants detection to fall through directly to lockfile heuristics.
-    # Pass skip_package_json_detection: true only as a compatibility alias for
-    # package_json: nil in older call sites.
-    def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET,
-                               skip_package_json_detection: false)
+    def detect_package_manager(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       detect_package_manager_with_source(
         app_root: app_root,
-        package_json: package_json,
-        skip_package_json_detection: skip_package_json_detection
+        package_json: package_json
       ).first
     end
 
     # source is one of :env, :package_json, :lockfile, :default — used to
     # name the originating source when surfacing detection errors.
-    def detect_package_manager_with_source(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET,
-                                           skip_package_json_detection: false)
+    def detect_package_manager_with_source(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
       return [env_package_manager, :env] if supported_package_manager?(env_package_manager)
 
       content = package_json_content(
         app_root: app_root,
-        package_json: package_json,
-        skip_package_json_detection: skip_package_json_detection
+        package_json: package_json
       )
       pm_from_json = content ? package_manager_name_from_content(content) : nil
       return [pm_from_json, :package_json] if pm_from_json
@@ -81,24 +75,22 @@ module GeneratorMessages
       end
     end
 
-    # Returns true when package.json declares a top-level `packageManager` field with an
-    # npm-style version/range/tag (e.g. `"pnpm@9.0.0"`, `"pnpm@10"`,
-    # `"pnpm@^10.0.0"`, or `"pnpm@latest"`) for the requested `manager`. These forms
-    # match what `pnpm/action-setup@v4` can resolve from package.json; projects that
-    # need reproducible Corepack behavior should prefer an exact version, optionally
-    # with a hash (e.g. `"pnpm@9.0.0+sha256.abc"`). A bare name without `@<version>`
-    # returns false because `pnpm/action-setup` has no version to resolve from it.
+    # Returns true when package.json declares a top-level `packageManager` field with a
+    # numeric version/range (e.g. `"pnpm@9.0.0"`, `"pnpm@10"`, or `"pnpm@^10.0.0"`)
+    # for the requested `manager`. Symbolic tags such as `"pnpm@latest"` return false
+    # so the CI scaffold keeps its reproducible fallback pin. Projects that need
+    # reproducible Corepack behavior should prefer an exact version, optionally with a
+    # hash (e.g. `"pnpm@9.0.0+sha256.abc"`). A bare name without `@<version>` returns
+    # false because `pnpm/action-setup` has no version to resolve from it.
     # Used by the CI scaffold to decide whether `pnpm/action-setup` needs an explicit
     # `version:` key; exact SemVer validation belongs only where a caller needs to
     # extract a reproducible version pin.
     # Pass package_json: <parsed_hash> to reuse an already-parsed package.json and
     # package_json: nil to preserve a cached missing/unreadable read.
-    def package_manager_declared?(manager:, app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET,
-                                  skip_package_json_detection: false)
+    def package_manager_declared?(manager:, app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       content = package_json_content(
         app_root: app_root,
-        package_json: package_json,
-        skip_package_json_detection: skip_package_json_detection
+        package_json: package_json
       )
       return false unless content
 
@@ -151,15 +143,6 @@ module GeneratorMessages
       nil
     end
 
-    # Converts a cached package.json read into detection kwargs. A parsed hash is
-    # reused directly; nil preserves the cached missing/unreadable state without a
-    # second disk read.
-    #
-    # @api public
-    def package_json_detection_options_for(package_json)
-      { package_json: package_json }
-    end
-
     private
 
     # Pipeline internals — external callers should go through `detect_package_manager`
@@ -171,16 +154,7 @@ module GeneratorMessages
       content ? package_manager_name_from_content(content) : nil
     end
 
-    def package_json_content(app_root:, package_json:, skip_package_json_detection:)
-      if skip_package_json_detection
-        # nil means the caller cached that package.json was absent; a stale hash is not allowed here.
-        if !package_json.equal?(PACKAGE_JSON_UNSET) && !package_json.nil?
-          raise ArgumentError, "Cannot use skip_package_json_detection: true with an explicit package_json hash"
-        end
-
-        return nil
-      end
-
+    def package_json_content(app_root:, package_json:)
       return read_package_json(app_root) if package_json.equal?(PACKAGE_JSON_UNSET)
 
       # nil means the caller cached that package.json was absent/unreadable.
@@ -188,15 +162,15 @@ module GeneratorMessages
     end
 
     # Sibling of `package_manager_name_from_content` for places that need a resolvable
-    # version spec, not just a manager name. It accepts npm-style version specs because
-    # `pnpm/action-setup` can read those from package.json; a bare `"pnpm"` still needs
-    # the scaffolded fallback version.
+    # version spec, not just a manager name. It accepts numeric npm-style version specs
+    # because `pnpm/action-setup` can read those from package.json; a bare `"pnpm"` or
+    # symbolic tag such as `"pnpm@latest"` still needs the scaffolded fallback version.
     def versioned_package_manager_name_from_content(content)
       raw_declared = content["packageManager"]
       return nil unless raw_declared.is_a?(String)
 
       declared = raw_declared.strip
-      match = declared.match(/\A([^@\s]+)@(\S+)\z/)
+      match = declared.match(/\A([^@\s]+)@(?=\S*\d)(\S+)\z/)
       return nil unless match
 
       name = match[1].downcase

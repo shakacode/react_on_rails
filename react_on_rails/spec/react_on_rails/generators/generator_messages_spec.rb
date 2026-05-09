@@ -180,16 +180,6 @@ describe GeneratorMessages do
       expect(described_class.detect_package_manager(package_json: nil)).to eq("yarn")
     end
 
-    it "skips package.json disk detection only when explicitly requested" do
-      expect(described_class).not_to receive(:read_package_json)
-      allow(File).to receive(:exist?).and_call_original
-      %w[yarn.lock pnpm-lock.yaml bun.lock bun.lockb package-lock.json].each do |lockfile|
-        allow(File).to receive(:exist?).with(File.join(Dir.pwd, lockfile)).and_return(false)
-      end
-
-      expect(described_class.detect_package_manager(skip_package_json_detection: true)).to eq("npm")
-    end
-
     it "returns nil from detect_package_manager_from_package_json for malformed JSON" do
       allow(File).to receive(:exist?).and_call_original
       allow(File).to receive(:exist?).with(File.join(Dir.pwd, "package.json")).and_return(true)
@@ -440,39 +430,6 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm", package_json: nil)).to be(false)
     end
 
-    it "skips package.json disk detection only when explicitly requested" do
-      expect(File).not_to receive(:read)
-
-      expect(
-        described_class.package_manager_declared?(
-          manager: "pnpm",
-          skip_package_json_detection: true
-        )
-      ).to be(false)
-    end
-
-    it "preserves a cached missing package.json when skip_package_json_detection is set" do
-      expect(File).not_to receive(:read)
-
-      expect(
-        described_class.package_manager_declared?(
-          manager: "pnpm",
-          package_json: nil,
-          skip_package_json_detection: true
-        )
-      ).to be(false)
-    end
-
-    it "rejects skip_package_json_detection when a package_json hash is provided" do
-      expect do
-        described_class.package_manager_declared?(
-          manager: "pnpm",
-          package_json: { "packageManager" => "pnpm@9.0.0" },
-          skip_package_json_detection: true
-        )
-      end.to raise_error(ArgumentError, /explicit package_json hash/)
-    end
-
     it "returns false when packageManager declares an unsupported tool" do
       allow(File).to receive(:exist?).with(package_json_path).and_return(true)
       allow(File).to receive(:read).with(package_json_path)
@@ -504,8 +461,8 @@ describe GeneratorMessages do
       expect(described_class.package_manager_declared?(manager: "pnpm")).to be(false)
     end
 
-    it "returns true when packageManager uses npm-style version specs" do
-      %w[pnpm@10 pnpm@10.x pnpm@^10.0.0 pnpm@latest].each do |package_manager|
+    it "returns true when packageManager uses numeric npm-style version specs" do
+      %w[pnpm@10 pnpm@10.x pnpm@^10.0.0].each do |package_manager|
         expect(
           described_class.package_manager_declared?(
             manager: "pnpm",
@@ -513,6 +470,15 @@ describe GeneratorMessages do
           )
         ).to be(true), "expected #{package_manager.inspect} to count as an explicit packageManager declaration"
       end
+    end
+
+    it "returns false when packageManager uses a symbolic version tag" do
+      expect(
+        described_class.package_manager_declared?(
+          manager: "pnpm",
+          package_json: { "packageManager" => "pnpm@latest" }
+        )
+      ).to be(false)
     end
 
     it "uses a provided package_json without reading package.json again" do
@@ -543,26 +509,6 @@ describe GeneratorMessages do
           package_json: { "devEngines" => { "packageManager" => "pnpm@9.14.2" } }
         )
       ).to be(false)
-    end
-  end
-
-  describe ".package_json_detection_options_for" do
-    it "is public for generator callers outside GeneratorMessages" do
-      expect(described_class).to respond_to(:package_json_detection_options_for)
-    end
-
-    it "preserves a cached missing package.json without a second read" do
-      expect(described_class.package_json_detection_options_for(nil)).to eq(
-        { package_json: nil }
-      )
-    end
-
-    it "passes a parsed package.json hash through for reuse" do
-      package_json = { "packageManager" => "pnpm@11.0.8" }
-
-      expect(described_class.package_json_detection_options_for(package_json)).to eq(
-        { package_json: package_json }
-      )
     end
   end
 end

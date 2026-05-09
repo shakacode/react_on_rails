@@ -2085,9 +2085,7 @@ describe InstallGenerator, type: :generator do
   end
 
   context "when env selects pnpm but packageManager declares yarn" do
-    previous_package_manager = nil
-
-    before(:all) do
+    around do |example|
       previous_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)
       ENV["REACT_ON_RAILS_PACKAGE_MANAGER"] = "pnpm"
       run_generator_test_with_args(%w[], package_json: true) do
@@ -2101,9 +2099,9 @@ describe InstallGenerator, type: :generator do
           "#{JSON.pretty_generate('name' => 'app', 'packageManager' => 'yarn@1.22.0')}\n"
         )
       end
-    end
 
-    after(:all) do
+      example.run
+    ensure
       if previous_package_manager.nil?
         ENV.delete("REACT_ON_RAILS_PACKAGE_MANAGER")
       else
