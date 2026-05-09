@@ -2949,14 +2949,10 @@ module ReactOnRails
     end
 
     def warn_missing_package_root(package_root)
-      if ReactOnRails.configuration.node_modules_location.to_s.empty?
-        checker.add_warning("⚠️  Rails root #{package_root} does not exist; cannot detect installed React")
-      else
-        checker.add_warning(
-          "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
-          "cannot detect installed React"
-        )
-      end
+      checker.add_warning(
+        "⚠️  node_modules_location points to #{package_root}, but that directory does not exist; " \
+        "cannot detect installed React"
+      )
     end
 
     def declared_react_version

@@ -27,6 +27,8 @@ module ReactOnRails
       resolved_location = Pathname.new(node_modules_location).cleanpath
       # cleanpath normalizes redundant separators and ".." without resolving symlinks;
       # realpath is intentionally skipped to avoid filesystem I/O on every call.
+      # Relative paths like "../client" remain valid diagnostics targets and are
+      # not constrained to stay within Rails.root.
       return Rails.root.to_s if resolved_location == Pathname.new(".") || resolved_location == Rails.root.cleanpath
       return resolved_location.to_s if resolved_location.absolute?
 
