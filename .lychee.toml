@@ -32,7 +32,7 @@ exclude = [
   '^https://invite\.reactrails\.com/?$',  # Slack invite endpoint returns 403 for automated requests
   '^https://docs\.google\.com',  # Private docs require auth
   '^https://claude\.ai',  # Returns 403 for automated requests
-  '^https://bencher\.dev/console/projects/react-on-rails-t8a9ncxo/?$',  # Dashboard requires auth; returns 403
+  '^https://bencher\.dev/console/projects/react-on-rails-t8a9ncxo',  # Dashboard requires auth; returns 403
   '^https://(www\.)?110grill\.com/?$',  # Returns 403 for automated requests
 
   # ============================================================================
