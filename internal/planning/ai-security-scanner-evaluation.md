@@ -53,12 +53,12 @@ prioritization, explanation, or reachability analysis for a finding that existin
 Start with this point-in-time vendor shortlist from the issue if the products still offer an appropriate plan at
 evaluation time.
 
-| Vendor          | Reference                  | Initial status | Before scheduling                                                                                   |
-| --------------- | -------------------------- | -------------- | --------------------------------------------------------------------------------------------------- |
-| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                             |
-| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                             |
-| Almanax         | <https://almanax.ai/>      | Lower priority | Confirm OSS or trial access and Ruby/TypeScript coverage; public examples are currently Web3-heavy. |
-| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                             |
+| Vendor          | Reference                  | Initial status | Before scheduling                                                                                                                       |
+| --------------- | -------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| ZeroPath        | <https://zeropath.com/>    | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                 |
+| Corgea          | <https://corgea.com/>      | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                 |
+| Almanax         | <https://almanax.ai/>      | Lower priority | Confirm OSS or trial access and Ruby/TypeScript coverage; public examples were Web3-heavy as of 2026-05-09. Re-evaluate at next review. |
+| DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage.                                                                                 |
 
 If the named vendors are unavailable or unsuitable, look for tools in these categories:
 
