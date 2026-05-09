@@ -126,7 +126,9 @@ For example, with `node-fetch` v2 in a CommonJS launch file:
 ```js
 const { reactOnRailsProNodeRenderer } = require('react-on-rails-pro-node-renderer');
 
-// node-fetch v2's CommonJS export is the fetch function, with Headers/Request/Response attached.
+// node-fetch v2: the default CJS export is the fetch function itself.
+// Headers, Request, and Response are properties attached to that function, not named exports.
+// Do not destructure `fetch` from require("node-fetch"); require it as the whole module instead.
 const nodeFetch = require('node-fetch');
 const {
   Headers: HeadersImplementation,
@@ -145,6 +147,8 @@ reactOnRailsProNodeRenderer({
 });
 ```
 
+If your components use abort signals with `node-fetch` v2, also pass `AbortController` and `AbortSignal` from a compatible polyfill through `additionalContext`.
+
 Use the same `additionalContext` shape if you import a compatible client from `undici` instead. Unlike `node-fetch` v2, `undici` exports `fetch` as a named export; choose a version compatible with your renderer Node.js runtime. Add the same startup guard so incompatible versions fail before the renderer starts:
 
 ```js
@@ -154,11 +158,20 @@ const {
   Headers: HeadersImplementation,
   Request: RequestImplementation,
   Response: ResponseImplementation,
+  AbortController: AbortControllerImplementation,
+  AbortSignal: AbortSignalImplementation,
 } = require('undici');
 
-if (!fetchImplementation || !HeadersImplementation || !RequestImplementation || !ResponseImplementation) {
+if (
+  !fetchImplementation ||
+  !HeadersImplementation ||
+  !RequestImplementation ||
+  !ResponseImplementation ||
+  !AbortControllerImplementation ||
+  !AbortSignalImplementation
+) {
   throw new Error(
-    'The selected undici version does not expose fetch, Headers, Request, and Response. ' +
+    'The selected undici version does not expose fetch, Headers, Request, Response, AbortController, and AbortSignal. ' +
       'Choose an undici release compatible with your renderer Node.js runtime.',
   );
 }
@@ -170,6 +183,8 @@ reactOnRailsProNodeRenderer({
     Headers: HeadersImplementation,
     Request: RequestImplementation,
     Response: ResponseImplementation,
+    AbortController: AbortControllerImplementation,
+    AbortSignal: AbortSignalImplementation,
   },
 });
 ```

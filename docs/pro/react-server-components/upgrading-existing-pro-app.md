@@ -45,7 +45,7 @@ Components that use any of the following **must** have `'use client'`:
 - **Router client APIs**: `useNavigate`, `useLocation`, `useParams`
 - **SSR entry-point files** using `StaticRouter`: these are SSR wrappers, not RSC server components — see the `.server.jsx` naming collision below
 - **Event handlers**: `onClick`, `onChange`, `onSubmit`, etc.
-- **Browser APIs**: `window`, `document`, `localStorage` (note: `fetch`, `Headers`, `Request`, and `Response` do **not** require `'use client'`, but they are available inside the node renderer VM only when provided through bundled imports or `additionalContext`; see [Node Renderer Runtime Globals](../../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc))
+- **Browser APIs**: `window`, `document`, `localStorage` (note: `fetch`, `Headers`, `Request`, and `Response` do **not** require `'use client'`, but they are available inside the node renderer VM only when provided through bundled imports or `additionalContext`; see [Node Renderer Runtime Globals](../../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc)). If you have existing Server Components that call `fetch()` directly, bundle an HTTP client (`node-fetch` v2 or `undici`) or inject fetch globals via `additionalContext` at renderer startup.
 
 ### The `.server.jsx` naming collision
 
