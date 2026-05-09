@@ -34,8 +34,9 @@ ceiling to `< 20.0.0`. **Owner**: @justin808 | **Target**: before any package-ra
 
 Use a dedicated branch for the actual version verification work:
 
-- [ ] Review the React 19.2.x changelog and release notes for breaking changes, deprecations, and new APIs that could
-      affect React on Rails SSR, streaming, RSC, or hydration integration.
+- [ ] Review the React 19.2.x [changelog](https://github.com/facebook/react/blob/main/CHANGELOG.md) and
+      [React 19 upgrade guide](https://react.dev/blog/2024/04/25/react-19-upgrade-guide) for breaking changes,
+      deprecations, and new APIs that could affect React on Rails SSR, streaming, RSC, or hydration integration.
 - [ ] Audit `renderToString` and `renderToStaticMarkup` call sites in React on Rails SSR paths; React 19 renders Suspense
       fallbacks synchronously in `renderToString` instead of suspending, which can silently change output without an error.
       For each call site in `packages/react-on-rails/src/serverRenderReactComponent.ts`,
@@ -43,8 +44,9 @@ Use a dedicated branch for the actual version verification work:
       `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.mjs" --include="*.cjs" --include="*.ts" --include="*.tsx" --include="*.cts"`,
       document whether a Suspense-containing tree could plausibly be passed by a user render function today, then either
       open a follow-up migration ticket or record why the current usage is acceptable.
-- [ ] Decide the fate of `packages/react-on-rails/src/ReactDOMServer.cts`: either remove the compatibility re-export when
-      dropping React 16/17 support or open a dedicated follow-up ticket recording the reason for keeping it.
+- [ ] Open a tracking issue titled "Drop React 16/17 support" if one does not already exist, then link it here. The
+      `packages/react-on-rails/src/ReactDOMServer.cts` compatibility re-export is already marked for deletion when that
+      support is dropped.
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
       React, React DOM, and `react-on-rails-rsc` resolve to compatible versions. Capture the exact
       `pnpm list -r --depth=0 react react-dom react-on-rails-rsc` output in the verification record, such as a comment on
@@ -88,13 +90,27 @@ Use a dedicated branch for the actual version verification work:
   - `cd react_on_rails_pro/spec/dummy && pnpm playwright install --with-deps`
   - `cd react_on_rails_pro/spec/dummy && pnpm run e2e-test` for Pro `stream_react_component` and RSC payload paths
   - See `.claude/docs/playwright-e2e-testing.md` for the OSS dummy setup.
-- [ ] Run the generated-app suite. Prefer a fresh clone.
+- [ ] Run the generated-app suite. Prefer a fresh clone. If a fresh clone is not practical, use a disposable worktree so
+      the current checkout and gitignored files are untouched:
+
+  ```bash
+  git worktree add /tmp/ror-verify HEAD
+  cd /tmp/ror-verify
+  pnpm install
+  ```
+
+  After the suite runs, remove the worktree from the original checkout:
+
+  ```bash
+  git worktree remove /tmp/ror-verify
+  ```
 
   > **Warning**: `git clean -fdx` deletes all untracked files, including gitignored files, and cannot be undone. Move or
   > back up gitignored files, such as `.env`, local credentials, or generated certs, before continuing.
 
-  If a fresh clone is not practical, use the repo root after stashing or committing tracked and non-ignored in-progress work.
-  Note: `git stash -u` saves untracked non-ignored files, but does not save gitignored files.
+  If neither a fresh clone nor a disposable worktree is practical, use the repo root only after stashing or committing tracked
+  and non-ignored in-progress work. Note: `git stash -u` saves untracked non-ignored files, but does not save gitignored
+  files.
 
   ```bash
   git stash -u
@@ -183,7 +199,10 @@ These placeholders must be filled before the first implementation PR is opened. 
 @justin808 is the fallback owner for both roles.
 
 These will be filled in Issue 3255 before any implementation PR is opened; they are intentionally left blank in this planning
-document.
+document. Track the assignments with auditable checklist items before opening that PR:
+
+- [ ] Add an Issue 3255 checklist item for assigning the secondary reviewer for the SSR-vs-RSC decision.
+- [ ] Add an Issue 3255 checklist item for assigning the backup reviewer for benchmark metrics.
 
 **Secondary reviewer (SSR-vs-RSC)**: _[name to be filled before first implementation PR; fallback: @justin808]_
 
