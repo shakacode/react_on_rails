@@ -119,9 +119,8 @@ module GeneratorMessages
     end
 
     # Parses package.json once and returns the hash, or nil if the file is missing
-    # or unreadable. This helper is public for generator code that needs to reuse
-    # the same parsed hash across setup, template, and message paths; it is not
-    # application-facing API.
+    # or unreadable. Generator code can reuse the same parsed hash across setup,
+    # template, and message paths.
     def read_package_json(app_root)
       package_json_path = File.join(app_root, "package.json")
       return nil unless File.exist?(package_json_path)
