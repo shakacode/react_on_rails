@@ -96,14 +96,11 @@ These shims are not covered by React on Rails CI and are documented as a tempora
 
 Webpack 4 does not support the `exports` field in `package.json`, so subpath imports such as `react-on-rails/client` resolve to a literal file path that does not exist; the package root import falls back to the `main` field. The `react-on-rails/client` subpath export has been present since [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03), so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need these shims.
 
-Step 1 is conditional: only needed if your packs currently import `react-on-rails/client`. Step 2 is also
-conditional: only needed if Webpack 4 fails to parse modern syntax; check whether your existing
-`@babel/preset-env` targets already cover optional chaining and nullish coalescing before installing new plugins.
-Step 3 requires those Babel transforms to be in place, either through Step 2 or existing `@babel/preset-env`
-targets, before adding the webpack rule. Step 4 is conditional: only needed if your project uses Jest. Keep each
-shim explicit and narrow:
+Keep each shim explicit and narrow:
 
 1. Import the package root from application packs:
+
+   **When to apply:** Only change imports that currently point to `react-on-rails/client`.
 
    ```diff
    - import ReactOnRails from 'react-on-rails/client';
@@ -113,6 +110,9 @@ shim explicit and narrow:
    The root import uses the full build and may log a browser console warning about bundled server-rendering code. It also includes server-rendering code in the client bundle, which increases client bundle size. That trade-off is expected for this temporary shim; remove the shim and return to the current client entry point after upgrading to Shakapacker/Webpack 5 or newer.
 
 2. Ensure Babel can parse modern syntax used by current packages. Add these plugins to your existing Babel config without replacing existing presets or plugins:
+
+   **When to apply:** Only add these plugins if Webpack 4 fails to parse modern syntax; first check whether your
+   existing `@babel/preset-env` targets already cover optional chaining and nullish coalescing.
 
    If you want to confirm whether your `@babel/preset-env` targets already include optional chaining and
    nullish coalescing, set `debug: true` on the `@babel/preset-env` options and check the build output for
@@ -159,6 +159,10 @@ shim explicit and narrow:
    `rootMode: 'upward'` tells Babel to walk up from `node_modules/react-on-rails` to the project root so it
    can find your project-wide `babel.config.js` or `babel.config.json`.
 
+   Webpacker 5's default JavaScript rule excludes `node_modules`, so files from `react-on-rails` will not reach
+   `babel-loader` unless you add a separate package-scoped rule. Keep the new rule narrow instead of removing the
+   global `node_modules` exclusion from Webpacker's default loader.
+
    ```diff
    // config/webpack/environment.js
    // Webpacker 5 uses '@rails/webpacker', not 'shakapacker'.
@@ -190,6 +194,8 @@ shim explicit and narrow:
 
 4. If your test suite uses Jest directly, remember that Jest does not use this Webpack loader. Add
    `react-on-rails` to `transformIgnorePatterns` in `jest.config.js` so Jest also transpiles React on Rails.
+
+   **When to apply:** Only add this Jest config if your project runs Jest directly.
 
    If you do not have existing `transformIgnorePatterns`, add the two-pattern form so Jest also handles pnpm's
    `.pnpm` store path:
