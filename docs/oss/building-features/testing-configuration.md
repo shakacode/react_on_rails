@@ -259,10 +259,11 @@ end
 Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately; if you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout. The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to the one-second connect timeout. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
 
 The helper relies on the Step 2 `configure_rspec_to_compile_assets` setup so bundles are available before renderer-backed
-examples run. The renderer starts in `before(:suite)`, and compilation runs in a second `before(:suite)` registered by
-`configure_rspec_to_compile_assets`; RSpec runs both hooks before any example executes, so the renderer has no bundles to
-serve until compilation has completed. If your suite starts the renderer before any `:rsc` example can trigger that hook,
-compile assets in your CI job before running the spec process.
+examples run. On RSpec 3.5 and newer, `configure_rspec_to_compile_assets` uses
+`when_first_matching_example_defined`, so compilation is triggered as soon as RSpec defines a matching example; older RSpec
+falls back to `before(:example, metatag)`. The renderer may already be running, but it does not need to serve an RSC request
+until a matching example executes. If your launcher validates bundles at boot, or your suite starts renderer-backed requests
+outside examples tagged for compilation, compile assets in your CI job before running the spec process.
 
 In CI, set `RSC_NODE_RENDERER_TESTS=1` for jobs that need the renderer. For local development, leaving it unset lets you run non-RSC specs without starting another process.
 
