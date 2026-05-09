@@ -33,13 +33,16 @@ If the repository does not show **Report a vulnerability** for your account, use
 routed to a React on Rails maintainer before sharing exposure details. Repository maintainers with write access may open
 a confidential
 [GitHub Security Advisory](https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/creating-a-repository-security-advisory)
-draft directly, but external reporters should not rely on that path because it requires repository write access.
+draft directly, but external reporters cannot use the GitHub Security Advisory draft path because creating a Security
+Advisory requires repository write access.
 
 If a reporter cannot use GitHub, they may email [contact@shakacode.com](mailto:contact@shakacode.com) with the subject
 line `React on Rails security` and ask to be routed to a React on Rails maintainer for coordinated disclosure. Do not
-include exploit details in that first contact. This fallback remains in place until maintainers publish a dedicated
-security alias. Maintainers will respond with a secure alternative, such as a private GitHub Advisory thread or another
-mutually agreed private channel, before requesting reproduction details.
+include exploit details in that first contact. This fallback remains in place until maintainers publish the dedicated
+security alias tracked in
+[Issue 3266](https://github.com/shakacode/react_on_rails/issues/3266). Maintainers will respond with a secure
+alternative, such as a private GitHub Advisory thread or another mutually agreed private channel, before requesting
+reproduction details.
 
 Maintainers aim to provide an initial response within five business days. The default disclosure window is 90 days from
 the date of first report unless maintainers and the reporter agree to a shorter or longer timeline.

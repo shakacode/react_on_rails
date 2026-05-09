@@ -123,7 +123,7 @@ where 6.4 is the sum of all weights.
 | Permission model          | Can it run with minimal GitHub permissions?                                        |             | 0.7          |                |
 | CI fit                    | Can results be advisory first, without failing every PR?                           |             | 0.7          |                |
 | Maintenance cost          | How much config, triage time, and vendor lock-in does it add?                      |             | 0.5          |                |
-| **Final score**           | Normalized weighted average: `sum(weighted scores) / 6.4`                          |             | **6.4**      | `<fill>`       |
+| **Final score**           | Normalized weighted average: `sum(weighted scores) / 6.4`; total weight = `6.4`    |             | N/A          | `<fill>`       |
 
 Anchor examples:
 
