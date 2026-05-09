@@ -21,6 +21,8 @@ With streaming, this boundary matters even more. Once Rails writes the first res
 ## Preflight Pattern
 
 Use a controller or service object to gather data and choose the response policy before rendering the RSC tree.
+The preflight object exposes a small, serializable result. `StorySerializer`, `PublicStorySerializer`, and
+`ViewerSerializer` are placeholder names in these examples; substitute your app's serializer or presenter as needed.
 
 ```ruby
 class StoriesController < ApplicationController
@@ -30,7 +32,11 @@ class StoriesController < ApplicationController
     preflight = StoryPagePreflight.call(params[:id], current_user: current_user)
 
     if preflight.redirect_reason
-      redirect_path = { unauthenticated: sign_in_path }.fetch(preflight.redirect_reason) do |reason|
+      redirect_path = {
+        unauthenticated: sign_in_path,
+        # Add a key here for every redirect_reason StoryPagePreflight can return.
+        # Unknown reasons fall back to root_path and log an error.
+      }.fetch(preflight.redirect_reason) do |reason|
         Rails.logger.error("Unknown redirect_reason: #{reason.inspect}")
         root_path
       end
@@ -46,8 +52,7 @@ class StoriesController < ApplicationController
 end
 ```
 
-The preflight object can expose a small, serializable result. These examples use placeholder serializer
-classes that return plain Ruby hashes; substitute your app's serializer or presenter as needed:
+One possible preflight implementation is:
 
 ```ruby
 class StoryPagePreflight
@@ -65,7 +70,7 @@ class StoryPagePreflight
       return Result.new(
         props: { notFound: true, story: nil },
         status: :not_found,
-        cache_control: "no-store" # or "public, max-age=30" to absorb repeat 404s at the CDN
+        cache_control: "no-store"
       )
     end
 
@@ -145,6 +150,10 @@ export default function StoryPage({ notFound, story }: StoryPageProps) {
 
 Use this pattern when the branded not-found UI benefits from the same RSC layout as the rest of the route. Use a plain Rails error template when you need the smallest, most reliable failure path.
 
+Cache `404` responses publicly only when the route is truly missing, such as typo-driven URLs that repeat often. Prefer
+`no-store` for user-specific or permission-sensitive misses, and use `410 Gone` for durable removals where caches should
+reuse the response as a permanent absence.
+
 Use `410 Gone` when the route identifies a permanently removed resource and you want caches to treat that response differently from a temporary `404`:
 
 ```ruby
@@ -152,7 +161,7 @@ def show
   story = Story.find_by(slug: params[:slug])
 
   if story&.removed?
-    response.headers["Cache-Control"] = "public, max-age=86400"
+    response.headers["Cache-Control"] = "public, max-age=3600" # Raise only for truly permanent removals.
     return render(template: "errors/gone", status: :gone)
   end
 
@@ -222,9 +231,13 @@ If `stale?` returns `false`, Rails has already prepared the `304 Not Modified` r
 When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary` policy before streaming or keep the response private:
 
 ```ruby
+# Merge with any existing Vary tokens set upstream, then deduplicate.
 existing_vary = response.headers["Vary"].presence
-vary_tokens = [existing_vary, "Accept-Language"].compact.join(", ")
-response.headers["Vary"] = vary_tokens.split(",").map(&:strip).uniq.join(", ")
+
+unless existing_vary == "*"
+  vary_tokens = [existing_vary, "Accept-Language"].compact.join(", ")
+  response.headers["Vary"] = vary_tokens.split(",").map(&:strip).uniq.join(", ")
+end
 ```
 
 Every `Vary` header expands the cache key; avoid high-cardinality headers for public caches unless that extra cache storage is intentional.
