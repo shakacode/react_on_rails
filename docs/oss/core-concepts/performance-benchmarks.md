@@ -89,7 +89,7 @@ Server components produce HTML that does not need hydration — they have no cli
 
 ## Real-World Results
 
-### Gumroad-Style RSC Benchmark Demo
+### Local Directional Benchmark: Gumroad-Style RSC Demo
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo, not an official Gumroad integration. It measures a bounded creator-dashboard
@@ -112,6 +112,10 @@ routes, four per route, with one warmup request before each measured run. Condit
 - Dedicated React on Rails Pro Node renderer on `RENDERER_PORT=3800`
 - Chrome 147 with matching ChromeDriver 147
 
+The original artifact does not yet publish `RAILS_ENV`, hardware/OS, Ruby/Node/Rails versions, or cache-state details.
+[Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks that environment metadata before these
+numbers should be treated as a stable baseline.
+
 The median results showed this directional signal:
 
 | Metric                        | Inertia demo | RSC demo |  Delta |
@@ -122,15 +126,16 @@ The median results showed this directional signal:
 | Controller `action_total`     |      346.9ms |  339.2ms |  -2.2% |
 | Page-specific script requests |            6 |        1 | -83.3% |
 
-_Rows 1-5 are medians (n=4 per route)._
+_Rows 1-5 are medians (n=4 per route). Distribution and variance artifacts are tracked in
+[Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 
-The observed **max `responseEnd`** across the same four RSC runs was 768.25ms vs. 730.62ms for the Inertia control
-(+5.2%), indicating worst-case timing still favored the control.
+The observed **max `responseEnd`** across the four RSC runs was 768.25ms vs. 730.62ms for the Inertia control's max
+(+5.2% for RSC worst-case), indicating worst-case timing still favored the control.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route was faster on
 user-visible median navigation duration and LCP while sending fewer page-specific script requests, but the worst-case
-timing still favored the Inertia control. A stable deployed repeat, renderer-internal timing, and hardware details for
-the local run are still required before making stronger production-performance claims.
+timing still favored the Inertia control. A stable deployed repeat, renderer-internal timing, environment metadata, and
+distribution artifacts are still required before making stronger production-performance claims.
 
 The script-request row counts browser-observed page-specific script resources only; combined transfer-size capture is
 tracked in [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
