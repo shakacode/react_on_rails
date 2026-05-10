@@ -132,6 +132,8 @@ Start the renderer in `before(:suite)` after assets are compiled and stop it in 
 >   // ...
 > };
 > ```
+>
+> The renderer package's built-in default chain is `RENDERER_SERVER_BUNDLE_CACHE_PATH || RENDERER_BUNDLE_PATH || '/tmp/react-on-rails-pro-node-renderer-bundles'`. The middle term is intentionally omitted here because `RENDERER_BUNDLE_PATH` is deprecated; if your existing renderer config relies on it, migrate to `RENDERER_SERVER_BUNDLE_CACHE_PATH` before adopting this snippet so the per-worker cache path actually takes effect.
 
 ```ruby
 # spec/support/rsc_node_renderer.rb
@@ -299,7 +301,10 @@ RSpec.configure do |config|
     # SIGKILL only fires when SIGTERM did not stop the process within the join window.
     unless rsc_node_renderer_waiter&.join(5)
       Process.kill("-KILL", pid)
-      rsc_node_renderer_waiter&.join(5)
+      unless rsc_node_renderer_waiter&.join(5)
+        warn "Node renderer process group #{pid} did not stop after SIGKILL; " \
+             "it may still occupy the renderer port for the next CI retry."
+      end
     end
   rescue Errno::ESRCH
     # Already stopped.
@@ -313,13 +318,16 @@ RSpec.configure do |config|
 end
 ```
 
-Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps. The TCP probe above is a fallback for renderers that do not expose a health endpoint; if your renderer has one, replace the probe with an HTTP health check. A successful TCP connection only proves the port is accepting connections, not that route handlers or bundle manifests are fully initialized. A reset during the pre-spawn probe usually means another service is already using the port and closing connections immediately. The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately; if you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout. The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to the one-second connect timeout. If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
+Require this file from `spec/rails_helper.rb` after loading `react_on_rails/test_helper`, unless your suite already loads `spec/support/**/*.rb`. On slow CI workers, increase `RSC_NODE_RENDERER_BOOT_TIMEOUT` instead of adding sleeps.
 
-The helper relies on the Step 2 `configure_rspec_to_compile_assets` setup so bundles are available before renderer-backed
-examples run. Load `support/rsc_node_renderer` after registering `configure_rspec_to_compile_assets` so modern RSpec can
-trigger compilation with `when_first_matching_example_defined` before suite hooks start the renderer. Older RSpec falls back
-to `before(:example, metatag)`, so compile assets in your CI job before running the spec process if your launcher validates
-bundles at boot or your suite starts renderer-backed requests outside examples tagged for compilation.
+**Caveats:**
+
+- The TCP probe above is a fallback for renderers that do not expose a health endpoint; if your renderer has one, replace the probe with an HTTP health check. A successful TCP connection only proves the port is accepting connections, not that route handlers or bundle manifests are fully initialized.
+- A reset during the pre-spawn probe usually means another service is already using the port and closing connections immediately.
+- The `connect_timeout` call is enough for `127.0.0.1` because an unused localhost port refuses the connection immediately. If you adapt the helper for a remote renderer, the operating system may still apply a longer TCP timeout.
+- The deadline is checked after each socket probe, so very tight timeouts can overshoot by up to the one-second connect timeout.
+- If CI hard-kills the Ruby process before `after(:suite)` runs, clear any orphaned renderer processes or occupied renderer ports before retrying the job.
+- The helper relies on the Step 2 `configure_rspec_to_compile_assets` setup so bundles are available before renderer-backed examples run. Load `support/rsc_node_renderer` after registering `configure_rspec_to_compile_assets` so modern RSpec can trigger compilation with `when_first_matching_example_defined` before suite hooks start the renderer. Older RSpec falls back to `before(:example, metatag)`, so compile assets in your CI job before running the spec process if your launcher validates bundles at boot or your suite starts renderer-backed requests outside examples tagged for compilation.
 
 In CI, set `RSC_NODE_RENDERER_TESTS=1` for jobs that need the renderer. For local development, leaving it unset lets you run non-RSC specs without starting another process.
 
