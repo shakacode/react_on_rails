@@ -111,7 +111,7 @@ imports from `react-on-rails/client` to the package root so Webpack resolves the
 The `react-on-rails/client` subpath export has been present since
 [React on Rails 14.2.0](https://github.com/shakacode/react_on_rails/blob/master/CHANGELOG.md#1420---2025-03-03),
 so any Webpacker 5 / Webpack 4 app on 14.2.0 or newer may need the Step 1 default-import shim. Steps 2-4 are
-only needed for versions that output ESM with modern syntax, such as React on Rails 16.0 and newer.
+only needed if Webpack 4 reports parse errors from `node_modules/react-on-rails` — check your build output first.
 
 Additionally, the built files in `lib/` use modern JavaScript syntax, such as optional chaining and nullish
 coalescing, that Webpack 4's default parser does not support. The package also declares `"type": "module"`, so
@@ -131,9 +131,10 @@ Keep each shim explicit and narrow:
    ```
 
    The root import uses the full build and may log a browser console warning about bundled server-rendering code. It
-   also includes a small amount of extra server-rendering code (the SSR capability module) in the client bundle compared
-   to the `react-on-rails/client` entry point. That trade-off is expected for this temporary shim; remove the shim and
-   return to the current client entry point after upgrading to Shakapacker/Webpack 5 or newer.
+   also includes extra server-rendering code (the SSR capability module) in the client bundle compared
+   to the `react-on-rails/client` entry point; the impact depends on your app, so measure with a tool like
+   `webpack-bundle-analyzer` if bundle size matters. That trade-off is expected for this temporary shim; remove the
+   shim and return to the current client entry point after upgrading to Shakapacker/Webpack 5 or newer.
 
    Do not use the root default import as a replacement for named utility subpaths. Those modules do not export the
    default `ReactOnRails` object. If Webpack 4 cannot resolve one of these named subpaths, use the corresponding
