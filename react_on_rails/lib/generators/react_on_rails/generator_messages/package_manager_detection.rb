@@ -44,6 +44,9 @@ module GeneratorMessages
 
     # source is one of :env, :package_json, :lockfile, :default — used to
     # name the originating source when surfacing detection errors.
+    #
+    # See `detect_package_manager` for the `package_json:` three-way semantics
+    # (omitted = read from disk, nil = caller cached absent, Hash = pre-parsed).
     def detect_package_manager_with_source(app_root: Dir.pwd, package_json: PACKAGE_JSON_UNSET)
       env_package_manager = ENV.fetch("REACT_ON_RAILS_PACKAGE_MANAGER", nil)&.strip&.downcase
       return [env_package_manager, :env] if supported_package_manager?(env_package_manager)
@@ -59,14 +62,6 @@ module GeneratorMessages
       return [pm_from_lockfile, :lockfile] if pm_from_lockfile
 
       ["npm", :default]
-    end
-
-    def package_manager_name_from_content(content)
-      raw_declared = raw_package_manager_field(content)
-      return nil if raw_declared.nil?
-
-      name = raw_declared.split("@", 2).first&.strip&.downcase
-      supported_package_manager?(name) ? name : nil
     end
 
     def lockfile_filename_for(package_manager, app_root: Dir.pwd)
@@ -159,6 +154,14 @@ module GeneratorMessages
 
       # nil means the caller cached that package.json was absent/unreadable.
       package_json
+    end
+
+    def package_manager_name_from_content(content)
+      raw_declared = raw_package_manager_field(content)
+      return nil if raw_declared.nil?
+
+      name = raw_declared.split("@", 2).first&.strip&.downcase
+      supported_package_manager?(name) ? name : nil
     end
 
     # Sibling of `package_manager_name_from_content` for places that need a resolvable
