@@ -48,7 +48,7 @@ Components that use any of the following **must** have `'use client'`:
 - **Browser APIs**: `window`, `document`, `localStorage`
 
 > [!NOTE]
-> `fetch`, `Headers`, `Request`, and `Response` do **not** require `'use client'`, but they are not available inside the node renderer VM by default. If your existing Server Components call `fetch()` directly, bundle an HTTP client (`node-fetch` v2 or `undici`) or inject fetch globals via `additionalContext` at renderer startup. See [Node Renderer Runtime Globals](../../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
+> `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` do **not** require `'use client'`, but they are not available inside the node renderer VM by default. If your existing Server Components call `fetch()` directly, bundle an HTTP client (`node-fetch` v2 or `undici`) or inject fetch globals via `additionalContext` at renderer startup. See [Node Renderer Runtime Globals](../../oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc).
 
 ### The `.server.jsx` naming collision
 
