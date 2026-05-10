@@ -25,7 +25,10 @@ confirm whether that workspace stays on React 18 during this work. That means th
 verification, not necessarily a broad package-range change.
 
 Note: `packages/react-on-rails-pro/package.json` already sets the `react-on-rails-rsc` peer dependency ceiling to
-`>= 19.0.2 <= 19.2.3` (space means AND; both comparators must be satisfied). The `<= 19.2.3` upper bound is a precautionary
+`>= 19.0.2 <= 19.2.3` (space means AND; both comparators must be satisfied). These 19.x version numbers apply to the
+`react-on-rails-rsc` package, not to React itself: `react-on-rails-rsc`'s major and minor numbers track the React
+release line it targets, so a constraint such as `<= 19.2.3` here is a constraint on the RSC integration package, not on
+the React peer dependency. The `<= 19.2.3` upper bound is a precautionary
 verified-patch ceiling from the current planning pass, not a recorded React API incompatibility. Verification should decide
 whether this ceiling should be widened alongside any React 19.2.x range update. Because a hard upper bound would reject a
 future `19.2.4` patch or `19.3.x` minor release, the decision must either widen the stable React 19 range to
@@ -46,7 +49,7 @@ Use a dedicated branch for the actual version verification work:
       fallbacks synchronously in `renderToString` instead of suspending, which can silently change output without an error.
       For each call site in `packages/react-on-rails/src/serverRenderReactComponent.ts`,
       `packages/react-on-rails/src/handleError.ts`, and any generated bundles found by
-      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.mjs" --include="*.cjs" --include="*.ts" --include="*.tsx" --include="*.cts"`
+      `grep -rE "renderToString|renderToStaticMarkup" packages/ --include="*.js" --include="*.mjs" --include="*.cjs" --include="*.ts" --include="*.tsx" --include="*.cts" --include="*.mts"`
       run from the repo root,
       document whether a Suspense-containing tree could plausibly be passed by a user render function today, then either
       open a follow-up migration ticket or record why the current usage is acceptable.
@@ -124,6 +127,7 @@ Use a dedicated branch for the actual version verification work:
 
   ```bash
   git stash -u
+  git clean -ndx   # dry run — review the printed list before running the destructive command below
   git clean -fdx
   pnpm install
   ```
@@ -209,10 +213,9 @@ These placeholders must be filled before the first implementation PR is opened. 
 @justin808 is the fallback owner for both roles.
 
 These will be filled in Issue 3255 before any implementation PR is opened; they are intentionally left blank in this planning
-document. Track the assignments with auditable checklist items before opening that PR:
-
-- [ ] Add an Issue 3255 checklist item for assigning the secondary reviewer for the SSR-vs-RSC decision.
-- [ ] Add an Issue 3255 checklist item for assigning the backup reviewer for benchmark metrics.
+document. Before opening the first implementation PR, add checklist items in Issue 3255 for assigning the secondary
+SSR-vs-RSC reviewer and the backup benchmarks reviewer, so each assignment is auditable in the issue tracker rather than
+duplicated here.
 
 **Secondary reviewer (SSR-vs-RSC)**: _[name to be filled before first implementation PR; fallback: @justin808]_
 
