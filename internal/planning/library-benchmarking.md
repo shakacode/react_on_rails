@@ -67,14 +67,16 @@ GitHub-hosted runners have been dominated by environmental noise. The goal is to
 to represent a real regression before restoring a hard gate, where CI fails the job instead of posting a warning.
 If the hard gate has to return to warning mode, re-tune from the existing baseline window and overlap data first; start a
 fresh 30-run baseline window only after benchmark workflow or runner changes invalidate the old history. Do not tune
-thresholds before the full 30-run window exists because sparse history trains on noise rather than signal.
+thresholds before the full 30-run window exists because sparse history trains on noise rather than signal. Archive this
+section once the hard gate has been restored and held for 30 or more qualifying runs without breaching the false-positive
+target; at that point the plan has executed and the section lives only as historical context.
 
 ### Baseline Dependency
 
 The Bencher reporting baseline fix from [PR 3148](https://github.com/shakacode/react_on_rails/pull/3148) landed on
 2026-04-23. Do not re-enable the hard gate until at least 30 successful `Benchmark Workflow` runs on `main` have built
 fresh history. Count only completed `benchmark` jobs triggered after that merge; exclude pre-merge runs, branch runs,
-reruns, and docs-only pushes skipped by
+reruns of any kind (manual workflow reruns or automatic GitHub retries), and docs-only pushes skipped by
 [`script/ci-changes-detector`](../../script/ci-changes-detector). Record each counted run ID and timestamp in
 [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
 
@@ -100,8 +102,10 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 - restoring the hard gate means changing the warning step to exit with `$BENCHER_EXIT_CODE` after the false-positive
   target is met, not removing `--err`
 
-> **Note:** The values above are a snapshot of the workflow at the time of writing. Verify against
-> `.github/workflows/benchmark.yml` (`run_bencher` function) before tuning because the workflow is the source of truth.
+> **Note:** The values above are a snapshot of the workflow at the time of writing and capture only the tuning-relevant
+> flags; operational flags such as `--quiet` and `--format html` are intentionally omitted because they do not affect
+> threshold behavior. Verify against `.github/workflows/benchmark.yml` (`run_bencher` function) before tuning because the
+> workflow is the source of truth.
 
 ### Tuning Sequence
 
@@ -112,8 +116,9 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
    [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169). For two adjacent alert sets `A` and `B`, use
    Jaccard overlap: `|A intersect B| / |A union B|`. For example, two shared pairs across 10 total unique alert pairs
    gives `2 / 10 = 20%`. Overlap below `0.20` means runner noise is still dominating; begin overlap analysis once at
-   least 5 adjacent qualifying-run pairs exist, but proceed to step 3 only after the full 30-run baseline window exists and
-   overlap is at least `0.40` for 3 consecutive adjacent qualifying-run pairs. The gap between `0.20` and `0.40` avoids
+   least 5 adjacent qualifying-run pairs exist (i.e., at least 6 qualifying runs because each pair shares one run with its
+   neighbor), but proceed to step 3 only after the full 30-run baseline window exists and overlap is at least `0.40` for
+   3 consecutive adjacent qualifying-run pairs. The gap between `0.20` and `0.40` avoids
    flip-flopping between noise and signal states; the thresholds were chosen empirically from the alert-overlap evidence in
    Issue 3169 and should be revisited if the alert distribution changes significantly. A run qualifies when the triggering
    push modifies at least one file that [`script/ci-changes-detector`](../../script/ci-changes-detector) does not classify
@@ -137,23 +142,30 @@ The current Bencher invocation lives in `.github/workflows/benchmark.yml` inside
 
 1. Before restoring the hard gate, verify it can detect real regressions: add a temporary controller delay to a benchmarked
    SSR route large enough to cause at least 20% degradation versus the current baseline median for that route, confirm an
-   alert fires under the tuned settings, then revert the delay. If no alert fires, re-tune before proceeding.
+   alert fires under the tuned settings, then revert the delay. The 20% magnitude reflects the project's stated detection
+   goal (see "Why We Chose Max Rate" above) and the fact that GitHub-hosted runner noise under `BOUNDARY=0.95` with the
+   t-test masks smaller deltas; recalibrate this floor downward if the gate later moves to dedicated runners or boundary
+   widening reduces the noise floor. If no alert fires, re-tune before proceeding.
 2. As a pre-condition for starting the 5-run clean-run count below, the tuned settings must require manual tracking in
    Issue 3169 to show the same `(benchmark, measure)` pair alerting on at least 2 consecutive runs before filing or
    failing; a single noisy run does not trigger the gate. This is a manual gate: Bencher still alerts on the first run,
    and the requirement is that a reviewer confirms recurrence in Issue 3169 before acting on it.
 3. Only after steps 1 and 2 pass, at least 5 consecutive qualifying main `Benchmark Workflow` runs complete with no
-   Bencher regression alert; that means `BENCHER_HAS_ALERT` stays `0` with the current code. A run qualifies when the
+   Bencher regression alert; that means `BENCHER_HAS_ALERT` stays `0` with the current code (a value of `1` is what
+   triggers the warning step and the regression-issue update). A run qualifies when the
    triggering push modifies at least one file that [`script/ci-changes-detector`](../../script/ci-changes-detector) does
    not classify as docs-only. Track the running count in [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169).
 4. Restore the hard gate once criteria 1-3 pass; those checks establish the project false-positive target of no more than
    1 noisy failure in 20 successful main `Benchmark Workflow` runs whose triggering commits do not intentionally change
-   benchmark performance.
+   benchmark performance. Criterion 5 below defines who tracks this rate after re-enabling and the review cadence that
+   triggers reverting to warning mode if the target is breached.
 5. After re-enabling, record each main gate failure in Issue 3169 with a noisy/real classification. Treat an alert as noisy
    when it does not recur for the same `(benchmark, measure)` pair in the next qualifying run and has no matching
-   performance-sensitive code change. Review the running rate after every 5 gate-triggering runs or at least monthly,
-   whichever comes first. If the gate later exceeds the 1-in-20 noisy-failure rate on main, revert it to warning mode and
-   re-tune thresholds from the existing baseline window and overlap data before trying to re-enable it again.
+   performance-sensitive code change. The 1-in-20 window is rolling: count the most recent 20 such qualifying runs (the
+   same cohort defined in criterion 4), and exclude intentional-perf-change commits from both the numerator (noisy
+   failures) and the denominator (the 20-run total) rather than counting them as either real or noisy. Review the running rate after every 5 gate-triggering runs or at least
+   monthly, whichever comes first. If the gate later exceeds the 1-in-20 noisy-failure rate on main, revert it to warning
+   mode and re-tune thresholds from the existing baseline window and overlap data before trying to re-enable it again.
 
 See [Issue 3169](https://github.com/shakacode/react_on_rails/issues/3169) for the tracking discussion and historical
 alert-overlap evidence.
