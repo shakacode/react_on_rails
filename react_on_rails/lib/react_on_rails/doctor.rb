@@ -75,7 +75,9 @@ module ReactOnRails
       "Dockerfile.staging",
       "Dockerfile.review",
       "docker-compose.yml",
+      "docker-compose.yaml",
       "compose.yml",
+      "compose.yaml",
       "bin/deploy",
       "bin/release",
       "bin/docker-entrypoint",
@@ -2813,7 +2815,7 @@ module ReactOnRails
 
       checker.add_warning(<<~MSG.strip)
         ⚠️  Deprecated rake task '#{DEPRECATED_RENDERER_CACHE_TASK}' referenced in:
-        #{matches.map { |p| "  • #{p} → #{renderer_cache_migration_suggestion(p)}" }.join("\n")}
+        #{matches.map { |p| format_renderer_cache_migration_bullet(p) }.join("\n")}
 
         The unified 'pre_seed_renderer_cache' task uses MODE=copy by default (for
         Docker/image builds) and MODE=symlink for same-filesystem workflows.
@@ -2831,13 +2833,26 @@ module ReactOnRails
       end
     end
 
+    def format_renderer_cache_migration_bullet(path)
+      suggestion = renderer_cache_migration_suggestion(path)
+      lines = suggestion.split("\n")
+      return "  • #{path} → #{suggestion}" if lines.length == 1
+
+      indented = lines.map { |line| "      #{line}" }.join("\n")
+      "  • #{path} →\n#{indented}"
+    end
+
     def renderer_cache_migration_suggestion(path)
       # Dockerfile* entries are RUN steps during image build, so copy mode bakes the cache into the layer.
       # Runtime hooks (Procfile, bin/*, .kamal/deploy.yml, Capistrano config) run after the app is deployed,
       # where both the app and renderer share the same filesystem, so symlink mode is correct.
       if path.start_with?("Dockerfile")
-        "RENDERER_SERVER_BUNDLE_CACHE_PATH=#{Rails.root.join('.node-renderer-bundles')} " \
-          "rake react_on_rails_pro:pre_seed_renderer_cache"
+        # /app/.node-renderer-bundles is a placeholder matching the docs' Dockerfile examples;
+        # the user must adjust it to match their image's WORKDIR. Hardcoding Rails.root here would
+        # leak the developer host path (e.g. /Users/alice/myapp/...) into the Dockerfile, which
+        # does not exist inside the container.
+        "ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles\n" \
+          "RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache"
       elsif path.start_with?(".kamal/")
         "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink # use copy mode for image builds"
       else

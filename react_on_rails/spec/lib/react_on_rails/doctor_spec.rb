@@ -2510,15 +2510,14 @@ RSpec.describe ReactOnRails::Doctor do
         doctor.send(:check_deprecated_renderer_cache_task)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs).not_to be_empty
-        suggestion_line = warning_msgs
-                          .flat_map { |m| m[:content].split("\n") }
-                          .find { |line| line.include?("Dockerfile.production →") }
-        expect(suggestion_line).not_to be_nil
-        expect(suggestion_line).to include("pre_seed_renderer_cache")
-        expect(suggestion_line).to include(
-          "RENDERER_SERVER_BUNDLE_CACHE_PATH=#{File.join(tmpdir, '.node-renderer-bundles')}"
-        )
-        expect(suggestion_line).not_to include("MODE=symlink")
+        warning_content = warning_msgs.map { |m| m[:content] }.join("\n")
+        # Match from the bullet header through any indented continuation lines.
+        bullet_section = warning_content[/  • Dockerfile\.production →(?:\n {6,}.*)*/]
+        expect(bullet_section).not_to be_nil
+        expect(bullet_section).to include("ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles")
+        expect(bullet_section).to include("RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache")
+        expect(bullet_section).not_to include(tmpdir)
+        expect(bullet_section).not_to include("MODE=symlink")
       end
     end
 
@@ -2541,6 +2540,30 @@ RSpec.describe ReactOnRails::Doctor do
         suggestion_line = warning_msgs
                           .flat_map { |m| m[:content].split("\n") }
                           .find { |line| line.include?("docker-compose.yml →") }
+        expect(suggestion_line).not_to be_nil
+        expect(suggestion_line).to include("pre_seed_renderer_cache")
+      end
+    end
+
+    context "when a Compose V2 compose.yaml references the deprecated task" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "compose.yaml"),
+          "services:\n  web:\n    command: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "detects .yaml variants of Compose files" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        suggestion_line = warning_msgs
+                          .flat_map { |m| m[:content].split("\n") }
+                          .find { |line| line.include?("compose.yaml →") }
         expect(suggestion_line).not_to be_nil
         expect(suggestion_line).to include("pre_seed_renderer_cache")
       end

@@ -179,6 +179,7 @@ module ReactOnRailsPro
 
     RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX = Mutex.new
     private_constant :RENDERER_BUNDLE_PATH_DEPRECATION_MUTEX
+    @renderer_bundle_path_deprecation_warned = false
 
     def self.resolve_renderer_cache_dir
       preferred = renderer_cache_env_value("RENDERER_SERVER_BUNDLE_CACHE_PATH")

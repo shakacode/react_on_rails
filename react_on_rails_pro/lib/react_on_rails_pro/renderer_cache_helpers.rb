@@ -151,7 +151,15 @@ module ReactOnRailsPro
     # value here would cause `File.join(cache_dir, "")` to resolve to `cache_dir`
     # itself and stage the bundle as `<cache_dir>/.js` — a hidden file the
     # renderer never reads. Fail loudly instead of silently mis-staging.
+    #
+    # We also reject non-String, non-nil types (e.g. Pathname, Symbol) so a
+    # future pool that returns one fails loudly rather than silently producing
+    # surprising `File.join` results downstream.
     def validate_bundle_hash!(hash, path)
+      unless hash.nil? || hash.is_a?(String)
+        raise ReactOnRailsPro::Error,
+              "Bundle hash for #{path} must be a String or nil, got #{hash.class}."
+      end
       return unless hash.to_s.strip.empty?
 
       raise ReactOnRailsPro::Error,
