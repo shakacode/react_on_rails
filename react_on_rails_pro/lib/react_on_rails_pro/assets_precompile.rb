@@ -201,7 +201,6 @@ module ReactOnRailsPro
                          :required_rsc_asset_basenames,
                          :publish_bundle,
                          :upload_bundle
-
     def self.pre_seed_renderer_cache_mode
       raw = ENV.fetch("ASSETS_PRECOMPILE_RENDERER_CACHE_MODE", "symlink").to_s.downcase
       mode = raw.to_sym
