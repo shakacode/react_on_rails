@@ -22,7 +22,14 @@ module ReactOnRailsPro
   class PreSeedRendererCache
     VALID_MODES = %i[copy symlink].freeze
 
-    def self.call(mode: :copy)
+    # `mode:` is required (no default) because the two modes have fundamentally
+    # different semantics — `:copy` bakes immutable artifacts for Docker/image
+    # builds; `:symlink` links live files on a shared filesystem. Forcing callers
+    # to be explicit prevents the footgun where an implicit default would mismatch
+    # the deploy context (e.g., copy-mode raises about RENDERER_SERVER_BUNDLE_CACHE_PATH
+    # in a dev shell). The rake task and AssetsPrecompile auto-invocation both pass
+    # `mode:` explicitly with their own context-appropriate defaults.
+    def self.call(mode:)
       unless VALID_MODES.include?(mode)
         raise ArgumentError, "mode must be one of #{VALID_MODES.inspect}, got #{mode.inspect}"
       end

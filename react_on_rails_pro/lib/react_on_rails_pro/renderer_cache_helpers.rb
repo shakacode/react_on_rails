@@ -106,7 +106,9 @@ module ReactOnRailsPro
       File.rename(tmp_file, dest)
       puts "[ReactOnRailsPro] #{log_prefix}: #{src} -> #{dest}"
     ensure
-      # Clean up the temp file on failure; rm_f is harmless after a successful rename.
+      # `tmp_file` is nil if FileUtils.mkdir_p raises before the assignment executes.
+      # On success, File.rename has already moved the temp file, so rm_f is a no-op.
+      # On failure after assignment, rm_f cleans up the orphaned temp file.
       FileUtils.rm_f(tmp_file) if tmp_file
     end
 

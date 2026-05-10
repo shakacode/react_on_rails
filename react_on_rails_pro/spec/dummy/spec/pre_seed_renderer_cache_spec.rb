@@ -4,7 +4,7 @@ require "rails_helper"
 
 # Spec lives under spec/dummy/spec/ because it requires the dummy Rails environment (Rails.root, webpack paths).
 describe ReactOnRailsPro::PreSeedRendererCache do # rubocop:disable RSpec/FilePath,RSpec/SpecFilePathFormat
-  subject(:pre_seed_cache) { described_class.call }
+  subject(:pre_seed_cache) { described_class.call(mode: :copy) }
 
   let(:asset_filename) { "loadable-stats2.json" }
   let(:asset_filename2) { "loadable-stats3.json" }
