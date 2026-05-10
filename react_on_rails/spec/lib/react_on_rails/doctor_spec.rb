@@ -2534,7 +2534,7 @@ RSpec.describe ReactOnRails::Doctor do
 
       after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
 
-      it "warns with migration guidance" do
+      it "warns with migration guidance and a copy-mode hint for image builds" do
         doctor.send(:check_deprecated_renderer_cache_task)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         suggestion_line = warning_msgs
@@ -2542,6 +2542,8 @@ RSpec.describe ReactOnRails::Doctor do
                           .find { |line| line.include?("docker-compose.yml →") }
         expect(suggestion_line).not_to be_nil
         expect(suggestion_line).to include("pre_seed_renderer_cache")
+        expect(suggestion_line).to include("MODE=symlink")
+        expect(suggestion_line).to include("MODE=copy")
       end
     end
 
@@ -2766,6 +2768,26 @@ RSpec.describe ReactOnRails::Doctor do
       after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
 
       it "does not warn for files where every match is in a leading-comment line" do
+        doctor.send(:check_deprecated_renderer_cache_task)
+        warning_msgs = checker.messages.select { |m| m[:type] == :warning }
+        expect(warning_msgs).to be_empty
+      end
+    end
+
+    context "when the deprecated task name appears only in a trailing inline comment" do
+      let(:tmpdir) { Dir.mktmpdir }
+
+      before do
+        File.write(
+          File.join(tmpdir, "Procfile"),
+          "web: bundle exec puma  # was: bundle exec rake react_on_rails_pro:pre_stage_bundle_for_node_renderer\n"
+        )
+        allow(Rails).to receive(:root).and_return(Pathname.new(tmpdir))
+      end
+
+      after { FileUtils.remove_entry(tmpdir) if File.directory?(tmpdir) }
+
+      it "does not warn when the task only appears after a trailing `#` annotation" do
         doctor.send(:check_deprecated_renderer_cache_task)
         warning_msgs = checker.messages.select { |m| m[:type] == :warning }
         expect(warning_msgs).to be_empty

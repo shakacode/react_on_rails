@@ -2827,9 +2827,14 @@ module ReactOnRails
     def deploy_script_references_deprecated_task?(full_path)
       # Only `#` comments matter for the scanned file types: Procfile, Dockerfile*,
       # and bin/* scripts all use `#`. None use `//`, so we don't filter it.
+      # The trailing-comment strip requires whitespace before `#`, so a fragment
+      # like `task#name` stays intact while `cmd # was: <deprecated>` is filtered.
       full_path.binread.each_line.any? do |line|
         stripped = line.lstrip
-        !stripped.start_with?("#") && stripped.include?(DEPRECATED_RENDERER_CACHE_TASK)
+        next false if stripped.start_with?("#")
+
+        without_inline_comment = stripped.sub(/ +#.*/, "")
+        without_inline_comment.include?(DEPRECATED_RENDERER_CACHE_TASK)
       end
     end
 
@@ -2856,7 +2861,10 @@ module ReactOnRails
       elsif path.start_with?(".kamal/")
         "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink # use copy mode for image builds"
       else
-        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink"
+        # docker-compose.yml / compose.yaml / bin/* / config/deploy.rb / scripts/deploy.sh
+        # default to symlink (correct for local dev + same-filesystem deploys); call out the
+        # copy alternative for users driving production container builds via Compose.
+        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink # use MODE=copy for Docker/container image builds"
       end
     end
 

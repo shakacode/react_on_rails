@@ -202,6 +202,13 @@ module ReactOnRailsPro
 
     # Surrounding whitespace is preserved verbatim (Node renderer reads it raw)
     # but is almost always a misconfigured CI secret — warn so operators notice.
+    #
+    # The two whitespace guards are intentionally asymmetric:
+    #   * Whitespace-only ("  ") raises — there is no valid interpretation, so a
+    #     misconfigured deploy should fail fast rather than silently fall back.
+    #   * Surrounding whitespace ("  /app/bundles  ") only warns — the trimmed
+    #     path could conceivably be intentional, so we let the operator decide
+    #     instead of hard-failing a deploy on a value that might still be usable.
     def self.renderer_cache_env_value(name)
       value = ENV.fetch(name, "")
       raise ReactOnRailsPro::Error, "#{name} is whitespace-only; set or unset it." if value.match?(/\A\s+\z/)
