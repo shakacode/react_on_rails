@@ -135,6 +135,10 @@ git_diff_base_fetch_depth() {
 
 git_diff_base_max_attempts() {
   local raw_attempts="${GIT_DIFF_BASE_MAX_ATTEMPTS:-8}"
+  # Cap the number of doubling iterations so deepen_depth (fetch_depth * 2^N)
+  # cannot overflow 64-bit signed arithmetic. With the default fetch_depth=50,
+  # 30 iterations already reach ~27 billion commits — well past any real repo.
+  local max_attempts_cap=30
 
   if [[ "$raw_attempts" =~ ^[[:space:]]*([0-9]+)[[:space:]]*$ ]]; then
     local max_attempts
@@ -142,6 +146,11 @@ git_diff_base_max_attempts() {
     max_attempts=$((10#${BASH_REMATCH[1]}))
 
     if [ "$max_attempts" -gt 0 ]; then
+      if [ "$max_attempts" -gt "$max_attempts_cap" ]; then
+        echo "Warning: GIT_DIFF_BASE_MAX_ATTEMPTS '$max_attempts' exceeds cap;" \
+          "using $max_attempts_cap." >&2
+        max_attempts="$max_attempts_cap"
+      fi
       printf '%s\n' "$max_attempts"
       return 0
     fi
@@ -264,7 +273,7 @@ git_diff_base_resolve() {
   local initial_fetch_policy="${3:-strict}"
   local remote_branch=""
   local current_remote_branch=""
-  local merge_base
+  local merge_base=""
   local is_shallow=false
   local fetch_depth
 
@@ -325,6 +334,11 @@ git_diff_base_resolve() {
   # fetches, where the base ref is absent. This is common in GitHub Actions
   # checkouts that fetch only the PR branch; unshallow mode becomes a plain
   # branch fetch in full repositories.
+  #
+  # The strict/lenient check below is effectively a no-op for the full-clone
+  # path: when lenient skips the early return, the verify_ref guard a few lines
+  # down hard-fails with a similar message because there is no shallow history
+  # left to deepen. The branch is kept for symmetry with the shallow path.
   if ! git_diff_base_verify_ref "$base_ref" &&
     [ -n "$remote_branch" ] &&
     [ "$is_shallow" = false ]; then
