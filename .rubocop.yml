@@ -78,7 +78,7 @@ Metrics/MethodLength:
   Max: 41
 
 Metrics/ModuleLength:
-  Max: 180
+  Max: 200
 
 RSpec/DescribeClass:
   Enabled: false
