@@ -109,5 +109,5 @@ junit.xml
 /security-scans/
 *.sarif
 *.sarif.json
-scanner-output/
-scanner-findings/
+/scanner-output/
+/scanner-findings/

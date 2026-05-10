@@ -60,7 +60,10 @@ evaluation time.
 | DryRun Security | <https://dryrun.security/> | Candidate      | Confirm OSS or trial plan and Ruby/TypeScript coverage. |
 
 **Deferred:** [Almanax](https://almanax.ai/) was Web3-heavy as of 2026-05-09 with no clear Ruby/TypeScript coverage
-signal. Re-add it to the shortlist only if the next annual review finds evidence of Rails/Node support.
+signal. Re-add it to the shortlist only when both signals are present at the next annual review: (1) vendor
+documentation explicitly names Ruby, Rails, Node, or TypeScript as supported languages or frameworks, and (2) a public
+changelog entry, customer case study, or release note shows non-Web3 coverage on a Rails or Node codebase. Record the
+URL for each signal in this section before promoting the vendor.
 
 If the named vendors are unavailable or unsuitable, look for tools in these categories:
 

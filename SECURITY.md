@@ -1,5 +1,9 @@
 # Security Policy
 
+- **Last reviewed:** 2026-05-09
+- **Review owner:** React on Rails maintainers
+- **Next review due:** 2027-05-09
+
 ## Supported Versions
 
 React on Rails does not yet publish fixed version numbers for security support. Report suspected vulnerabilities even
@@ -48,9 +52,9 @@ the date of first report unless maintainers and the reporter agree to a shorter 
 receive an initial response within ten business days, send a follow-up to the same email address or private GitHub
 report thread.
 
-Maintainers must keep reports private until the issue is patched or disproven, then publish an advisory or release note
-only after a fix, mitigation, or explicit non-impact determination means the disclosed reproduction details no longer
-help exploit supported releases.
+Maintainers must keep reports private until the issue is patched or disproven. An advisory or release note may be
+published only after a fix, mitigation, or explicit non-impact determination has been made — that is, once the disclosed
+reproduction details no longer help exploit supported releases.
 
 Reporters will be credited in the security advisory or release notes unless they request anonymity.
 
