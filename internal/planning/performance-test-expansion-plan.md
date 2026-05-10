@@ -64,10 +64,11 @@ OSS first slice or in a dedicated follow-up PR:
    coverage rather than streaming TTFB measurement. Use a static benchmark route with no required URL params. If the
    dummy app has no parameter-free RSC route, run `benchmarks/k6.ts` with an explicit `TARGET_URL`; alternatively,
    introduce an `RSC_BENCHMARK_COMPONENT` environment variable defaulting to a known component name so
-   `benchmarks/bench.rb` can construct the URL without relying on route discovery. If neither `TARGET_URL` nor
-   `RSC_BENCHMARK_COMPONENT` is provided and no parameter-free RSC route exists, fail setup with an actionable error
-   instead of silently skipping RSC coverage. Automatic route discovery currently skips required-parameter routes such as
-   `/rsc_payload/:component_name`.
+   `benchmarks/bench.rb` can construct the URL without relying on route discovery. When `RSC_BENCHMARK_COMPONENT` is set,
+   `benchmarks/bench.rb` constructs the target URL as `/rsc_payload/#{RSC_BENCHMARK_COMPONENT}` and bypasses route
+   discovery for that entry. If neither `TARGET_URL` nor `RSC_BENCHMARK_COMPONENT` is provided and no parameter-free RSC
+   route exists, fail setup with an actionable error instead of silently skipping RSC coverage. Automatic route discovery
+   currently skips required-parameter routes such as `/rsc_payload/:component_name`.
 
 Use `benchmarks/bench.rb`/`benchmarks/k6.ts` for Rails HTTP routes such as streaming SSR and static RSC payload endpoint
 checks. Use `benchmarks/bench-node-renderer.rb` for direct Pro Node Renderer transport coverage unless that script is
@@ -95,8 +96,7 @@ Prerequisites for the first implementation PR:
   first in `rails routes` order, then in reverse order in the same job. Record the pass order with the per-route
   artifacts before using route ordering as a noise-control signal. This is large enough to land as its own prerequisite
   PR, and the first benchmark-routes PR can defer it if the route-order work blocks progress. Budget it intentionally
-  because it roughly
-  doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about
+  because it roughly doubles route runtime: each route gets two k6 runs plus two warm-up phases, or about
   `2 * (DURATION + warm-up requests * warm-up sleep)` per route. With today's defaults and the hard-coded warm-up loop in
   `benchmarks/bench.rb`, that is `2 * (30s + 10 * 0.5s)` = 70 seconds. This estimate does not include the per-job
   `bundle exec rails routes` discovery call, server startup, or server warmdown time. Recalculate the estimate if
@@ -105,9 +105,11 @@ Prerequisites for the first implementation PR:
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
   `node --version` for `node_version`, and run `node -e "console.log(require('react/package.json').version)"` from the
-  active `APP_DIR` for `react_version` so OSS and Pro dummy apps report their own installed React package. Capture
-  `bundle_mode` from `ENV["NODE_ENV"]` (falling back to `"production"`) so the recorded mode reflects the actual build
-  rather than silently lying when CI or local runs use a non-production mode.
+  active `APP_DIR` for `react_version` so OSS and Pro dummy apps report their own installed React package. If the
+  `react_version` capture command fails (for example when `node_modules` is not yet installed in `APP_DIR`), record
+  `react_version: "unknown"` and emit a warning rather than aborting the benchmark run. Capture `bundle_mode` from
+  `ENV["NODE_ENV"]` (falling back to `"production"`) so the recorded mode reflects the actual build rather than silently
+  lying when CI or local runs use a non-production mode.
   Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary. The
   first slice should start at one run per route. If a later implementation aggregates forward and reverse passes into a
   single route summary, record `sample_count: 2`; if it writes one summary per pass, keep each summary at
@@ -134,8 +136,10 @@ Prerequisites for the first implementation PR:
 - Preserve the existing `benchmarks/bench.rb` summary metrics (`RPS`, `p50`, `p90`, `p99`, and `max`) and extend Bencher
   BMF reporting to include `max_latency` alongside the existing `rps`, `p50_latency`, `p90_latency`, `p99_latency`, and
   `failed_pct` measures. Today `max` appears in `summary.txt` but not in the BMF output. Add a `max:` keyword parameter
-  to `BmfCollector#add` in `benchmarks/lib/bmf_helpers.rb`, then pass `max: max_latency` from the `bmf_collector.add`
-  call in `benchmarks/bench.rb`.
+  to `BmfCollector#add` in `benchmarks/lib/bmf_helpers.rb` with a default of `nil` so existing callers stay valid, then
+  pass `max: max_latency` from the `bmf_collector.add` call in `benchmarks/bench.rb`. Updating the matching
+  `bmf_collector.add` calls in `benchmarks/bench-node-renderer.rb` (currently around lines 315 and 330) is deferred to
+  the Pro follow-on PR so the OSS first slice can land without changing Node Renderer benchmark output.
 
 Follow-on enhancements:
 
