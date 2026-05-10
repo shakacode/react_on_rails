@@ -89,13 +89,21 @@ Server components produce HTML that does not need hydration — they have no cli
 
 ## Real-World Results
 
+This section covers a non-production local directional benchmark first, then a production case study. For validated,
+at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
+
 ### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
 
 The [Gumroad-style RSC benchmark demo](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc)
 is a public ShakaCode comparison repo modeled after a creator-dashboard surface with product listings and sales metrics,
-not an official Gumroad integration. It measures the same reduced presenter data and outer layout across two routes. The
-comparison changes three axes at once (RSC, the Pro Node renderer, and SSR), so the deltas cannot be attributed to any
-single factor. The routes are:
+not an official Gumroad integration. The benchmark methodology and earlier-run artifacts are checked in as
+[`docs/performance-findings.md`](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/blob/5a2f0c29dc197184312c55bc4209492accea26e7/docs/performance-findings.md)
+on the active demo PR ([shakacode/react-on-rails-demo-gumroad-rsc#10](https://github.com/shakacode/react-on-rails-demo-gumroad-rsc/pull/10));
+the April 30, 2026 absolute timings reported below are from a more recent local run that has not yet landed in that
+artifact ([Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing distribution and
+source artifacts). It measures the same reduced presenter data and outer layout across two routes. The comparison
+changes three axes at once (RSC, the Pro Node renderer, and SSR), so the deltas cannot be attributed to any single
+factor. The routes are:
 
 - Inertia-style control: `/dashboard/inertia_demo` (uses the actual `inertia_rails` gem; no Pro renderer or SSR)
 - React on Rails Pro + React Server Components: `/dashboard/rsc_demo`
@@ -119,24 +127,26 @@ Conditions:
 - Chrome 147 with matching ChromeDriver 147
 
 > [!WARNING]
-> The original artifact does not yet publish `RAILS_ENV`, so the absolute timing values may include development-mode or
-> other non-production Rails overhead. It also does not publish browser cache behavior between measured runs, hardware/OS,
-> or Ruby/Node/Rails versions. Unknown browser cache state between measured runs affects repeatability. The single warmup
-> request before each measured run may also be insufficient for the Pro Node renderer worker pool to reach JIT and
-> RSC-payload-compilation steady state, which is more likely to make the RSC route look slower than its steady-state
-> performance than to inflate its advantage.
+> The original artifact does not yet publish `RAILS_ENV`, so the absolute timing values may include
+> `RAILS_ENV=development` overhead (no eager loading, active code reloader, no asset caching). It also does not publish
+> browser cache behavior between measured runs, hardware/OS, or Ruby/Node/Rails versions. Unknown browser cache state
+> between measured runs affects repeatability. The single warmup request before each measured run may also be
+> insufficient for the Pro Node renderer worker pool to reach JIT and RSC-payload-compilation steady state, which is
+> more likely to make the RSC route look slower than its steady-state performance than to inflate its advantage.
 > [Issue 3253](https://github.com/shakacode/react_on_rails/issues/3253) tracks the missing environment metadata. Until
 > that is resolved, treat these numbers as directional signals rather than a stable baseline.
 
 The median results showed this directional signal. The source artifact's navigation-duration metric comes from its
 Playwright harness and may differ from `PerformanceNavigationTiming.duration`.
 
-| Source  | Metric                                      | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
-| ------- | ------------------------------------------- | -----------: | -------: | ------------------------------: |
-| Browser | Navigation duration                         |        775ms |    607ms |                          -21.7% |
-| Browser | Largest Contentful Paint                    |        794ms |    634ms |                          -20.2% |
-| Browser | `responseEnd`                               |        645ms |    589ms |                           -8.7% |
-| Rails   | Controller `action_total` (Rails wall time) |        347ms |    339ms |                -2.3% (variance) |
+| Source  | Metric                                          | Inertia demo | RSC demo | Delta % (negative = RSC faster) |
+| ------- | ----------------------------------------------- | -----------: | -------: | ------------------------------: |
+| Browser | Navigation duration                             |        775ms |    607ms |                          -21.7% |
+| Browser | Largest Contentful Paint                        |        794ms |    634ms |                          -20.2% |
+| Browser | `responseEnd`                                   |        645ms |    589ms |                           -8.7% |
+| Rails   | Controller `action_total` (Rails wall time) [†] |        347ms |    339ms |                -2.3% (variance) |
+
+[†] `action_total` scope is unconfirmed; do not use it to infer the server-rendering split — see the paragraph below.
 
 `action_total` is the Rails wall-time field from the raw benchmark artifact, not a browser Performance API metric. The
 artifact does not yet publish enough logger or extraction-script context to confirm whether it is the full
@@ -146,12 +156,11 @@ RSC rendering cost that the Inertia control keeps in-process, so the two `action
 scopes of work. [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263) tracks the missing distribution
 and source artifacts.
 
-Derived from the median table above, the RSC route's post-`responseEnd` browser processing time (`navigation duration -
-responseEnd`, including HTML parsing, sub-resource loading, layout, and paint) was about 18ms, compared with about 130ms
-for the Inertia control. This gap is expected: the RSC route delivers fully server-rendered HTML, so the browser has
-minimal client-side hydration work after `responseEnd`, while the Inertia control must hydrate the React component tree
-on the client. That difference in client-side work helps explain why the navigation-duration gain (-21.7%) was larger
-than the `responseEnd` gain (-8.7%).
+The navigation-duration gain (-21.7%) was larger than the `responseEnd` gain (-8.7%), which is consistent with the RSC
+route delivering fully server-rendered HTML — the browser has minimal client-side hydration work after `responseEnd`,
+while the Inertia control must hydrate the React component tree on the client. Because the navigation-duration value
+comes from the source artifact's Playwright harness rather than `PerformanceNavigationTiming.duration`, the two metrics
+are not from the same timing source and a direct `navigation duration - responseEnd` subtraction is not reported here.
 
 The page-specific script request count was 6 for the Inertia demo and 1 for the RSC demo, recorded as Chrome DevTools
 Network panel `Script`-type requests after loading each route. This is a fixed post-load observation, not a per-run
