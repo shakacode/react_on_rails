@@ -140,9 +140,10 @@ Keep each shim explicit and narrow:
    default `ReactOnRails` object. If Webpack 4 cannot resolve one of these named subpaths, use the corresponding
    built-file path as a temporary compatibility import:
 
-   > **Warning:** These `lib/` paths are internal build artifacts, not stable public exports. They are not covered by
-   > the public API contract and may break without warning in any patch or minor release. Treat them as an absolute
-   > last resort, and pin `react_on_rails` tightly if you use them.
+   > **Warning:** These `lib/` file paths bypass the `exports` map and are not covered by the public API contract.
+   > The export name (`react-on-rails/context`, etc.) is stable, but the underlying file path (`lib/context.js`,
+   > etc.) may change without notice in any patch or minor release even when the named export remains stable.
+   > Treat them as an absolute last resort, and pin `react_on_rails` tightly if you use them.
 
    For `react-on-rails/context`, switch only that import:
 
@@ -164,6 +165,11 @@ Keep each shim explicit and narrow:
    - import { turbolinksSupported } from 'react-on-rails/turbolinksUtils';
    + import { turbolinksSupported } from 'react-on-rails/lib/turbolinksUtils.js';
    ```
+
+   Other subpath exports follow the same pattern: replace the subpath with the file path listed in the `exports`
+   field of `packages/react-on-rails/package.json`. Note that some exports resolve to `.cjs` rather than `.js`
+   (for example, `react-on-rails/reactApis` → `react-on-rails/lib/reactApis.cjs`); using the wrong extension yields
+   a module-not-found error.
 
    For React on Rails 16.0 and newer, these `lib/` path imports carry the same ESM and modern-syntax
    requirements as the `/client` import; steps 2 and 3 must also be in place before switching to them.
