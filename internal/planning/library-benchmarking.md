@@ -65,11 +65,19 @@ Options to improve accuracy if needed:
 The benchmark workflow currently treats main-regression alerts as warnings because single-run Bencher alerts on
 GitHub-hosted runners have been dominated by environmental noise. The goal is to make a fired alert much more likely
 to represent a real regression before restoring a hard gate, where CI fails the job instead of posting a warning.
-If the hard gate has to return to warning mode, re-tune from the existing baseline window and overlap data first; start a
-fresh 30-run baseline window only after benchmark workflow or runner changes invalidate the old history. Do not tune
-thresholds before the full 30-run window exists because sparse history trains on noise rather than signal. Archive this
-section once the hard gate has been restored and held for 30 or more qualifying runs without breaching the false-positive
-target; at that point the plan has executed and the section lives only as historical context.
+
+Standing instructions while this plan is in effect:
+
+- **Wait for history before tuning.** Do not tune thresholds before the full 30-run window exists; sparse history trains
+  on noise rather than signal.
+- **Fallback if the gate flips back.** If the hard gate has to return to warning mode, re-tune from the existing baseline
+  window and overlap data first rather than starting over.
+- **Baseline reset exception.** Start a fresh 30-run baseline window only after benchmark workflow or runner changes
+  invalidate the old history.
+- **Archive when done.** Once the hard gate has been restored and held for 30 or more qualifying runs without breaching
+  the false-positive target, delete the entire `## Main Gate Re-Enablement Plan` section (this heading and every
+  subsection through the end of the file, including the trailing Issue 3169 link) in a follow-up commit; the executed
+  plan then lives only in git history.
 
 ### Baseline Dependency
 
