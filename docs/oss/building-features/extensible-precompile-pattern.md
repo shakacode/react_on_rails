@@ -28,19 +28,23 @@ Consider this approach if you:
 If you have not already completed [Sections 1-4 below](#1-customize-bindev), do that first so `bin/dev`,
 `config/shakapacker.yml`, your Procfiles, and your build commands are in place before you start removing duplicates.
 
-When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice:
+When moving custom build work out of `precompile_hook`, make the ownership change in one commit so the same task cannot run twice. The checklist uses letters (A–E) so the steps are easy to distinguish from the numbered Implementation sections referenced above.
 
-1. Uncomment and add custom one-time tasks to the `run_precompile_tasks` method in `bin/dev`.
-2. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
-   need, such as ReScript builds, TypeScript checks or compilation, and locale generation. `bin/dev` is not invoked in
-   CI or production, so these commands are the only mechanism those lifecycles have.
-3. After verifying the updated commands work locally, remove one-time build commands from individual Procfile process
-   entries. If those same commands appear as standalone steps in CI/CD pipeline scripts, remove those duplicate
-   invocations too. For example, remove a bare `yarn res:build` GitHub Actions step only after `build_test_command` or
-   `build_production_command` includes it. Do not delete entire `.github/workflows`, `.circleci/config.yml`, or Heroku
-   `app.json` files unless they exist solely for the migrated build step.
-4. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
-5. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
+A. Uncomment and add custom one-time tasks to the `run_precompile_tasks` method in `bin/dev`.
+
+B. Ensure `build_test_command` and `build_production_command` each include every one-time build task those lifecycles
+need, such as ReScript builds, TypeScript checks or compilation, and locale generation. `bin/dev` is not invoked in
+CI or production, so these commands are the only mechanism those lifecycles have.
+
+C. After verifying the updated commands work locally, remove one-time build commands from individual Procfile process
+entries. If those same commands appear as standalone steps in CI/CD pipeline scripts, remove those duplicate
+invocations too. For example, remove a bare `yarn res:build` GitHub Actions step only after `build_test_command` or
+`build_production_command` includes it. Do not delete entire `.github/workflows`, `.circleci/config.yml`, or Heroku
+`app.json` files unless they exist solely for the migrated build step.
+
+D. Remove `precompile_hook` from `config/shakapacker.yml` as shown in [Section 2](#2-configure-shakapackeryml).
+
+E. Keep long-running watchers, such as `rescript: yarn res:watch`, as separate Procfile processes.
 
 The goal is one owner per lifecycle: `bin/dev` owns development startup, Procfile processes own long-running watchers, and React on Rails build commands own test and production compilation.
 
@@ -195,7 +199,8 @@ end
 #   system("yarn", "res:build")       || abort("res:build failed")
 
 # Mode-specific invocation below. RbConfig.ruby runs shakapacker with the same Ruby interpreter that launched this wrapper.
-# Add shared steps above, not inside the case blocks.
+# `bin/shakapacker` is resolved relative to the current working directory; Rails always runs build commands from the
+# Rails application root, so the relative path resolves correctly. Add shared steps above, not inside the case blocks.
 case mode
 when "test"
   env = { "RAILS_ENV" => "test", "NODE_ENV" => "test" }
@@ -203,10 +208,6 @@ when "test"
 when "production"
   env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
   system(env, RbConfig.ruby, "bin/shakapacker") || abort("shakapacker (production) failed")
-else
-  # Defensive: unreachable today because the guard above validates mode, but this
-  # protects against silent no-ops if the allowed modes are ever extended.
-  abort "BUG: unhandled mode #{mode.inspect}"
 end
 ```
 
@@ -238,8 +239,9 @@ Configure `react_on_rails.rb` once. Prefix the helper with `ruby` so the same co
 Windows or Windows-backed Docker bind-mount checkouts without relying on the current filesystem's executable bit.
 The outer `ruby` is resolved via `PATH` when Rails runs the build command, which works under rbenv/asdf/mise and
 standard CI images. For hermetic environments where `PATH` may not select the project's interpreter (e.g. some Docker
-base images without active version-manager shims), invoke through Bundler or substitute an absolute Ruby path. Inside
-the script, `RbConfig.ruby` already pins shakapacker to the same interpreter that launched the wrapper.
+base images without active version-manager shims), invoke through Bundler or substitute an absolute Ruby path — for
+example `bundle exec ruby bin/build-react-on-rails test` or `$(rbenv which ruby) bin/build-react-on-rails test`.
+Inside the script, `RbConfig.ruby` already pins shakapacker to the same interpreter that launched the wrapper.
 
 ```ruby
 # config/initializers/react_on_rails.rb
