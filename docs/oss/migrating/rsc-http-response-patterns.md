@@ -59,6 +59,9 @@ One possible preflight implementation is:
 ```ruby
 class StoryPagePreflight
   # redirect_reason is nil when no redirect is needed.
+  # redirect_status is only meaningful when redirect_reason is set; the override
+  # below ignores it otherwise so callers cannot accidentally produce a status
+  # without a reason.
   Result = Struct.new(
     :props,
     :status,
@@ -99,7 +102,7 @@ class StoryPagePreflight
     end
 
     Result.new(
-      props: { story: StorySerializer.render_as_hash(story) },
+      props: { notFound: false, story: StorySerializer.render_as_hash(story) },
       cache_control: "private, no-cache"
     )
   end
@@ -151,18 +154,18 @@ def show
     response.status = :not_found
     @story_props = { notFound: true, story: nil }
   else
-    @story_props = { story: StorySerializer.render_as_hash(story) }
+    @story_props = { notFound: false, story: StorySerializer.render_as_hash(story) }
   end
 
   stream_view_containing_react_components(template: "stories/show")
 end
 ```
 
-Then keep the React component purely presentational. The happy path omits `notFound`, so `notFound?: false` models the absent key as the non-error branch. Keep `props` whole until after the guard so TypeScript narrows `story` correctly:
+Then keep the React component purely presentational. Set `notFound` explicitly on every branch so the discriminated union is fully exhaustive and TypeScript narrows `story` correctly. Keep `props` whole until after the guard so the narrowing flows through:
 
 ```tsx
 type StoryData = { id: number; title: string };
-type StoryPageProps = { notFound: true; story: null } | { notFound?: false; story: StoryData };
+type StoryPageProps = { notFound: true; story: null } | { notFound: false; story: StoryData };
 
 export default function StoryPage(props: StoryPageProps) {
   if (props.notFound) {
@@ -206,6 +209,9 @@ responses. Cache a `410` only when the removal is durable enough for clients and
 With `max-age=3600`, a shared cache may keep serving the `410` for up to one hour after the origin restores the
 resource unless you purge that cache explicitly. Choose the TTL based on how confident you are that the removal is
 permanent and whether your CDN supports on-demand purging; longer TTLs are appropriate only for irreversible removals.
+Without on-demand CDN purging, the only way to recover before `s-maxage` expires is to wait out the full TTL, so use
+a short `s-maxage` (such as 300–600 seconds) when you are not certain the resource is gone permanently and your CDN
+does not support instant purging.
 
 ## Redirects
 
@@ -277,17 +283,39 @@ touch when it changes. Otherwise Rails can return `304 Not Modified` for content
 
 When the response varies by locale, device class, authentication state, or feature flag, set the corresponding `Vary`
 policy before streaming or keep the response private. Replace `Accept-Language` with the headers your app actually
-varies on, such as `Accept-Encoding`, `X-Device-Class`, or an application-specific header:
+varies on, such as `Accept-Encoding`, `X-Device-Class`, or an application-specific header.
+
+When the controller is the only place setting `Vary` for this response, assign it directly:
 
 ```ruby
-# Merge with any existing Vary tokens set upstream, then deduplicate case-insensitively.
-existing_vary = response.headers["Vary"].presence
-
-unless existing_vary == "*"
-  vary_tokens = [existing_vary, "Accept-Language"].compact.flat_map { |value| value.split(",") }.map(&:strip)
-  response.headers["Vary"] = vary_tokens.reject(&:empty?).uniq { |token| token.downcase }.join(", ")
-end
+response.headers["Vary"] = "Accept-Language"
 ```
+
+> **Advanced: merging with an upstream `Vary`.** If Rack middleware, a `before_action`, or a parent layout may have
+> already set `Vary`, append new tokens with a small helper that deduplicates case-insensitively and short-circuits on
+> `Vary: *` (which already varies on everything):
+>
+> ```ruby
+> # Call this before streaming, e.g. in a before_action or inline in the action.
+> def merge_vary_header(*tokens)
+>   existing = response.headers["Vary"].presence
+>   return if existing == "*"
+>
+>   merged = [existing, *tokens]
+>     .compact
+>     .flat_map { |value| value.split(",") }
+>     .map(&:strip)
+>     .reject(&:empty?)
+>     .uniq { |token| token.downcase }
+>   response.headers["Vary"] = merged.join(", ")
+> end
+> ```
+>
+> Then the call site stays readable:
+>
+> ```ruby
+> merge_vary_header("Accept-Language")
+> ```
 
 Every `Vary` header expands the cache key; avoid high-cardinality headers for public caches unless that extra cache storage is intentional.
 
