@@ -772,6 +772,7 @@ async function InternalDataComponent() {
   const response = await nodeFetch(serviceUrl, {
     headers: { Authorization: `Bearer ${secret}` },
   });
+  if (!response.ok) throw new Error(`HTTP error fetching data: ${response.status}`);
   const data = await response.json();
 
   return <pre>{JSON.stringify(data)}</pre>;

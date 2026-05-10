@@ -45,6 +45,9 @@ export interface Config {
   // If set to true, `supportModules` enables the server-bundle code to call a default set of NodeJS
   // global objects and functions that get added to the VM context:
   // `{ Buffer, TextDecoder, TextEncoder, URLSearchParams, ReadableStream, process, performance, setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate, queueMicrotask }`.
+  // NOTE: `fetch`, `Headers`, `Request`, `Response`, `AbortController`, and `AbortSignal` are NOT injected.
+  // Provide them via `additionalContext` if your bundle needs them.
+  // See docs/oss/building-features/node-renderer/js-configuration.md#runtime-globals-for-ssr-and-rsc.
   // This option is required to equal `true` if you want to use loadable components.
   // Setting this value to false causes the NodeRenderer to behave like ExecJS.
   supportModules: boolean;
