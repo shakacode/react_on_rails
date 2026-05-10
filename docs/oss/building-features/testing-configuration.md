@@ -174,8 +174,8 @@ module RscNodeRenderer
           hint = log_path ? " Check #{log_path} for startup errors." : ""
           raise "Node renderer process (pid #{pid}) exited before binding to #{host}:#{port}.#{hint}"
         rescue Errno::EPERM
-          hint = log_path ? " Check #{log_path} for startup errors." : ""
-          raise "Cannot inspect node renderer process (pid #{pid}) while waiting for #{host}:#{port}.#{hint}"
+          # Process exists but we lack permission to signal it (different UID, seccomp, container boundary).
+          # Continue waiting for the TCP port — the port probe is authoritative for readiness.
         end
       end
 
@@ -248,6 +248,7 @@ RSpec.configure do |config|
       raise "Cannot probe RENDERER_PORT #{renderer_env['RENDERER_PORT']}: #{e.class}: #{e.message}"
     end
 
+    FileUtils.mkdir_p(Rails.root.join("log"))
     renderer_log_path = Rails.root.join("log/node-renderer-test-#{RscTestWorker::ID}.log").to_s
     rsc_node_renderer_pid = Process.spawn(
       renderer_env,
@@ -300,10 +301,15 @@ RSpec.configure do |config|
     # Thread#join returns the waiter thread when the process exits, and nil on timeout.
     # SIGKILL only fires when SIGTERM did not stop the process within the join window.
     unless rsc_node_renderer_waiter&.join(5)
-      Process.kill("-KILL", pid)
-      unless rsc_node_renderer_waiter&.join(5)
-        warn "Node renderer process group #{pid} did not stop after SIGKILL; " \
-             "it may still occupy the renderer port for the next CI retry."
+      begin
+        Process.kill("-KILL", pid)
+      rescue Errno::ESRCH
+        # Process stopped between the join timeout and the SIGKILL; nothing more to do.
+      else
+        unless rsc_node_renderer_waiter&.join(5)
+          warn "Node renderer process group #{pid} did not stop after SIGKILL; " \
+               "it may still occupy the renderer port for the next CI retry."
+        end
       end
     end
   rescue Errno::ESRCH
