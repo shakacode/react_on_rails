@@ -89,8 +89,9 @@ Server components produce HTML that does not need hydration — they have no cli
 
 ## Real-World Results
 
-This section covers a non-production local directional benchmark first, then a production case study. For validated,
-at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
+> [!NOTE]
+> This section covers a non-production local directional benchmark first, then a production case study. For validated,
+> at-scale results, see the [Production Case Study: Popmenu](#popmenu) below.
 
 ### Non-Production Local Directional Benchmark: Gumroad-Style RSC Demo (April 2026) {#gumroad-style-rsc-demo}
 
@@ -144,7 +145,7 @@ Playwright harness and may differ from `PerformanceNavigationTiming.duration`.
 | Browser | Navigation duration                             |        775ms |    607ms |                          -21.7% |
 | Browser | Largest Contentful Paint                        |        794ms |    634ms |                          -20.2% |
 | Browser | `responseEnd`                                   |        645ms |    589ms |                           -8.7% |
-| Rails   | Controller `action_total` (Rails wall time) [†] |        347ms |    339ms |                -2.3% (variance) |
+| Rails   | Controller `action_total` (Rails wall time) [†] |        347ms |    339ms |                           -2.3% |
 
 [†] `action_total` scope is unconfirmed; do not use it to infer the server-rendering split — see the paragraph below.
 
@@ -170,11 +171,12 @@ is the meaningful network-cost metric and is not reported here. The raw request-
 completeness only. See
 [Issue 3259](https://github.com/shakacode/react_on_rails/issues/3259).
 
+- _The linked `performance-findings.md` artifact reflects an earlier run; the April 30 timings shown above will be added
+  there in a follow-up, and distribution/variance artifacts are still pending. See
+  [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
 - _All timing values are medians from the raw benchmark artifact values (n=4 per route); sample size is too small to
   establish statistical significance._
-- _The `action_total` delta is shown with a variance qualifier because its -2.3% difference is likely within expected
-  variance at n=4._
-- _Distribution and variance artifacts are tracked in [Issue 3263](https://github.com/shakacode/react_on_rails/issues/3263)._
+- _The `action_total` -2.3% delta is likely within expected variance at n=4._
 
 #### Worst-case `responseEnd` counter-signal {#gumroad-rsc-worst-case-responseend}
 
@@ -182,10 +184,10 @@ completeness only. See
 | ---------------------------------- | -----------: | -------: | ------------------------------: |
 | Worst-case `responseEnd` (max n=4) |        731ms |    768ms |                           +5.1% |
 
-The source artifact mislabels this metric as p95. With only four samples, p95 is the maximum observed value by
-definition, not an independently estimated tail percentile. It shows a +5.1% RSC regression on worst-case `responseEnd`
-(high variance is expected at n=4), indicating the Inertia control had a faster worst-case `responseEnd` than the RSC
-route.
+With only four samples, p95 is the maximum observed value by definition, not an independently estimated tail
+percentile; this metric is therefore reported as "worst-case (max n=4)" here. It shows a +5.1% RSC regression on
+worst-case `responseEnd` (high variance is expected at n=4), indicating the Inertia control had a faster worst-case
+`responseEnd` than the RSC route.
 
 Use these numbers as a case-study signal, not a universal performance claim. The RSC route combines RSC, the Pro Node
 renderer, and SSR, while the Inertia control has none of those three factors. With that caveat, the RSC route showed
