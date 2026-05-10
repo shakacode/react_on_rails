@@ -108,7 +108,8 @@ Use a dedicated branch for the actual version verification work:
       the current checkout and gitignored files are untouched:
 
   ```bash
-  git worktree add /tmp/ror-verify HEAD
+  git worktree list                      # confirm no stale /tmp/ror-verify entry from a prior interrupted run
+  git worktree add /tmp/ror-verify HEAD  # detached HEAD is intentional for read-only verification
   (cd /tmp/ror-verify && pnpm install)
   ```
 
@@ -145,7 +146,9 @@ Use a dedicated branch for the actual version verification work:
       examples.
 - [ ] Fill the secondary reviewer placeholders in the Open Questions section before opening the first implementation PR.
 
-If any verification step fails, capture the exact command and failure, then use this default decision rule:
+If any verification step fails, capture the exact command and failure in a comment on
+[Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255), then apply this default decision rule
+(**Owner**: @justin808 for all blocking calls):
 
 - Public API regression, such as broken SSR output, hydration mismatch, or a missing export: block the package-range work
   until resolved.
@@ -209,13 +212,9 @@ Before implementation starts, assign a secondary reviewer for the prerequisite S
 stall if @justin808 is unavailable. Also assign a backup reviewer for benchmark metrics because that decision can be
 validated independently from the rest of the implementation tree.
 
-These placeholders must be filled before the first implementation PR is opened. If no name is assigned by that point,
-@justin808 is the fallback owner for both roles.
-
-These will be filled in Issue 3255 before any implementation PR is opened; they are intentionally left blank in this planning
-document. Before opening the first implementation PR, add checklist items in Issue 3255 for assigning the secondary
-SSR-vs-RSC reviewer and the backup benchmarks reviewer, so each assignment is auditable in the issue tracker rather than
-duplicated here.
+These placeholders must be filled in [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255) before the
+first implementation PR is opened — add checklist items there so each assignment is auditable in the issue tracker. If
+no name is assigned by that point, @justin808 is the fallback owner for both roles.
 
 **Secondary reviewer (SSR-vs-RSC)**: _[name to be filled before first implementation PR; fallback: @justin808]_
 
