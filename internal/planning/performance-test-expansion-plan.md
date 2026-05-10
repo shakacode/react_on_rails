@@ -42,7 +42,7 @@ Recommended OSS first slice for [Issue 2169](https://github.com/shakacode/react_
 
 Hash SSR is deferred to a follow-on PR after the initial OSS noise profile is understood. The cached SSR slice should
 define separate cache-hit and cache-miss benchmark paths before comparing results. Use a dedicated cache adapter and
-namespace for benchmark routes, such as `ActiveSupport::Cache::FileStore.new("tmp/benchmark_cache")`, instead of the
+namespace for benchmark routes, such as `ActiveSupport::Cache::FileStore.new(Rails.root.join("tmp/benchmark_cache").to_s)`, instead of the
 app's default store. The miss path should clear only that benchmark cache namespace before measurement, and the hit path
 should clear that namespace, make one warm-up request to prime the fragment, then run k6 against the primed route. For
 the dedicated `FileStore`, clear the exact store root, for example
@@ -104,10 +104,21 @@ Prerequisites for the first implementation PR:
 - Record sample count, runner type, Ruby version, Node version, React version, renderer, and bundle mode in a
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
-  `node --version` for `node_version`, and run `node -e "console.log(require('react/package.json').version)"` from the
-  active `APP_DIR` for `react_version` so OSS and Pro dummy apps report their own installed React package. If the
-  `react_version` capture command fails (for example when `node_modules` is not yet installed in `APP_DIR`), record
-  `react_version: "unknown"` and emit a warning rather than aborting the benchmark run. Capture `bundle_mode` from
+  `node --version` for `node_version`, and capture `react_version` by invoking Node from `APP_DIR` so OSS and Pro dummy
+  apps report their own installed React package. The implementation PR must use a chdir-aware Ruby call so `require()`
+  resolves against `APP_DIR/node_modules` rather than `Dir.pwd`. Preferred form (no global side effects):
+
+  ```ruby
+  react_version, _status = Open3.capture2(
+    "node", "-e", "console.log(require('react/package.json').version)",
+    chdir: APP_DIR
+  )
+  react_version = react_version.strip
+  ```
+
+  Equivalent block form using `Dir.chdir(APP_DIR) do ... end` is acceptable when the surrounding code already manages
+  working directory state. If the `react_version` capture command fails (for example when `node_modules` is not yet
+  installed in `APP_DIR`), record `react_version: "unknown"` and emit a warning rather than aborting the benchmark run. Capture `bundle_mode` from
   `ENV["NODE_ENV"]` (falling back to `"production"`) so the recorded mode reflects the actual build rather than silently
   lying when CI or local runs use a non-production mode.
   Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary. The
@@ -121,11 +132,11 @@ Prerequisites for the first implementation PR:
   {
     "ruby_version": "<output of: ruby --version>",
     "node_version": "<output of: node --version>",
-    "react_version": "<output of: node -e \"console.log(require('react/package.json').version)\" from APP_DIR>",
+    "react_version": "<output of: Open3.capture2(\"node\", \"-e\", \"console.log(require('react/package.json').version)\", chdir: APP_DIR)>",
     "renderer": "<node_renderer when PRO=true, otherwise execjs>",
     "runner_type": "<RUNNER_OS/RUNNER_ARCH when available, otherwise local platform>",
     "bundle_mode": "<ENV[\"NODE_ENV\"] when set, otherwise production>",
-    "sample_count": "<number of completed k6 measurement samples included in this summary>"
+    "sample_count": 1
   }
   ```
 
@@ -138,8 +149,9 @@ Prerequisites for the first implementation PR:
   `failed_pct` measures. Today `max` appears in `summary.txt` but not in the BMF output. Add a `max:` keyword parameter
   to `BmfCollector#add` in `benchmarks/lib/bmf_helpers.rb` with a default of `nil` so existing callers stay valid, then
   pass `max: max_latency` from the `bmf_collector.add` call in `benchmarks/bench.rb`. Updating the matching
-  `bmf_collector.add` calls in `benchmarks/bench-node-renderer.rb` (currently around lines 315 and 330) is deferred to
-  the Pro follow-on PR so the OSS first slice can land without changing Node Renderer benchmark output.
+  `bmf_collector.add` calls in `benchmarks/bench-node-renderer.rb` (inside the `non_rsc_tests.each` and
+  `rsc_tests.each` blocks) is deferred to the Pro follow-on PR so the OSS first slice can land without changing Node
+  Renderer benchmark output.
 
 Follow-on enhancements:
 
