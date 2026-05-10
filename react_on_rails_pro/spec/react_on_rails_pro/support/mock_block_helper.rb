@@ -1,6 +1,20 @@
 # frozen_string_literal: true
 
 module MockBlockHelper
+  class BlockMock
+    def initialize(callback)
+      @callback = callback
+    end
+
+    def call(*args, &inner_block)
+      @callback&.call(*args, &inner_block)
+    end
+
+    def block
+      method(:call).to_proc
+    end
+  end
+
   # This is a class that can be used to mock a block.
   # It can be used to test that a block is called with the correct arguments.
   #
@@ -10,13 +24,8 @@ module MockBlockHelper
   # testing_method_taking_block(&mocked_block.block)
   # expect(mocked_block).to have_received(:call).with(1, 2, 3)
   def mock_block(&block)
-    double("BlockMock").tap do |mock| # rubocop:disable RSpec/VerifiedDoubles
-      allow(mock).to receive(:call) do |*args, &inner_block|
-        block&.call(*args, &inner_block)
-      end
-      def mock.block
-        method(:call).to_proc
-      end
+    BlockMock.new(block).tap do |mock|
+      allow(mock).to receive(:call).and_call_original
     end
   end
 end

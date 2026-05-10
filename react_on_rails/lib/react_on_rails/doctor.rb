@@ -58,6 +58,38 @@ module ReactOnRails
     SERVER_BUNDLE_SOURCE_EXTENSIONS = %w[.js .jsx .ts .tsx .mjs .cjs].freeze
     CUSTOM_LAUNCHER_INDICATOR_FILES = %w[dev].freeze
 
+    # Deprecated-renderer-cache scan (used by check_deprecated_renderer_cache_task):
+    # look for references to the old pre_stage_bundle_for_node_renderer task in
+    # common deploy-script locations so users on older Procfile/Dockerfile entries
+    # get a migration nudge before the task is removed.
+    DEPRECATED_RENDERER_CACHE_TASK = "pre_stage_bundle_for_node_renderer"
+    # Intentionally a fixed list, not a glob (for example, config/deploy/*.rb).
+    # CI manifests and directory globs need a separate bounded scan to avoid surprising IO.
+    RENDERER_CACHE_DEPLOY_SCRIPT_PATHS = [
+      "Procfile",
+      "Procfile.dev",
+      "Procfile.dev-static-assets",
+      "Procfile.production",
+      "Dockerfile",
+      "Dockerfile.production",
+      "Dockerfile.staging",
+      "Dockerfile.review",
+      "docker-compose.yml",
+      "docker-compose.yaml",
+      "compose.yml",
+      "compose.yaml",
+      "bin/deploy",
+      "bin/release",
+      "bin/docker-entrypoint",
+      "config/deploy.rb",
+      "config/deploy/production.rb",
+      "config/deploy/staging.rb",
+      ".kamal/deploy.yml",
+      "scripts/deploy.sh"
+    ].freeze
+    # Per-file safety gate to bound IO during the scan, not a meaningful size limit.
+    RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES = 1_048_576
+
     def initialize(verbose: false, fix: false)
       @verbose = verbose
       @fix = fix
@@ -2717,6 +2749,7 @@ module ReactOnRails
       ensure_rails_environment_loaded
       check_pro_renderer_mode
       check_base_package_imports
+      check_deprecated_renderer_cache_task
     end
 
     def check_pro_initializer_existence
@@ -2744,6 +2777,101 @@ module ReactOnRails
       end
     rescue StandardError => e
       checker.add_warning("⚠️  Could not detect Pro renderer mode: #{e.message}")
+    end
+
+    def check_deprecated_renderer_cache_task
+      # Resolve against Rails.root (not Dir.pwd) so the scan still fires when
+      # doctor is invoked from a subdirectory — otherwise the checks silently
+      # find nothing and the deprecation warning never surfaces.
+      #
+      # Read in binary mode (the task name is pure ASCII) so a non-UTF-8 byte
+      # in a deploy script does not raise Encoding::InvalidByteSequenceError
+      # and mask the file via the rescue below.
+      #
+      # Skip leading-comment lines (`#` is the comment prefix for all scanned
+      # file types: Procfile, Dockerfile, shell scripts, YAML, and Ruby) so
+      # files that mention the old task only inside a comment do not trip the
+      # migration nudge.
+      # Per-file rescue so a transient failure on one path (e.g. Errno::EACCES)
+      # does not abort the whole scan and silently skip the rest. The outer
+      # rescue catches anything that escapes the per-file guard.
+      matches = RENDERER_CACHE_DEPLOY_SCRIPT_PATHS.select do |path|
+        full_path = Rails.root.join(path)
+
+        begin
+          next false unless full_path.file?
+          # Skip files larger than 1 MB; deploy scripts should be tiny.
+          next false if full_path.size > RENDERER_CACHE_DEPLOY_SCRIPT_MAX_BYTES
+
+          deploy_script_references_deprecated_task?(full_path)
+        rescue StandardError => e
+          checker.add_warning(
+            "⚠️  Could not scan #{path} for deprecated renderer-cache task references: #{e.message}"
+          )
+          false
+        end
+      end
+
+      return if matches.empty?
+
+      checker.add_warning(<<~MSG.strip)
+        ⚠️  Deprecated rake task '#{DEPRECATED_RENDERER_CACHE_TASK}' referenced in:
+        #{matches.map { |p| format_renderer_cache_migration_bullet(p) }.join("\n")}
+
+        The unified 'pre_seed_renderer_cache' task uses MODE=copy by default (for
+        Docker/image builds) and MODE=symlink for same-filesystem workflows.
+      MSG
+    rescue StandardError => e
+      checker.add_warning("⚠️  Could not complete scan for deprecated renderer-cache task references: #{e.message}")
+    end
+
+    def deploy_script_references_deprecated_task?(full_path)
+      # Only `#` comments matter for the scanned file types: Procfile, Dockerfile*,
+      # and bin/* scripts all use `#`. None use `//`, so we don't filter it.
+      # The trailing-comment strip requires whitespace before `#`, so a fragment
+      # like `task#name` stays intact while `cmd # was: <deprecated>` is filtered.
+      full_path.binread.each_line.any? do |line|
+        stripped = line.lstrip
+        next false if stripped.start_with?("#")
+
+        without_inline_comment = stripped.sub(/ +#.*/, "")
+        without_inline_comment.include?(DEPRECATED_RENDERER_CACHE_TASK)
+      end
+    end
+
+    def format_renderer_cache_migration_bullet(path)
+      suggestion = renderer_cache_migration_suggestion(path)
+      lines = suggestion.split("\n")
+      return "  • #{path} → #{suggestion}" if lines.length == 1
+
+      indented = lines.map { |line| "      #{line}" }.join("\n")
+      "  • #{path} →\n#{indented}"
+    end
+
+    def renderer_cache_migration_suggestion(path)
+      # Dockerfile* entries are RUN steps during image build, so copy mode bakes the cache into the layer.
+      # Runtime hooks (Procfile, bin/*, .kamal/deploy.yml, Capistrano config) run after the app is deployed,
+      # where both the app and renderer share the same filesystem, so symlink mode is correct.
+      if path.start_with?("Dockerfile")
+        # /app/.node-renderer-bundles is a placeholder matching the docs' Dockerfile examples;
+        # the user must adjust it to match their image's WORKDIR. Hardcoding Rails.root here would
+        # leak the developer host path (e.g. /Users/alice/myapp/...) into the Dockerfile, which
+        # does not exist inside the container.
+        "ENV RENDERER_SERVER_BUNDLE_CACHE_PATH=/app/.node-renderer-bundles\n" \
+          "RUN bundle exec rake react_on_rails_pro:pre_seed_renderer_cache"
+      elsif path.start_with?(".kamal/")
+        # Kamal hooks run in two contexts: post-deploy hooks on the live server (symlink),
+        # and image-build hooks invoked during the Docker build (copy). The trailing comments
+        # disambiguate so users pick the mode that matches the hook they're editing.
+        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink\n" \
+          "# For Kamal deploy hooks (post-deploy, on the live server): MODE=symlink\n" \
+          "# For Kamal image-build hooks (hook/pre-build inside the Docker build): MODE=copy"
+      else
+        # docker-compose.yml / compose.yaml / bin/* / config/deploy.rb / scripts/deploy.sh
+        # default to symlink (correct for local dev + same-filesystem deploys); call out the
+        # copy alternative for users driving production container builds via Compose.
+        "rake react_on_rails_pro:pre_seed_renderer_cache MODE=symlink # use MODE=copy for Docker/container image builds"
+      end
     end
 
     # The base 'react-on-rails' npm package is a transitive dependency of 'react-on-rails-pro',
