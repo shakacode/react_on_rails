@@ -111,7 +111,7 @@ end
 require_relative "support/rsc_node_renderer"
 ```
 
-Passing any metatags replaces the TestHelper defaults, so include the default `:js`, `:server_rendering`, and `:controller` tags alongside `:rsc` if your suite mixes RSC and non-RSC specs.
+> **Warning:** Passing any metatags replaces the TestHelper defaults. Include `:js`, `:server_rendering`, and `:controller` alongside `:rsc` if your suite mixes RSC and non-RSC specs, or those tag groups will no longer trigger compilation.
 
 The derived metadata block intentionally tags every system and feature spec so the first browser request cannot race ahead of RSC bundle compilation. If only some directories exercise RSC, narrow the regex (for example, `spec/(system/rsc|features/rsc)`) or tag those examples manually to avoid compiling for unrelated system tests.
 
@@ -120,6 +120,18 @@ Tag request specs that hit the RSC payload endpoint explicitly with `:rsc`. If y
 ### 3. Start One Test Renderer Per Worker
 
 Start the renderer in `before(:suite)` after assets are compiled and stop it in `after(:suite)`. The example below assumes your app has a `node-renderer` package script that launches the node-renderer server, reads `RENDERER_PORT` and `RENDERER_SERVER_BUNDLE_CACHE_PATH` from ENV, and serves the RSC test bundle cache. See [Node Renderer JavaScript Configuration](node-renderer/js-configuration.md#example-launch-files) for launch-file and `package.json` script examples. Replace the package-manager command with the one your project uses.
+
+> **Warning:** The generated `renderer/node-renderer.js` template hardcodes `serverBundleCachePath` to `path.resolve(__dirname, '../.node-renderer-bundles')`, so it ignores `RENDERER_SERVER_BUNDLE_CACHE_PATH` until you change it. Without this edit every parallel worker shares the same cache directory and you will see stale-bundle and missing-bundle flakes that look like RSC timeouts. Update the launch file to read the env var:
+>
+> ```js
+> // renderer/node-renderer.js
+> const config = {
+>   serverBundleCachePath:
+>     process.env.RENDERER_SERVER_BUNDLE_CACHE_PATH || path.resolve(__dirname, '../.node-renderer-bundles'),
+>   port: Number(process.env.RENDERER_PORT) || 3800,
+>   // ...
+> };
+> ```
 
 ```ruby
 # spec/support/rsc_node_renderer.rb
@@ -132,6 +144,7 @@ module RscNodeRenderer
 
   def wait_until_ready!(host:, port:, timeout_seconds: 30, log_path: nil, pid: nil)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
+    saw_reset = false
 
     loop do
       begin
@@ -140,8 +153,11 @@ module RscNodeRenderer
       rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT
         # Port not yet open; renderer still booting.
       rescue Errno::ECONNRESET
-        # Connection reset: renderer may have bound the port and crashed.
-        # The PID check below catches a dead process and raises before the deadline.
+        # Connection reset: renderer bound the port but closed the connection before accepting.
+        # Fall through — the PID check below will detect a dead process and raise before the deadline.
+        # If the deadline expires without a successful connect, the deadline error mentions the reset
+        # so a port already used by another service is easier to diagnose than a generic timeout.
+        saw_reset = true
       rescue Errno::EADDRNOTAVAIL, Errno::EHOSTUNREACH, SocketError => e
         raise "Cannot reach node renderer at #{host}:#{port}. " \
               "Check the host configuration (#{e.class}: #{e.message})."
@@ -163,7 +179,8 @@ module RscNodeRenderer
 
       if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
         hint = log_path ? " Check #{log_path} for startup errors." : ""
-        raise "Node renderer did not boot on #{host}:#{port} within #{timeout_seconds}s.#{hint}"
+        reset_hint = saw_reset ? " (TCP connections were reset — another process may already be using this port)" : ""
+        raise "Node renderer did not boot on #{host}:#{port} within #{timeout_seconds}s.#{hint}#{reset_hint}"
       end
 
       sleep 0.1
@@ -225,6 +242,8 @@ RSpec.configure do |config|
     rescue Errno::ECONNRESET
       raise "RENDERER_PORT #{renderer_env['RENDERER_PORT']} accepted and reset a connection. " \
             "Another service may already be using it."
+    rescue Errno::EADDRNOTAVAIL, Errno::EHOSTUNREACH, SocketError => e
+      raise "Cannot probe RENDERER_PORT #{renderer_env['RENDERER_PORT']}: #{e.class}: #{e.message}"
     end
 
     renderer_log_path = Rails.root.join("log/node-renderer-test-#{RscTestWorker::ID}.log").to_s
@@ -258,8 +277,9 @@ RSpec.configure do |config|
     rescue StandardError
       begin
         Process.kill("-TERM", rsc_node_renderer_pid)
-      rescue Errno::ESRCH
-        # Already stopped.
+      rescue Errno::ESRCH, Errno::EPERM
+        # Already stopped or no permission to signal the process group; matches the after(:suite)
+        # cleanup so the original startup failure isn't masked by an EPERM here.
       end
       rsc_node_renderer_waiter&.join(2)
       rsc_node_renderer_pid = nil
@@ -276,12 +296,11 @@ RSpec.configure do |config|
     # Raises Errno::ESRCH if the group is already gone; caught by rescue below.
     Process.kill("-TERM", pid)
     # Thread#join returns the waiter thread when the process exits, and nil on timeout.
-    # Skip SIGKILL only when TERM worked and the waiter reaped the process.
-    # `next` exits only this hook block; Ruby still runs the ensure below, so cleanup always fires.
-    next if rsc_node_renderer_waiter&.join(5)
-
-    Process.kill("-KILL", pid)
-    rsc_node_renderer_waiter&.join(5)
+    # SIGKILL only fires when SIGTERM did not stop the process within the join window.
+    unless rsc_node_renderer_waiter&.join(5)
+      Process.kill("-KILL", pid)
+      rsc_node_renderer_waiter&.join(5)
+    end
   rescue Errno::ESRCH
     # Already stopped.
   rescue Errno::EPERM
