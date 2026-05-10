@@ -446,10 +446,9 @@ module ReactOnRailsPro
         return
       end
 
-      FileUtils.rm_rf(bundle_dir)
-      # Catch the narrow TOCTOU window where another writer recreates
-      # bundle_dir between rm_rf and mv; warn through the rescue path instead
-      # of overwriting that writer's work.
+      # TOCTOU guard: a concurrent writer may recreate bundle_dir between the
+      # File.exist? check above and the mv below. Raise so the rescue path
+      # leaves that writer's directory intact instead of overwriting it.
       if File.exist?(bundle_dir)
         raise ReactOnRailsPro::Error,
               "Cannot restore previous rolling-deploy bundle directory because #{bundle_dir} already exists."

@@ -38,6 +38,12 @@ module ReactOnRailsPro
       [unique, required_rsc_asset_paths(rsc_manifests)]
     end
 
+    # Convenience for callers that only need the asset list and intentionally
+    # discard the rsc_required_paths Set returned by
+    # collect_assets_with_required_paths. If you need to enforce required-RSC
+    # availability (raising loudly when a required manifest is missing), use
+    # collect_assets_with_required_paths and pass both into each_stageable_asset
+    # — `nil`-or-empty here would silently skip the required-paths check.
     def collect_assets
       collect_assets_with_required_paths.first
     end

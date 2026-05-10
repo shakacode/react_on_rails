@@ -267,6 +267,13 @@ class ControlPlaneRollingDeployAdapter
     _out, status = Open3.capture2e("cpln", "image", "pull", image, "--output", tmp)
     return nil unless status.success?
 
+    # Assumes the image layer contains exactly one .js file. If your build
+    # produces multiple .js artifacts (e.g. RSC enabled adds a server +
+    # rsc bundle, or you ship source maps), filter by a known filename
+    # convention instead — e.g. `Dir[File.join(tmp, "server-bundle*.js")]`
+    # or hard-coded `File.join(tmp, "server-bundle.js")`. Returning nil
+    # here causes the seeder to skip this hash and fall back to runtime
+    # 410-retry, which is a graceful but cold path.
     bundles = Dir[File.join(tmp, "*.js")].sort
     return nil unless bundles.one?
 

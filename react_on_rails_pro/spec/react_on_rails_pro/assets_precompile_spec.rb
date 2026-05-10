@@ -601,5 +601,51 @@ describe ReactOnRailsPro::AssetsPrecompile do
           .to output(/required RSC companion file/).to_stderr
       end
     end
+
+    # Regression: matches RendererCacheHelpers.each_stageable_asset behavior so
+    # `assets:precompile` invoked from a non-Rails.root cwd does not silently
+    # drop relative entries in `assets_to_copy` as missing.
+    context "when collect_assets returns relative paths" do
+      let(:rails_root) { Pathname.new(Dir.mktmpdir("rolling-deploy-rails-root")) }
+      let(:relative_path) { "tmp/rolling-deploy-relative-asset.js" }
+      let(:resolved_path) { rails_root.join(relative_path).to_s }
+
+      before do
+        allow(Rails).to receive(:root).and_return(rails_root)
+        FileUtils.mkdir_p(File.dirname(resolved_path))
+        File.write(resolved_path, "// existing asset")
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:collect_assets)
+          .and_return([relative_path])
+        allow(adapter).to receive(:upload)
+      end
+
+      after { FileUtils.rm_rf(rails_root.to_s) }
+
+      it "expands relative entries against Rails.root before checking existence" do
+        described_class.publish_current_bundle_if_configured
+
+        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [resolved_path])
+      end
+    end
+
+    context "when collect_assets returns a URL-backed asset (dev server)" do
+      let(:url_asset) { "http://localhost:3035/packs/manifest.json" }
+      let(:existing_asset) { File.join(Dir.tmpdir, "rolling-deploy-upload-with-url.js") }
+
+      before do
+        File.write(existing_asset, "// existing asset")
+        allow(ReactOnRailsPro::RendererCacheHelpers).to receive(:collect_assets)
+          .and_return([existing_asset, url_asset])
+        allow(adapter).to receive(:upload)
+      end
+
+      after { FileUtils.rm_f(existing_asset) }
+
+      it "skips URL-backed assets without misclassifying them as missing files" do
+        described_class.publish_current_bundle_if_configured
+
+        expect(adapter).to have_received(:upload).with("abc123", bundle: server_bundle, assets: [existing_asset])
+      end
+    end
   end
 end

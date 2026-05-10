@@ -286,6 +286,12 @@ module ReactOnRailsPro
             "upload(bundle_hash, bundle:, assets:). See docs/pro/rolling-deploy-adapters.md."
     end
 
+    # Best-effort signature check — covers the common explicit, splat, and
+    # options-hash shapes adapter authors actually write. Edge cases (e.g.
+    # `upload(hash, *args, bundle:)` mixing splat with explicit keywords) may
+    # pass this check and still fail at call time; the runtime ArgumentError
+    # in that case is clear enough that we accept the gap rather than encode
+    # every Ruby parameter combination here.
     def rolling_deploy_upload_signature_valid?(params)
       accepts_bundle_hash_argument?(params) &&
         (accepts_upload_keyword_arguments?(params) || accepts_upload_options_hash?(params))

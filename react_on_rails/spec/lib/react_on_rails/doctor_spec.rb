@@ -2647,6 +2647,24 @@ RSpec.describe ReactOnRails::Doctor do
       end
     end
 
+    # Regression: an accidentally-large PREVIOUS_BUNDLE_HASHES value (e.g. a
+    # full bundle dumped into the env by mistake) should not flood operator
+    # output. Echo a capped prefix and the total length instead.
+    context "when env override is large enough to flood operator output" do
+      let(:adapter) { nil }
+      let(:long_value) { "a" * 500 }
+
+      before { ENV["PREVIOUS_BUNDLE_HASHES"] = long_value }
+
+      it "truncates the echoed env value and reports the total length" do
+        doctor.send(:check_rolling_deploy_adapter)
+        warning = checker.messages.find { |m| m[:type] == :warning && m[:content].include?("PREVIOUS_BUNDLE_HASHES") }
+        expect(warning).not_to be_nil
+        expect(warning[:content]).to include("… (500 chars total)")
+        expect(warning[:content]).not_to include("a" * 200)
+      end
+    end
+
     context "when adapter implements all required methods and returns hashes" do
       let(:adapter) do
         Module.new do

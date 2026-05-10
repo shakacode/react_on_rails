@@ -127,8 +127,16 @@ module ReactOnRailsPro
     # an invalid path would raise and abort the whole hash upload, leaving the
     # next deploy unable to fetch this hash (→ cold 410 retries). Drop invalid
     # entries with a warning so publication still covers the existing assets.
+    #
+    # Mirrors RendererCacheHelpers.each_stageable_asset: skip URL-backed assets
+    # (dev server) and expand relative paths against Rails.root before checking
+    # existence. Without the expansion, `assets:precompile` invoked from a
+    # non-Rails.root cwd would silently drop relative entries in `assets_to_copy`.
     def self.filter_existing_assets(assets)
-      existing, invalid = assets.partition { |path| File.file?(path) }
+      resolvable = assets.reject { |path| ReactOnRailsPro::RendererCacheHelpers.http_url?(path) }
+      resolved = resolvable.map { |path| File.expand_path(path.to_s, Rails.root) }
+
+      existing, invalid = resolved.partition { |path| File.file?(path) }
       return existing if invalid.empty?
 
       missing, non_files = invalid.partition { |path| !File.exist?(path) }

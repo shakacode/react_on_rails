@@ -2888,9 +2888,9 @@ module ReactOnRails
         env_override = ENV.fetch("PREVIOUS_BUNDLE_HASHES", nil)
         if env_override && !env_override.empty?
           checker.add_warning(
-            "⚠️  PREVIOUS_BUNDLE_HASHES=#{env_override.inspect} is set but no rolling_deploy_adapter " \
-            "is configured. Rolling-deploy seeding needs both — the env var overrides *discovery* " \
-            "but the adapter is still required to fetch bundle files. " \
+            "⚠️  PREVIOUS_BUNDLE_HASHES=#{truncate_for_warning(env_override).inspect} is set but no " \
+            "rolling_deploy_adapter is configured. Rolling-deploy seeding needs both — the env var " \
+            "overrides *discovery* but the adapter is still required to fetch bundle files. " \
             "Set config.rolling_deploy_adapter or unset PREVIOUS_BUNDLE_HASHES."
           )
         else
@@ -2905,6 +2905,17 @@ module ReactOnRails
       report_resolved_cache_dir
     rescue StandardError => e
       checker.add_warning("⚠️  Could not evaluate rolling_deploy_adapter: #{e.message}")
+    end
+
+    # Cap echoed env-var values so a malformed (or accidentally large)
+    # PREVIOUS_BUNDLE_HASHES value doesn't dump kilobytes into operator output.
+    PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT = 80
+    private_constant :PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+    def truncate_for_warning(value)
+      return value if value.length <= PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT
+
+      "#{value[0, PREVIOUS_BUNDLE_HASHES_DISPLAY_LIMIT]}… (#{value.length} chars total)"
     end
 
     def report_adapter_protocol(adapter)

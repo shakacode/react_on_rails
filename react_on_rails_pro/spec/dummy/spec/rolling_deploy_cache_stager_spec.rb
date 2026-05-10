@@ -432,7 +432,7 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
     end
   end
 
-  context "when restore finds the bundle directory recreated by another process" do
+  context "when restore mv fails (e.g., concurrent writer recreated bundle_dir)" do
     let(:src_bundle) { source_file("bundle-new.js", contents: "// new bundle") }
     let(:src_asset) { source_file("loadable-stats.json", contents: "{}") }
     let(:bundle_dir) { File.join(cache_dir, "abc123") }
@@ -445,12 +445,12 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
       allow(adapter).to receive(:fetch).with("abc123").and_return(bundle: src_bundle, assets: [src_asset])
       allow(FileUtils).to receive(:mv).and_wrap_original do |original, source, destination, *args|
         raise Errno::EIO, "promotion failed" if source.to_s.include?("abc123.staging-")
+        # Restore mv from `.previous-<pid>-<hex>` back to bundle_dir fails — for
+        # example when bundle_dir was recreated by a concurrent writer in the
+        # narrow window between the existence check and this mv call.
+        raise Errno::ENOTEMPTY, "destination not empty" if source.to_s.include?("abc123.previous-")
 
         original.call(source, destination, *args)
-      end
-      allow(FileUtils).to receive(:rm_rf).and_wrap_original do |original, path, *args|
-        original.call(path, *args)
-        FileUtils.mkdir_p(bundle_dir) if path.to_s.end_with?("/abc123")
       end
     end
 
@@ -727,6 +727,18 @@ describe ReactOnRailsPro::RollingDeployCacheStager do # rubocop:disable RSpec/Fi
 
     it "matches PID-1 .previous suffixes (Docker/Kubernetes deployments)" do
       expect("abc.previous-1-#{SecureRandom.hex(6)}").to match(described_class::TEMPORARY_DIRECTORY_PATTERN)
+    end
+
+    # The OSS gem's react_on_rails:doctor task duplicates this regex as a
+    # hardcoded fallback (`react_on_rails/lib/react_on_rails/doctor.rb`'s
+    # `ROLLING_DEPLOY_TEMP_DIR_PATTERN`) because OSS cannot depend on the Pro
+    # gem. If you change TEMPORARY_DIRECTORY_PATTERN, update both — otherwise
+    # `react_on_rails:doctor` would silently use a stale pattern when the Pro
+    # gem isn't loaded and miscount bundle-hash subdirs.
+    it "matches the OSS doctor.rb hardcoded fallback regex" do
+      require "react_on_rails/doctor"
+      expect(described_class::TEMPORARY_DIRECTORY_PATTERN.source)
+        .to eq(ReactOnRails::Doctor::ROLLING_DEPLOY_TEMP_DIR_PATTERN.source)
     end
   end
 end
