@@ -204,6 +204,8 @@ when "production"
   env = { "RAILS_ENV" => "production", "NODE_ENV" => "production" }
   system(env, RbConfig.ruby, "bin/shakapacker") || abort("shakapacker (production) failed")
 else
+  # Defensive: unreachable today because the guard above validates mode, but this
+  # protects against silent no-ops if the allowed modes are ever extended.
   abort "BUG: unhandled mode #{mode.inspect}"
 end
 ```
@@ -233,7 +235,11 @@ If the file has not been staged yet, use `git update-index --add --chmod=+x bin/
 it does not change the current working-tree file mode.
 
 Configure `react_on_rails.rb` once. Prefix the helper with `ruby` so the same commands work on Unix, macOS, CI, and
-Windows or Windows-backed Docker bind-mount checkouts without relying on the current filesystem's executable bit:
+Windows or Windows-backed Docker bind-mount checkouts without relying on the current filesystem's executable bit.
+The outer `ruby` is resolved via `PATH` when Rails runs the build command, which works under rbenv/asdf/mise and
+standard CI images. For hermetic environments where `PATH` may not select the project's interpreter (e.g. some Docker
+base images without active version-manager shims), invoke through Bundler or substitute an absolute Ruby path. Inside
+the script, `RbConfig.ruby` already pins shakapacker to the same interpreter that launched the wrapper.
 
 ```ruby
 # config/initializers/react_on_rails.rb
