@@ -55,6 +55,11 @@ git_diff_base_sha_ref() {
   # instead of failing here as an unknown local ref.
   # Short hex strings count only when they already resolve locally, avoiding
   # hex branch-name hits.
+  # Edge case: a remote-only branch whose name is exactly 40 or 64 hex chars
+  # and that has no local refs/remotes/origin/<name> tracking ref will be
+  # misclassified as a SHA here. This is accepted as an extremely unlikely
+  # case; once the branch has been fetched, the local-ref checks below take
+  # over and classify it correctly as a branch.
   if [ "$length" -ne 40 ] && [ "$length" -ne 64 ] && ! git_diff_base_verify_ref "$ref"; then
     return 1
   fi
@@ -198,6 +203,10 @@ git_diff_base_fetch_remote_branch() {
     fi
   fi
 
+  # Initial and deepen fetches are intentionally not timeout-guarded. Their
+  # depth is bounded (50 commits by default, doubling per attempt up to
+  # max_attempts), so the worst case is a small fixed amount of network work.
+  # If a fetch hangs, GitHub Actions' job-level timeout terminates the run.
   git fetch "${fetch_args[@]}" >&2
 }
 
@@ -275,6 +284,8 @@ git_diff_base_resolve() {
 
   # - strict: abort immediately when the initial fetch fails
   # - lenient: continue with cached local history after an initial fetch failure
+  # The strict/lenient distinction only matters when is_shallow=true. In full
+  # clones the initial fetch is skipped, so both policies behave identically.
   if git_diff_base_is_shallow_repository; then
     is_shallow=true
   fi
@@ -370,6 +381,11 @@ git_diff_base_resolve() {
     # When base_ref is a raw event SHA and no base branch is known, remote_branch
     # is empty and deepening only the current branch can still reveal a
     # push-event before-SHA ancestor.
+    # The loop runs to max_attempts (default 8, doubling depth each time up to
+    # ~12,750 commits per branch) before falling back to --unshallow. This is
+    # intentional: most divergences resolve within a few attempts, and exhausting
+    # the bounded deepen budget first avoids paying for a full unshallow on
+    # every shallow CI run.
     while [ "$deepen_attempts" -lt "$max_attempts" ] && git_diff_base_is_shallow_repository; do
       deepen_attempts=$((deepen_attempts + 1))
       fetched=false

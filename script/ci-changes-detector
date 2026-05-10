@@ -31,6 +31,9 @@ fi
 
 # Get list of changed files (committed + uncommitted). A failed git diff is now
 # fatal so CI does not silently skip every job when diff detection breaks.
+# Note: bash 'set -e' does NOT trigger on a failed command substitution in an
+# assignment, so the explicit '|| { exit 1 }' is required to catch errors here.
+# Do not "simplify" this away — removing it reintroduces the silent-failure bug.
 CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF") || {
   echo -e "${RED}Error: git diff failed for $MERGE_BASE..$CURRENT_REF${NC}" >&2
   exit 1
