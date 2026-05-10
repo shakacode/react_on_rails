@@ -39,7 +39,12 @@ CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" "$CURRENT_REF") || {
   exit 1
 }
 
-# For local development, also include uncommitted changes
+# For local development, also include uncommitted changes.
+# Local-dev only: git failures here are intentionally non-fatal and degrade
+# to "no extra changes" via `|| echo ""`. The CI diff above hard-fails on
+# the same kind of error; do not propagate that swallow-and-continue
+# pattern back into CI, where a silent empty diff would skip every job
+# (the original bug this script was rewritten to prevent).
 if [ -z "${CI:-}" ] && [ "$CURRENT_REF" = "HEAD" ]; then
   UNCOMMITTED=$(git diff --name-only HEAD 2>/dev/null || echo "")
   UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null || echo "")

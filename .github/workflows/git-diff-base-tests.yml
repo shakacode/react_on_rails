@@ -1,0 +1,32 @@
+name: Git Diff Base Library Tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'script/lib/git-diff-base'
+      - 'script/lib/git-diff-base-test.bash'
+      - '.github/workflows/git-diff-base-tests.yml'
+  pull_request:
+    paths:
+      - 'script/lib/git-diff-base'
+      - 'script/lib/git-diff-base-test.bash'
+      - '.github/workflows/git-diff-base-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run git-diff-base test harness
+        run: bash script/lib/git-diff-base-test.bash
+
+      - name: Shellcheck library and test harness
+        run: shellcheck -x script/lib/git-diff-base script/lib/git-diff-base-test.bash
