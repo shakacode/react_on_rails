@@ -19,13 +19,13 @@ command is designed to prevent.
 5. For formatting failures (Prettier or rubocop auto-fixable offenses), run `rake autofix`; do not manually edit formatting-only changes.
 6. After one or more edits for a failure, restart at the failed command and continue forward. Track a loop counter per
    command:
-   1. Increment the counter when the same command fails on the same first item (test name, RuboCop offense, or Prettier
-      file) as the previous run.
-   2. Reset the counter when the first failing item changes or when you advance to a different command.
-   3. Stop and report after three consecutive cycles on the same item, unless the user asks you to keep going.
-   4. Stop immediately and report a regression if a later fix causes a command that previously passed to fail again on
-      the same file, symbol, or test item.
-   5. Do not claim a failure is fixed until the command passes locally.
+   - Increment the counter when the same command fails on the same first item (test name, RuboCop offense, or Prettier
+     file) as the previous run.
+   - Reset the counter when the first failing item changes or when you advance to a different command.
+   - Stop and report after three consecutive cycles on the same item, unless the user asks you to keep going.
+   - Stop immediately and report a regression if a later fix causes a command that previously passed to fail again on
+     the same file, symbol, or test item. Ask the user how to proceed rather than attempting a blind revert.
+   - Do not claim a failure is fixed until the command passes locally.
 7. Finish with the exact commands run and their pass/fail status.
 
 ## Default Verification Order
@@ -73,9 +73,10 @@ Use this order unless the changed files make a narrower or broader set clearly a
 - TypeScript package changes: run `pnpm run build`, package tests, `pnpm run lint`, and `pnpm run type-check`.
 - Generated examples or scripts: run the relevant generator/script command plus formatting and linting.
 - Documentation-only changes: run `pnpm start format.listDifferent`, sidebar validation for `docs/oss/` or `docs/pro/`, and `bin/check-links` for new or changed URLs. If committing, still run `bundle exec rubocop`; see Instructions step 3 for why this applies even to docs-only commits. RuboCop does not validate Markdown.
-- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm start format.listDifferent`; in the Pro package, `pnpm start` delegates to that package's `nps` script, so this uses the package-local Prettier check.
+- `react_on_rails_pro/**/*.{js,ts,tsx,jsx,json,css,md}` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `cd react_on_rails_pro && pnpm start format.listDifferent` (the Pro package's local Prettier check via its `nps` script).
 - `react_on_rails_pro/**/*.rb` changes: confirm the Pro package edit was approved per the `AGENTS.md` ask-first rule, then run `bundle exec rubocop react_on_rails_pro/` and any targeted RSpec.
 - GitHub Actions workflow changes: confirm the edit was approved per the `AGENTS.md` ask-first rule, then run `actionlint` and `yamllint .github/`. Do not run RuboCop on `.yml` files.
+- Anything not listed above (for example, Rakefile edits, generator templates, RBS-only changes, or build scripts): apply the narrowest set of checks that covers the changed surface and explain the choice in the output.
 
 ## Output Format
 
