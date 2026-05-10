@@ -628,6 +628,12 @@ module ReactOnRails
 
         # rubocop:disable Metrics/AbcSize
         def help_mode_details
+          # Reflect base-port mode so help text advertises the port `bin/dev`
+          # will actually use. Without this, `bin/dev help` in a worktree with
+          # REACT_ON_RAILS_BASE_PORT=4000 still claims 3000/3001.
+          dev_url  = "http://localhost:#{help_display_port(:dev)}/<route>"
+          prod_url = "http://localhost:#{help_display_port(:prod)}/<route>"
+
           <<~MODES
             #{Rainbow('🔥 HMR Development mode (default)').cyan.bold} - #{Rainbow('Procfile.dev').green}:
             #{Rainbow('•').yellow} #{Rainbow('Hot Module Replacement (HMR) enabled').white}
@@ -636,7 +642,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
             #{Rainbow('•').yellow} #{Rainbow('May have Flash of Unstyled Content (FOUC)').white}
             #{Rainbow('•').yellow} #{Rainbow('Fast recompilation').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow(dev_url).cyan.underline}
 
             #{Rainbow('📦 Static development mode').cyan.bold} - #{Rainbow('Procfile.dev-static-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets with auto-recompilation)').white}
@@ -646,7 +652,7 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Development environment (faster builds than production)').white}
             #{Rainbow('•').yellow} #{Rainbow('Source maps for debugging').white}
             #{Rainbow('•').yellow} #{Rainbow('Optional advanced testing: share output path with tests only in this mode').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3000/<route>').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow(dev_url).cyan.underline}
 
             #{Rainbow('🏭 Production-assets mode').cyan.bold} - #{Rainbow('Procfile.dev-prod-assets').green}:
             #{Rainbow('•').yellow} #{Rainbow('React on Rails pack generation (via precompile hook or assets:precompile)').white}
@@ -656,10 +662,22 @@ module ReactOnRails
             #{Rainbow('•').yellow} #{Rainbow('Server processes controlled by Procfile.dev-prod-assets environment').white}
             #{Rainbow('•').yellow} #{Rainbow('Optimized, minified bundles with CSS extraction').white}
             #{Rainbow('•').yellow} #{Rainbow('No HMR (static assets)').white}
-            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow('http://localhost:3001/<route>').cyan.underline}
+            #{Rainbow('•').yellow} #{Rainbow('Access at:').white} #{Rainbow(prod_url).cyan.underline}
           MODES
         end
         # rubocop:enable Metrics/AbcSize
+
+        # Returns the Rails port to advertise in `bin/dev help`. In base-port
+        # mode every mode uses `base + 0` (apply_base_port_env sets PORT
+        # uniformly across HMR/static/prod-assets); otherwise prod-assets
+        # defaults to 3001 and HMR/static default to 3000. Uses base_port_hash
+        # so help-rendering is silent (no banner) and read-only.
+        def help_display_port(mode)
+          base = PortSelector.base_port_hash
+          return base[:rails] if base
+
+          mode == :prod ? 3001 : 3000
+        end
 
         # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
         def run_production_like(_verbose: false, route: nil, rails_env: nil, skip_database_check: false,
@@ -944,14 +962,20 @@ module ReactOnRails
           puts ""
         end
 
+        # NOTE: `run_production_like` does NOT use this method — it calls
+        # `apply_base_port_if_active` directly because (1) its PORT auto-scan
+        # starts at 3001, not 3000, and (2) it must not set
+        # SHAKAPACKER_DEV_SERVER_PORT (no webpack-dev-server in prod-assets).
+        # Future `run_*` methods should choose between the two entry points
+        # rather than adding a third path.
         def configure_ports
           warn_if_legacy_renderer_url_env_used
-          # Single call: select_ports internally consults base_port_ports and
+          # Single call: select_ports! internally consults base_port_ports and
           # returns the same hash when base-port mode is active, so we branch
           # on :base_port_mode instead of calling base_port_ports twice.
           # Pass pro_renderer so OSS apps don't get a "port base+2 (renderer)
           # is already in use" warning for a port they don't actually use.
-          selected = PortSelector.select_ports(pro_renderer: pro_renderer_active?)
+          selected = PortSelector.select_ports!(pro_renderer: pro_renderer_active?)
           if selected[:base_port_mode]
             apply_base_port_env(selected)
           else
@@ -1042,10 +1066,21 @@ module ReactOnRails
           return unless pro_renderer_active?
 
           derived_url = "http://localhost:#{selected[:renderer]}"
-          warn_if_renderer_url_will_be_overridden(derived_url)
+          warn_if_renderer_url_will_be_overridden("REACT_RENDERER_URL", derived_url)
           warn_if_port_will_be_overridden("RENDERER_PORT", selected[:renderer])
           ENV["RENDERER_PORT"] = selected[:renderer].to_s
           ENV["REACT_RENDERER_URL"] = derived_url
+          # Keep legacy RENDERER_URL in sync only if the user already set it.
+          # Pro initializers mid-migration may still read ENV["RENDERER_URL"];
+          # leaving it pointed at the old port while the renderer process moves
+          # to base+2 would silently route SSR calls to the wrong endpoint.
+          # Skip when unset so we don't introduce the legacy name into envs
+          # that have already migrated to REACT_RENDERER_URL.
+          legacy_url = ENV.fetch("RENDERER_URL", nil)
+          return if legacy_url.nil? || legacy_url.strip.empty?
+
+          warn_if_renderer_url_will_be_overridden("RENDERER_URL", derived_url)
+          ENV["RENDERER_URL"] = derived_url
         end
 
         # Heuristic for "this app has a Pro node renderer to point at": either
@@ -1071,6 +1106,11 @@ module ReactOnRails
         # Mirrors warn_if_renderer_url_will_be_overridden so users notice when a
         # pre-existing PORT or SHAKAPACKER_DEV_SERVER_PORT is replaced by the
         # base-port-derived value.
+        #
+        # Asymmetry vs. `overwrite_invalid_port_env` is intentional: base-port
+        # mode replaces the user's explicit value with a derived one (so we
+        # warn on any non-matching value), while explicit mode honors valid
+        # user input and only warns when it must rewrite an invalid value.
         def warn_if_port_will_be_overridden(var_name, derived_port)
           existing = ENV.fetch(var_name, nil)
           return if existing.nil? || existing.strip.empty? || existing.strip == derived_port.to_s
@@ -1079,16 +1119,17 @@ module ReactOnRails
                "because base port mode is active."
         end
 
-        # Base port mode overrides REACT_RENDERER_URL to point at a local
-        # renderer derived from the base port. Warn whenever an explicitly-set
-        # URL doesn't exactly match the derived one so users notice — including
-        # the "localhost with a different port" case, which is a real
-        # misconfiguration (Rails would target one port, the renderer another).
-        def warn_if_renderer_url_will_be_overridden(derived_url)
-          existing = ENV.fetch("REACT_RENDERER_URL", nil)
+        # Base port mode overrides REACT_RENDERER_URL (and the legacy
+        # RENDERER_URL) to point at a local renderer derived from the base
+        # port. Warn whenever an explicitly-set URL doesn't exactly match the
+        # derived one so users notice — including the "localhost with a
+        # different port" case, which is a real misconfiguration (Rails would
+        # target one port, the renderer another).
+        def warn_if_renderer_url_will_be_overridden(var_name, derived_url)
+          existing = ENV.fetch(var_name, nil)
           return if existing.nil? || existing.strip.empty? || existing.strip == derived_url
 
-          warn "WARNING: Overriding REACT_RENDERER_URL=#{existing.inspect} with #{derived_url} " \
+          warn "WARNING: Overriding #{var_name}=#{existing.inspect} with #{derived_url} " \
                "because base port mode is active."
         end
 
@@ -1104,8 +1145,10 @@ module ReactOnRails
 
         # Replace an invalid env value with the derived port, surfacing the
         # override so a user who set (e.g.) PORT=abc can see why it was ignored.
-        # Silent when the env var is unset or already valid — matching
-        # warn_if_port_will_be_overridden's symmetry for base-port mode.
+        # Silent when the env var is unset or already valid — explicit mode
+        # honors a valid user-supplied port and only rewrites bad input.
+        # Inverse of `warn_if_port_will_be_overridden`, which always rewrites
+        # under base-port mode and warns on any non-matching value.
         def overwrite_invalid_port_env(var_name, derived_port)
           existing = ENV.fetch(var_name, nil)
           if valid_port_string?(existing)

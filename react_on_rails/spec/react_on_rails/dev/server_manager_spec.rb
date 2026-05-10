@@ -23,8 +23,8 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       old = {}
       # REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT must be cleared too: if either
       # is set in the developer's shell (common inside a Conductor workspace),
-      # the real PortSelector.select_ports enters base-port mode, and any test
-      # that doesn't stub select_ports will see unexpected port assignments.
+      # the real PortSelector.select_ports! enters base-port mode, and any test
+      # that doesn't stub select_ports! will see unexpected port assignments.
       # Mirrors port_selector_spec.rb's outer `around`.
       %w[PORT SHAKAPACKER_DEV_SERVER_PORT RENDERER_PORT REACT_RENDERER_URL
          RENDERER_URL REACT_ON_RAILS_BASE_PORT CONDUCTOR_PORT].each do |k|
@@ -66,7 +66,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     # that exercise base-port mode override these stubs.
     allow(ReactOnRails::Dev::PortSelector).to receive_messages(
       base_port_ports: nil,
-      select_ports: { rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false }
+      select_ports!: { rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false }
     )
   end
 
@@ -362,7 +362,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
     context "when configuring ports" do
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3000, webpack: 3035 })
       end
 
@@ -393,7 +393,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "uses auto-detected ports when defaults are occupied" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3001, webpack: 3036 })
         described_class.start(:development)
         expect(ENV.fetch("PORT", nil)).to eq("3001")
@@ -401,7 +401,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "has PORT set when print_procfile_info is called in development mode" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3001, webpack: 3036 })
 
         port_at_print_time = nil
@@ -416,7 +416,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "passes the auto-detected port to print_server_info in static mode" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3001, webpack: 3036 })
 
         port_at_server_info_time = nil
@@ -431,7 +431,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "has PORT set when print_procfile_info is called in static mode" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3001, webpack: 3036 })
 
         port_at_print_time = nil
@@ -446,7 +446,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       end
 
       it "exits cleanly when no port pair is available" do
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_raise(ReactOnRails::Dev::PortSelector::NoPortAvailable, "No available port pair found")
 
         expect_any_instance_of(Kernel).to receive(:exit).with(1)
@@ -459,15 +459,15 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        # configure_ports calls select_ports once; select_ports internally
+        # configure_ports calls select_ports! once; select_ports! internally
         # consults base_port_ports and returns that hash when base-port mode
-        # is active. Stub both so every code path (select_ports callers and
+        # is active. Stub both so every code path (select_ports! callers and
         # direct base_port_ports callers like run_production_like) sees the
         # same base-port result.
         base_port_hash = { rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true }
         allow(ReactOnRails::Dev::PortSelector).to receive_messages(
           base_port_ports: base_port_hash,
-          select_ports: base_port_hash
+          select_ports!: base_port_hash
         )
       end
 
@@ -513,6 +513,29 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         ENV["REACT_RENDERER_URL"] = "http://localhost:5002"
         expect { described_class.start(:development) }
           .not_to output(/Overriding REACT_RENDERER_URL/).to_stderr
+      end
+
+      it "rewrites a legacy RENDERER_URL to the derived URL" do
+        ENV["RENDERER_URL"] = "http://localhost:3800"
+        described_class.start(:development)
+        expect(ENV.fetch("RENDERER_URL", nil)).to eq("http://localhost:5002")
+      end
+
+      it "warns before overriding a legacy RENDERER_URL on a different port" do
+        ENV["RENDERER_URL"] = "http://localhost:3800"
+        expect { described_class.start(:development) }
+          .to output(%r{Overriding RENDERER_URL="http://localhost:3800" with http://localhost:5002}).to_stderr
+      end
+
+      it "does not introduce RENDERER_URL when it is unset" do
+        described_class.start(:development)
+        expect(ENV).not_to have_key("RENDERER_URL")
+      end
+
+      it "does not warn when RENDERER_URL already equals the derived URL" do
+        ENV["RENDERER_URL"] = "http://localhost:5002"
+        expect { described_class.start(:development) }
+          .not_to output(/Overriding RENDERER_URL/).to_stderr
       end
 
       it "warns before overriding a pre-existing PORT" do
@@ -588,7 +611,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
         base_port_hash = { rails: 5000, webpack: 5001, renderer: 5002, base_port_mode: true }
         allow(ReactOnRails::Dev::PortSelector).to receive_messages(
           base_port_ports: base_port_hash,
-          select_ports: base_port_hash
+          select_ports!: base_port_hash
         )
       end
 
@@ -628,7 +651,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
       end
 
@@ -650,7 +673,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
       end
 
@@ -678,7 +701,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
       end
 
@@ -700,7 +723,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
       end
 
@@ -737,7 +760,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
       end
 
@@ -871,7 +894,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
       end
 
@@ -915,7 +938,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       before do
         mock_system_calls
-        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+        allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
           .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
       end
 
@@ -947,7 +970,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       allow(ReactOnRails::Dev::ProcessManager).to receive(:ensure_procfile)
       allow(ReactOnRails::Dev::ProcessManager).to receive(:run_with_process_manager)
       allow(ReactOnRails::Dev::DatabaseChecker).to receive(:check_database).and_return(true)
-      allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports)
+      allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
         .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
     end
 
@@ -1441,6 +1464,33 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       expect { described_class.show_help }.to output(/TEST ASSET WORKFLOWS/).to_stdout_from_any_process
       expect { described_class.show_help }.to output(%r{bin/dev test-watch}).to_stdout_from_any_process
       expect { described_class.show_help }.to output(%r{bin/dev static}).to_stdout_from_any_process
+    end
+
+    context "when base-port mode is active" do
+      include_context "with clean port env"
+
+      before do
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "5000"
+      end
+
+      it "advertises the base-derived Rails port for HMR mode" do
+        expect { described_class.show_help }
+          .to output(%r{HMR Development.*Access at.*http://localhost:5000/<route>}m).to_stdout_from_any_process
+      end
+
+      it "advertises the base-derived Rails port for production-assets mode" do
+        expect { described_class.show_help }
+          .to output(%r{Production-assets.*Access at.*http://localhost:5000/<route>}m).to_stdout_from_any_process
+      end
+    end
+
+    context "when base-port mode is not active" do
+      include_context "with clean port env"
+
+      it "advertises 3001 for production-assets mode" do
+        expect { described_class.show_help }
+          .to output(%r{Production-assets.*Access at.*http://localhost:3001/<route>}m).to_stdout_from_any_process
+      end
     end
   end
 

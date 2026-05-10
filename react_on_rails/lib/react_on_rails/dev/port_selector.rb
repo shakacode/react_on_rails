@@ -65,7 +65,7 @@ module ReactOnRails
         # @param pro_renderer [Boolean] when false, suppresses the renderer
         #   port-in-use warning so OSS apps without a node renderer don't
         #   see "port X (renderer)" noise on a coincidentally-bound base+2.
-        def select_ports(pro_renderer: true)
+        def select_ports!(pro_renderer: true)
           base = base_port_ports(pro_renderer: pro_renderer)
           return base if base
 
@@ -106,7 +106,7 @@ module ReactOnRails
         end
 
         # Returns the base-port-derived port hash when a base port env var is
-        # set (with the same shape as #select_ports), otherwise nil. Does not
+        # set (with the same shape as #select_ports!), otherwise nil. Does not
         # fall back to per-service env vars or auto-detect, so callers can
         # branch on "is base-port mode active?" without triggering probing.
         # Used by ServerManager so all bin/dev modes (development, static,

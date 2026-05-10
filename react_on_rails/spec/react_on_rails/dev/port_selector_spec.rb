@@ -9,7 +9,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
   # that influence port selection; otherwise a value leaked from the outer
   # shell (e.g. a developer running specs inside a Conductor workspace, or an
   # agent that set REACT_ON_RAILS_BASE_PORT) can silently change what
-  # `select_ports` returns and cause tests to fail. Individual contexts set
+  # `select_ports!` returns and cause tests to fail. Individual contexts set
   # the vars they actually want under test inside their own `around` blocks.
   around do |example|
     saved = {}
@@ -25,7 +25,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
     saved&.each { |k, v| v.nil? ? ENV.delete(k) : ENV[k] = v }
   end
 
-  describe ".select_ports" do
+  describe ".select_ports!" do
     context "when REACT_ON_RAILS_BASE_PORT is set" do
       around do |example|
         ENV["REACT_ON_RAILS_BASE_PORT"] = "5000"
@@ -36,52 +36,52 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "derives Rails port from base + 0" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(5000)
       end
 
       it "derives webpack port from base + 1" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:webpack]).to eq(5001)
       end
 
       it "derives renderer port from base + 2" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:renderer]).to eq(5002)
       end
 
       it "sets base_port_mode: true on the returned hash" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:base_port_mode]).to be(true)
       end
 
       it "returns derived ports even when they are already in use (deterministic)" do
         allow(described_class).to receive(:port_available?).and_return(false)
         result = nil
-        expect { result = described_class.select_ports }.to output(/already in use/).to_stderr
+        expect { result = described_class.select_ports! }.to output(/already in use/).to_stderr
         expect(result).to include(rails: 5000, webpack: 5001, renderer: 5002)
       end
 
       it "skips the renderer port-in-use warning when pro_renderer is false (OSS)" do
         allow(described_class).to receive(:port_available?).and_return(false)
-        expect { described_class.select_ports(pro_renderer: false) }
+        expect { described_class.select_ports!(pro_renderer: false) }
           .to output(/port 5000 \(rails.+already in use.+port 5001 \(webpack.+already in use/m).to_stderr
-        expect { described_class.select_ports(pro_renderer: false) }
+        expect { described_class.select_ports!(pro_renderer: false) }
           .not_to output(/port 5002 \(renderer/).to_stderr
       end
 
       it "still warns about the renderer port when pro_renderer is true (default)" do
         allow(described_class).to receive(:port_available?).and_return(false)
-        expect { described_class.select_ports }
+        expect { described_class.select_ports! }
           .to output(/port 5002 \(renderer, derived from base 5000\) is already in use/).to_stderr
       end
 
       it "prints a base port message" do
-        expect { described_class.select_ports }.to output(/Base port 5000 detected/).to_stdout
+        expect { described_class.select_ports! }.to output(/Base port 5000 detected/).to_stdout
       end
 
       it "names the source env var in the base port log line" do
-        expect { described_class.select_ports }.to output(/via REACT_ON_RAILS_BASE_PORT/).to_stdout
+        expect { described_class.select_ports! }.to output(/via REACT_ON_RAILS_BASE_PORT/).to_stdout
       end
     end
 
@@ -94,18 +94,18 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "derives all ports from CONDUCTOR_PORT" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(6000)
         expect(result[:webpack]).to eq(6001)
         expect(result[:renderer]).to eq(6002)
       end
 
       it "names CONDUCTOR_PORT as the source in the base port log line" do
-        expect { described_class.select_ports }.to output(/via CONDUCTOR_PORT/).to_stdout
+        expect { described_class.select_ports! }.to output(/via CONDUCTOR_PORT/).to_stdout
       end
 
       it "calls out that REACT_ON_RAILS_BASE_PORT is the stable override" do
-        expect { described_class.select_ports }
+        expect { described_class.select_ports! }
           .to output(/CONDUCTOR_PORT .*set REACT_ON_RAILS_BASE_PORT to override/).to_stdout
       end
     end
@@ -120,7 +120,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "prefers REACT_ON_RAILS_BASE_PORT over CONDUCTOR_PORT" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(5000)
       end
     end
@@ -134,7 +134,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "warns and falls back to normal auto-detection" do
         allow(described_class).to receive(:port_available?).and_return(true)
         expect do
-          result = described_class.select_ports
+          result = described_class.select_ports!
           expect(result[:rails]).to eq(3000)
           expect(result[:renderer]).to be_nil
         end.to output(/out of range/).to_stderr
@@ -150,7 +150,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "warns and falls back to auto-detection rather than deriving port 0" do
         allow(described_class).to receive(:port_available?).and_return(true)
         expect do
-          result = described_class.select_ports
+          result = described_class.select_ports!
           expect(result[:rails]).to eq(3000)
           expect(result[:renderer]).to be_nil
         end.to output(/out of range/).to_stderr
@@ -167,12 +167,12 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
       it "still returns the derived ports (binding is the source of truth)" do
         result = nil
-        expect { result = described_class.select_ports }.to output(/privileged range/).to_stderr
+        expect { result = described_class.select_ports! }.to output(/privileged range/).to_stderr
         expect(result[:rails]).to eq(80)
       end
 
       it "warns that binding will fail without root" do
-        expect { described_class.select_ports }
+        expect { described_class.select_ports! }
           .to output(/privileged range \(1\.\.1023\); binding will fail without root/).to_stderr
       end
     end
@@ -186,7 +186,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "does not emit the privileged-port warning" do
-        expect { described_class.select_ports }.not_to output(/privileged range/).to_stderr
+        expect { described_class.select_ports! }.not_to output(/privileged range/).to_stderr
       end
     end
 
@@ -200,7 +200,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "warns and falls back to auto-detection instead of deriving an invalid port" do
         allow(described_class).to receive(:port_available?).and_return(true)
         expect do
-          result = described_class.select_ports
+          result = described_class.select_ports!
           expect(result[:rails]).to eq(3000)
           expect(result[:renderer]).to be_nil
         end.to output(/out of range/).to_stderr
@@ -216,7 +216,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "derives all three ports within the valid TCP range" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(described_class::MAX_BASE_PORT)
         expect(result[:webpack]).to eq(described_class::MAX_BASE_PORT + 1)
         expect(result[:renderer]).to eq(described_class::MAX_BASE_PORT + 2)
@@ -233,7 +233,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "warns and falls back to auto-detection instead of silently parsing as 400" do
         allow(described_class).to receive(:port_available?).and_return(true)
         expect do
-          result = described_class.select_ports
+          result = described_class.select_ports!
           expect(result[:rails]).to eq(3000)
           expect(result[:renderer]).to be_nil
         end.to output(/not a valid integer/).to_stderr
@@ -253,13 +253,13 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "trims whitespace and treats the value as valid" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(5000)
         expect(result[:base_port_mode]).to be(true)
       end
 
       it "does not emit the not-a-valid-integer warning" do
-        expect { described_class.select_ports }.not_to output(/not a valid integer/).to_stderr
+        expect { described_class.select_ports! }.not_to output(/not a valid integer/).to_stderr
       end
     end
 
@@ -272,7 +272,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "warns and falls back to auto-detection (mirrors REACT_ON_RAILS_BASE_PORT invalid handling)" do
         allow(described_class).to receive(:port_available?).and_return(true)
         expect do
-          result = described_class.select_ports
+          result = described_class.select_ports!
           expect(result[:rails]).to eq(3000)
           expect(result[:renderer]).to be_nil
           expect(result[:base_port_mode]).to be(false)
@@ -289,7 +289,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "warns and falls back to auto-detection" do
         allow(described_class).to receive(:port_available?).and_return(true)
         expect do
-          result = described_class.select_ports
+          result = described_class.select_ports!
           expect(result[:rails]).to eq(3000)
           expect(result[:base_port_mode]).to be(false)
         end.to output(/CONDUCTOR_PORT.*out of range/).to_stderr
@@ -308,13 +308,13 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       before { allow(described_class).to receive(:port_available?).and_return(true) }
 
       it "falls through to CONDUCTOR_PORT and activates base port mode" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(6000)
         expect(result[:base_port_mode]).to be(true)
       end
 
       it "warns that CONDUCTOR_PORT is still the active source so users can opt out" do
-        expect { described_class.select_ports }
+        expect { described_class.select_ports! }
           .to output(/Base port mode will still activate from CONDUCTOR_PORT; unset to disable/).to_stderr
       end
     end
@@ -329,7 +329,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "does not warn that CONDUCTOR_PORT will still activate base-port mode" do
         allow(described_class).to receive(:port_available?).and_return(true)
 
-        expect { described_class.select_ports }
+        expect { described_class.select_ports! }
           .not_to output(/Base port mode will still activate from CONDUCTOR_PORT/).to_stderr
       end
     end
@@ -337,25 +337,25 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
     context "when default ports are free" do
       it "returns the default Rails port 3000" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(3000)
       end
 
       it "returns the default webpack port 3035" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:webpack]).to eq(3035)
       end
 
       it "returns nil for renderer port" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:renderer]).to be_nil
       end
 
       it "does not print a shift message" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        expect { described_class.select_ports }.not_to output(/shifted/i).to_stdout
+        expect { described_class.select_ports! }.not_to output(/shifted/i).to_stdout
       end
     end
 
@@ -364,7 +364,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         allow(described_class).to receive(:port_available?) do |port|
           port != 3000 # only 3000 is occupied
         end
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(3001)
       end
 
@@ -372,7 +372,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         allow(described_class).to receive(:port_available?) do |port|
           port != 3000 # 3035 is still free
         end
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:webpack]).to eq(3035)
       end
 
@@ -380,7 +380,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         allow(described_class).to receive(:port_available?) do |port|
           port != 3000 && port != 3035
         end
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(3001)
         expect(result[:webpack]).to eq(3036)
       end
@@ -389,7 +389,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         allow(described_class).to receive(:port_available?) do |port|
           port != 3000 && port != 3035
         end
-        expect { described_class.select_ports }.to output(/3001.*3036|shifted|in use/i).to_stdout
+        expect { described_class.select_ports! }.to output(/3001.*3036|shifted|in use/i).to_stdout
       end
     end
 
@@ -401,13 +401,13 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
       it "respects the existing PORT env var" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(4000)
       end
 
       it "defaults webpack to 3035 when SHAKAPACKER_DEV_SERVER_PORT is not set and 3035 is free" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:webpack]).to eq(3035)
       end
 
@@ -417,14 +417,14 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
           call_count += 1
           call_count > 1 # first check (3035) fails
         end
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:webpack]).to eq(3036)
       end
 
       it "does not return PORT value as webpack port when they would be equal" do
         ENV["PORT"] = "3035"
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(3035)
         expect(result[:webpack]).not_to eq(3035)
       end
@@ -438,13 +438,13 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
 
       it "respects the existing SHAKAPACKER_DEV_SERVER_PORT env var" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:webpack]).to eq(4035)
       end
 
       it "defaults Rails to 3000 when PORT is not set and 3000 is free" do
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(3000)
       end
 
@@ -454,14 +454,14 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
           call_count += 1
           call_count > 1 # first check (3000) fails
         end
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(3001)
       end
 
       it "does not return SHAKAPACKER_DEV_SERVER_PORT value as rails port when they would be equal" do
         ENV["SHAKAPACKER_DEV_SERVER_PORT"] = "3000"
         allow(described_class).to receive(:port_available?).and_return(true)
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:webpack]).to eq(3000)
         expect(result[:rails]).not_to eq(3000)
       end
@@ -475,21 +475,21 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       end
 
       it "returns both explicit ports" do
-        result = described_class.select_ports
+        result = described_class.select_ports!
         expect(result[:rails]).to eq(4000)
         expect(result[:webpack]).to eq(4035)
       end
 
       it "does not probe for free ports" do
         expect(described_class).not_to receive(:port_available?)
-        described_class.select_ports
+        described_class.select_ports!
       end
     end
 
     context "when no port is available within max attempts" do
       it "raises an error" do
         allow(described_class).to receive(:port_available?).and_return(false)
-        expect { described_class.select_ports }.to raise_error(described_class::NoPortAvailable, /No available port/)
+        expect { described_class.select_ports! }.to raise_error(described_class::NoPortAvailable, /No available port/)
       end
     end
 
@@ -502,7 +502,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "warns, clears PORT, and falls back to auto-detection" do
         allow(described_class).to receive(:port_available?).and_return(true)
         result = nil
-        expect { result = described_class.select_ports }
+        expect { result = described_class.select_ports! }
           .to output(/PORT=.*"99999".*out of range/).to_stderr
         expect(result[:rails]).to eq(3000)
         expect(result[:webpack]).to eq(3035)
@@ -525,7 +525,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "rejects PORT, clears it, and falls back to auto-detection" do
         allow(described_class).to receive(:port_available?).and_return(true)
         result = nil
-        expect { result = described_class.select_ports }
+        expect { result = described_class.select_ports! }
           .to output(/PORT=.*"3000abc".*not a valid integer/).to_stderr
         expect(result[:rails]).to eq(3000)
         expect(ENV.fetch("PORT", nil)).to be_nil
@@ -541,7 +541,7 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "rejects the value, clears the env var, and falls back to auto-detection" do
         allow(described_class).to receive(:port_available?).and_return(true)
         result = nil
-        expect { result = described_class.select_ports }
+        expect { result = described_class.select_ports! }
           .to output(/SHAKAPACKER_DEV_SERVER_PORT=.*"3035xyz".*not a valid integer/).to_stderr
         expect(result[:webpack]).to eq(3035)
         expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to be_nil

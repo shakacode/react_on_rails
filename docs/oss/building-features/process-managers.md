@@ -482,6 +482,11 @@ REACT_RENDERER_URL=http://localhost:3801
 The renderer port must match on both sides: `RENDERER_PORT` is read by the Node process and
 `REACT_RENDERER_URL` is read by the Rails-side Pro initializer.
 
+> **Note:** `bin/dev kill` only stops the renderer when `RENDERER_PORT` (or `REACT_RENDERER_URL`)
+> is exported in the current shell. From a fresh terminal that hasn't sourced your worktree's
+> `.env`, run e.g. `RENDERER_PORT=3801 bin/dev kill`, or source `.env` first. Otherwise the
+> renderer process will silently keep running.
+
 ## See Also
 
 - [HMR and Hot Reloading](./hmr-and-hot-reloading-with-the-webpack-dev-server.md)
