@@ -105,7 +105,9 @@ Prerequisites for the first implementation PR:
   `metadata.json` artifact and mirror the key fields in the `summary.txt` header. Capture runtime-dependent fields when
   the benchmark runs instead of hard-coding the example schema values: use `ruby --version` for `ruby_version`,
   `node --version` for `node_version`, and run `node -e "console.log(require('react/package.json').version)"` from the
-  active `APP_DIR` for `react_version` so OSS and Pro dummy apps report their own installed React package.
+  active `APP_DIR` for `react_version` so OSS and Pro dummy apps report their own installed React package. Capture
+  `bundle_mode` from `ENV["NODE_ENV"]` (falling back to `"production"`) so the recorded mode reflects the actual build
+  rather than silently lying when CI or local runs use a non-production mode.
   Define `sample_count` as the number of completed k6 measurement runs contributing to the route's reported summary. The
   first slice should start at one run per route. If a later implementation aggregates forward and reverse passes into a
   single route summary, record `sample_count: 2`; if it writes one summary per pass, keep each summary at
@@ -120,10 +122,14 @@ Prerequisites for the first implementation PR:
     "react_version": "<output of: node -e \"console.log(require('react/package.json').version)\" from APP_DIR>",
     "renderer": "<node_renderer when PRO=true, otherwise execjs>",
     "runner_type": "<RUNNER_OS/RUNNER_ARCH when available, otherwise local platform>",
-    "bundle_mode": "production",
+    "bundle_mode": "<ENV[\"NODE_ENV\"] when set, otherwise production>",
     "sample_count": "<number of completed k6 measurement samples included in this summary>"
   }
   ```
+
+  The implementation PR also needs to extend the `actions/upload-artifact` step in `.github/workflows/benchmark.yml` to
+  upload `metadata.json` alongside the existing summary and BMF artifacts; otherwise the schema lands but the artifact
+  never reaches CI consumers.
 
 - Preserve the existing `benchmarks/bench.rb` summary metrics (`RPS`, `p50`, `p90`, `p99`, and `max`) and extend Bencher
   BMF reporting to include `max_latency` alongside the existing `rps`, `p50_latency`, `p90_latency`, `p99_latency`, and
@@ -162,7 +168,21 @@ reviewers have one stable compliance checklist.
 - CI behavior is advisory until noise controls are proven.
 - Regression detection favors sustained movement over single-run spikes and uses the current `p50`, `p90`, `p99`, and
   `max` metrics until `p95` is added explicitly.
-- Documentation tells contributors which benchmark to run for each rendering area.
+- Contributor documentation in `benchmarks/README.md` (or the benchmark-specific pull request template referenced under
+  Local Verification Before CI) tells contributors which benchmark to run for each rendering area.
+
+## Rollback / Abort Criteria
+
+If the noise controls in this plan still leave shared-runner variance too high to establish a stable baseline, treat
+the rollout as a rollback signal rather than continuing to lower thresholds:
+
+- If two consecutive benchmark runs on the same commit (no code changes) disagree by more than the largest threshold
+  the plan would set for any tracked metric, pause adding new routes and document the variance in the issue tracker.
+- If, after applying forward-then-reverse passes and the metadata artifact, single-commit variance still exceeds the
+  bands established in `internal/planning/library-benchmarking.md`, defer hard CI gates indefinitely and revisit the
+  approach (dedicated runner, longer sampling windows, or relocating the benchmark out of the shared CI job).
+- Until the abort criteria are clearly satisfied, keep all benchmark CI behavior advisory and do not block merges on
+  benchmark deltas.
 
 ## See Also
 
