@@ -145,7 +145,8 @@ Keep each shim explicit and narrow:
    These `lib/` file paths bypass the `exports` map and are not covered by the public API contract.
    The export name (`react-on-rails/context`, etc.) is stable, but the underlying file path (`lib/context.js`,
    etc.) may change without notice in any patch or minor release even when the named export remains stable.
-   Treat them as an absolute last resort, and pin `react_on_rails` tightly if you use them.
+   Treat them as an absolute last resort, and pin `react_on_rails` to an exact version (for example,
+   `gem 'react_on_rails', '= 16.0.0'`) if you use them so a patch or minor upgrade cannot silently move the file.
 
    :::
 
@@ -180,7 +181,9 @@ Keep each shim explicit and narrow:
    Other subpath exports follow the same pattern: replace the subpath with the file path listed in the `exports`
    field of `packages/react-on-rails/package.json`. Note that some exports resolve to `.cjs` rather than `.js`
    (for example, `react-on-rails/reactApis` → `react-on-rails/lib/reactApis.cjs`); using the wrong extension yields
-   a module-not-found error.
+   a module-not-found error. Exports prefixed with `@internal/` (for example, `@internal/sanitizeNonce`,
+   `@internal/base/client`, `@internal/createReactOnRails`) are not public API — never import them directly,
+   even via the `lib/` path fallback.
 
 2. Ensure Babel can parse modern syntax used by current packages:
 
@@ -191,12 +194,13 @@ Keep each shim explicit and narrow:
 
    If you want to confirm whether your `@babel/preset-env` targets already include optional chaining and
    nullish coalescing, set `debug: true` on the `@babel/preset-env` options and check the build output for
-   `optional-chaining` and `nullish-coalescing-operator` in the "Using plugins" list. Use the `transform-*` package
-   names first: `@babel/plugin-proposal-optional-chaining` is deprecated as of its 7.21.0 package metadata, and
-   `@babel/plugin-proposal-nullish-coalescing-operator` is deprecated in its 7.18.6 package metadata. Both notices
-   direct users to the corresponding `transform-*` package. If the transforms already appear in the preset output,
-   you can skip the standalone packages; when in doubt, install them because they are no-ops if `preset-env` already
-   transforms the syntax.
+   `optional-chaining` and `nullish-coalescing-operator` in the "Using plugins" list. Prefer the `transform-*`
+   package names: the `@babel/plugin-proposal-*` packages were renamed to `@babel/plugin-transform-*` in
+   Babel 7.22 (`@babel/plugin-proposal-optional-chaining` 7.21.0 and
+   `@babel/plugin-proposal-nullish-coalescing-operator` 7.18.6 are the last `proposal-*` releases). Both still
+   work, but the `proposal-*` packages emit deprecation notices that direct users to the `transform-*` packages.
+   If the transforms already appear in the preset output, you can skip the standalone packages; when in doubt,
+   install them because they are no-ops if `preset-env` already transforms the syntax.
 
    ```bash
    yarn add -D @babel/plugin-transform-optional-chaining @babel/plugin-transform-nullish-coalescing-operator
@@ -231,7 +235,9 @@ Keep each shim explicit and narrow:
    };
    ```
 
-3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently. `babel-loader` ships with Webpacker 5, so no extra loader install is needed.
+3. Transpile the React on Rails package files from `node_modules` so Webpack 4 can parse them consistently.
+
+   `babel-loader` ships with Webpacker 5, so no extra loader install is needed.
 
    **When to apply:** Add this loader if Webpack 4 reports parse errors from `node_modules/react-on-rails`.
    Step 2's Babel plugins only affect `node_modules/react-on-rails` after this loader rule is in place, so Step 2
@@ -268,7 +274,7 @@ Keep each shim explicit and narrow:
      overrides: [
        {
          test: /node_modules[\\/]react-on-rails[\\/]/,
-         // Adds CJS module transform on top of the global plugins from Step 2.
+         // Transform ESM to CJS for react-on-rails files.
          plugins: ['@babel/plugin-transform-modules-commonjs'],
        },
      ],
