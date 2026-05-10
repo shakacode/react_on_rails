@@ -123,7 +123,7 @@ Rails and the Node Renderer run as independent workloads with their own scaling.
 # config/initializers/react_on_rails_pro.rb
 ReactOnRailsPro.configure do |config|
   config.server_renderer = "NodeRenderer"
-  config.renderer_url = ENV.fetch("REACT_RENDERER_URL", "http://node-renderer-service:3800")
+  config.renderer_url = ENV.fetch("RENDERER_URL", "http://node-renderer-service:3800")
 end
 ```
 
@@ -194,7 +194,7 @@ services:
     ports:
       - '3000:3000'
     environment:
-      REACT_RENDERER_URL: 'http://renderer:3800'
+      RENDERER_URL: 'http://renderer:3800'
     depends_on:
       renderer:
         condition: service_healthy
@@ -474,7 +474,7 @@ spec:
           ports:
             - containerPort: 3000
           env:
-            - name: REACT_RENDERER_URL
+            - name: RENDERER_URL
               value: 'http://localhost:3800'
             - name: LD_PRELOAD
               value: '/usr/lib/x86_64-linux-gnu/libjemalloc.so.2'
