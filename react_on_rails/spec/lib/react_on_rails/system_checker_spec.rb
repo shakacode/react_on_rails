@@ -120,8 +120,9 @@ RSpec.describe ReactOnRails::SystemChecker do
     end
 
     context "when package managers are available" do
+      let(:rails_root) { Pathname.new("/tmp/myapp") }
+
       before do
-        rails_root = Pathname.new("/tmp/myapp")
         allow(Rails).to receive(:root).and_return(rails_root)
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: rails_root.to_s)
@@ -141,8 +142,6 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       it "adds a success message" do
-        rails_root = Pathname.new("/tmp/myapp")
-
         result = checker.check_package_manager
 
         expect(File).to have_received(:exist?).with(rails_root.join("yarn.lock").to_s)
@@ -153,7 +152,6 @@ RSpec.describe ReactOnRails::SystemChecker do
       end
 
       it "does not suggest installing lockfiles when the configured package root is missing" do
-        rails_root = Pathname.new("/tmp/myapp")
         package_root = rails_root.join("client")
         allow(ReactOnRails).to receive(:configuration).and_return(
           instance_double(ReactOnRails::Configuration, node_modules_location: "client")

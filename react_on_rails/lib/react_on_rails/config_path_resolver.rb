@@ -33,6 +33,10 @@ module ReactOnRails
       resolved_package_path("package.json", package_root)
     end
 
+    # Memoized per instance: configuration is set once at boot in production.
+    # Tests must build a fresh resolver after stubbing a different
+    # node_modules_location, since reconfiguration on a reused instance is
+    # ignored after the first call.
     def resolved_package_root
       @resolved_package_root ||= begin
         node_modules_location = ReactOnRails.configuration.node_modules_location.to_s

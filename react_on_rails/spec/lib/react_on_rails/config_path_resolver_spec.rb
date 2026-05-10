@@ -121,7 +121,7 @@ RSpec.describe ReactOnRails::ConfigPathResolver do
     it "raises a clear error when the includer does not provide add_warning" do
       resolver = resolver_class_without_add_warning.new
 
-      expect { resolver.send(:warn_missing_package_root, "/missing/client") }
+      expect { resolver.warn_missing_package_root("/missing/client") }
         .to raise_error(NotImplementedError, /must implement #add_warning\(message\)/)
     end
   end

@@ -15,9 +15,7 @@ module ReactOnRails
     attr_reader :messages
 
     SUPPORTED_ASSETS_BUNDLERS = %w[webpack rspack].freeze
-    unless const_defined?(:PackageManagerDetection, false)
-      PackageManagerDetection = Struct.new(:manager, :lockfile_scan_blocked, keyword_init: true)
-    end
+    PackageManagerDetection = Struct.new(:manager, :lockfile_scan_blocked, keyword_init: true)
 
     def initialize
       @messages = []
@@ -456,12 +454,14 @@ module ReactOnRails
       # legacy apps that keep their JS package tree under client/.
       package_root = resolved_package_root
       package_json_path = package_json_path_for(
-        "package manager lockfile",
+        "package manager",
         package_root
       )
       # If package.json cannot be read, the configured package root is broken
       # enough that detecting a stray lockfile would be misleading. Block the
       # scan so check_package_manager does not suggest installing lockfiles.
+      # Covers both cases handled by package_json_path_for: a missing package
+      # root directory and an existing directory without a package.json.
       return PackageManagerDetection.new(manager: nil, lockfile_scan_blocked: true) unless package_json_path
 
       manager = if File.exist?(File.join(package_root, "yarn.lock"))

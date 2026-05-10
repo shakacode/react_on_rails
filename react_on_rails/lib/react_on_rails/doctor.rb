@@ -2954,6 +2954,11 @@ module ReactOnRails
       checker.add_warning(message)
     end
 
+    # Delegates the protected registry to checker so warnings emitted from
+    # Doctor share the same de-dupe state as warnings emitted from the checker.
+    # The cross-class call is permitted because both Doctor and SystemChecker
+    # include ConfigPathResolver, which satisfies Ruby's protected-visibility
+    # rule (caller and receiver share an ancestor that defines the method).
     def config_path_warning_registry
       checker.config_path_warning_registry
     end
