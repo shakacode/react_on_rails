@@ -108,6 +108,19 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         expect { described_class.select_ports! }
           .to output(/CONDUCTOR_PORT .*set REACT_ON_RAILS_BASE_PORT to override/).to_stdout
       end
+
+      it "appends a CONDUCTOR_PORT semantic-drift hint when the Rails port (base + 0) is bound" do
+        # Surface the most likely failure mode if Conductor's CONDUCTOR_PORT
+        # contract ever shifts from "block base" to "Rails port": the derived
+        # Rails port collides with whatever the user already has bound there.
+        # Other roles (webpack/renderer) get the normal warning since the hint
+        # would be misleading for collisions on base + 1 / base + 2.
+        allow(described_class).to receive(:port_available?) do |port|
+          port != 6000
+        end
+        expect { described_class.select_ports! }
+          .to output(/port 6000 \(rails.*already in use.*CONDUCTOR_PORT.*set REACT_ON_RAILS_BASE_PORT/m).to_stderr
+      end
     end
 
     context "when both REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT are set" do

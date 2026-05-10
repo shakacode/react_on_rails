@@ -396,6 +396,13 @@ When a base port is detected, `bin/dev` also sets `RENDERER_PORT` and
 `REACT_RENDERER_URL` automatically so the Pro Node Renderer and Rails
 initializer agree on the port without any additional configuration.
 
+> **Heads up:** setting `RENDERER_PORT`, `RENDERER_URL`, or `REACT_RENDERER_URL`
+> in your environment activates the Pro renderer code path even in OSS apps —
+> in base-port mode this means `RENDERER_PORT` and `REACT_RENDERER_URL` will be
+> derived from the base and propagated to spawned processes. If you use
+> `RENDERER_PORT` in your environment for an unrelated purpose, rename your
+> variable to avoid the side effect.
+
 > **Note:** Base-port mode derives the node renderer URL as
 > `http://localhost:<port>`. If you run the renderer in a Docker container or
 > on a remote host (e.g. `REACT_RENDERER_URL=http://renderer:3800`), do not use

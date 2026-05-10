@@ -363,7 +363,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       before do
         mock_system_calls
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
-          .and_return({ rails: 3000, webpack: 3035 })
+          .and_return({ rails: 3000, webpack: 3035, renderer: nil, base_port_mode: false })
       end
 
       around do |example|
@@ -394,7 +394,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       it "uses auto-detected ports when defaults are occupied" do
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
-          .and_return({ rails: 3001, webpack: 3036 })
+          .and_return({ rails: 3001, webpack: 3036, renderer: nil, base_port_mode: false })
         described_class.start(:development)
         expect(ENV.fetch("PORT", nil)).to eq("3001")
         expect(ENV.fetch("SHAKAPACKER_DEV_SERVER_PORT", nil)).to eq("3036")
@@ -402,7 +402,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       it "has PORT set when print_procfile_info is called in development mode" do
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
-          .and_return({ rails: 3001, webpack: 3036 })
+          .and_return({ rails: 3001, webpack: 3036, renderer: nil, base_port_mode: false })
 
         port_at_print_time = nil
         allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|
@@ -417,7 +417,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       it "passes the auto-detected port to print_server_info in static mode" do
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
-          .and_return({ rails: 3001, webpack: 3036 })
+          .and_return({ rails: 3001, webpack: 3036, renderer: nil, base_port_mode: false })
 
         port_at_server_info_time = nil
         allow(described_class).to receive(:print_server_info).and_wrap_original do |m, *args, **kwargs|
@@ -432,7 +432,7 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
 
       it "has PORT set when print_procfile_info is called in static mode" do
         allow(ReactOnRails::Dev::PortSelector).to receive(:select_ports!)
-          .and_return({ rails: 3001, webpack: 3036 })
+          .and_return({ rails: 3001, webpack: 3036, renderer: nil, base_port_mode: false })
 
         port_at_print_time = nil
         allow(described_class).to receive(:print_procfile_info).and_wrap_original do |m, *args, **kwargs|

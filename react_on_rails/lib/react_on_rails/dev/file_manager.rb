@@ -8,9 +8,17 @@ module ReactOnRails
     class FileManager
       # Bounded probe so a stuck server with a full accept queue (rare for a
       # local overmind socket but theoretically possible) cannot stall
-      # bin/dev startup indefinitely. UNIX domain socket connect() to a dead
-      # listener typically fails in microseconds, so 150 ms is conservative
-      # while keeping worst-case overhead low across many stale sockets.
+      # bin/dev startup indefinitely.
+      #
+      # Two paths consume this budget differently:
+      #   - synchronous failure (typical): UNIX socket connect() to a dead
+      #     listener fails in microseconds, so 150 ms is far more than needed.
+      #   - async wait_writable: if connect() returns IO::WaitWritable, the
+      #     full 150 ms can be consumed waiting for the kernel to mark the
+      #     socket writable. This is the actual budget for slow-loopback or
+      #     paused-PID cases — not "microseconds".
+      # Result: 150 ms is conservative for the common path and the cap for
+      # the worst case.
       SOCKET_PROBE_TIMEOUT_SECS = 0.15
       private_constant :SOCKET_PROBE_TIMEOUT_SECS
 
@@ -146,20 +154,22 @@ module ReactOnRails
           return nil if path.nil? || path.empty?
 
           path
+        rescue Errno::ENOENT => e
+          # `lsof` binary missing — expected on minimal images. DEBUG-gated so
+          # users on Linux/macOS without the package don't see noise.
+          log_lsof_missing(e) if ENV["DEBUG"]
+          nil
         rescue StandardError => e
-          log_lsof_error(pid, e)
+          # Genuinely unexpected: resource limits (Errno::EMFILE), interrupted
+          # syscall (Errno::EINTR), permission errors, etc. Always-warn so the
+          # cross-directory PID check can't silently misfire under load.
+          warn "bin/dev: could not determine working directory for PID #{pid} " \
+               "(#{e.class}: #{e.message})."
           nil
         end
 
-        def log_lsof_error(pid, error)
-          return unless ENV["DEBUG"]
-
-          if error.is_a?(Errno::ENOENT)
-            warn "bin/dev: `lsof` not found; cross-directory PID check skipped (#{error.message})."
-          else
-            warn "bin/dev: could not determine working directory for PID #{pid} " \
-                 "(#{error.class}: #{error.message})."
-          end
+        def log_lsof_missing(error)
+          warn "bin/dev: `lsof` not found; cross-directory PID check skipped (#{error.message})."
         end
 
         def same_working_directory?(left, right)

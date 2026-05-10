@@ -964,10 +964,12 @@ module ReactOnRails
 
         # NOTE: `run_production_like` does NOT use this method — it calls
         # `apply_base_port_if_active` directly because (1) its PORT auto-scan
-        # starts at 3001, not 3000, and (2) it must not set
-        # SHAKAPACKER_DEV_SERVER_PORT (no webpack-dev-server in prod-assets).
-        # Future `run_*` methods should choose between the two entry points
-        # rather than adding a third path.
+        # starts at 3001, not 3000, and (2) in non-base-port mode it must not
+        # set SHAKAPACKER_DEV_SERVER_PORT (no webpack-dev-server in prod-assets).
+        # Base-port mode still sets SHAKAPACKER_DEV_SERVER_PORT (= base + 1) for
+        # tooling consistency — see apply_base_port_env. Future `run_*` methods
+        # should choose between the two entry points rather than adding a third
+        # path.
         def configure_ports
           warn_if_legacy_renderer_url_env_used
           # Single call: select_ports! internally consults base_port_ports and
@@ -1021,9 +1023,10 @@ module ReactOnRails
             warn "WARNING: RENDERER_URL is set but REACT_RENDERER_URL is not. " \
                  "RENDERER_URL was renamed to REACT_RENDERER_URL; update your " \
                  "env var to avoid silent fallback to the default renderer URL. " \
-                 "Note: RENDERER_URL still activates the Pro renderer path here, " \
-                 "so base-port mode will derive RENDERER_PORT/REACT_RENDERER_URL " \
-                 "from it until the variable is renamed."
+                 "Note: RENDERER_URL alone still activates the Pro renderer code " \
+                 "path. Separately, if REACT_ON_RAILS_BASE_PORT or CONDUCTOR_PORT " \
+                 "is set, base-port mode will derive RENDERER_PORT/REACT_RENDERER_URL " \
+                 "from the base (overriding RENDERER_URL)."
             return
           end
 

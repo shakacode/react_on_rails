@@ -129,7 +129,7 @@ module ReactOnRails
           renderer_segment = pro_renderer ? ", renderer :#{ports[:renderer]}" : ""
           puts "Base port #{bp} detected via #{source}#{source_note}. Using Rails :#{ports[:rails]}, " \
                "webpack :#{ports[:webpack]}#{renderer_segment}"
-          warn_if_derived_ports_in_use(bp, ports, pro_renderer: pro_renderer)
+          warn_if_derived_ports_in_use(bp, ports, source: source, pro_renderer: pro_renderer)
           ports
         end
 
@@ -191,12 +191,26 @@ module ReactOnRails
         # run a node renderer, so "port base+2 (renderer) is already in use"
         # would be confusing noise on a coincidental collision with an
         # unrelated local service.
-        def warn_if_derived_ports_in_use(base, ports, pro_renderer: true)
+        #
+        # When the base came from CONDUCTOR_PORT and the *Rails* port (base+0)
+        # is taken, append a hint that Conductor's contract is unofficial —
+        # this is the most likely failure mode if Conductor ever changes
+        # CONDUCTOR_PORT to mean "the Rails port" rather than "a block base"
+        # (the derived ports would silently land on whatever the user already
+        # has bound).
+        def warn_if_derived_ports_in_use(base, ports, source: nil, pro_renderer: true)
           roles = pro_renderer ? %i[rails webpack renderer] : %i[rails webpack]
           roles.each do |role|
             port_num = ports[role]
-            warn "WARNING: port #{port_num} (#{role}, derived from base #{base}) is already in use." \
-              unless port_available?(port_num)
+            next if port_available?(port_num)
+
+            hint = if role == :rails && source == "CONDUCTOR_PORT"
+                     " If your Conductor workspace exposes CONDUCTOR_PORT as the Rails port " \
+                       "rather than a block base, set REACT_ON_RAILS_BASE_PORT explicitly to override."
+                   else
+                     ""
+                   end
+            warn "WARNING: port #{port_num} (#{role}, derived from base #{base}) is already in use.#{hint}"
           end
         end
 
