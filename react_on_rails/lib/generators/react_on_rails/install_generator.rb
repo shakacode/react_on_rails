@@ -281,18 +281,18 @@ module ReactOnRails
         # `packageManager: pnpm@...`. Only ask the question for pnpm projects — other managers
         # never read this flag — and require a pnpm-specific declaration so an env-override to
         # pnpm while package.json declares a different manager still gets the version pin.
-        package_manager_declared = package_manager == "pnpm" &&
-                                   GeneratorMessages.package_manager_declared?(
-                                     app_root: destination_root,
-                                     manager: "pnpm",
-                                     package_json: package_json
-                                   )
+        pnpm_version_declared = package_manager == "pnpm" &&
+                                GeneratorMessages.package_manager_declared?(
+                                  app_root: destination_root,
+                                  manager: "pnpm",
+                                  package_json: package_json
+                                )
         has_active_record = File.exist?(File.join(destination_root, "config/database.yml"))
         has_rspec = File.exist?(File.join(destination_root, "spec/rails_helper.rb")) ||
                     File.exist?(File.join(destination_root, "spec/spec_helper.rb"))
         template("templates/base/base/.github/workflows/ci.yml.tt", ci_path,
                  { package_manager: package_manager, has_lockfile: has_lockfile,
-                   package_manager_declared: package_manager_declared,
+                   pnpm_version_declared: pnpm_version_declared,
                    pnpm_fallback_version: CI_PNPM_FALLBACK_VERSION,
                    has_active_record: has_active_record, has_rspec: has_rspec })
         @ci_workflow_generated = true

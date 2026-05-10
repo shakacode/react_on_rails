@@ -101,6 +101,9 @@ describe GeneratorMessages do
     Dir.mktmpdir do |app_root|
       expect(described_class).to receive(:read_package_json).with(app_root).once.and_call_original
 
+      # Calls the private build_ci_section directly to isolate the read-once invariant;
+      # going through the public `helpful_message_after_installation` path would mix in
+      # other helpers' reads and obscure which call site reopens package.json.
       message = described_class.send(:build_ci_section, app_root: app_root, ci_workflow_generated: true)
 
       expect(message).to include("CI / BUILD ORDERING")

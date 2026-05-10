@@ -24,6 +24,26 @@ describe InstallGenerator, type: :generator do
     end
   end
 
+  # Reads the repo's own package.json packageManager pin and returns the version.
+  # Anchoring on package.json (the user-visible source of truth) instead of
+  # `const_get(:CI_PNPM_FALLBACK_VERSION)` keeps the assertion on observable surface
+  # area and avoids reaching past `private_constant` from the spec.
+  def repo_pinned_pnpm_version
+    package_manager = JSON.parse(
+      File.read(File.expand_path("../../../../package.json", __dir__))
+    )["packageManager"]
+    expect(package_manager).not_to(
+      be_nil,
+      "package.json must declare packageManager so CI_PNPM_FALLBACK_VERSION stays in sync"
+    )
+    match = package_manager.match(/\Apnpm@(.+)\z/)
+    expect(match).not_to(
+      be_nil,
+      "package.json packageManager must declare a pnpm@<version> spec, got #{package_manager.inspect}"
+    )
+    match[1]
+  end
+
   context "without args" do
     before(:all) { run_generator_test_with_args(%w[], package_json: true) }
 
@@ -2053,7 +2073,7 @@ describe InstallGenerator, type: :generator do
     # Existing Shakapacker apps skip the seeding path, so the CI scaffold has to pin the
     # version itself or the workflow fails before dependency install.
     it "pins a pnpm version in the setup step" do
-      fallback_version = described_class.const_get(:CI_PNPM_FALLBACK_VERSION)
+      fallback_version = repo_pinned_pnpm_version
 
       assert_file ".github/workflows/ci.yml" do |content|
         expect(content).to include("uses: pnpm/action-setup@v4")
@@ -2068,14 +2088,13 @@ describe InstallGenerator, type: :generator do
   end
 
   it "keeps the fallback pin tied to a version-specific pnpm release note" do
-    fallback_version = described_class.const_get(:CI_PNPM_FALLBACK_VERSION)
+    fallback_version = repo_pinned_pnpm_version
     generator_source = File.read(
       File.expand_path("../../../lib/generators/react_on_rails/install_generator.rb", __dir__)
     )
-    package_manager = JSON.parse(File.read(File.expand_path("../../../../package.json", __dir__)))["packageManager"]
 
     expect(fallback_version).to match(/\A\d+\.\d+\.\d+\z/)
-    expect(package_manager).to eq("pnpm@#{fallback_version}")
+    expect(generator_source).to include(%(CI_PNPM_FALLBACK_VERSION = "#{fallback_version}"))
     expect(generator_source).to include(
       "https://github.com/pnpm/pnpm/releases/tag/v#{fallback_version}"
     )
@@ -2110,7 +2129,7 @@ describe InstallGenerator, type: :generator do
     end
 
     it "pins the pnpm fallback version in the setup step" do
-      fallback_version = described_class.const_get(:CI_PNPM_FALLBACK_VERSION)
+      fallback_version = repo_pinned_pnpm_version
 
       assert_file ".github/workflows/ci.yml" do |content|
         expect(content).to include("uses: pnpm/action-setup@v4")

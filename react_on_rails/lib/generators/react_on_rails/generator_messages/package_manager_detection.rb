@@ -62,10 +62,10 @@ module GeneratorMessages
     end
 
     def package_manager_name_from_content(content)
-      raw_declared = content["packageManager"]
-      return nil unless raw_declared.is_a?(String)
+      raw_declared = raw_package_manager_field(content)
+      return nil if raw_declared.nil?
 
-      name = raw_declared.strip.split("@", 2).first&.strip&.downcase
+      name = raw_declared.split("@", 2).first&.strip&.downcase
       supported_package_manager?(name) ? name : nil
     end
 
@@ -166,15 +166,26 @@ module GeneratorMessages
     # `"pnpm@latest"` are non-standard for reproducible Corepack usage, but this check
     # treats them as declared to avoid injecting a conflicting fallback version.
     def versioned_package_manager_name_from_content(content)
-      raw_declared = content["packageManager"]
-      return nil unless raw_declared.is_a?(String)
+      declared = raw_package_manager_field(content)
+      return nil if declared.nil?
 
-      declared = raw_declared.strip
       match = declared.match(/\A([^@\s]+)@(\S+)\z/)
       return nil unless match
 
       name = match[1].downcase
       supported_package_manager?(name) ? name : nil
+    end
+
+    # Single source of truth for reading and normalizing the raw `packageManager`
+    # string. Acceptance rules differ between callers (lenient name extraction vs.
+    # strict version-required regex), but field-handling concerns (type check,
+    # whitespace trim) belong in one place.
+    def raw_package_manager_field(content)
+      raw = content["packageManager"]
+      return nil unless raw.is_a?(String)
+
+      stripped = raw.strip
+      stripped.empty? ? nil : stripped
     end
   end
 end
