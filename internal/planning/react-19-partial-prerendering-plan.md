@@ -53,7 +53,7 @@ Use a dedicated branch for the actual version verification work:
       run from the repo root,
       document whether a Suspense-containing tree could plausibly be passed by a user render function today, then either
       open a follow-up migration ticket or record why the current usage is acceptable.
-- [ ] If the Issue 3255 minimum-React-version decision drops React 16/17 support, remove
+- [ ] If the [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255) minimum-React-version decision drops React 16/17 support, remove
       `packages/react-on-rails/src/ReactDOMServer.cts`. Otherwise, confirm the file's existing removal comment remains the
       accepted exit criterion and close this task.
 - [ ] Run `pnpm install` from a freshly cloned or freshly cleaned checkout with no existing `node_modules`, then confirm
@@ -64,9 +64,10 @@ Use a dedicated branch for the actual version verification work:
       `react-on-rails-rsc` version satisfies both the root `^19.0.4` range and the
       `packages/react-on-rails-pro/package.json` peer dependency ceiling `>= 19.0.2 <= 19.2.3`; a mismatch means the ceiling
       must be widened before workspace installs stay consistent across OSS and Pro.
-- [ ] Run package checks. Type checking catches breaking `react-dom/server` API changes such as `renderToPipeableStream`
-      and `renderToReadableStream` through `@types/react-dom`, lint enforces package style, and tests exercise the
-      runtime paths:
+- [ ] Run package checks. Type checking catches breaking API changes — `@types/react` shifts such as removal of the
+      implicit `children` prop from `React.FC` and a stricter `useRef` return type, plus `react-dom/server` changes such
+      as `renderToPipeableStream` and `renderToReadableStream` through `@types/react-dom` — lint enforces package style,
+      and tests exercise the runtime paths:
   - `pnpm run lint` from the repo root (ESLint only; per-package type-check and tests follow)
   - `pnpm --filter react-on-rails run type-check`
   - `pnpm --filter react-on-rails run test`
@@ -111,6 +112,7 @@ Use a dedicated branch for the actual version verification work:
   git worktree list                      # confirm no stale /tmp/ror-verify entry from a prior interrupted run
   git worktree add /tmp/ror-verify HEAD  # detached HEAD is intentional for read-only verification
   (cd /tmp/ror-verify && pnpm install)
+  cd /tmp/ror-verify/react_on_rails && bundle exec rake run_rspec:shakapacker_examples   # full suite across all example apps (latest + all pinned React versions)
   ```
 
   After the suite runs, remove the worktree from the original checkout:
@@ -131,11 +133,6 @@ Use a dedicated branch for the actual version verification work:
   git clean -ndx   # dry run — review the printed list before running the destructive command below
   git clean -fdx
   pnpm install
-  ```
-
-  Then run the suite:
-
-  ```bash
   cd react_on_rails && bundle exec rake run_rspec:shakapacker_examples   # full suite across all example apps (latest + all pinned React versions)
   ```
 
@@ -184,7 +181,8 @@ Evaluate these in order:
    emerges across examples.
 3. **Renderer protocol support**: add Node Renderer request metadata only if the helper-level approach cannot express the
    needed static/dynamic boundary cleanly.
-4. **Generated example**: add a small route in the dummy app after the behavior is proven manually.
+4. **Dummy-app example**: add a small route in the dummy app after the behavior is proven manually. Promote to a
+   generated-app entry only if the pattern needs scaffolding coverage in `run_rspec:shakapacker_examples`.
 
 ## Acceptance Criteria
 
@@ -209,12 +207,11 @@ Suspense, RSC, or both. Record that answer in Issue 3255 before opening the firs
 benchmarks, and streamed-error semantics stay provisional rather than settled.
 
 Before implementation starts, assign a secondary reviewer for the prerequisite SSR-vs-RSC decision so the plan does not
-stall if @justin808 is unavailable. Also assign a backup reviewer for benchmark metrics because that decision can be
-validated independently from the rest of the implementation tree.
-
-These placeholders must be filled in [Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255) before the
-first implementation PR is opened — add checklist items there so each assignment is auditable in the issue tracker. If
-no name is assigned by that point, @justin808 is the fallback owner for both roles.
+stall if @justin808 is unavailable, and a backup reviewer for benchmark metrics (which can be validated independently
+from the rest of the implementation tree). These placeholders must be filled in
+[Issue 3255](https://github.com/shakacode/react_on_rails/issues/3255) before the first implementation PR is opened — add
+checklist items there so each assignment is auditable in the issue tracker. If no name is assigned by that point,
+@justin808 is the fallback owner for both roles.
 
 **Secondary reviewer (SSR-vs-RSC)**: _[name to be filled before first implementation PR; fallback: @justin808]_
 
