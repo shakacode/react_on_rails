@@ -34,8 +34,10 @@ class StoriesController < ApplicationController
 
     if preflight.redirect_reason
       # Map every possible redirect_reason StoryPagePreflight can return.
+      # Extend this hash whenever the preflight gains a new redirect branch.
       redirect_path = {
         unauthenticated: sign_in_path,
+        # moved_permanently: story_path(preflight.canonical_slug),
       }.fetch(preflight.redirect_reason) do |reason|
         raise ArgumentError, "Unknown redirect_reason: #{reason.inspect}"
       end
@@ -94,6 +96,7 @@ class StoryPagePreflight
     end
 
     unless StoryPolicy.new(current_user, story).read?
+      # Return 404 instead of 403 to avoid revealing that this record exists.
       return Result.new(
         props: { notFound: true, story: nil },
         status: :not_found,
@@ -195,6 +198,8 @@ def show
 
   if story.removed?
     # Use this branch only when removed stories are truly permanent in your app.
+    # max-age=0 makes browsers always revalidate; s-maxage=3600 lets shared caches
+    # (such as a CDN) serve the 410 for up to an hour without hitting the origin.
     response.headers["Cache-Control"] = "public, max-age=0, s-maxage=3600"
     return render(template: "errors/gone", status: :gone)
   end
@@ -293,7 +298,8 @@ response.headers["Vary"] = "Accept-Language"
 
 > **Advanced: merging with an upstream `Vary`.** If Rack middleware, a `before_action`, or a parent layout may have
 > already set `Vary`, append new tokens with a small helper that deduplicates case-insensitively and short-circuits on
-> `Vary: *` (which already varies on everything):
+> `Vary: *` (which already varies on everything). Define this helper on `ApplicationController` or a shared concern so
+> every streaming action can call it before streaming:
 >
 > ```ruby
 > # Call this before streaming, e.g. in a before_action or inline in the action.
