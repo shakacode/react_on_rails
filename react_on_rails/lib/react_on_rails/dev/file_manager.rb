@@ -92,10 +92,22 @@ module ReactOnRails
         def socket_active?(socket_path)
           return false unless File.exist?(socket_path)
 
+          # Pre-pack the sockaddr in a narrow rescue so the only ArgumentError
+          # we swallow is the one Ruby raises for "too long unix socket path"
+          # (sun_path is capped at ~104/108 bytes). The wider connect block
+          # below intentionally does NOT catch ArgumentError, so a programming
+          # mistake in Socket.new or connect_nonblock surfaces instead of
+          # silently returning false.
+          begin
+            sockaddr = Socket.sockaddr_un(socket_path)
+          rescue ArgumentError
+            return false
+          end
+
           socket = nil
           begin
             socket = Socket.new(Socket::AF_UNIX, Socket::SOCK_STREAM, 0)
-            socket.connect_nonblock(Socket.sockaddr_un(socket_path))
+            socket.connect_nonblock(sockaddr)
             true
           rescue IO::WaitWritable
             # connect is in progress — wait up to SOCKET_PROBE_TIMEOUT_SECS for
@@ -108,7 +120,7 @@ module ReactOnRails
             socket.getsockopt(Socket::SOL_SOCKET, Socket::SO_ERROR).int.zero?
           rescue Errno::EISCONN
             true
-          rescue ArgumentError, SystemCallError, IOError
+          rescue SystemCallError, IOError
             false
           ensure
             socket&.close

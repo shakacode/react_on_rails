@@ -233,7 +233,6 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
         expect(result[:rails]).to eq(described_class::MAX_BASE_PORT)
         expect(result[:webpack]).to eq(described_class::MAX_BASE_PORT + 1)
         expect(result[:renderer]).to eq(described_class::MAX_BASE_PORT + 2)
-        expect(result[:renderer]).to be <= 65_535
       end
     end
 
@@ -342,6 +341,47 @@ RSpec.describe ReactOnRails::Dev::PortSelector do
       it "does not warn that CONDUCTOR_PORT will still activate base-port mode" do
         allow(described_class).to receive(:port_available?).and_return(true)
 
+        expect { described_class.select_ports! }
+          .not_to output(/Base port mode will still activate from CONDUCTOR_PORT/).to_stderr
+      end
+    end
+
+    context "when both REACT_ON_RAILS_BASE_PORT and CONDUCTOR_PORT are invalid" do
+      around do |example|
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "disabled"
+        ENV["CONDUCTOR_PORT"] = "abc"
+        example.run
+      end
+
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
+
+      it "does not falsely promise that base port mode will activate from CONDUCTOR_PORT" do
+        expect { described_class.select_ports! }
+          .not_to output(/Base port mode will still activate from CONDUCTOR_PORT/).to_stderr
+      end
+
+      it "still warns that each invalid value is being ignored" do
+        expect { described_class.select_ports! }
+          .to output(/REACT_ON_RAILS_BASE_PORT.*not a valid integer.*CONDUCTOR_PORT.*not a valid integer/m).to_stderr
+      end
+
+      it "falls back to default ports without entering base port mode" do
+        result = described_class.select_ports!
+        expect(result[:base_port_mode]).to be(false)
+        expect(result[:renderer]).to be_nil
+      end
+    end
+
+    context "when REACT_ON_RAILS_BASE_PORT is invalid and CONDUCTOR_PORT is out of range" do
+      around do |example|
+        ENV["REACT_ON_RAILS_BASE_PORT"] = "disabled"
+        ENV["CONDUCTOR_PORT"] = "70000"
+        example.run
+      end
+
+      before { allow(described_class).to receive(:port_available?).and_return(true) }
+
+      it "does not falsely promise that base port mode will activate from CONDUCTOR_PORT" do
         expect { described_class.select_ports! }
           .not_to output(/Base port mode will still activate from CONDUCTOR_PORT/).to_stderr
       end

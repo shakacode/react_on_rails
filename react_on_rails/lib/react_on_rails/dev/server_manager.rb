@@ -99,7 +99,11 @@ module ReactOnRails
           return local_url_port if local_url_port
           return nil if remote_renderer_url_configured?
 
-          3800
+          # Only fall back to the default renderer port when the user has set
+          # at least one renderer env var. Without that signal (Pro gem loaded
+          # but no renderer ever started), `bin/dev kill` would otherwise
+          # target an unrelated process bound to 3800 in OSS+Pro-gem apps.
+          renderer_env_signal? ? 3800 : nil
         end
 
         def local_renderer_url_port_for_kill
@@ -710,7 +714,15 @@ module ReactOnRails
             # otherwise flow straight through to `rails s -p …` and fail to
             # start.
             existing_port = ENV.fetch("PORT", nil)
-            unless valid_port_string?(existing_port)
+            if valid_port_string?(existing_port)
+              # Strip whitespace so a value like " 3001 " doesn't leak into ENV
+              # unstripped — mirrors overwrite_invalid_port_env's normalization
+              # used by configure_ports so all bin/dev modes leave ENV["PORT"]
+              # in the same shape for downstream consumers (Procfile expansion,
+              # exact ENV string comparisons).
+              stripped = existing_port.strip
+              ENV["PORT"] = stripped if stripped != existing_port
+            else
               unless existing_port.nil? || existing_port.strip.empty?
                 warn "WARNING: PORT=#{existing_port.inspect} is not a valid port; using auto-selected port."
               end
@@ -1100,6 +1112,17 @@ module ReactOnRails
         def pro_renderer_active?
           return true if Gem.loaded_specs.key?("react_on_rails_pro")
 
+          renderer_env_signal?
+        end
+
+        # Returns true when at least one renderer-pointing env var is set to a
+        # non-blank value. Used both by `pro_renderer_active?` (to detect
+        # Pro-renderer intent without the gem) and by
+        # `configured_renderer_port_for_kill` (to avoid widening the kill
+        # scope to 3800 when the Pro gem is loaded but no renderer was ever
+        # configured). The legacy `RENDERER_URL` is included intentionally —
+        # see `pro_renderer_active?` for the migration rationale.
+        def renderer_env_signal?
           %w[RENDERER_PORT REACT_RENDERER_URL RENDERER_URL].any? do |var|
             value = ENV.fetch(var, nil)
             !value.nil? && !value.strip.empty?
@@ -1138,9 +1161,13 @@ module ReactOnRails
 
         def apply_explicit_port_env(selected)
           # Overwrite whenever the current value is blank OR not a usable port
-          # string. PortSelector already rejects invalid values when it returns
-          # `selected`, so the Procfile's `${PORT:-3000}` fallback must not see
-          # a stale `PORT=99999` or `PORT=abc` that would reach `rails s -p …`.
+          # string. PortSelector.read_and_sanitize_port_env! has already
+          # cleared invalid PORT / SHAKAPACKER_DEV_SERVER_PORT values upstream
+          # (and emitted the "not a valid integer" warning there), so when
+          # overwrite_invalid_port_env sees nil it silently writes the derived
+          # port — the user-facing warning isn't missed, it fired at the
+          # source. The Procfile's `${PORT:-3000}` fallback must not see a
+          # stale `PORT=99999` or `PORT=abc` that would reach `rails s -p …`.
           overwrite_invalid_port_env("PORT", selected[:rails])
           overwrite_invalid_port_env("SHAKAPACKER_DEV_SERVER_PORT", selected[:webpack])
           sync_renderer_port_and_url
@@ -1244,6 +1271,15 @@ module ReactOnRails
         # keeping the URL would leave Rails targeting the stale port while the
         # Procfile falls back to 3800. Clear the URL so the initializer's
         # default localhost URL matches the renderer's fallback port.
+        #
+        # We clear unconditionally even when the user's URL port happens to
+        # match the current Procfile default (e.g. http://localhost:3800):
+        #   - The user expressed deliberate intent via RENDERER_PORT, which we
+        #     could not honor. Falling through to the Procfile-default-driven
+        #     URL keeps Rails and the renderer in sync regardless of which
+        #     port the Procfile chooses now or later.
+        #   - Any future change to the Procfile default would otherwise re-
+        #     introduce a Rails/renderer mismatch silently for those users.
         def clear_local_renderer_url_after_invalid_port(url)
           return if url.nil? || url.strip.empty? || !localhost_renderer_url?(url)
 

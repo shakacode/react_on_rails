@@ -1231,7 +1231,28 @@ RSpec.describe ReactOnRails::Dev::ServerManager do
       described_class.kill_processes
     end
 
-    it "targets the default renderer port when Pro renderer support is active without a base port" do
+    it "does not widen kill scope to 3800 when the Pro gem is loaded but no renderer env vars are set" do
+      # Pro gem may be present in OSS+Pro-gem apps that never run the
+      # renderer. Without an explicit RENDERER_PORT / REACT_RENDERER_URL /
+      # RENDERER_URL signal, `bin/dev kill` must not target 3800 — that
+      # port could belong to an unrelated process.
+      allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
+      allow(described_class).to receive(:pro_renderer_active?).and_return(true)
+      # No pattern-based processes so kill_port_processes runs.
+      allow(Open3).to receive(:capture2).with("pgrep", any_args).and_return(["", nil])
+
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3000", err: File::NULL).and_return(["", nil])
+      allow(Open3).to receive(:capture2).with("lsof", "-ti", ":3001", err: File::NULL).and_return(["", nil])
+      expect(Open3).not_to receive(:capture2).with("lsof", "-ti", ":3800", err: File::NULL)
+
+      allow(Process).to receive(:pid).and_return(9999)
+      expect(Process).not_to receive(:kill).with("TERM", 3801)
+
+      described_class.kill_processes
+    end
+
+    it "targets 3800 when a localhost REACT_RENDERER_URL is set without an explicit :port" do
+      ENV["REACT_RENDERER_URL"] = "http://localhost"
       allow(ReactOnRails::Dev::PortSelector).to receive(:base_port_hash).and_return(nil)
       allow(described_class).to receive(:pro_renderer_active?).and_return(true)
       # No pattern-based processes so kill_port_processes runs.

@@ -86,6 +86,15 @@ module ReactOnRails
           { rails: rails_port, webpack: webpack_port, renderer: nil, base_port_mode: false }
         end
 
+        # Deprecated alias for the pre-bang name. Kept as a safety net for any
+        # external caller (generator extension, host-app rake task) that wired
+        # to `select_ports` before the rename. The bang form is preferred — it
+        # surfaces the ENV-mutation side effect at the call site, which was
+        # the whole point of the rename. Remove in a future major release.
+        def select_ports(**kwargs)
+          select_ports!(**kwargs)
+        end
+
         # Public so it can be stubbed in tests.
         # NOTE: Inherent TOCTOU race — another process can claim the port between
         # server.close and the caller binding to it. This is unavoidable with the
@@ -259,9 +268,18 @@ module ReactOnRails
         # (or any future later entry). Surface the fallthrough in the warning so
         # users who set a non-integer to "disable" base port mode realize they
         # also need to unset the next var.
+        #
+        # Filter `remaining` against the same validity rules as `base_port_ports`
+        # (numeric + 1..MAX_BASE_PORT) so we never promise activation from a
+        # var that the validator will also reject — e.g.
+        # `REACT_ON_RAILS_BASE_PORT="disabled"` + `CONDUCTOR_PORT="abc"` must
+        # not say "will still activate from CONDUCTOR_PORT".
         def invalid_base_port_warning(var, raw, reason, idx)
           msg = "WARNING: #{var}=#{raw.inspect} is #{reason}; ignoring."
-          remaining = BASE_PORT_ENV_VARS[(idx + 1)..].reject { |v| ENV.fetch(v, "").strip.empty? }
+          remaining = BASE_PORT_ENV_VARS[(idx + 1)..].select do |v|
+            val = ENV.fetch(v, "").strip
+            val.match?(/\A\d+\z/) && val.to_i.between?(1, MAX_BASE_PORT)
+          end
           return msg if remaining.empty?
 
           msg + " Base port mode will still activate from #{remaining.join(', ')}; " \
